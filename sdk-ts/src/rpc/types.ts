@@ -176,7 +176,7 @@ export enum RPCErrorCode {
   INVALID_PARAMS = -32602,     // Invalid method parameters
   INTERNAL_ERROR = -32603,     // Internal JSON-RPC error
   
-  // Hachi-specific error codes
+  // Nitrolite-specific error codes
   UNAUTHORIZED = -32000,           // Not authorized to call method
   INVALID_STATE = -32001,          // Invalid state transition
   CHANNEL_NOT_FOUND = -32002,      // Channel not found

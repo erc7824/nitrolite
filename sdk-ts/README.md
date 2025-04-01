@@ -1,10 +1,10 @@
-# Hachi SDK for TypeScript
+# Nitrolite SDK for TypeScript
 
-A streamlined TypeScript SDK for building custom state channel applications with the Hachi framework. The SDK provides a simple client interface that allows developers to create and manage channels with their own application logic.
+A streamlined TypeScript SDK for building custom state channel applications with the Nitrolite framework. The SDK provides a simple client interface that allows developers to create and manage channels with their own application logic.
 
 ## Overview
 
-Hachi SDK provides a framework for developing scalable blockchain applications using state channels. State channels allow transactions to occur off-chain while maintaining the security guarantees of the underlying blockchain, resulting in:
+Nitrolite SDK provides a framework for developing scalable blockchain applications using state channels. State channels allow transactions to occur off-chain while maintaining the security guarantees of the underlying blockchain, resulting in:
 
 - ⚡ **Instant Finality**: Transactions settle immediately between parties
 - 💰 **Reduced Gas Costs**: Most interactions happen off-chain, with minimal on-chain footprint
@@ -15,13 +15,13 @@ Hachi SDK provides a framework for developing scalable blockchain applications u
 ## Installation
 
 ```bash
-npm install @ethtaipei/hachi-sdk-ts
+npm install @ethtaipei/nitrolite-sdk-ts
 ```
 
 ## Quick Start
 
 ```typescript
-import { HachiClient, AppDataTypes } from '@ethtaipei/hachi-sdk-ts';
+import { NitroliteClient, AppDataTypes } from '@ethtaipei/nitrolite-sdk-ts';
 import { createPublicClient, createWalletClient, http, encodeAbiParameters, Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
@@ -39,8 +39,8 @@ const walletClient = createWalletClient({
   transport: http('https://eth-mainnet.alchemyapi.io/v2/YOUR_API_KEY')
 });
 
-// Initialize Hachi client with required configuration
-const client = new HachiClient({
+// Initialize Nitrolite client with required configuration
+const client = new NitroliteClient({
   publicClient,
   walletClient,
   account,
@@ -186,7 +186,7 @@ A state channel is a relationship between participants that allows them to excha
 
 #### Applications
 
-Applications define the rules for state transitions in a channel. The Hachi SDK provides a framework for building custom applications or using pre-built ones.
+Applications define the rules for state transitions in a channel. The Nitrolite SDK provides a framework for building custom applications or using pre-built ones.
 
 ```typescript
 // Creating a simple channel with a single numeric value
@@ -226,11 +226,11 @@ const customChannel = client.createCustomChannel<MyAppState>({
 The SDK provides message type definitions for off-chain communication between participants, but lets you implement the transport layer yourself.
 
 ```typescript
-import { MessageType, ProposeStateMessage } from '@ethtaipei/hachi-sdk-ts';
+import { MessageType, ProposeStateMessage } from '@ethtaipei/nitrolite-sdk-ts';
 
 // Example: Creating your own message transport
 class MyChannelMessenger {
-  async sendMessage(message: HachiMessage) {
+  async sendMessage(message: NitroliteMessage) {
     // Your implementation - could use WebSockets, HTTP, etc.
     await this.socket.send(JSON.stringify(message));
   }
@@ -254,19 +254,19 @@ class MyChannelMessenger {
 
 ## Examples
 
-See the [examples](examples/) directory for complete working examples of building applications on Hachi.
+See the [examples](examples/) directory for complete working examples of building applications on Nitrolite.
 
 ### Multi-Chain Support
 
-Hachi SDK works with any EVM-compatible blockchain. Here's how to use it with different chains:
+Nitrolite SDK works with any EVM-compatible blockchain. Here's how to use it with different chains:
 
 ```typescript
-import { HachiClient } from '@ethtaipei/hachi-sdk-ts';
+import { NitroliteClient } from '@ethtaipei/nitrolite-sdk-ts';
 import { createPublicClient, http } from 'viem';
 import { mainnet, optimism, arbitrum, base, polygon } from 'viem/chains';
 
 // Example: Initialize client for Optimism
-const optimismClient = new HachiClient({
+const optimismClient = new NitroliteClient({
   publicClient: createPublicClient({
     chain: optimism,
     transport: http('https://optimism.example.com')
@@ -282,7 +282,7 @@ const optimismClient = new HachiClient({
 });
 
 // Example: Initialize client for Arbitrum
-const arbitrumClient = new HachiClient({
+const arbitrumClient = new NitroliteClient({
   publicClient: createPublicClient({
     chain: arbitrum,
     transport: http('https://arbitrum.example.com')
@@ -305,7 +305,7 @@ const arbitrumClient = new HachiClient({
 ### Using Custom Adjudicator ABIs
 
 ```typescript
-import { HachiClient } from '@ethtaipei/hachi-sdk-ts';
+import { NitroliteClient } from '@ethtaipei/nitrolite-sdk-ts';
 import { Abi } from 'viem';
 
 // Your custom adjudicator ABI
@@ -352,7 +352,7 @@ const myGameAdjudicatorAbi: Abi = [
 ];
 
 // Initialize client with custom adjudicator ABIs
-const client = new HachiClient({
+const client = new NitroliteClient({
   publicClient,
   walletClient,
   account,

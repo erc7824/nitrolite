@@ -1,5 +1,5 @@
 /**
- * Configuration for Hachi SDK
+ * Configuration for Nitrolite SDK
  * 
  * This module centralizes configuration options and default values
  * for the entire SDK, making settings consistent and configurable.
@@ -227,10 +227,10 @@ export interface Logger {
  * Default logger implementation
  */
 export const defaultLogger: Logger = {
-  debug: (message: string, ...args: any[]) => console.debug(`[Hachi:debug] ${message}`, ...args),
-  info: (message: string, ...args: any[]) => console.info(`[Hachi:info] ${message}`, ...args),
-  warn: (message: string, ...args: any[]) => console.warn(`[Hachi:warn] ${message}`, ...args),
-  error: (message: string, ...args: any[]) => console.error(`[Hachi:error] ${message}`, ...args),
+  debug: (message: string, ...args: any[]) => console.debug(`[Nitrolite:debug] ${message}`, ...args),
+  info: (message: string, ...args: any[]) => console.info(`[Nitrolite:info] ${message}`, ...args),
+  warn: (message: string, ...args: any[]) => console.warn(`[Nitrolite:warn] ${message}`, ...args),
+  error: (message: string, ...args: any[]) => console.error(`[Nitrolite:error] ${message}`, ...args),
 };
 
 /**

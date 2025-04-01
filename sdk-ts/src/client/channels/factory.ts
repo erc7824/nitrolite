@@ -10,16 +10,16 @@ import {
 } from '../../types';
 import { createAppLogic } from '../../utils';
 import { ChannelContext } from './ChannelContext';
-import type { HachiClient } from '../HachiClient';
+import type { NitroliteClient } from '../NitroliteClient';
 
 /**
  * Create a numeric value application
- * @param client The Hachi client
+ * @param client The Nitrolite client
  * @param params Application parameters
  * @returns A new channel context with a numeric value app
  */
 export function createNumericChannel(
-  client: HachiClient,
+  client: NitroliteClient,
   params: {
     participants: [Address, Address];
     adjudicatorAddress?: Address;
@@ -100,12 +100,12 @@ export function createNumericChannel(
 
 /**
  * Create a sequential state application
- * @param client The Hachi client
+ * @param client The Nitrolite client
  * @param params Application parameters
  * @returns A new channel context with a sequential state app
  */
 export function createSequentialChannel(
-  client: HachiClient,
+  client: NitroliteClient,
   params: {
     participants: [Address, Address];
     adjudicatorAddress?: Address;
@@ -191,12 +191,12 @@ export function createSequentialChannel(
 
 /**
  * Create a custom application
- * @param client The Hachi client
+ * @param client The Nitrolite client
  * @param params Custom application parameters
  * @returns A new channel context with custom app logic
  */
 export function createCustomChannel<T = unknown>(
-  client: HachiClient,
+  client: NitroliteClient,
   params: {
     participants: [Address, Address];
     challenge?: bigint;

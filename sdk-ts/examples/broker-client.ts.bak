@@ -244,7 +244,7 @@ class BrokerClientApp {
     async createDirectChannel(amount: bigint): Promise<string> {
         try {
             // Check token balance
-            const balance = await this.nitroliteClient.getTokenBalance(this.tokenAddress, this.address);
+            const balance = await this.NitroliteClient.getTokenBalance(this.tokenAddress, this.address);
             console.log(`Token balance: ${formatEther(balance)}`);
 
             if (balance < amount) {
@@ -256,14 +256,14 @@ class BrokerClientApp {
             }
 
             // Check token allowance
-            const allowance = await this.nitroliteClient.getTokenAllowance(this.tokenAddress, this.address, this.nitroliteClient.addresses.custody);
+            const allowance = await this.NitroliteClient.getTokenAllowance(this.tokenAddress, this.address, this.NitroliteClient.addresses.custody);
 
             console.log(`Current allowance: ${formatEther(allowance)}`);
 
             // Approve tokens if needed
             if (allowance < amount) {
                 console.log(`Approving ${formatEther(amount)} tokens`);
-                await this.nitroliteClient.approveTokens(this.tokenAddress, amount, this.nitroliteClient.addresses.custody);
+                await this.NitroliteClient.approveTokens(this.tokenAddress, amount, this.NitroliteClient.addresses.custody);
                 console.log("Token approval successful");
             }
 
@@ -273,7 +273,7 @@ class BrokerClientApp {
             // Configure the channel
             const channel = {
                 participants: [this.address, this.brokerAddress] as [Address, Address],
-                adjudicator: this.nitroliteClient.addresses.adjudicators.sequential,
+                adjudicator: this.NitroliteClient.addresses.adjudicators.sequential,
                 challenge: BigInt(86400), // 1 day challenge period
                 nonce,
             };
@@ -298,7 +298,7 @@ class BrokerClientApp {
 
             // Open the channel
             console.log("Opening direct channel with broker...");
-            const channelId = await this.nitroliteClient.openChannel(channel, initialState);
+            const channelId = await this.NitroliteClient.openChannel(channel, initialState);
             console.log(`Channel opened with ID: ${channelId}`);
 
             return channelId;

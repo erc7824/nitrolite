@@ -8,7 +8,7 @@ import { Address, Hex } from 'viem'; // Import Hex
 import { RPCRequest, RPCResponse, RPCError as RPCTypeError, RPCNotification, RPCMessageType } from '../types'; // Alias local RPCError type
 import { Logger } from '../../config';
 import {
-  HachiError,
+  NitroliteError,
   ValidationError,
   InvalidSignatureError,
   UnauthorizedError,
@@ -19,7 +19,7 @@ import {
   VirtualChannelError,
   InvalidRPCParamsError,
   RequestTimeoutError,
-  RPCError as HachiRPCError // Alias to avoid conflict
+  RPCError as NitroliteRPCError // Alias to avoid conflict
 } from '../../errors';
 import { RPC_ERROR_CODES } from '../../config';
 
@@ -153,11 +153,11 @@ export class RequestHandler extends BaseMessageHandler {
         error 
       });
       
-      // Map HachiError to appropriate RPC error code
+      // Map NitroliteError to appropriate RPC error code
       let errorCode = RPC_ERROR_CODES.INTERNAL_ERROR;
       let errorMessage = error.message || 'Internal error';
       
-      if (error instanceof HachiError) { // Use direct class name
+      if (error instanceof NitroliteError) { // Use direct class name
         // Map error types to appropriate RPC error codes
         if (error instanceof ValidationError) { // Use direct class name
           errorCode = RPC_ERROR_CODES.INVALID_PARAMS;
@@ -306,11 +306,11 @@ export class ErrorHandler extends BaseMessageHandler {
     this.pendingRequests.delete(requestId);
     
     // Create appropriate error type based on the RPC error code
-    let hachiError: HachiError; // Use direct type
+    let nitroliteError: NitroliteError; // Use direct type
     
     switch (code) {
       case RPC_ERROR_CODES.INVALID_PARAMS:
-        hachiError = new InvalidRPCParamsError(message, { // Use direct class name
+        nitroliteError = new InvalidRPCParamsError(message, { // Use direct class name
           requestId, 
           from,
           code
@@ -318,7 +318,7 @@ export class ErrorHandler extends BaseMessageHandler {
         break;
         
       case RPC_ERROR_CODES.INVALID_SIGNATURE:
-        hachiError = new InvalidSignatureError(message, { // Use direct class name
+        nitroliteError = new InvalidSignatureError(message, { // Use direct class name
           requestId, 
           from,
           code
@@ -326,7 +326,7 @@ export class ErrorHandler extends BaseMessageHandler {
         break;
         
       case RPC_ERROR_CODES.UNAUTHORIZED:
-        hachiError = new UnauthorizedError(message, { // Use direct class name
+        nitroliteError = new UnauthorizedError(message, { // Use direct class name
           requestId, 
           from,
           code
@@ -334,7 +334,7 @@ export class ErrorHandler extends BaseMessageHandler {
         break;
         
       case RPC_ERROR_CODES.METHOD_NOT_FOUND:
-        hachiError = new MethodNotFoundError(undefined, { // Use direct class name
+        nitroliteError = new MethodNotFoundError(undefined, { // Use direct class name
           requestId, 
           from,
           code,
@@ -343,7 +343,7 @@ export class ErrorHandler extends BaseMessageHandler {
         break;
         
       case RPC_ERROR_CODES.CHANNEL_NOT_FOUND:
-        hachiError = new ChannelNotFoundError(undefined, { // Use direct class name
+        nitroliteError = new ChannelNotFoundError(undefined, { // Use direct class name
           requestId, 
           from,
           code,
@@ -352,7 +352,7 @@ export class ErrorHandler extends BaseMessageHandler {
         break;
         
       case RPC_ERROR_CODES.TIMEOUT:
-        hachiError = new RequestTimeoutError(message, undefined, { // Use direct class name
+        nitroliteError = new RequestTimeoutError(message, undefined, { // Use direct class name
           requestId, 
           from,
           code
@@ -360,7 +360,7 @@ export class ErrorHandler extends BaseMessageHandler {
         break;
         
       case RPC_ERROR_CODES.VIRTUAL_CHANNEL_ERROR:
-        hachiError = new VirtualChannelError(message, undefined, undefined, undefined, { // Use direct class name
+        nitroliteError = new VirtualChannelError(message, undefined, undefined, undefined, { // Use direct class name
           requestId, 
           from,
           code
@@ -369,14 +369,14 @@ export class ErrorHandler extends BaseMessageHandler {
         
       default:
         // For standard JSON-RPC errors and other errors
-        hachiError = new HachiRPCError(message, code, { // Use aliased HachiRPCError
+        nitroliteError = new NitroliteRPCError(message, code, { // Use aliased NitroliteRPCError
           requestId, 
           from 
         });
     }
     
     // Reject the promise with the appropriate error
-    pendingRequest.reject(hachiError);
+    pendingRequest.reject(nitroliteError);
   }
 }
 

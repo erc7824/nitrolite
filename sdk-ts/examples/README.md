@@ -1,10 +1,10 @@
-# Hachi SDK Examples
+# Nitrolite SDK Examples
 
-This directory contains example applications that demonstrate the usage of the Hachi SDK.
+This directory contains example applications that demonstrate the usage of the Nitrolite SDK.
 
 ## Broker Client Example
 
-[broker-client.ts](./broker-client.ts) - A complete example demonstrating how to use the Hachi SDK to interact with the Virtual Ledger Broker. It showcases on-chain channel management, off-chain communication via WebSockets, and state updates through RPC.
+[broker-client.ts](./broker-client.ts) - A complete example demonstrating how to use the Nitrolite SDK to interact with the Virtual Ledger Broker. It showcases on-chain channel management, off-chain communication via WebSockets, and state updates through RPC.
 
 ### Features Demonstrated
 
@@ -43,7 +43,7 @@ This directory contains example applications that demonstrate the usage of the H
 
 2. In a new terminal, run the client example:
    ```bash
-   cd hachi-sdk-ts
+   cd Nitrolite-sdk-ts
    npm run build
    npx ts-node examples/broker-client.ts
    ```

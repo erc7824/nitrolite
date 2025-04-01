@@ -21,7 +21,7 @@ import {
 import Errors from '../errors'; // Import Errors
 import { Logger, defaultLogger } from '../config';
 
-import { HachiClientConfig } from './config';
+import { NitroliteClientConfig } from './config';
 import { ChannelOperations } from './operations';
 import { 
   ChannelContext,
@@ -32,9 +32,9 @@ import {
 import { generateChannelNonce } from '../utils';
 
 /**
- * Main client for interacting with Hachi contracts
+ * Main client for interacting with Nitrolite contracts
  */
-export class HachiClient {
+export class NitroliteClient {
   public readonly publicClient: PublicClient;
   public readonly walletClient?: WalletClient;
   public readonly account?: Account;
@@ -45,7 +45,7 @@ export class HachiClient {
   
   private readonly operations: ChannelOperations;
 
-  constructor(config: HachiClientConfig) {
+  constructor(config: NitroliteClientConfig) {
     // TODO: Add more comprehensive configuration validation (e.g., address formats)
     if (!config.publicClient) {
       throw new Errors.MissingParameterError('publicClient');

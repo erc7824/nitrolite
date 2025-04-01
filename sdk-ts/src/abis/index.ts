@@ -1,5 +1,5 @@
 /**
- * ABIs for Hachi contracts
+ * ABIs for Nitrolite contracts
  * 
  * This file exports all ABIs used by the SDK as well as common fragments and types
  */

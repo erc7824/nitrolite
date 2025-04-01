@@ -9,9 +9,9 @@ import { ContractAddresses } from '../abis';
 import { Logger } from '../config';
 
 /**
- * Configuration options for the Hachi client
+ * Configuration options for the Nitrolite client
  */
-export interface HachiClientConfig {
+export interface NitroliteClientConfig {
   /**
    * Public client for reading from the blockchain
    * Required to interact with the blockchain
@@ -43,7 +43,7 @@ export interface HachiClientConfig {
   custodyAddress?: Address;
   
   /**
-   * Contract addresses for the Hachi infrastructure
+   * Contract addresses for the Nitrolite infrastructure
    * Either this or custodyAddress must be provided
    */
   addresses?: ContractAddresses;

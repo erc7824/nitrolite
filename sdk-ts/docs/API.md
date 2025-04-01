@@ -1,4 +1,4 @@
-# Hachi SDK for TypeScript - API Documentation
+# Nitrolite SDK for TypeScript - API Documentation
 
 ## Table of Contents
 - [Overview](#overview)
@@ -17,7 +17,7 @@
 
 ## Overview
 
-The Hachi SDK provides a complete toolkit for building applications using state channels. It abstracts the complexity of channel management, cryptographic operations, and off-chain communication to enable developers to create scalable blockchain applications.
+The Nitrolite SDK provides a complete toolkit for building applications using state channels. It abstracts the complexity of channel management, cryptographic operations, and off-chain communication to enable developers to create scalable blockchain applications.
 
 ## Core Concepts
 
@@ -40,20 +40,20 @@ State channels allow participants to execute transactions off-chain while mainta
 ## Installation
 
 ```bash
-npm install @ethtaipei/hachi-sdk-ts
+npm install @ethtaipei/Nitrolite-sdk-ts
 ```
 
 ## Main SDK Components
 
-### HachiClient
+### NitroliteClient
 
-The `HachiClient` is the primary entry point for interacting with on-chain contracts.
+The `NitroliteClient` is the primary entry point for interacting with on-chain contracts.
 
 ```typescript
 import { 
-  HachiClient, 
+  NitroliteClient, 
   AppDataTypes 
-} from '@ethtaipei/hachi-sdk-ts';
+} from '@ethtaipei/Nitrolite-sdk-ts';
 import { createPublicClient, createWalletClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
@@ -71,8 +71,8 @@ const walletClient = createWalletClient({
   transport: http('https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY')
 });
 
-// Create a HachiClient instance
-const client = new HachiClient({
+// Create a NitroliteClient instance
+const client = new NitroliteClient({
   publicClient,
   walletClient,
   account,
@@ -104,7 +104,7 @@ import {
   RPCChannelManager, 
   createRPCChannelContext,
   MemoryRPCProvider 
-} from '@ethtaipei/hachi-sdk-ts';
+} from '@ethtaipei/Nitrolite-sdk-ts';
 import { signMessage } from 'viem';
 
 // Create a memory provider for testing
@@ -134,8 +134,8 @@ await rpcChannel.updateAppState({ value: BigInt(10) });
 #### Configuration
 
 ```typescript
-// HachiClient configuration
-interface HachiClientConfig {
+// NitroliteClient configuration
+interface NitroliteClientConfig {
   publicClient: PublicClient;
   walletClient?: WalletClient;
   account?: Account;
@@ -158,12 +158,12 @@ interface RPCClientConfig extends SDKConfig {
 
 ## Client API
 
-### HachiClient
+### NitroliteClient
 
-The `HachiClient` provides direct methods for interacting with the on-chain contracts.
+The `NitroliteClient` provides direct methods for interacting with the on-chain contracts.
 
 ```typescript
-const client = hachi.getClient();
+const client = Nitrolite.getClient();
 
 // Open a channel
 const channelId = await client.openChannel(channel, initialState);
@@ -199,7 +199,7 @@ The SDK allows users to provide custom adjudicator ABIs for their specific appli
 
 ```typescript
 // During client initialization
-const client = new HachiClient({
+const client = new NitroliteClient({
   // Other configuration...
   addresses: {
     custody: '0xCUSTODY_ADDRESS',
@@ -277,7 +277,7 @@ abstract class BaseApp {
 `CounterApp` implements a turn-taking counter game.
 
 ```typescript
-const counterApp = hachi.createApp({
+const counterApp = Nitrolite.createApp({
   appType: AppType.COUNTER,
   participants: [aliceAddress, bobAddress],
   challenge: BigInt(86400) // 1 day
@@ -309,7 +309,7 @@ if (counterApp.isGameComplete()) {
 `MicroPaymentApp` implements a one-way payment channel.
 
 ```typescript
-const paymentApp = hachi.createApp({
+const paymentApp = Nitrolite.createApp({
   appType: AppType.MICROPAYMENT,
   participants: [aliceAddress, bobAddress],
   challenge: BigInt(86400) // 1 day
@@ -336,7 +336,7 @@ await paymentApp.close();
 
 ## RPC Protocol
 
-Hachi SDK provides two levels of off-chain communication:
+Nitrolite SDK provides two levels of off-chain communication:
 
 1. **Basic Message Types** (`RPCRelay`) - Type definitions for message formats with no implementation
 2. **Complete RPC Protocol** - Full implementation with client, server, virtual channels, and integration with channel state management
@@ -344,7 +344,7 @@ Hachi SDK provides two levels of off-chain communication:
 ### Basic Message Types (RPCRelay)
 
 ```typescript
-import { MessageType, ProposeStateMessage } from '@ethtaipei/hachi-sdk-ts';
+import { MessageType, ProposeStateMessage } from '@ethtaipei/Nitrolite-sdk-ts';
 
 // Message types
 const messageTypes = [
@@ -377,7 +377,7 @@ import {
   createRPCChannelContext,
   MemoryRPCProvider,
   LVCI
-} from '@ethtaipei/hachi-sdk-ts';
+} from '@ethtaipei/Nitrolite-sdk-ts';
 
 // Create a provider (MemoryRPCProvider for testing)
 const provider = new MemoryRPCProvider(myAddress);
@@ -433,7 +433,7 @@ The RPC client handles communication between participants:
 The SDK is designed to be transport-agnostic. To create your own transport provider:
 
 ```typescript
-import { RPCProvider, RPCMessage } from '@ethtaipei/hachi-sdk-ts';
+import { RPCProvider, RPCMessage } from '@ethtaipei/Nitrolite-sdk-ts';
 
 // Implement your own transport provider
 class MyCustomProvider implements RPCProvider {
@@ -560,7 +560,7 @@ const relayedState = await rpcClient.relayStateUpdate(lvci, stateWithMetadata);
 
 #### Multi-Hop Virtual Channels
 
-Hachi SDK supports channels through multiple intermediaries:
+Nitrolite SDK supports channels through multiple intermediaries:
 
 ```
 ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
@@ -640,7 +640,7 @@ import {
   getStateHash, 
   verifySignature, 
   generateChannelNonce 
-} from '@ethtaipei/hachi-sdk-ts';
+} from '@ethtaipei/Nitrolite-sdk-ts';
 
 // Generate channel ID
 const channelId = getChannelId(channel);
@@ -658,7 +658,7 @@ const isValid = await verifySignature(stateHash, signature, signer);
 ### Data Encoding/Decoding
 
 ```typescript
-import { appEncoders, appDecoders } from '@ethtaipei/hachi-sdk-ts';
+import { appEncoders, appDecoders } from '@ethtaipei/Nitrolite-sdk-ts';
 
 // Encode counter data
 const data = appEncoders.counter(BigInt(42));
@@ -675,7 +675,7 @@ The SDK provides a comprehensive error handling system:
 
 ```typescript
 import { 
-  HachiError, 
+  NitroliteError, 
   ValidationError, 
   ConnectionError, 
   ContractError,
@@ -685,10 +685,10 @@ import {
   TransactionError, 
   StateError,
   VirtualChannelError
-} from '@ethtaipei/hachi-sdk-ts';
+} from '@ethtaipei/Nitrolite-sdk-ts';
 
 try {
-  await hachi.client.openChannel(channel, initialState);
+  await Nitrolite.client.openChannel(channel, initialState);
 } catch (error) {
   if (error instanceof TokenError) {
     // Handle token-specific errors
@@ -709,15 +709,15 @@ try {
       const requiredAmount = error.details?.required;
       
       if (tokenAddress && spender && requiredAmount) {
-        await hachi.client.approveTokens(tokenAddress, requiredAmount, spender);
+        await Nitrolite.client.approveTokens(tokenAddress, requiredAmount, spender);
         console.log(`Approved ${requiredAmount} tokens for ${spender}`);
       }
     }
   } else if (error instanceof TransactionError) {
     // Handle transaction errors
     console.error(`Transaction failed: ${error.message}`);
-  } else if (error instanceof HachiError) {
-    // Handle other Hachi-specific errors
+  } else if (error instanceof NitroliteError) {
+    // Handle other Nitrolite-specific errors
     console.error(`Error: ${error.message}, Code: ${error.code}`);
   } else {
     // Handle unknown errors

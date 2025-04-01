@@ -40,11 +40,11 @@ export class ChannelOperations {
    */
   private ensureWalletClient(): void {
     if (!this.walletClient || !this.account) {
-      throw new Errors.HachiError(
+      throw new Errors.NitroliteError(
         'Wallet client and account required for this operation',
         'MISSING_WALLET_CLIENT',
         400,
-        'Ensure walletClient and account are provided in HachiClient configuration for write operations',
+        'Ensure walletClient and account are provided in NitroliteClient configuration for write operations',
         { operation: 'write' }
       );
     }

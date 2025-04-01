@@ -1,10 +1,10 @@
-# Hachi SDK Error Handling Guide
+# Nitrolite SDK Error Handling Guide
 
-The Hachi SDK provides a comprehensive error handling system to help developers identify and address issues that may arise during development and production. This guide covers best practices for handling errors, understanding error categories, and troubleshooting common issues.
+The Nitrolite SDK provides a comprehensive error handling system to help developers identify and address issues that may arise during development and production. This guide covers best practices for handling errors, understanding error categories, and troubleshooting common issues.
 
 ## Error Architecture
 
-All errors in the Hachi SDK extend from the base `HachiError` class, which provides:
+All errors in the Nitrolite SDK extend from the base `NitroliteError` class, which provides:
 
 - **code**: A unique string identifier for the error
 - **statusCode**: An HTTP-like status code
@@ -117,12 +117,12 @@ The SDK uses standard JSON-RPC error codes:
 
 ```typescript
 import { 
-  HachiError, 
+  NitroliteError, 
   TokenError, 
   TransactionError,
   NetworkError,
   ValidationError 
-} from '@ethtaipei/hachi-sdk-ts';
+} from '@ethtaipei/Nitrolite-sdk-ts';
 
 try {
   await client.openChannel(channel, initialState);
@@ -147,7 +147,7 @@ try {
     // Handle validation issues
     console.error(`Invalid input: ${error.message}`);
     // Fix parameters
-  } else if (error instanceof HachiError) {
+  } else if (error instanceof NitroliteError) {
     // Handle general SDK errors
     console.error(`Error: ${error.message}, Code: ${error.code}`);
     console.error(`Suggestion: ${error.suggestion}`);
@@ -161,7 +161,7 @@ try {
 ### Implementing Retry Logic for Transient Errors
 
 ```typescript
-import { NetworkError, TimeoutError } from '@ethtaipei/hachi-sdk-ts';
+import { NetworkError, TimeoutError } from '@ethtaipei/Nitrolite-sdk-ts';
 
 async function withRetry(operation, maxRetries = 3) {
   let retries = 0;
@@ -193,7 +193,7 @@ await withRetry(() => client.openChannel(channel, initialState));
 ### Creating Context-Aware Error Handlers
 
 ```typescript
-import { HachiError, ChannelNotFoundError, InvalidStateTransitionError } from '@ethtaipei/hachi-sdk-ts';
+import { NitroliteError, ChannelNotFoundError, InvalidStateTransitionError } from '@ethtaipei/Nitrolite-sdk-ts';
 
 // Create specialized error handlers for different operations
 const channelErrorHandler = (operation) => async (...args) => {
@@ -208,7 +208,7 @@ const channelErrorHandler = (operation) => async (...args) => {
       console.error(`Invalid state transition: ${error.message}`);
       // Maybe fetch latest state and retry
       return await retryWithLatestState(...args);
-    } else if (error instanceof HachiError) {
+    } else if (error instanceof NitroliteError) {
       console.error(`Channel operation error: ${error.code} - ${error.message}`);
       console.error(`Suggestion: ${error.suggestion}`);
     }
@@ -224,10 +224,10 @@ await safeUpdateState(newState);
 ### Extracting and Logging Detailed Error Data
 
 ```typescript
-import { HachiError, VirtualChannelError } from '@ethtaipei/hachi-sdk-ts';
+import { NitroliteError, VirtualChannelError } from '@ethtaipei/Nitrolite-sdk-ts';
 
 function logDetailedError(error) {
-  if (error instanceof HachiError) {
+  if (error instanceof NitroliteError) {
     console.error(`
       Error: ${error.name} [${error.code}]
       Message: ${error.message}
@@ -405,7 +405,7 @@ try {
 You can adjust error-related settings in the SDK configuration:
 
 ```typescript
-import { getConfigWithDefaults } from '@ethtaipei/hachi-sdk-ts';
+import { getConfigWithDefaults } from '@ethtaipei/Nitrolite-sdk-ts';
 
 const config = getConfigWithDefaults({
   // Increase request timeout
@@ -433,16 +433,16 @@ For applications with many channel operations, a global error handler can be use
 
 ```typescript
 import { 
-  HachiError, 
+  NitroliteError, 
   NetworkError,
   TimeoutError,
   ContractError,
   StateError,
   VirtualChannelError
-} from '@ethtaipei/hachi-sdk-ts';
+} from '@ethtaipei/Nitrolite-sdk-ts';
 
 // Create a global error handler
-class HachiErrorHandler {
+class NitroliteErrorHandler {
   constructor(options = {}) {
     this.options = {
       maxRetries: 3,
@@ -504,7 +504,7 @@ class HachiErrorHandler {
   
   // Detailed error logging
   logError(error, context) {
-    if (error instanceof HachiError) {
+    if (error instanceof NitroliteError) {
       console.error(`
         [${new Date().toISOString()}] ${error.name} [${error.code}]
         Message: ${error.message}
@@ -525,7 +525,7 @@ class HachiErrorHandler {
 }
 
 // Usage
-const errorHandler = new HachiErrorHandler({
+const errorHandler = new NitroliteErrorHandler({
   onNetworkError: async (error, context) => {
     // Reconnect logic
     if (context.client) {

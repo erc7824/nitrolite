@@ -1,7 +1,7 @@
 {
-  "name": "@ethtaipei/hachi-sdk-ts",
+  "name": "@nitrolite/sdk-ts",
   "version": "0.1.0",
-  "description": "TypeScript SDK for the Hachi state channels framework",
+  "description": "TypeScript SDK for the Nitrolite state channels framework",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -21,14 +21,13 @@
     "state-channels",
     "layer2",
     "scaling",
-    "hachi",
-    "ethtaipei"
+    "nitrolite"
   ],
-  "author": "ETHTaipei Team",
+  "author": "Nitro Team",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/ethtaipei-research.git"
+    "url": "https://github.com/erc7824/nitrolite.git"
   },
   "dependencies": {
     "viem": "^2.5.0",

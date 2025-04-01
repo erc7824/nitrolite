@@ -1,7 +1,7 @@
 /**
  * RPC Protocol Layer
  * 
- * This module provides the RPC protocol implementation for Hachi SDK.
+ * This module provides the RPC protocol implementation for Nitrolite SDK.
  * It enables transport-agnostic communication between participants in
  * a state channel network, including support for virtual channels.
  */

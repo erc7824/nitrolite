@@ -25,6 +25,22 @@ interface IChannel {
     function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
 
     /**
+     * @notice Reset will close and open channel for resizing allocations
+     * @param channelId Unique identifier for the channel
+     * @param candidate The latest known valid state
+     * @param proofs is an array of valid state required by the adjudicator
+     * @param ch Channel configuration
+     * @param deposit is the initial State defined by the opener, it contains the expected allocation
+     */
+    function reset(
+        bytes32 channelId,
+        State calldata candidate,
+        State[] calldata proofs,
+        Channel calldata ch,
+        State calldata deposit
+    ) external;
+
+    /**
      * @notice Unilaterally post a state when the other party is uncooperative
      * @param channelId Unique identifier for the channel
      * @param candidate The latest known valid state

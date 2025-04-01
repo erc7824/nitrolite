@@ -52,7 +52,6 @@ contract TicTacToe is IAdjudicator {
         override
         returns (Status decision)
     {
-
         // Check if we have at least one signature
         if (candidate.sigs.length == 0) return Status.INVALID;
 

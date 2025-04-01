@@ -40,7 +40,6 @@ contract MicroPayment is IAdjudicator {
         override
         returns (Status decision)
     {
-
         // Ensure at least one signature exists
         if (candidate.sigs.length == 0) return Status.INVALID;
 

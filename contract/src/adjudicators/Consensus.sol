@@ -44,7 +44,6 @@ contract Consensus is IAdjudicator {
         override
         returns (IAdjudicator.Status decision)
     {
-
         // Check for insufficient signatures
         if (candidate.sigs.length == 0) return Status.INVALID;
 

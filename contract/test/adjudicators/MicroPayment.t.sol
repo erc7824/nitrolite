@@ -103,8 +103,7 @@ contract MicroPaymentTest is Test {
         state.sigs[0] = signState(state, hostPrivateKey);
 
         // Adjudicate
-        IAdjudicator.Status decision =
-            adjudicator.adjudicate(channel, state, new State[](0));
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
 
         // Check the status is ACTIVE
         assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
@@ -225,8 +224,7 @@ contract MicroPaymentTest is Test {
         proofs[0] = prevState;
 
         // Adjudicate
-        IAdjudicator.Status decision =
-            adjudicator.adjudicate(channel, newState, proofs);
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
 
         // Check the status is ACTIVE
         assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
@@ -249,8 +247,7 @@ contract MicroPaymentTest is Test {
         state.sigs[0] = signState(state, hostPrivateKey);
 
         // Adjudicate
-        IAdjudicator.Status decision =
-            adjudicator.adjudicate(channel, state, new State[](0));
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
 
         // Check the status is FINAL
         assertEq(uint256(decision), uint256(IAdjudicator.Status.FINAL));

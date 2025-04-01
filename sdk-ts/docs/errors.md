@@ -1,3 +1,4 @@
+# TODO: UPDATE
 # Nitrolite SDK Error Handling Guide
 
 The Nitrolite SDK provides a comprehensive error handling system to help developers identify and address issues that may arise during development and production. This guide covers best practices for handling errors, understanding error categories, and troubleshooting common issues.

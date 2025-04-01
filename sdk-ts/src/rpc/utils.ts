@@ -1,93 +1,98 @@
+import { Hex } from "viem";
+
 /**
- * RPC utilities and helper functions
+ * Utility functions for NitroRPC
  */
 
-import { Hex, Address, hashMessage } from 'viem';
-import { Logger } from '../config';
-import Errors from '../errors';
-
 /**
- * Create a payload for signing from any data
- * @param data The data to sign
- * @returns The payload as a hex string
+ * Create a payload hex string for signing
+ *
+ * @param data The data to convert to a hex string
+ * @returns A hex string representation of the data
  */
 export function createPayload(data: any): Hex {
-  // Convert the data to a string and hash it
-  return hashMessage(JSON.stringify(data));
+    // Optimize performance by using Buffer directly
+    // This is more efficient than the TextEncoder approach
+    return ("0x" + Buffer.from(JSON.stringify(data)).toString("hex")) as Hex;
 }
 
 /**
- * Verify a signature
- * @param payload The payload that was signed
- * @param signature The signature
- * @param expectedSigner The expected signer address
- * @param logger Optional logger for debugging
- * @returns True if the signature is valid
+ * Get the current time in milliseconds
+ *
+ * @returns The current timestamp in milliseconds
  */
-export async function verifySignature(
-  payload: Hex, 
-  signature: Hex, 
-  expectedSigner: Address, 
-  logger?: Logger
-): Promise<boolean> {
-  try {
-    if (logger) {
-      logger.debug('Verifying signature', { 
-        expectedSigner,
-        payloadLength: payload.length
-      });
-    }
-    
-    // Import verification utilities from viem
-    // Use the verifyMessage function to check if the signature is valid
-    // The function confirms that the recovered address matches the expected signer
-    const { verifyMessage } = await import('viem');
-    
-    // Verify that the signature was created by the expected signer
-    const valid = await verifyMessage({
-      address: expectedSigner,
-      message: payload,
-      signature: signature,
-    });
-    
-    if (logger) {
-      logger.debug('Signature verification result', {
-        valid,
-        expectedSigner
-      });
-    }
-    
-    return valid;
-  } catch (error) {
-    if (logger) {
-      logger.error('Error verifying signature', { 
-        expectedSigner, 
-        error 
-      });
-    }
-    return false;
-  }
+export function getCurrentTimestamp(): number {
+    return Date.now();
 }
 
 /**
- * Validate that an RPC client is connected
- * @param handlerRegistered Whether a handler is registered
- * @throws {ProviderNotConnectedError} If the client is not connected
+ * Generate a unique request ID
+ *
+ * @returns A unique request ID
  */
-export function validateConnection(handlerRegistered: boolean): void {
-  if (!handlerRegistered) {
-    throw new Errors.ProviderNotConnectedError('RPC Client');
-  }
+export function generateRequestId(): number {
+    return Math.floor(Date.now() + Math.random() * 10000);
 }
 
 /**
- * Validate required parameters
- * @param params Object containing parameters to validate
+ * Extract the request ID from a message
+ *
+ * @param message The message to extract from
+ * @returns The request ID, or undefined if not found
  */
-export function validateRequiredParams(params: Record<string, any>): void {
-  for (const [name, value] of Object.entries(params)) {
-    if (!value) {
-      throw new Errors.MissingParameterError(name);
+export function getRequestId(message: any): number | undefined {
+    if (message.req) return message.req[0];
+    if (message.res) return message.res[0];
+    if (message.err) return message.err[0];
+    return undefined;
+}
+
+/**
+ * Extract the method name from a request or response
+ *
+ * @param message The message to extract from
+ * @returns The method name, or undefined if not found
+ */
+export function getMethod(message: any): string | undefined {
+    if (message.req) return message.req[1];
+    if (message.res) return message.res[1];
+    return undefined;
+}
+
+/**
+ * Extract parameters from a request
+ *
+ * @param message The request message
+ * @returns The parameters, or an empty array if not found
+ */
+export function getParams(message: any): any[] {
+    if (message.req) return message.req[2] || [];
+    return [];
+}
+
+/**
+ * Extract result from a response
+ *
+ * @param message The response message
+ * @returns The result, or an empty array if not found
+ */
+export function getResult(message: any): any[] {
+    if (message.res) return message.res[2] || [];
+    return [];
+}
+
+/**
+ * Extract error details from an error message
+ *
+ * @param message The error message
+ * @returns The error details, or undefined if not found
+ */
+export function getError(message: any): { code: number; message: string } | undefined {
+    if (message.err) {
+        return {
+            code: message.err[1],
+            message: message.err[2],
+        };
     }
-  }
+    return undefined;
 }

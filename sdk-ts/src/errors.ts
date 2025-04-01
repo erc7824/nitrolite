@@ -297,6 +297,7 @@ export class NotParticipantError extends UnauthorizedError {
             address,
             channelId,
         });
+
         this.code = "NOT_PARTICIPANT";
         this.suggestion = "Only participants can perform operations on a channel";
     }

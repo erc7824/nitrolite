@@ -15,13 +15,13 @@ Nitrolite SDK provides a framework for developing scalable blockchain applicatio
 ## Installation
 
 ```bash
-npm install @ethtaipei/nitrolite-sdk-ts
+npm install @erc7824/nitrolite
 ```
 
 ## Quick Start
 
 ```typescript
-import { NitroliteClient, AppDataTypes } from '@ethtaipei/nitrolite-sdk-ts';
+import { NitroliteClient, AppDataTypes } from '@erc7824/nitrolite';
 import { createPublicClient, createWalletClient, http, encodeAbiParameters, Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { mainnet } from 'viem/chains';
@@ -226,7 +226,7 @@ const customChannel = client.createCustomChannel<MyAppState>({
 The SDK provides message type definitions for off-chain communication between participants, but lets you implement the transport layer yourself.
 
 ```typescript
-import { MessageType, ProposeStateMessage } from '@ethtaipei/nitrolite-sdk-ts';
+import { MessageType, ProposeStateMessage } from '@erc7824/nitrolite';
 
 // Example: Creating your own message transport
 class MyChannelMessenger {
@@ -261,7 +261,7 @@ See the [examples](examples/) directory for complete working examples of buildin
 Nitrolite SDK works with any EVM-compatible blockchain. Here's how to use it with different chains:
 
 ```typescript
-import { NitroliteClient } from '@ethtaipei/nitrolite-sdk-ts';
+import { NitroliteClient } from '@erc7824/nitrolite';
 import { createPublicClient, http } from 'viem';
 import { mainnet, optimism, arbitrum, base, polygon } from 'viem/chains';
 
@@ -305,7 +305,7 @@ const arbitrumClient = new NitroliteClient({
 ### Using Custom Adjudicator ABIs
 
 ```typescript
-import { NitroliteClient } from '@ethtaipei/nitrolite-sdk-ts';
+import { NitroliteClient } from '@erc7824/nitrolite';
 import { Abi } from 'viem';
 
 // Your custom adjudicator ABI

@@ -3,21 +3,23 @@ import {
   PublicClient,
   WalletClient,
   Account,
-  decodeEventLog // Import decodeEventLog
+  decodeEventLog, // Import decodeEventLog
+  zeroAddress,
+  parseEventLogs
 } from 'viem';
 import {
   Channel,
   State,
-  ChannelId
+  ChannelId,
+  Role
 } from '../types';
 import { 
   CustodyAbi,
   Erc20Abi
 } from '../abis';
-// Remove getChannelId import if no longer needed elsewhere
-// import { getChannelId } from '../utils';
 import Errors from '../errors'; // Import Errors
 import { Logger, defaultLogger } from '../config';
+import { ChannelOpenedEvent } from '../abis/custody';
 
 /**
  * Channel operations that interact with the blockchain
@@ -58,39 +60,50 @@ export class ChannelOperations {
    */
   async openChannel(
     channel: Channel,
-    deposit: State
+    deposit: State,
+    participantIndex: Role = Role.UNDEFINED
   ): Promise<ChannelId> {
     this.ensureWalletClient();
 
+    if (participantIndex === Role.UNDEFINED) {
+      throw new Errors.NitroliteError(
+        'Participant index is required to open a channel',
+        'MISSING_PARTICIPANT_INDEX',
+        400,
+        'Specify the participant index (0 or 1) when opening a channel',
+        { operation: 'openChannel' }
+      );
+    }
+
     // If allocation amount > 0, we need to approve the token first
-    const hostAllocation = deposit.allocations[0];
-    if (hostAllocation.amount > 0 && hostAllocation.token !== '0x0000000000000000000000000000000000000000') {
+    const participantAllocation = deposit.allocations[0];
+    if (participantAllocation.amount > 0 && participantAllocation.token !== zeroAddress) {
       try {
         // Check current allowance before approving
         const currentAllowance = await this.getTokenAllowance(
-          hostAllocation.token,
+          participantAllocation.token,
           this.account!.address,
           this.custodyAddress
         );
         
         // Only approve if the current allowance is insufficient
-        if (currentAllowance < hostAllocation.amount) {
+        if (currentAllowance < participantAllocation.amount) {
           this.logger.info('Approving tokens for channel', {
-            token: hostAllocation.token,
-            amount: hostAllocation.amount,
+            token: participantAllocation.token,
+            amount: participantAllocation.amount,
             custodyContract: this.custodyAddress
           });
           
           await this.approveTokens(
-            hostAllocation.token,
-            hostAllocation.amount,
+            participantAllocation.token,
+            participantAllocation.amount,
             this.custodyAddress
           );
         } else {
           this.logger.info('Token allowance sufficient, skipping approval', {
-            token: hostAllocation.token,
+            token: participantAllocation.token,
             currentAllowance,
-            requiredAmount: hostAllocation.amount
+            requiredAmount: participantAllocation.amount
           });
         }
       } catch (error: any) {
@@ -120,8 +133,8 @@ export class ChannelOperations {
           suggestion,
           { 
             cause: error, 
-            token: hostAllocation.token, 
-            amount: hostAllocation.amount, 
+            token: participantAllocation.token, 
+            amount: participantAllocation.amount, 
             spender: this.custodyAddress 
           }
         );
@@ -133,8 +146,8 @@ export class ChannelOperations {
       const { request } = await this.publicClient.simulateContract({
         address: this.custodyAddress,
         abi: CustodyAbi,
-      functionName: 'open',
-      args: [channel, deposit],
+        functionName: 'open',
+        args: [channel, deposit],
         account: this.account!
       });
 
@@ -156,36 +169,20 @@ export class ChannelOperations {
 
     // Extract channelId from logs
     let channelId: ChannelId | null = null;
-    const eventName = 'ChannelOpened'; // Assuming this is the event name
 
-    for (const log of receipt.logs) {
-      try {
-        // Check if the log originates from the custody contract
-        if (log.address.toLowerCase() === this.custodyAddress.toLowerCase()) {
-          const decodedLog = decodeEventLog({
-            abi: CustodyAbi,
-            data: log.data,
-            topics: log.topics,
-            strict: false // Allow extra data in log
-          });
+    const logs = parseEventLogs({
+      abi: CustodyAbi,
+      logs: receipt.logs,
+      eventName: ChannelOpenedEvent,
+    });
 
-          if (decodedLog.eventName === eventName) {
-            // Assuming the event has a 'channelId' argument
-            channelId = (decodedLog.args as any)?.channelId;
-            if (channelId) {
-              break; // Found the channelId, exit loop
-            }
-          }
-        }
-      } catch (e) {
-        // Ignore logs that don't match the ABI or event signature
-        // console.warn('Could not decode log:', e);
-      }
+    if (logs && logs.length > 0) {
+      channelId = (logs[0] as any)?.channelId;
     }
 
     if (!channelId) {
       throw new Errors.ContractError(
-        `Could not find ${eventName} event log in transaction receipt`,
+        `Could not find ${ChannelOpenedEvent} event log in transaction receipt`,
         'EVENT_NOT_FOUND', // Specific error code
         500,
         'Check transaction receipt and contract event definitions', // Specific suggestion

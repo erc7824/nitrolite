@@ -4,18 +4,9 @@ import {
   PublicClient,
   WalletClient,
   Abi,
-  Hex
 } from 'viem';
-import {
-  Channel,
-  State,
-  ChannelId,
-  AppDataTypes,
-  AppLogic
-} from '../types';
 import { 
   AdjudicatorAbi,
-  defaultAbiConfig,
   ContractAddresses
 } from '../abis';
 import Errors from '../errors'; // Import Errors
@@ -23,13 +14,7 @@ import { Logger, defaultLogger } from '../config';
 
 import { NitroliteClientConfig } from './config';
 import { ChannelOperations } from './operations';
-import { 
-  ChannelContext,
-  createNumericChannel,
-  createSequentialChannel,
-  createCustomChannel
-} from './channels';
-import { generateChannelNonce } from '../utils';
+import { State, ChannelId, Channel } from './types';
 
 /**
  * Main client for interacting with Nitrolite contracts
@@ -59,28 +44,17 @@ export class NitroliteClient {
         throw new Errors.MissingParameterError('chainId');
       }
     }
-    
-    // Prefer using the 'addresses' object, 'custodyAddress' is for backward compatibility
-    if (!config.addresses && !config.custodyAddress) {
-      throw new Errors.MissingParameterError('addresses or custodyAddress');
+
+    if (!config.addresses) {
+      throw new Errors.MissingParameterError('addresses');
     }
     
     this.publicClient = config.publicClient;
     this.walletClient = config.walletClient;
     this.account = config.account;
     this.chainId = chainId;
+    this.addresses = config.addresses;
     this.logger = config.logger || defaultLogger;
-    
-    // Use provided addresses or create from custody address
-    if (config.addresses) {
-      this.addresses = config.addresses;
-    } else {
-      // Backwards compatibility for custodyAddress
-      this.addresses = {
-        custody: config.custodyAddress as Address,
-        adjudicators: {}
-      };
-    }
     
     // Make sure adjudicators object exists
     if (!this.addresses.adjudicators) {
@@ -136,19 +110,13 @@ export class NitroliteClient {
   /**
    * Get an adjudicator address by type
    * @param type The adjudicator type
-   * @param fallbackToBase Whether to fall back to the base adjudicator if type not found
    * @returns The adjudicator address
    */
-  getAdjudicatorAddress(type: string, fallbackToBase: boolean = true): Address {
+  getAdjudicatorAddress(type: string): Address {
     // First try to get the requested adjudicator type
     const address = this.addresses.adjudicators[type];
     if (address) {
       return address;
-    }
-    
-    // If requested to fall back and base adjudicator exists, use it
-    if (fallbackToBase && this.addresses.adjudicators['base']) {
-      return this.addresses.adjudicators['base'];
     }
     
     // Otherwise throw an error with helpful message
@@ -217,85 +185,5 @@ export class NitroliteClient {
    */
   async getTokenBalance(tokenAddress: Address, account: Address): Promise<bigint> {
     return this.operations.getTokenBalance(tokenAddress, account);
-  }
-  
-  // ======== Channel creation methods ========
-  
-  /**
-   * Create a channel context with a specific application logic
-   * @param params Parameters for creating the channel context
-   * @returns A new channel context
-   */
-  createChannel<T = unknown>(params: {
-    participants: [Address, Address];
-    challenge?: bigint;
-    nonce?: bigint;
-    appLogic: AppLogic<T>;
-    initialAppState?: T;
-  }): ChannelContext<T> {
-    // Create the channel configuration
-    const channel: Channel = {
-      participants: params.participants,
-      adjudicator: params.appLogic.getAdjudicatorAddress(),
-      challenge: params.challenge || BigInt(86400), // Default: 1 day
-      // Use a robust nonce generation strategy to prevent collisions
-      nonce: params.nonce || generateChannelNonce(this.account?.address)
-    };
-    
-    // Create and return the channel context
-    return new ChannelContext<T>(
-      this,
-      channel,
-      params.appLogic,
-      params.initialAppState
-    );
-  }
-  
-  /**
-   * Create a numeric value application
-   */
-  createNumericChannel(params: {
-    participants: [Address, Address];
-    adjudicatorAddress?: Address;
-    adjudicatorAbi?: Abi;
-    challenge?: bigint;
-    nonce?: bigint;
-    initialValue?: bigint;
-    finalValue?: bigint;
-  }): ChannelContext<AppDataTypes.NumericState> {
-    return createNumericChannel(this, params);
-  }
-  
-  /**
-   * Create a sequential state application
-   */
-  createSequentialChannel(params: {
-    participants: [Address, Address];
-    adjudicatorAddress?: Address;
-    adjudicatorAbi?: Abi;
-    challenge?: bigint;
-    nonce?: bigint;
-    initialValue?: bigint;
-  }): ChannelContext<AppDataTypes.SequentialState> {
-    return createSequentialChannel(this, params);
-  }
-  
-  /**
-   * Create a custom application
-   */
-  createCustomChannel<T = unknown>(params: {
-    participants: [Address, Address];
-    challenge?: bigint;
-    nonce?: bigint;
-    encode: (data: T) => Hex;
-    decode: (encoded: Hex) => T;
-    validateTransition?: (prevState: T, nextState: T, signer: Address) => boolean;
-    isFinal?: (state: T) => boolean;
-    adjudicatorAddress?: Address;
-    adjudicatorType?: string;
-    adjudicatorAbi?: Abi;
-    initialState?: T;
-  }): ChannelContext<T> {
-    return createCustomChannel<T>(this, params);
   }
 }

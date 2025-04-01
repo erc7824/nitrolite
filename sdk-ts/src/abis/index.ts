@@ -14,20 +14,3 @@ export * from './fragments';
 
 // Export ABI types
 export * from './types';
-
-// Type demonstration for properly configuring addresses
-// IMPORTANT: This is only a type example, not actual implementation
-// Developers must provide their own addresses for the contracts
-export const defaultAbiConfig = {
-  // This is just an example structure
-  // The SDK will require proper addresses to be provided by the user
-  chainId: 1, // Example chain ID
-  addresses: {
-    custody: '0x0000000000000000000000000000000000000000', // Placeholder - not for use
-    adjudicators: {
-      base: '0x0000000000000000000000000000000000000000', // Placeholder - not for use
-      numeric: '0x0000000000000000000000000000000000000000', // Placeholder - not for use
-      sequential: '0x0000000000000000000000000000000000000000', // Placeholder - not for use
-    }
-  }
-};

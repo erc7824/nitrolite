@@ -1,5 +1,10 @@
 import { Abi } from 'abitype';
 
+export const ChannelOpenedEvent = "ChannelOpened";
+export const ChannelClosedEvent = "ChannelClosed";
+export const ChannelChallengedEvent = "ChannelChallenged";
+export const ChannelCheckpointedEvent = "ChannelCheckpointed";
+
 /**
  * ABI for the Custody contract
  * Manages the lifecycle of state channels

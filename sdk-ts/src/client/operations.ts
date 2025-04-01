@@ -62,8 +62,10 @@ export class ChannelOperations {
   ): Promise<ChannelId> {
     this.ensureWalletClient();
 
+    // It's wrong to assume, that user of client will always be the host + we need to know who are we (participant index)
     // If allocation amount > 0, we need to approve the token first
     const hostAllocation = deposit.allocations[0];
+    // viem.zeroAddress or smth like this
     if (hostAllocation.amount > 0 && hostAllocation.token !== '0x0000000000000000000000000000000000000000') {
       try {
         // Check current allowance before approving
@@ -156,6 +158,7 @@ export class ChannelOperations {
 
     // Extract channelId from logs
     let channelId: ChannelId | null = null;
+    // find a way to remove this hardcode (move into constant or use from ABI)
     const eventName = 'ChannelOpened'; // Assuming this is the event name
 
     for (const log of receipt.logs) {

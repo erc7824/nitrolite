@@ -24,6 +24,7 @@ export class ChannelContext<T = unknown> {
   readonly client: HachiClient;
   readonly appLogic: AppLogic<T>;
   
+  // use collection of states instead, it will be useful for the future (proofs, challenges)
   private currentState?: State;
   private appState?: T;
   private role: Role;
@@ -160,6 +161,8 @@ export class ChannelContext<T = unknown> {
       const isValid = this.appLogic.validateTransition(
         this.appState,
         newAppState,
+        // update could be signed by anyone or none, so it's better to put inside the app logic
+        // and provide only states here
         this.client.account?.address || '0x0000000000000000000000000000000000000000'
       );
       
@@ -200,7 +203,8 @@ export class ChannelContext<T = unknown> {
 
   /**
    * Close the channel with the current state
-   */
+  */
+  // The amount and quality of proofs should be defined in the app logic
   async close(proofs: State[] = []): Promise<void> {
     if (!this.currentState) {
       throw new Error('No current state to close with');
@@ -241,6 +245,7 @@ export class ChannelContext<T = unknown> {
   /**
    * Process a state received from the other participant
    */
+  // could be merged with an updateAppState (after including all of the previous suggestions)
   async processReceivedState(receivedState: State): Promise<boolean> {
     if (!this.currentState || !this.appState) {
       // First state in the channel

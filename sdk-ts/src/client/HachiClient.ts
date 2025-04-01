@@ -145,7 +145,8 @@ export class HachiClient {
     if (address) {
       return address;
     }
-    
+
+    // There is no base adjudicator, at least one adjudicator should be always defined by the business logic
     // If requested to fall back and base adjudicator exists, use it
     if (fallbackToBase && this.addresses.adjudicators['base']) {
       return this.addresses.adjudicators['base'];
@@ -239,6 +240,8 @@ export class HachiClient {
       adjudicator: params.appLogic.getAdjudicatorAddress(),
       challenge: params.challenge || BigInt(86400), // Default: 1 day
       // Use a robust nonce generation strategy to prevent collisions
+      // Nonce generation could be anything, but ideally it should be precalculated by the both sides
+      // in other words, both sides should know next nonce without asking each other
       nonce: params.nonce || generateChannelNonce(this.account?.address)
     };
     
@@ -251,6 +254,8 @@ export class HachiClient {
     );
   }
   
+  // In my opinion, these methods should not be part of HachiClient. And if we want 
+  // to keep some templates/examples of channels, they should inherit from the base class
   /**
    * Create a numeric value application
    */

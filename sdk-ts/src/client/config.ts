@@ -36,6 +36,7 @@ export interface HachiClientConfig {
    */
   chainId?: number;
   
+  // No need for this parameter and its backward compatibility (there is no legacy code)
   /**
    * Contract custody address (legacy parameter)
    * Use 'addresses' property instead when possible

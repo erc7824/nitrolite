@@ -100,6 +100,7 @@ export interface AppLogic<T = unknown> {
    * @param signer Address of participant who signed this update
    * @returns Whether the transition is valid
    */
+  // signers should be an array of addresses, or even better pass Channel struct
   validateTransition?: (prevState: T, nextState: T, signer: Address) => boolean;
   
   /**
@@ -113,6 +114,7 @@ export interface AppLogic<T = unknown> {
    * Get adjudicator contract address
    * @returns Contract address of the adjudicator
    */
+  // App could use different adjudicator for different channels, perhaps return a map type->address?
   getAdjudicatorAddress: () => Address;
   
   /**
@@ -140,6 +142,7 @@ export interface AppConfig<T = unknown> {
 /**
  * Example generic app data types (for reference only)
  */
+// not the right place for it
 export namespace AppDataTypes {
   // Generic app state with a numeric value
   export interface NumericState {
@@ -164,6 +167,7 @@ export namespace AppDataTypes {
 /**
  * Channel events
  */
+// align somehow with an abi, perhaps use some boilerplate generator
 export interface ChannelOpenedEvent {
   channelId: ChannelId;
   channel: Channel;

@@ -8,14 +8,12 @@ import {Channel, State, Allocation} from "./Types.sol";
  * @notice Interface for state validation and outcome determination
  */
 interface IAdjudicator {
-    // TODO: do not define status here to allow each adjudicator to define its own ones
     enum Status {
-        VOID, // Channel was never active or have an anomaly
+        VOID, // Channel was never active (zero-initialized)
         PARTIAL, // Partial funding waiting for other participants
         ACTIVE, // Channel fully funded using open or state are valid
         INVALID, // Channel state is invalid
         FINAL // This is the FINAL State channel can be closed
-
     }
 
     /**

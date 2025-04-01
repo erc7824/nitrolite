@@ -1,7 +1,8 @@
 import { Address, Hex } from "viem";
-import { Channel, State, ChannelId, Role, AppLogic, Allocation } from "../../types";
 import { getChannelId } from "../../utils";
 import type { NitroliteClient } from "../NitroliteClient";
+import { AppLogic } from "../../types";
+import { ChannelId, State, Role, Allocation, Channel } from "../types";
 
 /**
  * Channel context for managing application state
@@ -12,25 +13,27 @@ export class ChannelContext<T = unknown> {
     readonly client: NitroliteClient;
     readonly appLogic: AppLogic<T>;
 
-    private currentState?: State;
-    private appState?: T;
+    private states: State[] = [];
     private role: Role;
 
     /**
      * Create a new channel context
      */
-    constructor(client: NitroliteClient, channel: Channel, appLogic: AppLogic<T>, initialAppState?: T) {
+    constructor(client: NitroliteClient, channel: Channel, appLogic: AppLogic<T>, signerAttorneyAddress?: Address) {
         this.client = client;
         this.channel = channel;
         this.channelId = getChannelId(channel);
         this.appLogic = appLogic;
-        this.appState = initialAppState;
 
-        // Determine role
-        const accountAddress = client.account?.address;
-        if (accountAddress === channel.participants[0]) {
+        // If there is no signer attorney, use the client's address
+        let participantAddress= (signerAttorneyAddress || client.account?.address) as Address | undefined;
+        if (!participantAddress) {
+            throw new Error("Channel participant is not provided");
+        }
+
+        if (participantAddress === channel.participants[0]) {
             this.role = Role.HOST;
-        } else if (accountAddress === channel.participants[1]) {
+        } else if (participantAddress === channel.participants[1]) {
             this.role = Role.GUEST;
         } else {
             throw new Error("Account is not a participant in this channel");
@@ -55,14 +58,16 @@ export class ChannelContext<T = unknown> {
      * Get the current state
      */
     getCurrentState(): State | undefined {
-        return this.currentState;
+        return this.states[this.states.length - 1];
     }
 
     /**
      * Get the current application state
      */
     getCurrentAppState(): T | undefined {
-        return this.appState;
+        const currentState = this.getCurrentState();
+
+        return currentState?.data && this.appLogic.decode(currentState.data);
     }
 
     /**
@@ -82,13 +87,9 @@ export class ChannelContext<T = unknown> {
     /**
      * Create a channel state based on application state
      */
-    private async createChannelState(tokenAddress: Address, amounts: [bigint, bigint]): Promise<State> {
-        if (!this.appState) {
-            throw new Error("Application state not initialized");
-        }
-
+    private async createChannelState(appState: T, tokenAddress: Address, amounts: [bigint, bigint]): Promise<State> {
         // Encode the app state
-        const data = this.appLogic.encode(this.appState);
+        const data = this.appLogic.encode(appState);
 
         // Create allocations
         const allocations: [Allocation, Allocation] = [
@@ -115,35 +116,34 @@ export class ChannelContext<T = unknown> {
     /**
      * Open a channel with initial funding
      */
-    async open(tokenAddress: Address, amounts: [bigint, bigint]): Promise<ChannelId> {
-        if (!this.appState) {
-            throw new Error("Application state not initialized");
-        }
-
+    async open(appState: T, tokenAddress: Address, amounts: [bigint, bigint]): Promise<ChannelId> {
         // Create initial state
-        const initialState = await this.createChannelState(tokenAddress, amounts);
+        const initialState = await this.createChannelState(appState, tokenAddress, amounts);
 
         // Save as current state
-        this.currentState = initialState;
+        this.states.push(initialState);
 
         // Open the channel
         return this.client.openChannel(this.channel, initialState);
     }
 
     /**
-     * Update the application state
+     * Append the application state
      */
-    async updateAppState(newAppState: T): Promise<State> {
-        if (!this.currentState) {
-            throw new Error("Channel state not initialized");
+    async appendAppState(newAppState: T): Promise<State> {
+        const currentState = this.getCurrentState();
+        const currentAppState = this.getCurrentAppState();
+
+        if (!currentAppState || !currentState) {
+            throw new Error("No current app state to update, open channel first");
         }
 
         // Validate state transition if the app logic provides a validator
-        if (this.appLogic.validateTransition && this.appState) {
+        if (this.appLogic.validateTransition) {
             const isValid = this.appLogic.validateTransition(
-                this.appState,
+                this.channel,
+                currentAppState,
                 newAppState,
-                this.client.account?.address || "0x0000000000000000000000000000000000000000"
             );
 
             if (!isValid) {
@@ -151,21 +151,18 @@ export class ChannelContext<T = unknown> {
             }
         }
 
-        // Update the app state
-        this.appState = newAppState;
-
         // Encode the app state
         const data = this.appLogic.encode(newAppState);
 
         // Create new state with existing allocations
         const newState: State = {
             data,
-            allocations: this.currentState.allocations,
+            allocations: currentState.allocations,
             sigs: [], // Will be filled when signing
         };
 
-        // Update the channel state
-        this.currentState = newState;
+        // Append the channel state
+        this.states.push(newState);
 
         return newState;
     }
@@ -174,44 +171,70 @@ export class ChannelContext<T = unknown> {
      * Check if the current state is final
      */
     isFinal(): boolean {
-        if (!this.appState || !this.appLogic.isFinal) {
+        const currentAppState = this.getCurrentAppState();
+        if (!currentAppState || !this.appLogic.isFinal) {
             return false;
         }
 
-        return this.appLogic.isFinal(this.appState);
+        return this.appLogic.isFinal(currentAppState);
     }
 
     /**
      * Close the channel with the current state
      */
-    async close(proofs: State[] = []): Promise<void> {
-        if (!this.currentState) {
+    async close(): Promise<void> {
+        const currentState = this.getCurrentState();
+        const currentAppState = this.getCurrentAppState();
+
+        if (!this.isFinal() || !currentState || !currentAppState) {
             throw new Error("No current state to close with");
         }
 
-        return this.client.closeChannel(this.channelId, this.currentState, proofs);
+        let proofs: State[] = [];
+        if (this.appLogic.provideProofs) {
+            proofs = this.appLogic.provideProofs(this.channel, currentAppState, this.states) || [];
+        }
+
+        return this.client.closeChannel(this.channelId, currentState, proofs);
     }
 
     /**
      * Challenge the channel with the current state
      */
-    async challenge(proofs: State[] = []): Promise<void> {
-        if (!this.currentState) {
+    async challenge(): Promise<void> {
+        const currentState = this.getCurrentState();
+        const currentAppState = this.getCurrentAppState();
+
+        if (!currentState || !currentAppState) {
             throw new Error("No current state to challenge with");
         }
 
-        return this.client.challengeChannel(this.channelId, this.currentState, proofs);
+        let proofs: State[] = [];
+        if (this.appLogic.provideProofs) {
+            proofs = this.appLogic.provideProofs(this.channel, currentAppState, this.states) || [];
+        }
+
+        return this.client.challengeChannel(this.channelId, currentState, proofs);
     }
 
     /**
      * Checkpoint the current state
      */
-    async checkpoint(proofs: State[] = []): Promise<void> {
-        if (!this.currentState) {
+    async checkpoint(): Promise<void> {
+        const currentState = this.getCurrentState();
+        const currentAppState = this.getCurrentAppState();
+
+        if (!currentState || !currentAppState) {
             throw new Error("No current state to checkpoint");
         }
 
-        return this.client.checkpointChannel(this.channelId, this.currentState, proofs);
+        let proofs: State[] = [];
+        if (this.appLogic.provideProofs) {
+            proofs = this.appLogic.provideProofs(this.channel, currentAppState, this.states) || [];
+        }
+
+
+        return this.client.checkpointChannel(this.channelId, currentState, proofs);
     }
 
     /**
@@ -219,37 +242,5 @@ export class ChannelContext<T = unknown> {
      */
     async reclaim(): Promise<void> {
         return this.client.reclaimChannel(this.channelId);
-    }
-
-    /**
-     * Process a state received from the other participant
-     */
-    async processReceivedState(receivedState: State): Promise<boolean> {
-        if (!this.currentState || !this.appState) {
-            // First state in the channel
-            this.currentState = receivedState;
-            this.appState = this.appLogic.decode(receivedState.data);
-            return true;
-        }
-
-        // Decode app states
-        const currentAppState = this.appState;
-        const receivedAppState = this.appLogic.decode(receivedState.data);
-
-        // Validate state transition if the app logic provides a validator
-        if (this.appLogic.validateTransition) {
-            const otherParticipant = this.getOtherParticipant();
-            const isValid = this.appLogic.validateTransition(currentAppState, receivedAppState, otherParticipant);
-
-            if (!isValid) {
-                return false;
-            }
-        }
-
-        // Update our state
-        this.appState = receivedAppState;
-        this.currentState = receivedState;
-
-        return true;
     }
 }

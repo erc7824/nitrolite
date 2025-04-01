@@ -37,12 +37,6 @@ export interface NitroliteClientConfig {
   chainId?: number;
   
   /**
-   * Contract custody address (legacy parameter)
-   * Use 'addresses' property instead when possible
-   */
-  custodyAddress?: Address;
-  
-  /**
    * Contract addresses for the Nitrolite infrastructure
    * Either this or custodyAddress must be provided
    */

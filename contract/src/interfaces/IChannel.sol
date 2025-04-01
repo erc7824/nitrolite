@@ -8,6 +8,12 @@ import {Channel, State} from "./Types.sol";
  * @notice Main interface for the state channel system
  */
 interface IChannel {
+    event ChannelPartiallyFunded(bytes32 indexed channelId, Channel channel);
+    event ChannelOpened(bytes32 indexed channelId, Channel channel);
+    event ChannelChallenged(bytes32 indexed channelId, uint256 expiration);
+    event ChannelCheckpointed(bytes32 indexed channelId);
+    event ChannelClosed(bytes32 indexed channelId);
+
     /**
      * @notice Open or join a channel by depositing assets
      * @param ch Channel configuration

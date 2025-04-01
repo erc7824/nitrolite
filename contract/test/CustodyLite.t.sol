@@ -314,7 +314,7 @@ contract CustodyLiteTest is Test {
 
         // Close the channel
         vm.expectEmit(true, false, false, false);
-        emit CustodyLite.ChannelClosed(channelId);
+        emit IChannel.ChannelClosed(channelId);
 
         vm.prank(host);
         custody.close(channelId, finalState, proofs);
@@ -392,7 +392,7 @@ contract CustodyLiteTest is Test {
 
         // Start a challenge
         vm.expectEmit(true, false, false, false);
-        emit CustodyLite.ChannelChallenged(channelId, block.timestamp + channel.challenge);
+        emit IChannel.ChannelChallenged(channelId, block.timestamp + channel.challenge);
 
         vm.prank(host);
         custody.challenge(channelId, laterState, proofs);
@@ -425,7 +425,7 @@ contract CustodyLiteTest is Test {
 
         uint256 newExpiration = block.timestamp + channel.challenge;
         vm.expectEmit(true, false, false, false);
-        emit CustodyLite.ChannelChallenged(channelId, newExpiration);
+        emit IChannel.ChannelChallenged(channelId, newExpiration);
 
         vm.prank(guest);
         custody.challenge(channelId, guestChallengeState, guestProofs);
@@ -451,7 +451,7 @@ contract CustodyLiteTest is Test {
 
         // Attempting challenge with a FINAL state should close immediately
         vm.expectEmit(true, false, false, false);
-        emit CustodyLite.ChannelClosed(channelId);
+        emit IChannel.ChannelClosed(channelId);
 
         vm.prank(host);
         custody.close(channelId, finalState, proofs);
@@ -515,7 +515,7 @@ contract CustodyLiteTest is Test {
 
         // Checkpoint the state
         vm.expectEmit(true, false, false, false);
-        emit CustodyLite.ChannelCheckpointed(channelId);
+        emit IChannel.ChannelCheckpointed(channelId);
 
         vm.prank(host);
         custody.checkpoint(channelId, checkpointState, proofs);
@@ -541,7 +541,7 @@ contract CustodyLiteTest is Test {
 
         // Checkpoint with FINAL state should close immediately
         vm.expectEmit(true, false, false, false);
-        emit CustodyLite.ChannelClosed(channelId);
+        emit IChannel.ChannelClosed(channelId);
 
         vm.prank(host);
         custody.close(channelId, finalState, proofs);
@@ -617,7 +617,7 @@ contract CustodyLiteTest is Test {
 
         // Reclaim funds
         vm.expectEmit(true, false, false, false);
-        emit CustodyLite.ChannelClosed(channelId);
+        emit IChannel.ChannelClosed(channelId);
 
         vm.prank(guest); // Anyone can call reclaim
         custody.reclaim(channelId);

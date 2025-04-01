@@ -7,11 +7,6 @@ import {Channel, State, Allocation} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
 
 contract ChannelMock is IChannel {
-    event ChannelOpened(bytes32 indexed channelId, Channel channel);
-    event ChannelChallenged(bytes32 indexed channelId, uint256 expiration);
-    event ChannelCheckpointed(bytes32 indexed channelId);
-    event ChannelClosed(bytes32 indexed channelId);
-
     IAdjudicator public adjudicator;
     mapping(bytes32 channelId => Channel ch) public channels;
 

@@ -13,23 +13,14 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol
  */
 contract CustodyLite is IChannel {
     // Errors
-    error ChannelNotFound();
+    error ChannelNotFound(bytes32 channelId);
     error InvalidParticipant();
-    error InvalidChannel();
     error InvalidState();
     error InvalidAdjudicator();
     error InvalidChallengePeriod();
-    error ChannelAlreadyExists();
-    error TransferFailed();
+    error TransferFailed(address token, address to, uint256 amount);
     error ChallengeNotExpired();
     error ChannelNotFinal();
-
-    // Events
-    event ChannelPartiallyFunded(bytes32 indexed channelId, Channel channel);
-    event ChannelOpened(bytes32 indexed channelId, Channel channel);
-    event ChannelChallenged(bytes32 indexed channelId, uint256 expiration);
-    event ChannelCheckpointed(bytes32 indexed channelId);
-    event ChannelClosed(bytes32 indexed channelId);
 
     // Index in the array of participants
     uint256 constant HOST = 0;
@@ -52,6 +43,7 @@ contract CustodyLite is IChannel {
      */
     function open(Channel calldata ch, State calldata deposit) public returns (bytes32 channelId) {
         // Validate input parameters
+        // FIXME: lift this restriction
         require(ch.participants.length == 2, InvalidParticipant());
         require(ch.participants[0] != address(0) && ch.participants[1] != address(0), InvalidParticipant());
         require(ch.adjudicator != address(0), InvalidAdjudicator());
@@ -67,7 +59,7 @@ contract CustodyLite is IChannel {
             Allocation memory allocation = deposit.allocations[HOST];
             if (allocation.amount > 0) {
                 bool success = IERC20(allocation.token).transferFrom(msg.sender, address(this), allocation.amount);
-                require(success, TransferFailed());
+                require(success, TransferFailed(allocation.token, address(this), allocation.amount));
             }
 
             Metadata memory newCh = Metadata({chan: ch, challengeExpire: 0, lastValidState: deposit});
@@ -78,7 +70,7 @@ contract CustodyLite is IChannel {
             Allocation memory allocation = deposit.allocations[GUEST];
             if (allocation.amount > 0) {
                 bool success = IERC20(allocation.token).transferFrom(msg.sender, address(this), allocation.amount);
-                require(success, TransferFailed());
+                require(success, TransferFailed(allocation.token, address(this), allocation.amount));
             }
 
             // Get adjudicator's validation of the state
@@ -112,7 +104,7 @@ contract CustodyLite is IChannel {
      */
     function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) public {
         Metadata storage meta = channels[channelId];
-        require(meta.chan.adjudicator != address(0), ChannelNotFound());
+        require(meta.chan.adjudicator != address(0), ChannelNotFound(channelId));
 
         // Get adjudicator's validation of the candidate state
         IAdjudicator.Status status = _adjudicate(meta.chan, candidate, proofs);
@@ -137,7 +129,7 @@ contract CustodyLite is IChannel {
      */
     function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = channels[channelId];
-        require(meta.chan.adjudicator != address(0), ChannelNotFound());
+        require(meta.chan.adjudicator != address(0), ChannelNotFound(channelId));
 
         // Get adjudicator's validation of the candidate state
         IAdjudicator.Status status = _adjudicate(meta.chan, candidate, proofs);
@@ -168,7 +160,7 @@ contract CustodyLite is IChannel {
      */
     function checkpoint(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = channels[channelId];
-        require(meta.chan.adjudicator != address(0), ChannelNotFound());
+        require(meta.chan.adjudicator != address(0), ChannelNotFound(channelId));
 
         // Get adjudicator's validation of the candidate state
         IAdjudicator.Status status = _adjudicate(meta.chan, candidate, proofs);
@@ -195,7 +187,7 @@ contract CustodyLite is IChannel {
      */
     function reclaim(bytes32 channelId) external {
         Metadata storage meta = channels[channelId];
-        require(meta.chan.adjudicator != address(0), ChannelNotFound());
+        require(meta.chan.adjudicator != address(0), ChannelNotFound(channelId));
 
         // Ensure challenge period has expired
         require(meta.challengeExpire != 0 && block.timestamp >= meta.challengeExpire, ChallengeNotExpired());
@@ -238,15 +230,15 @@ contract CustodyLite is IChannel {
 
             // FIXME: withdrawals when partially funded for challenges on this state to make sense. For that TODO: specify assets distribution per channel
             if (allocation.amount > 0) {
+                bool success;
                 if (allocation.token == address(0)) {
                     // Transfer ETH
-                    (bool success,) = allocation.destination.call{value: allocation.amount}("");
-                    require(success, TransferFailed());
+                    (success,) = allocation.destination.call{value: allocation.amount}("");
                 } else {
                     // Transfer ERC20
-                    bool success = IERC20(allocation.token).transfer(allocation.destination, allocation.amount);
-                    require(success, TransferFailed());
+                    success = IERC20(allocation.token).transfer(allocation.destination, allocation.amount);
                 }
+                require(success, TransferFailed(allocation.token, allocation.destination, allocation.amount));
             }
         }
 

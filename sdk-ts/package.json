@@ -1,0 +1,48 @@
+{
+  "name": "@ethtaipei/hachi-sdk-ts",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the Hachi state channels framework",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "keywords": [
+    "ethereum",
+    "state-channels",
+    "layer2",
+    "scaling",
+    "hachi",
+    "ethtaipei"
+  ],
+  "author": "ETHTaipei Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/ethtaipei-research.git"
+  },
+  "dependencies": {
+    "viem": "^2.5.0",
+    "abitype": "^0.10.3"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "rimraf": "^5.0.5",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.3.0"
+  }
+}

@@ -133,6 +133,22 @@ interface IChannel {
     function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
 
     /**
+     * @notice Reset will close and open channel for resizing allocations
+     * @param channelId Unique identifier for the channel
+     * @param candidate The latest known valid state
+     * @param proofs is an array of valid state required by the adjudicator
+     * @param ch Channel configuration
+     * @param deposit is the initial State defined by the opener, it contains the expected allocation
+     */
+    function reset(
+        bytes32 channelId,
+        State calldata candidate,
+        State[] calldata proofs,
+        Channel calldata ch,
+        State calldata deposit
+    ) external;
+
+    /**
      * @notice Unilaterally post a state when the other party is uncooperative
      * @param channelId Unique identifier for the channel
      * @param candidate The latest known valid state
@@ -177,22 +193,30 @@ interface IChannel {
      - If valid, distributes tokens according to the state's allocations
      - Closes the channel
 
-3. **Challenge Channel**  
-   `challenge(bytes32 channelId, State candidate, State[] proofs)`  
+3. **Reset Channel**
+`reset(bytes32 channelId, State candidate, State[] proofs, Channel ch, State deposit)`
+   - **Purpose**: Close and reopen a channel to resize allocations.
+   - **Logic**:
+     - Closes the existing channel with the valid candidate state
+     - Opens a new channel with the provided configuration and deposit
+     - Used when allocation adjustments (deposits/withdrawals) are needed
+
+4. **Challenge Channel**
+`challenge(bytes32 channelId, State candidate, State[] proofs)`  
    - **Purpose**: Unilaterally post a state when the other party is uncooperative.
    - **Logic**:
      - Verifies the submitted state is valid via `adjudicate`
      - If valid, records the proposed state and starts the challenge period
 
-4. **Checkpoint**  
-   `checkpoint(bytes32 channelId, State candidate, State[] proofs)`  
+5. **Checkpoint**
+`checkpoint(bytes32 channelId, State candidate, State[] proofs)`  
    - **Purpose**: Store a valid state on-chain to prevent future disputes.
    - **Logic**:
      - Verifies the submitted state is valid via `adjudicate`
      - Records the state without initiating channel closure
 
-5. **Reclaim**  
-   `reclaim(bytes32 channelId)`  
+6. **Reclaim**  
+`reclaim(bytes32 channelId)`  
    - **Purpose**: Conclude the channel after challenge period expires.
    - **Logic**:  
      - Distributes tokens according to the last valid state's allocations

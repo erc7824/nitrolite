@@ -38,19 +38,15 @@ contract Counter is IAdjudicator {
      * @param candidate The proposed counter state
      * @param proofs Array containing the previous state signed by the previous participant
      * @return decision The status of the channel after adjudication
-     * @return allocations The allocations from the candidate state
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
         view
         override
-        returns (Status decision, Allocation[2] memory allocations)
+        returns (Status decision)
     {
-        // Default allocations from candidate state
-        allocations = candidate.allocations;
-
         // Check if we have at least one signature
-        if (candidate.sigs.length == 0) return (Status.INVALID, allocations);
+        if (candidate.sigs.length == 0) return Status.INVALID;
 
         // Get the state hash for signature verification
         bytes32 stateHash = Utils.getStateHash(chan, candidate);
@@ -62,36 +58,36 @@ contract Counter is IAdjudicator {
         if (proofs.length == 0) {
             // First signature must be from HOST who sets initial counter
             if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])) {
-                return (Status.VOID, allocations);
+                return Status.VOID;
             }
 
             // If only Host has signed, channel is PARTIAL
             if (candidate.sigs.length < 2) {
-                return (Status.PARTIAL, allocations);
+                return Status.PARTIAL;
             }
 
             // Both signatures provided, verify Guest's signature
             if (!Utils.verifySignature(stateHash, candidate.sigs[1], chan.participants[GUEST])) {
-                return (Status.VOID, allocations);
+                return Status.VOID;
             }
 
             // Channel becomes ACTIVE only if counter > 0
             if (candidateCounterData.counter > 0) {
-                return (Status.ACTIVE, allocations);
+                return Status.ACTIVE;
             } else {
-                return (Status.PARTIAL, allocations);
+                return Status.PARTIAL;
             }
         }
 
         // NORMAL STATE TRANSITION: Proof provided.
         // Ensure proof state has at least one signature
-        if (proofs[0].sigs.length == 0) return (Status.INVALID, allocations);
+        if (proofs[0].sigs.length == 0) return Status.INVALID;
 
         CounterData memory proofCounterData = abi.decode(proofs[0].data, (CounterData));
 
         // Verify the increment is exactly 1
         if (candidateCounterData.counter != proofCounterData.counter + 1) {
-            return (Status.INVALID, allocations);
+            return Status.INVALID;
         }
 
         bytes32 proofStateHash = Utils.getStateHash(chan, proofs[0]);
@@ -100,27 +96,27 @@ contract Counter is IAdjudicator {
         if (Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])) {
             // Verify Guest signed the proof
             if (!Utils.verifySignature(proofStateHash, proofs[0].sigs[0], chan.participants[GUEST])) {
-                return (Status.INVALID, allocations);
+                return Status.INVALID;
             }
         }
         // When Guest is the signer of candidate, Host must have signed the proof
         else if (Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[GUEST])) {
             // Verify Host signed the proof
             if (!Utils.verifySignature(proofStateHash, proofs[0].sigs[0], chan.participants[HOST])) {
-                return (Status.INVALID, allocations);
+                return Status.INVALID;
             }
         }
         // Invalid signature on candidate
         else {
-            return (Status.INVALID, allocations);
+            return Status.INVALID;
         }
 
         // Check if counter has reached or exceeded the final value
         if (candidateCounterData.counter >= FINAL_COUNTER) {
-            return (Status.FINAL, allocations);
+            return Status.FINAL;
         }
 
         // Valid state transition, channel remains ACTIVE
-        return (Status.ACTIVE, allocations);
+        return Status.ACTIVE;
     }
 }

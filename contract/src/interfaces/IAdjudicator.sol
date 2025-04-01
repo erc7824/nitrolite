@@ -24,10 +24,9 @@ interface IAdjudicator {
      * @param candidate The proposed state to be validated
      * @param proofs Array of previous states that may be used to validate the candidate state
      * @return decision The status of the channel after adjudication
-     * @return allocations The final allocations for participants based on the adjudication
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
         view
-        returns (Status decision, Allocation[2] memory allocations);
+        returns (Status decision);
 }

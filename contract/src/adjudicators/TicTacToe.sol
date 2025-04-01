@@ -45,19 +45,16 @@ contract TicTacToe is IAdjudicator {
      * @param candidate The proposed game state
      * @param proofs Array containing the previous state signed by the previous participant
      * @return decision The status of the channel after adjudication
-     * @return allocations The allocations from the candidate state
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
         pure
         override
-        returns (Status decision, Allocation[2] memory allocations)
+        returns (Status decision)
     {
-        // Default allocations from candidate state
-        allocations = candidate.allocations;
 
         // Check if we have at least one signature
-        if (candidate.sigs.length == 0) return (Status.INVALID, allocations);
+        if (candidate.sigs.length == 0) return Status.INVALID;
 
         // Get the state hash for signature verification
         bytes32 stateHash = Utils.getStateHash(chan, candidate);
@@ -69,38 +66,38 @@ contract TicTacToe is IAdjudicator {
         if (proofs.length == 0) {
             // First signature must be from HOST who initializes the game
             if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])) {
-                return (Status.VOID, allocations);
+                return Status.VOID;
             }
 
             // If only Host has signed, channel is PARTIAL
             if (candidate.sigs.length < 2) {
-                return (Status.PARTIAL, allocations);
+                return Status.PARTIAL;
             }
 
             // Both signatures provided, verify Guest's signature
             if (!Utils.verifySignature(stateHash, candidate.sigs[1], chan.participants[GUEST])) {
-                return (Status.VOID, allocations);
+                return Status.VOID;
             }
 
             // Verify initial grid is empty and move count is 0
             if (!isGridEmpty(candidateGrid)) {
-                return (Status.INVALID, allocations);
+                return Status.INVALID;
             }
 
             // Channel becomes ACTIVE with an empty grid
-            return (Status.ACTIVE, allocations);
+            return Status.ACTIVE;
         }
 
         // NORMAL STATE TRANSITION: Proof provided.
         // Ensure proof state has at least one signature
-        if (proofs[0].sigs.length == 0) return (Status.INVALID, allocations);
+        if (proofs[0].sigs.length == 0) return Status.INVALID;
 
         GameGrid memory previousGrid = abi.decode(proofs[0].data, (GameGrid));
         bytes32 proofStateHash = Utils.getStateHash(chan, proofs[0]);
 
         // Verify the move is valid (check number of moves, grid changes, etc.)
         if (!isValidMove(previousGrid, candidateGrid)) {
-            return (Status.INVALID, allocations);
+            return Status.INVALID;
         }
 
         // Check whose turn it is based on the move count in previous grid
@@ -110,34 +107,22 @@ contract TicTacToe is IAdjudicator {
 
         // Verify the current player has signed the candidate state
         if (!Utils.verifySignature(stateHash, candidate.sigs[0], currentPlayer)) {
-            return (Status.INVALID, allocations);
+            return Status.INVALID;
         }
 
         // Verify the previous player has signed the proof state
         if (!Utils.verifySignature(proofStateHash, proofs[0].sigs[0], previousPlayer)) {
-            return (Status.INVALID, allocations);
+            return Status.INVALID;
         }
 
         // Check if the game is over (win or draw)
         uint256 winner = checkWinner(candidateGrid);
         if (winner == X || winner == O || isDraw(candidateGrid)) {
-            // Adjust allocations based on winner if needed
-            if (winner == X) {
-                // Host wins - all funds go to Host
-                allocations[HOST].amount = allocations[HOST].amount + allocations[GUEST].amount;
-                allocations[GUEST].amount = 0;
-            } else if (winner == O) {
-                // Guest wins - all funds go to Guest
-                allocations[GUEST].amount = allocations[HOST].amount + allocations[GUEST].amount;
-                allocations[HOST].amount = 0;
-            }
-            // For a draw, keep the allocations as they are
-
-            return (Status.FINAL, allocations);
+            return Status.FINAL;
         }
 
         // Valid state transition, channel remains ACTIVE
-        return (Status.ACTIVE, allocations);
+        return Status.ACTIVE;
     }
 
     /**

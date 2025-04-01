@@ -15,15 +15,14 @@ contract Trivial is IAdjudicator {
      * @param chan The channel parameters
      * @param candidate The candidate state to adjudicate
      * @param proofs Previous state proofs (unused in this implementation)
-     * @return outcome Always returns Status.ACTIVE
-     * @return allocations The allocations from the candidate state
+     * @return decision Always returns Status.ACTIVE
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
         pure
         override
-        returns (Status outcome, Allocation[2] memory allocations)
+        returns (Status decision)
     {
-        return (Status.ACTIVE, candidate.allocations);
+        return Status.ACTIVE;
     }
 }

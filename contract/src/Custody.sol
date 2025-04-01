@@ -83,8 +83,7 @@ contract Custody is IChannel {
 
             // Get adjudicator's validation of the state
             State[] memory emptyProofs = new State[](0);
-            (IAdjudicator.Status status, Allocation[2] memory allocations) =
-                _adjudicate(meta.chan, deposit, emptyProofs);
+            IAdjudicator.Status status = _adjudicate(meta.chan, deposit, emptyProofs);
 
             // Update channel state based on adjudicator decision
             if (status == IAdjudicator.Status.ACTIVE) {
@@ -116,13 +115,12 @@ contract Custody is IChannel {
         if (meta.chan.adjudicator == address(0)) revert ChannelNotFound();
 
         // Get adjudicator's validation of the candidate state
-        (IAdjudicator.Status status, Allocation[2] memory allocations) = _adjudicate(meta.chan, candidate, proofs);
+        IAdjudicator.Status status = _adjudicate(meta.chan, candidate, proofs);
 
         // Only proceed if adjudicator determines the state is FINAL
         if (status == IAdjudicator.Status.FINAL) {
-            // Set last valid state and update allocations with swapped values
+            // Set last valid state
             meta.lastValidState = candidate;
-            meta.lastValidState.allocations = allocations;
             _closeChannel(channelId, meta);
         } else if (status == IAdjudicator.Status.INVALID) {
             revert InvalidState();
@@ -142,7 +140,7 @@ contract Custody is IChannel {
         if (meta.chan.adjudicator == address(0)) revert ChannelNotFound();
 
         // Get adjudicator's validation of the candidate state
-        (IAdjudicator.Status status, Allocation[2] memory allocations) = _adjudicate(meta.chan, candidate, proofs);
+        IAdjudicator.Status status = _adjudicate(meta.chan, candidate, proofs);
 
         if (status == IAdjudicator.Status.ACTIVE) {
             // Valid challenge, save state and start challenge period
@@ -155,7 +153,6 @@ contract Custody is IChannel {
         } else if (status == IAdjudicator.Status.FINAL) {
             // If state is final, close the channel directly
             meta.lastValidState = candidate;
-            meta.lastValidState.allocations = allocations;
             _closeChannel(channelId, meta);
         } else {
             // For other statuses like PARTIAL or VOID
@@ -174,7 +171,7 @@ contract Custody is IChannel {
         if (meta.chan.adjudicator == address(0)) revert ChannelNotFound();
 
         // Get adjudicator's validation of the candidate state
-        (IAdjudicator.Status status, Allocation[2] memory allocations) = _adjudicate(meta.chan, candidate, proofs);
+        IAdjudicator.Status status = _adjudicate(meta.chan, candidate, proofs);
 
         if (status == IAdjudicator.Status.ACTIVE) {
             // Valid state, save it without starting challenge
@@ -185,7 +182,6 @@ contract Custody is IChannel {
         } else if (status == IAdjudicator.Status.FINAL) {
             // If state is final, checkpoint it
             meta.lastValidState = candidate;
-            meta.lastValidState.allocations = allocations;
             emit ChannelCheckpointed(channelId);
         } else {
             // For other statuses like PARTIAL or VOID
@@ -245,12 +241,11 @@ contract Custody is IChannel {
      * @param candidate The state to be adjudicated
      * @param proofs Additional proof states if required
      * @return status The adjudication status
-     * @return allocations The resulting allocations
      */
     function _adjudicate(Channel memory ch, State memory candidate, State[] memory proofs)
         internal
         view
-        returns (IAdjudicator.Status status, Allocation[2] memory allocations)
+        returns (IAdjudicator.Status status)
     {
         IAdjudicator adjudicator = IAdjudicator(ch.adjudicator);
         // Convert to calldata by passing individual parameters

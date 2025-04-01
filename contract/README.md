@@ -92,14 +92,14 @@ interface IAdjudicator {
         VOID,     // Channel was never active or have an anomaly
         PARTIAL,  // Partial funding waiting for other participants
         ACTIVE,   // Channel fully funded using open or state are valid
-        INVALID,  // Channel in challenge period
+        INVALID,  // Channel state is invalid
         FINAL     // This is the FINAL State channel can be closed
     }
 
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
         view
-        returns (Status decision, Allocation[2] memory allocations);
+        returns (Status decision);
 }
 ```
 
@@ -109,7 +109,6 @@ interface IAdjudicator {
   - `proofs`: Previous valid states for reference in validation
 - **Returns**:
   - `decision`: Status of the channel after adjudication
-  - `allocations`: The final allocations for participants based on the adjudication
 
 ## IChannel Interface
 
@@ -175,7 +174,7 @@ interface IChannel {
    - **Purpose**: Finalize the channel immediately with a valid state.
    - **Logic**:
      - Calls `adjudicate` on the channel's adjudicator with the candidate state and proofs
-     - If valid, distributes tokens according to allocations
+     - If valid, distributes tokens according to the state's allocations
      - Closes the channel
 
 3. **Challenge Channel**  
@@ -196,7 +195,7 @@ interface IChannel {
    `reclaim(bytes32 channelId)`  
    - **Purpose**: Conclude the channel after challenge period expires.
    - **Logic**:  
-     - Distributes tokens according to the last valid outcome
+     - Distributes tokens according to the last valid state's allocations
      - Closes the channel
 
 ## High-Level Flow
@@ -208,14 +207,14 @@ interface IChannel {
 3. **Happy Path (Cooperative Close)**:  
    - A final state is validated by the adjudicator.
    - Either party calls `close` with the candidate state and any required proofs.
-   - The adjudicator verifies the state and determines the final allocations.
+   - The adjudicator verifies the state's validity, and the contract uses the state's allocations for distribution.
 4. **Intermediate State Record (Checkpoint)**:
    - At any point, either party can call `checkpoint` to record a valid state on-chain.
    - This doesn't close the channel but provides protection against future disputes.
 5. **Unhappy Path (Challenge)**:  
    - One party calls `challenge` with their most recent valid state and any required proofs.
    - The counterparty may respond with a more recent valid state using another `challenge`.
-   - After the challenge period expires, `reclaim` settles funds according to the last adjudicated valid state.
+   - After the challenge period expires, `reclaim` settles funds according to the allocations in the last adjudicated valid state.
 
 ## Project Structure
 
@@ -258,4 +257,4 @@ mapping(bytes32 => Metadata) private channels;
 
 ### Trivial Adjudicator
 
-The Trivial adjudicator provides a basic implementation for validating state transitions. It always returns ACTIVE status and the allocations from the candidate state, allowing testing the framework with simple state validation rules.
+The Trivial adjudicator provides a basic implementation for validating state transitions. It always returns ACTIVE status, allowing testing the framework with simple state validation rules.

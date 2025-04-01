@@ -33,26 +33,23 @@ contract MicroPayment is IAdjudicator {
      * @param candidate The proposed payment state
      * @param proofs Array containing previous states (optional)
      * @return decision The status of the channel after adjudication
-     * @return allocations The final allocations based on the payment amount
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
         pure
         override
-        returns (Status decision, Allocation[2] memory allocations)
+        returns (Status decision)
     {
-        // Start with allocations from candidate state
-        allocations = candidate.allocations;
 
         // Ensure at least one signature exists
-        if (candidate.sigs.length == 0) return (Status.INVALID, allocations);
+        if (candidate.sigs.length == 0) return Status.INVALID;
 
         // Get the state hash for signature verification
         bytes32 stateHash = Utils.getStateHash(chan, candidate);
 
         // Verify that the Host signed the state
         if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])) {
-            return (Status.INVALID, allocations);
+            return Status.INVALID;
         }
 
         // Decode the payment amount from candidate state.data
@@ -63,7 +60,7 @@ contract MicroPayment is IAdjudicator {
             // Validate previous state is also signed by Host
             bytes32 proofStateHash = Utils.getStateHash(chan, proofs[0]);
             if (!Utils.verifySignature(proofStateHash, proofs[0].sigs[0], chan.participants[HOST])) {
-                return (Status.INVALID, allocations);
+                return Status.INVALID;
             }
 
             // Decode the payment amount from proof state
@@ -71,28 +68,26 @@ contract MicroPayment is IAdjudicator {
 
             // Payment amount must not decrease
             if (paymentAmount < previousAmount) {
-                return (Status.INVALID, allocations);
+                return Status.INVALID;
             }
         }
 
         // Calculate the total deposited by Host
-        uint256 hostDeposit = allocations[HOST].amount + allocations[GUEST].amount;
+        // Note: We are still reading from allocations for validation purposes
+        // even though we don't return them anymore
+        uint256 hostDeposit = candidate.allocations[HOST].amount + candidate.allocations[GUEST].amount;
 
         // Payment amount cannot exceed Host's deposit
         if (paymentAmount > hostDeposit) {
-            return (Status.INVALID, allocations);
+            return Status.INVALID;
         }
-
-        // Update allocations based on payment amount
-        allocations[HOST].amount = hostDeposit - paymentAmount;
-        allocations[GUEST].amount = paymentAmount;
 
         // For micro-payment channels, states are always ACTIVE until participants decide to close
         // A payment of the full deposit amount makes the channel FINAL
         if (paymentAmount == hostDeposit) {
-            return (Status.FINAL, allocations);
+            return Status.FINAL;
         }
 
-        return (Status.ACTIVE, allocations);
+        return Status.ACTIVE;
     }
 }

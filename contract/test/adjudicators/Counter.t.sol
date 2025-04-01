@@ -102,7 +102,7 @@ contract CounterTest is Test {
         state.sigs[0] = signState(state, hostPrivateKey);
 
         // Adjudicate
-        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
 
         // With counter = 0, should be PARTIAL
         assertEq(uint256(decision), uint256(IAdjudicator.Status.PARTIAL));
@@ -119,7 +119,7 @@ contract CounterTest is Test {
         state.sigs[1] = signState(state, guestPrivateKey);
 
         // Adjudicate
-        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
 
         // With counter = 0, should be PARTIAL
         assertEq(uint256(decision), uint256(IAdjudicator.Status.PARTIAL));
@@ -136,7 +136,7 @@ contract CounterTest is Test {
         state.sigs[1] = signState(state, guestPrivateKey);
 
         // Adjudicate
-        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
 
         // With counter > 0, should be ACTIVE
         assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
@@ -154,7 +154,7 @@ contract CounterTest is Test {
         state.sigs[0] = sig;
 
         // Adjudicate with corrupted signature should return VOID
-        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.VOID));
     }
 
@@ -172,7 +172,7 @@ contract CounterTest is Test {
         state.sigs[1] = guestSig;
 
         // Adjudicate with corrupted guest signature should return VOID
-        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.VOID));
     }
 
@@ -184,7 +184,7 @@ contract CounterTest is Test {
         // No signatures added
 
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -206,7 +206,7 @@ contract CounterTest is Test {
         proofs[0] = prevState;
 
         // Adjudicate
-        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
 
         // Should be ACTIVE
         assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
@@ -230,7 +230,7 @@ contract CounterTest is Test {
         proofs[0] = prevState;
 
         // Adjudicate
-        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
 
         // Should be ACTIVE
         assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
@@ -254,7 +254,7 @@ contract CounterTest is Test {
         proofs[0] = prevState;
 
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -276,7 +276,7 @@ contract CounterTest is Test {
         proofs[0] = prevState;
 
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -298,7 +298,7 @@ contract CounterTest is Test {
         proofs[0] = prevState;
 
         // Adjudicate
-        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
+        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
 
         // Should be FINAL
         assertEq(uint256(decision), uint256(IAdjudicator.Status.FINAL));

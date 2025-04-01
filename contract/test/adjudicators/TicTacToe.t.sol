@@ -110,7 +110,7 @@ contract TicTacToeTest is Test {
 
         // Adjudicate with just Host signature - should be PARTIAL
         State[] memory noProofs = new State[](0);
-        (IAdjudicator.Status decision,) = ticTacToe.adjudicate(chan, initialState, noProofs);
+        IAdjudicator.Status decision = ticTacToe.adjudicate(chan, initialState, noProofs);
         assertEq(uint256(decision), uint256(IAdjudicator.Status.PARTIAL));
 
         // Add Guest signature
@@ -119,7 +119,7 @@ contract TicTacToeTest is Test {
         initialState.sigs[1] = signState(initialState, guestPrivateKey);
 
         // Adjudicate with both signatures - should be ACTIVE
-        (decision,) = ticTacToe.adjudicate(chan, initialState, noProofs);
+        decision = ticTacToe.adjudicate(chan, initialState, noProofs);
         assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
     }
 
@@ -136,7 +136,7 @@ contract TicTacToeTest is Test {
         // Adjudicate first move with initial state as proof
         State[] memory proofs = new State[](1);
         proofs[0] = initialState;
-        (IAdjudicator.Status decision,) = ticTacToe.adjudicate(chan, firstMove, proofs);
+        IAdjudicator.Status decision = ticTacToe.adjudicate(chan, firstMove, proofs);
         // Based on the current implementation, the status is INVALID for the first move
         // Changing the assertion to match what's actually returned
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
@@ -155,7 +155,7 @@ contract TicTacToeTest is Test {
         // Adjudicate invalid move with initial state as proof
         State[] memory proofs = new State[](1);
         proofs[0] = initialState;
-        (IAdjudicator.Status decision,) = ticTacToe.adjudicate(chan, invalidMove, proofs);
+        IAdjudicator.Status decision = ticTacToe.adjudicate(chan, invalidMove, proofs);
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -184,7 +184,7 @@ contract TicTacToeTest is Test {
         // Adjudicate invalid move with first move as proof
         State[] memory proofs = new State[](1);
         proofs[0] = firstMove;
-        (IAdjudicator.Status decision,) = ticTacToe.adjudicate(chan, invalidMove, proofs);
+        IAdjudicator.Status decision = ticTacToe.adjudicate(chan, invalidMove, proofs);
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -213,12 +213,10 @@ contract TicTacToeTest is Test {
         // Adjudicate winning move with previous move as proof
         State[] memory proofs = new State[](1);
         proofs[0] = move4;
-        (IAdjudicator.Status decision, Allocation[2] memory allocations) = ticTacToe.adjudicate(chan, move5, proofs);
+        IAdjudicator.Status decision = ticTacToe.adjudicate(chan, move5, proofs);
 
         // Should be FINAL with all funds allocated to Host
         assertEq(uint256(decision), uint256(IAdjudicator.Status.FINAL));
-        assertEq(allocations[0].amount, 200); // Host gets all funds
-        assertEq(allocations[1].amount, 0); // Guest gets nothing
     }
 
     function test_GuestWins() public {
@@ -249,12 +247,10 @@ contract TicTacToeTest is Test {
         // Adjudicate winning move with previous move as proof
         State[] memory proofs = new State[](1);
         proofs[0] = move5;
-        (IAdjudicator.Status decision, Allocation[2] memory allocations) = ticTacToe.adjudicate(chan, move6, proofs);
+        IAdjudicator.Status decision = ticTacToe.adjudicate(chan, move6, proofs);
 
         // Should be FINAL with all funds allocated to Guest
         assertEq(uint256(decision), uint256(IAdjudicator.Status.FINAL));
-        assertEq(allocations[0].amount, 0); // Host gets nothing
-        assertEq(allocations[1].amount, 200); // Guest gets all funds
     }
 
     function test_Draw() public {
@@ -299,13 +295,9 @@ contract TicTacToeTest is Test {
         // Adjudicate final move with previous move as proof
         State[] memory proofs = new State[](1);
         proofs[0] = move8;
-        (IAdjudicator.Status decision, Allocation[2] memory allocations) = ticTacToe.adjudicate(chan, move9, proofs);
+        IAdjudicator.Status decision = ticTacToe.adjudicate(chan, move9, proofs);
 
         // Should be FINAL with original allocation maintained (draw)
         assertEq(uint256(decision), uint256(IAdjudicator.Status.FINAL));
-
-        // For a draw, funds should remain the same
-        assertEq(allocations[0].amount, 100);
-        assertEq(allocations[1].amount, 100);
     }
 }

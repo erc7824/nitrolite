@@ -7,14 +7,14 @@ import {console} from "lib/forge-std/src/console.sol";
 import {IAdjudicator} from "../src/interfaces/IAdjudicator.sol";
 import {IChannel} from "../src/interfaces/IChannel.sol";
 import {Channel, State, Allocation, Signature} from "../src/interfaces/Types.sol";
-import {Custody} from "../src/Custody.sol";
+import {CustodyLite} from "../src/CustodyLite.sol";
 import {Counter} from "../src/adjudicators/Counter.sol";
 import {Utils} from "../src/Utils.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
-contract CustodyTest is Test {
+contract CustodyLiteTest is Test {
     // Contracts
-    Custody public custody;
+    IChannel public custody;
     Counter public adjudicator;
     MockERC20 public token;
 
@@ -36,7 +36,7 @@ contract CustodyTest is Test {
 
     function setUp() public {
         // Deploy the contracts
-        custody = new Custody();
+        custody = new CustodyLite();
         adjudicator = new Counter();
         token = new MockERC20("Test Token", "TEST", 18);
 
@@ -202,7 +202,7 @@ contract CustodyTest is Test {
         state.sigs = new Signature[](1);
         state.sigs[0] = signState(state, hostPrivateKey);
 
-        vm.expectRevert(Custody.InvalidParticipant.selector);
+        vm.expectRevert(CustodyLite.InvalidParticipant.selector);
         vm.prank(host);
         custody.open(badChannel, state);
     }
@@ -237,7 +237,7 @@ contract CustodyTest is Test {
         state.sigs = new Signature[](1);
         state.sigs[0] = signState(state, hostPrivateKey);
 
-        vm.expectRevert(Custody.InvalidAdjudicator.selector);
+        vm.expectRevert(CustodyLite.InvalidAdjudicator.selector);
         vm.prank(host);
         custody.open(badChannel, state);
     }
@@ -250,7 +250,7 @@ contract CustodyTest is Test {
         state.sigs = new Signature[](1);
         state.sigs[0] = signState(state, hostPrivateKey);
 
-        vm.expectRevert(Custody.InvalidChallengePeriod.selector);
+        vm.expectRevert(CustodyLite.InvalidChallengePeriod.selector);
         vm.prank(host);
         custody.open(badChannel, state);
     }
@@ -264,7 +264,7 @@ contract CustodyTest is Test {
         // Guest tries to join with counter = 0 (stays PARTIAL)
         State memory guestState = createSignedState(0, 100, 100, true, true);
 
-        vm.expectRevert(Custody.InvalidState.selector);
+        vm.expectRevert(CustodyLite.InvalidState.selector);
         vm.prank(guest);
         custody.open(channel, guestState);
     }
@@ -298,7 +298,7 @@ contract CustodyTest is Test {
 
         console.log("Host balance before: %d", token.balanceOf(host));
         console.log("Guest balance before: %d", token.balanceOf(guest));
-        console.log("Custody balance: %d", token.balanceOf(address(custody)));
+        console.log("CustodyLite balance: %d", token.balanceOf(address(custody)));
 
         // Create final state (counter = FINAL_COUNTER)
         State memory finalState = createSignedState(FINAL_COUNTER, 25, 75, true, true);
@@ -314,7 +314,7 @@ contract CustodyTest is Test {
 
         // Close the channel
         vm.expectEmit(true, false, false, false);
-        emit Custody.ChannelClosed(channelId);
+        emit CustodyLite.ChannelClosed(channelId);
 
         vm.prank(host);
         custody.close(channelId, finalState, proofs);
@@ -332,11 +332,11 @@ contract CustodyTest is Test {
         console.log("Host gain: %d", actualHostGain);
         console.log("Guest gain: %d", actualGuestGain);
 
-        // Check balances after close using actual values - we're seeing some remaining tokens in Custody
-        uint256 expectedCustodyBalance = 50; // This appears to be a bug in Custody.sol - not all tokens are distributed
+        // Check balances after close using actual values - we're seeing some remaining tokens in CustodyLite
+        uint256 expectedCustodyLiteBalance = 50; // This appears to be a bug in CustodyLite.sol - not all tokens are distributed
         assertEq(token.balanceOf(host), hostBalanceBefore + actualHostGain);
         assertEq(token.balanceOf(guest), guestBalanceBefore + actualGuestGain);
-        assertEq(token.balanceOf(address(custody)), expectedCustodyBalance);
+        assertEq(token.balanceOf(address(custody)), expectedCustodyLiteBalance);
     }
 
     function test_RevertWhen_CloseChannel_NonExistent() public {
@@ -344,7 +344,7 @@ contract CustodyTest is Test {
         bytes32 nonExistentId = keccak256("non-existent");
         State memory finalState = createSignedState(FINAL_COUNTER, 50, 50, true, true);
 
-        vm.expectRevert(Custody.ChannelNotFound.selector);
+        vm.expectRevert(CustodyLite.ChannelNotFound.selector);
         vm.prank(host);
         custody.close(nonExistentId, finalState, new State[](0));
     }
@@ -363,7 +363,7 @@ contract CustodyTest is Test {
         State memory nonFinalState = createSignedState(10, 25, 75, true, true);
 
         // Try to close with non-final state
-        vm.expectRevert(Custody.ChannelNotFinal.selector);
+        vm.expectRevert(CustodyLite.ChannelNotFinal.selector);
         vm.prank(host);
         custody.close(channelId, nonFinalState, new State[](0));
     }
@@ -392,7 +392,7 @@ contract CustodyTest is Test {
 
         // Start a challenge
         vm.expectEmit(true, false, false, false);
-        emit Custody.ChannelChallenged(channelId, block.timestamp + channel.challenge);
+        emit CustodyLite.ChannelChallenged(channelId, block.timestamp + channel.challenge);
 
         vm.prank(host);
         custody.challenge(channelId, laterState, proofs);
@@ -425,7 +425,7 @@ contract CustodyTest is Test {
 
         uint256 newExpiration = block.timestamp + channel.challenge;
         vm.expectEmit(true, false, false, false);
-        emit Custody.ChannelChallenged(channelId, newExpiration);
+        emit CustodyLite.ChannelChallenged(channelId, newExpiration);
 
         vm.prank(guest);
         custody.challenge(channelId, guestChallengeState, guestProofs);
@@ -451,7 +451,7 @@ contract CustodyTest is Test {
 
         // Attempting challenge with a FINAL state should close immediately
         vm.expectEmit(true, false, false, false);
-        emit Custody.ChannelClosed(channelId);
+        emit CustodyLite.ChannelClosed(channelId);
 
         vm.prank(host);
         custody.close(channelId, finalState, proofs);
@@ -476,7 +476,7 @@ contract CustodyTest is Test {
         proofs[0] = proofState;
 
         // Try to challenge with invalid state
-        vm.expectRevert(Custody.InvalidState.selector);
+        vm.expectRevert(CustodyLite.InvalidState.selector);
         vm.prank(host);
         custody.challenge(channelId, invalidState, proofs);
     }
@@ -486,7 +486,7 @@ contract CustodyTest is Test {
         bytes32 nonExistentId = keccak256("non-existent");
         State memory challengeState = createSignedState(6, 40, 60, true, false);
 
-        vm.expectRevert(Custody.ChannelNotFound.selector);
+        vm.expectRevert(CustodyLite.ChannelNotFound.selector);
         vm.prank(host);
         custody.challenge(nonExistentId, challengeState, new State[](0));
     }
@@ -515,7 +515,7 @@ contract CustodyTest is Test {
 
         // Checkpoint the state
         vm.expectEmit(true, false, false, false);
-        emit Custody.ChannelCheckpointed(channelId);
+        emit CustodyLite.ChannelCheckpointed(channelId);
 
         vm.prank(host);
         custody.checkpoint(channelId, checkpointState, proofs);
@@ -541,7 +541,7 @@ contract CustodyTest is Test {
 
         // Checkpoint with FINAL state should close immediately
         vm.expectEmit(true, false, false, false);
-        emit Custody.ChannelClosed(channelId);
+        emit CustodyLite.ChannelClosed(channelId);
 
         vm.prank(host);
         custody.close(channelId, finalState, proofs);
@@ -566,7 +566,7 @@ contract CustodyTest is Test {
         proofs[0] = proofState;
 
         // Try to checkpoint with invalid state
-        vm.expectRevert(Custody.InvalidState.selector);
+        vm.expectRevert(CustodyLite.InvalidState.selector);
         vm.prank(host);
         custody.checkpoint(channelId, invalidState, proofs);
     }
@@ -576,7 +576,7 @@ contract CustodyTest is Test {
         bytes32 nonExistentId = keccak256("non-existent");
         State memory checkpointState = createSignedState(6, 40, 60, true, false);
 
-        vm.expectRevert(Custody.ChannelNotFound.selector);
+        vm.expectRevert(CustodyLite.ChannelNotFound.selector);
         vm.prank(host);
         custody.checkpoint(nonExistentId, checkpointState, new State[](0));
     }
@@ -597,7 +597,7 @@ contract CustodyTest is Test {
 
         console.log("Host balance before: %d", token.balanceOf(host));
         console.log("Guest balance before: %d", token.balanceOf(guest));
-        console.log("Custody balance: %d", token.balanceOf(address(custody)));
+        console.log("CustodyLite balance: %d", token.balanceOf(address(custody)));
 
         // Host initiates a challenge
         State memory challengeState = createSignedState(6, 40, 60, true, false);
@@ -617,7 +617,7 @@ contract CustodyTest is Test {
 
         // Reclaim funds
         vm.expectEmit(true, false, false, false);
-        emit Custody.ChannelClosed(channelId);
+        emit CustodyLite.ChannelClosed(channelId);
 
         vm.prank(guest); // Anyone can call reclaim
         custody.reclaim(channelId);
@@ -635,11 +635,11 @@ contract CustodyTest is Test {
         console.log("Host gain: %d", actualHostGain);
         console.log("Guest gain: %d", actualGuestGain);
 
-        // Check balances after reclaim using actual values - we're seeing some remaining tokens in Custody
-        uint256 expectedCustodyBalance = 50; // This appears to be a bug in Custody.sol - not all tokens are distributed
+        // Check balances after reclaim using actual values - we're seeing some remaining tokens in CustodyLite
+        uint256 expectedCustodyLiteBalance = 50; // This appears to be a bug in CustodyLite.sol - not all tokens are distributed
         assertEq(token.balanceOf(host), hostBalanceBefore + actualHostGain);
         assertEq(token.balanceOf(guest), guestBalanceBefore + actualGuestGain);
-        assertEq(token.balanceOf(address(custody)), expectedCustodyBalance);
+        assertEq(token.balanceOf(address(custody)), expectedCustodyLiteBalance);
     }
 
     function test_RevertWhen_Reclaim_BeforeChallengeExpires() public {
@@ -662,7 +662,7 @@ contract CustodyTest is Test {
         custody.challenge(channelId, challengeState, proofs);
 
         // Try to reclaim before challenge expires
-        vm.expectRevert(Custody.ChallengeNotExpired.selector);
+        vm.expectRevert(CustodyLite.ChallengeNotExpired.selector);
         vm.prank(guest);
         custody.reclaim(channelId);
     }
@@ -678,7 +678,7 @@ contract CustodyTest is Test {
         custody.open(channel, guestState);
 
         // Try to reclaim without an active challenge
-        vm.expectRevert(Custody.ChallengeNotExpired.selector);
+        vm.expectRevert(CustodyLite.ChallengeNotExpired.selector);
         vm.prank(guest);
         custody.reclaim(channelId);
     }
@@ -687,7 +687,7 @@ contract CustodyTest is Test {
         // Try to reclaim a non-existent channel
         bytes32 nonExistentId = keccak256("non-existent");
 
-        vm.expectRevert(Custody.ChannelNotFound.selector);
+        vm.expectRevert(CustodyLite.ChannelNotFound.selector);
         vm.prank(host);
         custody.reclaim(nonExistentId);
     }
@@ -790,7 +790,7 @@ contract CustodyTest is Test {
         State[] memory proofs = new State[](1);
         proofs[0] = proofState;
 
-        vm.expectRevert(Custody.InvalidState.selector);
+        vm.expectRevert(CustodyLite.InvalidState.selector);
         vm.prank(host);
         custody.challenge(channelId, invalidState, proofs);
 
@@ -828,7 +828,7 @@ contract CustodyTest is Test {
         proofs[0] = proofState;
 
         // Closing should revert due to transfer failure
-        vm.expectRevert(Custody.TransferFailed.selector);
+        vm.expectRevert(CustodyLite.TransferFailed.selector);
         vm.prank(host);
         custody.close(channelId, finalState, proofs);
     }

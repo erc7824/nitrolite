@@ -11,7 +11,7 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol
  * @title Custody
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
  */
-contract Custody is IChannel {
+contract CustodyLite is IChannel {
     // Errors
     error ChannelNotFound();
     error InvalidParticipant();

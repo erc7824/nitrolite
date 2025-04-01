@@ -59,14 +59,13 @@ contract CounterTest is Test {
     }
 
     // Helper function to create a counter state
-    function createCounterState(
-        uint256 counter, 
-        Allocation[2] memory allocations
-    ) internal pure returns (State memory) {
+    function createCounterState(uint256 counter, Allocation[2] memory allocations)
+        internal
+        pure
+        returns (State memory)
+    {
         State memory state;
-        Counter.CounterData memory counterData = Counter.CounterData({
-            counter: counter
-        });
+        Counter.CounterData memory counterData = Counter.CounterData({counter: counter});
         state.data = abi.encode(counterData);
         state.allocations = allocations;
         state.sigs = new Signature[](0); // Empty signatures to be filled later
@@ -84,10 +83,10 @@ contract CounterTest is Test {
     function test_BasicSignatureVerification() public {
         bytes32 message = keccak256("test message");
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(hostPrivateKey, message);
-        
+
         address recovered = ecrecover(message, v, r, s);
         assertEq(recovered, host);
-        
+
         Signature memory signature = Signature({v: v, r: r, s: s});
         bool isValid = Utils.verifySignature(message, signature, host);
         assertTrue(isValid);
@@ -97,14 +96,14 @@ contract CounterTest is Test {
     function test_InitialStateHostOnly() public {
         Allocation[2] memory allocations = createAllocations(50, 50);
         State memory state = createCounterState(0, allocations);
-        
+
         // Add host signature
         state.sigs = new Signature[](1);
         state.sigs[0] = signState(state, hostPrivateKey);
-        
+
         // Adjudicate
         (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
-        
+
         // With counter = 0, should be PARTIAL
         assertEq(uint256(decision), uint256(IAdjudicator.Status.PARTIAL));
     }
@@ -113,15 +112,15 @@ contract CounterTest is Test {
     function test_InitialStateBothSignaturesZeroCounter() public {
         Allocation[2] memory allocations = createAllocations(50, 50);
         State memory state = createCounterState(0, allocations);
-        
+
         // Add both signatures
         state.sigs = new Signature[](2);
         state.sigs[0] = signState(state, hostPrivateKey);
         state.sigs[1] = signState(state, guestPrivateKey);
-        
+
         // Adjudicate
         (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
-        
+
         // With counter = 0, should be PARTIAL
         assertEq(uint256(decision), uint256(IAdjudicator.Status.PARTIAL));
     }
@@ -130,15 +129,15 @@ contract CounterTest is Test {
     function test_InitialStateBothSignaturesNonZeroCounter() public {
         Allocation[2] memory allocations = createAllocations(50, 50);
         State memory state = createCounterState(5, allocations);
-        
+
         // Add both signatures
         state.sigs = new Signature[](2);
         state.sigs[0] = signState(state, hostPrivateKey);
         state.sigs[1] = signState(state, guestPrivateKey);
-        
+
         // Adjudicate
         (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
-        
+
         // With counter > 0, should be ACTIVE
         assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
     }
@@ -147,13 +146,13 @@ contract CounterTest is Test {
     function test_InvalidHostSignature() public {
         Allocation[2] memory allocations = createAllocations(50, 50);
         State memory state = createCounterState(5, allocations);
-        
+
         // Add host signature but corrupt it
         state.sigs = new Signature[](1);
         Signature memory sig = signState(state, hostPrivateKey);
         sig.r = bytes32(0); // Corrupt signature
         state.sigs[0] = sig;
-        
+
         // Adjudicate with corrupted signature should return VOID
         (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.VOID));
@@ -163,15 +162,15 @@ contract CounterTest is Test {
     function test_InvalidGuestSignature() public {
         Allocation[2] memory allocations = createAllocations(50, 50);
         State memory state = createCounterState(5, allocations);
-        
+
         // Add both signatures but corrupt guest signature
         state.sigs = new Signature[](2);
         state.sigs[0] = signState(state, hostPrivateKey);
-        
+
         Signature memory guestSig = signState(state, guestPrivateKey);
         guestSig.r = bytes32(0); // Corrupt signature
         state.sigs[1] = guestSig;
-        
+
         // Adjudicate with corrupted guest signature should return VOID
         (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.VOID));
@@ -181,11 +180,11 @@ contract CounterTest is Test {
     function test_InsufficientSignatures() public {
         Allocation[2] memory allocations = createAllocations(50, 50);
         State memory state = createCounterState(5, allocations);
-        
+
         // No signatures added
-        
+
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, state, new State[](0));
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -196,19 +195,19 @@ contract CounterTest is Test {
         State memory prevState = createCounterState(5, allocations);
         prevState.sigs = new Signature[](1);
         prevState.sigs[0] = signState(prevState, guestPrivateKey);
-        
+
         // Create the new state (counter = 6, signed by Host)
         State memory newState = createCounterState(6, allocations);
         newState.sigs = new Signature[](1);
         newState.sigs[0] = signState(newState, hostPrivateKey);
-        
+
         // Create proofs array with previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
-        
+
         // Adjudicate
         (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
-        
+
         // Should be ACTIVE
         assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
     }
@@ -220,19 +219,19 @@ contract CounterTest is Test {
         State memory prevState = createCounterState(6, allocations);
         prevState.sigs = new Signature[](1);
         prevState.sigs[0] = signState(prevState, hostPrivateKey);
-        
+
         // Create the new state (counter = 7, signed by Guest)
         State memory newState = createCounterState(7, allocations);
         newState.sigs = new Signature[](1);
         newState.sigs[0] = signState(newState, guestPrivateKey);
-        
+
         // Create proofs array with previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
-        
+
         // Adjudicate
         (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
-        
+
         // Should be ACTIVE
         assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
     }
@@ -244,18 +243,18 @@ contract CounterTest is Test {
         State memory prevState = createCounterState(5, allocations);
         prevState.sigs = new Signature[](1);
         prevState.sigs[0] = signState(prevState, guestPrivateKey);
-        
+
         // Create the new state (counter = 7, signed by Host) - increment by 2 instead of 1
         State memory newState = createCounterState(7, allocations);
         newState.sigs = new Signature[](1);
         newState.sigs[0] = signState(newState, hostPrivateKey);
-        
+
         // Create proofs array with previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
-        
+
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, newState, proofs);
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -266,18 +265,18 @@ contract CounterTest is Test {
         State memory prevState = createCounterState(5, allocations);
         prevState.sigs = new Signature[](1);
         prevState.sigs[0] = signState(prevState, hostPrivateKey);
-        
+
         // Create the new state (counter = 6, signed by Host again)
         State memory newState = createCounterState(6, allocations);
         newState.sigs = new Signature[](1);
         newState.sigs[0] = signState(newState, hostPrivateKey);
-        
+
         // Create proofs array with previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
-        
+
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, newState, proofs);
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -288,19 +287,19 @@ contract CounterTest is Test {
         State memory prevState = createCounterState(999, allocations);
         prevState.sigs = new Signature[](1);
         prevState.sigs[0] = signState(prevState, guestPrivateKey);
-        
+
         // Create the new state (counter = 1000, signed by Host)
         State memory newState = createCounterState(1000, allocations);
         newState.sigs = new Signature[](1);
         newState.sigs[0] = signState(newState, hostPrivateKey);
-        
+
         // Create proofs array with previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
-        
+
         // Adjudicate
         (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
-        
+
         // Should be FINAL
         assertEq(uint256(decision), uint256(IAdjudicator.Status.FINAL));
     }

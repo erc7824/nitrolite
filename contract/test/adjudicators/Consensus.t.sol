@@ -146,7 +146,7 @@ contract ConsensusTest is Test {
         state.sigs[0] = Signature({v: v, r: r, s: s});
 
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, state, new State[](0));
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -179,7 +179,7 @@ contract ConsensusTest is Test {
         state.sigs[1] = Signature({v: v, r: r, s: s});
 
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, state, new State[](0));
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -200,7 +200,7 @@ contract ConsensusTest is Test {
         // State.sigs defaults to empty values
 
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, state, new State[](0));
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 }

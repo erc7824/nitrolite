@@ -64,7 +64,7 @@ contract Counter is IAdjudicator {
             if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])) {
                 return (Status.VOID, allocations);
             }
-            
+
             // If only Host has signed, channel is PARTIAL
             if (candidate.sigs.length < 2) {
                 return (Status.PARTIAL, allocations);
@@ -102,14 +102,14 @@ contract Counter is IAdjudicator {
             if (!Utils.verifySignature(proofStateHash, proofs[0].sigs[0], chan.participants[GUEST])) {
                 return (Status.INVALID, allocations);
             }
-        } 
+        }
         // When Guest is the signer of candidate, Host must have signed the proof
         else if (Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[GUEST])) {
             // Verify Host signed the proof
             if (!Utils.verifySignature(proofStateHash, proofs[0].sigs[0], chan.participants[HOST])) {
                 return (Status.INVALID, allocations);
             }
-        } 
+        }
         // Invalid signature on candidate
         else {
             return (Status.INVALID, allocations);

@@ -71,7 +71,7 @@ contract TicTacToe is IAdjudicator {
             if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])) {
                 return (Status.VOID, allocations);
             }
-            
+
             // If only Host has signed, channel is PARTIAL
             if (candidate.sigs.length < 2) {
                 return (Status.PARTIAL, allocations);
@@ -147,13 +147,13 @@ contract TicTacToe is IAdjudicator {
      */
     function isGridEmpty(GameGrid memory grid) internal pure returns (bool) {
         if (grid.moveCount != 0) return false;
-        
+
         for (uint256 i = 0; i < 3; i++) {
             for (uint256 j = 0; j < 3; j++) {
                 if (grid.grid[i][j] != EMPTY) return false;
             }
         }
-        
+
         return true;
     }
 
@@ -171,19 +171,19 @@ contract TicTacToe is IAdjudicator {
 
         // Determine which player's turn it is based on move count
         uint256 currentPlayer = previousGrid.moveCount % 2 == 0 ? X : O;
-        
+
         // Count changes between grids - should be exactly one change
         uint256 changesCount = 0;
         uint256 row;
         uint256 col;
-        
+
         for (uint256 i = 0; i < 3; i++) {
             for (uint256 j = 0; j < 3; j++) {
                 if (previousGrid.grid[i][j] != candidateGrid.grid[i][j]) {
                     changesCount++;
                     row = i;
                     col = j;
-                    
+
                     // The cell should have been empty and now contain the current player's marker
                     if (previousGrid.grid[i][j] != EMPTY || candidateGrid.grid[i][j] != currentPlayer) {
                         return false;
@@ -191,7 +191,7 @@ contract TicTacToe is IAdjudicator {
                 }
             }
         }
-        
+
         // Ensure exactly one change occurred
         return changesCount == 1;
     }
@@ -204,36 +204,28 @@ contract TicTacToe is IAdjudicator {
     function checkWinner(GameGrid memory grid) internal pure returns (uint256) {
         // Check rows
         for (uint256 i = 0; i < 3; i++) {
-            if (grid.grid[i][0] != EMPTY && 
-                grid.grid[i][0] == grid.grid[i][1] && 
-                grid.grid[i][1] == grid.grid[i][2]) {
+            if (grid.grid[i][0] != EMPTY && grid.grid[i][0] == grid.grid[i][1] && grid.grid[i][1] == grid.grid[i][2]) {
                 return grid.grid[i][0];
             }
         }
-        
+
         // Check columns
         for (uint256 j = 0; j < 3; j++) {
-            if (grid.grid[0][j] != EMPTY && 
-                grid.grid[0][j] == grid.grid[1][j] && 
-                grid.grid[1][j] == grid.grid[2][j]) {
+            if (grid.grid[0][j] != EMPTY && grid.grid[0][j] == grid.grid[1][j] && grid.grid[1][j] == grid.grid[2][j]) {
                 return grid.grid[0][j];
             }
         }
-        
+
         // Check diagonal top-left to bottom-right
-        if (grid.grid[0][0] != EMPTY && 
-            grid.grid[0][0] == grid.grid[1][1] && 
-            grid.grid[1][1] == grid.grid[2][2]) {
+        if (grid.grid[0][0] != EMPTY && grid.grid[0][0] == grid.grid[1][1] && grid.grid[1][1] == grid.grid[2][2]) {
             return grid.grid[0][0];
         }
-        
+
         // Check diagonal top-right to bottom-left
-        if (grid.grid[0][2] != EMPTY && 
-            grid.grid[0][2] == grid.grid[1][1] && 
-            grid.grid[1][1] == grid.grid[2][0]) {
+        if (grid.grid[0][2] != EMPTY && grid.grid[0][2] == grid.grid[1][1] && grid.grid[1][1] == grid.grid[2][0]) {
             return grid.grid[0][2];
         }
-        
+
         return EMPTY; // No winner
     }
 
@@ -247,7 +239,7 @@ contract TicTacToe is IAdjudicator {
         if (checkWinner(grid) != EMPTY) {
             return false;
         }
-        
+
         // If all cells are filled, it's a draw
         return grid.moveCount == 9;
     }

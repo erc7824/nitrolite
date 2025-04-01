@@ -14,6 +14,7 @@ interface IAdjudicator {
         ACTIVE, // Channel fully funded using open or state are valid
         INVALID, // Channel state is invalid
         FINAL // This is the FINAL State channel can be closed
+
     }
 
     /**

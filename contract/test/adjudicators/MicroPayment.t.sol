@@ -58,10 +58,11 @@ contract MicroPaymentTest is Test {
     }
 
     // Helper function to create a payment state
-    function createPaymentState(
-        uint256 paymentAmount, 
-        Allocation[2] memory allocations
-    ) internal pure returns (State memory) {
+    function createPaymentState(uint256 paymentAmount, Allocation[2] memory allocations)
+        internal
+        pure
+        returns (State memory)
+    {
         State memory state;
         state.data = abi.encode(paymentAmount);
         state.allocations = allocations;
@@ -80,10 +81,10 @@ contract MicroPaymentTest is Test {
     function test_BasicSignatureVerification() public {
         bytes32 message = keccak256("test message");
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(hostPrivateKey, message);
-        
+
         address recovered = ecrecover(message, v, r, s);
         assertEq(recovered, host);
-        
+
         Signature memory signature = Signature({v: v, r: r, s: s});
         bool isValid = Utils.verifySignature(message, signature, host);
         assertTrue(isValid);
@@ -93,21 +94,21 @@ contract MicroPaymentTest is Test {
     function test_ValidPaymentState() public {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
-        
+
         // Create a state with 30 tokens payment to guest
         State memory state = createPaymentState(30, allocations);
-        
+
         // Add host signature
         state.sigs = new Signature[](1);
         state.sigs[0] = signState(state, hostPrivateKey);
-        
+
         // Adjudicate
-        (IAdjudicator.Status decision, Allocation[2] memory finalAllocations) = 
+        (IAdjudicator.Status decision, Allocation[2] memory finalAllocations) =
             adjudicator.adjudicate(channel, state, new State[](0));
-        
+
         // Check the status is ACTIVE
         assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
-        
+
         // Check the allocations have been updated properly
         assertEq(finalAllocations[HOST].amount, 70); // Host has 70 tokens left
         assertEq(finalAllocations[GUEST].amount, 30); // Guest has 30 tokens now
@@ -117,16 +118,16 @@ contract MicroPaymentTest is Test {
     function test_GuestSignatureInvalid() public {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
-        
+
         // Create a state with 30 tokens payment to guest
         State memory state = createPaymentState(30, allocations);
-        
+
         // Add guest signature (this should fail)
         state.sigs = new Signature[](1);
         state.sigs[0] = signState(state, guestPrivateKey);
-        
+
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, state, new State[](0));
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -134,14 +135,14 @@ contract MicroPaymentTest is Test {
     function test_MissingSignature() public {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
-        
+
         // Create a state with 30 tokens payment to guest
         State memory state = createPaymentState(30, allocations);
-        
+
         // No signatures added
-        
+
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, state, new State[](0));
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -149,18 +150,18 @@ contract MicroPaymentTest is Test {
     function test_InvalidHostSignature() public {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
-        
+
         // Create a state with 30 tokens payment to guest
         State memory state = createPaymentState(30, allocations);
-        
+
         // Add corrupted host signature
         state.sigs = new Signature[](1);
         Signature memory sig = signState(state, hostPrivateKey);
         sig.r = bytes32(0); // Corrupt the signature
         state.sigs[0] = sig;
-        
+
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, state, new State[](0));
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -168,16 +169,16 @@ contract MicroPaymentTest is Test {
     function test_PaymentExceedsDeposit() public {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
-        
+
         // Create a state with 150 tokens payment (exceeds the 100 token deposit)
         State memory state = createPaymentState(150, allocations);
-        
+
         // Add host signature
         state.sigs = new Signature[](1);
         state.sigs[0] = signState(state, hostPrivateKey);
-        
+
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, state, new State[](0));
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, state, new State[](0));
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -185,23 +186,23 @@ contract MicroPaymentTest is Test {
     function test_DecreasingPayment() public {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
-        
+
         // Create a previous state with 50 tokens payment
         State memory prevState = createPaymentState(50, allocations);
         prevState.sigs = new Signature[](1);
         prevState.sigs[0] = signState(prevState, hostPrivateKey);
-        
+
         // Create a new state with 30 tokens payment (decreasing)
         State memory newState = createPaymentState(30, allocations);
         newState.sigs = new Signature[](1);
         newState.sigs[0] = signState(newState, hostPrivateKey);
-        
+
         // Create proofs array with previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
-        
+
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, newState, proofs);
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 
@@ -209,28 +210,28 @@ contract MicroPaymentTest is Test {
     function test_IncreasingPayment() public {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
-        
+
         // Create a previous state with 30 tokens payment
         State memory prevState = createPaymentState(30, allocations);
         prevState.sigs = new Signature[](1);
         prevState.sigs[0] = signState(prevState, hostPrivateKey);
-        
+
         // Create a new state with 50 tokens payment (increasing)
         State memory newState = createPaymentState(50, allocations);
         newState.sigs = new Signature[](1);
         newState.sigs[0] = signState(newState, hostPrivateKey);
-        
+
         // Create proofs array with previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
-        
+
         // Adjudicate
-        (IAdjudicator.Status decision, Allocation[2] memory finalAllocations) = 
+        (IAdjudicator.Status decision, Allocation[2] memory finalAllocations) =
             adjudicator.adjudicate(channel, newState, proofs);
-        
+
         // Check the status is ACTIVE
         assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
-        
+
         // Check the allocations have been updated properly
         assertEq(finalAllocations[HOST].amount, 50); // Host has 50 tokens left
         assertEq(finalAllocations[GUEST].amount, 50); // Guest has 50 tokens now
@@ -240,21 +241,21 @@ contract MicroPaymentTest is Test {
     function test_FinalPayment() public {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
-        
+
         // Create a state with full 100 tokens payment
         State memory state = createPaymentState(100, allocations);
-        
+
         // Add host signature
         state.sigs = new Signature[](1);
         state.sigs[0] = signState(state, hostPrivateKey);
-        
+
         // Adjudicate
-        (IAdjudicator.Status decision, Allocation[2] memory finalAllocations) = 
+        (IAdjudicator.Status decision, Allocation[2] memory finalAllocations) =
             adjudicator.adjudicate(channel, state, new State[](0));
-        
+
         // Check the status is FINAL
         assertEq(uint256(decision), uint256(IAdjudicator.Status.FINAL));
-        
+
         // Check the allocations have been updated properly
         assertEq(finalAllocations[HOST].amount, 0); // Host has 0 tokens left
         assertEq(finalAllocations[GUEST].amount, 100); // Guest has all 100 tokens
@@ -264,25 +265,25 @@ contract MicroPaymentTest is Test {
     function test_InvalidProofSignature() public {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
-        
+
         // Create a previous state with 30 tokens payment but corrupt signature
         State memory prevState = createPaymentState(30, allocations);
         prevState.sigs = new Signature[](1);
         Signature memory prevSig = signState(prevState, hostPrivateKey);
         prevSig.r = bytes32(0); // Corrupt the signature
         prevState.sigs[0] = prevSig;
-        
+
         // Create a new state with 50 tokens payment
         State memory newState = createPaymentState(50, allocations);
         newState.sigs = new Signature[](1);
         newState.sigs[0] = signState(newState, hostPrivateKey);
-        
+
         // Create proofs array with corrupted previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
-        
+
         // Adjudicate and expect INVALID status instead of revert
-        (IAdjudicator.Status decision, ) = adjudicator.adjudicate(channel, newState, proofs);
+        (IAdjudicator.Status decision,) = adjudicator.adjudicate(channel, newState, proofs);
         assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
     }
 }

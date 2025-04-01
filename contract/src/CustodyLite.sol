@@ -8,7 +8,7 @@ import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 
 /**
- * @title Custody
+ * @title CustodyLite
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
  */
 contract CustodyLite is IChannel {
@@ -25,6 +25,7 @@ contract CustodyLite is IChannel {
     error ChannelNotFinal();
 
     // Events
+    event ChannelPartiallyFunded(bytes32 indexed channelId, Channel channel);
     event ChannelOpened(bytes32 indexed channelId, Channel channel);
     event ChannelChallenged(bytes32 indexed channelId, uint256 expiration);
     event ChannelCheckpointed(bytes32 indexed channelId);
@@ -41,8 +42,7 @@ contract CustodyLite is IChannel {
         State lastValidState; // Last valid state when adjudicator was called
     }
 
-    // ChannelId to Data
-    mapping(bytes32 => Metadata) private channels;
+    mapping(bytes32 channelId => Metadata chMeta) private channels;
 
     /**
      * @notice Open or join a channel by depositing assets
@@ -50,12 +50,12 @@ contract CustodyLite is IChannel {
      * @param deposit is the initial State defined by the opener, it contains the expected allocation
      * @return channelId Unique identifier for the channel
      */
-    function open(Channel calldata ch, State calldata deposit) external override returns (bytes32 channelId) {
+    function open(Channel calldata ch, State calldata deposit) public returns (bytes32 channelId) {
         // Validate input parameters
-        if (ch.participants.length != 2) revert InvalidParticipant();
-        if (ch.participants[0] == address(0) || ch.participants[1] == address(0)) revert InvalidParticipant();
-        if (ch.adjudicator == address(0)) revert InvalidAdjudicator();
-        if (ch.challenge == 0) revert InvalidChallengePeriod();
+        require(ch.participants.length == 2, InvalidParticipant());
+        require(ch.participants[0] != address(0) && ch.participants[1] != address(0), InvalidParticipant());
+        require(ch.adjudicator != address(0), InvalidAdjudicator());
+        require(ch.challenge != 0, InvalidChallengePeriod());
 
         // Generate channel ID
         channelId = Utils.getChannelId(ch);
@@ -67,18 +67,18 @@ contract CustodyLite is IChannel {
             Allocation memory allocation = deposit.allocations[HOST];
             if (allocation.amount > 0) {
                 bool success = IERC20(allocation.token).transferFrom(msg.sender, address(this), allocation.amount);
-                if (!success) revert TransferFailed();
+                require(success, TransferFailed());
             }
 
             Metadata memory newCh = Metadata({chan: ch, challengeExpire: 0, lastValidState: deposit});
 
             channels[channelId] = newCh;
-            emit ChannelOpened(channelId, ch);
+            emit ChannelPartiallyFunded(channelId, ch);
         } else {
             Allocation memory allocation = deposit.allocations[GUEST];
             if (allocation.amount > 0) {
                 bool success = IERC20(allocation.token).transferFrom(msg.sender, address(this), allocation.amount);
-                if (!success) revert TransferFailed();
+                require(success, TransferFailed());
             }
 
             // Get adjudicator's validation of the state
@@ -110,9 +110,9 @@ contract CustodyLite is IChannel {
      * @param candidate The latest known valid state
      * @param proofs is an array of valid state required by the adjudicator
      */
-    function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) external override {
+    function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) public {
         Metadata storage meta = channels[channelId];
-        if (meta.chan.adjudicator == address(0)) revert ChannelNotFound();
+        require(meta.chan.adjudicator != address(0), ChannelNotFound());
 
         // Get adjudicator's validation of the candidate state
         IAdjudicator.Status status = _adjudicate(meta.chan, candidate, proofs);
@@ -135,14 +135,14 @@ contract CustodyLite is IChannel {
      * @param candidate The latest known valid state
      * @param proofs is an array of valid state required by the adjudicator
      */
-    function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs) external override {
+    function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = channels[channelId];
-        if (meta.chan.adjudicator == address(0)) revert ChannelNotFound();
+        require(meta.chan.adjudicator != address(0), ChannelNotFound());
 
         // Get adjudicator's validation of the candidate state
         IAdjudicator.Status status = _adjudicate(meta.chan, candidate, proofs);
 
-        if (status == IAdjudicator.Status.ACTIVE) {
+        if (status == IAdjudicator.Status.ACTIVE || status == IAdjudicator.Status.PARTIAL) {
             // Valid challenge, save state and start challenge period
             meta.lastValidState = candidate;
             meta.challengeExpire = block.timestamp + meta.chan.challenge;
@@ -166,9 +166,9 @@ contract CustodyLite is IChannel {
      * @param candidate The latest known valid state
      * @param proofs is an array of valid state required by the adjudicator
      */
-    function checkpoint(bytes32 channelId, State calldata candidate, State[] calldata proofs) external override {
+    function checkpoint(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = channels[channelId];
-        if (meta.chan.adjudicator == address(0)) revert ChannelNotFound();
+        require(meta.chan.adjudicator != address(0), ChannelNotFound());
 
         // Get adjudicator's validation of the candidate state
         IAdjudicator.Status status = _adjudicate(meta.chan, candidate, proofs);
@@ -193,14 +193,12 @@ contract CustodyLite is IChannel {
      * @notice Conclude the channel after challenge period expires
      * @param channelId Unique identifier for the channel
      */
-    function reclaim(bytes32 channelId) external override {
+    function reclaim(bytes32 channelId) external {
         Metadata storage meta = channels[channelId];
-        if (meta.chan.adjudicator == address(0)) revert ChannelNotFound();
+        require(meta.chan.adjudicator != address(0), ChannelNotFound());
 
         // Ensure challenge period has expired
-        if (meta.challengeExpire == 0 || block.timestamp < meta.challengeExpire) {
-            revert ChallengeNotExpired();
-        }
+        require(meta.challengeExpire != 0 && block.timestamp >= meta.challengeExpire, ChallengeNotExpired());
 
         // Close the channel with last valid state
         _closeChannel(channelId, meta);
@@ -210,23 +208,22 @@ contract CustodyLite is IChannel {
      * @notice Reset will close and open channel for resizing allocations
      * @param channelId Unique identifier for the channel
      * @param candidate The latest known valid state
-     * @param proofs is an array of valid state required by the adjudicator
-     * @param ch Channel configuration
-     * @param deposit is the initial State defined by the opener, it contains the expected allocation
+     * @param proofs An array of valid state required by the adjudicator
+     * @param newChannel New channel configuration
+     * @param newDeposit Initial State defined by the opener, containing the expected allocation
      */
     function reset(
         bytes32 channelId,
         State calldata candidate,
         State[] calldata proofs,
-        Channel calldata ch,
-        State calldata deposit
-    ) external override {
-        // Empty implementation to be filled later
+        Channel calldata newChannel,
+        State calldata newDeposit
+    ) external {
         // First close the existing channel
-        this.close(channelId, candidate, proofs);
+        close(channelId, candidate, proofs);
 
         // Then open a new channel with the provided configuration
-        this.open(ch, deposit);
+        open(newChannel, newDeposit);
     }
 
     /**
@@ -239,15 +236,16 @@ contract CustodyLite is IChannel {
         for (uint256 i = 0; i < meta.lastValidState.allocations.length; i++) {
             Allocation memory allocation = meta.lastValidState.allocations[i];
 
+            // FIXME: withdrawals when partially funded for challenges on this state to make sense. For that TODO: specify assets distribution per channel
             if (allocation.amount > 0) {
                 if (allocation.token == address(0)) {
                     // Transfer ETH
                     (bool success,) = allocation.destination.call{value: allocation.amount}("");
-                    if (!success) revert TransferFailed();
+                    require(success, TransferFailed());
                 } else {
                     // Transfer ERC20
                     bool success = IERC20(allocation.token).transfer(allocation.destination, allocation.amount);
-                    if (!success) revert TransferFailed();
+                    require(success, TransferFailed());
                 }
             }
         }

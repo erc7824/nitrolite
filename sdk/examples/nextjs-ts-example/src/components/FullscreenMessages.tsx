@@ -1,34 +1,35 @@
-import { useRef, useEffect, useState } from "react";
-import { useMessageStyles, MessageType } from "@/hooks/useMessageStyles";
+import React, { useState, useEffect, useRef } from "react";
 import { Message } from "@/types";
-import { FullscreenMessages } from "./FullscreenMessages";
+import { useMessageStyles } from "@/hooks/useMessageStyles";
+import { useSnapshot } from "valtio";
+import WalletStore from "@/store/WalletStore";
 
-type MessageListProps = {
+interface FullscreenMessagesProps {
     messages: Message[];
-    onClear: () => void;
     status: string;
-};
+    onClose: () => void;
+}
 
-export function MessageList({ messages, onClear, status }: MessageListProps) {
-    const [isFullscreen, setIsFullscreen] = useState(false);
+export function FullscreenMessages({ messages, status, onClose }: FullscreenMessagesProps) {
+    const messageStyles = useMessageStyles();
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const messageStyles = useMessageStyles();
+    const walletSnap = useSnapshot(WalletStore.state);
     const shouldScrollRef = useRef(true);
 
-    // Handle fullscreen toggle event
+    // Auto-scroll to bottom when messages change
     useEffect(() => {
-        const handleToggleFullscreen = () => {
-            setIsFullscreen(prev => !prev);
-        };
+        if (shouldScrollRef.current && messagesEndRef.current && containerRef.current) {
+            containerRef.current.scrollTo({
+                top: containerRef.current.scrollHeight,
+                behavior: "smooth",
+            });
+        }
+    }, [messages]);
 
-        window.addEventListener('toggle-fullscreen-messages', handleToggleFullscreen);
-        return () => window.removeEventListener('toggle-fullscreen-messages', handleToggleFullscreen);
-    }, []);
-
-    // Handle scroll event to detect if user has scrolled up
+    // Handle scroll events to detect if user has scrolled up
     useEffect(() => {
-        const container = document.getElementById("message-container");
+        const container = containerRef.current;
         if (!container) return;
 
         const handleScroll = () => {
@@ -40,80 +41,34 @@ export function MessageList({ messages, onClear, status }: MessageListProps) {
         return () => container.removeEventListener("scroll", handleScroll);
     }, []);
 
-    // Auto-scroll only if user hasn't scrolled up
-    useEffect(() => {
-        if (shouldScrollRef.current && messagesEndRef.current) {
-            // Scroll the container element itself, not the whole page
-            const container = document.getElementById("message-container");
-            if (container) {
-                container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: "smooth",
-                });
-            }
-        }
-    }, [messages]);
-
     // Format timestamp
     const formatTime = (timestamp?: number) => {
         if (!timestamp) return "";
         return new Date(timestamp).toLocaleTimeString();
     };
 
-    // Close fullscreen handler
-    const handleCloseFullscreen = () => {
-        setIsFullscreen(false);
-    };
-
-    if (isFullscreen) {
-        return <FullscreenMessages 
-            messages={messages} 
-            status={status} 
-            onClose={handleCloseFullscreen} 
-        />;
-    }
-
     return (
-        <div className="mb-4">
-            <div className="flex justify-between items-center mb-2">
-                <h2 className="text-lg font-semibold text-[#3531ff]">Messages</h2>
-                <div className="flex space-x-2">
-                    <button 
-                        onClick={() => setIsFullscreen(true)}
-                        className="px-3 py-1 bg-[#3531ff] text-white text-sm rounded hover:bg-[#2b28cc] flex items-center cursor-pointer transition-colors"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
-                        </svg>
-                        Full View
-                    </button>
-                    <button
-                        onClick={onClear}
-                        className="px-3 py-1 bg-white border border-gray-200 text-gray-600 text-sm rounded hover:bg-gray-50 flex items-center cursor-pointer"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                        </svg>
-                        Clear
-                    </button>
-                </div>
+        <div className="fixed inset-0 bg-white z-50 flex flex-col">
+            <div className="flex justify-between items-center py-2 px-4 border-b border-gray-200">
+                <h1 className="text-lg font-bold text-[#3531ff]">Nitrolite Messages</h1>
+                <button
+                    onClick={onClose}
+                    className="bg-[#3531ff] hover:bg-[#2b28cc] text-white px-3 py-1 rounded flex items-center transition-colors"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Exit Full View
+                </button>
             </div>
 
-            <div
-                className="bg-white rounded-lg p-4 border border-gray-200 h-[calc(100vh-350px)] min-h-[300px] overflow-y-auto scrollbar-thin shadow-sm"
-                id="message-container"
-            >
+            <div ref={containerRef} className="flex-grow overflow-y-auto p-3" id="fullscreen-message-container">
                 {messages.length === 0 ? (
                     <div className="text-gray-500 text-center py-10">No messages yet</div>
                 ) : (
-                    <div>
+                    <div className="w-full mx-auto">
                         {messages.map((message, index) => (
-                            <div key={index} className={`p-1 rounded mb-1.5 ${messageStyles[message.type] || messageStyles.info}`}>
+                            <div key={index} className={`p-2 rounded mb-2 ${messageStyles[message.type] || messageStyles.info}`}>
                                 {message.type === "sent" && (
                                     <svg
                                         className="inline-block w-4 h-4 mr-1 -mt-1"
@@ -172,6 +127,22 @@ export function MessageList({ messages, onClear, status }: MessageListProps) {
                             </div>
                         ))}
                         <div ref={messagesEndRef} />
+                    </div>
+                )}
+            </div>
+
+            <div className="p-2 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-xs text-gray-600">
+                <div className="flex items-center">
+                    <div className={`w-2 h-2 rounded-full mr-1 ${status === "connected" ? "bg-green-500" : "bg-yellow-500"}`}></div>
+                    <span>{status === "connected" ? "Connected" : "Connecting..."}</span>
+                </div>
+
+                {walletSnap.channelOpen && (
+                    <div className="flex items-center">
+                        <span className="mr-2">Channel:</span>
+                        <span className="font-mono bg-white px-1 py-0.5 rounded-sm border border-gray-200 text-gray-700">
+                            {walletSnap.selectedTokenAddress?.substring(0, 6)}...{walletSnap.selectedTokenAddress?.substring(38)}
+                        </span>
                     </div>
                 )}
             </div>

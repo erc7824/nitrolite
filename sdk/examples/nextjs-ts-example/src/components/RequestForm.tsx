@@ -76,7 +76,7 @@ export function RequestForm({
               value={selectedChannel}
               onChange={handleChannelSelect}
               disabled={!isConnected}
-              className="w-full bg-white text-gray-700 rounded border border-gray-200 focus:border-[#3531ff] focus:ring focus:ring-[#3531ff] focus:ring-opacity-30 py-2 px-4 disabled:bg-gray-100 disabled:text-gray-500"
+              className="w-full bg-white text-gray-700 rounded border border-gray-200 focus:border-[#3531ff] focus:ring focus:ring-[#3531ff] focus:ring-opacity-30 py-2 px-4 disabled:bg-gray-100 disabled:text-gray-400"
             >
               <option value="public">Public</option>
               <option value="game">Game</option>
@@ -101,7 +101,7 @@ export function RequestForm({
             onKeyPress={handleKeyPress}
             placeholder="Type your message..." 
             disabled={!isConnected || !currentChannel}
-            className="flex-grow bg-white text-gray-700 rounded border border-gray-200 focus:border-[#3531ff] focus:outline-none focus:ring focus:ring-[#3531ff] focus:ring-opacity-30 py-2 px-4 disabled:bg-gray-100 disabled:text-gray-500"
+            className="flex-grow bg-white text-gray-700 rounded border border-gray-200 focus:border-[#3531ff] focus:outline-none focus:ring focus:ring-[#3531ff] focus:ring-opacity-30 py-2 px-4 disabled:bg-gray-100 disabled:text-gray-400"
           />
           <button 
             onClick={handleSendMessage}

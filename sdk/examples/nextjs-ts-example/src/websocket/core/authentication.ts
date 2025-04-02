@@ -12,10 +12,8 @@ import { WalletSigner } from "../crypto";
 export async function authenticate(ws: WebSocket, signer: WalletSigner, timeout: number): Promise<void> {
     if (!ws) throw new Error("WebSocket not connected");
 
-    const authRequest = NitroliteRPC.createRequest("auth", [signer.publicKey]);
-    console.log("authRequest", authRequest);
+    const authRequest = NitroliteRPC.createRequest("auth", [signer.address]);
     const signedAuthRequest = await NitroliteRPC.signMessage(authRequest, signer.sign);
-    console.log("signedAuthRequest", signedAuthRequest);
 
     return new Promise((resolve, reject) => {
         if (!ws) return reject(new Error("WebSocket not connected"));

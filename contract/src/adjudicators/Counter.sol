@@ -41,7 +41,7 @@ contract Counter is IAdjudicator {
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
-        view
+        pure
         override
         returns (Status decision)
     {
@@ -54,8 +54,8 @@ contract Counter is IAdjudicator {
         // Decode the counter from candidate state.data
         CounterData memory candidateCounterData = abi.decode(candidate.data, (CounterData));
 
-        // INITIAL STATE ACTIVATION: No proofs provided
-        if (proofs.length == 0) {
+        // INITIAL STATE ACTIVATION
+        if (candidateCounterData.counter == 0) {
             // First signature must be from HOST who sets initial counter
             if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])) {
                 return Status.VOID;
@@ -81,7 +81,7 @@ contract Counter is IAdjudicator {
 
         // NORMAL STATE TRANSITION: Proof provided.
         // Ensure proof state has at least one signature
-        if (proofs[0].sigs.length == 0) return Status.INVALID;
+        if (proofs.length == 0 || proofs[0].sigs.length == 0) return Status.INVALID;
 
         CounterData memory proofCounterData = abi.decode(proofs[0].data, (CounterData));
 

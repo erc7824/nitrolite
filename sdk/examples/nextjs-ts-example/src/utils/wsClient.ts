@@ -311,7 +311,7 @@ export class WebSocketClient {
     private async authenticate(): Promise<void> {
         if (!this.ws) throw new Error("WebSocket not connected");
 
-        const authRequest = NitroliteRPC.createAuthRequest(this.signer.publicKey);
+        const authRequest = NitroliteRPC.createRequest("auth", [this.signer.publicKey]);
         const signedAuthRequest = await NitroliteRPC.signMessage(authRequest, this.signer.sign);
 
         return new Promise((resolve, reject) => {
@@ -366,7 +366,7 @@ export class WebSocketClient {
     async subscribe(channel: Channel): Promise<void> {
         if (!this.isConnected) throw new Error("WebSocket not connected");
 
-        const request = NitroliteRPC.createSubscribeRequest(channel);
+        const request = NitroliteRPC.createRequest("subscribe", [channel]);
         await this.sendSignedRequest(request);
         this.currentChannel = channel;
     }
@@ -377,18 +377,19 @@ export class WebSocketClient {
         if (!this.currentChannel) throw new Error("Not subscribed to any channel");
 
         const shortenedKey = this.getShortenedPublicKey();
-        const request = NitroliteRPC.createPublishRequest(this.currentChannel, message, shortenedKey);
+        // Use createRequest instead of the missing createPublishRequest
+        const request = NitroliteRPC.createRequest("publish", [this.currentChannel, message, shortenedKey]);
         await this.sendRequestDirect(await NitroliteRPC.signMessage(request, this.signer.sign));
     }
 
     // Send a ping request
     async ping(): Promise<any> {
-        return this.sendSignedRequest(NitroliteRPC.createPingRequest());
+        return this.sendSignedRequest(NitroliteRPC.createRequest("ping", []));
     }
 
     // Check balance
     async checkBalance(tokenAddress: string = "0xSHIB..."): Promise<any> {
-        return this.sendSignedRequest(NitroliteRPC.createBalanceRequest(tokenAddress));
+        return this.sendSignedRequest(NitroliteRPC.createRequest("balance", [tokenAddress]));
     }
 
     // Helper method to sign and send a request

@@ -33,6 +33,7 @@ contract Custody is IChannel, IDeposit {
         Channel chan; // Opener define channel configuration
         uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
         State lastValidState; // Last valid state when adjudicator was called
+        mapping(address token => uint256 balance) tokenBalances; // Token balances for the channel
     }
 
     struct Account {
@@ -43,7 +44,6 @@ contract Custody is IChannel, IDeposit {
 
     mapping(bytes32 channelId => Metadata chMeta) internal channels;
     mapping(address account => mapping(address token => Account)) internal balances;
-    mapping(bytes32 channelId => mapping(address token => uint256 balance)) internal channelBalances;
 
     function deposit(address token, uint256 amount) external {
         _transferFrom(token, msg.sender, address(this), amount);
@@ -118,11 +118,16 @@ contract Custody is IChannel, IDeposit {
         if (meta.chan.adjudicator == address(0)) {
             // Validate deposits and transfer funds
             Allocation memory allocation = depositSt.allocations[HOST];
+
+            // Initialize channel metadata
+            Metadata storage newCh = channels[channelId];
+            newCh.chan = ch;
+            newCh.challengeExpire = 0;
+            newCh.lastValidState = depositSt;
+
+            // Transfer funds from account to channel
             _checkAndTransferAccountToChannel(ch.participants[HOST], channelId, allocation.token, allocation.amount);
 
-            Metadata memory newCh = Metadata({chan: ch, challengeExpire: 0, lastValidState: depositSt});
-
-            channels[channelId] = newCh;
             emit ChannelPartiallyFunded(channelId, ch);
         } else {
             Allocation memory allocation = depositSt.allocations[GUEST];
@@ -355,7 +360,8 @@ contract Custody is IChannel, IDeposit {
             accountInfo.channels.push(channelId);
         }
 
-        channelBalances[channelId][token] += amount;
+        Metadata storage meta = channels[channelId];
+        meta.tokenBalances[token] += amount;
     }
 
     // Does not perform checks to allow transferring partial balances in case of partial deposit
@@ -364,11 +370,12 @@ contract Custody is IChannel, IDeposit {
     {
         if (amount == 0) return;
 
-        uint256 channelBalance = channelBalances[channelId][token];
+        Metadata storage meta = channels[channelId];
+        uint256 channelBalance = meta.tokenBalances[token];
         if (channelBalance == 0) return;
 
         uint256 correctedAmount = channelBalance > amount ? amount : channelBalance;
-        channelBalances[channelId][token] -= correctedAmount;
+        meta.tokenBalances[token] -= correctedAmount;
 
         Account storage accountInfo = balances[account][token];
         accountInfo.deposited += correctedAmount;

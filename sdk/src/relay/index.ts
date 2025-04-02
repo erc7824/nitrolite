@@ -94,3 +94,37 @@ export type NitroliteMessage =
     | SignStateMessage
     | ChallengeNotificationMessage
     | ClosureNotificationMessage;
+
+/**
+ * Generic message type for transport
+ */
+export type Message = NitroliteMessage;
+
+/**
+ * Message handler function type
+ */
+export type MessageHandler = (message: Message) => Promise<void> | void;
+
+/**
+ * Message processor type
+ */
+export interface MessageProcessor {
+    processMessage: MessageHandler;
+}
+
+/**
+ * WebSocket relay options
+ */
+export interface WebSocketOptions {
+    url: string;
+    reconnectDelay?: number;
+    maxReconnectAttempts?: number;
+}
+
+/**
+ * WebSocket relay configuration
+ */
+export interface WebSocketRelayConfig {
+    options: WebSocketOptions;
+    processor: MessageProcessor;
+}

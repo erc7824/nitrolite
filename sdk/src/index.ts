@@ -16,14 +16,10 @@ export * from "./errors";
 
 // Client (without re-exporting conflicting types)
 export {
-  NitroliteClient,
-  ClientConfig,
-  ClientEvents
+  NitroliteClient
 } from "./client/NitroliteClient";
 export {
-  defaultLogger,
-  Logger,
-  LogLevel
+  NitroliteClientConfig
 } from "./client/config";
 export {
   ChannelOperations
@@ -35,8 +31,26 @@ export {
   ChannelContext
 } from "./client/channels";
 
+// Export from base config (avoiding conflicts)
+export {
+  DEFAULT_CONFIG,
+  RPC_ERROR_CODES,
+  SDKConfig,
+  LogLevel,
+  Logger,
+  defaultLogger,
+  createFilteredLogger,
+  getConfigWithDefaults
+} from "./config";
+
 // RPC Relay
-export * from "./relay";
+export {
+  Message,
+  MessageHandler,
+  MessageProcessor,
+  WebSocketOptions,
+  WebSocketRelayConfig
+} from "./relay";
 
 // RPC Protocol
 export * from "./rpc";

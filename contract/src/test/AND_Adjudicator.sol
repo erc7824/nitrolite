@@ -10,7 +10,11 @@ contract AND_Adjudicator is IAdjudicator {
         bool flag;
     }
 
-    function adjudicate(Channel calldata, State calldata candidate, State[] calldata proofs) public pure returns (Status) {
+    function adjudicate(Channel calldata, State calldata candidate, State[] calldata proofs)
+        public
+        pure
+        returns (Status)
+    {
         if (proofs.length > 1) {
             return Status.INVALID;
         }

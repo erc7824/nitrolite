@@ -9,10 +9,36 @@ type MessageListProps = {
 
 export function MessageList({ messages, onClear }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const messageStyles = useMessageStyles();
+  const shouldScrollRef = useRef(true);
 
+  // Handle scroll event to detect if user has scrolled up
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = document.getElementById('message-container');
+    if (!container) return;
+
+    const handleScroll = () => {
+      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+      shouldScrollRef.current = isAtBottom;
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-scroll only if user hasn't scrolled up
+  useEffect(() => {
+    if (shouldScrollRef.current && messagesEndRef.current) {
+      // Scroll the container element itself, not the whole page
+      const container = document.getElementById('message-container');
+      if (container) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }
   }, [messages]);
 
   // Format timestamp
@@ -36,7 +62,7 @@ export function MessageList({ messages, onClear }: MessageListProps) {
         </button>
       </div>
       
-      <div className="bg-gray-800 rounded-lg p-4 h-80 overflow-y-auto scrollbar-thin">
+      <div className="bg-gray-800 rounded-lg p-4 h-80 overflow-y-auto scrollbar-thin" id="message-container">
         {messages.length === 0 ? (
           <div className="text-gray-500 text-center py-10">No messages yet</div>
         ) : (

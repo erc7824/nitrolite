@@ -1,6 +1,6 @@
 import { Address, Hex } from "viem";
 import { NitroliteRPCMessage, NitroliteErrorCode, MessageSigner, MessageVerifier } from "./types";
-import { createPayload, getCurrentTimestamp, generateRequestId } from "./utils";
+import { getCurrentTimestamp, generateRequestId } from "./utils";
 
 /**
  * NitroliteRPC utility class for creating and signing RPC messages
@@ -83,14 +83,14 @@ export class NitroliteRPC {
      */
     static async signMessage(message: NitroliteRPCMessage, signer: MessageSigner): Promise<NitroliteRPCMessage> {
         // Determine which field to sign based on message type
-        let payload: Hex;
+        let payload: string;
 
         if (message.req) {
-            payload = createPayload(message.req);
+            payload = JSON.stringify(message.req);
         } else if (message.res) {
-            payload = createPayload(message.res);
+            payload = JSON.stringify(message.res);
         } else if (message.err) {
-            payload = createPayload(message.err);
+            payload = JSON.stringify(message.err);
         } else {
             throw new Error("Invalid message: must contain req, res, or err field");
         }
@@ -125,14 +125,14 @@ export class NitroliteRPC {
             return false;
         }
 
-        let payload: Hex;
+        let payload: string;
 
         if (message.req) {
-            payload = createPayload(message.req);
+            payload = JSON.stringify(message.req);
         } else if (message.res) {
-            payload = createPayload(message.res);
+            payload = JSON.stringify(message.res);
         } else if (message.err) {
-            payload = createPayload(message.err);
+            payload = JSON.stringify(message.err);
         } else {
             return false;
         }

@@ -1,20 +1,8 @@
-import { Hex, keccak256 } from "viem";
+import { Hex } from "viem";
 
 /**
  * Utility functions for NitroRPC
  */
-
-/**
- * Create a payload hex string for signing
- *
- * @param data The data to convert to a hex string
- * @returns A hex string representation of the data
- */
-export function createPayload(data: any): Hex {
-    // Optimize performance by using Buffer directly
-    // This is more efficient than the TextEncoder approach
-    return keccak256(Buffer.from(JSON.stringify(data))) as Hex;
-}
 
 /**
  * Get the current time in milliseconds

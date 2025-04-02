@@ -184,43 +184,6 @@ A state channel is a relationship between participants that allows them to excha
              +------------+
 ```
 
-#### Applications
-
-Applications define the rules for state transitions in a channel. The Nitrolite SDK provides a framework for building custom applications or using pre-built ones.
-
-```typescript
-// Creating a simple channel with a single numeric value
-const numericChannel = client.createNumericChannel({
-  participants: [aliceAddress, bobAddress],
-  // The SDK will use the 'numeric' adjudicator from your addresses config
-  // Or you can explicitly provide an address:
-  // adjudicatorAddress: '0xSPECIFIC_ADJUDICATOR_ADDRESS'
-});
-
-// Creating a channel with sequential state updates
-const sequentialChannel = client.createSequentialChannel({
-  participants: [aliceAddress, bobAddress],
-  // The SDK will use the 'sequential' adjudicator from your addresses config
-  // Or you can explicitly provide an address:
-  // adjudicatorAddress: '0xSPECIFIC_ADJUDICATOR_ADDRESS'
-});
-
-// Creating a custom channel with your own application logic
-const customChannel = client.createCustomChannel<MyAppState>({
-  participants: [aliceAddress, bobAddress],
-  // You can reference a registered adjudicator by type
-  adjudicatorType: 'base', // Will use the base adjudicator from your addresses config
-  // Or provide a specific address
-  // adjudicatorAddress: '0xYOUR_CUSTOM_ADJUDICATOR_ADDRESS',
-  // You can also provide a custom adjudicator ABI
-  // adjudicatorAbi: myCustomAdjudicatorAbi,
-  encode: myStateEncoder,
-  decode: myStateDecoder,
-  validateTransition: myStateValidator,
-  isFinal: myFinalStateChecker
-});
-```
-
 #### Off-Chain Communication
 
 The SDK provides message type definitions for off-chain communication between participants, but lets you implement the transport layer yourself.
@@ -260,6 +223,85 @@ See the [examples](examples/) directory for examples of using the Nitrolite SDK:
 - **Nitrolite RPC Example** - A simple example demonstrating how to use the NitroliteRPC protocol with WebSockets.
 
 More examples are coming soon! Check the [examples README](examples/README.md) for details.
+
+## RPC Protocol
+
+Nitrolite includes a lightweight RPC protocol for communication between clients and state channel brokers.
+
+### Message Format
+
+Messages are formatted as fixed JSON arrays with a standard structure:
+
+```
+[request_id, method, params, timestamp]
+```
+
+**Request Message**:
+```json
+{
+  "req": [1001, "subtract", [42, 23], 1741344819012],
+  "sig": "0xa0ad67f51cc73aee5b874ace9bc2e2053488bde06de257541e05fc58fd8c4f149cca44f1c702fcbdbde0aa09bcd24456f465e5c3002c011a3bc0f317df7777d2"
+}
+```
+
+**Response Message**:
+```json
+{
+  "res": [1001, "subtract", [19], 1741344819814],
+  "sig": "0xd73268362b04516451ec52170f5c8ca189d35d9ac5e9041c156c9f0faf9aebd2891309e3b2b5d8788578ab3449c96f7aa81aefb25482b53f02bac42c65f806e5"
+}
+```
+
+**Error Message**:
+```json
+{
+  "err": [1001, -32601, "Method not found", 1741344819814],
+  "sig": "0xd73268362b04516451ec52170f5c8ca189d35d9ac5e9041c156c9f0faf9aebd2891309e3b2b5d8788578ab3449c96f7aa81aefb25482b53f02bac42c65f806e5"
+}
+```
+
+### Using NitroliteRPC
+
+```typescript
+import { NitroliteRPC } from '@erc7824/nitrolite';
+
+// Create a request message
+const request = NitroliteRPC.createRequest(
+  'subtract',    // Method name
+  [42, 23],      // Method parameters
+  1001           // Optional: Request ID
+);
+
+// Sign the request with your own signer function
+const signedRequest = await NitroliteRPC.signMessage(
+  request,
+  (message) => yourSigningFunction(message)
+);
+
+// Send the message via your own WebSocket connection
+ws.send(JSON.stringify(signedRequest));
+```
+
+### Common RPC Methods
+
+| Method | Description | Parameters |
+|--------|-------------|------------|
+| `auth` | Authenticate with the broker | `[publicKey]` |
+| `subscribe` | Subscribe to a channel | `[channelName]` |
+| `publish` | Publish a message to a channel | `[channelName, messageData]` |
+| `ping` | Check connection latency | `[timestamp]` |
+| `state_update` | Update channel state | `[channelId, stateData, signature]` |
+
+### Error Codes
+
+- `-32700`: Parse Error - Invalid JSON
+- `-32600`: Invalid Request - Not a valid request object
+- `-32601`: Method Not Found - Method doesn't exist
+- `-32602`: Invalid Params - Invalid method parameters
+- `-32603`: Internal Error - Internal JSON-RPC error
+- `-32001`: Invalid State - Invalid state transition
+- `-32002`: Channel Not Found - Referenced channel doesn't exist
+- `-32003`: Invalid Signature - Signature verification failed
 
 ### Multi-Chain Support
 

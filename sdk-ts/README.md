@@ -254,7 +254,12 @@ class MyChannelMessenger {
 
 ## Examples
 
-See the [examples](examples/) directory for complete working examples of building applications on Nitrolite.
+See the [examples](examples/) directory for examples of using the Nitrolite SDK:
+
+- **NextJS TypeScript Example** - A complete frontend application demonstrating how to use the SDK with a React-based web application.
+- **Nitrolite RPC Example** - A simple example demonstrating how to use the NitroliteRPC protocol with WebSockets.
+
+More examples are coming soon! Check the [examples README](examples/README.md) for details.
 
 ### Multi-Chain Support
 
@@ -402,6 +407,9 @@ npm run typecheck
 
 # Lint code
 npm run lint
+
+# Clean build artifacts
+npm run clean
 ```
 
 ## Contributing

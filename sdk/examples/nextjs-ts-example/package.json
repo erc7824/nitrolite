@@ -10,12 +10,14 @@
   },
   "dependencies": {
     "@erc7824/nitrolite": "0.0.7-alpha",
+    "axios": "1.8.4",
     "centrifuge": "5.3.4",
     "ethers": "5.7.2",
     "next": "15.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-use-websocket": "3.0.0",
+    "valtio": "2.1.4",
     "viem": "2.24.3"
   },
   "devDependencies": {

@@ -12,7 +12,7 @@ interface IDeposit {
      * @param token Address of the ERC20 token to deposit
      * @param amount Amount of tokens to deposit
      */
-    function deposit(address token, uint256 amount) external;
+    function deposit(address token, uint256 amount) external payable;
 
     /**
      * @notice Withdraws tokens from the contract

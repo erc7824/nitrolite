@@ -33,7 +33,7 @@ contract ChannelMock is IChannel {
         IAdjudicator.Status status = adjudicator.adjudicate(ch, candidate, proofs);
 
         if (status == IAdjudicator.Status.FINAL) {
-                emit ChannelClosed(channelId);
+            emit ChannelClosed(channelId);
         } else {
             revert("Invalid Channel State");
         }
@@ -55,7 +55,7 @@ contract ChannelMock is IChannel {
         IAdjudicator.Status status = adjudicator.adjudicate(ch, candidate, proofs);
 
         if (status == IAdjudicator.Status.ACTIVE) {
-                emit ChannelChallenged(channelId, block.timestamp + ch.challenge);
+            emit ChannelChallenged(channelId, block.timestamp + ch.challenge);
         } else {
             revert("Invalid Channel State");
         }
@@ -66,7 +66,7 @@ contract ChannelMock is IChannel {
         IAdjudicator.Status status = adjudicator.adjudicate(ch, candidate, proofs);
 
         if (status == IAdjudicator.Status.ACTIVE) {
-                emit ChannelCheckpointed(channelId);
+            emit ChannelCheckpointed(channelId);
         } else {
             revert("Invalid Channel State");
         }

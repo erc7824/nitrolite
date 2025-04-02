@@ -91,47 +91,7 @@ export const generateKeyPair = async (): Promise<CryptoKeypair> => {
     }
 };
 
-// Mock signer for development using Keccak
-export const createMockSigner = (): WalletSigner => {
-    try {
-        // Create a deterministic but unique mock wallet
-        const seed = ethers.utils.id("mock-wallet-" + Date.now().toString());
-        const privateKey = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(seed));
-        const wallet = new ethers.Wallet(privateKey);
 
-        return {
-            publicKey: wallet.publicKey,
-            address: wallet.address,
-            sign: async (msg: string): Promise<Hex> => {
-                // Real signing with the mock wallet
-                const messageHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(msg));
-                const signature = await wallet.signMessage(ethers.utils.arrayify(messageHash));
-                return signature as Hex;
-            },
-        };
-    } catch (error) {
-        console.error("Error creating mock signer:", error);
-        // Very basic fallback if ethers fails
-        const randomKey = "0x" + Array.from({ length: 42 }, (_, i) => (i === 0 ? "" : Math.floor(Math.random() * 16).toString(16))).join("");
-        const mockAddress = "0x" + Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-        return {
-            publicKey: randomKey,
-            address: mockAddress,
-            sign: async (msg: string): Promise<Hex> => {
-                // Use keccak for consistent approach even in fallback
-                try {
-                    const mockSignature = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(msg + randomKey));
-                    return mockSignature as Hex;
-                } catch (e) {
-                    return ("0x" + Array.from({ length: 130 }, () => Math.floor(Math.random() * 16).toString(16)).join("")) as Hex;
-                }
-            },
-        };
-    }
-};
-
-// Default mock signer
-export const mockSigner = createMockSigner();
 
 export enum WebSocketReadyState {
     CONNECTING = 0,

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   createWebSocketClient,
-  mockSigner, 
   createEthersSigner, 
   generateKeyPair, 
   WalletSigner, 
@@ -41,32 +40,52 @@ export function useWebSocket(url: string) {
     }
     return null;
   });
-  const [currentSigner, setCurrentSigner] = useState<WalletSigner>(() => {
-    // Initialize signer from saved keys if available
-    if (typeof window !== 'undefined' && keyPair?.privateKey) {
+  const [currentSigner, setCurrentSigner] = useState<WalletSigner | null>(null);
+
+  // Effect to generate keys if none exist on component mount
+  useEffect(() => {
+    if (!keyPair && typeof window !== 'undefined') {
+      // Generate keys on component mount if none exist
+      generateKeyPair().then(newKeyPair => {
+        if (newKeyPair) {
+          setKeyPair(newKeyPair);
+          localStorage.setItem('crypto_keypair', JSON.stringify(newKeyPair));
+          try {
+            setCurrentSigner(createEthersSigner(newKeyPair.privateKey));
+            addMessage("Generated new key pair", "success");
+            addMessage(`Ethereum Address: ${newKeyPair.address || 'unknown'}`, "info");
+          } catch (e) {
+            console.error('Failed to create signer from new keys:', e);
+          }
+        }
+      });
+    } else if (keyPair?.privateKey) {
+      // Initialize signer from saved keys if available
       try {
-        return createEthersSigner(keyPair.privateKey);
+        setCurrentSigner(createEthersSigner(keyPair.privateKey));
       } catch (e) {
         console.error('Failed to create signer from saved keys:', e);
       }
     }
-    return mockSigner;
-  });
+  }, []);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   
   // Create WebSocket client with current signer
-  const client = useMemo(() => createWebSocketClient(
-    url, 
-    currentSigner,
-    { 
-      autoReconnect: true, 
-      reconnectDelay: 1000, 
-      maxReconnectAttempts: 5,
-      requestTimeout: 10000
-    }
-  ), [url, currentSigner]);
+  const client = useMemo(() => {
+    if (!currentSigner) return null;
+    return createWebSocketClient(
+      url, 
+      currentSigner,
+      { 
+        autoReconnect: true, 
+        reconnectDelay: 1000, 
+        maxReconnectAttempts: 5,
+        requestTimeout: 10000
+      }
+    );
+  }, [url, currentSigner]);
   
-  const clientRef = useRef(client);
+  const clientRef = useRef<any>(null);
   
   // Update the client reference when the client changes
   useEffect(() => {
@@ -85,6 +104,7 @@ export function useWebSocket(url: string) {
   // Initialize WebSocket event listeners
   useEffect(() => {
     const client = clientRef.current;
+    if (!client) return;
     
     client.onStatusChange((newStatus) => {
       setStatus(newStatus);
@@ -295,9 +315,23 @@ export function useWebSocket(url: string) {
       localStorage.removeItem('crypto_keypair');
     }
     setKeyPair(null);
-    setCurrentSigner(mockSigner);
+    setCurrentSigner(null);
     addMessage("Keys cleared from browser storage", "system");
-  }, [addMessage]);
+    // Generate new keys immediately
+    generateKeyPair().then(newKeyPair => {
+      if (newKeyPair) {
+        setKeyPair(newKeyPair);
+        localStorage.setItem('crypto_keypair', JSON.stringify(newKeyPair));
+        try {
+          setCurrentSigner(createEthersSigner(newKeyPair.privateKey));
+          addMessage("Generated new key pair", "success");
+          addMessage(`Ethereum Address: ${newKeyPair.address || 'unknown'}`, "info");
+        } catch (e) {
+          console.error('Failed to create signer from new keys:', e);
+        }
+      }
+    });
+  }, [addMessage, generateKeyPair]);
   
   return {
     // State
@@ -307,7 +341,7 @@ export function useWebSocket(url: string) {
     currentChannel,
     
     // Computed values
-    isConnected: clientRef.current.isConnected,
+    isConnected: clientRef.current?.isConnected || false,
     hasKeys: !!keyPair,
     
     // Actions

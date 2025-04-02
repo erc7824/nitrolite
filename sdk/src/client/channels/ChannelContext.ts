@@ -1,8 +1,8 @@
-import { Address, Hex } from "viem";
-import { getChannelId } from "../../utils";
-import type { NitroliteClient } from "../NitroliteClient";
-import { AppLogic } from "../../types";
-import { ChannelId, State, Role, Allocation, Channel } from "../types";
+import { Address, Hex } from 'viem';
+import { getChannelId } from '../../utils';
+import type { NitroliteClient } from '../NitroliteClient';
+import { AppLogic } from '../../types';
+import { ChannelId, State, Role, Allocation, Channel } from '../types';
 
 /**
  * Channel context for managing application state
@@ -19,16 +19,22 @@ export class ChannelContext<T = unknown> {
     /**
      * Create a new channel context
      */
-    constructor(client: NitroliteClient, channel: Channel, appLogic: AppLogic<T>, signerAttorneyAddress?: Address) {
+    constructor(
+        client: NitroliteClient,
+        channel: Channel,
+        appLogic: AppLogic<T>,
+        signerAttorneyAddress?: Address
+    ) {
         this.client = client;
         this.channel = channel;
         this.channelId = getChannelId(channel);
         this.appLogic = appLogic;
 
         // If there is no signer attorney, use the client's address
-        let participantAddress= (signerAttorneyAddress || client.account?.address) as Address | undefined;
+        let participantAddress = (signerAttorneyAddress ||
+            client.account?.address) as Address | undefined;
         if (!participantAddress) {
-            throw new Error("Channel participant is not provided");
+            throw new Error('Channel participant is not provided');
         }
 
         if (participantAddress === channel.participants[0]) {
@@ -36,7 +42,7 @@ export class ChannelContext<T = unknown> {
         } else if (participantAddress === channel.participants[1]) {
             this.role = Role.GUEST;
         } else {
-            throw new Error("Account is not a participant in this channel");
+            throw new Error('Account is not a participant in this channel');
         }
     }
 
@@ -81,13 +87,19 @@ export class ChannelContext<T = unknown> {
      * Get the other participant's address
      */
     getOtherParticipant(): Address {
-        return this.channel.participants[this.role === Role.HOST ? Role.GUEST : Role.HOST];
+        return this.channel.participants[
+            this.role === Role.HOST ? Role.GUEST : Role.HOST
+        ];
     }
 
     /**
      * Create a channel state based on application state
      */
-    private async createChannelState(appState: T, tokenAddress: Address, amounts: [bigint, bigint]): Promise<State> {
+    private async createChannelState(
+        appState: T,
+        tokenAddress: Address,
+        amounts: [bigint, bigint]
+    ): Promise<State> {
         // Encode the app state
         const data = this.appLogic.encode(appState);
 
@@ -116,9 +128,17 @@ export class ChannelContext<T = unknown> {
     /**
      * Open a channel with initial funding
      */
-    async open(appState: T, tokenAddress: Address, amounts: [bigint, bigint]): Promise<ChannelId> {
+    async open(
+        appState: T,
+        tokenAddress: Address,
+        amounts: [bigint, bigint]
+    ): Promise<ChannelId> {
         // Create initial state
-        const initialState = await this.createChannelState(appState, tokenAddress, amounts);
+        const initialState = await this.createChannelState(
+            appState,
+            tokenAddress,
+            amounts
+        );
 
         // Save as current state
         this.states.push(initialState);
@@ -135,7 +155,9 @@ export class ChannelContext<T = unknown> {
         const currentAppState = this.getCurrentAppState();
 
         if (!currentAppState || !currentState) {
-            throw new Error("No current app state to update, open channel first");
+            throw new Error(
+                'No current app state to update, open channel first'
+            );
         }
 
         // Validate state transition if the app logic provides a validator
@@ -143,11 +165,11 @@ export class ChannelContext<T = unknown> {
             const isValid = this.appLogic.validateTransition(
                 this.channel,
                 currentAppState,
-                newAppState,
+                newAppState
             );
 
             if (!isValid) {
-                throw new Error("Invalid state transition");
+                throw new Error('Invalid state transition');
             }
         }
 
@@ -187,12 +209,17 @@ export class ChannelContext<T = unknown> {
         const currentAppState = this.getCurrentAppState();
 
         if (!this.isFinal() || !currentState || !currentAppState) {
-            throw new Error("No current state to close with");
+            throw new Error('No current state to close with');
         }
 
         let proofs: State[] = [];
         if (this.appLogic.provideProofs) {
-            proofs = this.appLogic.provideProofs(this.channel, currentAppState, this.states) || [];
+            proofs =
+                this.appLogic.provideProofs(
+                    this.channel,
+                    currentAppState,
+                    this.states
+                ) || [];
         }
 
         return this.client.closeChannel(this.channelId, currentState, proofs);
@@ -206,15 +233,24 @@ export class ChannelContext<T = unknown> {
         const currentAppState = this.getCurrentAppState();
 
         if (!currentState || !currentAppState) {
-            throw new Error("No current state to challenge with");
+            throw new Error('No current state to challenge with');
         }
 
         let proofs: State[] = [];
         if (this.appLogic.provideProofs) {
-            proofs = this.appLogic.provideProofs(this.channel, currentAppState, this.states) || [];
+            proofs =
+                this.appLogic.provideProofs(
+                    this.channel,
+                    currentAppState,
+                    this.states
+                ) || [];
         }
 
-        return this.client.challengeChannel(this.channelId, currentState, proofs);
+        return this.client.challengeChannel(
+            this.channelId,
+            currentState,
+            proofs
+        );
     }
 
     /**
@@ -225,16 +261,24 @@ export class ChannelContext<T = unknown> {
         const currentAppState = this.getCurrentAppState();
 
         if (!currentState || !currentAppState) {
-            throw new Error("No current state to checkpoint");
+            throw new Error('No current state to checkpoint');
         }
 
         let proofs: State[] = [];
         if (this.appLogic.provideProofs) {
-            proofs = this.appLogic.provideProofs(this.channel, currentAppState, this.states) || [];
+            proofs =
+                this.appLogic.provideProofs(
+                    this.channel,
+                    currentAppState,
+                    this.states
+                ) || [];
         }
 
-
-        return this.client.checkpointChannel(this.channelId, currentState, proofs);
+        return this.client.checkpointChannel(
+            this.channelId,
+            currentState,
+            proofs
+        );
     }
 
     /**

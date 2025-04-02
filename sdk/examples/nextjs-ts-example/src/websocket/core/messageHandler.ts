@@ -1,13 +1,13 @@
 import { Channel } from "@/types";
+import MessageService from "@/websocket/services/MessageService";
 
 /**
  * Handles incoming WebSocket messages
- * 
  * @param event - The message event
  * @param pendingRequests - Map of pending requests waiting for responses
  * @param setChannel - Function to set the current channel
- * @param onMessageCallback - Callback for all messages
- * @param onErrorCallback - Callback for errors
+ * @param onMessageCallback - Optional callback for all messages
+ * @param onErrorCallback - Optional callback for errors
  */
 export function handleMessage(
   event: MessageEvent,
@@ -18,19 +18,23 @@ export function handleMessage(
 ): void {
   let response;
 
+  // Parse incoming message
   try {
     response = JSON.parse(event.data);
   } catch (error) {
-    console.error("Error parsing message:", error);
-    console.log("Raw message:", event.data);
-    // Notify about message parsing error but don't break the connection
-    onErrorCallback?.(new Error("Failed to parse server message"));
+    const errorMessage = "Failed to parse server message";
+    // Log the raw data for debugging without using console
+    MessageService.error(`${errorMessage}: ${event.data}`);
+    onErrorCallback?.(new Error(errorMessage));
     return;
   }
 
   try {
     // Notify callback about received message
     onMessageCallback?.(response);
+    
+    // Process message with MessageService
+    MessageService.handleWebSocketMessage(response);
 
     // Handle standard NitroRPC responses
     if (response.res) {
@@ -43,22 +47,22 @@ export function handleMessage(
     // Handle error responses
     else if (response.err) {
       const requestId = response.err[0];
+      const errorMessage = `Error ${response.err[1]}: ${response.err[2]}`;
+      
+      MessageService.error(errorMessage);
+      
       if (pendingRequests.has(requestId)) {
-        pendingRequests.get(requestId)!.reject(
-          new Error(`Error ${response.err[1]}: ${response.err[2]}`)
-        );
+        pendingRequests.get(requestId)!.reject(new Error(errorMessage));
         pendingRequests.delete(requestId);
       }
     }
     // Handle legacy/custom responses
     else if (response.type) {
-      if (response.type === "auth_success") {
-        // Authentication handled separately
-      } else if (response.type === "subscribe_success" && response.data?.channel) {
+      if (response.type === "subscribe_success" && response.data?.channel) {
         setChannel(response.data.channel as Channel);
       }
 
-      // For all other responses with a requestId, resolve any pending requests
+      // Resolve any pending requests with a requestId
       const requestId = response.requestId;
       if (requestId && pendingRequests.has(requestId)) {
         pendingRequests.get(requestId)!.resolve(response.data || response);
@@ -66,9 +70,8 @@ export function handleMessage(
       }
     }
   } catch (error) {
-    console.error("Error handling message:", error);
-    onErrorCallback?.(
-      new Error(`Error processing message: ${error instanceof Error ? error.message : String(error)}`)
-    );
+    const errorMessage = `Error processing message: ${error instanceof Error ? error.message : String(error)}`;
+    MessageService.error(errorMessage);
+    onErrorCallback?.(new Error(errorMessage));
   }
 }

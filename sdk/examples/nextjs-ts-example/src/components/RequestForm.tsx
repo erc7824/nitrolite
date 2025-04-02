@@ -1,5 +1,6 @@
 import { useState, ChangeEvent } from 'react';
 import { Channel } from '@/types';
+import { useMessageService } from '@/hooks/useMessageService';
 
 type RequestFormProps = {
   isConnected: boolean;
@@ -25,6 +26,9 @@ export function RequestForm({
   const [methodParams, setMethodParams] = useState<string>("");
   const [message, setMessage] = useState<string>("");
   const [selectedChannel, setSelectedChannel] = useState<Channel>("public");
+  
+  // Use our message service hook
+  const { activeChannel } = useMessageService();
   
   // Event handlers
   const handleMethodNameChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -68,7 +72,7 @@ export function RequestForm({
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       {/* Channel Panel */}
       <div className="md:col-span-3 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <h2 className="text-lg font-semibold mb-3 text-[#3531ff]">Channel Messages</h2>
+        <h2 className="text-lg font-semibold mb-3 text-[#3531ff]">Channel: {activeChannel}</h2>
         
         <div className="flex mb-3 space-x-2">
           <div className="flex-grow">

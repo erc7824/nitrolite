@@ -1,21 +1,22 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Message } from "@/types";
+import React, { useEffect, useRef } from "react";
 import { useMessageStyles } from "@/hooks/useMessageStyles";
 import { useSnapshot } from "valtio";
 import WalletStore from "@/store/WalletStore";
+import { useMessageService } from "@/hooks/useMessageService";
 
 interface FullscreenMessagesProps {
-    messages: Message[];
-    status: string;
     onClose: () => void;
 }
 
-export function FullscreenMessages({ messages, status, onClose }: FullscreenMessagesProps) {
+export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
     const messageStyles = useMessageStyles();
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const walletSnap = useSnapshot(WalletStore.state);
     const shouldScrollRef = useRef(true);
+    
+    // Use our message service hook
+    const { messages, status } = useMessageService();
 
     // Auto-scroll to bottom when messages change
     useEffect(() => {

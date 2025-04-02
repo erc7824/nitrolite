@@ -41,7 +41,8 @@ const MetaMaskConnect: React.FC<MetaMaskConnectProps> = ({ onChannelOpen }) => {
       await connectMetaMask();
       setStep(2);
     } catch (error) {
-      console.error('Error connecting to MetaMask:', error);
+      // Show error message to user
+      alert(`Error connecting to MetaMask: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
   

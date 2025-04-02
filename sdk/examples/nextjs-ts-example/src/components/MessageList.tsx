@@ -1,20 +1,22 @@
 import { useRef, useEffect, useState } from "react";
-import { useMessageStyles, MessageType } from "@/hooks/useMessageStyles";
-import { Message } from "@/types";
+import { useMessageStyles } from "@/hooks/useMessageStyles";
 import { FullscreenMessages } from "./FullscreenMessages";
+import { useMessageService } from "@/hooks/useMessageService";
 
-type MessageListProps = {
-    messages: Message[];
-    onClear: () => void;
-    status: string;
-};
-
-export function MessageList({ messages, onClear, status }: MessageListProps) {
+export function MessageList() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const messageStyles = useMessageStyles();
     const shouldScrollRef = useRef(true);
+    
+    // Use our optimized message service
+    const { messages, clearMessages, status } = useMessageService();
+    
+    // Monitor messages for changes
+    useEffect(() => {
+        // Messages state has changed
+    }, [messages]);
 
     // Handle fullscreen toggle event
     useEffect(() => {
@@ -43,7 +45,6 @@ export function MessageList({ messages, onClear, status }: MessageListProps) {
     // Auto-scroll only if user hasn't scrolled up
     useEffect(() => {
         if (shouldScrollRef.current && messagesEndRef.current) {
-            // Scroll the container element itself, not the whole page
             const container = document.getElementById("message-container");
             if (container) {
                 container.scrollTo({
@@ -88,7 +89,7 @@ export function MessageList({ messages, onClear, status }: MessageListProps) {
                         Full View
                     </button>
                     <button
-                        onClick={onClear}
+                        onClick={clearMessages}
                         className="px-3 py-1 bg-white border border-gray-200 text-gray-600 text-sm rounded hover:bg-gray-50 flex items-center cursor-pointer"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

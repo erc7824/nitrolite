@@ -280,8 +280,8 @@ export class StateNotInitializedError extends StateError {
 export class ChannelNotFoundError extends StateNotFoundError {
     constructor(channelId?: string, details?: Record<string, any>) {
         super("Channel", channelId, details);
-        this.code = "CHANNEL_NOT_FOUND";
-        this.suggestion = "Verify that the channel exists and is registered";
+        Object.defineProperty(this, 'code', { value: "CHANNEL_NOT_FOUND" });
+        Object.defineProperty(this, 'suggestion', { value: "Verify that the channel exists and is registered" });
     }
 }
 
@@ -298,8 +298,8 @@ export class NotParticipantError extends UnauthorizedError {
             channelId,
         });
 
-        this.code = "NOT_PARTICIPANT";
-        this.suggestion = "Only participants can perform operations on a channel";
+        Object.defineProperty(this, 'code', { value: "NOT_PARTICIPANT" });
+        Object.defineProperty(this, 'suggestion', { value: "Only participants can perform operations on a channel" });
     }
 }
 

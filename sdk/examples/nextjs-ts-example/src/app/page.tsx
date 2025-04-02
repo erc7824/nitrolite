@@ -47,19 +47,31 @@ export default function Home() {
         // Update wallet store
         WalletStore.openChannel(tokenAddress as Address, amount);
 
-        // Automatically generate keys if not present
-        if (!keyPair) {
-            await generateKeys();
-        }
-
-        // Automatically connect to broker websocket
-        setTimeout(() => {
-            if (status === "disconnected" && keyPair) {
-                connect();
+        // Generate keys and connect to websocket in a sequential flow
+        try {
+            // Step 1: Generate keys if not present
+            let currentKeyPair = keyPair;
+            if (!currentKeyPair) {
+                currentKeyPair = await generateKeys();
+                if (!currentKeyPair) {
+                    throw new Error("Failed to generate keys");
+                }
             }
-        }, 500);
-
-        // Channel is now open, no need to change UI state
+            
+            // Step 2: Connect to the broker websocket only after we have keys
+            if (status === "disconnected" && currentKeyPair) {
+                await connect();
+            }
+            
+            // Step 3: Now that we're connected, we could auto-subscribe to a channel if needed
+            // This is optional and depends on your application flow
+            // if (status === "connected") {
+            //    await subscribeToChannel("your-channel-id");
+            // }
+        } catch (error) {
+            console.error("Error in channel opening sequence:", error);
+            // You might want to update the UI to show the error
+        }
     };
 
     return (
@@ -77,8 +89,13 @@ export default function Home() {
                                 </span>
                                 <button
                                     onClick={async () => {
-                                        const { disconnect } = await import("@/hooks/useMetaMask");
-                                        disconnect();
+                                        // First disconnect from WebSocket if connected
+                                        if (status === "connected") {
+                                            disconnect(); // This is the WebSocket disconnect
+                                        }
+                                        // Then disconnect from MetaMask
+                                        const { disconnectWallet } = await import("@/hooks/useMetaMask");
+                                        await disconnectWallet();
                                     }}
                                     className="bg-red-600 hover:bg-red-700 text-white text-sm py-1 px-2 rounded transition-colors cursor-pointer"
                                 >
@@ -101,9 +118,17 @@ export default function Home() {
                                     <div className="flex items-center space-x-3">
                                         <div className="flex items-center">
                                             <div
-                                                className={`w-2 h-2 rounded-full mr-1 ${status === "connected" ? "bg-green-500" : "bg-yellow-500"}`}
+                                                className={`w-2 h-2 rounded-full mr-1 ${
+                                                  status === "connected" ? "bg-green-500" : 
+                                                  status === "connecting" ? "bg-yellow-500" : 
+                                                  "bg-red-500"
+                                                }`}
                                             ></div>
-                                            <span className="text-xs text-gray-600">{status === "connected" ? "Channel Active" : "Initializing"}</span>
+                                            <span className="text-xs text-gray-600">
+                                              {status === "connected" ? "Channel Active" : 
+                                               status === "connecting" ? "Connecting..." : 
+                                               "Disconnected"}
+                                            </span>
                                         </div>
                                         <div className="text-xs text-gray-600 font-mono">
                                             <span className="px-2 py-0.5 bg-gray-100 rounded-sm">
@@ -121,8 +146,16 @@ export default function Home() {
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-xs font-medium text-gray-700">Authentication Keys</span>
                                     <div className="flex items-center">
-                                        <div className={`w-2 h-2 rounded-full mr-1 ${status === "connected" ? "bg-green-500" : "bg-red-500"}`}></div>
-                                        <span className="text-xs text-gray-600">{status === "connected" ? "Connected to Broker" : "Connecting..."}</span>
+                                        <div className={`w-2 h-2 rounded-full mr-1 ${
+                                          status === "connected" ? "bg-green-500" : 
+                                          status === "connecting" ? "bg-yellow-500" : 
+                                          "bg-red-500"
+                                        }`}></div>
+                                        <span className="text-xs text-gray-600">
+                                          {status === "connected" ? "Connected to Broker" : 
+                                           status === "connecting" ? "Connecting..." : 
+                                           "Disconnected"}
+                                        </span>
                                     </div>
                                 </div>
 

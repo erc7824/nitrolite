@@ -68,7 +68,7 @@ export function FullscreenMessages({ messages, status, onClose }: FullscreenMess
                 ) : (
                     <div className="w-full mx-auto">
                         {messages.map((message, index) => (
-                            <div key={index} className={`p-2 rounded mb-2 ${messageStyles[message.type] || messageStyles.info}`}>
+                            <div key={index} className={`p-1 rounded mb-0 ${messageStyles[message.type] || messageStyles.info}`}>
                                 {message.type === "sent" && (
                                     <svg
                                         className="inline-block w-4 h-4 mr-1 -mt-1"

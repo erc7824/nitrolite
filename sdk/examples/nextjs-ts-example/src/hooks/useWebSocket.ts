@@ -42,32 +42,29 @@ export function useWebSocket(url: string) {
   });
   const [currentSigner, setCurrentSigner] = useState<WalletSigner | null>(null);
 
-  // Effect to generate keys if none exist on component mount
+  // Create addMessage function before using it
+  const addMessage = useCallback((text: string, type: MessageType = "info", sender?: string) => {
+    setMessages(prev => [...prev, { 
+      text, 
+      type, 
+      sender,
+      timestamp: Date.now()
+    }]);
+  }, []);
+  
+  // Effect to initialize signer from existing keys if available
   useEffect(() => {
-    if (!keyPair && typeof window !== 'undefined') {
-      // Generate keys on component mount if none exist
-      generateKeyPair().then(newKeyPair => {
-        if (newKeyPair) {
-          setKeyPair(newKeyPair);
-          localStorage.setItem('crypto_keypair', JSON.stringify(newKeyPair));
-          try {
-            setCurrentSigner(createEthersSigner(newKeyPair.privateKey));
-            addMessage("Generated new key pair", "success");
-            addMessage(`Ethereum Address: ${newKeyPair.address || 'unknown'}`, "info");
-          } catch (e) {
-            console.error('Failed to create signer from new keys:', e);
-          }
-        }
-      });
-    } else if (keyPair?.privateKey) {
+    if (keyPair?.privateKey && !currentSigner) {
       // Initialize signer from saved keys if available
       try {
         setCurrentSigner(createEthersSigner(keyPair.privateKey));
+        addMessage("Loaded existing keys", "system");
+        // Don't generate keys automatically anymore - wait for explicit channel opening
       } catch (e) {
         console.error('Failed to create signer from saved keys:', e);
       }
     }
-  }, []);
+  }, [keyPair, currentSigner, addMessage]);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   
   // Create WebSocket client with current signer
@@ -91,15 +88,6 @@ export function useWebSocket(url: string) {
   useEffect(() => {
     clientRef.current = client;
   }, [client]);
-  
-  const addMessage = useCallback((text: string, type: MessageType = "info", sender?: string) => {
-    setMessages(prev => [...prev, { 
-      text, 
-      type, 
-      sender,
-      timestamp: Date.now()
-    }]);
-  }, []);
   
   // Initialize WebSocket event listeners
   useEffect(() => {
@@ -146,16 +134,7 @@ export function useWebSocket(url: string) {
     return () => client.close();
   }, [addMessage, keyPair]);
   
-  // This will store the auto-connect intent
-  const [shouldAutoConnect, setShouldAutoConnect] = useState(false);
-  
-  // Check if we should auto-connect
-  useEffect(() => {
-    // Only mark for auto-connect once on startup if we have keys
-    if (keyPair && status === "disconnected" && !shouldAutoConnect) {
-      setShouldAutoConnect(true);
-    }
-  }, [keyPair, status, shouldAutoConnect]);
+  // Removed auto-connect functionality as we're now connecting explicitly after channel opening
   
   // Generate a new key pair
   const generateKeys = useCallback(async () => {
@@ -173,8 +152,8 @@ export function useWebSocket(url: string) {
       setCurrentSigner(newSigner);
       
       addMessage("Generated new key pair", "success");
-      addMessage(`Private key: ${newKeyPair.privateKey}`, "info");
-      addMessage(`Public key: ${newKeyPair.publicKey}`, "info");
+      addMessage(`Private key: ${newKeyPair.privateKey.substring(0, 10)}...`, "info");
+      addMessage(`Public key: ${newKeyPair.publicKey.substring(0, 10)}...`, "info");
       addMessage("Keys saved to browser storage", "success");
       
       return newKeyPair;
@@ -187,29 +166,21 @@ export function useWebSocket(url: string) {
   // Connect to WebSocket
   const connect = useCallback(async () => {
     if (!keyPair) {
-      return addMessage("Please generate a key pair first", "error");
+      addMessage("Please generate a key pair first", "error");
+      throw new Error("No key pair available for connection");
     }
     
     try {
+      addMessage("Connecting to broker...", "system");
       await clientRef.current.connect();
+      addMessage("Connected to broker successfully", "success");
+      return true;
     } catch (error) {
       console.error("Connection error:", error);
       addMessage(`Connection error: ${error instanceof Error ? error.message : String(error)}`, "error");
+      throw error;
     }
   }, [keyPair, addMessage]);
-  
-  // Handle auto-connection after connect function is fully defined
-  useEffect(() => {
-    if (shouldAutoConnect && connect) {
-      const timer = setTimeout(() => {
-        addMessage("Attempting auto-connection with saved keys...", "system");
-        connect();
-        setShouldAutoConnect(false); // Reset flag to prevent multiple attempts
-      }, 1500); // Small delay to allow UI to initialize
-      
-      return () => clearTimeout(timer);
-    }
-  }, [shouldAutoConnect, connect, addMessage]);
   
   // Disconnect from WebSocket
   const disconnect = useCallback(() => {
@@ -317,21 +288,10 @@ export function useWebSocket(url: string) {
     setKeyPair(null);
     setCurrentSigner(null);
     addMessage("Keys cleared from browser storage", "system");
-    // Generate new keys immediately
-    generateKeyPair().then(newKeyPair => {
-      if (newKeyPair) {
-        setKeyPair(newKeyPair);
-        localStorage.setItem('crypto_keypair', JSON.stringify(newKeyPair));
-        try {
-          setCurrentSigner(createEthersSigner(newKeyPair.privateKey));
-          addMessage("Generated new key pair", "success");
-          addMessage(`Ethereum Address: ${newKeyPair.address || 'unknown'}`, "info");
-        } catch (e) {
-          console.error('Failed to create signer from new keys:', e);
-        }
-      }
-    });
-  }, [addMessage, generateKeyPair]);
+    
+    // Don't auto-generate after clearing - let the channel opening flow handle it
+    addMessage("Keys will be generated when you open a channel", "info");
+  }, [addMessage]);
   
   return {
     // State

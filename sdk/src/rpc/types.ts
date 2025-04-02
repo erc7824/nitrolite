@@ -45,9 +45,9 @@ export enum NitroliteErrorCode {
 /**
  * Message signer function type
  */
-export type MessageSigner = (payload: Hex) => Promise<Hex>;
+export type MessageSigner = (payload: string) => Promise<Hex>;
 
 /**
  * Message verifier function type
  */
-export type MessageVerifier = (payload: Hex, signature: Hex, address: Address) => Promise<boolean>;
+export type MessageVerifier = (payload: string, signature: Hex, address: Address) => Promise<boolean>;

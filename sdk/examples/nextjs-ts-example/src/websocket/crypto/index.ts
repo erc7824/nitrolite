@@ -65,11 +65,17 @@ export const createEthersSigner = (privateKey: string): WalletSigner => {
             publicKey: wallet.publicKey,
             address: wallet.address,
             sign: async (message: string): Promise<Hex> => {
-                console.log("hash", message);
-                // Sign the entire message as a hex string
-                // This matches what NitroliteRPC.signMessage expects - it will pass the serialized message payload
-                const signature = await wallet.signMessage(ethers.utils.arrayify(message));
-                return signature as Hex;
+                try {
+                    console.log("Message to sign:", message);
+                    // The message is already a JSON string, so we sign it directly
+                    // without trying to convert it to bytes (which would fail for JSON)
+                    console.log("signMessage", message);
+                    const signature = await wallet.signMessage(message);
+                    return signature as Hex;
+                } catch (error) {
+                    console.error("Error signing message:", error);
+                    throw error;
+                }
             },
         };
     } catch (error) {

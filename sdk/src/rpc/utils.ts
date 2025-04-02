@@ -10,10 +10,10 @@ import { Hex } from "viem";
  * @param data The data to convert to a hex string
  * @returns A hex string representation of the data
  */
-export function createPayload(data: any): Hex {
+export function createPayload(data: any): string {
     // Optimize performance by using Buffer directly
     // This is more efficient than the TextEncoder approach
-    return ("0x" + Buffer.from(JSON.stringify(data)).toString("hex")) as Hex;
+    return JSON.stringify(data);
 }
 
 /**

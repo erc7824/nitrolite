@@ -112,6 +112,100 @@ NitroliteRPC is transport-agnostic, meaning you can use any WebSocket library or
    };
    ```
 
+## Building a WebSocket Client
+
+For WebSocket communication, you'll need to implement a client that can:
+
+1. **Connect to the broker server**: Establish a WebSocket connection
+2. **Authenticate**: Sign and send an authentication message using your Ethereum key
+3. **Process messages**: Handle incoming requests, responses, and errors
+4. **Send messages**: Create, sign, and send NitroliteRPC messages
+
+Here's a simplified example:
+
+```typescript
+import { NitroliteRPC } from '@erc7824/nitrolite';
+import { Hex } from 'viem';
+
+// Interface for the wallet signer
+interface WalletSigner {
+  publicKey: string;
+  address?: string;
+  sign: (message: string) => Promise<Hex>;
+}
+
+class WebSocketClient {
+  private ws: WebSocket | null = null;
+  private signer: WalletSigner;
+  
+  constructor(url: string, signer: WalletSigner) {
+    this.signer = signer;
+  }
+  
+  async connect(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.ws = new WebSocket(url);
+      
+      this.ws.onopen = async () => {
+        try {
+          // Authenticate upon connection
+          await this.authenticate();
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      // Set up message handling
+      this.ws.onmessage = (event) => {
+        const response = JSON.parse(event.data);
+        // Handle messages...
+      };
+    });
+  }
+  
+  private async authenticate(): Promise<void> {
+    // Create and send authentication request
+    const authRequest = NitroliteRPC.createRequest(
+      'auth', 
+      [this.signer.publicKey]
+    );
+    
+    const signedRequest = await NitroliteRPC.signMessage(
+      authRequest,
+      this.signer.sign
+    );
+    
+    this.ws!.send(JSON.stringify(signedRequest));
+    
+    // Wait for auth response...
+  }
+  
+  async sendRequest(method: string, params: any[] = []): Promise<any> {
+    const request = NitroliteRPC.createRequest(method, params);
+    const signedRequest = await NitroliteRPC.signMessage(request, this.signer.sign);
+    
+    // Send and wait for response...
+    this.ws!.send(JSON.stringify(signedRequest));
+  }
+}
+```
+
+For a complete implementation, see our [NextJS example](https://github.com/erc7824/nitrolite/tree/main/sdk-ts/examples/nextjs-ts-example).
+
+## Common Message Types
+
+Nitrolite applications typically use these standard RPC method types:
+
+| Method | Description | Parameters |
+|--------|-------------|------------|
+| `auth` | Authenticate with the broker | `[publicKey]` |
+| `subscribe` | Subscribe to a channel | `[channelName]` |
+| `publish` | Publish a message to a channel | `[channelName, messageData]` |
+| `ping` | Check connection latency | `[timestamp]` |
+| `get_balance` | Check token balance | `[tokenAddress]` |
+| `state_update` | Update channel state | `[channelId, stateData, signature]` |
+
 ## Error Codes
 
 Standard JSON-RPC error codes:
@@ -127,3 +221,10 @@ Nitrolite-specific error codes:
 - `-32001`: Invalid State - Invalid state transition
 - `-32002`: Channel Not Found - Referenced channel doesn't exist
 - `-32003`: Invalid Signature - Signature verification failed
+
+## Security Considerations
+
+1. **Timestamp Validation**: Always check that incoming messages have a timestamp within an acceptable range to prevent replay attacks.
+2. **Signature Verification**: Always verify signatures on received messages.
+3. **Request IDs**: Track request IDs to associate responses with their original requests.
+4. **Error Handling**: Implement robust error handling for network issues and invalid messages.

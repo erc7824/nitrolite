@@ -2,6 +2,47 @@
 
 This directory contains example applications that demonstrate the usage of the Nitrolite SDK.
 
+## NextJS TypeScript Example
+
+[NextJS TypeScript Example](./nextjs-ts-example) - A complete frontend application demonstrating how to use the Nitrolite SDK with a React-based web application.
+
+### Features Demonstrated
+
+- **Client-Side WebSocket Integration**
+  - WebSocket connection with automatic reconnection
+  - Secure authentication using cryptographic keys
+  - Real-time message handling and display
+
+- **NitroliteRPC Protocol**
+  - Message creation and signing
+  - Request/response handling
+  - Channel subscription and messaging
+
+- **UI Components**
+  - Connection status management
+  - Message display with sender information
+  - Form for sending custom RPC requests
+
+- **React Hooks**
+  - Custom hooks for WebSocket connection
+  - State management for messages and connection status
+  - Local storage integration for persistent keys
+
+### Running the Example
+
+```bash
+# Navigate to the example directory
+cd examples/nextjs-ts-example
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+
+Then open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+
 ## Broker Client Example
 
 [broker-client.ts](./broker-client.ts) - A complete example demonstrating how to use the Nitrolite SDK to interact with the Virtual Ledger Broker. It showcases on-chain channel management, off-chain communication via WebSockets, and state updates through RPC.

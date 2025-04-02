@@ -13,7 +13,7 @@ import { fetchAssets } from "@/store/AssetsStore";
 import { Address } from "viem";
 
 export default function Home() {
-    const [showMetaMaskFlow, setShowMetaMaskFlow] = useState(false);
+    // No longer need the showMetaMaskFlow state as we show it directly
     const walletSnap = useSnapshot(WalletStore.state);
 
     const {
@@ -59,8 +59,7 @@ export default function Home() {
             }
         }, 500);
 
-        // Hide MetaMask flow and show the main app
-        setShowMetaMaskFlow(false);
+        // Channel is now open, no need to change UI state
     };
 
     return (
@@ -92,7 +91,7 @@ export default function Home() {
 
                 {walletSnap.channelOpen ? (
                     <>
-                        <div className="flex gap-4 mb-2 flex-col md:flex-row">
+                        <div className="flex gap-3 mb-2 flex-col md:flex-row">
                             <div className="bg-white p-3 rounded-lg border border-[#3531ff]/30 shadow-sm flex-1">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center">
@@ -231,24 +230,76 @@ export default function Home() {
                             onSendPing={sendPing}
                             onCheckBalance={checkBalance}
                         />
-                    </>
-                ) : showMetaMaskFlow ? (
-                    <MetaMaskConnect onChannelOpen={handleOpenChannel} />
-                ) : (
-                    <div className="flex flex-col items-center justify-center py-12">
-                        <div className="text-center mb-8">
-                            <h2 className="text-2xl font-bold mb-4">Welcome to Nitrolite</h2>
-                            <p className="text-gray-600 max-w-md mx-auto">
-                                Connect your MetaMask wallet and open a channel to start using Nitrolite's secure services.
-                            </p>
+                        
+                        <div className="mt-4 flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+                            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm w-full md:w-1/2">
+                                <h2 className="text-lg font-semibold mb-3 text-[#3531ff]">About Nitrolite</h2>
+                                <p className="text-gray-600 text-sm mb-3">
+                                    Nitrolite provides secure state channels with cryptographic authentication for fast, low-cost transactions without on-chain delays.
+                                </p>
+                                <div className="mt-4">
+                                    <a href="https://erc7824.org/" target="_blank" rel="noopener noreferrer" className="text-[#3531ff] text-sm hover:underline cursor-pointer">
+                                        Learn more about Nitrolite
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm w-full md:w-1/2">
+                                <h2 className="text-lg font-semibold mb-3 text-[#3531ff]">FAQ</h2>
+                                <div className="space-y-2">
+                                    <details className="group">
+                                        <summary className="flex justify-between items-center font-medium cursor-pointer text-sm text-gray-700">
+                                            <span>What are state channels?</span>
+                                            <span className="transition group-open:rotate-180">
+                                                <svg fill="none" height="12" width="12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>
+                                            </span>
+                                        </summary>
+                                        <p className="text-xs text-gray-600 mt-1 group-open:animate-fadeIn">
+                                            State channels allow for off-chain transactions that are later settled on-chain, reducing gas costs and increasing speed.
+                                        </p>
+                                    </details>
+                                    
+                                    <details className="group">
+                                        <summary className="flex justify-between items-center font-medium cursor-pointer text-sm text-gray-700">
+                                            <span>How secure are these channels?</span>
+                                            <span className="transition group-open:rotate-180">
+                                                <svg fill="none" height="12" width="12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>
+                                            </span>
+                                        </summary>
+                                        <p className="text-xs text-gray-600 mt-1 group-open:animate-fadeIn">
+                                            All transactions are cryptographically signed and verified, ensuring the same security guarantees as on-chain transactions.
+                                        </p>
+                                    </details>
+                                    
+                                    <details className="group">
+                                        <summary className="flex justify-between items-center font-medium cursor-pointer text-sm text-gray-700">
+                                            <span>Can I close my channel?</span>
+                                            <span className="transition group-open:rotate-180">
+                                                <svg fill="none" height="12" width="12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>
+                                            </span>
+                                        </summary>
+                                        <p className="text-xs text-gray-600 mt-1 group-open:animate-fadeIn">
+                                            Yes, you can close your channel at any time, which will settle the final state on-chain.
+                                        </p>
+                                    </details>
+                                    
+                                    <details className="group">
+                                        <summary className="flex justify-between items-center font-medium cursor-pointer text-sm text-gray-700">
+                                            <span>What tokens are supported?</span>
+                                            <span className="transition group-open:rotate-180">
+                                                <svg fill="none" height="12" width="12" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>
+                                            </span>
+                                        </summary>
+                                        <p className="text-xs text-gray-600 mt-1 group-open:animate-fadeIn">
+                                            Nitrolite supports a wide range of ERC-20 tokens across multiple blockchain networks.
+                                        </p>
+                                    </details>
+                                </div>
+                            </div>
                         </div>
-                        <button
-                            onClick={() => setShowMetaMaskFlow(true)}
-                            className="bg-[#3531ff] hover:bg-[#2b28cc] text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-lg shadow-[#3531ff]/20 cursor-pointer"
-                        >
-                            Connect MetaMask & Open Channel
-                        </button>
-                    </div>
+                    </>
+                ) : (
+                    <MetaMaskConnect onChannelOpen={handleOpenChannel} />
                 )}
             </div>
         </div>

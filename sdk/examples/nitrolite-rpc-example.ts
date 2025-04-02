@@ -133,7 +133,9 @@ class NitroliteExample {
         const request = NitroliteRPC.createRequest(method, params, requestId);
 
         // Sign the request
+        console.log("req", request);
         const signedRequest = await NitroliteRPC.signMessage(request, this.signer);
+        console.log("sign", signedRequest);
 
         // Send the request
         return new Promise<T>((resolve, reject) => {

@@ -83,7 +83,7 @@ export class NitroliteRPC {
      */
     static async signMessage(message: NitroliteRPCMessage, signer: MessageSigner): Promise<NitroliteRPCMessage> {
         // Determine which field to sign based on message type
-        let payload: string;
+        let payload: Hex;
 
         if (message.req) {
             payload = createPayload(message.req);
@@ -125,7 +125,7 @@ export class NitroliteRPC {
             return false;
         }
 
-        let payload: string;
+        let payload: Hex;
 
         if (message.req) {
             payload = createPayload(message.req);

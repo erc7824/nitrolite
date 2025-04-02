@@ -348,9 +348,7 @@ contract Custody is IChannel, IDeposit {
         require(success, TransferFailed(token, to, amount));
     }
 
-    function _lockAccountFundsToChannel(address account, bytes32 channelId, address token, uint256 amount)
-        internal
-    {
+    function _lockAccountFundsToChannel(address account, bytes32 channelId, address token, uint256 amount) internal {
         if (amount == 0) return;
 
         Account storage accountInfo = _accounts[account];
@@ -365,9 +363,7 @@ contract Custody is IChannel, IDeposit {
     }
 
     // Does not perform checks to allow transferring partial balances in case of partial deposit
-    function _unlockChannelFundsToAccount(bytes32 channelId, address account, address token, uint256 amount)
-        internal
-    {
+    function _unlockChannelFundsToAccount(bytes32 channelId, address account, address token, uint256 amount) internal {
         if (amount == 0) return;
 
         Metadata storage meta = _channels[channelId];

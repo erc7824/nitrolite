@@ -10,7 +10,7 @@ contract DeployFundERC20Script is Script {
     function setUp() public {}
 
     function run(string memory mnemonic) public {
-        (address deployer, ) = deriveRememberKey(mnemonic, 0);
+        (address deployer,) = deriveRememberKey(mnemonic, 0);
         vm.startBroadcast(deployer);
 
         token = new TestERC20("Test Token", "TST", 8, type(uint256).max);

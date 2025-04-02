@@ -2,17 +2,17 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {CustodyLite} from "../src/CustodyLite.sol";
+import {Custody} from "../src/Custody.sol";
 
-contract CustodyLiteScript is Script {
-    CustodyLite public custodyLite;
+contract CustodyScript is Script {
+    Custody public custody;
 
     function setUp() public {}
 
     function run() public {
         vm.startBroadcast();
 
-        custodyLite = new CustodyLite();
+        custody = new Custody();
 
         vm.stopBroadcast();
     }

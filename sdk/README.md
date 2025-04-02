@@ -6,11 +6,11 @@ A streamlined TypeScript SDK for building custom state channel applications with
 
 Nitrolite SDK provides a framework for developing scalable blockchain applications using state channels. State channels allow transactions to occur off-chain while maintaining the security guarantees of the underlying blockchain, resulting in:
 
-- ⚡ **Instant Finality**: Transactions settle immediately between parties
-- 💰 **Reduced Gas Costs**: Most interactions happen off-chain, with minimal on-chain footprint
-- 🔄 **High Throughput**: Support for thousands of transactions per second
-- 🛡️ **Security Guarantees**: Same security as on-chain, with cryptographic proofs
-- 🌐 **Chain Agnostic**: Works with any EVM-compatible blockchain
+- **Instant Finality**: Transactions settle immediately between parties
+- **Reduced Gas Costs**: Most interactions happen off-chain, with minimal on-chain footprint
+- **High Throughput**: Support for thousands of transactions per second
+- **Security Guarantees**: Same security as on-chain, with cryptographic proofs
+- **Chain Agnostic**: Works with any EVM-compatible blockchain
 
 ## Installation
 
@@ -121,13 +121,13 @@ await channel.close();
 
 ## Core Features
 
-### 🔄 State Channel Management
+### State Channel Management
 
 - **Open/close channels** with configurable challenge periods
 - **Challenge resolution** for uncooperative counterparties
 - **Checkpointing** to prevent disputes
 
-### 📱 Application Framework
+### Application Framework
 
 Generic application interface that you can extend with your own logic:
 
@@ -136,7 +136,7 @@ Generic application interface that you can extend with your own logic:
 - **Built-in Helpers**: Utility functions for common application patterns
 - **Example Applications**: Counter, MicroPayment, and more examples provided
 
-### 🧩 Custom Adjudicators
+### Custom Adjudicators
 
 Support for custom state transition validators (adjudicators):
 
@@ -145,13 +145,13 @@ Support for custom state transition validators (adjudicators):
 - **Adjudicator Registry**: Register and reference adjudicators by type
 - **Type-safe Interface**: TypeScript generics for your application states
 
-### 🌐 Off-Chain Communication
+### Off-Chain Communication
 
 - **Message Types** for protocol communication
 - **Flexible Design** - implement your own communication layer
 - **Type Definitions** for state proposals, signatures, and notifications
 
-### 🔐 Cryptographic Utilities
+### Cryptographic Utilities
 
 - **State hashing** and verification
 - **Signature generation** and validation

@@ -99,10 +99,10 @@ contract Custody is IChannel, IDeposit {
     /**
      * @notice Open or join a channel by depositing assets
      * @param ch Channel configuration
-     * @param depositSt is the initial State defined by the opener, it contains the expected allocation
+     * @param dst is the initial State defined by the opener, it contains the expected allocation
      * @return channelId Unique identifier for the channel
      */
-    function open(Channel calldata ch, State calldata depositSt) public returns (bytes32 channelId) {
+    function open(Channel calldata ch, State calldata dst) public returns (bytes32 channelId) {
         // Validate input parameters
         // FIXME: lift this restriction
         require(ch.participants.length == 2, InvalidParticipant());
@@ -117,25 +117,25 @@ contract Custody is IChannel, IDeposit {
         Metadata storage meta = channels[channelId];
         if (meta.chan.adjudicator == address(0)) {
             // Validate deposits and transfer funds
-            Allocation memory allocation = depositSt.allocations[HOST];
+            Allocation memory allocation = dst.allocations[HOST];
 
             // Initialize channel metadata
             Metadata storage newCh = channels[channelId];
             newCh.chan = ch;
             newCh.challengeExpire = 0;
-            newCh.lastValidState = depositSt;
+            newCh.lastValidState = dst;
 
             // Transfer funds from account to channel
             _checkAndTransferAccountToChannel(ch.participants[HOST], channelId, allocation.token, allocation.amount);
 
             emit ChannelPartiallyFunded(channelId, ch);
         } else {
-            Allocation memory allocation = depositSt.allocations[GUEST];
+            Allocation memory allocation = dst.allocations[GUEST];
             _checkAndTransferAccountToChannel(ch.participants[GUEST], channelId, allocation.token, allocation.amount);
 
             // Validate the state with an empty proof
             State[] memory emptyProofs = new State[](0);
-            IAdjudicator.Status status = _validateState(meta, depositSt, emptyProofs);
+            IAdjudicator.Status status = _validateState(meta, dst, emptyProofs);
 
             // Update channel state based on adjudicator decision
             if (status == IAdjudicator.Status.ACTIVE || status == IAdjudicator.Status.VOID) {

@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@erc7824/nitrolite": "0.0.4-alpha",
+    "@erc7824/nitrolite": "0.0.7-alpha",
     "centrifuge": "5.3.4",
     "ethers": "5.7.2",
     "next": "15.2.4",

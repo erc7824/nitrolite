@@ -263,7 +263,7 @@ Messages are formatted as fixed JSON arrays with a standard structure:
 ### Using NitroliteRPC
 
 ```typescript
-import { NitroliteRPC } from '@erc7824/nitrolite';
+import { NitroliteRPC, prepareMessageForSigning } from '@erc7824/nitrolite';
 
 // Create a request message
 const request = NitroliteRPC.createRequest(
@@ -280,6 +280,53 @@ const signedRequest = await NitroliteRPC.signMessage(
 
 // Send the message via your own WebSocket connection
 ws.send(JSON.stringify(signedRequest));
+```
+
+### Message Signing
+
+Nitrolite SDK provides utilities to help with consistent message signing across different platforms:
+
+```typescript
+import { prepareMessageForSigning, createPayloadHash } from '@erc7824/nitrolite';
+import { ethers } from 'ethers';
+
+// Example: Creating an Ethereum signer with ethers.js
+function createEthersSigner(privateKey: string) {
+  const wallet = new ethers.Wallet(privateKey);
+  
+  return {
+    address: wallet.address,
+    publicKey: wallet.publicKey,
+    sign: async (message: string): Promise<string> => {
+      // Prepare the message for signing using the SDK utility
+      // This handles JSON conversion and keccak256 hashing in a consistent way
+      const hashBytes = prepareMessageForSigning(message);
+      
+      // Sign the prepared hash bytes
+      const signature = await wallet.signMessage(hashBytes);
+      return signature;
+    }
+  };
+}
+
+// Example: Creating a signer with viem
+function createViemSigner(privateKey: string) {
+  const account = privateKeyToAccount(privateKey);
+  
+  return {
+    address: account.address,
+    sign: async (message: string): Promise<string> => {
+      // Get the keccak hash of the message
+      const hash = createPayloadHash(message);
+      
+      // Sign the hash with viem
+      return signMessage({
+        account,
+        message: { raw: hash }
+      });
+    }
+  };
+}
 ```
 
 ### Common RPC Methods

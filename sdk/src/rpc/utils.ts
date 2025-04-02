@@ -1,5 +1,3 @@
-import { Hex } from "viem";
-
 /**
  * Utility functions for NitroRPC
  */

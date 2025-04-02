@@ -1,5 +1,6 @@
 import { Hex } from "viem";
 import { ethers } from "ethers";
+import { prepareMessageForSigning } from "@erc7824/nitrolite";
 
 /**
  * Interface for a cryptographic keypair
@@ -66,13 +67,8 @@ export const createEthersSigner = (privateKey: string): WalletSigner => {
             address: wallet.address,
             sign: async (message: string): Promise<Hex> => {
                 try {
-                    // console.log("Message to sign:");
-                    const keccakMessage = ethers.utils.keccak256(Buffer.from(message));
-                    console.log("Keccak256 message:", keccakMessage);
-                    // The message is already a JSON string, so we sign it directly
-                    // without trying to convert it to bytes (which would fail for JSON)
+                    const messageHash = prepareMessageForSigning(message);
                     const signature = await wallet.signMessage(message);
-                    console.log("signed", message);
 
                     return signature as Hex;
                 } catch (error) {

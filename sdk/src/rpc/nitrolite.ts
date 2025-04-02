@@ -95,7 +95,10 @@ export class NitroliteRPC {
             throw new Error("Invalid message: must contain req, res, or err field");
         }
 
-        // Sign the payload
+        // Pass the payload directly to the signer
+        // The MessageSigner interface expects a string payload
+        // Signers should use the prepareForSigning utility if they need 
+        // to process the payload before signing (e.g., hashing with keccak256)
         const signature = await signer(payload);
 
         // Return a new message with the signature

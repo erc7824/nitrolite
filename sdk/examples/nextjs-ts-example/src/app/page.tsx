@@ -6,6 +6,7 @@ import { useMessageService } from "@/hooks/useMessageService";
 import WalletStore from "@/store/WalletStore";
 import { fetchAssets } from "@/store/AssetsStore";
 import { Address } from "viem";
+import { generateKeyPair } from "@/websocket/crypto";
 
 // Components
 import { Header } from "@/components/Header";

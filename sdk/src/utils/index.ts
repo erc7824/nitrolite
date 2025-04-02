@@ -212,7 +212,9 @@ export function createAppLogic<T>(config: {
   const appLogic: AppLogic<T> = {
     encode: config.encode,
     decode: config.decode,
-    validateTransition: config.validateTransition,
+    validateTransition: config.validateTransition ? 
+    (channel, prevState, nextState) => config.validateTransition!(prevState, nextState, '0x' as Address) : 
+    undefined,
     isFinal: config.isFinal,
     getAdjudicatorAddress: () => config.adjudicatorAddress
   };

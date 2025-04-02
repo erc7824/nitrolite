@@ -1,5 +1,57 @@
 import { Address, Hex } from 'viem';
-import { Channel, State } from '../client';
+import { Channel as ClientChannel, State as ClientState } from '../client/types';
+
+/**
+ * Re-export client types
+ */
+export type Channel = ClientChannel;
+export type State = ClientState;
+export type ChannelId = Hex;
+export type StateHash = Hex;
+export type Signature = {
+  v: number;
+  r: Hex;
+  s: Hex;
+};
+
+/**
+ * Participant roles in a channel
+ */
+export enum Role {
+  UNDEFINED = -1,
+  HOST = 0,
+  GUEST = 1
+}
+
+/**
+ * Standard app data types
+ */
+export namespace AppDataTypes {
+  export interface NumericState {
+    value: bigint;
+  }
+
+  export interface SequentialState {
+    sequence: bigint;
+    value: bigint;
+  }
+
+  export interface TurnBasedState {
+    data: any;
+    turn: number;
+    status: number;
+    isComplete: boolean;
+  }
+}
+
+/**
+ * Channel metadata
+ */
+export interface Metadata {
+  chan: Channel;
+  challengeExpire: bigint;
+  lastValidState: State;
+}
 
 /**
  * Generic application logic interface

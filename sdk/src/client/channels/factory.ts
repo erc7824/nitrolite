@@ -94,7 +94,7 @@ export function createNumericChannel(
     client,
     channel,
     appLogic,
-    { value: params.initialValue || BigInt(0) }
+    { value: params.initialValue || BigInt(0) } as unknown as Hex
   );
 }
 
@@ -185,7 +185,7 @@ export function createSequentialChannel(
     client,
     channel,
     appLogic,
-    { sequence: BigInt(0), value: params.initialValue || BigInt(0) }
+    { sequence: BigInt(0), value: params.initialValue || BigInt(0) } as unknown as Hex
   );
 }
 
@@ -195,7 +195,7 @@ export function createSequentialChannel(
  * @param params Custom application parameters
  * @returns A new channel context with custom app logic
  */
-export function createCustomChannel<T = unknown>(
+export function createCustomChannel<T extends Hex | unknown = unknown>(
   client: NitroliteClient,
   params: {
     participants: [Address, Address];
@@ -267,6 +267,6 @@ export function createCustomChannel<T = unknown>(
     client,
     channel,
     appLogic,
-    params.initialState
+    params.initialState as unknown as Hex
   );
 }

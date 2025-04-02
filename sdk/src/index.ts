@@ -14,8 +14,26 @@ export * from "./utils";
 // Error types
 export * from "./errors";
 
-// Client
-export * from "./client";
+// Client (without re-exporting conflicting types)
+export {
+  NitroliteClient,
+  ClientConfig,
+  ClientEvents
+} from "./client/NitroliteClient";
+export {
+  defaultLogger,
+  Logger,
+  LogLevel
+} from "./client/config";
+export {
+  ChannelOperations
+} from "./client/operations";
+export {
+  createNumericChannel,
+  createSequentialChannel,
+  createCustomChannel,
+  ChannelContext
+} from "./client/channels";
 
 // RPC Relay
 export * from "./relay";

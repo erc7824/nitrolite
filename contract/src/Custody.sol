@@ -7,18 +7,22 @@ import {IAdjudicator} from "./interfaces/IAdjudicator.sol";
 import {Channel, State, Allocation} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
+import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
 /**
  * @title Custody
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
  */
 contract Custody is IChannel, IDeposit {
+    using EnumerableSet for EnumerableSet.Bytes32Set;
+
     // Errors
     error ChannelNotFound(bytes32 channelId);
     error InvalidParticipant();
     error InvalidState();
     error InvalidAdjudicator();
     error InvalidChallengePeriod();
+    error InvalidAmount();
     error TransferFailed(address token, address to, uint256 amount);
     error ChallengeNotExpired();
     error ChannelNotFinal();
@@ -36,73 +40,73 @@ contract Custody is IChannel, IDeposit {
         mapping(address token => uint256 balance) tokenBalances; // Token balances for the channel
     }
 
-    struct Account {
-        uint256 deposited; // Total amount for this token
+    struct Funds {
+        uint256 available; // Available amount that can be withdrawn or allocated to channels
         uint256 locked; // Amount currently allocated to channels
-        bytes32[] channels; // List of user ChannelId
     }
 
-    mapping(bytes32 channelId => Metadata chMeta) internal channels;
-    mapping(address account => mapping(address token => Account)) internal balances;
+    struct Account {
+        mapping(address token => Funds funds) tokens; // Token balances
+        EnumerableSet.Bytes32Set channels; // Set of user ChannelId
+    }
 
-    function deposit(address token, uint256 amount) external {
-        _transferFrom(token, msg.sender, address(this), amount);
-        balances[msg.sender][token].deposited += amount;
+    mapping(bytes32 channelId => Metadata chMeta) internal _channels;
+    mapping(address account => Account) internal _accounts;
+
+    function deposit(address token, uint256 amount) external payable {
+        address account = msg.sender;
+        if (token == address(0)) {
+            require(msg.value == amount, InvalidAmount());
+        } else {
+            bool success = IERC20(token).transferFrom(account, address(this), amount);
+            require(success, TransferFailed(token, address(this), amount));
+        }
+
+        _accounts[msg.sender].tokens[token].available += amount;
     }
 
     function withdraw(address token, uint256 amount) external {
-        Account storage account = balances[msg.sender][token];
-        uint256 available = getAvailableBalance(msg.sender, token);
+        Account storage account = _accounts[msg.sender];
+        uint256 available = account.tokens[token].available;
         require(available >= amount, InsufficientBalance(available, amount));
         _transfer(token, msg.sender, amount);
-        account.deposited -= amount;
+        account.tokens[token].available -= amount;
     }
 
     /**
-     * @notice Get available balance for an account for a specific token
+     * @notice Get channels associated with an account
      * @param account The account address
-     * @param token The token address
-     * @return available The available balance that can be withdrawn or allocated to channels
+     * @return List of channel IDs associated with the account
      */
-    function getAvailableBalance(address account, address token) public view returns (uint256 available) {
-        Account storage accountInfo = balances[account][token];
-        return accountInfo.deposited - accountInfo.locked;
-    }
-
-    /**
-     * @notice Get channels associated with an account for a specific token
-     * @param account The account address
-     * @param token The token address
-     * @return List of channel IDs associated with the account for the token
-     */
-    function getAccountChannels(address account, address token) public view returns (bytes32[] memory) {
-        return balances[account][token].channels;
+    function getAccountChannels(address account) public view returns (bytes32[] memory) {
+        return _accounts[account].channels.values();
     }
 
     /**
      * @notice Get account information for a specific token
      * @param account The account address
      * @param token The token address
-     * @return deposited Total deposited amount
+     * @return available Amount available for withdrawal or allocation
      * @return locked Amount locked in channels
      * @return channelCount Number of associated channels
      */
     function getAccountInfo(address account, address token)
         public
         view
-        returns (uint256 deposited, uint256 locked, uint256 channelCount)
+        returns (uint256 available, uint256 locked, uint256 channelCount)
     {
-        Account storage accountInfo = balances[account][token];
-        return (accountInfo.deposited, accountInfo.locked, accountInfo.channels.length);
+        Account storage accountInfo = _accounts[account];
+        Funds storage funds = accountInfo.tokens[token];
+        return (funds.available, funds.locked, accountInfo.channels.length());
     }
 
     /**
      * @notice Open or join a channel by depositing assets
      * @param ch Channel configuration
-     * @param dst is the initial State defined by the opener, it contains the expected allocation
+     * @param depositState is the initial State defined by the opener, it contains the expected allocation
      * @return channelId Unique identifier for the channel
      */
-    function open(Channel calldata ch, State calldata dst) public returns (bytes32 channelId) {
+    function open(Channel calldata ch, State calldata depositState) public returns (bytes32 channelId) {
         // Validate input parameters
         // FIXME: lift this restriction
         require(ch.participants.length == 2, InvalidParticipant());
@@ -114,31 +118,33 @@ contract Custody is IChannel, IDeposit {
         channelId = Utils.getChannelId(ch);
 
         // Check if channel doesn't exists and create new one
-        Metadata storage meta = channels[channelId];
+        Metadata storage meta = _channels[channelId];
         if (meta.chan.adjudicator == address(0)) {
             // Validate deposits and transfer funds
-            Allocation memory allocation = dst.allocations[HOST];
+            Allocation memory allocation = depositState.allocations[HOST];
 
             // Initialize channel metadata
-            Metadata storage newCh = channels[channelId];
+            Metadata storage newCh = _channels[channelId];
             newCh.chan = ch;
             newCh.challengeExpire = 0;
-            newCh.lastValidState = dst;
+            newCh.lastValidState = depositState;
 
             // Transfer funds from account to channel
-            _checkAndTransferAccountToChannel(ch.participants[HOST], channelId, allocation.token, allocation.amount);
+            _lockAccountFundsToChannel(ch.participants[HOST], channelId, allocation.token, allocation.amount);
+            _accounts[ch.participants[HOST]].channels.add(channelId);
 
             emit ChannelPartiallyFunded(channelId, ch);
         } else {
-            Allocation memory allocation = dst.allocations[GUEST];
-            _checkAndTransferAccountToChannel(ch.participants[GUEST], channelId, allocation.token, allocation.amount);
+            Allocation memory allocation = depositState.allocations[GUEST];
+            _lockAccountFundsToChannel(ch.participants[GUEST], channelId, allocation.token, allocation.amount);
 
             // Validate the state with an empty proof
             State[] memory emptyProofs = new State[](0);
-            IAdjudicator.Status status = _validateState(meta, dst, emptyProofs);
+            IAdjudicator.Status status = _validateState(meta, depositState, emptyProofs);
 
             // Update channel state based on adjudicator decision
             if (status == IAdjudicator.Status.ACTIVE || status == IAdjudicator.Status.VOID) {
+                _accounts[ch.participants[GUEST]].channels.add(channelId);
                 emit ChannelOpened(channelId, ch);
             } else if (status == IAdjudicator.Status.PARTIAL) {
                 // For Counter adjudicator, PARTIAL means counter = 0
@@ -258,13 +264,20 @@ contract Custody is IChannel, IDeposit {
      */
     function _closeChannel(bytes32 channelId, Metadata storage meta) internal {
         // Distribute funds according to allocations
-        for (uint256 i = 0; i < meta.lastValidState.allocations.length; i++) {
+        uint256 allocsLength = meta.lastValidState.allocations.length;
+        for (uint256 i = 0; i < allocsLength; i++) {
             Allocation memory allocation = meta.lastValidState.allocations[i];
-            _checkAndTransferChannelToAccount(channelId, allocation.destination, allocation.token, allocation.amount);
+            _unlockChannelFundsToAccount(channelId, allocation.destination, allocation.token, allocation.amount);
+        }
+
+        uint256 participantsLength = meta.chan.participants.length;
+        for (uint256 i = 0; i < participantsLength; i++) {
+            address participant = meta.chan.participants[i];
+            _accounts[participant].channels.remove(channelId);
         }
 
         // Mark channel as closed by removing it
-        delete channels[channelId];
+        delete _channels[channelId];
 
         emit ChannelClosed(channelId);
     }
@@ -275,7 +288,7 @@ contract Custody is IChannel, IDeposit {
      * @return meta The channel's metadata
      */
     function _requireValidChannel(bytes32 channelId) internal view returns (Metadata storage meta) {
-        meta = channels[channelId];
+        meta = _channels[channelId];
         require(meta.chan.adjudicator != address(0), ChannelNotFound(channelId));
         return meta;
     }
@@ -335,101 +348,37 @@ contract Custody is IChannel, IDeposit {
         require(success, TransferFailed(token, to, amount));
     }
 
-    function _transferFrom(address token, address from, address to, uint256 amount) internal {
-        bool success;
-        if (token == address(0)) {
-            (success,) = to.call{value: amount}("");
-        } else {
-            success = IERC20(token).transferFrom(from, to, amount);
-        }
-        require(success, TransferFailed(token, to, amount));
-    }
-
-    function _checkAndTransferAccountToChannel(address account, bytes32 channelId, address token, uint256 amount)
+    function _lockAccountFundsToChannel(address account, bytes32 channelId, address token, uint256 amount)
         internal
     {
         if (amount == 0) return;
 
-        Account storage accountInfo = balances[account][token];
-        uint256 available = getAvailableBalance(account, token);
+        Account storage accountInfo = _accounts[account];
+        uint256 available = accountInfo.tokens[token].available;
         require(available >= amount, InsufficientBalance(available, amount));
 
-        accountInfo.locked += amount;
-        // Add channelId to the list if it's not already there
-        if (!_containsValue(accountInfo.channels, channelId)) {
-            accountInfo.channels.push(channelId);
-        }
+        accountInfo.tokens[token].available -= amount;
+        accountInfo.tokens[token].locked += amount;
 
-        Metadata storage meta = channels[channelId];
+        Metadata storage meta = _channels[channelId];
         meta.tokenBalances[token] += amount;
     }
 
     // Does not perform checks to allow transferring partial balances in case of partial deposit
-    function _checkAndTransferChannelToAccount(bytes32 channelId, address account, address token, uint256 amount)
+    function _unlockChannelFundsToAccount(bytes32 channelId, address account, address token, uint256 amount)
         internal
     {
         if (amount == 0) return;
 
-        Metadata storage meta = channels[channelId];
+        Metadata storage meta = _channels[channelId];
         uint256 channelBalance = meta.tokenBalances[token];
         if (channelBalance == 0) return;
 
         uint256 correctedAmount = channelBalance > amount ? amount : channelBalance;
         meta.tokenBalances[token] -= correctedAmount;
 
-        Account storage accountInfo = balances[account][token];
-        accountInfo.deposited += correctedAmount;
-
-        // Check if we need to update locked amount and possibly remove channel from list
-        bool shouldRemoveChannel = channelBalance <= correctedAmount;
-        if (shouldRemoveChannel) {
-            // Update locked amount
-            if (accountInfo.locked >= correctedAmount) {
-                accountInfo.locked -= correctedAmount;
-            } else {
-                // This shouldn't happen, but as a safety measure
-                accountInfo.locked = 0;
-            }
-
-            // Remove channelId from the list
-            _removeFromArray(accountInfo.channels, channelId);
-        }
-    }
-
-    /**
-     * @notice Utility function to remove an element from a bytes32 array
-     * @param array The array to modify
-     * @param value The value to remove
-     * @return found Whether the value was found and removed
-     */
-    function _removeFromArray(bytes32[] storage array, bytes32 value) internal returns (bool found) {
-        uint256 length = array.length;
-        for (uint256 i = 0; i < length; i++) {
-            if (array[i] == value) {
-                // Replace with the last element and remove the last one
-                if (i < length - 1) {
-                    array[i] = array[length - 1];
-                }
-                array.pop();
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * @notice Utility function to check if an array contains a value
-     * @param array The array to check
-     * @param value The value to look for
-     * @return exists Whether the value exists in the array
-     */
-    function _containsValue(bytes32[] storage array, bytes32 value) internal view returns (bool exists) {
-        uint256 length = array.length;
-        for (uint256 i = 0; i < length; i++) {
-            if (array[i] == value) {
-                return true;
-            }
-        }
-        return false;
+        Account storage accountInfo = _accounts[account];
+        accountInfo.tokens[token].locked -= correctedAmount;
+        accountInfo.tokens[token].available += correctedAmount;
     }
 }

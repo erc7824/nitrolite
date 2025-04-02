@@ -6,7 +6,7 @@ import {
   WalletSigner, 
   CryptoKeypair,
   getAddressFromPublicKey
-} from '@/utils/wsClient';
+} from '@/websocket';
 import { Message, Channel, WSStatus } from '@/types';
 import { MessageType } from '@/hooks/useMessageStyles';
 

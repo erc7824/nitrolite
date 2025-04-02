@@ -18,14 +18,13 @@ contract ChannelMock is IChannel {
         State[] memory emptyProofs = new State[](0);
         IAdjudicator.Status status = adjudicator.adjudicate(ch, deposit, emptyProofs);
 
+        channelId = Utils.getChannelId(ch);
         if (status == IAdjudicator.Status.ACTIVE) {
             channels[channelId] = ch;
             emit ChannelOpened(channelId, ch);
         } else {
             revert("Invalid Channel State");
         }
-
-        return Utils.getChannelId(ch);
     }
 
     function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) public {

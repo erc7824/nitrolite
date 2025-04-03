@@ -1,6 +1,5 @@
-import { Hex } from "viem";
-import { ethers } from "ethers";
-import { prepareMessageForSigning } from "@erc7824/nitrolite";
+import { Hex } from 'viem';
+import { ethers } from 'ethers';
 
 /**
  * Interface for a cryptographic keypair
@@ -35,18 +34,18 @@ export interface WalletSigner {
 export const getAddressFromPublicKey = (publicKey: string): string => {
     try {
         // Remove '0x' prefix if it exists and make sure it's a compressed public key
-        const cleanPublicKey = publicKey.startsWith("0x") ? publicKey.slice(2) : publicKey;
+        const cleanPublicKey = publicKey.startsWith('0x') ? publicKey.slice(2) : publicKey;
 
         // Keccak hash of the public key
-        const hash = ethers.utils.keccak256("0x" + cleanPublicKey);
+        const hash = ethers.utils.keccak256('0x' + cleanPublicKey);
 
         // Take the last 20 bytes of the hash and prefix with '0x' to get the address
-        const address = "0x" + hash.slice(-40);
+        const address = '0x' + hash.slice(-40);
 
         // Return checksummed address
         return ethers.utils.getAddress(address);
     } catch (error) {
-        throw new Error("Invalid public key format", error as any);
+        throw new Error(`Invalid public key format: ${error instanceof Error ? error.message : String(error)}`);
     }
 };
 
@@ -67,18 +66,17 @@ export const createEthersSigner = (privateKey: string): WalletSigner => {
             address: wallet.address,
             sign: async (message: string): Promise<Hex> => {
                 try {
-                    const messageHash = prepareMessageForSigning(message);
                     const signature = await wallet.signMessage(message);
 
                     return signature as Hex;
                 } catch (error) {
-                    console.error("Error signing message:", error);
+                    console.error('Error signing message:', error);
                     throw error;
                 }
             },
         };
     } catch (error) {
-        console.error("Error creating ethers signer:", error);
+        console.error('Error creating ethers signer:', error);
         throw error;
     }
 };
@@ -105,7 +103,7 @@ export const generateKeyPair = async (): Promise<CryptoKeypair> => {
             address: walletFromHashedKey.address,
         };
     } catch (error) {
-        console.error("Error generating keypair, using fallback:", error);
+        console.error('Error generating keypair, using fallback:', error);
         // Fallback implementation
         const randomHex = ethers.utils.randomBytes(32);
         const privateKey = ethers.utils.keccak256(randomHex);
@@ -126,5 +124,5 @@ export const generateKeyPair = async (): Promise<CryptoKeypair> => {
  * @returns A shortened version of the public key (e.g. "0x1234...5678")
  */
 export const shortenPublicKey = (publicKey: string): string => {
-    return publicKey.substring(0, 8) + "..." + publicKey.substring(publicKey.length - 4);
+    return publicKey.substring(0, 8) + '...' + publicKey.substring(publicKey.length - 4);
 };

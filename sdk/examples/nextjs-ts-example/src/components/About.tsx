@@ -4,7 +4,10 @@ export function About() {
             <h2 className="text-lg font-semibold mb-4 text-[#3531ff]">About Nitrolite</h2>
 
             <div className="space-y-4">
-                <p>Nitrolite provides secure state channels with cryptographic authentication for fast and secure transactions.</p>
+                <p>
+                    Nitrolite provides secure state channels with cryptographic authentication for fast and secure
+                    transactions.
+                </p>
 
                 <div className="bg-gray-50 p-3 rounded-lg border-l-2 border-[#3531ff]">
                     <h3 className="text-sm font-semibold mb-2 text-[#3531ff]">How to use Nitrolite:</h3>

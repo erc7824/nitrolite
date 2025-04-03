@@ -21,20 +21,23 @@ This example demonstrates how to integrate the Nitrolite SDK (@erc7824/nitrolite
 ### Installation
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/erc7824/nitrolite.git
-   cd nitrolite/sdk-ts/examples/nextjs-ts-example
-   ```
+
+    ```bash
+    git clone https://github.com/erc7824/nitrolite.git
+    cd nitrolite/sdk-ts/examples/nextjs-ts-example
+    ```
 
 2. Install dependencies:
-   ```bash
-   npm install
-   ```
+
+    ```bash
+    npm install
+    ```
 
 3. Start the development server:
-   ```bash
-   npm run dev
-   ```
+
+    ```bash
+    npm run dev
+    ```
 
 4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
@@ -51,7 +54,9 @@ This example demonstrates how to integrate the Nitrolite SDK (@erc7824/nitrolite
 You can configure the WebSocket server URL in the `src/app/page.tsx` file:
 
 ```tsx
-const { /* ... */ } = useWebSocket("ws://localhost:8000/ws");
+const {
+    /* ... */
+} = useWebSocket('ws://localhost:8000/ws');
 ```
 
 ## Project Structure

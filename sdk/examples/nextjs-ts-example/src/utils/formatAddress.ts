@@ -1,4 +1,4 @@
-import { Address } from "viem";
+import { Address } from 'viem';
 
 /**
  * Formats an Ethereum address in the style of MetaMask
@@ -8,13 +8,13 @@ import { Address } from "viem";
  * @returns Formatted address string
  */
 export function formatAddress(address: Address | null | undefined, short: boolean = true): string {
-  if (!address) {
-    return '';
-  }
-  
-  if (short) {
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-  }
-  
-  return address;
+    if (!address) {
+        return '';
+    }
+
+    if (short) {
+        return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+    }
+
+    return address;
 }

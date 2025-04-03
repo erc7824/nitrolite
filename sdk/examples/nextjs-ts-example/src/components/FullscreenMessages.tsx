@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from "react";
-import { useMessageStyles } from "@/hooks/useMessageStyles";
-import { useSnapshot } from "valtio";
-import WalletStore from "@/store/WalletStore";
-import { useMessageService } from "@/hooks/useMessageService";
+import { useEffect, useRef } from 'react';
+import { useMessageStyles } from '@/hooks/useMessageStyles';
+import { useSnapshot } from 'valtio';
+import WalletStore from '@/store/WalletStore';
+import { useMessageService } from '@/hooks/useMessageService';
 
 interface FullscreenMessagesProps {
     onClose: () => void;
@@ -14,7 +14,7 @@ export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const walletSnap = useSnapshot(WalletStore.state);
     const shouldScrollRef = useRef(true);
-    
+
     // Use our message service hook
     const { messages, status } = useMessageService();
 
@@ -23,7 +23,7 @@ export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
         if (shouldScrollRef.current && messagesEndRef.current && containerRef.current) {
             containerRef.current.scrollTo({
                 top: containerRef.current.scrollHeight,
-                behavior: "smooth",
+                behavior: 'smooth',
             });
         }
     }, [messages]);
@@ -31,20 +31,22 @@ export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
     // Handle scroll events to detect if user has scrolled up
     useEffect(() => {
         const container = containerRef.current;
+
         if (!container) return;
 
         const handleScroll = () => {
             const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+
             shouldScrollRef.current = isAtBottom;
         };
 
-        container.addEventListener("scroll", handleScroll);
-        return () => container.removeEventListener("scroll", handleScroll);
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
     }, []);
 
     // Format timestamp
     const formatTime = (timestamp?: number) => {
-        if (!timestamp) return "";
+        if (!timestamp) return '';
         return new Date(timestamp).toLocaleTimeString();
     };
 
@@ -56,7 +58,13 @@ export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
                     onClick={onClose}
                     className="bg-[#3531ff] hover:bg-[#2b28cc] text-white px-3 py-1 rounded flex items-center transition-colors"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 mr-1"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                     Exit Full View
@@ -69,18 +77,27 @@ export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
                 ) : (
                     <div className="w-full mx-auto">
                         {messages.map((message, index) => (
-                            <div key={index} className={`p-1 rounded mb-0 ${messageStyles[message.type] || messageStyles.info}`}>
-                                {message.type === "sent" && (
+                            <div
+                                key={index}
+                                className={`p-1 rounded mb-0 ${messageStyles[message.type] || messageStyles.info}`}
+                            >
+                                {message.type === 'sent' && (
                                     <svg
                                         className="inline-block w-4 h-4 mr-1 -mt-1"
                                         viewBox="0 0 24 24"
                                         fill="none"
                                         xmlns="http://www.w3.org/2000/svg"
                                     >
-                                        <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                        <path
+                                            d="M5 13l4 4L19 7"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
                                     </svg>
                                 )}
-                                {message.type === "received" && (
+                                {message.type === 'received' && (
                                     <svg
                                         className="inline-block w-4 h-4 mr-1 -mt-1"
                                         viewBox="0 0 24 24"
@@ -95,7 +112,7 @@ export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
                                         />
                                     </svg>
                                 )}
-                                {message.type === "system" && (
+                                {message.type === 'system' && (
                                     <svg
                                         className="inline-block w-4 h-4 mr-1 -mt-1"
                                         viewBox="0 0 24 24"
@@ -108,7 +125,7 @@ export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
                                         />
                                     </svg>
                                 )}
-                                {message.type === "error" && (
+                                {message.type === 'error' && (
                                     <svg
                                         className="inline-block w-4 h-4 mr-1 -mt-1"
                                         viewBox="0 0 24 24"
@@ -124,7 +141,8 @@ export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
                                     </svg>
                                 )}
                                 <span className="text-xs text-gray-500">{formatTime(message.timestamp)}</span>
-                                {message.sender && <span className="font-medium"> {message.sender}:</span>} {message.text}
+                                {message.sender && <span className="font-medium"> {message.sender}:</span>}{' '}
+                                {message.text}
                             </div>
                         ))}
                         <div ref={messagesEndRef} />
@@ -134,15 +152,18 @@ export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
 
             <div className="p-2 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-xs text-gray-600">
                 <div className="flex items-center">
-                    <div className={`w-2 h-2 rounded-full mr-1 ${status === "connected" ? "bg-green-500" : "bg-yellow-500"}`}></div>
-                    <span>{status === "connected" ? "Connected" : "Connecting..."}</span>
+                    <div
+                        className={`w-2 h-2 rounded-full mr-1 ${status === 'connected' ? 'bg-green-500' : 'bg-yellow-500'}`}
+                     />
+                    <span>{status === 'connected' ? 'Connected' : 'Connecting...'}</span>
                 </div>
 
                 {walletSnap.channelOpen && (
                     <div className="flex items-center">
                         <span className="mr-2">Channel:</span>
                         <span className="font-mono bg-white px-1 py-0.5 rounded-sm border border-gray-200 text-gray-700">
-                            {walletSnap.selectedTokenAddress?.substring(0, 6)}...{walletSnap.selectedTokenAddress?.substring(38)}
+                            {walletSnap.selectedTokenAddress?.substring(0, 6)}...
+                            {walletSnap.selectedTokenAddress?.substring(38)}
                         </span>
                     </div>
                 )}

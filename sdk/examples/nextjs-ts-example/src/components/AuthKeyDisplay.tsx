@@ -1,4 +1,4 @@
-import { CryptoKeypair } from "@/websocket";
+import { CryptoKeypair } from '@/websocket';
 
 interface AuthKeyDisplayProps {
     keyPair: CryptoKeypair | null;
@@ -13,16 +13,23 @@ export function AuthKeyDisplay({ keyPair, status }: AuthKeyDisplayProps) {
             <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-gray-700">Authentication Keys</span>
                 <div className="flex items-center">
-                    <div className={`w-2 h-2 rounded-full mr-1 ${
-                      status === "connected" ? "bg-green-500" : 
-                      status === "connecting" || status === "authenticating" ? "bg-yellow-500" : 
-                      "bg-red-500"
-                    }`}></div>
+                    <div
+                        className={`w-2 h-2 rounded-full mr-1 ${
+                            status === 'connected'
+                                ? 'bg-green-500'
+                                : status === 'connecting' || status === 'authenticating'
+                                  ? 'bg-yellow-500'
+                                  : 'bg-red-500'
+                        }`}
+                     />
                     <span className="text-xs text-gray-600">
-                      {status === "connected" ? "Connected to Broker" : 
-                       status === "connecting" ? "Connecting..." :
-                       status === "authenticating" ? "Authenticating..." :
-                       "Disconnected"}
+                        {status === 'connected'
+                            ? 'Connected to Broker'
+                            : status === 'connecting'
+                              ? 'Connecting...'
+                              : status === 'authenticating'
+                                ? 'Authenticating...'
+                                : 'Disconnected'}
                     </span>
                 </div>
             </div>
@@ -36,7 +43,7 @@ export function AuthKeyDisplay({ keyPair, status }: AuthKeyDisplayProps) {
                     <button
                         className="ml-1 px-1 py-0.5 text-[#3531ff] hover:bg-[#3531ff]/10 rounded cursor-pointer transition-colors"
                         onClick={() => {
-                            navigator.clipboard.writeText(keyPair.address || "");
+                            navigator.clipboard.writeText(keyPair.address || '');
                         }}
                         title="Copy address"
                     >
@@ -60,7 +67,7 @@ export function AuthKeyDisplay({ keyPair, status }: AuthKeyDisplayProps) {
                     <span className="text-gray-500 w-20">Public Key:</span>
                     <span className="font-mono bg-gray-100 px-1 py-0.5 rounded-sm text-gray-800 overflow-hidden text-ellipsis flex-1">{`${keyPair.publicKey.substring(
                         0,
-                        16
+                        16,
                     )}...${keyPair.publicKey.substring(keyPair.publicKey.length - 16)}`}</span>
                     <button
                         className="ml-1 px-1 py-0.5 text-[#3531ff] hover:bg-[#3531ff]/10 rounded cursor-pointer transition-colors"
@@ -89,7 +96,7 @@ export function AuthKeyDisplay({ keyPair, status }: AuthKeyDisplayProps) {
                     <span className="text-gray-500 w-20">Private Key:</span>
                     <span className="font-mono bg-gray-100 px-1 py-0.5 rounded-sm text-gray-800 overflow-hidden text-ellipsis flex-1">{`${keyPair.privateKey.substring(
                         0,
-                        16
+                        16,
                     )}...${keyPair.privateKey.substring(keyPair.privateKey.length - 16)}`}</span>
                     <button
                         className="ml-1 px-1 py-0.5 text-[#3531ff] hover:bg-[#3531ff]/10 rounded cursor-pointer transition-colors"

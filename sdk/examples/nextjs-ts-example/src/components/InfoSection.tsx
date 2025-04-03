@@ -1,5 +1,5 @@
-import { About } from "./About";
-import { FAQ } from "./FAQ";
+import { About } from './About';
+import { FAQ } from './FAQ';
 
 export function InfoSection() {
     return (

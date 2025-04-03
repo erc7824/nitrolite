@@ -1,12 +1,12 @@
-import { useSnapshot } from "valtio";
-import WalletStore from "@/store/WalletStore";
+import { useSnapshot } from 'valtio';
+import WalletStore from '@/store/WalletStore';
 
 interface HeaderProps {
     onDisconnect: () => void;
     wsConnected: boolean;
 }
 
-export function Header({ onDisconnect, wsConnected }: HeaderProps) {
+export function Header({ onDisconnect }: HeaderProps) {
     const walletSnap = useSnapshot(WalletStore.state);
 
     return (

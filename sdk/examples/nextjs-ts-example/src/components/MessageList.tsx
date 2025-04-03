@@ -1,18 +1,19 @@
-import { useRef, useEffect, useState } from "react";
-import { useMessageStyles } from "@/hooks/useMessageStyles";
-import { FullscreenMessages } from "./FullscreenMessages";
-import { useMessageService } from "@/hooks/useMessageService";
+import { useRef, useEffect, useState } from 'react';
+import { useMessageStyles } from '@/hooks/useMessageStyles';
+import { FullscreenMessages } from './FullscreenMessages';
+import { useMessageService } from '@/hooks/useMessageService';
 
 export function MessageList() {
     const [isFullscreen, setIsFullscreen] = useState(false);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
+    // const containerRef = useRef<HTMLDivElement>(null);
     const messageStyles = useMessageStyles();
     const shouldScrollRef = useRef(true);
-    
+
     // Use our optimized message service
     const { messages, clearMessages, status } = useMessageService();
-    
+
     // Monitor messages for changes
     useEffect(() => {
         // Messages state has changed
@@ -21,7 +22,7 @@ export function MessageList() {
     // Handle fullscreen toggle event
     useEffect(() => {
         const handleToggleFullscreen = () => {
-            setIsFullscreen(prev => !prev);
+            setIsFullscreen((prev) => !prev);
         };
 
         window.addEventListener('toggle-fullscreen-messages', handleToggleFullscreen);
@@ -30,26 +31,29 @@ export function MessageList() {
 
     // Handle scroll event to detect if user has scrolled up
     useEffect(() => {
-        const container = document.getElementById("message-container");
+        const container = document.getElementById('message-container');
+
         if (!container) return;
 
         const handleScroll = () => {
             const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50;
+
             shouldScrollRef.current = isAtBottom;
         };
 
-        container.addEventListener("scroll", handleScroll);
-        return () => container.removeEventListener("scroll", handleScroll);
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
     }, []);
 
     // Auto-scroll only if user hasn't scrolled up
     useEffect(() => {
         if (shouldScrollRef.current && messagesEndRef.current) {
-            const container = document.getElementById("message-container");
+            const container = document.getElementById('message-container');
+
             if (container) {
                 container.scrollTo({
                     top: container.scrollHeight,
-                    behavior: "smooth",
+                    behavior: 'smooth',
                 });
             }
         }
@@ -57,7 +61,7 @@ export function MessageList() {
 
     // Format timestamp
     const formatTime = (timestamp?: number) => {
-        if (!timestamp) return "";
+        if (!timestamp) return '';
         return new Date(timestamp).toLocaleTimeString();
     };
 
@@ -67,11 +71,7 @@ export function MessageList() {
     };
 
     if (isFullscreen) {
-        return <FullscreenMessages 
-            messages={messages} 
-            status={status} 
-            onClose={handleCloseFullscreen} 
-        />;
+        return <FullscreenMessages messages={messages} status={status} onClose={handleCloseFullscreen} />;
     }
 
     return (
@@ -79,12 +79,23 @@ export function MessageList() {
             <div className="flex justify-between items-center mb-2">
                 <h2 className="text-lg font-semibold text-[#3531ff]">Messages</h2>
                 <div className="flex space-x-2">
-                    <button 
+                    <button
                         onClick={() => setIsFullscreen(true)}
                         className="px-3 py-1 bg-[#3531ff] text-white text-sm rounded hover:bg-[#2b28cc] flex items-center cursor-pointer transition-colors"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4 mr-1"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"
+                            />
                         </svg>
                         Full View
                     </button>
@@ -92,7 +103,13 @@ export function MessageList() {
                         onClick={clearMessages}
                         className="px-3 py-1 bg-white border border-gray-200 text-gray-600 text-sm rounded hover:bg-gray-50 flex items-center cursor-pointer"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4 mr-1"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
                             <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -114,18 +131,27 @@ export function MessageList() {
                 ) : (
                     <div>
                         {messages.map((message, index) => (
-                            <div key={index} className={`p-1 rounded mb-1.5 ${messageStyles[message.type] || messageStyles.info}`}>
-                                {message.type === "sent" && (
+                            <div
+                                key={index}
+                                className={`p-1 rounded mb-1.5 ${messageStyles[message.type] || messageStyles.info}`}
+                            >
+                                {message.type === 'sent' && (
                                     <svg
                                         className="inline-block w-4 h-4 mr-1 -mt-1"
                                         viewBox="0 0 24 24"
                                         fill="none"
                                         xmlns="http://www.w3.org/2000/svg"
                                     >
-                                        <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                        <path
+                                            d="M5 13l4 4L19 7"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        />
                                     </svg>
                                 )}
-                                {message.type === "received" && (
+                                {message.type === 'received' && (
                                     <svg
                                         className="inline-block w-4 h-4 mr-1 -mt-1"
                                         viewBox="0 0 24 24"
@@ -140,7 +166,7 @@ export function MessageList() {
                                         />
                                     </svg>
                                 )}
-                                {message.type === "system" && (
+                                {message.type === 'system' && (
                                     <svg
                                         className="inline-block w-4 h-4 mr-1 -mt-1"
                                         viewBox="0 0 24 24"
@@ -153,7 +179,7 @@ export function MessageList() {
                                         />
                                     </svg>
                                 )}
-                                {message.type === "error" && (
+                                {message.type === 'error' && (
                                     <svg
                                         className="inline-block w-4 h-4 mr-1 -mt-1"
                                         viewBox="0 0 24 24"
@@ -169,7 +195,8 @@ export function MessageList() {
                                     </svg>
                                 )}
                                 <span className="text-xs text-gray-500">{formatTime(message.timestamp)}</span>
-                                {message.sender && <span className="font-medium"> {message.sender}:</span>} {message.text}
+                                {message.sender && <span className="font-medium"> {message.sender}:</span>}{' '}
+                                {message.text}
                             </div>
                         ))}
                         <div ref={messagesEndRef} />

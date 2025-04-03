@@ -1,9 +1,9 @@
-import { proxy, subscribe } from "valtio";
+import { proxy, subscribe } from 'valtio';
 
-import SettingsStore from "./SettingsStore";
-import axios from "axios";
-import { Address, Chain } from "viem";
-import { getBalances } from "@/hooks/wallet/getTokenBalances";
+import SettingsStore from './SettingsStore';
+import axios from 'axios';
+import { Address, Chain } from 'viem';
+import { getBalances } from '@/hooks/wallet/getTokenBalances';
 
 export interface TAsset {
     name: string;
@@ -13,7 +13,7 @@ export interface TAsset {
     chainId: number;
     logoURI?: string;
     precision?: number;
-    extensions?: any;
+    extensions?: Record<string, unknown>;
 }
 
 export interface TBalance {
@@ -54,7 +54,10 @@ const AssetsStore = {
 };
 
 export const fetchAssets = async () => {
-    const assetsUrl = process.env.NEXT_PUBLIC_ASSETS_URL?.replace("{chain_id}", String(SettingsStore.state.activeChain?.id ?? ""));
+    const assetsUrl = process.env.NEXT_PUBLIC_ASSETS_URL?.replace(
+        '{chain_id}',
+        String(SettingsStore.state.activeChain?.id ?? ''),
+    );
 
     if (!assetsUrl) {
         return;
@@ -68,7 +71,7 @@ export const fetchAssets = async () => {
 
         assets = response.data.tokens || [];
     } catch (error) {
-        console.error("Error fetching assets:", error);
+        console.error('Error fetching assets:', error);
     } finally {
         AssetsStore.setAssetsLoading(false);
     }
@@ -90,7 +93,7 @@ export const fetchBalances = async (accountAddress?: string, activeChain?: Chain
 
         AssetsStore.setBalances(newBalances);
     } catch (error) {
-        console.error("Error fetching balances:", error);
+        console.error('Error fetching balances:', error);
     } finally {
         AssetsStore.setBalancesLoading(false);
     }

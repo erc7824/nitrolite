@@ -1,6 +1,6 @@
-import { Address, Chain } from "viem";
-import { chains } from "@/config/chains";
-import { proxy } from "valtio";
+import { Chain } from 'viem';
+import { chains } from '@/config/chains';
+import { proxy } from 'valtio';
 
 const defaultChain = () => {
     // It doesn't work on linea sepolia
@@ -8,7 +8,9 @@ const defaultChain = () => {
     const chainByDevMode = 137;
 
     const chainId =
-        typeof localStorage !== "undefined" && Number(localStorage.getItem("chainId")) ? Number(localStorage.getItem("chainId")) : chainByDevMode;
+        typeof localStorage !== 'undefined' && Number(localStorage.getItem('chainId'))
+            ? Number(localStorage.getItem('chainId'))
+            : chainByDevMode;
 
     const chain = chains.find((chain) => chain.id === chainId);
 
@@ -32,7 +34,7 @@ export interface ISettingsStore {
  * State
  */
 const state = proxy<ISettingsStore>({
-    testnets: typeof localStorage !== "undefined" ? Boolean(localStorage.getItem("testnets")) : true,
+    testnets: typeof localStorage !== 'undefined' ? Boolean(localStorage.getItem('testnets')) : true,
     activeChain: defaultChain(),
     prevChainId: defaultChain()?.id ?? 0,
 });
@@ -45,7 +47,7 @@ const SettingsStore = {
 
     setActiveChain(value: Chain | undefined) {
         state.activeChain = value;
-        localStorage.setItem("chainId", value ? value.id.toString() : "");
+        localStorage.setItem('chainId', value ? value.id.toString() : '');
     },
 
     setPrevChainId(value: number | undefined) {
@@ -55,9 +57,9 @@ const SettingsStore = {
     toggleTestNets() {
         state.testnets = !state.testnets;
         if (state.testnets) {
-            localStorage.setItem("testnets", "true");
+            localStorage.setItem('testnets', 'true');
         } else {
-            localStorage.removeItem("testnets");
+            localStorage.removeItem('testnets');
         }
     },
 };

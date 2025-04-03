@@ -1,25 +1,29 @@
-import { NitroliteRPC } from "@erc7824/nitrolite";
-import { Channel } from "@/types";
-import { WebSocketConnection } from "./connection";
-import { WalletSigner } from "../crypto";
-import MessageService from "../services/MessageService";
+import { NitroliteRPC } from '@erc7824/nitrolite';
+import { Channel } from '@/types';
+import { WebSocketConnection } from './connection';
+import { WalletSigner } from '../crypto';
+import MessageService from '../services/MessageService';
 
 /**
  * Handles WebSocket requests with NitroliteRPC
  */
 export class WSRequests {
-    constructor(private connection: WebSocketConnection, private signer: WalletSigner) {}
+    constructor(
+        private connection: WebSocketConnection,
+        private signer: WalletSigner,
+    ) {}
 
     /**
      * Sends a request to the server
      */
-    async sendRequest(method: string, params: any[] = []): Promise<any> {
+    async sendRequest(method: string, params: unknown[] = []): Promise<unknown> {
         if (!this.connection.isConnected) {
-            const errorMsg = "WebSocket not connected";
+            const errorMsg = 'WebSocket not connected';
+
             MessageService.error(errorMsg);
             throw new Error(errorMsg);
         }
-        
+
         MessageService.system(`Sending request: ${method}`);
         return this.sendSignedRequest(NitroliteRPC.createRequest(method, params));
     }
@@ -29,14 +33,16 @@ export class WSRequests {
      */
     async subscribe(channel: Channel): Promise<void> {
         if (!this.connection.isConnected) {
-            const errorMsg = "WebSocket not connected";
+            const errorMsg = 'WebSocket not connected';
+
             MessageService.error(errorMsg);
             throw new Error(errorMsg);
         }
 
         MessageService.system(`Subscribing to channel: ${channel}`);
-        
-        const request = NitroliteRPC.createRequest("subscribe", [channel]);
+
+        const request = NitroliteRPC.createRequest('subscribe', [channel]);
+
         await this.sendSignedRequest(request);
         this.connection.setCurrentChannel(channel);
     }
@@ -46,49 +52,52 @@ export class WSRequests {
      */
     async publishMessage(message: string): Promise<void> {
         if (!this.connection.isConnected) {
-            const errorMsg = "WebSocket not connected";
+            const errorMsg = 'WebSocket not connected';
+
             MessageService.error(errorMsg);
             throw new Error(errorMsg);
         }
-        
+
         if (!this.connection.currentSubscribedChannel) {
-            const errorMsg = "Not subscribed to any channel";
+            const errorMsg = 'Not subscribed to any channel';
+
             MessageService.error(errorMsg);
             throw new Error(errorMsg);
         }
 
         const shortenedKey = this.connection.getShortenedPublicKey();
+
         MessageService.sent(message, shortenedKey);
-        
-        const request = NitroliteRPC.createRequest("publish", [
-            this.connection.currentSubscribedChannel, 
-            message, 
-            shortenedKey
+
+        const request = NitroliteRPC.createRequest('publish', [
+            this.connection.currentSubscribedChannel,
+            message,
+            shortenedKey,
         ]);
-        
+
         await this.sendRequestDirect(await NitroliteRPC.signMessage(request, this.signer.sign));
     }
 
     /**
      * Sends a ping request to the server
      */
-    async ping(): Promise<any> {
-        MessageService.system("Sending ping request");
-        return this.sendSignedRequest(NitroliteRPC.createRequest("ping", []));
+    async ping(): Promise<unknown> {
+        MessageService.system('Sending ping request');
+        return this.sendSignedRequest(NitroliteRPC.createRequest('ping', []));
     }
 
     /**
      * Checks the balance of a token
      */
-    async checkBalance(tokenAddress: string = "0xSHIB..."): Promise<any> {
+    async checkBalance(tokenAddress: string = '0xSHIB...'): Promise<unknown> {
         MessageService.system(`Checking balance for token: ${tokenAddress}`);
-        return this.sendSignedRequest(NitroliteRPC.createRequest("balance", [tokenAddress]));
+        return this.sendSignedRequest(NitroliteRPC.createRequest('balance', [tokenAddress]));
     }
 
     /**
      * Sends multiple requests in batch
      */
-    async sendBatch(requests: { method: string; params: any[] }[]): Promise<any[]> {
+    async sendBatch(requests: { method: string; params: unknown[] }[]): Promise<unknown[]> {
         MessageService.system(`Sending batch of ${requests.length} requests`);
         return Promise.all(requests.map((req) => this.sendRequest(req.method, req.params)));
     }
@@ -96,12 +105,14 @@ export class WSRequests {
     /**
      * Helper method to sign and send a request
      */
-    private async sendSignedRequest(request: any): Promise<any> {
+    private async sendSignedRequest(request: unknown): Promise<unknown> {
         try {
             const signedRequest = await NitroliteRPC.signMessage(request, this.signer.sign);
+
             return this.sendRequestDirect(signedRequest);
         } catch (error) {
             const errorMsg = `Signing request failed: ${error instanceof Error ? error.message : String(error)}`;
+
             MessageService.error(errorMsg);
             throw new Error(errorMsg);
         }
@@ -110,9 +121,10 @@ export class WSRequests {
     /**
      * Helper method to send a pre-constructed request
      */
-    private async sendRequestDirect(signedRequest: any): Promise<any> {
+    private async sendRequestDirect(signedRequest: unknown): Promise<unknown> {
         if (!this.connection.isConnected || !this.connection.webSocket) {
-            const errorMsg = "WebSocket not connected";
+            const errorMsg = 'WebSocket not connected';
+
             MessageService.error(errorMsg);
             throw new Error(errorMsg);
         }
@@ -122,20 +134,36 @@ export class WSRequests {
         const ws = this.connection.webSocket;
 
         return new Promise((resolve, reject) => {
+            // Safely check format of signedRequest
+            if (
+                typeof signedRequest !== 'object' ||
+                !signedRequest ||
+                !('req' in signedRequest) ||
+                !Array.isArray(signedRequest.req) ||
+                signedRequest.req.length === 0 ||
+                typeof signedRequest.req[0] !== 'number'
+            ) {
+                throw new Error('Invalid request format');
+            }
+
             const requestId = signedRequest.req[0];
-            const method = signedRequest.req[1];
-            
+            const method =
+                Array.isArray(signedRequest.req) && signedRequest.req.length > 1
+                    ? String(signedRequest.req[1])
+                    : 'unknown';
+
             const requestTimeout = setTimeout(() => {
                 if (pendingRequests.has(requestId)) {
                     pendingRequests.delete(requestId);
                     const timeoutMsg = `Request timeout: ${method}`;
+
                     MessageService.error(timeoutMsg);
                     reject(new Error(timeoutMsg));
                 }
             }, timeout);
 
             pendingRequests.set(requestId, {
-                resolve: (result: any) => {
+                resolve: (result: unknown) => {
                     clearTimeout(requestTimeout);
                     resolve(result);
                 },
@@ -150,8 +178,9 @@ export class WSRequests {
             } catch (error) {
                 clearTimeout(requestTimeout);
                 pendingRequests.delete(requestId);
-                
+
                 const errorMsg = `Failed to send message: ${error instanceof Error ? error.message : String(error)}`;
+
                 MessageService.error(errorMsg);
                 reject(new Error(errorMsg));
             }

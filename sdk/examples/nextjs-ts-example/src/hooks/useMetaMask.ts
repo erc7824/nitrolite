@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { useSnapshot } from "valtio";
-import WalletStore from "@/store/WalletStore";
-import SettingsStore from "@/store/SettingsStore";
-import { Address } from "viem";
+import { useState, useEffect } from 'react';
+import { useSnapshot } from 'valtio';
+import WalletStore from '@/store/WalletStore';
+import SettingsStore from '@/store/SettingsStore';
+import { Address } from 'viem';
 
 // Static export for disconnect function that can be used outside of components
 export const disconnectWallet = async () => {
@@ -12,8 +12,8 @@ export const disconnectWallet = async () => {
 
     // MetaMask may implement a disconnect method in the future
     // For now, we'll let the user know they need to disconnect manually if they want to connect a different account
-    if (typeof window !== "undefined" && window.ethereum && window.ethereum.isMetaMask) {
-        console.log("MetaMask connection state cleared");
+    if (typeof window !== 'undefined' && window.ethereum && window.ethereum.isMetaMask) {
+        console.log('MetaMask connection state cleared');
         // You can also show a notification to the user if needed
     }
 };
@@ -25,7 +25,7 @@ export function useMetaMask() {
 
     // Check if MetaMask is installed
     useEffect(() => {
-        if (typeof window !== "undefined") {
+        if (typeof window !== 'undefined') {
             setIsMetaMaskInstalled(!!window.ethereum?.isMetaMask);
         }
     }, []);
@@ -33,14 +33,14 @@ export function useMetaMask() {
     // Connect to MetaMask
     const connect = async () => {
         if (!window.ethereum) {
-            WalletStore.setError("MetaMask is not installed");
+            WalletStore.setError('MetaMask is not installed');
             return;
         }
 
         try {
             // Request accounts
-            const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-            const chainIdHex = await window.ethereum.request({ method: "eth_chainId" });
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
             const chainId = parseInt(chainIdHex, 16);
 
             // Update store
@@ -51,8 +51,8 @@ export function useMetaMask() {
                 await switchNetwork(settingsSnap.activeChain.id);
             }
         } catch (error) {
-            console.error("Error connecting to MetaMask:", error);
-            WalletStore.setError("Failed to connect to MetaMask");
+            console.error('Error connecting to MetaMask:', error);
+            WalletStore.setError('Failed to connect to MetaMask');
         }
     };
 
@@ -68,22 +68,22 @@ export function useMetaMask() {
         try {
             // Try switching to the network
             await window.ethereum.request({
-                method: "wallet_switchEthereumChain",
+                method: 'wallet_switchEthereumChain',
                 params: [{ chainId: `0x${chainId.toString(16)}` }],
             });
 
             // Update the store with the new chain ID
             WalletStore.setChainId(chainId);
-        } catch (error: any) {
+        } catch (error: unknown) {
             // If the network doesn't exist in MetaMask, we need to add it
-            if (error.code === 4902) {
+            if (error && typeof error === 'object' && 'code' in error && error.code === 4902) {
                 // This would need chain-specific data like name, RPC URLs, etc.
                 // Consider adding logic to add networks if needed
-                console.error("Network not available in MetaMask");
-                WalletStore.setError("Network not available in MetaMask");
+                console.error('Network not available in MetaMask');
+                WalletStore.setError('Network not available in MetaMask');
             } else {
-                console.error("Error switching network:", error);
-                WalletStore.setError("Failed to switch network");
+                console.error('Error switching network:', error);
+                WalletStore.setError('Failed to switch network');
             }
         }
     };
@@ -103,15 +103,16 @@ export function useMetaMask() {
 
             const handleChainChanged = (chainIdHex: string) => {
                 const chainId = parseInt(chainIdHex, 16);
+
                 WalletStore.setChainId(chainId);
             };
 
-            window.ethereum.on("accountsChanged", handleAccountsChanged);
-            window.ethereum.on("chainChanged", handleChainChanged);
+            window.ethereum.on('accountsChanged', handleAccountsChanged);
+            window.ethereum.on('chainChanged', handleChainChanged);
 
             return () => {
-                window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
-                window.ethereum.removeListener("chainChanged", handleChainChanged);
+                window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+                window.ethereum.removeListener('chainChanged', handleChainChanged);
             };
         }
     }, [walletSnap.account, walletSnap.chainId]);

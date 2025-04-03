@@ -1,21 +1,21 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { useMessageService } from "@/hooks/useMessageService";
-import WalletStore from "@/store/WalletStore";
-import { fetchAssets } from "@/store/AssetsStore";
-import { Address } from "viem";
-import { generateKeyPair } from "@/websocket/crypto";
+import { useEffect } from 'react';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { useMessageService } from '@/hooks/useMessageService';
+import WalletStore from '@/store/WalletStore';
+import { fetchAssets } from '@/store/AssetsStore';
+import { Address } from 'viem';
+// import { generateKeyPair } from "@/websocket/crypto";
 
 // Components
-import { Header } from "@/components/Header";
-import { ChannelStatus } from "@/components/ChannelStatus";
-import { AuthKeyDisplay } from "@/components/AuthKeyDisplay";
-import { MessageList } from "@/components/MessageList";
-import { RequestForm } from "@/components/RequestForm";
-import { InfoSection } from "@/components/InfoSection";
-import MetaMaskConnect from "@/components/MetaMaskConnect";
+import { Header } from '@/components/Header';
+import { ChannelStatus } from '@/components/ChannelStatus';
+import { AuthKeyDisplay } from '@/components/AuthKeyDisplay';
+import { MessageList } from '@/components/MessageList';
+import { RequestForm } from '@/components/RequestForm';
+import { InfoSection } from '@/components/InfoSection';
+import MetaMaskConnect from '@/components/MetaMaskConnect';
 
 export default function Home() {
     const { status, addSystemMessage } = useMessageService();
@@ -32,21 +32,22 @@ export default function Home() {
         sendPing,
         checkBalance,
         sendRequest,
-        clearKeys,
-    } = useWebSocket("ws://localhost:8000/ws");
+    } = useWebSocket('ws://localhost:8000/ws');
 
     // Load assets and add initial message when component mounts
     useEffect(() => {
         fetchAssets();
-        
+
         // Add an initial system message
-        addSystemMessage("Application initialized - Welcome to Nitrolite!");
+        addSystemMessage('Application initialized - Welcome to Nitrolite!');
     }, [addSystemMessage]);
 
     // Function to handle channel opening
     const handleOpenChannel = async (tokenAddress: string, amount: string) => {
         // Add system message about channel opening
-        addSystemMessage(`Opening channel with token ${tokenAddress.substring(0, 6)}...${tokenAddress.substring(38)} and amount ${amount}`);
+        addSystemMessage(
+            `Opening channel with token ${tokenAddress.substring(0, 6)}...${tokenAddress.substring(38)} and amount ${amount}`,
+        );
 
         // Update wallet store
         WalletStore.openChannel(tokenAddress as Address, amount);
@@ -55,43 +56,49 @@ export default function Home() {
         try {
             // Step 1: Generate keys if not present
             let currentKeyPair = keyPair;
+
             if (!currentKeyPair) {
-                addSystemMessage("Generating new key pair...");
+                addSystemMessage('Generating new key pair...');
                 currentKeyPair = await generateKeys();
                 if (!currentKeyPair) {
-                    const errorMsg = "Failed to generate keys";
+                    const errorMsg = 'Failed to generate keys';
+
                     addSystemMessage(errorMsg);
                     throw new Error(errorMsg);
                 }
-                addSystemMessage("Key pair generated successfully");
+                addSystemMessage('Key pair generated successfully');
             }
-            
+
             // Step 2: Connect to the broker websocket only after we have keys
-            if (status === "disconnected" && currentKeyPair) {
+            if (status === 'disconnected' && currentKeyPair) {
                 try {
-                    addSystemMessage("Connecting to WebSocket server...");
+                    addSystemMessage('Connecting to WebSocket server...');
                     await connect();
-                    addSystemMessage("WebSocket connection established");
-                } catch (connectionError) {
-                    // This could be a network error
-                    addSystemMessage(`WebSocket connection error: Make sure the WebSocket server is running at ws://localhost:8000/ws`);
-                    // Continue anyway - the UI should still be functional
+                    addSystemMessage('WebSocket connection established');
+                } catch (error) {
+                    addSystemMessage(
+                        'WebSocket connection error: Make sure the WebSocket server is running at ws://localhost:8000/ws',
+                        error,
+                    );
                 }
             }
         } catch (error) {
-            addSystemMessage(`Error in channel opening sequence: ${error instanceof Error ? error.message : String(error)}`);
+            addSystemMessage(
+                `Error in channel opening sequence: ${error instanceof Error ? error.message : String(error)}`,
+            );
         }
     };
 
     // Handle wallet disconnection
     const handleDisconnect = async () => {
         // First disconnect from WebSocket if connected
-        if (status === "connected") {
+        if (status === 'connected') {
             disconnect(); // This is the WebSocket disconnect
         }
-        
+
         // Then disconnect from MetaMask
-        const { disconnectWallet } = await import("@/hooks/useMetaMask");
+        const { disconnectWallet } = await import('@/hooks/useMetaMask');
+
         await disconnectWallet();
     };
 
@@ -100,10 +107,7 @@ export default function Home() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 text-gray-800 p-6">
             <div className="max-w-6xl mx-auto">
-                <Header 
-                    onDisconnect={handleDisconnect}
-                    wsConnected={isConnected}
-                />
+                <Header onDisconnect={handleDisconnect} wsConnected={isConnected} />
 
                 {isChannelOpen ? (
                     <>
@@ -123,7 +127,7 @@ export default function Home() {
                             onSendPing={sendPing}
                             onCheckBalance={checkBalance}
                         />
-                        
+
                         <InfoSection />
                     </>
                 ) : (

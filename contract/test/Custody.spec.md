@@ -4,6 +4,9 @@ This document outlines the comprehensive test cases needed to verify the functio
 
 Test the following scenarios:
 
+To prepare the test, participant must deposit treasury in their account before opening channels with smaller amounts.
+by using the IDeposit intergrate methods.
+
 ## 1. Channel Creation and Opening
 
 ### 1.1 Channel Creation

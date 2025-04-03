@@ -124,8 +124,16 @@ contract Custody is IChannel, IDeposit {
             // This is the first participant (HOST) creating the channel
             Allocation memory allocation = depositState.allocations[HOST];
 
-            // TODO: Verify by calling adjudicator with empty proofs
-            // TODO: Verify stateHash is signed by HOST
+            // Verify state hash is signed by HOST
+            bytes32 stateHash = Utils.getStateHash(ch, depositState);
+            bool validSignature = Utils.verifySignature(stateHash, depositState.sigs[0], ch.participants[HOST]);
+            require(validSignature, "Host signature invalid");
+
+            // Verify by calling adjudicator with empty proofs
+            IAdjudicator adjudicator = IAdjudicator(ch.adjudicator);
+            State[] memory emptyProofs = new State[](0);
+            bool isValid = adjudicator.adjudicate(ch, depositState, emptyProofs);
+            require(isValid, "Invalid state according to adjudicator");
 
             // Initialize channel metadata
             Metadata storage newCh = _channels[channelId];
@@ -143,31 +151,36 @@ contract Custody is IChannel, IDeposit {
             // This is the second participant (GUEST) joining an existing partially funded channel
             Allocation memory allocation = depositState.allocations[GUEST];
 
-            // TODO: Call adjudicate with empty proofs
-            // TODO: Verify stateHash is signed by all participants
+            // Call adjudicate with empty proofs to validate state
+            IAdjudicator adjudicator = IAdjudicator(ch.adjudicator);
+            State[] memory emptyProofs = new State[](0);
+            bool isValid = adjudicator.adjudicate(ch, depositState, emptyProofs);
+            require(isValid, "Invalid state according to adjudicator");
+
+            // Verify stateHash is signed by both participants
+            bytes32 stateHash = Utils.getStateHash(ch, depositState);
+
+            // Verify HOST signature
+            bool hostSignatureValid = Utils.verifySignature(stateHash, depositState.sigs[0], ch.participants[HOST]);
+            require(hostSignatureValid, "Host signature invalid");
+
+            // Verify GUEST signature
+            bool guestSignatureValid = Utils.verifySignature(stateHash, depositState.sigs[1], ch.participants[GUEST]);
+            require(guestSignatureValid, "Guest signature invalid");
 
             // Lock funds from the GUEST to the channel
             _lockAccountFundsToChannel(ch.participants[GUEST], channelId, allocation.token, allocation.amount);
 
-            // Verify the guest's signature
-            bytes32 stateHash = Utils.getStateHash(ch, depositState);
-            bool validSignature = Utils.verifySignature(stateHash, depositState.sigs[0], ch.participants[GUEST]);
+            // Store the new state with signatures from both participants
+            meta.lastValidState = depositState;
 
-            // We can set Status.ACTIVE when all participants signature is present and valid
-            if (validSignature) {
-                // Store the new state with GUEST's signature
-                meta.lastValidState = depositState;
+            // Now that both participants have funded, change status to ACTIVE
+            meta.status = Status.ACTIVE;
 
-                // Now that both participants have funded, change status to ACTIVE
-                meta.status = Status.ACTIVE;
+            // Add channel to GUEST's account
+            _accounts[ch.participants[GUEST]].channels.add(channelId);
 
-                // Add channel to GUEST's account
-                _accounts[ch.participants[GUEST]].channels.add(channelId);
-
-                emit ChannelOpened(channelId, ch);
-            } else {
-                revert InvalidState();
-            }
+            emit ChannelOpened(channelId, ch);
         } else {
             // Channel exists but is not in PARTIAL state
             revert InvalidState();
@@ -197,8 +210,13 @@ contract Custody is IChannel, IDeposit {
 
             // For cooperative close, we need:
             // 1. The state must be valid according to the adjudicator
-            // 2. The state must have signatures from all participants
-            if (isValid && candidate.sigs.length == meta.chan.participants.length) {
+            // 2. The state must have valid signatures from all participants
+
+            // Verify signatures from all participants
+            bool allSignaturesValid = _verifyAllSignatures(meta.chan, candidate);
+            bool hasAllSignatures = candidate.sigs.length == meta.chan.participants.length;
+
+            if (isValid && hasAllSignatures && allSignaturesValid) {
                 // All requirements met, set status to FINAL
                 meta.status = Status.FINAL;
             } else {
@@ -227,11 +245,17 @@ contract Custody is IChannel, IDeposit {
         // Adjudicators only validate state transitions, not channel status
         bool isValid = _validateState(meta, candidate, proofs);
 
-        // FIXME: challenge can only be valid if it's more recent state than the checkpointed state
-        // We could imagine using comparable interface between candidate and lastValidState
+        // Check if the candidate state is more recent than the checkpointed state
+        // For now, we're using the array length of signatures as a simple proxy for "more recent"
+        // In a real implementation, this would involve comparing sequence numbers or timestamps in the state data
+        bool isMoreRecent = candidate.sigs.length >= meta.lastValidState.sigs.length;
+        require(isMoreRecent, "State is not more recent than the checkpointed state");
+
         if (isValid) {
-            // If state has signatures from all participants, consider it final
-            // TODO: make a helper to verify participant signatures.
+            // Verify all available participant signatures
+            bool allSignaturesValid = _verifyAllSignatures(meta.chan, candidate);
+            require(allSignaturesValid, "One or more signatures are invalid");
+
             // Start challenge period - this is handled by Custody, not adjudicator
             meta.challengeExpire = block.timestamp + meta.chan.challenge;
 
@@ -263,12 +287,15 @@ contract Custody is IChannel, IDeposit {
         bool isValid = _validateState(meta, candidate, proofs);
 
         if (isValid) {
+            // Verify all available participant signatures
+            bool allSignaturesValid = _verifyAllSignatures(meta.chan, candidate);
+            require(allSignaturesValid, "One or more signatures are invalid");
+
             // Valid state is stored for future reference
-
             meta.lastValidState = candidate;
-            // Otherwise, keep the channel status as is (ACTIVE or PARTIAL)
-            // This allows the channel to continue operating with the checkpoint as the latest valid state
 
+            // Keep the channel status as is (ACTIVE or PARTIAL)
+            // This allows the channel to continue operating with the checkpoint as the latest valid state
             emit ChannelCheckpointed(channelId);
         } else {
             // Invalid state according to adjudicator
@@ -375,8 +402,9 @@ contract Custody is IChannel, IDeposit {
 
                 // Channel status handling is managed by Custody contract
                 // Don't automatically change status to ACTIVE here
-
-                return valid;
+            } else {
+                // If adjudicator returns false, mark as invalid
+                meta.status = Status.INVALID;
             }
 
             return valid;
@@ -432,5 +460,31 @@ contract Custody is IChannel, IDeposit {
             accountInfo.tokens[token].locked -= amountToUnlock;
             accountInfo.tokens[token].available += amountToUnlock;
         }
+    }
+
+    /**
+     * @notice Verifies that all provided signatures are valid for the given state
+     * @param chan The channel configuration
+     * @param state The state to verify signatures for
+     * @return valid True if all provided signatures are valid
+     */
+    function _verifyAllSignatures(Channel memory chan, State memory state) internal pure returns (bool valid) {
+        // Calculate the state hash once
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+
+        // Check if we have the right number of signatures
+        if (state.sigs.length > chan.participants.length) {
+            return false;
+        }
+
+        // Verify each signature
+        for (uint256 i = 0; i < state.sigs.length; i++) {
+            bool isValid = Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i]);
+            if (!isValid) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

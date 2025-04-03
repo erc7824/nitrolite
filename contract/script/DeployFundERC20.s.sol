@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {TestERC20} from "../src/test/TestERC20.sol";
+import {TestERC20} from "../test/TestERC20.sol";
 
 contract DeployFundERC20Script is Script {
     TestERC20 public token;

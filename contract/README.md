@@ -44,7 +44,7 @@ keccak256(
 );
 ```
 
-### `Types`
+### `Types.sol`
 
 Contains shared type definitions:
 
@@ -71,7 +71,7 @@ struct Channel {
 struct State {
     bytes data; // Application data encoded, decoded by the adjudicator for business logic
     Allocation[2] allocations; // Combined asset allocation and destination for each participant
-    Signature[2] sigs; // stateHash signatures
+    Signature[] sigs; // stateHash signatures
 }
 
 // Recommended structure to keep track of states
@@ -82,20 +82,28 @@ struct Metadata {
 }
 ```
 
-### `IAdjudicator`
+### `IAdjudicator.sol`
 
 The adjudicator contract must implement:
 
 ```solidity
 interface IAdjudicator {
     enum Status {
-        VOID,     // Channel was never active or have an anomaly
+        VOID,     // Channel was never active (zero-initialized)
         PARTIAL,  // Partial funding waiting for other participants
         ACTIVE,   // Channel fully funded using open or state are valid
         INVALID,  // Channel state is invalid
         FINAL     // This is the FINAL State channel can be closed
     }
 
+    /**
+     * @notice Validates the application state and determines the outcome of a channel
+     * @dev This function evaluates the validity of a candidate state against provided proofs
+     * @param chan The channel information containing participants, adjudicator, nonce, and challenge period
+     * @param candidate The proposed state to be validated
+     * @param proofs Array of previous states that may be used to validate the candidate state
+     * @return decision The status of the channel after adjudication
+     */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
         view
@@ -105,17 +113,47 @@ interface IAdjudicator {
 
 - **Parameters**:
   - `chan`: Channel configuration
-  - `candidate`: The State being validated, containing application-specific data
-  - `proofs`: Previous valid states for reference in validation
+  - `candidate`: The proposed state to be validated
+  - `proofs`: Array of previous states that may be used to validate the candidate state
 - **Returns**:
   - `decision`: Status of the channel after adjudication
 
-## IChannel Interface
+### `IDeposit.sol`
+
+Interface for contracts that allow users to deposit and withdraw token funds:
+
+```solidity
+interface IDeposit {
+    /**
+     * @notice Deposits tokens into the contract
+     * @dev Any user can deposit tokens
+     * @param token Address of the ERC20 token to deposit
+     * @param amount Amount of tokens to deposit
+     */
+    function deposit(address token, uint256 amount) external payable;
+
+    /**
+     * @notice Withdraws tokens from the contract
+     * @dev Any user can withdraw their previously deposited tokens
+     * @param token Address of the ERC20 token to withdraw
+     * @param amount Amount of tokens to withdraw
+     */
+    function withdraw(address token, uint256 amount) external;
+}
+```
+
+## `IChannel.sol` Interface
 
 The main state channel interface implements:
 
 ```solidity
 interface IChannel {
+    event ChannelPartiallyFunded(bytes32 indexed channelId, Channel channel);
+    event ChannelOpened(bytes32 indexed channelId, Channel channel);
+    event ChannelChallenged(bytes32 indexed channelId, uint256 expiration);
+    event ChannelCheckpointed(bytes32 indexed channelId);
+    event ChannelClosed(bytes32 indexed channelId);
+
     /**
      * @notice Open or join a channel by depositing assets
      * @param ch Channel configuration
@@ -245,11 +283,18 @@ interface IChannel {
 ```
 src
 ├── Custody.sol
+├── CustodyLite.sol
+├── Utils.sol
 ├── adjudicators
+│   ├── Consensus.sol
+│   ├── Counter.sol
+│   ├── MicroPayment.sol
+│   ├── TicTacToe.sol
 │   └── Trivial.sol
 └── interfaces
     ├── IAdjudicator.sol  # Interface for state validation and outcome determination
     ├── IChannel.sol      # Main interface for the state channel system
+    ├── IDeposit.sol      # Interface for token deposit and withdrawal
     └── Types.sol         # Shared types used in the state channel system
 ```
 

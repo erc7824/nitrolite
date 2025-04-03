@@ -14,8 +14,9 @@ localnet:
 	anvil --chain-id $(CHAIN_ID) --accounts 15 --balance 300
 
 deploy-counter:
-	@echo "Deploying Counter... 0x5fbdb2315678afecb367f032d93f642f64180aa3"
-	forge script script/Counter.s.sol:CounterScript --rpc-url $(RPC_URL) --private-key $(PRIVATE_KEY) --broadcast
+	# @echo "Deploying Counter... 0x5fbdb2315678afecb367f032d93f642f64180aa3"
+	# forge script script/Counter.s.sol:CounterScript --rpc-url $(RPC_URL) --private-key $(PRIVATE_KEY) --broadcast
+	forge create --broadcast --optimizer-runs 1000000 --via-ir ./test/mocks/FlagAdjudicator.sol:FlagAdjudicator --rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --constructor-args true
 
 deploy-erc-20:
 	@echo "Deploying ERC20... 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512"

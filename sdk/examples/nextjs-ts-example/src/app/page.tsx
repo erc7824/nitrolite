@@ -83,7 +83,7 @@ export default function Home() {
                 {
                     r: parsedSig.r,
                     s: parsedSig.s,
-                    v: parsedSig.yParity,
+                    v: +parsedSig.v.toString(),
                 },
             ],
         );

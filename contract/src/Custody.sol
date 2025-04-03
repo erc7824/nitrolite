@@ -199,7 +199,6 @@ contract Custody is IChannel, IDeposit {
             // 1. The state must be valid according to the adjudicator
             // 2. The state must have signatures from all participants
             if (isValid && candidate.sigs.length == meta.chan.participants.length) {
-                // TODO: Verify signatures of all participants
                 // All requirements met, set status to FINAL
                 meta.status = Status.FINAL;
             } else {
@@ -380,7 +379,6 @@ contract Custody is IChannel, IDeposit {
                 return valid;
             }
 
-            meta.status = Status.INVALID;
             return valid;
         } catch {
             // If the adjudicator call reverts, treat as invalid state

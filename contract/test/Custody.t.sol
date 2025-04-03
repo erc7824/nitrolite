@@ -104,8 +104,15 @@ contract CustodyTest is Test {
         returns (State memory)
     {
         State memory state;
-        Counter.CounterData memory counterData = Counter.CounterData({counter: counter});
-        state.data = abi.encode(counterData);
+        // Update the version based on counter value to ensure valid transitions
+        uint256 version = counter > 0 ? counter - 1 : 0;
+        
+        Counter.CounterApp memory CounterApp = Counter.CounterApp({
+            counter: counter,
+            target: 10, // Default target
+            version: version // Version should match counter-1 for validity
+        });
+        state.data = abi.encode(CounterApp);
         state.allocations = allocations;
         state.sigs = new Signature[](0); // Empty signatures to be filled later
         return state;
@@ -335,14 +342,20 @@ contract CustodyTest is Test {
         custody.open(channel, guestState);
         vm.stopPrank();
 
-        // Create state with both signatures (any valid counter works, we're not using 1000 anymore)
+        // Create a final state with both signatures (version 1 for valid transition)
         Allocation[2] memory finalAllocations = createAllocations(DEPOSIT_AMOUNT / 4, (DEPOSIT_AMOUNT * 3) / 4);
-        State memory finalState = createCounterState(5, finalAllocations);
+        State memory finalState = createCounterState(1, finalAllocations);
         finalState = addSignatures(finalState, true, true);
+
+        // We need to provide the previous state as proof for close to work properly
+        State[] memory proofs = new State[](1);
+        proofs[0] = hostState;
 
         // Close the channel with the final state
         vm.startPrank(host);
-        custody.close(channelId, finalState, new State[](0));
+        vm.expectEmit(true, false, false, false);
+        emit IChannel.ChannelClosed(channelId);
+        custody.close(channelId, finalState, proofs);
         vm.stopPrank();
 
         // Verify funds are distributed correctly
@@ -384,12 +397,16 @@ contract CustodyTest is Test {
         vm.stopPrank();
 
         // Try to close with state that doesn't have both signatures
-        State memory nonFinalState = createCounterState(5, allocations);
+        State memory nonFinalState = createCounterState(1, allocations);
         nonFinalState = addSignatures(nonFinalState, true, false);
+
+        // We need to provide the previous state as proof
+        State[] memory proofs = new State[](1);
+        proofs[0] = hostState;
 
         vm.startPrank(host);
         vm.expectRevert(Custody.ChannelNotFinal.selector);
-        custody.close(channelId, nonFinalState, new State[](0));
+        custody.close(channelId, nonFinalState, proofs);
         vm.stopPrank();
     }
 
@@ -398,12 +415,14 @@ contract CustodyTest is Test {
         bytes32 nonExistentChannelId = bytes32(uint256(123456));
 
         Allocation[2] memory allocations = createAllocations(DEPOSIT_AMOUNT / 2, DEPOSIT_AMOUNT / 2);
-        State memory finalState = createCounterState(1000, allocations);
+        State memory finalState = createCounterState(1, allocations);
         finalState = addSignatures(finalState, true, true);
+
+        State[] memory proofs = new State[](0); // No proofs needed for non-existent channel test
 
         vm.startPrank(host);
         vm.expectRevert(abi.encodeWithSelector(Custody.ChannelNotFound.selector, nonExistentChannelId));
-        custody.close(nonExistentChannelId, finalState, new State[](0));
+        custody.close(nonExistentChannelId, finalState, proofs);
         vm.stopPrank();
     }
 
@@ -427,26 +446,23 @@ contract CustodyTest is Test {
         custody.open(channel, guestState);
         vm.stopPrank();
 
-        // Create a challengeable state (counter = 5, host signature)
+        // Create a challengeable state (counter = 1, host signature)
         Allocation[2] memory challengeAllocations = createAllocations(DEPOSIT_AMOUNT / 3, (DEPOSIT_AMOUNT * 2) / 3);
-        State memory challengeState = createCounterState(5, challengeAllocations);
+        State memory challengeState = createCounterState(1, challengeAllocations);
         challengeState = addSignatures(challengeState, true, false);
 
-        // Previous state for proof
-        State memory prevState = createCounterState(4, allocations);
-        prevState = addSignatures(prevState, false, true);
-
+        // Use initial state as proof
         State[] memory proofs = new State[](1);
-        proofs[0] = prevState;
+        proofs[0] = hostState;
 
         // Submit challenge
         vm.startPrank(host);
+        vm.expectEmit(true, false, false, false);
+        emit IChannel.ChannelChallenged(channelId, block.timestamp + CHALLENGE_PERIOD);
         custody.challenge(channelId, challengeState, proofs);
         vm.stopPrank();
 
-        // Cannot test internal state directly, but we can verify event emission
-        vm.expectEmit(true, false, false, false);
-        emit IChannel.ChannelChallenged(channelId, block.timestamp + CHALLENGE_PERIOD);
+        // Challenge submitted successfully
     }
 
     function test_CounterChallenge() public {
@@ -467,24 +483,23 @@ contract CustodyTest is Test {
         custody.open(channel, guestState);
         vm.stopPrank();
 
-        // Host challenges with state 5
+        // Host challenges with state 1
         Allocation[2] memory hostChallengeAllocations = createAllocations(DEPOSIT_AMOUNT / 3, (DEPOSIT_AMOUNT * 2) / 3);
-        State memory hostChallengeState = createCounterState(5, hostChallengeAllocations);
+        State memory hostChallengeState = createCounterState(1, hostChallengeAllocations);
         hostChallengeState = addSignatures(hostChallengeState, true, false);
 
-        State memory prevState = createCounterState(4, allocations);
-        prevState = addSignatures(prevState, false, true);
-
         State[] memory proofs = new State[](1);
-        proofs[0] = prevState;
+        proofs[0] = hostState; // Use initial state (0) as proof for state 1
 
         vm.startPrank(host);
+        vm.expectEmit(true, false, false, false);
+        emit IChannel.ChannelChallenged(channelId, block.timestamp + CHALLENGE_PERIOD);
         custody.challenge(channelId, hostChallengeState, proofs);
         vm.stopPrank();
 
-        // Guest counter-challenges with state 6
+        // Guest counter-challenges with state 2
         Allocation[2] memory guestChallengeAllocations = createAllocations(DEPOSIT_AMOUNT / 4, (DEPOSIT_AMOUNT * 3) / 4);
-        State memory guestChallengeState = createCounterState(6, guestChallengeAllocations);
+        State memory guestChallengeState = createCounterState(2, guestChallengeAllocations);
         guestChallengeState = addSignatures(guestChallengeState, false, true);
 
         // Use host's challenge state as proof
@@ -492,12 +507,10 @@ contract CustodyTest is Test {
         counterProofs[0] = hostChallengeState;
 
         vm.startPrank(guest);
-        custody.challenge(channelId, guestChallengeState, counterProofs);
-        vm.stopPrank();
-
-        // Check event emission for updated challenge timer
         vm.expectEmit(true, false, false, false);
         emit IChannel.ChannelChallenged(channelId, block.timestamp + CHALLENGE_PERIOD);
+        custody.challenge(channelId, guestChallengeState, counterProofs);
+        vm.stopPrank();
     }
 
     function test_ChallengeWithFinalState() public {
@@ -532,6 +545,8 @@ contract CustodyTest is Test {
 
         // Challenge with final state should close immediately
         vm.startPrank(host);
+        vm.expectEmit(true, false, false, false);
+        emit IChannel.ChannelClosed(channelId);
         custody.challenge(channelId, finalState, proofs);
         vm.stopPrank();
 
@@ -580,9 +595,9 @@ contract CustodyTest is Test {
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
 
-        // Challenge with invalid state should invalidate the state and set status to INVALID
+        // Challenge with invalid state should revert with InvalidState
         vm.startPrank(host);
-        // Now we expect it to return false rather than revert
+        vm.expectRevert(Custody.InvalidState.selector);
         custody.challenge(channelId, invalidState, proofs);
         vm.stopPrank();
     }
@@ -621,12 +636,12 @@ contract CustodyTest is Test {
 
         // Submit checkpoint
         vm.startPrank(host);
+        vm.expectEmit(true, false, false, false);
+        emit IChannel.ChannelCheckpointed(channelId);
         custody.checkpoint(channelId, checkpointState, proofs);
         vm.stopPrank();
 
-        // Verify checkpoint event
-        vm.expectEmit(true, false, false, false);
-        emit IChannel.ChannelCheckpointed(channelId);
+        // Checkpoint was successful
     }
 
     function test_CheckpointWithFinalState() public {
@@ -647,26 +662,23 @@ contract CustodyTest is Test {
         custody.open(channel, guestState);
         vm.stopPrank();
 
-        // Create a final state for checkpoint
+        // Create a final state for checkpoint (using version 1 for valid transition)
         Allocation[2] memory finalAllocations = createAllocations(DEPOSIT_AMOUNT / 4, (DEPOSIT_AMOUNT * 3) / 4);
-        State memory finalState = createCounterState(1000, finalAllocations);
+        State memory finalState = createCounterState(1, finalAllocations);
         finalState = addSignatures(finalState, true, true);
 
-        // Previous state for proof
-        State memory prevState = createCounterState(4, allocations);
-        prevState = addSignatures(prevState, false, true);
-
+        // For test simplicity, we'll use an initial state as proof
         State[] memory proofs = new State[](1);
-        proofs[0] = prevState;
+        proofs[0] = hostState;
 
         // Submit checkpoint with final state
         vm.startPrank(host);
+        vm.expectEmit(true, false, false, false);
+        emit IChannel.ChannelCheckpointed(channelId);
         custody.checkpoint(channelId, finalState, proofs);
         vm.stopPrank();
 
-        // Verify checkpoint event
-        vm.expectEmit(true, false, false, false);
-        emit IChannel.ChannelCheckpointed(channelId);
+        // Checkpoint was successful
     }
 
     function test_CheckpointWithInvalidState() public {
@@ -700,6 +712,7 @@ contract CustodyTest is Test {
 
         // Checkpoint with invalid state should not revert anymore
         vm.startPrank(host);
+        vm.expectRevert(Custody.InvalidState.selector);
         custody.checkpoint(channelId, invalidState, proofs);
         vm.stopPrank();
     }
@@ -726,16 +739,15 @@ contract CustodyTest is Test {
 
         // Host challenges with an intermediate state
         Allocation[2] memory challengeAllocations = createAllocations(DEPOSIT_AMOUNT / 3, (DEPOSIT_AMOUNT * 2) / 3);
-        State memory challengeState = createCounterState(5, challengeAllocations);
+        State memory challengeState = createCounterState(1, challengeAllocations);
         challengeState = addSignatures(challengeState, true, false);
 
-        State memory prevState = createCounterState(4, allocations);
-        prevState = addSignatures(prevState, false, true);
-
         State[] memory proofs = new State[](1);
-        proofs[0] = prevState;
+        proofs[0] = hostState; // Use initial state (0) as proof for state 1
 
         vm.startPrank(host);
+        vm.expectEmit(true, false, false, false);
+        emit IChannel.ChannelChallenged(channelId, block.timestamp + CHALLENGE_PERIOD);
         custody.challenge(channelId, challengeState, proofs);
         vm.stopPrank();
 
@@ -744,6 +756,8 @@ contract CustodyTest is Test {
 
         // Reclaim funds
         vm.startPrank(host);
+        vm.expectEmit(true, false, false, false);
+        emit IChannel.ChannelClosed(channelId);
         custody.reclaim(channelId);
         vm.stopPrank();
 
@@ -787,16 +801,15 @@ contract CustodyTest is Test {
 
         // Host challenges with an intermediate state
         Allocation[2] memory challengeAllocations = createAllocations(DEPOSIT_AMOUNT / 3, (DEPOSIT_AMOUNT * 2) / 3);
-        State memory challengeState = createCounterState(5, challengeAllocations);
+        State memory challengeState = createCounterState(1, challengeAllocations);
         challengeState = addSignatures(challengeState, true, false);
 
-        State memory prevState = createCounterState(4, allocations);
-        prevState = addSignatures(prevState, false, true);
-
         State[] memory proofs = new State[](1);
-        proofs[0] = prevState;
+        proofs[0] = hostState; // Use initial state (0) as proof for state 1
 
         vm.startPrank(host);
+        vm.expectEmit(true, false, false, false);
+        emit IChannel.ChannelChallenged(channelId, block.timestamp + CHALLENGE_PERIOD);
         custody.challenge(channelId, challengeState, proofs);
         vm.stopPrank();
 
@@ -906,9 +919,17 @@ contract CustodyTest is Test {
         State memory newState = createCounterState(0, newAllocations);
         newState = addSignatures(newState, true, false);
 
+        // We need state proofs for reset to work
+        State[] memory proofs = new State[](1);
+        proofs[0] = hostState; // Use initial state (0) as proof for state 1000
+
         // Reset channel
         vm.startPrank(host);
-        custody.reset(channelId, finalState, new State[](0), newChannel, newState);
+        vm.expectEmit(true, false, false, false);
+        emit IChannel.ChannelClosed(channelId);
+        vm.expectEmit(true, false, false, false);
+        emit IChannel.ChannelPartiallyFunded(newChannelId, newChannel);
+        custody.reset(channelId, finalState, proofs, newChannel, newState);
         vm.stopPrank();
 
         // Verify old channel is closed
@@ -967,15 +988,12 @@ contract CustodyTest is Test {
         custody.open(channel, guestState);
         vm.stopPrank();
 
-        // Test ChannelChallenged event
-        State memory challengeState = createCounterState(5, allocations);
+        // Test ChannelChallenged event - using valid state transitions this time
+        State memory challengeState = createCounterState(1, allocations);
         challengeState = addSignatures(challengeState, true, false);
 
-        State memory prevState = createCounterState(4, allocations);
-        prevState = addSignatures(prevState, false, true);
-
         State[] memory proofs = new State[](1);
-        proofs[0] = prevState;
+        proofs[0] = hostState; // Use initial state as proof
 
         vm.expectEmit(true, false, false, false);
         emit IChannel.ChannelChallenged(channelId, block.timestamp + CHALLENGE_PERIOD);

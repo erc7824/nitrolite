@@ -258,7 +258,7 @@ contract Custody is IChannel, IDeposit {
             emit ChannelChallenged(channelId, meta.challengeExpire);
         } else {
             // Invalid state according to adjudicator
-            revert InvalidStatus();
+            revert InvalidState();
         }
     }
 

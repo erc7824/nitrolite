@@ -162,7 +162,6 @@ export class ChannelContext<T = unknown> {
 
         // Validate state transition if the app logic provides a validator
         if (this.appLogic.validateTransition) {
-            console.log("Validate", currentAppState, newAppState);
             const isValid = this.appLogic.validateTransition(
                 this.channel,
                 currentAppState,

@@ -268,6 +268,7 @@ contract Custody is IChannel, IDeposit {
      * @param candidate The latest known valid state
      * @param proofs is an array of valid state required by the adjudicator
      */
+    // TODO: checkpoint should remove ongoing challenge if checkpointed state is newer then the challenged one
     function checkpoint(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = _requireValidChannel(channelId);
 

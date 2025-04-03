@@ -1,283 +1,969 @@
 import { Abi } from 'abitype';
 
-export const ChannelOpenedEvent = "ChannelOpened";
-export const ChannelClosedEvent = "ChannelClosed";
-export const ChannelChallengedEvent = "ChannelChallenged";
-export const ChannelCheckpointedEvent = "ChannelCheckpointed";
+export const ChannelOpenedEvent = 'ChannelOpened';
+export const ChannelClosedEvent = 'ChannelClosed';
+export const ChannelChallengedEvent = 'ChannelChallenged';
+export const ChannelCheckpointedEvent = 'ChannelCheckpointed';
 
 /**
  * ABI for the Custody contract
  * Manages the lifecycle of state channels
  */
 export const CustodyAbi: Abi = [
-  // Functions
-  {
-    type: 'function',
-    name: 'open',
-    inputs: [
-      {
-        name: 'ch',
-        type: 'tuple',
-        components: [
-          { name: 'participants', type: 'address[2]' },
-          { name: 'adjudicator', type: 'address' },
-          { name: 'challenge', type: 'uint64' },
-          { name: 'nonce', type: 'uint64' }
-        ]
-      },
-      {
+    {
+        type: 'function',
+        name: 'challenge',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                internalType: 'bytes32',
+            },
+            {
+                name: 'candidate',
+                type: 'tuple',
+                internalType: 'struct State',
+                components: [
+                    {
+                        name: 'data',
+                        type: 'bytes',
+                        internalType: 'bytes',
+                    },
+                    {
+                        name: 'allocations',
+                        type: 'tuple[2]',
+                        internalType: 'struct Allocation[2]',
+                        components: [
+                            {
+                                name: 'destination',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'token',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'amount',
+                                type: 'uint256',
+                                internalType: 'uint256',
+                            },
+                        ],
+                    },
+                    {
+                        name: 'sigs',
+                        type: 'tuple[]',
+                        internalType: 'struct Signature[]',
+                        components: [
+                            {
+                                name: 'v',
+                                type: 'uint8',
+                                internalType: 'uint8',
+                            },
+                            {
+                                name: 'r',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                            {
+                                name: 's',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                name: 'proofs',
+                type: 'tuple[]',
+                internalType: 'struct State[]',
+                components: [
+                    {
+                        name: 'data',
+                        type: 'bytes',
+                        internalType: 'bytes',
+                    },
+                    {
+                        name: 'allocations',
+                        type: 'tuple[2]',
+                        internalType: 'struct Allocation[2]',
+                        components: [
+                            {
+                                name: 'destination',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'token',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'amount',
+                                type: 'uint256',
+                                internalType: 'uint256',
+                            },
+                        ],
+                    },
+                    {
+                        name: 'sigs',
+                        type: 'tuple[]',
+                        internalType: 'struct Signature[]',
+                        components: [
+                            {
+                                name: 'v',
+                                type: 'uint8',
+                                internalType: 'uint8',
+                            },
+                            {
+                                name: 'r',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                            {
+                                name: 's',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+        outputs: [],
+        stateMutability: 'nonpayable',
+    },
+    {
+        type: 'function',
+        name: 'checkpoint',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                internalType: 'bytes32',
+            },
+            {
+                name: 'candidate',
+                type: 'tuple',
+                internalType: 'struct State',
+                components: [
+                    {
+                        name: 'data',
+                        type: 'bytes',
+                        internalType: 'bytes',
+                    },
+                    {
+                        name: 'allocations',
+                        type: 'tuple[2]',
+                        internalType: 'struct Allocation[2]',
+                        components: [
+                            {
+                                name: 'destination',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'token',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'amount',
+                                type: 'uint256',
+                                internalType: 'uint256',
+                            },
+                        ],
+                    },
+                    {
+                        name: 'sigs',
+                        type: 'tuple[]',
+                        internalType: 'struct Signature[]',
+                        components: [
+                            {
+                                name: 'v',
+                                type: 'uint8',
+                                internalType: 'uint8',
+                            },
+                            {
+                                name: 'r',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                            {
+                                name: 's',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                name: 'proofs',
+                type: 'tuple[]',
+                internalType: 'struct State[]',
+                components: [
+                    {
+                        name: 'data',
+                        type: 'bytes',
+                        internalType: 'bytes',
+                    },
+                    {
+                        name: 'allocations',
+                        type: 'tuple[2]',
+                        internalType: 'struct Allocation[2]',
+                        components: [
+                            {
+                                name: 'destination',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'token',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'amount',
+                                type: 'uint256',
+                                internalType: 'uint256',
+                            },
+                        ],
+                    },
+                    {
+                        name: 'sigs',
+                        type: 'tuple[]',
+                        internalType: 'struct Signature[]',
+                        components: [
+                            {
+                                name: 'v',
+                                type: 'uint8',
+                                internalType: 'uint8',
+                            },
+                            {
+                                name: 'r',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                            {
+                                name: 's',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+        outputs: [],
+        stateMutability: 'nonpayable',
+    },
+    {
+        type: 'function',
+        name: 'close',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                internalType: 'bytes32',
+            },
+            {
+                name: 'candidate',
+                type: 'tuple',
+                internalType: 'struct State',
+                components: [
+                    {
+                        name: 'data',
+                        type: 'bytes',
+                        internalType: 'bytes',
+                    },
+                    {
+                        name: 'allocations',
+                        type: 'tuple[2]',
+                        internalType: 'struct Allocation[2]',
+                        components: [
+                            {
+                                name: 'destination',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'token',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'amount',
+                                type: 'uint256',
+                                internalType: 'uint256',
+                            },
+                        ],
+                    },
+                    {
+                        name: 'sigs',
+                        type: 'tuple[]',
+                        internalType: 'struct Signature[]',
+                        components: [
+                            {
+                                name: 'v',
+                                type: 'uint8',
+                                internalType: 'uint8',
+                            },
+                            {
+                                name: 'r',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                            {
+                                name: 's',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                name: 'proofs',
+                type: 'tuple[]',
+                internalType: 'struct State[]',
+                components: [
+                    {
+                        name: 'data',
+                        type: 'bytes',
+                        internalType: 'bytes',
+                    },
+                    {
+                        name: 'allocations',
+                        type: 'tuple[2]',
+                        internalType: 'struct Allocation[2]',
+                        components: [
+                            {
+                                name: 'destination',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'token',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'amount',
+                                type: 'uint256',
+                                internalType: 'uint256',
+                            },
+                        ],
+                    },
+                    {
+                        name: 'sigs',
+                        type: 'tuple[]',
+                        internalType: 'struct Signature[]',
+                        components: [
+                            {
+                                name: 'v',
+                                type: 'uint8',
+                                internalType: 'uint8',
+                            },
+                            {
+                                name: 'r',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                            {
+                                name: 's',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+        outputs: [],
+        stateMutability: 'nonpayable',
+    },
+    {
+        type: 'function',
         name: 'deposit',
-        type: 'tuple',
-        components: [
-          { name: 'data', type: 'bytes' },
-          {
-            name: 'allocations',
-            type: 'tuple[2]',
-            components: [
-              { name: 'destination', type: 'address' },
-              { name: 'token', type: 'address' },
-              { name: 'amount', type: 'uint256' }
-            ]
-          },
-          {
-            name: 'sigs',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', type: 'uint8' },
-              { name: 'r', type: 'bytes32' },
-              { name: 's', type: 'bytes32' }
-            ]
-          }
-        ]
-      }
-    ],
-    outputs: [{ name: 'channelId', type: 'bytes32' }],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'close',
-    inputs: [
-      { name: 'channelId', type: 'bytes32' },
-      {
-        name: 'candidate',
-        type: 'tuple',
-        components: [
-          { name: 'data', type: 'bytes' },
-          {
-            name: 'allocations',
-            type: 'tuple[2]',
-            components: [
-              { name: 'destination', type: 'address' },
-              { name: 'token', type: 'address' },
-              { name: 'amount', type: 'uint256' }
-            ]
-          },
-          {
-            name: 'sigs',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', type: 'uint8' },
-              { name: 'r', type: 'bytes32' },
-              { name: 's', type: 'bytes32' }
-            ]
-          }
-        ]
-      },
-      {
-        name: 'proofs',
-        type: 'tuple[]',
-        components: [
-          { name: 'data', type: 'bytes' },
-          {
-            name: 'allocations',
-            type: 'tuple[2]',
-            components: [
-              { name: 'destination', type: 'address' },
-              { name: 'token', type: 'address' },
-              { name: 'amount', type: 'uint256' }
-            ]
-          },
-          {
-            name: 'sigs',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', type: 'uint8' },
-              { name: 'r', type: 'bytes32' },
-              { name: 's', type: 'bytes32' }
-            ]
-          }
-        ]
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'challenge',
-    inputs: [
-      { name: 'channelId', type: 'bytes32' },
-      {
-        name: 'candidate',
-        type: 'tuple',
-        components: [
-          { name: 'data', type: 'bytes' },
-          {
-            name: 'allocations',
-            type: 'tuple[2]',
-            components: [
-              { name: 'destination', type: 'address' },
-              { name: 'token', type: 'address' },
-              { name: 'amount', type: 'uint256' }
-            ]
-          },
-          {
-            name: 'sigs',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', type: 'uint8' },
-              { name: 'r', type: 'bytes32' },
-              { name: 's', type: 'bytes32' }
-            ]
-          }
-        ]
-      },
-      {
-        name: 'proofs',
-        type: 'tuple[]',
-        components: [
-          { name: 'data', type: 'bytes' },
-          {
-            name: 'allocations',
-            type: 'tuple[2]',
-            components: [
-              { name: 'destination', type: 'address' },
-              { name: 'token', type: 'address' },
-              { name: 'amount', type: 'uint256' }
-            ]
-          },
-          {
-            name: 'sigs',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', type: 'uint8' },
-              { name: 'r', type: 'bytes32' },
-              { name: 's', type: 'bytes32' }
-            ]
-          }
-        ]
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'checkpoint',
-    inputs: [
-      { name: 'channelId', type: 'bytes32' },
-      {
-        name: 'candidate',
-        type: 'tuple',
-        components: [
-          { name: 'data', type: 'bytes' },
-          {
-            name: 'allocations',
-            type: 'tuple[2]',
-            components: [
-              { name: 'destination', type: 'address' },
-              { name: 'token', type: 'address' },
-              { name: 'amount', type: 'uint256' }
-            ]
-          },
-          {
-            name: 'sigs',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', type: 'uint8' },
-              { name: 'r', type: 'bytes32' },
-              { name: 's', type: 'bytes32' }
-            ]
-          }
-        ]
-      },
-      {
-        name: 'proofs',
-        type: 'tuple[]',
-        components: [
-          { name: 'data', type: 'bytes' },
-          {
-            name: 'allocations',
-            type: 'tuple[2]',
-            components: [
-              { name: 'destination', type: 'address' },
-              { name: 'token', type: 'address' },
-              { name: 'amount', type: 'uint256' }
-            ]
-          },
-          {
-            name: 'sigs',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', type: 'uint8' },
-              { name: 'r', type: 'bytes32' },
-              { name: 's', type: 'bytes32' }
-            ]
-          }
-        ]
-      }
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  {
-    type: 'function',
-    name: 'reclaim',
-    inputs: [{ name: 'channelId', type: 'bytes32' }],
-    outputs: [],
-    stateMutability: 'nonpayable'
-  },
-  
-  // Events
-  {
-    type: 'event',
-    name: 'ChannelOpened',
-    inputs: [
-      { indexed: true, name: 'channelId', type: 'bytes32' },
-      {
-        indexed: false,
-        name: 'channel',
-        type: 'tuple',
-        components: [
-          { name: 'participants', type: 'address[2]' },
-          { name: 'adjudicator', type: 'address' },
-          { name: 'challenge', type: 'uint64' },
-          { name: 'nonce', type: 'uint64' }
-        ]
-      }
-    ],
-    anonymous: false
-  },
-  {
-    type: 'event',
-    name: 'ChannelChallenged',
-    inputs: [
-      { indexed: true, name: 'channelId', type: 'bytes32' },
-      { indexed: false, name: 'expiration', type: 'uint256' }
-    ],
-    anonymous: false
-  },
-  {
-    type: 'event',
-    name: 'ChannelCheckpointed',
-    inputs: [{ indexed: true, name: 'channelId', type: 'bytes32' }],
-    anonymous: false
-  },
-  {
-    type: 'event',
-    name: 'ChannelClosed',
-    inputs: [{ indexed: true, name: 'channelId', type: 'bytes32' }],
-    anonymous: false
-  }
+        inputs: [
+            {
+                name: 'token',
+                type: 'address',
+                internalType: 'address',
+            },
+            {
+                name: 'amount',
+                type: 'uint256',
+                internalType: 'uint256',
+            },
+        ],
+        outputs: [],
+        stateMutability: 'payable',
+    },
+    {
+        type: 'function',
+        name: 'getAccountChannels',
+        inputs: [
+            {
+                name: 'account',
+                type: 'address',
+                internalType: 'address',
+            },
+        ],
+        outputs: [{ name: '', type: 'bytes32[]', internalType: 'bytes32[]' }],
+        stateMutability: 'view',
+    },
+    {
+        type: 'function',
+        name: 'getAccountInfo',
+        inputs: [
+            {
+                name: 'user',
+                type: 'address',
+                internalType: 'address',
+            },
+            {
+                name: 'token',
+                type: 'address',
+                internalType: 'address',
+            },
+        ],
+        outputs: [
+            {
+                name: 'available',
+                type: 'uint256',
+                internalType: 'uint256',
+            },
+            {
+                name: 'locked',
+                type: 'uint256',
+                internalType: 'uint256',
+            },
+            {
+                name: 'channelCount',
+                type: 'uint256',
+                internalType: 'uint256',
+            },
+        ],
+        stateMutability: 'view',
+    },
+    {
+        type: 'function',
+        name: 'open',
+        inputs: [
+            {
+                name: 'ch',
+                type: 'tuple',
+                internalType: 'struct Channel',
+                components: [
+                    {
+                        name: 'participants',
+                        type: 'address[2]',
+                        internalType: 'address[2]',
+                    },
+                    {
+                        name: 'adjudicator',
+                        type: 'address',
+                        internalType: 'address',
+                    },
+                    {
+                        name: 'challenge',
+                        type: 'uint64',
+                        internalType: 'uint64',
+                    },
+                    {
+                        name: 'nonce',
+                        type: 'uint64',
+                        internalType: 'uint64',
+                    },
+                ],
+            },
+            {
+                name: 'depositState',
+                type: 'tuple',
+                internalType: 'struct State',
+                components: [
+                    {
+                        name: 'data',
+                        type: 'bytes',
+                        internalType: 'bytes',
+                    },
+                    {
+                        name: 'allocations',
+                        type: 'tuple[2]',
+                        internalType: 'struct Allocation[2]',
+                        components: [
+                            {
+                                name: 'destination',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'token',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'amount',
+                                type: 'uint256',
+                                internalType: 'uint256',
+                            },
+                        ],
+                    },
+                    {
+                        name: 'sigs',
+                        type: 'tuple[]',
+                        internalType: 'struct Signature[]',
+                        components: [
+                            {
+                                name: 'v',
+                                type: 'uint8',
+                                internalType: 'uint8',
+                            },
+                            {
+                                name: 'r',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                            {
+                                name: 's',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+        outputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                internalType: 'bytes32',
+            },
+        ],
+        stateMutability: 'nonpayable',
+    },
+    {
+        type: 'function',
+        name: 'reclaim',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                internalType: 'bytes32',
+            },
+        ],
+        outputs: [],
+        stateMutability: 'nonpayable',
+    },
+    {
+        type: 'function',
+        name: 'reset',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                internalType: 'bytes32',
+            },
+            {
+                name: 'candidate',
+                type: 'tuple',
+                internalType: 'struct State',
+                components: [
+                    {
+                        name: 'data',
+                        type: 'bytes',
+                        internalType: 'bytes',
+                    },
+                    {
+                        name: 'allocations',
+                        type: 'tuple[2]',
+                        internalType: 'struct Allocation[2]',
+                        components: [
+                            {
+                                name: 'destination',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'token',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'amount',
+                                type: 'uint256',
+                                internalType: 'uint256',
+                            },
+                        ],
+                    },
+                    {
+                        name: 'sigs',
+                        type: 'tuple[]',
+                        internalType: 'struct Signature[]',
+                        components: [
+                            {
+                                name: 'v',
+                                type: 'uint8',
+                                internalType: 'uint8',
+                            },
+                            {
+                                name: 'r',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                            {
+                                name: 's',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                name: 'proofs',
+                type: 'tuple[]',
+                internalType: 'struct State[]',
+                components: [
+                    {
+                        name: 'data',
+                        type: 'bytes',
+                        internalType: 'bytes',
+                    },
+                    {
+                        name: 'allocations',
+                        type: 'tuple[2]',
+                        internalType: 'struct Allocation[2]',
+                        components: [
+                            {
+                                name: 'destination',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'token',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'amount',
+                                type: 'uint256',
+                                internalType: 'uint256',
+                            },
+                        ],
+                    },
+                    {
+                        name: 'sigs',
+                        type: 'tuple[]',
+                        internalType: 'struct Signature[]',
+                        components: [
+                            {
+                                name: 'v',
+                                type: 'uint8',
+                                internalType: 'uint8',
+                            },
+                            {
+                                name: 'r',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                            {
+                                name: 's',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                name: 'newChannel',
+                type: 'tuple',
+                internalType: 'struct Channel',
+                components: [
+                    {
+                        name: 'participants',
+                        type: 'address[2]',
+                        internalType: 'address[2]',
+                    },
+                    {
+                        name: 'adjudicator',
+                        type: 'address',
+                        internalType: 'address',
+                    },
+                    {
+                        name: 'challenge',
+                        type: 'uint64',
+                        internalType: 'uint64',
+                    },
+                    {
+                        name: 'nonce',
+                        type: 'uint64',
+                        internalType: 'uint64',
+                    },
+                ],
+            },
+            {
+                name: 'newDeposit',
+                type: 'tuple',
+                internalType: 'struct State',
+                components: [
+                    {
+                        name: 'data',
+                        type: 'bytes',
+                        internalType: 'bytes',
+                    },
+                    {
+                        name: 'allocations',
+                        type: 'tuple[2]',
+                        internalType: 'struct Allocation[2]',
+                        components: [
+                            {
+                                name: 'destination',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'token',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'amount',
+                                type: 'uint256',
+                                internalType: 'uint256',
+                            },
+                        ],
+                    },
+                    {
+                        name: 'sigs',
+                        type: 'tuple[]',
+                        internalType: 'struct Signature[]',
+                        components: [
+                            {
+                                name: 'v',
+                                type: 'uint8',
+                                internalType: 'uint8',
+                            },
+                            {
+                                name: 'r',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                            {
+                                name: 's',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+        outputs: [],
+        stateMutability: 'nonpayable',
+    },
+    {
+        type: 'function',
+        name: 'withdraw',
+        inputs: [
+            {
+                name: 'token',
+                type: 'address',
+                internalType: 'address',
+            },
+            {
+                name: 'amount',
+                type: 'uint256',
+                internalType: 'uint256',
+            },
+        ],
+        outputs: [],
+        stateMutability: 'nonpayable',
+    },
+    {
+        type: 'event',
+        name: 'ChannelChallenged',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                indexed: true,
+                internalType: 'bytes32',
+            },
+            {
+                name: 'expiration',
+                type: 'uint256',
+                indexed: false,
+                internalType: 'uint256',
+            },
+        ],
+        anonymous: false,
+    },
+    {
+        type: 'event',
+        name: 'ChannelCheckpointed',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                indexed: true,
+                internalType: 'bytes32',
+            },
+        ],
+        anonymous: false,
+    },
+    {
+        type: 'event',
+        name: 'ChannelClosed',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                indexed: true,
+                internalType: 'bytes32',
+            },
+        ],
+        anonymous: false,
+    },
+    {
+        type: 'event',
+        name: 'ChannelOpened',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                indexed: true,
+                internalType: 'bytes32',
+            },
+            {
+                name: 'channel',
+                type: 'tuple',
+                indexed: false,
+                internalType: 'struct Channel',
+                components: [
+                    {
+                        name: 'participants',
+                        type: 'address[2]',
+                        internalType: 'address[2]',
+                    },
+                    {
+                        name: 'adjudicator',
+                        type: 'address',
+                        internalType: 'address',
+                    },
+                    {
+                        name: 'challenge',
+                        type: 'uint64',
+                        internalType: 'uint64',
+                    },
+                    {
+                        name: 'nonce',
+                        type: 'uint64',
+                        internalType: 'uint64',
+                    },
+                ],
+            },
+        ],
+        anonymous: false,
+    },
+    {
+        type: 'event',
+        name: 'ChannelPartiallyFunded',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                indexed: true,
+                internalType: 'bytes32',
+            },
+            {
+                name: 'channel',
+                type: 'tuple',
+                indexed: false,
+                internalType: 'struct Channel',
+                components: [
+                    {
+                        name: 'participants',
+                        type: 'address[2]',
+                        internalType: 'address[2]',
+                    },
+                    {
+                        name: 'adjudicator',
+                        type: 'address',
+                        internalType: 'address',
+                    },
+                    {
+                        name: 'challenge',
+                        type: 'uint64',
+                        internalType: 'uint64',
+                    },
+                    {
+                        name: 'nonce',
+                        type: 'uint64',
+                        internalType: 'uint64',
+                    },
+                ],
+            },
+        ],
+        anonymous: false,
+    },
+    { type: 'error', name: 'ChallengeNotExpired', inputs: [] },
+    { type: 'error', name: 'ChannelNotFinal', inputs: [] },
+    {
+        type: 'error',
+        name: 'ChannelNotFound',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                internalType: 'bytes32',
+            },
+        ],
+    },
+    {
+        type: 'error',
+        name: 'InsufficientBalance',
+        inputs: [
+            {
+                name: 'available',
+                type: 'uint256',
+                internalType: 'uint256',
+            },
+            {
+                name: 'required',
+                type: 'uint256',
+                internalType: 'uint256',
+            },
+        ],
+    },
+    { type: 'error', name: 'InvalidAdjudicator', inputs: [] },
+    { type: 'error', name: 'InvalidAmount', inputs: [] },
+    { type: 'error', name: 'InvalidChallengePeriod', inputs: [] },
+    { type: 'error', name: 'InvalidParticipant', inputs: [] },
+    { type: 'error', name: 'InvalidState', inputs: [] },
+    { type: 'error', name: 'InvalidStateSignatures', inputs: [] },
+    { type: 'error', name: 'InvalidStatus', inputs: [] },
+    {
+        type: 'error',
+        name: 'TransferFailed',
+        inputs: [
+            {
+                name: 'token',
+                type: 'address',
+                internalType: 'address',
+            },
+            { name: 'to', type: 'address', internalType: 'address' },
+            {
+                name: 'amount',
+                type: 'uint256',
+                internalType: 'uint256',
+            },
+        ],
+    },
 ];

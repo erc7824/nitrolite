@@ -21,7 +21,11 @@ deploy-erc-20:
 	@echo "Deploying ERC20... 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512"
 	forge script ./script/DeployFundERC20.s.sol --broadcast --rpc-url $(RPC_URL) --sig "run(string)" "test test test test test test test test test test test junk"
 
-deploy: deploy-counter deploy-erc-20
+deploy-custody:
+	@echo "Deploying Custody... 0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE"
+	forge script script/Custody.s.sol:CustodyScript --rpc-url $(RPC_URL) --private-key $(PRIVATE_KEY) --broadcast
+
+deploy: deploy-counter deploy-erc-20 deploy-custody
 	@echo "All contracts deployed!"
 
 # Helper to verify contract on explorer (for testnet/mainnet)

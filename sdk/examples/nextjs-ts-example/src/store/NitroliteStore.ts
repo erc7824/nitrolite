@@ -1,5 +1,5 @@
 import { Channel as ChannelType, Message } from '@/types';
-import { AppLogic, ChannelContext, NitroliteClient } from '@erc7824/nitrolite';
+import { AppLogic, ChannelContext, NitroliteClient, Signature } from '@erc7824/nitrolite';
 import { proxy } from 'valtio';
 import { Address } from 'viem';
 
@@ -18,13 +18,10 @@ const NitroliteStore = {
     state,
 
     setClient(client: NitroliteClient) {
-        console.log("set client", client);
-
         state.client = client;
     },
 
     setChannelContext(channelType: ChannelType, guest: Address, app: AppLogic<Message>) {
-        console.log("client", state.client);
         state.channelContext[channelType] = new ChannelContext<Message>(state.client, guest, app);
     },
 
@@ -32,8 +29,8 @@ const NitroliteStore = {
         await state.channelContext[channel].deposit(tokenAddress, BigInt(amount));
     },
 
-    async openChannel(channel: ChannelType, appState: Message, token: Address, allocations: [bigint, bigint]) {
-        await state.channelContext[channel].open(appState, token, allocations);
+    async openChannel(channel: ChannelType, appState: Message, token: Address, allocations: [bigint, bigint], signatures: Signature[] = []) {
+        await state.channelContext[channel].open(appState, token, allocations, signatures);
     },
 };
 

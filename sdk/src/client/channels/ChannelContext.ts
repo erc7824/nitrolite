@@ -1,7 +1,7 @@
-import { Address, Hex } from 'viem';
+import { Address, encodeAbiParameters, Hex, keccak256 } from 'viem';
 import { getChannelId } from '../../utils';
 import type { NitroliteClient } from '../NitroliteClient';
-import { AppLogic } from '../../types';
+import { AppLogic, Signature } from '../../types';
 import { ChannelId, State, Role, Allocation, Channel } from '../types';
 
 /**
@@ -29,10 +29,9 @@ export class ChannelContext<T = unknown> {
         this.channel = {
             participants: [client.account?.address as Address, guest],
             adjudicator: appLogic.getAdjudicatorAddress(),
-            challenge: 0n, // TODO:
+            challenge: 100500n, // TODO:
             nonce: 0n, // TODO:
         } as Channel;
-        console.log(client.account, this.channel);
         this.channelId = getChannelId(this.channel);
         this.appLogic = appLogic;
 
@@ -45,11 +44,11 @@ export class ChannelContext<T = unknown> {
 
         // TODO:
         // if (participantAddress === channel.participants[0]) {
-            this.role = Role.HOST;
+        this.role = Role.HOST;
         // } else if (participantAddress === channel.participants[1]) {
-            // this.role = Role.GUEST;
+        // this.role = Role.GUEST;
         // } else {
-            // throw new Error('Account is not a participant in this channel');
+        // throw new Error('Account is not a participant in this channel');
         // }
     }
 
@@ -102,33 +101,22 @@ export class ChannelContext<T = unknown> {
     /**
      * Create a channel state based on application state
      */
-    private async createChannelState(
+    createChannelState(
         appState: T,
         tokenAddress: Address,
-        amounts: [bigint, bigint]
-    ): Promise<State> {
+        amounts: [bigint, bigint],
+        signatures: Signature[] = []
+    ): State {
         // Encode the app state
         const data = this.appLogic.encode(appState);
 
         // Create allocations
-        const allocations: [Allocation, Allocation] = [
-            {
-                destination: this.channel.participants[0],
-                token: tokenAddress,
-                amount: amounts[0],
-            },
-            {
-                destination: this.channel.participants[1],
-                token: tokenAddress,
-                amount: amounts[1],
-            },
-        ];
+        const allocations = this.getAllocations(tokenAddress, amounts);
 
-        // Create state (without signatures)
         return {
             data,
             allocations,
-            sigs: [],
+            sigs: signatures,
         };
     }
 
@@ -138,13 +126,15 @@ export class ChannelContext<T = unknown> {
     async open(
         appState: T,
         tokenAddress: Address,
-        amounts: [bigint, bigint]
+        amounts: [bigint, bigint],
+        signatures: Signature[] = []
     ): Promise<ChannelId> {
         // Create initial state
         const initialState = await this.createChannelState(
             appState,
             tokenAddress,
-            amounts
+            amounts,
+            signatures
         );
 
         // Save as current state
@@ -288,38 +278,34 @@ export class ChannelContext<T = unknown> {
         );
     }
 
-    async deposit(
-        tokenAddress: Address,
-        amount: bigint
-    ): Promise<void> {
+    async deposit(tokenAddress: Address, amount: bigint): Promise<void> {
         return this.client.deposit(tokenAddress, amount);
     }
 
-    async withdraw(
-        tokenAddress: Address,
-        amount: bigint
-    ): Promise<void> {
+    async withdraw(tokenAddress: Address, amount: bigint): Promise<void> {
         return this.client.withdraw(tokenAddress, amount);
     }
 
-    async getAvailableBalance(
-        tokenAddress: Address
-    ): Promise<bigint> {
+    async getAvailableBalance(tokenAddress: Address): Promise<bigint> {
         if (!this.client.account?.address) {
             throw new Error('Account address is not provided');
         }
 
-        return this.client.getAvailableBalance(this.client.account.address, tokenAddress);
+        return this.client.getAvailableBalance(
+            this.client.account.address,
+            tokenAddress
+        );
     }
 
-    async getAccountChannels(
-        tokenAddress: Address
-    ): Promise<ChannelId[]> {
+    async getAccountChannels(tokenAddress: Address): Promise<ChannelId[]> {
         if (!this.client.account?.address) {
             throw new Error('Account address is not provided');
         }
 
-        return this.client.getAccountChannels(this.client.account.address, tokenAddress);
+        return this.client.getAccountChannels(
+            this.client.account.address,
+            tokenAddress
+        );
     }
 
     /**
@@ -327,5 +313,50 @@ export class ChannelContext<T = unknown> {
      */
     async reclaim(): Promise<void> {
         return this.client.reclaimChannel(this.channelId);
+    }
+
+    getStateHash(
+        appState: T,
+        tokenAddress: Address,
+        amounts: [bigint, bigint]
+    ): ChannelId {
+        const data = this.appLogic.encode(appState);
+        const allocations = this.getAllocations(tokenAddress, amounts);
+
+        const encoded = encodeAbiParameters(
+            [
+                { type: 'bytes32' },
+                { type: 'bytes' },
+                {
+                    type: 'tuple[2]',
+                    components: [
+                        { name: 'destination', type: 'address' },
+                        { name: 'token', type: 'address' },
+                        { name: 'amount', type: 'uint256' },
+                    ],
+                },
+            ],
+            [this.channelId, data, allocations]
+        );
+
+        return keccak256(encoded);
+    }
+
+    private getAllocations(
+        tokenAddress: Address,
+        amounts: [bigint, bigint]
+    ): [Allocation, Allocation] {
+        return [
+            {
+                destination: this.channel.participants[0],
+                token: tokenAddress,
+                amount: amounts[0],
+            },
+            {
+                destination: this.channel.participants[1],
+                token: tokenAddress,
+                amount: amounts[1],
+            },
+        ];
     }
 }

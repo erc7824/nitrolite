@@ -5,7 +5,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { useMessageService } from '@/hooks/useMessageService';
 import WalletStore from '@/store/WalletStore';
 import { fetchAssets } from '@/store/AssetsStore';
-import { Address } from 'viem';
+import { Address, encodeAbiParameters, keccak256, parseSignature } from 'viem';
 // import { generateKeyPair } from "@/websocket/crypto";
 
 // Components
@@ -19,6 +19,7 @@ import MetaMaskConnect from '@/components/MetaMaskConnect';
 import NitroliteStore from '@/store/NitroliteStore';
 import { CounterApp } from './apps/counter';
 import { useNitroliteClient } from '@/hooks/useNitroliteClient';
+import { privateKeyToAccount } from 'viem/accounts';
 
 export default function Home() {
     const { status, addSystemMessage } = useMessageService();
@@ -45,7 +46,6 @@ export default function Home() {
         addSystemMessage('Application initialized - Welcome to Nitrolite!');
     }, [addSystemMessage]);
 
-
     useNitroliteClient();
 
     // Function to handle channel opening
@@ -57,21 +57,35 @@ export default function Home() {
 
         const app = new CounterApp();
 
-        NitroliteStore.setChannelContext(
-            currentChannel,
-            '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
-            app,
+        NitroliteStore.setChannelContext(currentChannel, '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', app);
+
+        const appState = { type: 'system', text: '' };
+        //TODO:
+        const stateHash = NitroliteStore.state.channelContext[currentChannel].getStateHash(
+            appState,
+            tokenAddress as Address,
+            [BigInt(amount), BigInt(0)] as [bigint, bigint],
         );
+
+        const account = privateKeyToAccount('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80');
+        const signature = await account.signMessage({
+            message: { raw: stateHash },
+        });
+        const parsedSig = parseSignature(signature);
 
         await NitroliteStore.deposit(currentChannel, tokenAddress as Address, amount);
         await NitroliteStore.openChannel(
             currentChannel,
-            {
-                text: '',
-                type: 'system'
-            },
+            { type: 'system', text: '' },
             tokenAddress as Address,
             [BigInt(amount), BigInt(0)] as [bigint, bigint],
+            [
+                {
+                    r: parsedSig.r,
+                    s: parsedSig.s,
+                    v: parsedSig.yParity,
+                },
+            ],
         );
 
         // Generate keys and connect to websocket in a sequential flow

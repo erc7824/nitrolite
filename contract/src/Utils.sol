@@ -30,8 +30,8 @@ library Utils {
      * @dev The state hash is computed according to the specification in the README, using channelId, data, and allocations
      */
     function getStateHash(Channel memory ch, State memory state) internal pure returns (bytes32) {
-        bytes32 channelId = getChannelId(ch).toEthSignedMessageHash();
-        return keccak256(abi.encode(channelId, state.data, state.allocations));
+        bytes32 channelId = getChannelId(ch);
+        return keccak256(abi.encode(channelId, state.data, state.allocations)).toEthSignedMessageHash();
     }
 
     /**

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
+import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Channel, State, Signature} from "./interfaces/Types.sol";
 
 /**
@@ -8,6 +10,9 @@ import {Channel, State, Signature} from "./interfaces/Types.sol";
  * @notice Library providing utility functions for state channel operations
  */
 library Utils {
+    using ECDSA for bytes32;
+    using MessageHashUtils for bytes32;
+
     /**
      * @notice Compute the unique identifier for a channel
      * @param ch The channel struct
@@ -26,7 +31,7 @@ library Utils {
      */
     function getStateHash(Channel memory ch, State memory state) internal pure returns (bytes32) {
         bytes32 channelId = getChannelId(ch);
-        return keccak256(abi.encode(channelId, state.data, state.allocations));
+        return keccak256(abi.encode(channelId, state.data, state.allocations)).toEthSignedMessageHash();
     }
 
     /**
@@ -38,8 +43,7 @@ library Utils {
      */
     function verifySignature(bytes32 stateHash, Signature memory sig, address signer) internal pure returns (bool) {
         // Verify the signature
-        address recoveredSigner = ecrecover(stateHash, sig.v, sig.r, sig.s);
-
+        address recoveredSigner = stateHash.recover(sig.v, sig.r, sig.s);
         return recoveredSigner == signer;
     }
 }

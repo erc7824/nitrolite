@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "watch": "tsc --watch",
     "clean": "rimraf dist",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",

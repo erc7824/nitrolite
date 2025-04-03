@@ -8,9 +8,9 @@ import { chains } from '@/config/chains';
 
 // You might want to move these to a config file
 const CONTRACTS = {
-    custody: '0x...' as `0x${string}`,
+    custody: '',
     adjudicators: {
-        base: '0x...' as `0x${string}`,
+        base: '0x5fbdb2315678afecb367f032d93f642f64180aa3',
     },
 };
 
@@ -37,7 +37,10 @@ export function useNitroliteClient() {
             const walletClient = createWalletClient({
                 transport: custom(window.ethereum),
                 chain,
+                account: walletState.account,
             });
+
+            console.log("wallet client", walletClient)
 
             // Create Nitrolite client
             const client = new NitroliteClient({

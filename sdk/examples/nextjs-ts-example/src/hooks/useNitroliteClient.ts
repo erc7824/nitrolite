@@ -8,7 +8,7 @@ import { chains } from '@/config/chains';
 
 // You might want to move these to a config file
 const CONTRACTS = {
-    custody: '',
+    custody: '0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE',
     adjudicators: {
         base: '0x5fbdb2315678afecb367f032d93f642f64180aa3',
     },
@@ -39,8 +39,6 @@ export function useNitroliteClient() {
                 chain,
                 account: walletState.account,
             });
-
-            console.log("wallet client", walletClient)
 
             // Create Nitrolite client
             const client = new NitroliteClient({

@@ -101,8 +101,4 @@ contract Counter is IAdjudicator {
         // All validations passed.
         return true;
     }
-
-    function a(CounterData calldata p) external pure returns (uint256) {
-        return p.counter;
-    }
 }

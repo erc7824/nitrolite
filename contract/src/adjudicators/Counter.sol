@@ -48,7 +48,7 @@ contract Counter is IAdjudicator {
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
-        view
+        pure
         override
         returns (bool valid)
     {
@@ -65,14 +65,9 @@ contract Counter is IAdjudicator {
 
         // INITIAL STATE: version 0 requires both signatures.
         if (candidateState.version == 0) {
-            if (
-                !Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])
-                    || !Utils.verifySignature(stateHash, candidate.sigs[1], chan.participants[GUEST])
-            ) {
-                return false;
-            }
-            // Valid initial state.
-            return true;
+            // true if both signatures are valid
+            return Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])
+                    && Utils.verifySignature(stateHash, candidate.sigs[1], chan.participants[GUEST]);
         }
 
         // For non-initial states, ensure a previous state is provided.

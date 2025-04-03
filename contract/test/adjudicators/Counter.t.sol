@@ -70,7 +70,7 @@ contract CounterTest is Test {
     // -------------------- INITIAL STATE TESTS --------------------
 
     // Valid initial state: version 0 with two valid signatures (host, then guest)
-    function test_ValidInitialState() public {
+    function test_ValidInitialState() public view {
         uint256 counterVal = 0;
         uint256 target = 10;
         uint256 version = 0;
@@ -87,7 +87,7 @@ contract CounterTest is Test {
     }
 
     // Initial state with insufficient signatures should fail.
-    function test_InitialStateInsufficientSignatures() public {
+    function test_InitialStateInsufficientSignatures() public view {
         uint256 counterVal = 0;
         uint256 target = 10;
         uint256 version = 0;
@@ -103,7 +103,7 @@ contract CounterTest is Test {
     }
 
     // Initial state with an invalid (corrupted) signature should fail.
-    function test_InitialStateInvalidSignature() public {
+    function test_InitialStateInvalidSignature() public view {
         uint256 counterVal = 0;
         uint256 target = 10;
         uint256 version = 0;
@@ -127,7 +127,7 @@ contract CounterTest is Test {
     // Valid non-initial state transition:
     // previous state has version 0 and candidate state has version 1,
     // counter increments by 1 and target remains the same.
-    function test_ValidNonInitialState() public {
+    function test_ValidNonInitialState() public view {
         // Create previous (initial) state.
         uint256 prevCounter = 3;
         uint256 target = 10;
@@ -155,7 +155,7 @@ contract CounterTest is Test {
     }
 
     // Non-initial state with missing proof(s) should fail.
-    function test_NonInitialStateMissingProofs() public {
+    function test_NonInitialStateMissingProofs() public view {
         uint256 counterVal = 1;
         uint256 target = 10;
         uint256 version = 1; // Non-initial state
@@ -172,7 +172,7 @@ contract CounterTest is Test {
     }
 
     // Non-initial state with an incorrect counter increment (not exactly +1) should fail.
-    function test_InvalidCounterIncrement() public {
+    function test_InvalidCounterIncrement() public view {
         // Previous state: counter = 3.
         uint256 prevCounter = 3;
         uint256 target = 10;
@@ -198,7 +198,7 @@ contract CounterTest is Test {
     }
 
     // Non-initial state with an incorrect version increment (not exactly +1) should fail.
-    function test_InvalidVersionIncrement() public {
+    function test_InvalidVersionIncrement() public view {
         // Previous state: version = 0.
         uint256 prevCounter = 3;
         uint256 target = 10;
@@ -224,7 +224,7 @@ contract CounterTest is Test {
     }
 
     // Non-initial state where the target changes should fail.
-    function test_InvalidTargetChange() public {
+    function test_InvalidTargetChange() public view {
         // Previous state: target = 10.
         uint256 prevCounter = 3;
         uint256 target = 10;
@@ -250,7 +250,7 @@ contract CounterTest is Test {
     }
 
     // Non-initial state where the candidate counter exceeds the target should fail.
-    function test_CandidateCounterExceedsTarget() public {
+    function test_CandidateCounterExceedsTarget() public view {
         // Previous state: counter equals the target.
         uint256 prevCounter = 10;
         uint256 target = 10;

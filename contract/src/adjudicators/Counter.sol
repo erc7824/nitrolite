@@ -93,6 +93,11 @@ contract Counter is IAdjudicator {
             return false;
         }
 
+        // Ensure the rules of the game are consistent, for simplisity.
+        if (candidateState.target != previousState.target) {
+            return false;
+        }
+        
         // Ensure the candidate counter does not exceed its target.
         if (candidateState.counter > candidateState.target) {
             return false;

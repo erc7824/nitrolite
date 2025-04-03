@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import {IChannel} from "./interfaces/IChannel.sol";
 import {IDeposit} from "./interfaces/IDeposit.sol";
 import {IAdjudicator} from "./interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation} from "./interfaces/Types.sol";
+import {Channel, State, Allocation, Status} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
@@ -19,7 +19,9 @@ contract Custody is IChannel, IDeposit {
     // Errors
     error ChannelNotFound(bytes32 channelId);
     error InvalidParticipant();
+    error InvalidStatus();
     error InvalidState();
+    error InvalidStateSignatures();
     error InvalidAdjudicator();
     error InvalidChallengePeriod();
     error InvalidAmount();
@@ -35,23 +37,25 @@ contract Custody is IChannel, IDeposit {
     // Recommended structure to keep track of states
     struct Metadata {
         Channel chan; // Opener define channel configuration
+        Status status; // Current channel status
         uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
         State lastValidState; // Last valid state when adjudicator was called
         mapping(address token => uint256 balance) tokenBalances; // Token balances for the channel
     }
 
-    struct Funds {
+    // Account is a ledger account per unique depositor and token
+    struct Account {
         uint256 available; // Available amount that can be withdrawn or allocated to channels
         uint256 locked; // Amount currently allocated to channels
     }
 
-    struct Account {
-        mapping(address token => Funds funds) tokens; // Token balances
+    struct Ledger {
+        mapping(address token => Account funds) tokens; // Token balances
         EnumerableSet.Bytes32Set channels; // Set of user ChannelId
     }
 
     mapping(bytes32 channelId => Metadata chMeta) internal _channels;
-    mapping(address account => Account) internal _accounts;
+    mapping(address account => Ledger ledger) internal _ledgers;
 
     function deposit(address token, uint256 amount) external payable {
         address account = msg.sender;
@@ -61,16 +65,15 @@ contract Custody is IChannel, IDeposit {
             bool success = IERC20(token).transferFrom(account, address(this), amount);
             require(success, TransferFailed(token, address(this), amount));
         }
-
-        _accounts[msg.sender].tokens[token].available += amount;
+        _ledgers[msg.sender].tokens[token].available += amount;
     }
 
     function withdraw(address token, uint256 amount) external {
-        Account storage account = _accounts[msg.sender];
-        uint256 available = account.tokens[token].available;
+        Ledger storage ledger = _ledgers[msg.sender];
+        uint256 available = ledger.tokens[token].available;
         require(available >= amount, InsufficientBalance(available, amount));
         _transfer(token, msg.sender, amount);
-        account.tokens[token].available -= amount;
+        ledger.tokens[token].available -= amount;
     }
 
     /**
@@ -79,25 +82,25 @@ contract Custody is IChannel, IDeposit {
      * @return List of channel IDs associated with the account
      */
     function getAccountChannels(address account) public view returns (bytes32[] memory) {
-        return _accounts[account].channels.values();
+        return _ledgers[account].channels.values();
     }
 
     /**
      * @notice Get account information for a specific token
-     * @param account The account address
+     * @param user The account address
      * @param token The token address
      * @return available Amount available for withdrawal or allocation
      * @return locked Amount locked in channels
      * @return channelCount Number of associated channels
      */
-    function getAccountInfo(address account, address token)
+    function getAccountInfo(address user, address token)
         public
         view
         returns (uint256 available, uint256 locked, uint256 channelCount)
     {
-        Account storage accountInfo = _accounts[account];
-        Funds storage funds = accountInfo.tokens[token];
-        return (funds.available, funds.locked, accountInfo.channels.length());
+        Ledger storage ledger = _ledgers[user];
+        Account storage account = ledger.tokens[token];
+        return (account.available, account.locked, ledger.channels.length());
     }
 
     /**
@@ -108,7 +111,7 @@ contract Custody is IChannel, IDeposit {
      */
     function open(Channel calldata ch, State calldata depositState) public returns (bytes32 channelId) {
         // Validate input parameters
-        // FIXME: lift this restriction
+        // FIXME: lift this restriction when supporting N-party channels
         require(ch.participants.length == 2, InvalidParticipant());
         require(ch.participants[0] != address(0) && ch.participants[1] != address(0), InvalidParticipant());
         require(ch.adjudicator != address(0), InvalidAdjudicator());
@@ -117,41 +120,65 @@ contract Custody is IChannel, IDeposit {
         // Generate channel ID
         channelId = Utils.getChannelId(ch);
 
-        // Check if channel doesn't exists and create new one
+        // Check if channel doesn't exist and create new one (HOST deposit)
         Metadata storage meta = _channels[channelId];
         if (meta.chan.adjudicator == address(0)) {
-            // Validate deposits and transfer funds
+            // This is the first participant (HOST) creating the channel
             Allocation memory allocation = depositState.allocations[HOST];
+
+            // Verify state hash is signed by HOST
+            bytes32 stateHash = Utils.getStateHash(ch, depositState);
+            bool validSignature = Utils.verifySignature(stateHash, depositState.sigs[0], ch.participants[HOST]);
+            require(validSignature, InvalidStateSignatures());
+
+            // Verify by calling adjudicator with empty proofs
+            IAdjudicator adjudicator = IAdjudicator(ch.adjudicator);
+            State[] memory emptyProofs = new State[](0);
+            bool isValid = adjudicator.adjudicate(ch, depositState, emptyProofs);
+            require(isValid, InvalidState());
 
             // Initialize channel metadata
             Metadata storage newCh = _channels[channelId];
             newCh.chan = ch;
+            newCh.status = Status.PARTIAL; // Set initial status to PARTIAL (partially funded)
             newCh.challengeExpire = 0;
             newCh.lastValidState = depositState;
 
             // Transfer funds from account to channel
             _lockAccountFundsToChannel(ch.participants[HOST], channelId, allocation.token, allocation.amount);
-            _accounts[ch.participants[HOST]].channels.add(channelId);
+            _ledgers[ch.participants[HOST]].channels.add(channelId);
 
             emit ChannelPartiallyFunded(channelId, ch);
-        } else {
+        } else if (meta.status == Status.PARTIAL) {
+            // This is the second participant (GUEST) joining an existing partially funded channel
             Allocation memory allocation = depositState.allocations[GUEST];
+
+            // Call adjudicate with empty proofs to validate state
+            IAdjudicator adjudicator = IAdjudicator(ch.adjudicator);
+            State[] memory emptyProofs = new State[](0);
+            bool isValid = adjudicator.adjudicate(ch, depositState, emptyProofs);
+            require(isValid, InvalidState());
+
+            bool validSignatures = _verifyAllSignatures(ch, depositState);
+            require(validSignatures, InvalidStateSignatures());
+
+            // Lock funds from the GUEST to the channel
             _lockAccountFundsToChannel(ch.participants[GUEST], channelId, allocation.token, allocation.amount);
 
-            // Validate the state with an empty proof
-            State[] memory emptyProofs = new State[](0);
-            IAdjudicator.Status status = _validateState(meta, depositState, emptyProofs);
+            // Store the new state with signatures from both participants
+            meta.lastValidState = depositState;
 
-            // Update channel state based on adjudicator decision
-            if (status == IAdjudicator.Status.ACTIVE || status == IAdjudicator.Status.VOID) {
-                _accounts[ch.participants[GUEST]].channels.add(channelId);
-                emit ChannelOpened(channelId, ch);
-            } else if (status == IAdjudicator.Status.PARTIAL) {
-                // For Counter adjudicator, PARTIAL means counter = 0
-                revert InvalidState();
-            }
+            // Now that both participants have funded, change status to ACTIVE
+            meta.status = Status.ACTIVE;
+
+            // Add channel to GUEST's account
+            _ledgers[ch.participants[GUEST]].channels.add(channelId);
+
+            emit ChannelOpened(channelId, ch);
+        } else {
+            // Channel exists but is not in PARTIAL state
+            revert InvalidStatus();
         }
-
         return channelId;
     }
 
@@ -164,15 +191,34 @@ contract Custody is IChannel, IDeposit {
     function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) public {
         Metadata storage meta = _requireValidChannel(channelId);
 
-        // Validate the candidate state
-        IAdjudicator.Status status = _validateState(meta, candidate, proofs);
-
-        // Only proceed if adjudicator determines the state is FINAL
-        if (status == IAdjudicator.Status.FINAL) {
-            _closeChannel(channelId, meta);
-        } else {
-            revert ChannelNotFinal();
+        // Channel must be in a valid state to close (ACTIVE, PARTIAL, or already FINAL)
+        if (meta.status == Status.VOID || meta.status == Status.INVALID) {
+            revert InvalidStatus();
         }
+
+        // If already FINAL, we can proceed to close without adjudicator validation
+        if (meta.status != Status.FINAL) {
+            // Validate the candidate state using the adjudicator
+            // Adjudicator only validates state transitions, not channel status
+            bool isValid = _validateState(meta, candidate, proofs);
+
+            // For cooperative close, we need:
+            // 1. The state must be valid according to the adjudicator
+            // 2. The state must have valid signatures from all participants
+
+            // Verify signatures from all participants
+            bool allSignaturesValid = _verifyAllSignatures(meta.chan, candidate);
+            bool hasAllSignatures = candidate.sigs.length == meta.chan.participants.length;
+
+            if (isValid && hasAllSignatures && allSignaturesValid) {
+                // All requirements met, set status to FINAL
+                meta.status = Status.FINAL;
+            } else {
+                revert ChannelNotFinal();
+            }
+        }
+        // At this point, the channel is in FINAL state, so we can close it
+        _distributeAllocation(channelId, meta);
     }
 
     /**
@@ -184,18 +230,34 @@ contract Custody is IChannel, IDeposit {
     function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = _requireValidChannel(channelId);
 
-        // Validate the candidate state
-        IAdjudicator.Status status = _validateState(meta, candidate, proofs);
+        // Only allow challenges on funded channels
+        if (meta.status != Status.ACTIVE && meta.status != Status.PARTIAL) {
+            revert InvalidStatus();
+        }
 
-        if (status == IAdjudicator.Status.ACTIVE || status == IAdjudicator.Status.PARTIAL) {
-            // Valid challenge, start challenge period
+        // Validate the candidate state using adjudicator
+        // Adjudicators only validate state transitions, not channel status
+        bool isValid = _validateState(meta, candidate, proofs);
+
+        // Check if the candidate state is more recent than the checkpointed state
+        // For now, we're using the array length of signatures as a simple proxy for "more recent"
+        // In a real implementation, this would involve comparing sequence numbers or timestamps in the state data
+        bool isMoreRecent = candidate.sigs.length >= meta.lastValidState.sigs.length;
+        require(isMoreRecent, "State is not more recent than the checkpointed state");
+
+        if (isValid) {
+            // Verify all available participant signatures
+            bool allSignaturesValid = _verifyAllSignatures(meta.chan, candidate);
+            require(allSignaturesValid, InvalidStateSignatures());
+
+            // Start challenge period - this is handled by Custody, not adjudicator
             meta.challengeExpire = block.timestamp + meta.chan.challenge;
+
+            // Keep the channel status as is (ACTIVE or PARTIAL)
+            // The status will be updated to FINAL when reclaim is called after challenge period
             emit ChannelChallenged(channelId, meta.challengeExpire);
-        } else if (status == IAdjudicator.Status.FINAL) {
-            // If state is final, close the channel directly
-            _closeChannel(channelId, meta);
         } else {
-            // For other statuses like VOID
+            // Invalid state according to adjudicator
             revert InvalidState();
         }
     }
@@ -206,18 +268,33 @@ contract Custody is IChannel, IDeposit {
      * @param candidate The latest known valid state
      * @param proofs is an array of valid state required by the adjudicator
      */
+    // TODO: checkpoint should remove ongoing challenge if checkpointed state is newer then the challenged one
     function checkpoint(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = _requireValidChannel(channelId);
 
-        // Validate the candidate state
-        IAdjudicator.Status status = _validateState(meta, candidate, proofs);
+        // Only allow checkpoints on funded channels
+        if (meta.status != Status.ACTIVE && meta.status != Status.PARTIAL) {
+            revert InvalidStatus();
+        }
 
-        if (status == IAdjudicator.Status.ACTIVE || status == IAdjudicator.Status.FINAL) {
-            // Valid state, checkpoint without starting challenge
+        // Validate the candidate state
+        // Adjudicators only validate state transitions, not channel status
+        bool isValid = _validateState(meta, candidate, proofs);
+
+        if (isValid) {
+            // Verify all available participant signatures
+            bool allSignaturesValid = _verifyAllSignatures(meta.chan, candidate);
+            require(allSignaturesValid, InvalidStateSignatures());
+
+            // Valid state is stored for future reference
+            meta.lastValidState = candidate;
+
+            // Keep the channel status as is (ACTIVE or PARTIAL)
+            // This allows the channel to continue operating with the checkpoint as the latest valid state
             emit ChannelCheckpointed(channelId);
         } else {
-            // For other statuses like PARTIAL or VOID
-            revert InvalidState();
+            // Invalid state according to adjudicator
+            revert InvalidStatus();
         }
     }
 
@@ -231,8 +308,12 @@ contract Custody is IChannel, IDeposit {
         // Ensure challenge period has expired
         require(meta.challengeExpire != 0 && block.timestamp >= meta.challengeExpire, ChallengeNotExpired());
 
+        // Set the status to FINAL before closing
+        // This is the custody contract's responsibility, not the adjudicator's
+        meta.status = Status.FINAL;
+
         // Close the channel with last valid state
-        _closeChannel(channelId, meta);
+        _distributeAllocation(channelId, meta);
     }
 
     /**
@@ -262,7 +343,7 @@ contract Custody is IChannel, IDeposit {
      * @param channelId The channel identifier
      * @param meta The channel's metadata
      */
-    function _closeChannel(bytes32 channelId, Metadata storage meta) internal {
+    function _distributeAllocation(bytes32 channelId, Metadata storage meta) internal {
         // Distribute funds according to allocations
         uint256 allocsLength = meta.lastValidState.allocations.length;
         for (uint256 i = 0; i < allocsLength; i++) {
@@ -273,7 +354,7 @@ contract Custody is IChannel, IDeposit {
         uint256 participantsLength = meta.chan.participants.length;
         for (uint256 i = 0; i < participantsLength; i++) {
             address participant = meta.chan.participants[i];
-            _accounts[participant].channels.remove(channelId);
+            _ledgers[participant].channels.remove(channelId);
         }
 
         // Mark channel as closed by removing it
@@ -298,44 +379,35 @@ contract Custody is IChannel, IDeposit {
      * @param meta The channel's metadata
      * @param candidate The state to be adjudicated
      * @param proofs Additional proof states if required
-     * @return status The adjudication status
+     * @return valid True if the state is valid according to the adjudicator
      */
     function _validateState(Metadata storage meta, State memory candidate, State[] memory proofs)
         internal
-        returns (IAdjudicator.Status)
+        returns (bool valid)
     {
-        IAdjudicator.Status status = _adjudicate(meta.chan, candidate, proofs);
+        IAdjudicator adjudicator = IAdjudicator(meta.chan.adjudicator);
 
-        if (status == IAdjudicator.Status.INVALID) {
-            revert InvalidState();
+        // Adjudicators only validate state transitions, not channel status
+        try adjudicator.adjudicate(meta.chan, candidate, proofs) returns (bool result) {
+            valid = result;
+
+            if (valid) {
+                // Store the valid state
+                meta.lastValidState = candidate;
+
+                // Channel status handling is managed by Custody contract
+                // Don't automatically change status to ACTIVE here
+            } else {
+                // If adjudicator returns false, mark as invalid
+                meta.status = Status.INVALID;
+            }
+
+            return valid;
+        } catch {
+            // If the adjudicator call reverts, treat as invalid state
+            meta.status = Status.INVALID;
+            return false;
         }
-
-        // For valid states, update the lastValidState
-        if (
-            status == IAdjudicator.Status.ACTIVE || status == IAdjudicator.Status.PARTIAL
-                || status == IAdjudicator.Status.FINAL
-        ) {
-            meta.lastValidState = candidate;
-        }
-
-        return status;
-    }
-
-    /**
-     * @notice Internal function to adjudicate a state
-     * @param ch The channel configuration
-     * @param candidate The state to be adjudicated
-     * @param proofs Additional proof states if required
-     * @return status The adjudication status
-     */
-    function _adjudicate(Channel memory ch, State memory candidate, State[] memory proofs)
-        internal
-        view
-        returns (IAdjudicator.Status status)
-    {
-        IAdjudicator adjudicator = IAdjudicator(ch.adjudicator);
-        // Convert to calldata by passing individual parameters
-        return adjudicator.adjudicate(ch, candidate, proofs);
     }
 
     function _transfer(address token, address to, uint256 amount) internal {
@@ -351,12 +423,12 @@ contract Custody is IChannel, IDeposit {
     function _lockAccountFundsToChannel(address account, bytes32 channelId, address token, uint256 amount) internal {
         if (amount == 0) return;
 
-        Account storage accountInfo = _accounts[account];
-        uint256 available = accountInfo.tokens[token].available;
+        Ledger storage ledger = _ledgers[account];
+        uint256 available = ledger.tokens[token].available;
         require(available >= amount, InsufficientBalance(available, amount));
 
-        accountInfo.tokens[token].available -= amount;
-        accountInfo.tokens[token].locked += amount;
+        ledger.tokens[token].available -= amount;
+        ledger.tokens[token].locked += amount;
 
         Metadata storage meta = _channels[channelId];
         meta.tokenBalances[token] += amount;
@@ -373,8 +445,41 @@ contract Custody is IChannel, IDeposit {
         uint256 correctedAmount = channelBalance > amount ? amount : channelBalance;
         meta.tokenBalances[token] -= correctedAmount;
 
-        Account storage accountInfo = _accounts[account];
-        accountInfo.tokens[token].locked -= correctedAmount;
-        accountInfo.tokens[token].available += correctedAmount;
+        Ledger storage ledger = _ledgers[account];
+
+        // Check locked amount before subtracting to prevent underflow
+        uint256 lockedAmount = ledger.tokens[token].locked;
+        uint256 amountToUnlock = lockedAmount > correctedAmount ? correctedAmount : lockedAmount;
+
+        if (amountToUnlock > 0) {
+            ledger.tokens[token].locked -= amountToUnlock;
+        }
+        ledger.tokens[token].available += amountToUnlock;
+    }
+
+    /**
+     * @notice Verifies that all provided signatures are valid for the given state
+     * @param chan The channel configuration
+     * @param state The state to verify signatures for
+     * @return valid True if all provided signatures are valid
+     */
+    function _verifyAllSignatures(Channel memory chan, State memory state) internal pure returns (bool valid) {
+        // Calculate the state hash once
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+
+        // Check if we have the right number of signatures
+        if (state.sigs.length > chan.participants.length) {
+            return false;
+        }
+
+        // Verify each signature
+        for (uint256 i = 0; i < state.sigs.length; i++) {
+            bool isValid = Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i]);
+            if (!isValid) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

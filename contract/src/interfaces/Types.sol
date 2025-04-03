@@ -30,9 +30,20 @@ struct State {
     Signature[] sigs; // stateHash signatures
 }
 
-// Recommended structure to keep track of states
+enum Status {
+    VOID, // Channel was never active (zero-initialized)
+    PARTIAL, // Partial funding waiting for other participants
+    ACTIVE, // Channel fully funded and valid state
+    FINAL, // This is the FINAL state, channel can be closed
+    INVALID // Channel state is invalid
+
+}
+
+// This struct has been moved to Custody.sol with additional fields
+// Kept here for backward compatibility, but should be migrated to use the Custody.sol version
 struct Metadata {
     Channel chan; // Opener define channel configuration
+    Status status; // Current channel status
     uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
     State lastValidState; // Last valid state when adjudicator was called
 }

@@ -8,6 +8,8 @@ This document describes a minimal **2-party state channel** that enables off-cha
 - **Mutual close** when participants agree a final state.
 - **Challenge/response** mechanism allowing a party to unilaterally finalize if needed.
 
+> **Note:** The current implementation has been simplified to support only 2 participants per channel. Once the protocol is battle-tested, we plan to extend support for multiple participants as outlined in the Roadmap.
+
 State channel infrastructure has two main components:
 
 - **IChannel** escrow which stores funds and can support and run adjudication on multiple channels
@@ -74,9 +76,19 @@ struct State {
     Signature[] sigs; // stateHash signatures
 }
 
-// Recommended structure to keep track of states
+enum Status {
+    VOID,     // Channel was never active (zero-initialized)
+    PARTIAL,  // Partial funding waiting for other participants
+    ACTIVE,   // Channel fully funded and valid state
+    FINAL,    // This is the FINAL state, channel can be closed
+    INVALID   // Channel state is invalid
+}
+
+// This struct has been moved to Custody.sol with additional fields
+// Kept here for backward compatibility, but should be migrated to use the Custody.sol version
 struct Metadata {
     Channel chan; // Opener define channel configuration
+    Status status; // Current channel status
     uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
     State lastValidState; // Last valid state when adjudicator was called
 }
@@ -88,39 +100,32 @@ The adjudicator contract must implement:
 
 ```solidity
 interface IAdjudicator {
-    enum Status {
-        VOID,     // Channel was never active (zero-initialized)
-        PARTIAL,  // Partial funding waiting for other participants
-        ACTIVE,   // Channel fully funded using open or state are valid
-        INVALID,  // Channel state is invalid
-        FINAL     // This is the FINAL State channel can be closed
-    }
-
     /**
      * @notice Validates the application state and determines the outcome of a channel
      * @dev This function evaluates the validity of a candidate state against provided proofs
      * @param chan The channel information containing participants, adjudicator, nonce, and challenge period
      * @param candidate The proposed state to be validated
      * @param proofs Array of previous states that may be used to validate the candidate state
-     * @return decision The status of the channel after adjudication
+     * @return valid is true if the candidate is approved
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
         view
-        returns (Status decision);
+        returns (bool valid);
 }
 ```
+
 
 - **Parameters**:
   - `chan`: Channel configuration
   - `candidate`: The proposed state to be validated
   - `proofs`: Array of previous states that may be used to validate the candidate state
 - **Returns**:
-  - `decision`: Status of the channel after adjudication
+  - `valid`: Boolean indicating if the candidate state is approved
 
 ### `IDeposit.sol`
 
-Interface for contracts that allow users to deposit and withdraw token funds:
+Interface for contracts that allow users to deposit and withdraw token funds. This interface is about pre-funding the contract to make calls to reset easier when we want to resize a channel allocation. Participants usually make their respective Deposit before calling open or reset, and the initial deposit balance must be higher or equal than the allocation to the channel.
 
 ```solidity
 interface IDeposit {
@@ -218,6 +223,12 @@ interface IChannel {
    First depositor is the Host, second depositor is the Guest.
    - **Notice**: Participants are only used to sign state and might not be the caller of the smart-contract,
    Moreover participant address are not payout destination addresses.
+   - **Process**:
+     - When first participant calls this method, they provide the initial allocation and expected number of participants for the adjudicator
+     - If their signature on the state is valid and their Allocation Transfer was successful (taking from initial `deposit()`), we check if state is valid with the adjudicator
+     - The channel status is moved from VOID to PARTIAL and an event is emitted
+     - Participants listen to the contract events, and if they approve the Allocation and State suggested by initiator, they can append their signature to the same State and call Open()
+     - Once the last participant has successfully locked allocation to the channel, channel becomes Status.ACTIVE, and they can transact off-chain
    - **Effects**:  
      - Transfers token amounts from the caller to the contract
      - Call adjudicate to activate the channel
@@ -228,7 +239,8 @@ interface IChannel {
    - **Purpose**: Finalize the channel immediately with a valid state.
    - **Logic**:
      - Calls `adjudicate` on the channel's adjudicator with the candidate state and proofs
-     - If valid, distributes tokens according to the state's allocations
+     - Verifies all participant signatures are present
+     - If state is valid, sets Status.FINAL and unallocates funds back to their user balance
      - Closes the channel
 
 3. **Reset Channel**
@@ -244,6 +256,7 @@ interface IChannel {
    - **Purpose**: Unilaterally post a state when the other party is uncooperative.
    - **Logic**:
      - Verifies the submitted state is valid via `adjudicate`
+     - Either party can Challenge with a valid State
      - If valid, records the proposed state and starts the challenge period
 
 5. **Checkpoint**
@@ -251,6 +264,7 @@ interface IChannel {
    - **Purpose**: Store a valid state on-chain to prevent future disputes.
    - **Logic**:
      - Verifies the submitted state is valid via `adjudicate`
+     - Either party can Checkpoint with a valid State
      - Records the state without initiating channel closure
 
 6. **Reclaim**  
@@ -283,14 +297,11 @@ interface IChannel {
 ```
 src
 ├── Custody.sol
-├── CustodyLite.sol
 ├── Utils.sol
 ├── adjudicators
 │   ├── Consensus.sol
 │   ├── Counter.sol
 │   ├── MicroPayment.sol
-│   ├── TicTacToe.sol
-│   └── Trivial.sol
 └── interfaces
     ├── IAdjudicator.sol  # Interface for state validation and outcome determination
     ├── IChannel.sol      # Main interface for the state channel system
@@ -300,22 +311,33 @@ src
 
 ### Custody.sol implementation
 
-The `Custody.sol` contract implements the `IChannel` interface, managing the state channels and enforcing the rules for opening, closing, challenging, and reclaiming funds.
+The `Custody.sol` contract implements the `IChannel` interface, managing the state channels and enforcing the rules for opening, closing, challenging, and reclaiming funds. It also contains the Status enum that defines the possible channel states.
+
+```solidity
+enum Status {
+    VOID,     // Channel was never active (zero-initialized)
+    PARTIAL,  // Partial funding waiting for other participants
+    ACTIVE,   // Channel fully funded and valid state
+    FINAL,    // This is the FINAL state, channel can be closed
+    INVALID   // Channel state is invalid
+}
+```
 
 #### Requirements
 
-- Only state which adjudicator return valid can replace previously lastValidState
+- Only state which adjudicator returns valid can replace previously lastValidState
 - `open` is called first by the Host creating the initial funding State `deposit` which contains expected deposits
   - When Guest join the channel a call to the adjudicator will be made to validate state transitions from PARTIAL to ACTIVE
 - `close` will be closing the channel if channel is ACTIVE, and adjudicator maybe return FINAL allowing token distribution
-- `challenge` if the adjudicator return ACTIVE, State is saved and challenge can be start by setting challengeExpire = now + ch.challenge
-- `checkpoint` if the adjudicator return ACTIVE, State is saved on-chain
+- `challenge` if the adjudicator returns valid, State is saved and challenge can be start by setting challengeExpire = now + ch.challenge
+- `checkpoint` if the adjudicator returns valid, State is saved on-chain
 - `reclaim` is called after challengeExpire time to distribute the tokens
 
 ```solidity
 // This is the recommended internal structure for tracking channel state
 struct Metadata {
     Channel chan;             // Opener define channel configuration
+    Status status;            // Current channel status
     uint256 challengeExpire;  // If non-zero channel will resolve to lastValidState when challenge Expires
     State lastValidState;     // Last valid state when adjudicator was called
 }
@@ -327,3 +349,14 @@ mapping(bytes32 => Metadata) private channels;
 ### Trivial Adjudicator
 
 The Trivial adjudicator provides a basic implementation for validating state transitions. It always returns ACTIVE status, allowing testing the framework with simple state validation rules.
+
+## Roadmap
+
+The following features are planned for future development:
+
+1. **Support for multiparty channels**
+   - Refactor the `Channel.participants` structure to support variable-length arrays of participants
+   - Update allocation handling to match the number of participants
+   - Enhance the signature collection and verification process for multiple parties
+   - Modify adjudicators to support multi-party state validation
+   - Update state transition logic for partially funded channels with multiple participants

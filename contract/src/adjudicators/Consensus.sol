@@ -36,16 +36,16 @@ contract Consensus is IAdjudicator {
      * @param chan The channel configuration
      * @param candidate The proposed state
      * @param proofs Array of previous states (unused in this implementation)
-     * @return decision The status of the channel after adjudication
+     * @return valid True if the state is valid, false otherwise
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
         view
         override
-        returns (IAdjudicator.Status decision)
+        returns (bool valid)
     {
         // Check for insufficient signatures
-        if (candidate.sigs.length == 0) return Status.INVALID;
+        if (candidate.sigs.length == 0) return false;
 
         // Get the state hash for signature verification
         bytes32 stateHash = Utils.getStateHash(chan, candidate);
@@ -58,11 +58,11 @@ contract Consensus is IAdjudicator {
         if (proofs.length == 0 && appData.status == AppStatus.Starting) {
             // Verify Host's signature (first participant)
             if (!Utils.verifySignature(stateHash, candidate.sigs[HOST], chan.participants[HOST])) {
-                return Status.INVALID;
+                return false;
             }
 
-            // Initial state is PARTIAL until Guest joins
-            return IAdjudicator.Status.PARTIAL;
+            // Initial state is valid with just Host's signature
+            return true;
         }
 
         // For normal state transitions and final state
@@ -70,23 +70,15 @@ contract Consensus is IAdjudicator {
 
         // Verify Host's signature (first participant)
         if (!Utils.verifySignature(stateHash, candidate.sigs[HOST], chan.participants[HOST])) {
-            return Status.INVALID;
+            return false;
         }
 
         // Verify Guest's signature (second participant)
         if (!Utils.verifySignature(stateHash, candidate.sigs[GUEST], chan.participants[GUEST])) {
-            return Status.INVALID;
+            return false;
         }
 
-        // If both signatures are valid, check the application status to determine channel status
-        // Return ACTIVE if app status is Ready and FINAL if app status is Finish
-        if (appData.status == AppStatus.Finish) {
-            return IAdjudicator.Status.FINAL;
-        } else if (appData.status == AppStatus.Ready) {
-            return IAdjudicator.Status.ACTIVE;
-        } else {
-            // Default to PARTIAL for Starting status
-            return IAdjudicator.Status.PARTIAL;
-        }
+        // If both signatures are valid, the state is valid
+        return true;
     }
 }

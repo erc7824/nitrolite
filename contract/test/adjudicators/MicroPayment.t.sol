@@ -103,13 +103,13 @@ contract MicroPaymentTest is Test {
         state.sigs[0] = signState(state, hostPrivateKey);
 
         // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
 
-        // Check the status is ACTIVE
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
+        // Check the state is valid
+        assertTrue(isValid, "Payment state should be valid");
 
         // With the updated interface, we no longer get allocations returned
-        // The adjudicator still processes them internally, but we just verify the Status
+        // The adjudicator still processes them internally, but we just verify if it's valid
     }
 
     // Test: Guest trying to sign a payment is invalid
@@ -124,9 +124,9 @@ contract MicroPaymentTest is Test {
         state.sigs = new Signature[](1);
         state.sigs[0] = signState(state, guestPrivateKey);
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
+        assertFalse(isValid, "Invalid state should not be valid");
     }
 
     // Test: Missing signature
@@ -139,9 +139,9 @@ contract MicroPaymentTest is Test {
 
         // No signatures added
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
+        assertFalse(isValid, "Invalid state should not be valid");
     }
 
     // Test: Invalid host signature (corrupted)
@@ -158,9 +158,9 @@ contract MicroPaymentTest is Test {
         sig.r = bytes32(0); // Corrupt the signature
         state.sigs[0] = sig;
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
+        assertFalse(isValid, "Invalid state should not be valid");
     }
 
     // Test: Payment exceeds deposit
@@ -175,9 +175,9 @@ contract MicroPaymentTest is Test {
         state.sigs = new Signature[](1);
         state.sigs[0] = signState(state, hostPrivateKey);
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
+        assertFalse(isValid, "Invalid state should not be valid");
     }
 
     // Test: Decreasing payment amount
@@ -199,9 +199,9 @@ contract MicroPaymentTest is Test {
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, newState, proofs);
+        assertFalse(isValid, "Invalid state should not be valid");
     }
 
     // Test: Increasing payment amount
@@ -224,14 +224,14 @@ contract MicroPaymentTest is Test {
         proofs[0] = prevState;
 
         // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
+        bool isValid = adjudicator.adjudicate(channel, newState, proofs);
 
-        // Check the status is ACTIVE
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
+        // Check the state is valid
+        assertTrue(isValid, "Increasing payment should be valid");
 
         // Check the allocations have been updated properly
         // With the updated interface, we no longer get allocations returned
-        // The adjudicator still processes them internally, but we just verify the Status
+        // The adjudicator still processes them internally, but we just verify if it's valid
     }
 
     // Test: Final payment (full amount)
@@ -247,10 +247,10 @@ contract MicroPaymentTest is Test {
         state.sigs[0] = signState(state, hostPrivateKey);
 
         // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
 
-        // Check the status is FINAL
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.FINAL));
+        // Check the state is valid (final state is also valid)
+        assertTrue(isValid, "Final payment state should be valid");
     }
 
     // Test: Invalid signature in proof state
@@ -274,8 +274,8 @@ contract MicroPaymentTest is Test {
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, newState, proofs);
+        assertFalse(isValid, "Invalid state should not be valid");
     }
 }

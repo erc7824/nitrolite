@@ -7,10 +7,9 @@ import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
 import {Channel, State, Allocation, Signature} from "../../src/interfaces/Types.sol";
 import {Counter} from "../../src/adjudicators/Counter.sol";
 import {Utils} from "../../src/Utils.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
 
 contract CounterTest is Test {
-    Counter public adjudicator;
+    Counter public counterAdjudicator;
 
     // Test accounts
     address public host;
@@ -20,287 +19,259 @@ contract CounterTest is Test {
 
     // Channel parameters
     Channel public channel;
-    MockERC20 public token;
 
-    // Constants
-    uint256 private constant FINAL_COUNTER = 1000;
-    uint256 private constant HOST = 0;
-    uint256 private constant GUEST = 1;
+    // Constants for participant ordering
+    uint256 private constant HOST_IDX = 0;
+    uint256 private constant GUEST_IDX = 1;
 
     function setUp() public {
-        // Deploy the adjudicator contract
-        adjudicator = new Counter();
+        // Deploy the adjudicator
+        counterAdjudicator = new Counter();
 
-        // Generate private keys and addresses for the participants
+        // Set private keys and corresponding addresses
         hostPrivateKey = 0x1;
         guestPrivateKey = 0x2;
         host = vm.addr(hostPrivateKey);
         guest = vm.addr(guestPrivateKey);
 
-        // Deploy the mock token
-        token = new MockERC20("Test Token", "TEST", 18);
-
-        // Set up the channel
-        address[2] memory participants = [host, guest];
+        // Set up the channel with the two participants
+        address[2] memory participants;
+        participants[HOST_IDX] = host;
+        participants[GUEST_IDX] = guest;
         channel = Channel({
             participants: participants,
-            adjudicator: address(adjudicator),
-            challenge: 3600, // 1 hour challenge period
+            adjudicator: address(counterAdjudicator),
+            challenge: 3600, // e.g., 1-hour challenge period
             nonce: 1
         });
     }
 
-    // Helper function to create test allocations
-    function createAllocations(uint256 hostAmount, uint256 guestAmount) internal view returns (Allocation[2] memory) {
-        Allocation[2] memory allocations;
-        allocations[0] = Allocation({destination: host, token: address(token), amount: hostAmount});
-        allocations[1] = Allocation({destination: guest, token: address(token), amount: guestAmount});
-        return allocations;
-    }
-
-    // Helper function to create a counter state
-    function createCounterState(uint256 counter, Allocation[2] memory allocations)
+    // Helper function to create a Counter state.
+    // The CounterApp struct is: { uint256 counter, uint256 target, uint256 version }
+    function createCounterState(uint256 _counter, uint256 _target, uint256 _version)
         internal
         pure
         returns (State memory)
     {
         State memory state;
-        Counter.CounterData memory counterData = Counter.CounterData({counter: counter});
-        state.data = abi.encode(counterData);
-        state.allocations = allocations;
-        state.sigs = new Signature[](0); // Empty signatures to be filled later
+        // Encoding must match the order in the CounterApp struct.
+        state.data = abi.encode(_counter, _target, _version);
+        state.sigs = new Signature[](0);
         return state;
     }
 
-    // Helper to sign state with specified key
+    // Helper to sign a state using a given private key.
     function signState(State memory state, uint256 privateKey) internal view returns (Signature memory) {
         bytes32 stateHash = Utils.getStateHash(channel, state);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, stateHash);
         return Signature({v: v, r: r, s: s});
     }
 
-    // Test basic signature verification
-    function test_BasicSignatureVerification() public view {
-        bytes32 message = keccak256("test message");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(hostPrivateKey, message);
+    // -------------------- INITIAL STATE TESTS --------------------
 
-        address recovered = ecrecover(message, v, r, s);
-        assertEq(recovered, host);
+    // Valid initial state: version 0 with two valid signatures (host, then guest)
+    function test_ValidInitialState() public view {
+        uint256 counterVal = 0;
+        uint256 target = 10;
+        uint256 version = 0;
+        State memory state = createCounterState(counterVal, target, version);
 
-        Signature memory signature = Signature({v: v, r: r, s: s});
-        bool isValid = Utils.verifySignature(message, signature, host);
-        assertTrue(isValid);
+        // Provide exactly two valid signatures in the proper order.
+        state.sigs = new Signature[](2);
+        state.sigs[HOST_IDX] = signState(state, hostPrivateKey);
+        state.sigs[GUEST_IDX] = signState(state, guestPrivateKey);
+
+        State[] memory emptyProofs = new State[](0);
+        bool valid = counterAdjudicator.adjudicate(channel, state, emptyProofs);
+        assertTrue(valid, "Valid initial state should be accepted");
     }
 
-    // Test: Initial state with host signature only - should return PARTIAL
-    function test_InitialStateHostOnly() public view {
-        Allocation[2] memory allocations = createAllocations(50, 50);
-        State memory state = createCounterState(0, allocations);
+    // Initial state with insufficient signatures should fail.
+    function test_InitialStateInsufficientSignatures() public view {
+        uint256 counterVal = 0;
+        uint256 target = 10;
+        uint256 version = 0;
+        State memory state = createCounterState(counterVal, target, version);
 
-        // Add host signature
+        // Only one signature provided.
         state.sigs = new Signature[](1);
-        state.sigs[0] = signState(state, hostPrivateKey);
+        state.sigs[HOST_IDX] = signState(state, hostPrivateKey);
 
-        // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-
-        // With counter = 0, should be PARTIAL
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.PARTIAL));
+        State[] memory emptyProofs = new State[](0);
+        bool valid = counterAdjudicator.adjudicate(channel, state, emptyProofs);
+        assertFalse(valid, "Initial state with insufficient signatures should be rejected");
     }
 
-    // Test: Initial state with both signatures but counter = 0 - should return PARTIAL
-    function test_InitialStateBothSignaturesZeroCounter() public view {
-        Allocation[2] memory allocations = createAllocations(50, 50);
-        State memory state = createCounterState(0, allocations);
+    // Initial state with an invalid (corrupted) signature should fail.
+    function test_InitialStateInvalidSignature() public view {
+        uint256 counterVal = 0;
+        uint256 target = 10;
+        uint256 version = 0;
+        State memory state = createCounterState(counterVal, target, version);
 
-        // Add both signatures
         state.sigs = new Signature[](2);
-        state.sigs[0] = signState(state, hostPrivateKey);
-        state.sigs[1] = signState(state, guestPrivateKey);
+        Signature memory sigHost = signState(state, hostPrivateKey);
+        Signature memory sigGuest = signState(state, guestPrivateKey);
+        // Corrupt the host signature.
+        sigHost.r = bytes32(0);
+        state.sigs[HOST_IDX] = sigHost;
+        state.sigs[GUEST_IDX] = sigGuest;
 
-        // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-
-        // With counter = 0, should be PARTIAL
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.PARTIAL));
+        State[] memory emptyProofs = new State[](0);
+        bool valid = counterAdjudicator.adjudicate(channel, state, emptyProofs);
+        assertFalse(valid, "Initial state with an invalid signature should be rejected");
     }
 
-    // Test: Initial state with both signatures and counter > 0 - should return ACTIVE
-    function test_InitialStateBothSignaturesNonZeroCounter() public view {
-        Allocation[2] memory allocations = createAllocations(50, 50);
-        State memory state = createCounterState(5, allocations);
+    // -------------------- NON-INITIAL STATE TESTS --------------------
 
-        // Add both signatures
+    // Valid non-initial state transition:
+    // previous state has version 0 and candidate state has version 1,
+    // counter increments by 1 and target remains the same.
+    function test_ValidNonInitialState() public view {
+        // Create previous (initial) state.
+        uint256 prevCounter = 3;
+        uint256 target = 10;
+        uint256 prevVersion = 0;
+        State memory prevState = createCounterState(prevCounter, target, prevVersion);
+        prevState.sigs = new Signature[](2);
+        prevState.sigs[HOST_IDX] = signState(prevState, hostPrivateKey);
+        prevState.sigs[GUEST_IDX] = signState(prevState, guestPrivateKey);
+
+        // Create candidate (non-initial) state.
+        uint256 newCounter = prevCounter + 1;
+        uint256 newVersion = prevVersion + 1;
+        State memory newState = createCounterState(newCounter, target, newVersion);
+        // Even for non-initial states, exactly two signatures are required.
+        newState.sigs = new Signature[](2);
+        newState.sigs[HOST_IDX] = signState(newState, hostPrivateKey);
+        newState.sigs[GUEST_IDX] = signState(newState, guestPrivateKey);
+
+        // Provide the previous state as proof.
+        State[] memory proofs = new State[](1);
+        proofs[0] = prevState;
+
+        bool valid = counterAdjudicator.adjudicate(channel, newState, proofs);
+        assertTrue(valid, "Valid non-initial state transition should be accepted");
+    }
+
+    // Non-initial state with missing proof(s) should fail.
+    function test_NonInitialStateMissingProofs() public view {
+        uint256 counterVal = 1;
+        uint256 target = 10;
+        uint256 version = 1; // Non-initial state
+        State memory state = createCounterState(counterVal, target, version);
         state.sigs = new Signature[](2);
-        state.sigs[0] = signState(state, hostPrivateKey);
-        state.sigs[1] = signState(state, guestPrivateKey);
+        state.sigs[HOST_IDX] = signState(state, hostPrivateKey);
+        state.sigs[GUEST_IDX] = signState(state, guestPrivateKey);
 
-        // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
+        // No proofs provided.
+        State[] memory proofs = new State[](0);
 
-        // With counter > 0, should be ACTIVE
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        bool valid = counterAdjudicator.adjudicate(channel, state, proofs);
+        assertFalse(valid, "Non-initial state without proof should be rejected");
     }
 
-    // Test: Invalid host signature
-    function test_InvalidHostSignature() public view {
-        Allocation[2] memory allocations = createAllocations(50, 50);
-        State memory state = createCounterState(5, allocations);
+    // Non-initial state with an incorrect counter increment (not exactly +1) should fail.
+    function test_InvalidCounterIncrement() public view {
+        // Previous state: counter = 3.
+        uint256 prevCounter = 3;
+        uint256 target = 10;
+        uint256 prevVersion = 0;
+        State memory prevState = createCounterState(prevCounter, target, prevVersion);
+        prevState.sigs = new Signature[](2);
+        prevState.sigs[HOST_IDX] = signState(prevState, hostPrivateKey);
+        prevState.sigs[GUEST_IDX] = signState(prevState, guestPrivateKey);
 
-        // Add host signature but corrupt it
-        state.sigs = new Signature[](1);
-        Signature memory sig = signState(state, hostPrivateKey);
-        sig.r = bytes32(0); // Corrupt signature
-        state.sigs[0] = sig;
+        // Candidate state: counter jumps by 2 (should be 4, not 5).
+        uint256 newCounter = prevCounter + 2;
+        uint256 newVersion = prevVersion + 1;
+        State memory newState = createCounterState(newCounter, target, newVersion);
+        newState.sigs = new Signature[](2);
+        newState.sigs[HOST_IDX] = signState(newState, hostPrivateKey);
+        newState.sigs[GUEST_IDX] = signState(newState, guestPrivateKey);
 
-        // Adjudicate with corrupted signature should return VOID
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.VOID));
-    }
-
-    // Test: Invalid guest signature
-    function test_InvalidGuestSignature() public view {
-        Allocation[2] memory allocations = createAllocations(50, 50);
-        State memory state = createCounterState(5, allocations);
-
-        // Add both signatures but corrupt guest signature
-        state.sigs = new Signature[](2);
-        state.sigs[0] = signState(state, hostPrivateKey);
-
-        Signature memory guestSig = signState(state, guestPrivateKey);
-        guestSig.r = bytes32(0); // Corrupt signature
-        state.sigs[1] = guestSig;
-
-        // Adjudicate with corrupted guest signature should return VOID
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.VOID));
-    }
-
-    // Test: Insufficient signatures
-    function test_InsufficientSignatures() public view {
-        Allocation[2] memory allocations = createAllocations(50, 50);
-        State memory state = createCounterState(5, allocations);
-
-        // No signatures added
-
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
-    }
-
-    // Test: Valid counter increment from host to guest
-    function test_ValidCounterIncrementHostToGuest() public view {
-        // Create the previous state (counter = 5, signed by Guest)
-        Allocation[2] memory allocations = createAllocations(50, 50);
-        State memory prevState = createCounterState(5, allocations);
-        prevState.sigs = new Signature[](1);
-        prevState.sigs[0] = signState(prevState, guestPrivateKey);
-
-        // Create the new state (counter = 6, signed by Host)
-        State memory newState = createCounterState(6, allocations);
-        newState.sigs = new Signature[](1);
-        newState.sigs[0] = signState(newState, hostPrivateKey);
-
-        // Create proofs array with previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
 
-        // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
-
-        // Should be ACTIVE
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
+        bool valid = counterAdjudicator.adjudicate(channel, newState, proofs);
+        assertFalse(valid, "State with incorrect counter increment should be rejected");
     }
 
-    // Test: Valid counter increment from guest to host
-    function test_ValidCounterIncrementGuestToHost() public view {
-        // Create the previous state (counter = 6, signed by Host)
-        Allocation[2] memory allocations = createAllocations(50, 50);
-        State memory prevState = createCounterState(6, allocations);
-        prevState.sigs = new Signature[](1);
-        prevState.sigs[0] = signState(prevState, hostPrivateKey);
+    // Non-initial state with an incorrect version increment (not exactly +1) should fail.
+    function test_InvalidVersionIncrement() public view {
+        // Previous state: version = 0.
+        uint256 prevCounter = 3;
+        uint256 target = 10;
+        uint256 prevVersion = 0;
+        State memory prevState = createCounterState(prevCounter, target, prevVersion);
+        prevState.sigs = new Signature[](2);
+        prevState.sigs[HOST_IDX] = signState(prevState, hostPrivateKey);
+        prevState.sigs[GUEST_IDX] = signState(prevState, guestPrivateKey);
 
-        // Create the new state (counter = 7, signed by Guest)
-        State memory newState = createCounterState(7, allocations);
-        newState.sigs = new Signature[](1);
-        newState.sigs[0] = signState(newState, guestPrivateKey);
+        // Candidate state: version jumps by 2 instead of 1.
+        uint256 newCounter = prevCounter + 1;
+        uint256 newVersion = prevVersion + 2;
+        State memory newState = createCounterState(newCounter, target, newVersion);
+        newState.sigs = new Signature[](2);
+        newState.sigs[HOST_IDX] = signState(newState, hostPrivateKey);
+        newState.sigs[GUEST_IDX] = signState(newState, guestPrivateKey);
 
-        // Create proofs array with previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
 
-        // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
-
-        // Should be ACTIVE
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
+        bool valid = counterAdjudicator.adjudicate(channel, newState, proofs);
+        assertFalse(valid, "State with incorrect version increment should be rejected");
     }
 
-    // Test: Invalid increment (not exactly +1)
-    function test_InvalidIncrement() public view {
-        // Create the previous state (counter = 5, signed by Guest)
-        Allocation[2] memory allocations = createAllocations(50, 50);
-        State memory prevState = createCounterState(5, allocations);
-        prevState.sigs = new Signature[](1);
-        prevState.sigs[0] = signState(prevState, guestPrivateKey);
+    // Non-initial state where the target changes should fail.
+    function test_InvalidTargetChange() public view {
+        // Previous state: target = 10.
+        uint256 prevCounter = 3;
+        uint256 target = 10;
+        uint256 prevVersion = 0;
+        State memory prevState = createCounterState(prevCounter, target, prevVersion);
+        prevState.sigs = new Signature[](2);
+        prevState.sigs[HOST_IDX] = signState(prevState, hostPrivateKey);
+        prevState.sigs[GUEST_IDX] = signState(prevState, guestPrivateKey);
 
-        // Create the new state (counter = 7, signed by Host) - increment by 2 instead of 1
-        State memory newState = createCounterState(7, allocations);
-        newState.sigs = new Signature[](1);
-        newState.sigs[0] = signState(newState, hostPrivateKey);
+        // Candidate state: target changes (e.g., to 12) while counter and version increment correctly.
+        uint256 newCounter = prevCounter + 1;
+        uint256 newVersion = prevVersion + 1;
+        State memory newState = createCounterState(newCounter, 12, newVersion);
+        newState.sigs = new Signature[](2);
+        newState.sigs[HOST_IDX] = signState(newState, hostPrivateKey);
+        newState.sigs[GUEST_IDX] = signState(newState, guestPrivateKey);
 
-        // Create proofs array with previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        bool valid = counterAdjudicator.adjudicate(channel, newState, proofs);
+        assertFalse(valid, "State with a changed target should be rejected");
     }
 
-    // Test: Invalid turn (Host followed by Host)
-    function test_InvalidTurnSameParticipant() public view {
-        // Create the previous state (counter = 5, signed by Host)
-        Allocation[2] memory allocations = createAllocations(50, 50);
-        State memory prevState = createCounterState(5, allocations);
-        prevState.sigs = new Signature[](1);
-        prevState.sigs[0] = signState(prevState, hostPrivateKey);
+    // Non-initial state where the candidate counter exceeds the target should fail.
+    function test_CandidateCounterExceedsTarget() public view {
+        // Previous state: counter equals the target.
+        uint256 prevCounter = 10;
+        uint256 target = 10;
+        uint256 prevVersion = 0;
+        State memory prevState = createCounterState(prevCounter, target, prevVersion);
+        prevState.sigs = new Signature[](2);
+        prevState.sigs[HOST_IDX] = signState(prevState, hostPrivateKey);
+        prevState.sigs[GUEST_IDX] = signState(prevState, guestPrivateKey);
 
-        // Create the new state (counter = 6, signed by Host again)
-        State memory newState = createCounterState(6, allocations);
-        newState.sigs = new Signature[](1);
-        newState.sigs[0] = signState(newState, hostPrivateKey);
+        // Candidate state: counter increments to 11, which exceeds target.
+        uint256 newCounter = prevCounter + 1;
+        uint256 newVersion = prevVersion + 1;
+        State memory newState = createCounterState(newCounter, target, newVersion);
+        newState.sigs = new Signature[](2);
+        newState.sigs[HOST_IDX] = signState(newState, hostPrivateKey);
+        newState.sigs[GUEST_IDX] = signState(newState, guestPrivateKey);
 
-        // Create proofs array with previous state
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
-    }
-
-    // Test: Reaching final state
-    function test_ReachingFinalState() public view {
-        // Create the previous state (counter = 999, signed by Guest)
-        Allocation[2] memory allocations = createAllocations(50, 50);
-        State memory prevState = createCounterState(999, allocations);
-        prevState.sigs = new Signature[](1);
-        prevState.sigs[0] = signState(prevState, guestPrivateKey);
-
-        // Create the new state (counter = 1000, signed by Host)
-        State memory newState = createCounterState(1000, allocations);
-        newState.sigs = new Signature[](1);
-        newState.sigs[0] = signState(newState, hostPrivateKey);
-
-        // Create proofs array with previous state
-        State[] memory proofs = new State[](1);
-        proofs[0] = prevState;
-
-        // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
-
-        // Should be FINAL
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.FINAL));
+        bool valid = counterAdjudicator.adjudicate(channel, newState, proofs);
+        assertFalse(valid, "State with counter exceeding target should be rejected");
     }
 }

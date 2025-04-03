@@ -5,6 +5,7 @@ import AssetsStore, { fetchAssets, fetchBalances, TAsset } from '@/store/AssetsS
 import WalletStore from '@/store/WalletStore';
 import { useMetaMask } from '@/hooks/useMetaMask';
 import { chains } from '@/config/chains';
+import { useNitroliteClient } from '@/hooks/useNitroliteClient';
 
 interface MetaMaskConnectProps {
     onChannelOpen: (tokenAddress: string, amount: string) => void;
@@ -27,6 +28,8 @@ const MetaMaskConnect: React.FC<MetaMaskConnectProps> = ({ onChannelOpen }) => {
         disconnect: disconnectMetaMask,
         switchNetwork,
     } = useMetaMask();
+
+    useNitroliteClient();
 
     // Connect to MetaMask
     const connectWallet = async () => {

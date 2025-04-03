@@ -16,6 +16,9 @@ import { MessageList } from '@/components/MessageList';
 import { RequestForm } from '@/components/RequestForm';
 import { InfoSection } from '@/components/InfoSection';
 import MetaMaskConnect from '@/components/MetaMaskConnect';
+import NitroliteStore from '@/store/NitroliteStore';
+import { AppLogic, State } from '@erc7824/nitrolite';
+import { Message } from '@/types';
 
 export default function Home() {
     const { status, addSystemMessage } = useMessageService();
@@ -49,8 +52,22 @@ export default function Home() {
             `Opening channel with token ${tokenAddress.substring(0, 6)}...${tokenAddress.substring(38)} and amount ${amount}`,
         );
 
-        // Update wallet store
-        WalletStore.openChannel(tokenAddress as Address, amount);
+        NitroliteStore.setChannelContext(
+            currentChannel,
+            '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+            {} as AppLogic<Message>,
+        );
+
+        await NitroliteStore.deposit(currentChannel, tokenAddress as Address, amount);
+        await NitroliteStore.openChannel(
+            currentChannel,
+            {
+                text: '',
+                type: 'system'
+            },
+            tokenAddress as Address,
+            [BigInt(amount), BigInt(0)] as [bigint, bigint],
+        );
 
         // Generate keys and connect to websocket in a sequential flow
         try {

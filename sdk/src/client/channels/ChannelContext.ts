@@ -21,13 +21,18 @@ export class ChannelContext<T = unknown> {
      */
     constructor(
         client: NitroliteClient,
-        channel: Channel,
+        guest: Address,
         appLogic: AppLogic<T>,
         signerAttorneyAddress?: Address
     ) {
         this.client = client;
-        this.channel = channel;
-        this.channelId = getChannelId(channel);
+        this.channel = {
+            participants: [client.account?.address as Address, guest],
+            adjudicator: appLogic.getAdjudicatorAddress(),
+            challenge: 0n, // TODO:
+            nonce: 0n, // TODO:
+        } as Channel;
+        this.channelId = getChannelId(this.channel);
         this.appLogic = appLogic;
 
         // If there is no signer attorney, use the client's address
@@ -37,13 +42,14 @@ export class ChannelContext<T = unknown> {
             throw new Error('Channel participant is not provided');
         }
 
-        if (participantAddress === channel.participants[0]) {
+        // TODO:
+        // if (participantAddress === channel.participants[0]) {
             this.role = Role.HOST;
-        } else if (participantAddress === channel.participants[1]) {
-            this.role = Role.GUEST;
-        } else {
-            throw new Error('Account is not a participant in this channel');
-        }
+        // } else if (participantAddress === channel.participants[1]) {
+            // this.role = Role.GUEST;
+        // } else {
+            // throw new Error('Account is not a participant in this channel');
+        // }
     }
 
     /**

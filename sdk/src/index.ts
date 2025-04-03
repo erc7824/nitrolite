@@ -25,9 +25,6 @@ export {
   ChannelOperations
 } from "./client/operations";
 export {
-  createNumericChannel,
-  createSequentialChannel,
-  createCustomChannel,
   ChannelContext
 } from "./client/channels";
 

@@ -79,7 +79,7 @@ export function useMetaMask() {
             if (error && typeof error === 'object' && 'code' in error && error.code === 4902) {
                 // This would need chain-specific data like name, RPC URLs, etc.
                 // Consider adding logic to add networks if needed
-                console.error('Network not available in MetaMask');
+                console.error('Network not available in MetaMask', chainId);
                 WalletStore.setError('Network not available in MetaMask');
             } else {
                 console.error('Error switching network:', error);

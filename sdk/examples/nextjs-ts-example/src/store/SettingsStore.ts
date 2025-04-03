@@ -5,7 +5,7 @@ import { proxy } from 'valtio';
 const defaultChain = () => {
     // It doesn't work on linea sepolia
     // const chainByDevMode = process.env.NEXT_PUBLIC_DEV_MODE ? 59141 : 137;
-    const chainByDevMode = 137;
+    const chainByDevMode = 1337;
 
     const chainId =
         typeof localStorage !== 'undefined' && Number(localStorage.getItem('chainId'))

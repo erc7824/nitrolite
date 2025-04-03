@@ -12,6 +12,7 @@ import {
     arbitrum,
     sepolia,
     avalanche,
+    localhost,
 } from 'viem/chains';
 
 const polygon = defineChain({
@@ -61,6 +62,7 @@ const chainsArray = [
     linea,
     lineaSepolia,
     scroll,
+    localhost
 ];
 
 export const chains = chainsArray.filter((chain) => supportedChains.includes(chain.id));

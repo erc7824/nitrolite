@@ -21,15 +21,7 @@ deploy-erc-20:
 	@echo "Deploying ERC20... 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512"
 	forge script ./script/DeployFundERC20.s.sol --broadcast --rpc-url $(RPC_URL) --sig "run(string)" "test test test test test test test test test test test junk"
 
-deploy-and-adjudicator:
-	@echo "Deploying AND_Adjudicator... 0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0"
-	forge create --broadcast --optimizer-runs 1000000 --via-ir ./src/test/AND_Adjudicator.sol:AND_Adjudicator --rpc-url $(RPC_URL) --private-key $(PRIVATE_KEY)
-
-deploy-channel-mock:
-	@echo "Deploying ChannelMock... 0x68B1D87F95878fE05B998F19b66F4baba5De1aed"
-	forge create --broadcast --optimizer-runs 1000000 --via-ir ./src/test/ChannelMock.sol:ChannelMock --rpc-url $(RPC_URL) --private-key $(PRIVATE_KEY) --constructor-args 0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0
-
-deploy: deploy-counter deploy-erc-20 deploy-and-adjudicator deploy-channel-mock
+deploy: deploy-counter deploy-erc-20
 	@echo "All contracts deployed!"
 
 # Helper to verify contract on explorer (for testnet/mainnet)

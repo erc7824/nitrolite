@@ -67,7 +67,7 @@ contract Counter is IAdjudicator {
         if (candidateState.version == 0) {
             // true if both signatures are valid
             return Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])
-                    && Utils.verifySignature(stateHash, candidate.sigs[1], chan.participants[GUEST]);
+                && Utils.verifySignature(stateHash, candidate.sigs[1], chan.participants[GUEST]);
         }
 
         // For non-initial states, ensure a previous state is provided.

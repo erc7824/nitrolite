@@ -17,8 +17,8 @@ import { RequestForm } from '@/components/RequestForm';
 import { InfoSection } from '@/components/InfoSection';
 import MetaMaskConnect from '@/components/MetaMaskConnect';
 import NitroliteStore from '@/store/NitroliteStore';
-import { AppLogic, State } from '@erc7824/nitrolite';
-import { Message } from '@/types';
+import { CounterApp } from './apps/counter';
+import { useNitroliteClient } from '@/hooks/useNitroliteClient';
 
 export default function Home() {
     const { status, addSystemMessage } = useMessageService();
@@ -45,6 +45,9 @@ export default function Home() {
         addSystemMessage('Application initialized - Welcome to Nitrolite!');
     }, [addSystemMessage]);
 
+
+    useNitroliteClient();
+
     // Function to handle channel opening
     const handleOpenChannel = async (tokenAddress: string, amount: string) => {
         // Add system message about channel opening
@@ -52,10 +55,12 @@ export default function Home() {
             `Opening channel with token ${tokenAddress.substring(0, 6)}...${tokenAddress.substring(38)} and amount ${amount}`,
         );
 
+        const app = new CounterApp();
+
         NitroliteStore.setChannelContext(
             currentChannel,
             '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
-            {} as AppLogic<Message>,
+            app,
         );
 
         await NitroliteStore.deposit(currentChannel, tokenAddress as Address, amount);

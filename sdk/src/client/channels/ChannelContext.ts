@@ -32,6 +32,7 @@ export class ChannelContext<T = unknown> {
             challenge: 0n, // TODO:
             nonce: 0n, // TODO:
         } as Channel;
+        console.log(client.account, this.channel);
         this.channelId = getChannelId(this.channel);
         this.appLogic = appLogic;
 

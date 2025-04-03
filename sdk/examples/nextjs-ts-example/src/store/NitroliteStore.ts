@@ -18,10 +18,13 @@ const NitroliteStore = {
     state,
 
     setClient(client: NitroliteClient) {
+        console.log("set client", client);
+
         state.client = client;
     },
 
     setChannelContext(channelType: ChannelType, guest: Address, app: AppLogic<Message>) {
+        console.log("client", state.client);
         state.channelContext[channelType] = new ChannelContext<Message>(state.client, guest, app);
     },
 

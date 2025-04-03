@@ -29,8 +29,6 @@ const MetaMaskConnect: React.FC<MetaMaskConnectProps> = ({ onChannelOpen }) => {
         switchNetwork,
     } = useMetaMask();
 
-    useNitroliteClient();
-
     // Connect to MetaMask
     const connectWallet = async () => {
         if (!isMetaMaskInstalled) {

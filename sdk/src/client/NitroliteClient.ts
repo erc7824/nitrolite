@@ -5,7 +5,7 @@ import { Logger, defaultLogger } from '../config';
 
 import { NitroliteClientConfig } from './config';
 import { ChannelOperations } from './operations';
-import { State, ChannelId, Channel } from './types';
+import { State, ChannelId, Channel, Role } from './types';
 
 /**
  * Main client for interacting with Nitrolite contracts
@@ -117,8 +117,6 @@ export class NitroliteClient {
         });
     }
 
-    // ======== Channel operations ========
-
     async deposit(tokenAddress: Address, amount: bigint): Promise<void> {
         return this.operations.deposit(tokenAddress, amount);
     }
@@ -144,8 +142,8 @@ export class NitroliteClient {
     /**
      * Open a new channel or join an existing one
      */
-    async openChannel(channel: Channel, deposit: State): Promise<ChannelId> {
-        return this.operations.openChannel(channel, deposit);
+    async openChannel(channel: Channel, deposit: State, participantIndex: Role = Role.UNDEFINED): Promise<ChannelId> {
+        return this.operations.openChannel(channel, deposit, participantIndex);
     }
 
     /**

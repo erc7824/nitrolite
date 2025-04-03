@@ -144,13 +144,13 @@ export class ChannelContext<T = unknown> {
         this.states.push(initialState);
 
         // Open the channel
-        return this.client.openChannel(this.channel, initialState);
+        return this.client.openChannel(this.channel, initialState, this.role);
     }
 
     /**
      * Append the application state
      */
-    async appendAppState(newAppState: T): Promise<State> {
+    appendAppState(newAppState: T): State {
         const currentState = this.getCurrentState();
         const currentAppState = this.getCurrentAppState();
 
@@ -279,6 +279,40 @@ export class ChannelContext<T = unknown> {
             currentState,
             proofs
         );
+    }
+
+    async deposit(
+        tokenAddress: Address,
+        amount: bigint
+    ): Promise<void> {
+        return this.client.deposit(tokenAddress, amount);
+    }
+
+    async withdraw(
+        tokenAddress: Address,
+        amount: bigint
+    ): Promise<void> {
+        return this.client.withdraw(tokenAddress, amount);
+    }
+
+    async getAvailableBalance(
+        tokenAddress: Address
+    ): Promise<bigint> {
+        if (!this.client.account?.address) {
+            throw new Error('Account address is not provided');
+        }
+
+        return this.client.getAvailableBalance(this.client.account.address, tokenAddress);
+    }
+
+    async getAccountChannels(
+        tokenAddress: Address
+    ): Promise<ChannelId[]> {
+        if (!this.client.account?.address) {
+            throw new Error('Account address is not provided');
+        }
+
+        return this.client.getAccountChannels(this.client.account.address, tokenAddress);
     }
 
     /**

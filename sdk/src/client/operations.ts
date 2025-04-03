@@ -6,6 +6,7 @@ import {
     decodeEventLog, // Import decodeEventLog
     zeroAddress,
     parseEventLogs,
+    encodeFunctionData,
 } from 'viem';
 import { Channel, State, ChannelId, Role } from '../types';
 import { CustodyAbi, Erc20Abi } from '../abis';
@@ -94,7 +95,7 @@ export class ChannelOperations {
                 eventName: ChannelOpenedEvent,
             });
 
-            if (!logs || logs.length === 0) {
+            if (!logs || logs.length === 0 || !logs[0].args) {
                 throw new Errors.ContractError(
                     `Could not find ${ChannelOpenedEvent} event log`,
                     'EVENT_NOT_FOUND',
@@ -104,7 +105,7 @@ export class ChannelOperations {
                 );
             }
 
-            return (logs[0] as any).channelId;
+            return (logs[0].args as any).channelId;
         } catch (error: any) {
             throw new Errors.ContractCallError(
                 `Failed to open channel: ${error.message}`,

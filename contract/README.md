@@ -88,26 +88,30 @@ The adjudicator contract must implement:
 
 ```solidity
 interface IAdjudicator {
-    enum Status {
-        VOID,     // Channel was never active (zero-initialized)
-        PARTIAL,  // Partial funding waiting for other participants
-        ACTIVE,   // Channel fully funded using open or state are valid
-        INVALID,  // Channel state is invalid
-        FINAL     // This is the FINAL State channel can be closed
-    }
-
     /**
      * @notice Validates the application state and determines the outcome of a channel
      * @dev This function evaluates the validity of a candidate state against provided proofs
      * @param chan The channel information containing participants, adjudicator, nonce, and challenge period
      * @param candidate The proposed state to be validated
      * @param proofs Array of previous states that may be used to validate the candidate state
-     * @return decision The status of the channel after adjudication
+     * @return valid is true if the candidate is approved
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
         view
-        returns (Status decision);
+        returns (bool valid);
+}
+```
+
+Note: The Status enum has been moved from IAdjudicator to the Custody contract implementation:
+
+```solidity
+enum Status {
+    VOID,     // Channel was never active (zero-initialized)
+    PARTIAL,  // Partial funding waiting for other participants
+    ACTIVE,   // Channel fully funded using open or state are valid
+    INVALID,  // Channel state is invalid
+    FINAL     // This is the FINAL State channel can be closed
 }
 ```
 
@@ -116,7 +120,7 @@ interface IAdjudicator {
   - `candidate`: The proposed state to be validated
   - `proofs`: Array of previous states that may be used to validate the candidate state
 - **Returns**:
-  - `decision`: Status of the channel after adjudication
+  - `valid`: Boolean indicating if the candidate state is approved
 
 ### `IDeposit.sol`
 
@@ -300,16 +304,26 @@ src
 
 ### Custody.sol implementation
 
-The `Custody.sol` contract implements the `IChannel` interface, managing the state channels and enforcing the rules for opening, closing, challenging, and reclaiming funds.
+The `Custody.sol` contract implements the `IChannel` interface, managing the state channels and enforcing the rules for opening, closing, challenging, and reclaiming funds. It also contains the Status enum that defines the possible channel states.
+
+```solidity
+enum Status {
+    VOID,     // Channel was never active (zero-initialized)
+    PARTIAL,  // Partial funding waiting for other participants
+    ACTIVE,   // Channel fully funded using open or state are valid
+    INVALID,  // Channel state is invalid
+    FINAL     // This is the FINAL State channel can be closed
+}
+```
 
 #### Requirements
 
-- Only state which adjudicator return valid can replace previously lastValidState
+- Only state which adjudicator returns valid can replace previously lastValidState
 - `open` is called first by the Host creating the initial funding State `deposit` which contains expected deposits
   - When Guest join the channel a call to the adjudicator will be made to validate state transitions from PARTIAL to ACTIVE
 - `close` will be closing the channel if channel is ACTIVE, and adjudicator maybe return FINAL allowing token distribution
-- `challenge` if the adjudicator return ACTIVE, State is saved and challenge can be start by setting challengeExpire = now + ch.challenge
-- `checkpoint` if the adjudicator return ACTIVE, State is saved on-chain
+- `challenge` if the adjudicator returns valid, State is saved and challenge can be start by setting challengeExpire = now + ch.challenge
+- `checkpoint` if the adjudicator returns valid, State is saved on-chain
 - `reclaim` is called after challengeExpire time to distribute the tokens
 
 ```solidity

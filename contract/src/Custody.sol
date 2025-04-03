@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import {IChannel} from "./interfaces/IChannel.sol";
 import {IDeposit} from "./interfaces/IDeposit.sol";
 import {IAdjudicator} from "./interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation} from "./interfaces/Types.sol";
+import {Channel, State, Allocation, Status} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
@@ -35,6 +35,7 @@ contract Custody is IChannel, IDeposit {
     // Recommended structure to keep track of states
     struct Metadata {
         Channel chan; // Opener define channel configuration
+        Status status; // Current channel status
         uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
         State lastValidState; // Last valid state when adjudicator was called
         mapping(address token => uint256 balance) tokenBalances; // Token balances for the channel
@@ -126,6 +127,7 @@ contract Custody is IChannel, IDeposit {
             // Initialize channel metadata
             Metadata storage newCh = _channels[channelId];
             newCh.chan = ch;
+            newCh.status = Status.PARTIAL; // Set initial status to PARTIAL
             newCh.challengeExpire = 0;
             newCh.lastValidState = depositState;
 
@@ -138,16 +140,17 @@ contract Custody is IChannel, IDeposit {
             Allocation memory allocation = depositState.allocations[GUEST];
             _lockAccountFundsToChannel(ch.participants[GUEST], channelId, allocation.token, allocation.amount);
 
-            // Validate the state with an empty proof
-            State[] memory emptyProofs = new State[](0);
-            IAdjudicator.Status status = _validateState(meta, depositState, emptyProofs);
+            // For opening a channel, we just need to verify the guest's signature
+            // but don't need to validate with the adjudicator
+            bytes32 stateHash = Utils.getStateHash(ch, depositState);
+            bool validSignature = Utils.verifySignature(stateHash, depositState.sigs[0], ch.participants[GUEST]);
 
-            // Update channel state based on adjudicator decision
-            if (status == IAdjudicator.Status.ACTIVE || status == IAdjudicator.Status.VOID) {
+            if (validSignature) {
+                meta.lastValidState = depositState;
+                meta.status = Status.ACTIVE; // Set status to ACTIVE
                 _accounts[ch.participants[GUEST]].channels.add(channelId);
                 emit ChannelOpened(channelId, ch);
-            } else if (status == IAdjudicator.Status.PARTIAL) {
-                // For Counter adjudicator, PARTIAL means counter = 0
+            } else {
                 revert InvalidState();
             }
         }
@@ -165,10 +168,14 @@ contract Custody is IChannel, IDeposit {
         Metadata storage meta = _requireValidChannel(channelId);
 
         // Validate the candidate state
-        IAdjudicator.Status status = _validateState(meta, candidate, proofs);
+        bool isValid = _validateState(meta, candidate, proofs);
 
-        // Only proceed if adjudicator determines the state is FINAL
-        if (status == IAdjudicator.Status.FINAL) {
+        // For cooperative close, we need:
+        // 1. The state must be valid
+        // 2. The state must have signatures from all participants
+        if (isValid && candidate.sigs.length == meta.chan.participants.length) {
+            // Set status to FINAL
+            meta.status = Status.FINAL;
             _closeChannel(channelId, meta);
         } else {
             revert ChannelNotFinal();
@@ -185,17 +192,25 @@ contract Custody is IChannel, IDeposit {
         Metadata storage meta = _requireValidChannel(channelId);
 
         // Validate the candidate state
-        IAdjudicator.Status status = _validateState(meta, candidate, proofs);
+        bool isValid = _validateState(meta, candidate, proofs);
 
-        if (status == IAdjudicator.Status.ACTIVE || status == IAdjudicator.Status.PARTIAL) {
-            // Valid challenge, start challenge period
-            meta.challengeExpire = block.timestamp + meta.chan.challenge;
-            emit ChannelChallenged(channelId, meta.challengeExpire);
-        } else if (status == IAdjudicator.Status.FINAL) {
-            // If state is final, close the channel directly
-            _closeChannel(channelId, meta);
+        if (isValid) {
+            if (meta.status == Status.ACTIVE || meta.status == Status.PARTIAL) {
+                // If state has signatures from all participants, consider it final
+                if (candidate.sigs.length == meta.chan.participants.length) {
+                    meta.status = Status.FINAL;
+                    _closeChannel(channelId, meta);
+                } else {
+                    // Valid challenge, start challenge period
+                    meta.challengeExpire = block.timestamp + meta.chan.challenge;
+                    emit ChannelChallenged(channelId, meta.challengeExpire);
+                }
+            } else {
+                // For other statuses like VOID or INVALID
+                revert InvalidState();
+            }
         } else {
-            // For other statuses like VOID
+            // This shouldn't happen since _validateState would revert
             revert InvalidState();
         }
     }
@@ -210,13 +225,23 @@ contract Custody is IChannel, IDeposit {
         Metadata storage meta = _requireValidChannel(channelId);
 
         // Validate the candidate state
-        IAdjudicator.Status status = _validateState(meta, candidate, proofs);
+        bool isValid = _validateState(meta, candidate, proofs);
 
-        if (status == IAdjudicator.Status.ACTIVE || status == IAdjudicator.Status.FINAL) {
-            // Valid state, checkpoint without starting challenge
-            emit ChannelCheckpointed(channelId);
+        if (isValid) {
+            if (meta.status == Status.ACTIVE || meta.status == Status.PARTIAL) {
+                // Valid state, checkpoint without starting challenge
+                emit ChannelCheckpointed(channelId);
+
+                // If all participants signed, update to FINAL
+                if (candidate.sigs.length == meta.chan.participants.length) {
+                    meta.status = Status.FINAL;
+                }
+            } else {
+                // For other statuses like VOID or INVALID
+                revert InvalidState();
+            }
         } else {
-            // For other statuses like PARTIAL or VOID
+            // This shouldn't happen since _validateState would revert
             revert InvalidState();
         }
     }
@@ -298,44 +323,30 @@ contract Custody is IChannel, IDeposit {
      * @param meta The channel's metadata
      * @param candidate The state to be adjudicated
      * @param proofs Additional proof states if required
-     * @return status The adjudication status
+     * @return valid True if the state is valid according to the adjudicator
      */
     function _validateState(Metadata storage meta, State memory candidate, State[] memory proofs)
         internal
-        returns (IAdjudicator.Status)
+        returns (bool valid)
     {
-        IAdjudicator.Status status = _adjudicate(meta.chan, candidate, proofs);
+        IAdjudicator adjudicator = IAdjudicator(meta.chan.adjudicator);
 
-        if (status == IAdjudicator.Status.INVALID) {
-            revert InvalidState();
+        try adjudicator.adjudicate(meta.chan, candidate, proofs) returns (bool result) {
+            valid = result;
+
+            if (valid) {
+                meta.lastValidState = candidate;
+                meta.status = Status.ACTIVE;
+                return valid;
+            }
+
+            meta.status = Status.INVALID;
+            return valid;
+        } catch {
+            // If the adjudicator call reverts, treat as invalid state
+            meta.status = Status.INVALID;
+            return false;
         }
-
-        // For valid states, update the lastValidState
-        if (
-            status == IAdjudicator.Status.ACTIVE || status == IAdjudicator.Status.PARTIAL
-                || status == IAdjudicator.Status.FINAL
-        ) {
-            meta.lastValidState = candidate;
-        }
-
-        return status;
-    }
-
-    /**
-     * @notice Internal function to adjudicate a state
-     * @param ch The channel configuration
-     * @param candidate The state to be adjudicated
-     * @param proofs Additional proof states if required
-     * @return status The adjudication status
-     */
-    function _adjudicate(Channel memory ch, State memory candidate, State[] memory proofs)
-        internal
-        view
-        returns (IAdjudicator.Status status)
-    {
-        IAdjudicator adjudicator = IAdjudicator(ch.adjudicator);
-        // Convert to calldata by passing individual parameters
-        return adjudicator.adjudicate(ch, candidate, proofs);
     }
 
     function _transfer(address token, address to, uint256 amount) internal {
@@ -374,7 +385,14 @@ contract Custody is IChannel, IDeposit {
         meta.tokenBalances[token] -= correctedAmount;
 
         Account storage accountInfo = _accounts[account];
-        accountInfo.tokens[token].locked -= correctedAmount;
-        accountInfo.tokens[token].available += correctedAmount;
+
+        // Check locked amount before subtracting to prevent underflow
+        uint256 lockedAmount = accountInfo.tokens[token].locked;
+        uint256 amountToUnlock = lockedAmount > correctedAmount ? correctedAmount : lockedAmount;
+
+        if (amountToUnlock > 0) {
+            accountInfo.tokens[token].locked -= amountToUnlock;
+            accountInfo.tokens[token].available += amountToUnlock;
+        }
     }
 }

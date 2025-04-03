@@ -24,7 +24,8 @@ contract Counter is IAdjudicator {
     /// @notice Error thrown when insufficient signatures are provided
     error InsufficientSignatures();
 
-    uint256 private constant FINAL_COUNTER = 1000;
+    // The custody contract now determines if a state is final based on signatures
+    // not on reaching a specific counter value
     uint256 private constant HOST = 0;
     uint256 private constant GUEST = 1;
 
@@ -37,16 +38,16 @@ contract Counter is IAdjudicator {
      * @param chan The channel configuration
      * @param candidate The proposed counter state
      * @param proofs Array containing the previous state signed by the previous participant
-     * @return decision The status of the channel after adjudication
+     * @return valid True if the state is valid, false otherwise
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
-        pure
+        view
         override
-        returns (Status decision)
+        returns (bool valid)
     {
         // Check if we have at least one signature
-        if (candidate.sigs.length == 0) return Status.INVALID;
+        if (candidate.sigs.length == 0) return false;
 
         // Get the state hash for signature verification
         bytes32 stateHash = Utils.getStateHash(chan, candidate);
@@ -54,40 +55,59 @@ contract Counter is IAdjudicator {
         // Decode the counter from candidate state.data
         CounterData memory candidateCounterData = abi.decode(candidate.data, (CounterData));
 
+        // The isFinal flag in the State struct should match the counter value
+        // but we won't use it for validation to maintain backward compatibility
+        // The custody contract will handle the final state status
+
         // INITIAL STATE ACTIVATION
         if (candidateCounterData.counter == 0) {
             // First signature must be from HOST who sets initial counter
             if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])) {
-                return Status.VOID;
+                return false;
             }
 
-            // If only Host has signed, channel is PARTIAL
+            // If only Host has signed, it's valid for initial funding
             if (candidate.sigs.length < 2) {
-                return Status.PARTIAL;
+                return true;
             }
 
             // Both signatures provided, verify Guest's signature
             if (!Utils.verifySignature(stateHash, candidate.sigs[1], chan.participants[GUEST])) {
-                return Status.VOID;
+                return false;
             }
 
-            // Channel becomes ACTIVE only if counter > 0
-            if (candidateCounterData.counter > 0) {
-                return Status.ACTIVE;
-            } else {
-                return Status.PARTIAL;
-            }
+            // Valid initial state with both signatures
+            return true;
         }
 
         // NORMAL STATE TRANSITION: Proof provided.
+        // If we have a non-zero counter but no proofs, we need to check both signatures
+        if (proofs.length == 0) {
+            // For non-zero counter without proofs, we need both signatures
+            if (candidate.sigs.length < 2) {
+                return false;
+            }
+
+            // Verify both signatures
+            if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])) {
+                return false;
+            }
+
+            if (!Utils.verifySignature(stateHash, candidate.sigs[1], chan.participants[GUEST])) {
+                return false;
+            }
+
+            return true;
+        }
+
         // Ensure proof state has at least one signature
-        if (proofs.length == 0 || proofs[0].sigs.length == 0) return Status.INVALID;
+        if (proofs[0].sigs.length == 0) return false;
 
         CounterData memory proofCounterData = abi.decode(proofs[0].data, (CounterData));
 
         // Verify the increment is exactly 1
         if (candidateCounterData.counter != proofCounterData.counter + 1) {
-            return Status.INVALID;
+            return false;
         }
 
         bytes32 proofStateHash = Utils.getStateHash(chan, proofs[0]);
@@ -96,27 +116,22 @@ contract Counter is IAdjudicator {
         if (Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])) {
             // Verify Guest signed the proof
             if (!Utils.verifySignature(proofStateHash, proofs[0].sigs[0], chan.participants[GUEST])) {
-                return Status.INVALID;
+                return false;
             }
         }
         // When Guest is the signer of candidate, Host must have signed the proof
         else if (Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[GUEST])) {
             // Verify Host signed the proof
             if (!Utils.verifySignature(proofStateHash, proofs[0].sigs[0], chan.participants[HOST])) {
-                return Status.INVALID;
+                return false;
             }
         }
         // Invalid signature on candidate
         else {
-            return Status.INVALID;
+            return false;
         }
 
-        // Check if counter has reached or exceeded the final value
-        if (candidateCounterData.counter >= FINAL_COUNTER) {
-            return Status.FINAL;
-        }
-
-        // Valid state transition, channel remains ACTIVE
-        return Status.ACTIVE;
+        // All validations passed
+        return true;
     }
 }

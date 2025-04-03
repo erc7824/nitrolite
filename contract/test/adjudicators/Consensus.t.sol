@@ -111,10 +111,10 @@ contract ConsensusTest is Test {
         assertTrue(hostSigValid, "Host signature verification failed in Utils");
 
         // Adjudicate using the contract
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
 
-        // Check the expected status is returned
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.PARTIAL));
+        // Check the state is valid
+        assertTrue(isValid, "State should be valid");
     }
 
     // Test invalid host signature
@@ -145,9 +145,9 @@ contract ConsensusTest is Test {
         // Create the signature
         state.sigs[0] = Signature({v: v, r: r, s: s});
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
+        assertFalse(isValid, "State should be invalid");
     }
 
     // Test invalid guest signature
@@ -178,9 +178,9 @@ contract ConsensusTest is Test {
         r = bytes32(0); // Corrupt r
         state.sigs[1] = Signature({v: v, r: r, s: s});
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
+        assertFalse(isValid, "State should be invalid");
     }
 
     // Test insufficient signatures
@@ -199,8 +199,8 @@ contract ConsensusTest is Test {
         state.allocations = allocations;
         // State.sigs defaults to empty values
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
+        assertFalse(isValid, "State should be invalid");
     }
 }

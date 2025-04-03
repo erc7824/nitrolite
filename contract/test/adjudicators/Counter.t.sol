@@ -102,10 +102,10 @@ contract CounterTest is Test {
         state.sigs[0] = signState(state, hostPrivateKey);
 
         // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
 
-        // With counter = 0, should be PARTIAL
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.PARTIAL));
+        // With counter = 0 and host signature, should be valid
+        assertTrue(isValid, "Initial state with host signature should be valid");
     }
 
     // Test: Initial state with both signatures but counter = 0 - should return PARTIAL
@@ -119,10 +119,10 @@ contract CounterTest is Test {
         state.sigs[1] = signState(state, guestPrivateKey);
 
         // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
 
-        // With counter = 0, should be PARTIAL
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.PARTIAL));
+        // With counter = 0 and both signatures, should be valid
+        assertTrue(isValid, "Initial state with both signatures should be valid");
     }
 
     // Test: Initial state with both signatures and counter > 0 - should return ACTIVE
@@ -136,10 +136,10 @@ contract CounterTest is Test {
         state.sigs[1] = signState(state, guestPrivateKey);
 
         // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
 
-        // With counter > 0, should be ACTIVE
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // With counter > 0 and both signatures, should be valid
+        assertTrue(isValid, "State with counter > 0 and both signatures should be valid");
     }
 
     // Test: Invalid host signature
@@ -153,9 +153,9 @@ contract CounterTest is Test {
         sig.r = bytes32(0); // Corrupt signature
         state.sigs[0] = sig;
 
-        // Adjudicate with corrupted signature should return VOID
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.VOID));
+        // Adjudicate with corrupted signature should be invalid
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
+        assertFalse(isValid, "State with invalid signature should not be valid");
     }
 
     // Test: Invalid guest signature
@@ -171,9 +171,9 @@ contract CounterTest is Test {
         guestSig.r = bytes32(0); // Corrupt signature
         state.sigs[1] = guestSig;
 
-        // Adjudicate with corrupted guest signature should return VOID
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.VOID));
+        // Adjudicate with corrupted guest signature should be invalid
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
+        assertFalse(isValid, "State with invalid signature should not be valid");
     }
 
     // Test: Insufficient signatures
@@ -183,9 +183,9 @@ contract CounterTest is Test {
 
         // No signatures added
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, state, new State[](0));
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
+        assertFalse(isValid, "State with no signatures should not be valid");
     }
 
     // Test: Valid counter increment from host to guest
@@ -206,10 +206,10 @@ contract CounterTest is Test {
         proofs[0] = prevState;
 
         // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
+        bool isValid = adjudicator.adjudicate(channel, newState, proofs);
 
-        // Should be ACTIVE
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
+        // Valid counter increment should be valid
+        assertTrue(isValid, "Valid counter increment should be valid");
     }
 
     // Test: Valid counter increment from guest to host
@@ -230,10 +230,10 @@ contract CounterTest is Test {
         proofs[0] = prevState;
 
         // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
+        bool isValid = adjudicator.adjudicate(channel, newState, proofs);
 
-        // Should be ACTIVE
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.ACTIVE));
+        // Valid counter increment should be valid
+        assertTrue(isValid, "Valid counter increment should be valid");
     }
 
     // Test: Invalid increment (not exactly +1)
@@ -253,9 +253,9 @@ contract CounterTest is Test {
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, newState, proofs);
+        assertFalse(isValid, "Invalid counter increment should not be valid");
     }
 
     // Test: Invalid turn (Host followed by Host)
@@ -275,9 +275,9 @@ contract CounterTest is Test {
         State[] memory proofs = new State[](1);
         proofs[0] = prevState;
 
-        // Adjudicate and expect INVALID status instead of revert
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.INVALID));
+        // Adjudicate and expect invalid result
+        bool isValid = adjudicator.adjudicate(channel, newState, proofs);
+        assertFalse(isValid, "Same participant twice in a row should not be valid");
     }
 
     // Test: Reaching final state
@@ -298,9 +298,9 @@ contract CounterTest is Test {
         proofs[0] = prevState;
 
         // Adjudicate
-        IAdjudicator.Status decision = adjudicator.adjudicate(channel, newState, proofs);
+        bool isValid = adjudicator.adjudicate(channel, newState, proofs);
 
-        // Should be FINAL
-        assertEq(uint256(decision), uint256(IAdjudicator.Status.FINAL));
+        // Final state should be valid
+        assertTrue(isValid, "Final state should be valid");
     }
 }

@@ -106,6 +106,23 @@ const MessageService = {
 
                 MessageService.received(`Server responded with pong (${timestamp})`);
             } else if (
+                data.type === 'channel_message' &&
+                hasProperty(data, 'data') &&
+                typeof data.data === 'object' &&
+                data.data &&
+                hasProperty(data.data, 'content') &&
+                hasProperty(data.data, 'sender')
+            ) {
+                const content = String(data.data.content).toLowerCase();
+                const sender = String(data.data.sender);
+                
+                if (content === 'ping' || content === 'pong') {
+                    // These are handled by the useWebSocket hook
+                    return;
+                } else {
+                    MessageService.received(`${sender}: ${data.data.content}`, sender);
+                }
+            } else if (
                 data.type === 'rpc_response' &&
                 hasProperty(data, 'data') &&
                 typeof data.data === 'object' &&

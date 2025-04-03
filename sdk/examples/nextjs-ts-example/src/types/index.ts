@@ -18,4 +18,6 @@ export type WSStatus =
     | 'reconnect_failed'
     | 'auth_failed'
     | 'authenticating'
+    | 'ping_verification'
+    | 'ping_failed'
     | 'waiting';

@@ -46,6 +46,15 @@ export function useMessageService() {
         MessageService.status.set(newStatus as WSStatus);
     }, []);
 
+    // Add specialized message types for ping-pong with different parties
+    const addPingMessage = useCallback((text: string, party?: 'user' | 'guest') => {
+        MessageService.add({ text, type: party === 'guest' ? 'guest-ping' : 'user-ping', sender: party });
+    }, []);
+
+    const addPongMessage = useCallback((text: string, party?: 'user' | 'guest') => {
+        MessageService.add({ text, type: party === 'guest' ? 'guest-pong' : 'user-pong', sender: party });
+    }, []);
+
     return {
         // State
         messages,
@@ -58,6 +67,8 @@ export function useMessageService() {
         addErrorMessage,
         addSentMessage,
         addReceivedMessage,
+        addPingMessage,
+        addPongMessage,
         clearMessages,
 
         // Channel methods

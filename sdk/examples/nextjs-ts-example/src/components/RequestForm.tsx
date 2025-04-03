@@ -1,4 +1,5 @@
 import { useState, ChangeEvent } from 'react';
+import { NitroliteRPC } from '@erc7824/nitrolite';
 import { Channel } from '@/types';
 import { useMessageService } from '@/hooks/useMessageService';
 
@@ -11,6 +12,14 @@ interface RequestFormProps {
     onSendPing: () => void;
     onCheckBalance: () => void;
 }
+
+// Common NitroRPC methods for quick access
+const COMMON_RPC_METHODS = [
+    { name: 'ping', description: 'Simple ping to check connectivity' },
+    { name: 'subscribe', description: 'Subscribe to a channel' },
+    { name: 'publish', description: 'Publish message to a channel' },
+    { name: 'balance', description: 'Check token balance' },
+];
 
 export function RequestForm({
     isConnected,
@@ -26,9 +35,10 @@ export function RequestForm({
     const [methodParams, setMethodParams] = useState<string>('');
     const [message, setMessage] = useState<string>('');
     const [selectedChannel, setSelectedChannel] = useState<Channel>('public');
+    const [showMethodList, setShowMethodList] = useState<boolean>(false);
 
     // Use our message service hook
-    const { activeChannel } = useMessageService();
+    const { activeChannel, addSystemMessage } = useMessageService();
 
     // Event handlers
     const handleMethodNameChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -40,7 +50,46 @@ export function RequestForm({
     };
 
     const handleSendRequest = () => {
-        onSendRequest(methodName, methodParams);
+        try {
+            // Create a formatted request using NitroliteRPC to validate format
+            let params: unknown[] = [];
+
+            if (methodParams.trim()) {
+                try {
+                    params = JSON.parse(methodParams);
+                    if (!Array.isArray(params)) params = [params];
+                } catch (e) {
+                    addSystemMessage(`Error parsing params: ${e instanceof Error ? e.message : String(e)}`);
+                    return;
+                }
+            }
+
+            // Create request format for display purposes
+            const request = NitroliteRPC.createRequest(methodName, params);
+
+            addSystemMessage(`Sending NitroRPC request: ${JSON.stringify(request)}`);
+
+            // Send the actual request
+            onSendRequest(methodName, methodParams);
+        } catch (error) {
+            addSystemMessage(`RPC request error: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    };
+
+    const selectPredefinedMethod = (method: string) => {
+        setMethodName(method);
+        setShowMethodList(false);
+
+        // Set default parameters based on method
+        if (method === 'subscribe' && currentChannel) {
+            setMethodParams(JSON.stringify([currentChannel]));
+        } else if (method === 'publish' && currentChannel) {
+            setMethodParams(JSON.stringify([currentChannel, 'Hello from NitroRPC']));
+        } else if (method === 'balance') {
+            setMethodParams(JSON.stringify(['0xToken...']));
+        } else {
+            setMethodParams('[]');
+        }
     };
 
     const handleChannelSelect = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -117,9 +166,9 @@ export function RequestForm({
                 </div>
             </div>
 
-            {/* Operations Panel */}
+            {/* NitroRPC Operations Panel */}
             <div className="md:col-span-1 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-                <h2 className="text-lg font-semibold mb-3 text-[#3531ff]">Operations</h2>
+                <h2 className="text-lg font-semibold mb-3 text-[#3531ff]">NitroRPC</h2>
 
                 <div className="space-y-4">
                     <div className="flex flex-wrap gap-2">
@@ -168,27 +217,62 @@ export function RequestForm({
                         </button>
                     </div>
 
-                    <div>
-                        <label className="block text-sm text-gray-600 mb-1">Custom RPC Method</label>
-                        <input
-                            type="text"
-                            value={methodName}
-                            onChange={handleMethodNameChange}
-                            placeholder="e.g. ping, add, subtract"
-                            disabled={!isConnected}
-                            className="w-full p-2 bg-white text-gray-700 rounded border border-gray-200 disabled:bg-gray-100 disabled:text-gray-400 mb-2"
-                        />
+                    <div className="relative">
+                        <label className="block text-sm text-gray-600 mb-1">NitroRPC Method</label>
+                        <div className="flex">
+                            <input
+                                type="text"
+                                value={methodName}
+                                onChange={handleMethodNameChange}
+                                placeholder="e.g. ping, subscribe, publish"
+                                disabled={!isConnected}
+                                className="flex-grow p-2 bg-white text-gray-700 rounded-l border border-gray-200 disabled:bg-gray-100 disabled:text-gray-400"
+                            />
+                            <button
+                                onClick={() => setShowMethodList(!showMethodList)}
+                                disabled={!isConnected}
+                                className="p-2 bg-gray-100 text-gray-700 rounded-r border border-l-0 border-gray-200 hover:bg-gray-200"
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-5 w-5"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                        clipRule="evenodd"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {showMethodList && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg">
+                                {COMMON_RPC_METHODS.map((method) => (
+                                    <div
+                                        key={method.name}
+                                        onClick={() => selectPredefinedMethod(method.name)}
+                                        className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100"
+                                    >
+                                        <div className="font-medium">{method.name}</div>
+                                        <div className="text-xs text-gray-500">{method.description}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div>
-                        <label className="block text-sm text-gray-600 mb-1">Parameters (JSON)</label>
+                        <label className="block text-sm text-gray-600 mb-1">Parameters (JSON array)</label>
                         <textarea
                             value={methodParams}
                             onChange={handleMethodParamsChange}
                             placeholder="e.g. [42, 23]"
                             disabled={!isConnected}
-                            rows={2}
-                            className="w-full p-2 bg-white text-gray-700 rounded border border-gray-200 font-mono text-sm disabled:bg-gray-100 disabled:text-gray-400 mb-2"
+                            rows={3}
+                            className="w-full p-2 bg-white text-gray-700 rounded border border-gray-200 font-mono text-sm disabled:bg-gray-100 disabled:text-gray-400"
                         />
                     </div>
 
@@ -197,7 +281,7 @@ export function RequestForm({
                         disabled={!isConnected || !methodName.trim()}
                         className="w-full bg-[#3531ff] hover:bg-[#2b28cc] disabled:bg-gray-200 disabled:text-gray-400 text-white font-medium py-2 px-4 rounded transition-colors cursor-pointer disabled:cursor-not-allowed"
                     >
-                        Send Custom Request
+                        Send NitroRPC Request
                     </button>
                 </div>
             </div>

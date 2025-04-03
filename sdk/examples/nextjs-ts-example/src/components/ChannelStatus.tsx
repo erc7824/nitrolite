@@ -22,11 +22,15 @@ export function ChannelStatus({ status }: ChannelStatusProps) {
                             className={`w-2 h-2 rounded-full mr-1 ${
                                 status === 'connected'
                                     ? 'bg-green-500'
-                                    : status === 'connecting' || status === 'authenticating'
+                                    : status === 'connecting' ||
+                                        status === 'authenticating' ||
+                                        status === 'ping_verification'
                                       ? 'bg-yellow-500'
-                                      : 'bg-red-500'
+                                      : status === 'auth_failed' || status === 'ping_failed'
+                                        ? 'bg-red-500'
+                                        : 'bg-red-500'
                             }`}
-                         />
+                        />
                         <span className="text-xs text-gray-600">
                             {status === 'connected'
                                 ? 'Channel Active'
@@ -34,7 +38,13 @@ export function ChannelStatus({ status }: ChannelStatusProps) {
                                   ? 'Connecting...'
                                   : status === 'authenticating'
                                     ? 'Authenticating...'
-                                    : 'Disconnected'}
+                                    : status === 'ping_verification'
+                                      ? 'Verifying Connection...'
+                                      : status === 'auth_failed'
+                                        ? 'Authentication Failed'
+                                        : status === 'ping_failed'
+                                          ? 'Ping Verification Failed'
+                                          : 'Disconnected'}
                         </span>
                     </div>
                     <div className="text-xs text-gray-600 font-mono">

@@ -154,7 +154,7 @@ export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
                 <div className="flex items-center">
                     <div
                         className={`w-2 h-2 rounded-full mr-1 ${status === 'connected' ? 'bg-green-500' : 'bg-yellow-500'}`}
-                     />
+                    />
                     <span>{status === 'connected' ? 'Connected' : 'Connecting...'}</span>
                 </div>
 

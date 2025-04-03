@@ -2,7 +2,7 @@ import { WSStatus, Channel } from '@/types';
 import { WebSocketReadyState, WebSocketClientOptions } from './types';
 import { WalletSigner, shortenPublicKey } from '../crypto';
 import { handleMessage } from './messageHandler';
-import { authenticate } from './authentication';
+import { authenticate, performAuthentication, performPingVerification } from './authentication';
 
 /**
  * Client for WebSocket connection management
@@ -102,11 +102,25 @@ export class WebSocketConnection {
 
                 this.ws.onopen = async () => {
                     try {
+                        // Initial authentication
                         this.onStatusChangeCallback?.('authenticating');
-                        await authenticate(this.ws, this.signer, this.options.requestTimeout);
-                        this.onStatusChangeCallback?.('connected');
-                        this.reconnectAttempts = 0;
-                        resolve();
+                        await performAuthentication(this.ws, this.signer, this.options.requestTimeout);
+
+                        // Skip ping verification during authentication, it will be handled by UI
+                        try {
+                            // Mark as connected right away
+                            this.onStatusChangeCallback?.('connected');
+                            this.reconnectAttempts = 0;
+                            resolve();
+                        } catch (pingError) {
+                            this.onStatusChangeCallback?.('ping_failed');
+                            this.onErrorCallback?.(
+                                pingError instanceof Error ? pingError : new Error(String(pingError)),
+                            );
+                            reject(pingError);
+                            this.close();
+                            this.handleReconnect();
+                        }
                     } catch (error) {
                         this.onStatusChangeCallback?.('auth_failed');
                         this.onErrorCallback?.(error instanceof Error ? error : new Error(String(error)));

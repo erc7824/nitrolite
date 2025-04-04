@@ -30,7 +30,7 @@ export class ChannelContext<T = unknown> {
             participants: [client.account?.address as Address, guest],
             adjudicator: appLogic.getAdjudicatorAddress(),
             challenge: 100500n, // TODO:
-            nonce: 0n, // TODO:
+            nonce: BigInt(Date.now()), // TODO:
         } as Channel;
         this.channelId = getChannelId(this.channel);
         this.appLogic = appLogic;
@@ -147,7 +147,12 @@ export class ChannelContext<T = unknown> {
     /**
      * Append the application state
      */
-    appendAppState(newAppState: T): State {
+    appendAppState(
+        newAppState: T,
+        tokenAddress: Address,
+        amounts: [bigint, bigint],
+        signatures: Signature[] = []
+    ): State {
         const currentState = this.getCurrentState();
         const currentAppState = this.getCurrentAppState();
 
@@ -170,15 +175,13 @@ export class ChannelContext<T = unknown> {
             }
         }
 
-        // Encode the app state
-        const data = this.appLogic.encode(newAppState);
-
         // Create new state with existing allocations
-        const newState: State = {
-            data,
-            allocations: currentState.allocations,
-            sigs: [], // Will be filled when signing
-        };
+        const newState: State = this.createChannelState(
+            newAppState,
+            tokenAddress,
+            amounts,
+            signatures
+        );
 
         // Append the channel state
         this.states.push(newState);
@@ -199,27 +202,33 @@ export class ChannelContext<T = unknown> {
     }
 
     /**
-     * Close the channel with the current state
+     * Close the channel with the provided state
      */
-    async close(): Promise<void> {
-        const currentState = this.getCurrentState();
-        const currentAppState = this.getCurrentAppState();
-
-        if (!this.isFinal() || !currentState || !currentAppState) {
-            throw new Error('No current state to close with');
+    async close(
+        newAppState: T,
+        tokenAddress: Address,
+        amounts: [bigint, bigint],
+        signatures: Signature[] = []
+    ): Promise<void> {
+        if (!this.appLogic.isFinal || !this.appLogic.isFinal(newAppState)) {
+            throw new Error('Provided state is not final');
         }
+
+        const finalState = this.createChannelState(newAppState, tokenAddress, amounts, signatures);
 
         let proofs: State[] = [];
         if (this.appLogic.provideProofs) {
             proofs =
                 this.appLogic.provideProofs(
                     this.channel,
-                    currentAppState,
+                    newAppState,
                     this.states
                 ) || [];
         }
 
-        return this.client.closeChannel(this.channelId, currentState, proofs);
+        this.states.push(finalState);
+
+        return this.client.closeChannel(this.channelId, finalState, proofs);
     }
 
     /**
@@ -322,7 +331,7 @@ export class ChannelContext<T = unknown> {
     ): ChannelId {
         const data = this.appLogic.encode(appState);
         const allocations = this.getAllocations(tokenAddress, amounts);
-        
+
         const encoded = encodeAbiParameters(
             [
                 { type: 'bytes32' },

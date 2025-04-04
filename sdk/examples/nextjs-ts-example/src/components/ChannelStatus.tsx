@@ -26,7 +26,7 @@ export function ChannelStatus({ status }: ChannelStatusProps) {
                                       ? 'bg-yellow-500'
                                       : 'bg-red-500'
                             }`}
-                         />
+                        />
                         <span className="text-xs text-gray-600">
                             {status === 'connected'
                                 ? 'Channel Active'

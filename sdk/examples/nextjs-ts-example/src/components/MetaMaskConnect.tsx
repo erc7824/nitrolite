@@ -3,9 +3,9 @@ import { useSnapshot } from 'valtio';
 import SettingsStore from '@/store/SettingsStore';
 import AssetsStore, { fetchAssets, fetchBalances, TAsset } from '@/store/AssetsStore';
 import WalletStore from '@/store/WalletStore';
-import { useMetaMask } from '@/hooks/useMetaMask';
+import { useMetaMask } from '@/hooks/wallet';
+import { useNitroliteClient } from '@/hooks/channel';
 import { chains } from '@/config/chains';
-import { useNitroliteClient } from '@/hooks/useNitroliteClient';
 
 interface MetaMaskConnectProps {
     onChannelOpen: (tokenAddress: string, amount: string) => void;
@@ -118,7 +118,8 @@ const MetaMaskConnect: React.FC<MetaMaskConnectProps> = ({ onChannelOpen }) => {
                     </p>
                     <button
                         onClick={connectWallet}
-                        className="w-full bg-[#3531ff] hover:bg-[#2b28cc] text-white font-bold py-3 px-6 rounded transition-colors cursor-pointer shadow-sm">
+                        className="w-full bg-[#3531ff] hover:bg-[#2b28cc] text-white font-bold py-3 px-6 rounded transition-colors cursor-pointer shadow-sm"
+                    >
                         Connect MetaMask
                     </button>
 
@@ -142,7 +143,8 @@ const MetaMaskConnect: React.FC<MetaMaskConnectProps> = ({ onChannelOpen }) => {
                     </span>
                     <button
                         onClick={disconnectWallet}
-                        className="bg-red-600 hover:bg-red-700 text-white text-sm py-1 px-2 rounded transition-colors cursor-pointer">
+                        className="bg-red-600 hover:bg-red-700 text-white text-sm py-1 px-2 rounded transition-colors cursor-pointer"
+                    >
                         Disconnect
                     </button>
                 </div>
@@ -153,7 +155,8 @@ const MetaMaskConnect: React.FC<MetaMaskConnectProps> = ({ onChannelOpen }) => {
                 <select
                     className="w-full p-2 bg-white border border-gray-300 rounded text-gray-700"
                     value={settingsSnapshot.activeChain?.id || ''}
-                    onChange={(e) => handleChainChange(Number(e.target.value))}>
+                    onChange={(e) => handleChainChange(Number(e.target.value))}
+                >
                     {chains.map((chain) => (
                         <option key={chain.id} value={chain.id}>
                             {chain.name}
@@ -174,7 +177,8 @@ const MetaMaskConnect: React.FC<MetaMaskConnectProps> = ({ onChannelOpen }) => {
                             const token = assetsSnapshot.assets?.find((a) => a.address === e.target.value) || null;
 
                             setSelectedToken(token);
-                        }}>
+                        }}
+                    >
                         <option value="">Select a token</option>
                         {assetsSnapshot.assets?.map((asset) => (
                             <option key={asset.address} value={asset.address}>
@@ -208,7 +212,8 @@ const MetaMaskConnect: React.FC<MetaMaskConnectProps> = ({ onChannelOpen }) => {
                     !selectedToken || !amount || assetsSnapshot.balancesLoading
                         ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                         : 'bg-[#3531ff] hover:bg-[#2b28cc] transition-colors cursor-pointer text-white'
-                }`}>
+                }`}
+            >
                 {assetsSnapshot.balancesLoading ? 'Loading Balances...' : 'Open Channel'}
             </button>
         </div>

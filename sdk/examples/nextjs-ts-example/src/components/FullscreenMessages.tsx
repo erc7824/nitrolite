@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { useMessageStyles } from '@/hooks/useMessageStyles';
+import { useMessageStyles, useMessageService } from '@/hooks/ui';
 import { useSnapshot } from 'valtio';
 import WalletStore from '@/store/WalletStore';
-import { useMessageService } from '@/hooks/useMessageService';
 
 interface FullscreenMessagesProps {
     onClose: () => void;
@@ -154,7 +153,7 @@ export function FullscreenMessages({ onClose }: FullscreenMessagesProps) {
                 <div className="flex items-center">
                     <div
                         className={`w-2 h-2 rounded-full mr-1 ${status === 'connected' ? 'bg-green-500' : 'bg-yellow-500'}`}
-                     />
+                    />
                     <span>{status === 'connected' ? 'Connected' : 'Connecting...'}</span>
                 </div>
 

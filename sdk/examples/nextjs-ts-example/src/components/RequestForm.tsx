@@ -1,15 +1,14 @@
 import { useState, ChangeEvent } from 'react';
-import { Channel } from '@/types';
-import { useMessageService } from '@/hooks/useMessageService';
+import { Channel as AppChannel } from '@/types';
+import { useMessageService } from '@/hooks/ui';
+import { Channel } from '@erc7824/nitrolite';
 
 interface RequestFormProps {
     isConnected: boolean;
     currentChannel: Channel | null;
     onSendRequest: (methodName: string, methodParams: string) => void;
-    onSendMessage: (message: string) => void;
-    onSubscribeToChannel: (channel: Channel) => void;
+    onSendMessage: (message: string, channelOverride?: AppChannel) => void;
     onSendPing: () => void;
-    onCheckBalance: () => void;
 }
 
 export function RequestForm({
@@ -17,15 +16,13 @@ export function RequestForm({
     currentChannel,
     onSendRequest,
     onSendMessage,
-    onSubscribeToChannel,
     onSendPing,
-    onCheckBalance,
 }: RequestFormProps) {
     // States for form inputs
     const [methodName, setMethodName] = useState<string>('ping');
     const [methodParams, setMethodParams] = useState<string>('');
     const [message, setMessage] = useState<string>('');
-    const [selectedChannel, setSelectedChannel] = useState<Channel>('public');
+    const [selectedChannel, setSelectedChannel] = useState<AppChannel>('public');
 
     // Use our message service hook
     const { activeChannel } = useMessageService();
@@ -44,12 +41,10 @@ export function RequestForm({
     };
 
     const handleChannelSelect = (e: ChangeEvent<HTMLSelectElement>) => {
-        setSelectedChannel(e.target.value as Channel);
+        setSelectedChannel(e.target.value as AppChannel);
     };
 
-    const handleSubscribe = () => {
-        onSubscribeToChannel(selectedChannel);
-    };
+    // Channel selection is now just for display/message override
 
     const handleMessageChange = (e: ChangeEvent<HTMLInputElement>) => {
         setMessage(e.target.value);
@@ -57,7 +52,8 @@ export function RequestForm({
 
     const handleSendMessage = () => {
         if (message.trim()) {
-            onSendMessage(message);
+            // Pass the selected channel as an override
+            onSendMessage(message, selectedChannel);
             setMessage('');
         }
     };
@@ -88,13 +84,7 @@ export function RequestForm({
                             <option value="private">Private</option>
                         </select>
                     </div>
-                    <button
-                        onClick={handleSubscribe}
-                        disabled={!isConnected}
-                        className="bg-[#3531ff] hover:bg-[#2b28cc] disabled:bg-gray-200 disabled:text-gray-400 text-white font-medium py-2 px-4 rounded transition-colors cursor-pointer disabled:cursor-not-allowed"
-                    >
-                        Subscribe
-                    </button>
+                    {/* Channel selection is used for message routing */}
                 </div>
 
                 <div className="flex space-x-2">
@@ -145,27 +135,7 @@ export function RequestForm({
                             Ping Server
                         </button>
 
-                        <button
-                            onClick={onCheckBalance}
-                            disabled={!isConnected}
-                            className="bg-[#3531ff] hover:bg-[#2b28cc] disabled:bg-gray-200 disabled:text-gray-400 text-white font-medium py-2 px-4 rounded transition-colors flex items-center cursor-pointer disabled:cursor-not-allowed"
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5 mr-2"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                            </svg>
-                            Check Balance
-                        </button>
+                        {/* Only ping button remains */}
                     </div>
 
                     <div>

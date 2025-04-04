@@ -13,6 +13,7 @@
         "prettier": "prettier --write ."
     },
     "dependencies": {
+        "@erc7824/nitrolite": "0.0.9-alpha",
         "@eslint/compat": "1.2.8",
         "axios": "1.8.4",
         "centrifuge": "5.3.4",

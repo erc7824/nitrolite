@@ -31,7 +31,7 @@ export class WSRequests {
     /**
      * Subscribes to a channel
      */
-    async subscribe(channel: Channel): Promise<void> {
+    async subscribe(channel: Channel | string): Promise<void> {
         if (!this.connection.isConnected) {
             const errorMsg = 'WebSocket not connected';
 
@@ -41,16 +41,23 @@ export class WSRequests {
 
         MessageService.system(`Subscribing to channel: ${channel}`);
 
-        const request = NitroliteRPC.createRequest('subscribe', [channel]);
+        // Convert Nitrolite Channel to string if needed
+        const channelString = typeof channel === 'string' ? channel : String(channel);
+        const request = NitroliteRPC.createRequest('subscribe', [channelString]);
 
         await this.sendSignedRequest(request);
-        this.connection.setCurrentChannel(channel);
+        if (
+            typeof channel === 'string' &&
+            (channel === 'public' || channel === 'game' || channel === 'trade' || channel === 'private')
+        ) {
+            this.connection.setCurrentChannel(channel as Channel);
+        }
     }
 
     /**
-     * Publishes a message to the current channel
+     * Publishes a message to the specified channel
      */
-    async publishMessage(message: string): Promise<void> {
+    async publishMessage(message: string, channelOverride?: Channel): Promise<void> {
         if (!this.connection.isConnected) {
             const errorMsg = 'WebSocket not connected';
 
@@ -58,8 +65,10 @@ export class WSRequests {
             throw new Error(errorMsg);
         }
 
-        if (!this.connection.currentSubscribedChannel) {
-            const errorMsg = 'Not subscribed to any channel';
+        const channel = channelOverride || this.connection.currentSubscribedChannel;
+
+        if (!channel) {
+            const errorMsg = 'No channel specified and not subscribed to any channel';
 
             MessageService.error(errorMsg);
             throw new Error(errorMsg);
@@ -69,11 +78,7 @@ export class WSRequests {
 
         MessageService.sent(message, shortenedKey);
 
-        const request = NitroliteRPC.createRequest('publish', [
-            this.connection.currentSubscribedChannel,
-            message,
-            shortenedKey,
-        ]);
+        const request = NitroliteRPC.createRequest('publish', [channel, message, shortenedKey]);
 
         await this.sendRequestDirect(await NitroliteRPC.signMessage(request, this.signer.sign));
     }
@@ -84,14 +89,6 @@ export class WSRequests {
     async ping(): Promise<unknown> {
         MessageService.system('Sending ping request');
         return this.sendSignedRequest(NitroliteRPC.createRequest('ping', []));
-    }
-
-    /**
-     * Checks the balance of a token
-     */
-    async checkBalance(tokenAddress: string = '0xSHIB...'): Promise<unknown> {
-        MessageService.system(`Checking balance for token: ${tokenAddress}`);
-        return this.sendSignedRequest(NitroliteRPC.createRequest('balance', [tokenAddress]));
     }
 
     /**

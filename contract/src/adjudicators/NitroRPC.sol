@@ -28,17 +28,17 @@ contract NitroRPC is IAdjudicator {
     /**
      * @dev RPCMessage represents an RPC communication
      * @param requestID Unique identifier for the request
+     * @param timestamp Server timestamp in milliseconds
      * @param method Method name being called
      * @param params Parameters for the request
      * @param result Results from the response
-     * @param timestamp Server timestamp in milliseconds
      */
     struct RPCMessage {
         uint64 requestID;
+        uint64 timestamp;
         string method;
         bytes[] params;
         bytes[] result;
-        uint64 timestamp;
     }
 
     /**
@@ -50,7 +50,7 @@ contract NitroRPC is IAdjudicator {
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
-        pure
+        view
         override
         returns (bool valid)
     {
@@ -65,7 +65,7 @@ contract NitroRPC is IAdjudicator {
         // Verify both signatures
         bool hostSigValid = Utils.verifySignature(stateHash, candidate.sigs[HOST], chan.participants[HOST]);
         bool guestSigValid = Utils.verifySignature(stateHash, candidate.sigs[GUEST], chan.participants[GUEST]);
-        
+
         if (!hostSigValid || !guestSigValid) {
             return false;
         }
@@ -79,13 +79,13 @@ contract NitroRPC is IAdjudicator {
             if (candidateRPC.params.length == 0) {
                 return false;
             }
-            
+
             uint16 magicNumber;
             if (candidateRPC.params[0].length == 2) {
                 magicNumber = uint16(bytes2(candidateRPC.params[0]));
                 return magicNumber == OPENCHAN;
             }
-            
+
             return false;
         }
 
@@ -98,13 +98,18 @@ contract NitroRPC is IAdjudicator {
         RPCMessage memory previousRPC = abi.decode(proofs[0].data, (RPCMessage));
 
         // Validate timestamp progression
-        if (candidateRPC.timestamp <= previousRPC.timestamp) {
+        if (previousRPC.timestamp <= candidateRPC.timestamp &&
+            candidateRPC.timestamp <= block.timestamp) {
             return false;
         }
 
-        // Validate request ID is unique and valid
-        if (candidateRPC.requestID <= previousRPC.requestID) {
+        // requestId can not decrease
+        if (candidateRPC.requestID < previousRPC.requestID) {
             return false;
+        } else if (candidateRPC.requestID == previousRPC.requestID) {
+            // req and resp
+            // TODO: use more gas-optimized way for string comparison
+            return keccak256(abi.encode(previousRPC.method)) == keccak256(abi.encode(candidateRPC.method));
         }
 
         // All validations passed

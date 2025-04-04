@@ -55,7 +55,7 @@ const NitroliteStore = {
             return true;
         } catch (error) {
             console.error(`Failed to deposit to channel ${typeof channelId === 'string' ? channelId : 'complex channel'}:`, error);
-            return false;
+            throw error;
         }
     },
 
@@ -77,7 +77,7 @@ const NitroliteStore = {
             return true;
         } catch (error) {
             console.error(`Failed to open channel ${typeof channelId === 'string' ? channelId : 'complex channel'}:`, error);
-            return false;
+            throw error;
         }
     },
 };

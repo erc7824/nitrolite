@@ -142,8 +142,7 @@ export class NitroliteClient {
     /**
      * Open a new channel or join an existing one
      */
-    async openChannel(channel: Channel, deposit: State, participantIndex: Role = Role.UNDEFINED): Promise<ChannelId> {
-
+    async openChannel(channel: Channel, deposit: State, participantIndex: Role = Role.UNDEFINED): Promise<void> {
         return this.operations.openChannel(channel, deposit, participantIndex);
     }
 

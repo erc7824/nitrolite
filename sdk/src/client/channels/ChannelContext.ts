@@ -128,7 +128,7 @@ export class ChannelContext<T = unknown> {
         tokenAddress: Address,
         amounts: [bigint, bigint],
         signatures: Signature[] = []
-    ): Promise<ChannelId> {
+    ): Promise<void> {
         // Create initial state
         const initialState = await this.createChannelState(
             appState,
@@ -320,6 +320,8 @@ export class ChannelContext<T = unknown> {
         tokenAddress: Address,
         amounts: [bigint, bigint]
     ): ChannelId {
+
+        // return "0xbeced09521047d05b8960b7e7bcc1d1292cf3e4b2a6b63f48335cbde5f7545d2"
 
         // return '0xa552b3021984e63e48bc2ecc66a088d3e67abfe53bfc320fe0ab7063a4e6c235';
         

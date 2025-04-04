@@ -47,16 +47,6 @@ export function useChannelOpening(connect: () => Promise<boolean>, generateKeys:
                 // First set up the channel context with the counter app
                 NitroliteStore.setChannelContext(channelId, APP_CONFIG.CHANNEL.DEFAULT_ADDRESS, app);
 
-                // Create initial app state
-                const appState = { type: 'system' as MessageType, text: '0', sequence: '0' };
-
-                // Get state hash for signing
-                const stateHash = NitroliteStore.state.channelContext[channelId].getStateHash(
-                    appState,
-                    tokenAddress as Address,
-                    [BigInt(amount), BigInt(0)] as [bigint, bigint],
-                );
-
                 // Sign the state hash using MetaMask
                 addSystemMessage('Signing initial state with MetaMask...');
                 if (!window.ethereum) {
@@ -68,30 +58,69 @@ export function useChannelOpening(connect: () => Promise<boolean>, generateKeys:
                     throw new Error('No wallet connected');
                 }
 
-                const signature = await window.ethereum.request({
-                    method: 'personal_sign',
-                    params: [`0x${Buffer.from(stateHash).toString('hex')}`, address],
-                });
-                const parsedSig = parseSignature(signature as Hex);
-
                 // Deposit tokens and open the channel
                 addSystemMessage('Depositing tokens and opening channel...');
 
-                // TODO: should be inside try-catch
-                await NitroliteStore.deposit(channelId, tokenAddress as Address, amount);
-                await NitroliteStore.openChannel(
-                    channelId,
-                    appState,
-                    tokenAddress as Address,
-                    [BigInt(amount), BigInt(0)] as [bigint, bigint],
-                    [
-                        {
-                            r: parsedSig.r,
-                            s: parsedSig.s,
-                            v: parsedSig.yParity,
-                        },
-                    ],
-                );
+                try {
+                    console.log('Depositing tokens...');
+                    await NitroliteStore.deposit(channelId, tokenAddress as Address, amount);
+                    console.log('Deposited tokens...');
+                } catch (error) {
+                    addSystemMessage(
+                        `Error depositing tokens: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                    throw error;
+                }
+
+                try {
+                    console.log('Opening channel...');
+
+                    // Create initial app state
+                    const appState = { type: 'system' as MessageType, text: '0', sequence: '0' };
+
+                    // Get state hash for signing
+                    const stateHash = NitroliteStore.state.channelContext[channelId].getStateHash(
+                        appState,
+                        tokenAddress as Address,
+                        [BigInt(amount), BigInt(0)] as [bigint, bigint],
+                    );
+
+                    // const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+
+                    // // 4. Sign the hash
+                    // const signature = await account.signMessage({
+                    //     message: { raw: stateHash },
+                    // })
+
+                    const signature = await window.ethereum.request({
+                        method: 'personal_sign',
+                        // params: [`0x${Buffer.from(stateHash).toString('hex')}`, address],
+                        params: [stateHash, address],
+
+                    });
+
+                    const parsedSig = parseSignature(signature as Hex);
+
+                    await NitroliteStore.openChannel(
+                        channelId,
+                        appState,
+                        tokenAddress as Address,
+                        [BigInt(amount), BigInt(0)] as [bigint, bigint],
+                        [
+                            {
+                                r: parsedSig.r,
+                                s: parsedSig.s,
+                                v: +parsedSig.v.toString(),
+                            },
+                        ],
+                    );
+                    console.log('Opened channel...');
+                } catch (error) {
+                    addSystemMessage(
+                        `Error opening channel: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                    throw error;
+                }
 
                 addSystemMessage('Channel opened successfully! Now generating keys for WebSocket connection...');
 
@@ -106,6 +135,7 @@ export function useChannelOpening(connect: () => Promise<boolean>, generateKeys:
                         // Automatically attempt to connect to WebSocket after generating keys
                         try {
                             const connected = await connect();
+
                             if (connected) {
                                 addSystemMessage('Successfully connected to WebSocket server.');
                             } else {

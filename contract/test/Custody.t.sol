@@ -4,6 +4,10 @@ pragma solidity ^0.8.13;
 import {Test, console} from "lib/forge-std/src/Test.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 
+import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
+import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+
+import {TestUtils} from "./TestUtils.sol";
 import {Custody} from "../src/Custody.sol";
 import {Channel, State, Allocation, Signature, Status} from "../src/interfaces/Types.sol";
 import {Utils} from "../src/Utils.sol";
@@ -106,7 +110,7 @@ contract CustodyTest is Test {
         returns (Signature memory)
     {
         bytes32 stateHash = Utils.getStateHash(chan, state);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, stateHash);
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, stateHash);
         return Signature({v: v, r: r, s: s});
     }
 

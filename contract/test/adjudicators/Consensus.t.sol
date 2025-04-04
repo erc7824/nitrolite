@@ -3,13 +3,22 @@ pragma solidity ^0.8.13;
 
 import {Test} from "lib/forge-std/src/Test.sol";
 import {Vm} from "lib/forge-std/src/Vm.sol";
+
+import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
+
+import {TestUtils} from "../TestUtils.sol";
+import {MockERC20} from "../mocks/MockERC20.sol";
+
 import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
 import {Channel, State, Allocation, Signature} from "../../src/interfaces/Types.sol";
 import {Consensus} from "../../src/adjudicators/Consensus.sol";
 import {Utils} from "../../src/Utils.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
 
 contract ConsensusTest is Test {
+    using ECDSA for bytes32;
+    using MessageHashUtils for bytes32;
+
     Consensus public adjudicator;
 
     // Test accounts
@@ -47,15 +56,15 @@ contract ConsensusTest is Test {
 
     // Test case: Basic signing test to verify our signature approach
     // using foundry's vm.sign and correctly formatted message for ecrecover
-    function test_BasicSignatureVerification() public {
+    function test_BasicSignatureVerification() public view {
         // Simple message to sign
         bytes32 message = keccak256("test message");
 
         // Sign with the prefixed hash as required by Ethereum
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(hostPrivateKey, message);
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, hostPrivateKey, message);
 
         // Directly recover using ecrecover (without prefix since we already signed prefixed hash)
-        address recovered = ecrecover(message, v, r, s);
+        address recovered = message.toEthSignedMessageHash().recover(v, r, s);
 
         // This should pass - verifying our signing approach
         assertEq(recovered, host);
@@ -80,7 +89,7 @@ contract ConsensusTest is Test {
     }
 
     // Create an initial state signed by host only
-    function test_DirectInitialState() public {
+    function test_DirectInitialState() public view {
         // Create allocations
         Allocation[2] memory allocations = createAllocations(50, 50);
 
@@ -99,7 +108,7 @@ contract ConsensusTest is Test {
         bytes32 stateHash = Utils.getStateHash(channel, state);
 
         // Sign the Ethereum signed message hash with host key
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(hostPrivateKey, stateHash);
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, hostPrivateKey, stateHash);
 
         // Create the signature
         state.sigs[0] = Signature({v: v, r: r, s: s});
@@ -117,8 +126,8 @@ contract ConsensusTest is Test {
         assertTrue(isValid, "State should be valid");
     }
 
-    // Test invalid host signature
-    function test_InvalidHostSignature() public {
+    // Test corrupt host signature
+    function test_CorruptHostSignature() public {
         // Create allocations
         Allocation[2] memory allocations = createAllocations(50, 50);
 
@@ -137,7 +146,7 @@ contract ConsensusTest is Test {
         bytes32 stateHash = Utils.getStateHash(channel, state);
 
         // Sign the state hash with host key
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(hostPrivateKey, stateHash);
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, hostPrivateKey, stateHash);
 
         // Corrupt the signature by changing r
         r = bytes32(0);
@@ -146,12 +155,12 @@ contract ConsensusTest is Test {
         state.sigs[0] = Signature({v: v, r: r, s: s});
 
         // Adjudicate and expect invalid result
-        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
-        assertFalse(isValid, "State should be invalid");
+        vm.expectRevert(ECDSA.ECDSAInvalidSignature.selector);
+        adjudicator.adjudicate(channel, state, new State[](0));
     }
 
-    // Test invalid guest signature
-    function test_InvalidGuestSignature() public {
+    // Test corrupt guest signature
+    function test_CorruptGuestSignature() public {
         // Create allocations
         Allocation[2] memory allocations = createAllocations(50, 50);
 
@@ -170,7 +179,7 @@ contract ConsensusTest is Test {
         bytes32 stateHash = Utils.getStateHash(channel, state);
 
         // Sign the state hash with both keys
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(hostPrivateKey, stateHash);
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, hostPrivateKey, stateHash);
         state.sigs[0] = Signature({v: v, r: r, s: s});
 
         // Corrupt the guest signature
@@ -179,12 +188,13 @@ contract ConsensusTest is Test {
         state.sigs[1] = Signature({v: v, r: r, s: s});
 
         // Adjudicate and expect invalid result
+        vm.expectRevert(ECDSA.ECDSAInvalidSignature.selector);
         bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
         assertFalse(isValid, "State should be invalid");
     }
 
     // Test insufficient signatures
-    function test_InsufficientSignatures() public {
+    function test_InsufficientSignatures() public view {
         // Create allocations
         Allocation[2] memory allocations = createAllocations(50, 50);
 

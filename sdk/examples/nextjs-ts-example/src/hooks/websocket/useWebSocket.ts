@@ -8,8 +8,9 @@ import {
     getAddressFromPublicKey,
     WebSocketClient,
 } from '@/websocket';
+import { useMessageService } from '@/hooks/ui/useMessageService';
+import { Channel as NitroliteChannel } from '@erc7824/nitrolite';
 import { Channel } from '@/types';
-import { useMessageService } from './useMessageService';
 
 /**
  * Custom hook to manage WebSocket connection and operations
@@ -41,7 +42,8 @@ export function useWebSocket(url: string) {
     });
 
     const [currentSigner, setCurrentSigner] = useState<WalletSigner | null>(null);
-    const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
+    const [wsChannel, setWsChannel] = useState<Channel | null>(null);
+    const [currentNitroliteChannel, setCurrentNitroliteChannel] = useState<NitroliteChannel | null>(null);
 
     // Use our message service
     const { setStatus: setMessageStatus, addSystemMessage, addErrorMessage } = useMessageService();
@@ -108,7 +110,18 @@ export function useWebSocket(url: string) {
 
         // Set up message handler
         client.onMessage((message) => {
-            addSystemMessage(`Received message of type: ${message.type || 'unknown'}`);
+            // Type guard to check if message has 'type' property
+            const hasType = (msg: unknown): msg is { type: unknown } => {
+                return typeof msg === 'object' && msg !== null && 'type' in msg;
+            };
+
+            const messageType = hasType(message)
+                ? typeof message.type === 'string'
+                    ? message.type
+                    : String(message.type)
+                : 'unknown';
+
+            addSystemMessage(`Received message of type: ${messageType}`);
         });
 
         // Add initial system message
@@ -181,18 +194,35 @@ export function useWebSocket(url: string) {
 
         try {
             await clientRef.current.subscribe(channel);
-            setCurrentChannel(channel);
+            setWsChannel(channel);
         } catch (error) {
             console.error('Subscribe error:', error);
         }
     }, []);
 
-    // Send a message to the current channel
-    const sendMessage = useCallback(async (message: string) => {
-        if (!clientRef.current?.isConnected || !clientRef.current.currentSubscribedChannel) return;
+    // Store Nitrolite channel ID without subscribing
+    const setNitroliteChannel = useCallback(
+        (nitroliteChannel: NitroliteChannel) => {
+            // Update our state directly without WebSocket subscription
+            setCurrentNitroliteChannel(nitroliteChannel);
+            
+            // Tell the connection about the Nitrolite channel
+            if (clientRef.current) {
+                clientRef.current.setNitroliteChannel(nitroliteChannel);
+            }
+        },
+        [],
+    );
+
+    // Send a message to a channel
+    const sendMessage = useCallback(async (message: string, channelOverride?: Channel) => {
+        if (!clientRef.current?.isConnected) return;
+
+        // If no channel is specified and we don't have a current channel, return
+        if (!channelOverride && !clientRef.current.currentSubscribedChannel) return;
 
         try {
-            await clientRef.current.publishMessage(message);
+            await clientRef.current.publishMessage(message, channelOverride);
         } catch (error) {
             console.error('Send error:', error);
         }
@@ -258,7 +288,8 @@ export function useWebSocket(url: string) {
         // State
         status,
         keyPair,
-        currentChannel,
+        wsChannel,
+        currentNitroliteChannel,
 
         // Computed values
         isConnected: clientRef.current?.isConnected || false,
@@ -268,11 +299,12 @@ export function useWebSocket(url: string) {
         generateKeys,
         connect,
         disconnect,
+        setNitroliteChannel,
+        clearKeys,
         subscribeToChannel,
         sendMessage,
         sendPing,
-        checkBalance,
         sendRequest,
-        clearKeys,
+        checkBalance,
     };
 }

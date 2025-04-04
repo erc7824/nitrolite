@@ -62,7 +62,7 @@ const chainsArray = [
     linea,
     lineaSepolia,
     scroll,
-    localhost
+    localhost,
 ];
 
 export const chains = chainsArray.filter((chain) => supportedChains.includes(chain.id));

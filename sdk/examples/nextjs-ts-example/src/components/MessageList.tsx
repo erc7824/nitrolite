@@ -1,7 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
-import { useMessageStyles } from '@/hooks/useMessageStyles';
+import { useMessageStyles, useMessageService } from '@/hooks/ui';
 import { FullscreenMessages } from './FullscreenMessages';
-import { useMessageService } from '@/hooks/useMessageService';
 
 export function MessageList() {
     const [isFullscreen, setIsFullscreen] = useState(false);

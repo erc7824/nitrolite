@@ -1,4 +1,5 @@
 import { WSStatus, Channel } from '@/types';
+import { Channel as NitroliteChannel } from '@erc7824/nitrolite';
 import { WebSocketReadyState, WebSocketClientOptions } from './types';
 import { WalletSigner, shortenPublicKey } from '../crypto';
 import { handleMessage } from './messageHandler';
@@ -16,6 +17,7 @@ export class WebSocketConnection {
     private onMessageCallback?: (message: unknown) => void;
     private onErrorCallback?: (error: Error) => void;
     private currentChannel: Channel | null = null;
+    private nitroliteChannel: NitroliteChannel | null = null;
 
     /**
      * Creates a new WebSocketConnection
@@ -75,6 +77,13 @@ export class WebSocketConnection {
      */
     get currentSubscribedChannel(): Channel | null {
         return this.currentChannel;
+    }
+    
+    /**
+     * Gets the currently subscribed nitrolite channel, if any
+     */
+    get currentNitroliteChannel(): NitroliteChannel | null {
+        return this.nitroliteChannel;
     }
 
     /**
@@ -206,6 +215,13 @@ export class WebSocketConnection {
 
     setCurrentChannel(channel: Channel): void {
         this.currentChannel = channel;
+    }
+    
+    /**
+     * Sets the current nitrolite channel
+     */
+    setNitroliteChannel(channel: NitroliteChannel): void {
+        this.nitroliteChannel = channel;
     }
 
     getRequestTimeout(): number {

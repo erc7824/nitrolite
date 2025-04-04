@@ -1,7 +1,7 @@
+import APP_CONFIG from '@/config/app';
 import { Message } from '@/types';
 import { AppLogic, Channel, State } from '@erc7824/nitrolite';
 import { Address, encodeAbiParameters, Hex, decodeAbiParameters } from 'viem';
-import CONTRACTS from '@/config/contracts';
 
 /**
  * CounterApp: A simple state channel application that implements a counter
@@ -117,7 +117,8 @@ export class CounterApp implements AppLogic<Message> {
      * @returns Adjudicator contract address
      */
     public getAdjudicatorAddress(): Address {
-        return CONTRACTS.adjudicators.counter;
+        // TODO:
+        return APP_CONFIG.ADJUDICATORS.flag as Address;
     }
 
     /**

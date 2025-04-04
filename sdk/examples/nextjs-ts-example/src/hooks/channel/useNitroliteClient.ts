@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { useSnapshot } from 'valtio';
-import { createPublicClient, createWalletClient, custom, http } from 'viem';
+import { Address, createPublicClient, createWalletClient, custom, http } from 'viem';
 import { NitroliteClient } from '@erc7824/nitrolite';
 import WalletStore from '@/store/WalletStore';
 import NitroliteStore from '@/store/NitroliteStore';
 import { chains } from '@/config/chains';
-import CONTRACTS from '@/config/contracts';
+import APP_CONFIG from '@/config/app';
 
 export function useNitroliteClient() {
     const walletState = useSnapshot(WalletStore.state);
@@ -36,6 +36,11 @@ export function useNitroliteClient() {
                     account: walletState.account,
                 });
 
+                const addresses = {
+                    custody: APP_CONFIG.CUSTODIES[chain.id] as Address,
+                    adjudicators: APP_CONFIG.ADJUDICATORS
+                };
+
                 // Create Nitrolite client
                 const client = new NitroliteClient({
                     // @ts-ignore
@@ -43,7 +48,7 @@ export function useNitroliteClient() {
                     walletClient,
                     account: walletClient.account,
                     chainId: walletState.chainId,
-                    addresses: CONTRACTS,
+                    addresses,
                 });
 
                 // Save client to store

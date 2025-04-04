@@ -22,6 +22,16 @@ export interface WebSocketClientOptions {
     maxReconnectAttempts: number;
     /** Timeout for requests in milliseconds */
     requestTimeout: number;
+    /** Number of pings to send during verification (defaults to 1000) */
+    pingVerificationCount?: number;
+    /** Size of ping batches to send at once (defaults to 10) */
+    pingBatchSize?: number;
+    /** Delay between ping batches in milliseconds (defaults to 10) */
+    pingBatchDelay?: number;
+    /** Required success rate for ping verification (0-1, defaults to 0.95) */
+    pingSuccessThreshold?: number;
+    /** Channel to use for P2P ping-pong verification (defaults to 'public') */
+    pingChannel?: string;
 }
 
 /**

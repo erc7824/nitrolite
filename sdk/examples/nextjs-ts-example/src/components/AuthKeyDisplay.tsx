@@ -21,7 +21,7 @@ export function AuthKeyDisplay({ keyPair, status }: AuthKeyDisplayProps) {
                                   ? 'bg-yellow-500'
                                   : 'bg-red-500'
                         }`}
-                     />
+                    />
                     <span className="text-xs text-gray-600">
                         {status === 'connected'
                             ? 'Connected to Broker'

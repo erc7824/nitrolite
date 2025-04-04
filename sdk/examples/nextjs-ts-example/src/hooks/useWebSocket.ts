@@ -1,58 +1,30 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import {
-    createWebSocketClient,
-    createEthersSigner,
-    generateKeyPair,
-    WalletSigner,
-    CryptoKeypair,
-    getAddressFromPublicKey,
-    WebSocketClient,
-} from '@/websocket';
+import { createWebSocketClient, createEthersSigner, WalletSigner, WebSocketClient } from '@/websocket';
 import { Channel } from '@/types';
 import { useMessageService } from './useMessageService';
+import { useKeyPair, usePingPongBenchmark, useMessageHandler } from './websocket';
 
 /**
  * Custom hook to manage WebSocket connection and operations
  */
 export function useWebSocket(url: string) {
     const [status, setStatus] = useState<string>('disconnected');
-    const [keyPair, setKeyPair] = useState<CryptoKeypair | null>(() => {
-        // Try to load keys from localStorage on initial render
-        if (typeof window !== 'undefined') {
-            const savedKeys = localStorage.getItem('crypto_keypair');
-
-            if (savedKeys) {
-                try {
-                    const parsed = JSON.parse(savedKeys) as CryptoKeypair;
-
-                    // If missing address property, derive it from the public key
-                    if (parsed.publicKey && !parsed.address) {
-                        parsed.address = getAddressFromPublicKey(parsed.publicKey);
-                        localStorage.setItem('crypto_keypair', JSON.stringify(parsed));
-                    }
-
-                    return parsed;
-                } catch (e) {
-                    console.error('Failed to parse saved keys:', e);
-                }
-            }
-        }
-        return null;
-    });
-
-    const [currentSigner, setCurrentSigner] = useState<WalletSigner | null>(null);
     const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
+    const [startBenchmarkFlag, setStartBenchmarkFlag] = useState<boolean>(false);
+    const [currentSigner, setCurrentSigner] = useState<WalletSigner | null>(null);
+
+    // Use our key pair management hook
+    const { keyPair, clearKeys, generateKeys, hasKeys } = useKeyPair();
 
     // Use our message service
-    const { setStatus: setMessageStatus, addSystemMessage, addErrorMessage } = useMessageService();
+    const messageService = useMessageService();
+    const { setStatus: setMessageStatus, addSystemMessage, addErrorMessage, addPingMessage } = messageService;
 
     // Update both statuses
     const updateStatus = useCallback(
         (newStatus: string) => {
             setStatus(newStatus);
             setMessageStatus(newStatus);
-
-            // Add a system message about status change
             addSystemMessage(`Connection status changed to: ${newStatus}`);
         },
         [setMessageStatus, addSystemMessage],
@@ -75,8 +47,9 @@ export function useWebSocket(url: string) {
         return createWebSocketClient(url, currentSigner, {
             autoReconnect: true,
             reconnectDelay: 1000,
-            maxReconnectAttempts: 5,
+            maxReconnectAttempts: 3,
             requestTimeout: 10000,
+            pingChannel: 'public',
         });
     }, [url, currentSigner]);
 
@@ -86,6 +59,25 @@ export function useWebSocket(url: string) {
     useEffect(() => {
         clientRef.current = client;
     }, [client]);
+
+    // Use our ping-pong benchmark hook
+    const pingPongBenchmark = usePingPongBenchmark(clientRef, messageService);
+    const { runPingPongBenchmark } = pingPongBenchmark;
+
+    // Use our message handler hook
+    const { handleMessage } = useMessageHandler(clientRef, pingPongBenchmark, messageService);
+
+    // Run ping-pong benchmark when flag is set
+    useEffect(() => {
+        if (startBenchmarkFlag && clientRef.current?.isConnected) {
+            addSystemMessage('Starting 1000 ping-pong benchmark...');
+            runPingPongBenchmark(1000).catch((err) => {
+                console.error('Benchmark error:', err);
+                addErrorMessage(`Benchmark error: ${err instanceof Error ? err.message : String(err)}`);
+            });
+            setStartBenchmarkFlag(false);
+        }
+    }, [startBenchmarkFlag, runPingPongBenchmark, addSystemMessage, addErrorMessage]);
 
     // Initialize WebSocket event listeners
     useEffect(() => {
@@ -107,9 +99,7 @@ export function useWebSocket(url: string) {
         });
 
         // Set up message handler
-        client.onMessage((message) => {
-            addSystemMessage(`Received message of type: ${message.type || 'unknown'}`);
-        });
+        client.onMessage(handleMessage);
 
         // Add initial system message
         addSystemMessage('WebSocket listeners initialized successfully');
@@ -118,53 +108,43 @@ export function useWebSocket(url: string) {
             addSystemMessage('Cleaning up WebSocket connection');
             client.close();
         };
-    }, [updateStatus, addSystemMessage, addErrorMessage]);
+    }, [updateStatus, handleMessage, addSystemMessage, addErrorMessage]);
 
-    // Generate a new key pair
-    const generateKeys = useCallback(async () => {
+    // Generate a new key pair with error handling
+    const generateKeysWithErrorHandling = useCallback(async () => {
         try {
-            const newKeyPair = await generateKeyPair();
+            const newKeyPair = await generateKeys();
 
-            setKeyPair(newKeyPair);
-
-            // Save to localStorage
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('crypto_keypair', JSON.stringify(newKeyPair));
+            if (newKeyPair) {
+                // Create a new signer with the generated private key
+                const newSigner = createEthersSigner(newKeyPair.privateKey);
+                setCurrentSigner(newSigner);
+                return newKeyPair;
             }
-
-            // Create a new signer with the generated private key
-            const newSigner = createEthersSigner(newKeyPair.privateKey);
-
-            setCurrentSigner(newSigner);
-
-            return newKeyPair;
+            return null;
         } catch (error) {
             const errorMsg = `Error generating keys: ${error instanceof Error ? error.message : String(error)}`;
-
             addErrorMessage(errorMsg);
             return null;
         }
-    }, [addErrorMessage]);
+    }, [generateKeys, addErrorMessage]);
 
     // Connect to WebSocket
     const connect = useCallback(async () => {
         if (!keyPair) {
             const errorMsg = 'No key pair available for connection';
-
             addSystemMessage(errorMsg);
             throw new Error(errorMsg);
         }
 
         try {
             addSystemMessage('Attempting to connect to WebSocket...');
-
             await clientRef.current.connect();
-
+            setStartBenchmarkFlag(true);
             addSystemMessage('WebSocket connected successfully');
             return true;
         } catch (error) {
             const errorMsg = `Connection error: ${error instanceof Error ? error.message : String(error)}`;
-
             addErrorMessage(errorMsg);
             throw error;
         }
@@ -204,10 +184,12 @@ export function useWebSocket(url: string) {
 
         try {
             await clientRef.current.ping();
+            addPingMessage(`>user: PING`, 'user');
         } catch (error) {
             console.error('Ping error:', error);
+            addErrorMessage(`Ping error: ${error instanceof Error ? error.message : String(error)}`);
         }
-    }, []);
+    }, [addPingMessage, addErrorMessage]);
 
     // Check balance
     const checkBalance = useCallback(async (tokenAddress: string = '0xSHIB...') => {
@@ -237,22 +219,14 @@ export function useWebSocket(url: string) {
                 }
             }
 
-            const response = await clientRef.current.sendRequest(methodName, params);
-
-            return response;
+            return await clientRef.current.sendRequest(methodName, params);
         } catch (error) {
             console.error('Request error:', error);
         }
     }, []);
 
-    // Function to clear saved keys
-    const clearKeys = useCallback(() => {
-        if (typeof window !== 'undefined') {
-            localStorage.removeItem('crypto_keypair');
-        }
-        setKeyPair(null);
-        setCurrentSigner(null);
-    }, []);
+    // Get latest stats
+    const stats = pingPongBenchmark.getTotalStats();
 
     return {
         // State
@@ -262,10 +236,20 @@ export function useWebSocket(url: string) {
 
         // Computed values
         isConnected: clientRef.current?.isConnected || false,
-        hasKeys: !!keyPair,
+        hasKeys,
+        benchmarkInProgress: pingPongBenchmark.benchmarkInProgress.current,
+
+        // Message counts
+        userPingCount: stats.user.pings,
+        userPongCount: stats.user.pongs,
+        userTotal: stats.user.total,
+        guestPingCount: stats.guest.pings,
+        guestPongCount: stats.guest.pongs,
+        guestTotal: stats.guest.total,
+        totalMessages: stats.total,
 
         // Actions
-        generateKeys,
+        generateKeys: generateKeysWithErrorHandling,
         connect,
         disconnect,
         subscribeToChannel,
@@ -274,5 +258,6 @@ export function useWebSocket(url: string) {
         checkBalance,
         sendRequest,
         clearKeys,
+        runPingPongBenchmark,
     };
 }

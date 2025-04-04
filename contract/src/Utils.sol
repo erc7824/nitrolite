@@ -31,7 +31,7 @@ library Utils {
      */
     function getStateHash(Channel memory ch, State memory state) internal pure returns (bytes32) {
         bytes32 channelId = getChannelId(ch);
-        return keccak256(abi.encode(channelId, state.data, state.allocations)).toEthSignedMessageHash();
+        return keccak256(abi.encode(channelId, state.data, state.allocations));
     }
 
     /**
@@ -43,7 +43,7 @@ library Utils {
      */
     function verifySignature(bytes32 stateHash, Signature memory sig, address signer) internal pure returns (bool) {
         // Verify the signature
-        address recoveredSigner = stateHash.recover(sig.v, sig.r, sig.s);
+        address recoveredSigner = stateHash.toEthSignedMessageHash().recover(sig.v, sig.r, sig.s);
         return recoveredSigner == signer;
     }
 }

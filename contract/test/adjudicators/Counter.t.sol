@@ -3,6 +3,12 @@ pragma solidity ^0.8.13;
 
 import {Test} from "lib/forge-std/src/Test.sol";
 import {Vm} from "lib/forge-std/src/Vm.sol";
+
+import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
+import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+
+import {TestUtils} from "../TestUtils.sol";
+
 import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
 import {Channel, State, Allocation, Signature} from "../../src/interfaces/Types.sol";
 import {Counter} from "../../src/adjudicators/Counter.sol";
@@ -63,7 +69,7 @@ contract CounterTest is Test {
     // Helper to sign a state using a given private key.
     function signState(State memory state, uint256 privateKey) internal view returns (Signature memory) {
         bytes32 stateHash = Utils.getStateHash(channel, state);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, stateHash);
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, stateHash);
         return Signature({v: v, r: r, s: s});
     }
 
@@ -103,7 +109,7 @@ contract CounterTest is Test {
     }
 
     // Initial state with an invalid (corrupted) signature should fail.
-    function test_InitialStateInvalidSignature() public view {
+    function test_InitialStateInvalidSignature() public {
         uint256 counterVal = 0;
         uint256 target = 10;
         uint256 version = 0;
@@ -118,8 +124,8 @@ contract CounterTest is Test {
         state.sigs[GUEST_IDX] = sigGuest;
 
         State[] memory emptyProofs = new State[](0);
-        bool valid = counterAdjudicator.adjudicate(channel, state, emptyProofs);
-        assertFalse(valid, "Initial state with an invalid signature should be rejected");
+        vm.expectRevert(ECDSA.ECDSAInvalidSignature.selector);
+        counterAdjudicator.adjudicate(channel, state, emptyProofs);
     }
 
     // -------------------- NON-INITIAL STATE TESTS --------------------

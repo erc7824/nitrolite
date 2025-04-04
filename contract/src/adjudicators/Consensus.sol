@@ -40,7 +40,7 @@ contract Consensus is IAdjudicator {
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
-        view
+        pure
         override
         returns (bool valid)
     {

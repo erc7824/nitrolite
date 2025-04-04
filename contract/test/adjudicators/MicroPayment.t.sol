@@ -3,11 +3,17 @@ pragma solidity ^0.8.13;
 
 import {Test} from "lib/forge-std/src/Test.sol";
 import {Vm} from "lib/forge-std/src/Vm.sol";
+
+import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
+import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+
+import {TestUtils} from "../TestUtils.sol";
+import {MockERC20} from "../mocks/MockERC20.sol";
+
 import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
 import {Channel, State, Allocation, Signature} from "../../src/interfaces/Types.sol";
 import {MicroPayment} from "../../src/adjudicators/MicroPayment.sol";
 import {Utils} from "../../src/Utils.sol";
-import {MockERC20} from "../mocks/MockERC20.sol";
 
 contract MicroPaymentTest is Test {
     MicroPayment public adjudicator;
@@ -73,25 +79,12 @@ contract MicroPaymentTest is Test {
     // Helper to sign state with specified key
     function signState(State memory state, uint256 privateKey) internal view returns (Signature memory) {
         bytes32 stateHash = Utils.getStateHash(channel, state);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, stateHash);
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, stateHash);
         return Signature({v: v, r: r, s: s});
     }
 
-    // Test basic signature verification
-    function test_BasicSignatureVerification() public {
-        bytes32 message = keccak256("test message");
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(hostPrivateKey, message);
-
-        address recovered = ecrecover(message, v, r, s);
-        assertEq(recovered, host);
-
-        Signature memory signature = Signature({v: v, r: r, s: s});
-        bool isValid = Utils.verifySignature(message, signature, host);
-        assertTrue(isValid);
-    }
-
     // Test: Valid payment state, host can send payment to guest
-    function test_ValidPaymentState() public {
+    function test_ValidPaymentState() public view {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
 
@@ -107,13 +100,10 @@ contract MicroPaymentTest is Test {
 
         // Check the state is valid
         assertTrue(isValid, "Payment state should be valid");
-
-        // With the updated interface, we no longer get allocations returned
-        // The adjudicator still processes them internally, but we just verify if it's valid
     }
 
     // Test: Guest trying to sign a payment is invalid
-    function test_GuestSignatureInvalid() public {
+    function test_GuestSignatureInvalid() public view {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
 
@@ -130,7 +120,7 @@ contract MicroPaymentTest is Test {
     }
 
     // Test: Missing signature
-    function test_MissingSignature() public {
+    function test_MissingSignature() public view {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
 
@@ -159,12 +149,12 @@ contract MicroPaymentTest is Test {
         state.sigs[0] = sig;
 
         // Adjudicate and expect invalid result
-        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
-        assertFalse(isValid, "Invalid state should not be valid");
+        vm.expectRevert(ECDSA.ECDSAInvalidSignature.selector);
+        adjudicator.adjudicate(channel, state, new State[](0));
     }
 
     // Test: Payment exceeds deposit
-    function test_PaymentExceedsDeposit() public {
+    function test_PaymentExceedsDeposit() public view {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
 
@@ -181,7 +171,7 @@ contract MicroPaymentTest is Test {
     }
 
     // Test: Decreasing payment amount
-    function test_DecreasingPayment() public {
+    function test_DecreasingPayment() public view {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
 
@@ -205,7 +195,7 @@ contract MicroPaymentTest is Test {
     }
 
     // Test: Increasing payment amount
-    function test_IncreasingPayment() public {
+    function test_IncreasingPayment() public view {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
 
@@ -228,14 +218,10 @@ contract MicroPaymentTest is Test {
 
         // Check the state is valid
         assertTrue(isValid, "Increasing payment should be valid");
-
-        // Check the allocations have been updated properly
-        // With the updated interface, we no longer get allocations returned
-        // The adjudicator still processes them internally, but we just verify if it's valid
     }
 
     // Test: Final payment (full amount)
-    function test_FinalPayment() public {
+    function test_FinalPayment() public view {
         // Initial allocation: host has 100 tokens, guest has 0
         Allocation[2] memory allocations = createAllocations(100, 0);
 
@@ -275,7 +261,7 @@ contract MicroPaymentTest is Test {
         proofs[0] = prevState;
 
         // Adjudicate and expect invalid result
-        bool isValid = adjudicator.adjudicate(channel, newState, proofs);
-        assertFalse(isValid, "Invalid state should not be valid");
+        vm.expectRevert(ECDSA.ECDSAInvalidSignature.selector);
+        adjudicator.adjudicate(channel, newState, proofs);
     }
 }

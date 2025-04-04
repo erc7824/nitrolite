@@ -320,16 +320,9 @@ export class ChannelContext<T = unknown> {
         tokenAddress: Address,
         amounts: [bigint, bigint]
     ): ChannelId {
-
-        // return "0xbeced09521047d05b8960b7e7bcc1d1292cf3e4b2a6b63f48335cbde5f7545d2"
-
-        // return '0xa552b3021984e63e48bc2ecc66a088d3e67abfe53bfc320fe0ab7063a4e6c235';
-        
         const data = this.appLogic.encode(appState);
         const allocations = this.getAllocations(tokenAddress, amounts);
         
-        console.log("state hash", this.channelId, data, allocations);
-
         const encoded = encodeAbiParameters(
             [
                 { type: 'bytes32' },
@@ -347,8 +340,6 @@ export class ChannelContext<T = unknown> {
         );
 
         const stateHash = keccak256(encoded);
-
-        console.log("state has", stateHash);
 
         return stateHash;
     }

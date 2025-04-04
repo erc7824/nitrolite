@@ -26,20 +26,19 @@ const NitroliteStore = {
         return true;
     },
 
-    setChannelContext(channelId: NitroliteChannel | string, guest: Address, app: AppLogic<Message>) {
+    setChannelContext(guest: Address, app: AppLogic<Message>): ChannelContext {
         try {
             if (!state.client) {
                 throw new Error('Nitrolite client not initialized');
             }
+
+            const channel = new ChannelContext<Message>(state.client, guest, app);
             
-            // Convert channel to string for use as an object key
-            const key = typeof channelId === 'string' ? channelId : JSON.stringify(channelId);
-            
-            state.channelContext[key] = new ChannelContext<Message>(state.client, guest, app);
-            return true;
+            state.channelContext[channel.channelId] = channel;
+            return channel;
         } catch (error) {
-            console.error(`Failed to set channel context for ${typeof channelId === 'string' ? channelId : 'complex channel'}:`, error);
-            return false;
+            console.error('Failed to set channel context:', error);
+            throw error;
         }
     },
 

@@ -1,4 +1,4 @@
-import { Hex } from 'viem';
+import { Address } from 'viem';
 
 /**
  * Application configuration
@@ -14,20 +14,18 @@ export const APP_CONFIG = {
 
     // Channel configuration
     CHANNEL: {
-        // Default counterparty address (for demo purposes)
-        DEFAULT_ADDRESS: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' as Hex,
-
-        // Default private key (for demo purposes only - NEVER use in production)
-        DEFAULT_PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as Hex,
-
+        // Default address for the second participant
+        DEFAULT_GUEST: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
         // Challenge period in seconds (1 day)
         CHALLENGE_PERIOD: 86400,
     },
 
-    // Default token configuration
-    TOKENS: {
-        // Default ERC20 token address
-        DEFAULT_TOKEN: '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2' as Hex,
+    CUSTODIES: {
+        1337: '0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE' as Address,
+    },
+
+    ADJUDICATORS: {
+        flag: '0x5fbdb2315678afecb367f032d93f642f64180aa3' as Address,
     },
 };
 

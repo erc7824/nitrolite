@@ -17,6 +17,7 @@ export function useMessageService() {
     }, []);
 
     const addSystemMessage = useCallback((text: string) => {
+        console.log('MessageService:', text);
         MessageService.system(text);
     }, []);
 

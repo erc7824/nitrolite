@@ -36,16 +36,13 @@ export function useChannelOpening(connect: () => Promise<boolean>, generateKeys:
             // Set the channel open flag first
             WalletStore.setChannelOpen(true);
 
-            // Create a unique channel identifier (typically derived from transaction hash)
-            // For demo purposes, using a timestamp-based ID
-            const channelId = `channel_${Date.now()}`;
-
             try {
                 // Initialize channel context with the app logic
                 addSystemMessage('Initializing channel context...');
 
                 // First set up the channel context with the counter app
-                NitroliteStore.setChannelContext(channelId, APP_CONFIG.CHANNEL.DEFAULT_ADDRESS, app);
+                const channel = NitroliteStore.setChannelContext(APP_CONFIG.CHANNEL.DEFAULT_GUEST as Address, app);
+                const channelId = channel.getChannelId();
 
                 // Sign the state hash using MetaMask
                 addSystemMessage('Signing initial state with MetaMask...');
@@ -54,6 +51,7 @@ export function useChannelOpening(connect: () => Promise<boolean>, generateKeys:
                 }
 
                 const address = WalletStore.state.account;
+
                 if (!address) {
                     throw new Error('No wallet connected');
                 }
@@ -62,9 +60,7 @@ export function useChannelOpening(connect: () => Promise<boolean>, generateKeys:
                 addSystemMessage('Depositing tokens and opening channel...');
 
                 try {
-                    console.log('Depositing tokens...');
                     await NitroliteStore.deposit(channelId, tokenAddress as Address, amount);
-                    console.log('Deposited tokens...');
                 } catch (error) {
                     addSystemMessage(
                         `Error depositing tokens: ${error instanceof Error ? error.message : String(error)}`,
@@ -73,30 +69,20 @@ export function useChannelOpening(connect: () => Promise<boolean>, generateKeys:
                 }
 
                 try {
-                    console.log('Opening channel...');
-
                     // Create initial app state
                     const appState = { type: 'system' as MessageType, text: '0', sequence: '0' };
 
                     // Get state hash for signing
-                    const stateHash = NitroliteStore.state.channelContext[channelId].getStateHash(
+                    const stateHash = channel.getStateHash(
                         appState,
                         tokenAddress as Address,
                         [BigInt(amount), BigInt(0)] as [bigint, bigint],
                     );
 
-                    // const account = privateKeyToAccount("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-
-                    // // 4. Sign the hash
-                    // const signature = await account.signMessage({
-                    //     message: { raw: stateHash },
-                    // })
-
                     const signature = await window.ethereum.request({
                         method: 'personal_sign',
                         // params: [`0x${Buffer.from(stateHash).toString('hex')}`, address],
                         params: [stateHash, address],
-
                     });
 
                     const parsedSig = parseSignature(signature as Hex);
@@ -114,7 +100,8 @@ export function useChannelOpening(connect: () => Promise<boolean>, generateKeys:
                             },
                         ],
                     );
-                    console.log('Opened channel...');
+
+                    WalletStore.openChannel(tokenAddress as Address, amount);
                 } catch (error) {
                     addSystemMessage(
                         `Error opening channel: ${error instanceof Error ? error.message : String(error)}`,

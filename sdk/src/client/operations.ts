@@ -500,8 +500,6 @@ export class ChannelOperations {
                 account: this.account!,
             });
 
-            console.log(request)
-
             const hash = await this.walletClient!.writeContract(request);
 
             // Wait for transaction to be mined

@@ -81,7 +81,6 @@ export function useChannelOpening(connect: () => Promise<boolean>, generateKeys:
 
                     const signature = await window.ethereum.request({
                         method: 'personal_sign',
-                        // params: [`0x${Buffer.from(stateHash).toString('hex')}`, address],
                         params: [stateHash, address],
                     });
 

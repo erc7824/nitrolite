@@ -1,22 +1,22 @@
 # Nitrolite NextJS TypeScript Example
 
-This example demonstrates how to integrate the Nitrolite SDK (@erc7824/nitrolite) with a NextJS application. It showcases a simple WebSocket client that connects to a Nitrolite broker and enables real-time communication using the NitroliteRPC protocol.
+This example demonstrates how to integrate the Nitrolite SDK with a NextJS application. It showcases a simple state channel application that uses the Nitrolite client to create, manage, and interact with state channels.
 
 ## Features
 
-- WebSocket connection to a Nitrolite broker server
-- Cryptographic authentication using Ethereum-compatible keys
-- Channel subscription and messaging
-- Custom RPC requests using the NitroliteRPC protocol
-- React hooks for easy state management
-- Responsive UI with connection status indicators
+- Integration with MetaMask for wallet connection
+- Nitrolite client initialization and configuration 
+- State channel creation and management
+- Channel state updates and visualization
+- Counter application example with custom application logic
+- WebSocket connection for real-time updates
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+ and npm
-- A running Nitrolite broker server (see main repository for setup instructions)
+- MetaMask extension installed in your browser
 
 ### Installation
 
@@ -24,7 +24,7 @@ This example demonstrates how to integrate the Nitrolite SDK (@erc7824/nitrolite
 
     ```bash
     git clone https://github.com/erc7824/nitrolite.git
-    cd nitrolite/sdk-ts/examples/nextjs-ts-example
+    cd nitrolite/sdk/examples/nextjs-ts-example
     ```
 
 2. Install dependencies:
@@ -43,57 +43,67 @@ This example demonstrates how to integrate the Nitrolite SDK (@erc7824/nitrolite
 
 ## Usage
 
-1. **Generate Keys**: Click the "Generate Keys" button to create a new key pair.
-2. **Connect**: Connect to the WebSocket server using the generated keys.
-3. **Subscribe to a Channel**: Select a channel from the dropdown and click "Subscribe".
-4. **Send Messages**: Send messages to the subscribed channel.
-5. **Custom RPC**: Send custom RPC requests to the server.
+1. **Connect Wallet**: Connect your MetaMask wallet to the application.
+2. **Open a Channel**: Specify a token address and amount to open a state channel.
+3. **View Channel Status**: See the current state of your open channels.
+4. **Update State**: Interact with the counter application to update the channel state.
+5. **Close Channel**: Close the channel when you're done.
 
 ## Configuration
 
-You can configure the WebSocket server URL in the `src/app/page.tsx` file:
+You can configure the application in the following files:
 
-```tsx
-const {
-    /* ... */
-} = useWebSocket('ws://localhost:8000/ws');
-```
+- `src/config/app.ts`: Application configuration including WebSocket URL and default addresses
+- `src/config/contracts/index.ts`: Contract addresses for the Nitrolite framework 
+- `src/config/chains/index.ts`: Blockchain network configuration
 
 ## Project Structure
 
 ```
 src/
-├── app/                # Next.js app directory
-│   ├── globals.css     # Global styles
-│   ├── layout.tsx      # Root layout component
-│   └── page.tsx        # Main page component
-├── components/         # React components
-│   ├── About.tsx               # Information about the app
-│   ├── ConnectionStatus.tsx    # WebSocket connection status display
-│   ├── MessageList.tsx         # Display received messages
-│   └── RequestForm.tsx         # Form for sending requests
-├── hooks/              # Custom React hooks
-│   ├── useConnectionStatus.ts  # Hook for connection status styling
-│   ├── useMessageStyles.ts     # Hook for message styling
-│   └── useWebSocket.ts         # WebSocket connection hook
-├── types/              # TypeScript type definitions
-│   └── index.ts                # Common type definitions
-└── utils/              # Utility functions
-    └── wsClient.ts             # WebSocket client implementation
+├── app/                  # Next.js app directory
+│   ├── globals.css       # Global styles
+│   ├── layout.tsx        # Root layout component
+│   └── page.tsx          # Main page component
+├── components/           # React components
+│   ├── ChannelStatus.tsx # Channel status display
+│   ├── MessageList.tsx   # Display messages and state updates
+│   └── MetaMaskConnect.tsx # Wallet connection component
+├── services/             # Application services
+│   └── apps/             # Custom applications
+│       └── counter.ts    # Counter application logic
+├── hooks/                # Custom React hooks
+│   ├── useChannelOpening.ts # Hook for opening channels
+│   ├── useMessageService.ts # Hook for message handling
+│   └── useNitroliteClient.ts # Hook for Nitrolite client
+├── store/                # State management
+│   ├── NitroliteStore.ts # Store for Nitrolite client state
+│   └── WalletStore.ts    # Store for wallet connection state
+├── types/                # TypeScript type definitions
+└── config/               # Application configuration
+    ├── app.ts            # Global app configuration
+    ├── chains/           # Blockchain network configuration
+    └── contracts/        # Contract addresses
 ```
 
 ## Integration with Nitrolite SDK
 
-This example uses the `@erc7824/nitrolite` SDK to handle WebSocket communication with the Nitrolite broker. Key features include:
+This example demonstrates key features of the Nitrolite SDK:
 
-1. **NitroliteRPC Protocol**: Uses the NitroliteRPC format for structured communication.
-2. **Signing and Verification**: Implements cryptographic message signing and verification.
-3. **Channel Management**: Demonstrates subscription to channels and message publication.
-4. **Error Handling**: Implements robust error handling and reconnection logic.
+1. **Client Initialization**: Setup of the Nitrolite client with proper configuration
+2. **Channel Management**: Opening and managing state channels
+3. **Custom Application Logic**: Implementation of a counter application with custom state transition rules
+4. **State Updates**: Handling state updates and signatures
+5. **Multi-chain Support**: Configurable for different EVM chains
 
-## Contributing
+## Customizing the Example
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+To adapt this example for your own application:
+
+1. Create a custom application logic class by implementing the `AppLogic` interface
+2. Configure the contract addresses in `src/config/contracts/index.ts`
+3. Update the UI components to match your application's requirements
+4. Modify the state management to handle your application's state
 
 ## License
 

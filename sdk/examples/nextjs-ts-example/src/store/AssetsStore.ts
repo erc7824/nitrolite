@@ -60,6 +60,15 @@ export const fetchAssets = async () => {
     );
 
     if (!assetsUrl) {
+        AssetsStore.setAssets([
+            {
+                name: 'Test Token',
+                address: '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512',
+                symbol: 'TST',
+                decimals: 8,
+                chainId: 1337,
+            },
+        ]);
         return;
     }
 

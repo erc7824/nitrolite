@@ -1,6 +1,6 @@
 import { TAsset } from '@/store/AssetsStore';
 import balanceCheckerAbi from '@/abi/balance.checker.abi.json';
-import { Address, Chain, createPublicClient, formatUnits, http } from 'viem';
+import { Address, Chain, createPublicClient, erc20Abi, formatUnits, http } from 'viem';
 
 const BALANCE_CHECKER_ADDRESSES = {
     1: '0xb1f8e55c7f64d203c1400b9d8555d050f94adf39',
@@ -33,12 +33,28 @@ export const getBalances = async (
 
     const addresses = assets.map((asset) => asset.address);
 
-    const balancesBigInt = (await publicClient.readContract({
-        abi: balanceCheckerAbi,
-        address: BALANCE_CHECKER_ADDRESSES[chain.id] as Address,
-        functionName: 'balances',
-        args: [[walletAddress], addresses],
-    })) as bigint[];
+    let balancesBigInt: bigint[] = [];
+
+    // For local development, use the balanceOf function directly
+    if (chain.id === 1337) {
+        balancesBigInt = await Promise.all(
+            addresses.map(async (address) => {
+                return await publicClient.readContract({
+                    abi: erc20Abi,
+                    address: address,
+                    functionName: 'balanceOf',
+                    args: [walletAddress as Address],
+                });
+            }),
+        );
+    } else {
+        balancesBigInt = (await publicClient.readContract({
+            abi: balanceCheckerAbi,
+            address: BALANCE_CHECKER_ADDRESSES[chain.id] as Address,
+            functionName: 'balances',
+            args: [[walletAddress], addresses],
+        })) as bigint[];
+    }
 
     const balances = balancesBigInt.map((balanceBigInt: bigint, index: number) => {
         const asset = assets[index];

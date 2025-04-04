@@ -1,106 +1,40 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import { useMessageService } from '@/hooks/useMessageService';
-import WalletStore from '@/store/WalletStore';
-import { fetchAssets } from '@/store/AssetsStore';
-import { Address } from 'viem';
-// import { generateKeyPair } from "@/websocket/crypto";
+
+// Import hooks from organized structure
+import { useChannelOpening, useNitroliteClient } from '@/hooks/channel';
+import { useMessageService } from '@/hooks/ui';
+import { useWalletConnection } from '@/hooks/wallet';
+import { useWebSocket } from '@/hooks/websocket';
 
 // Components
+import { ConnectedView } from '@/components/ConnectedView';
 import { Header } from '@/components/Header';
-import { ChannelStatus } from '@/components/ChannelStatus';
-import { AuthKeyDisplay } from '@/components/AuthKeyDisplay';
-import { MessageList } from '@/components/MessageList';
-import { RequestForm } from '@/components/RequestForm';
-import { InfoSection } from '@/components/InfoSection';
 import MetaMaskConnect from '@/components/MetaMaskConnect';
+
+// Stores & Config
+import WalletStore from '@/store/WalletStore';
+import { fetchAssets } from '@/store/AssetsStore';
+import APP_CONFIG from '@/config/app';
 
 export default function Home() {
     const { status, addSystemMessage } = useMessageService();
 
-    const {
-        keyPair,
-        currentChannel,
-        isConnected,
-        generateKeys,
-        connect,
-        disconnect,
-        subscribeToChannel,
-        sendMessage,
-        sendPing,
-        checkBalance,
-        sendRequest,
-    } = useWebSocket('ws://localhost:8000/ws');
+    const { keyPair, wsChannel, currentNitroliteChannel, isConnected, connect, disconnect, generateKeys } =
+        useWebSocket(APP_CONFIG.WEBSOCKET.URL);
+
+    const { handleOpenChannel } = useChannelOpening(currentNitroliteChannel, connect, status, generateKeys);
+
+    const { handleDisconnect } = useWalletConnection(status, disconnect);
 
     // Load assets and add initial message when component mounts
     useEffect(() => {
         fetchAssets();
-
-        // Add an initial system message
         addSystemMessage('Application initialized - Welcome to Nitrolite!');
     }, [addSystemMessage]);
 
-    // Function to handle channel opening
-    const handleOpenChannel = async (tokenAddress: string, amount: string) => {
-        // Add system message about channel opening
-        addSystemMessage(
-            `Opening channel with token ${tokenAddress.substring(0, 6)}...${tokenAddress.substring(38)} and amount ${amount}`,
-        );
-
-        // Update wallet store
-        WalletStore.openChannel(tokenAddress as Address, amount);
-
-        // Generate keys and connect to websocket in a sequential flow
-        try {
-            // Step 1: Generate keys if not present
-            let currentKeyPair = keyPair;
-
-            if (!currentKeyPair) {
-                addSystemMessage('Generating new key pair...');
-                currentKeyPair = await generateKeys();
-                if (!currentKeyPair) {
-                    const errorMsg = 'Failed to generate keys';
-
-                    addSystemMessage(errorMsg);
-                    throw new Error(errorMsg);
-                }
-                addSystemMessage('Key pair generated successfully');
-            }
-
-            // Step 2: Connect to the broker websocket only after we have keys
-            if (status === 'disconnected' && currentKeyPair) {
-                try {
-                    addSystemMessage('Connecting to WebSocket server...');
-                    await connect();
-                    addSystemMessage('WebSocket connection established');
-                } catch (error) {
-                    addSystemMessage(
-                        'WebSocket connection error: Make sure the WebSocket server is running at ws://localhost:8000/ws',
-                        error,
-                    );
-                }
-            }
-        } catch (error) {
-            addSystemMessage(
-                `Error in channel opening sequence: ${error instanceof Error ? error.message : String(error)}`,
-            );
-        }
-    };
-
-    // Handle wallet disconnection
-    const handleDisconnect = async () => {
-        // First disconnect from WebSocket if connected
-        if (status === 'connected') {
-            disconnect(); // This is the WebSocket disconnect
-        }
-
-        // Then disconnect from MetaMask
-        const { disconnectWallet } = await import('@/hooks/useMetaMask');
-
-        await disconnectWallet();
-    };
+    useNitroliteClient();
 
     const isChannelOpen = WalletStore.state.channelOpen;
 
@@ -110,26 +44,15 @@ export default function Home() {
                 <Header onDisconnect={handleDisconnect} wsConnected={isConnected} />
 
                 {isChannelOpen ? (
-                    <>
-                        <div className="flex gap-3 mb-2 flex-col md:flex-row">
-                            <ChannelStatus status={status} />
-                            <AuthKeyDisplay keyPair={keyPair} status={status} />
-                        </div>
-
-                        <MessageList />
-
-                        <RequestForm
-                            isConnected={isConnected}
-                            currentChannel={currentChannel}
-                            onSendRequest={sendRequest}
-                            onSendMessage={sendMessage}
-                            onSubscribeToChannel={subscribeToChannel}
-                            onSendPing={sendPing}
-                            onCheckBalance={checkBalance}
-                        />
-
-                        <InfoSection />
-                    </>
+                    <ConnectedView
+                        status={status}
+                        keyPair={keyPair}
+                        isConnected={isConnected}
+                        wsChannel={wsChannel}
+                        onGenerateKeys={generateKeys}
+                        onConnect={connect}
+                        onDisconnect={disconnect}
+                    />
                 ) : (
                     <MetaMaskConnect onChannelOpen={handleOpenChannel} />
                 )}

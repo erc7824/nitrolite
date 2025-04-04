@@ -2,6 +2,7 @@ import { WalletSigner } from './crypto';
 import { WebSocketClientOptions } from './core/types';
 import { WebSocketConnection } from './core/connection';
 import { WSRequests } from './core/requests';
+import { Channel as NitroliteChannel } from '@erc7824/nitrolite';
 
 /**
  * Client for WebSocket communication with signature-based authentication
@@ -50,6 +51,9 @@ export class WebSocketClient {
     get currentSubscribedChannel() {
         return this.connection.currentSubscribedChannel;
     }
+    get currentNitroliteChannel() {
+        return this.connection.currentNitroliteChannel;
+    }
     getShortenedPublicKey() {
         return this.connection.getShortenedPublicKey();
     }
@@ -59,22 +63,22 @@ export class WebSocketClient {
     close() {
         return this.connection.close();
     }
+    setNitroliteChannel(channel: NitroliteChannel) {
+        return this.connection.setNitroliteChannel(channel);
+    }
 
     // Forward request methods
     sendRequest(method: string, params: unknown[] = []) {
         return this.requests.sendRequest(method, params);
     }
-    subscribe(channel: import('@/types').Channel) {
+    subscribe(channel: import('@/types').Channel | string) {
         return this.requests.subscribe(channel);
     }
-    publishMessage(message: string) {
-        return this.requests.publishMessage(message);
+    publishMessage(message: string, channelOverride?: import('@/types').Channel) {
+        return this.requests.publishMessage(message, channelOverride);
     }
     ping() {
         return this.requests.ping();
-    }
-    checkBalance(tokenAddress?: string) {
-        return this.requests.checkBalance(tokenAddress);
     }
     sendBatch(requests: { method: string; params: unknown[] }[]) {
         return this.requests.sendBatch(requests);

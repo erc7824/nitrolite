@@ -61,6 +61,10 @@ const WalletStore = {
         state.selectedTokenAddress = null;
         state.selectedAmount = null;
     },
+    
+    setChannelOpen(isOpen: boolean) {
+        state.channelOpen = isOpen;
+    },
 };
 
 export default WalletStore;

@@ -3,7 +3,8 @@ import { useSnapshot } from 'valtio';
 import SettingsStore from '@/store/SettingsStore';
 import AssetsStore, { fetchAssets, fetchBalances, TAsset } from '@/store/AssetsStore';
 import WalletStore from '@/store/WalletStore';
-import { useMetaMask } from '@/hooks/useMetaMask';
+import { useMetaMask } from '@/hooks/wallet';
+import { useNitroliteClient } from '@/hooks/channel';
 import { chains } from '@/config/chains';
 
 interface MetaMaskConnectProps {

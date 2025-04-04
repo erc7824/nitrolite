@@ -55,7 +55,7 @@ export class ChannelOperations {
         channel: Channel,
         deposit: State,
         participantIndex: Role = Role.UNDEFINED
-    ): Promise<ChannelId> {
+    ): Promise<void> {
         this.ensureWalletClient();
 
         if (participantIndex === Role.UNDEFINED) {
@@ -88,24 +88,6 @@ export class ChannelOperations {
                     { receipt }
                 );
             }
-
-            const logs = parseEventLogs({
-                abi: CustodyAbi,
-                logs: receipt.logs,
-                eventName: ChannelOpenedEvent,
-            });
-
-            if (!logs || logs.length === 0 || !logs[0].args) {
-                throw new Errors.ContractError(
-                    `Could not find ${ChannelOpenedEvent} event log`,
-                    'EVENT_NOT_FOUND',
-                    500,
-                    'Check transaction receipt and contract event definitions',
-                    { receipt, custodyAddress: this.custodyAddress }
-                );
-            }
-
-            return (logs[0].args as any).channelId;
         } catch (error: any) {
             throw new Errors.ContractCallError(
                 `Failed to open channel: ${error.message}`,
@@ -366,6 +348,7 @@ export class ChannelOperations {
             });
 
             const hash = await this.walletClient!.writeContract(request);
+
             const receipt = await this.publicClient.waitForTransactionReceipt({
                 hash,
             });
@@ -516,6 +499,8 @@ export class ChannelOperations {
                 args: [spender, amount],
                 account: this.account!,
             });
+
+            console.log(request)
 
             const hash = await this.walletClient!.writeContract(request);
 

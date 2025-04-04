@@ -8,6 +8,7 @@ import {Channel, State, Allocation, Status} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
+import {console} from "lib/forge-std/src/console.sol";
 
 /**
  * @title Custody
@@ -120,6 +121,8 @@ contract Custody is IChannel, IDeposit {
         // Generate channel ID
         channelId = Utils.getChannelId(ch);
 
+        console.logBytes32(channelId);
+
         // Check if channel doesn't exist and create new one (HOST deposit)
         Metadata storage meta = _channels[channelId];
         if (meta.chan.adjudicator == address(0)) {
@@ -128,6 +131,7 @@ contract Custody is IChannel, IDeposit {
 
             // Verify state hash is signed by HOST
             bytes32 stateHash = Utils.getStateHash(ch, depositState);
+            console.logBytes32(stateHash);
             bool validSignature = Utils.verifySignature(stateHash, depositState.sigs[0], ch.participants[HOST]);
             require(validSignature, InvalidStateSignatures());
 

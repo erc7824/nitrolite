@@ -126,11 +126,6 @@ contract Custody is IChannel, IDeposit {
             // This is the first participant (HOST) creating the channel
             Allocation memory allocation = depositState.allocations[HOST];
 
-            // Verify state hash is signed by HOST
-            bytes32 stateHash = Utils.getStateHash(ch, depositState);
-            bool validSignature = Utils.verifySignature(stateHash, depositState.sigs[0], ch.participants[HOST]);
-            require(validSignature, InvalidStateSignatures());
-
             // Verify by calling adjudicator with empty proofs
             IAdjudicator adjudicator = IAdjudicator(ch.adjudicator);
             State[] memory emptyProofs = new State[](0);
@@ -158,9 +153,6 @@ contract Custody is IChannel, IDeposit {
             State[] memory emptyProofs = new State[](0);
             bool isValid = adjudicator.adjudicate(ch, depositState, emptyProofs);
             require(isValid, InvalidState());
-
-            bool validSignatures = _verifyAllSignatures(ch, depositState);
-            require(validSignatures, InvalidStateSignatures());
 
             // Lock funds from the GUEST to the channel
             _lockAccountFundsToChannel(ch.participants[GUEST], channelId, allocation.token, allocation.amount);
@@ -202,15 +194,12 @@ contract Custody is IChannel, IDeposit {
             // Adjudicator only validates state transitions, not channel status
             bool isValid = _validateState(meta, candidate, proofs);
 
-            // For cooperative close, we need:
-            // 1. The state must be valid according to the adjudicator
-            // 2. The state must have valid signatures from all participants
-
-            // Verify signatures from all participants
-            bool allSignaturesValid = _verifyAllSignatures(meta.chan, candidate);
+            // TODO: introduce additional checks that make final states stand out.
+            // For now there is no way to differentiate between a consensus state and a final state
+            bool allSigsValid = _verifyAllSignatures(meta.chan, candidate);
             bool hasAllSignatures = candidate.sigs.length == meta.chan.participants.length;
 
-            if (isValid && hasAllSignatures && allSignaturesValid) {
+            if (isValid && allSigsValid && hasAllSignatures) {
                 // All requirements met, set status to FINAL
                 meta.status = Status.FINAL;
             } else {
@@ -246,10 +235,6 @@ contract Custody is IChannel, IDeposit {
         require(isMoreRecent, "State is not more recent than the checkpointed state");
 
         if (isValid) {
-            // Verify all available participant signatures
-            bool allSignaturesValid = _verifyAllSignatures(meta.chan, candidate);
-            require(allSignaturesValid, InvalidStateSignatures());
-
             // Start challenge period - this is handled by Custody, not adjudicator
             meta.challengeExpire = block.timestamp + meta.chan.challenge;
 
@@ -282,10 +267,6 @@ contract Custody is IChannel, IDeposit {
         bool isValid = _validateState(meta, candidate, proofs);
 
         if (isValid) {
-            // Verify all available participant signatures
-            bool allSignaturesValid = _verifyAllSignatures(meta.chan, candidate);
-            require(allSignaturesValid, InvalidStateSignatures());
-
             // Valid state is stored for future reference
             meta.lastValidState = candidate;
 

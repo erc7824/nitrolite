@@ -35,6 +35,7 @@ keccak256(
 ### StateHash
 
 StateHash are used in signature and often stored in `state.sigs`
+signature use ec25519 without eip-191 prefix as the protocol is chain-agnostic.
 
 ```solidity
 keccak256(
@@ -114,7 +115,6 @@ interface IAdjudicator {
         returns (bool valid);
 }
 ```
-
 
 - **Parameters**:
   - `chan`: Channel configuration

@@ -5,6 +5,7 @@ pragma solidity ^0.8.13;
  * @title State Channel Type Definitions
  * @notice Shared types used in the state channel system
  */
+// TODO: remove in favor of `bytes`
 struct Signature {
     uint8 v;
     bytes32 r;
@@ -24,6 +25,8 @@ struct Channel {
     uint64 nonce; // Unique per channel with same participants and adjudicator
 }
 
+uint16 constant OPENCHAN = 0x1EC7; // Magic number for Initial State.data
+
 struct State {
     bytes data; // Application data encoded, decoded by the adjudicator for business logic
     Allocation[2] allocations; // Combined asset allocation and destination for each participant
@@ -36,7 +39,6 @@ enum Status {
     ACTIVE, // Channel fully funded and valid state
     FINAL, // This is the FINAL state, channel can be closed
     INVALID // Channel state is invalid
-
 }
 
 // This struct has been moved to Custody.sol with additional fields

@@ -171,21 +171,19 @@ export class ChannelContext<T = unknown> {
     /**
      * Close the channel with the provided state
      */
-    async close(newAppState: T, tokenAddress: Address, amounts: [bigint, bigint], signatures: Signature[] = []): Promise<void> {
-        if (!this.appLogic.isFinal || !this.appLogic.isFinal(newAppState)) {
+    async close(finalState: State): Promise<void> {
+        const appData = this.appLogic.decode(finalState.data);
+        if (!this.appLogic.isFinal || !this.appLogic.isFinal(appData)) {
             throw new Error("Provided state is not final");
         }
 
-        const finalState = this.createChannelState(newAppState, tokenAddress, amounts, signatures);
-
         let proofs: State[] = [];
         if (this.appLogic.provideProofs) {
-            proofs = this.appLogic.provideProofs(this.channel, newAppState, this.states) || [];
+            proofs = this.appLogic.provideProofs(this.channel, appData, this.states) || [];
         }
 
+        await this.client.closeChannel(this.channelId, finalState, proofs);
         this.states.push(finalState);
-
-        return this.client.closeChannel(this.channelId, finalState, proofs);
     }
 
     /**

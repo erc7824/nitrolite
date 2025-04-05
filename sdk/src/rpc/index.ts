@@ -6,5 +6,6 @@
  */
 
 export * from "./nitrolite";
+export * from "./nitrolite.hash";
 export * from "./types";
 export * from "./utils";

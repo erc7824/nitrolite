@@ -24,7 +24,7 @@ export interface Signature {
  */
 export interface Allocation {
     destination: Address; // Where funds are sent on channel closure
-    token: Address; // ERC-20 token contract address
+    token: Address; // ERC-20 token address (zero address for ETH)
     amount: bigint; // Token amount allocated
 }
 

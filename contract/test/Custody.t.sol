@@ -71,7 +71,7 @@ contract CustodyTest is Test {
         address[] memory participants = new address[](2);
         participants[0] = host;
         participants[1] = guest;
-        
+
         return Channel({
             participants: participants,
             adjudicator: address(adjudicator),
@@ -84,18 +84,10 @@ contract CustodyTest is Test {
     function createInitialState() internal view returns (State memory) {
         // Create allocations for both participants
         Allocation[] memory allocations = new Allocation[](2);
-        
-        allocations[0] = Allocation({
-            destination: host, 
-            token: address(token), 
-            amount: DEPOSIT_AMOUNT
-        });
-        
-        allocations[1] = Allocation({
-            destination: guest, 
-            token: address(token), 
-            amount: DEPOSIT_AMOUNT
-        });
+
+        allocations[0] = Allocation({destination: host, token: address(token), amount: DEPOSIT_AMOUNT});
+
+        allocations[1] = Allocation({destination: guest, token: address(token), amount: DEPOSIT_AMOUNT});
 
         // Create openChannel magic number data
         bytes memory data = abi.encode(CHANOPEN);
@@ -107,23 +99,15 @@ contract CustodyTest is Test {
             sigs: new Signature[](0) // Empty initially
         });
     }
-    
+
     // Helper to create a closing state
     function createClosingState() internal view returns (State memory) {
         // Create allocations for both participants
         Allocation[] memory allocations = new Allocation[](2);
-        
-        allocations[0] = Allocation({
-            destination: host, 
-            token: address(token), 
-            amount: DEPOSIT_AMOUNT
-        });
-        
-        allocations[1] = Allocation({
-            destination: guest, 
-            token: address(token), 
-            amount: DEPOSIT_AMOUNT
-        });
+
+        allocations[0] = Allocation({destination: host, token: address(token), amount: DEPOSIT_AMOUNT});
+
+        allocations[1] = Allocation({destination: guest, token: address(token), amount: DEPOSIT_AMOUNT});
 
         // Create closeChannel magic number data
         bytes memory data = abi.encode(CHANCLOSE);
@@ -260,11 +244,11 @@ contract CustodyTest is Test {
         address[] memory validParticipants = new address[](2);
         validParticipants[0] = host;
         validParticipants[1] = guest;
-        
+
         Channel memory chanWithZeroAdjudicator = Channel({
-            participants: validParticipants, 
-            adjudicator: address(0), 
-            challenge: CHALLENGE_DURATION, 
+            participants: validParticipants,
+            adjudicator: address(0),
+            challenge: CHALLENGE_DURATION,
             nonce: NONCE
         });
 
@@ -274,12 +258,8 @@ contract CustodyTest is Test {
         vm.stopPrank();
 
         // Test with zero challenge period
-        Channel memory chanWithZeroChallenge = Channel({
-            participants: validParticipants, 
-            adjudicator: address(adjudicator), 
-            challenge: 0, 
-            nonce: NONCE
-        });
+        Channel memory chanWithZeroChallenge =
+            Channel({participants: validParticipants, adjudicator: address(adjudicator), challenge: 0, nonce: NONCE});
 
         vm.startPrank(host);
         vm.expectRevert(Custody.InvalidChallengePeriod.selector);
@@ -317,7 +297,7 @@ contract CustodyTest is Test {
         // Both sign the final state
         hostSig = signState(chan, finalState, hostPrivKey);
         guestSig = signState(chan, finalState, guestPrivKey);
-        
+
         Signature[] memory bothSigs = new Signature[](2);
         bothSigs[0] = hostSig;
         bothSigs[1] = guestSig;
@@ -364,7 +344,7 @@ contract CustodyTest is Test {
 
         // 2. Try to close with invalid close state (missing CHANCLOSE magic number)
         State memory invalidState = initialState; // Not a closing state
-        
+
         Signature[] memory bothSigs = new Signature[](2);
         bothSigs[0] = hostSig;
         bothSigs[1] = guestSig;
@@ -431,7 +411,7 @@ contract CustodyTest is Test {
         // Both sign the counter-challenge
         Signature memory hostCounterSig = signState(chan, counterChallengeState, hostPrivKey);
         Signature memory guestCounterSig = signState(chan, counterChallengeState, guestPrivKey);
-        
+
         Signature[] memory counterChallengeSigs = new Signature[](2);
         counterChallengeSigs[0] = hostCounterSig;
         counterChallengeSigs[1] = guestCounterSig;
@@ -563,7 +543,7 @@ contract CustodyTest is Test {
 
         // Close with checkpointed state
         skipChallengeTime();
-        
+
         // Try to close normally - should succeed because challenge timer expired
         State memory closeState = createClosingState();
         // Add signatures
@@ -573,7 +553,7 @@ contract CustodyTest is Test {
         closeSigs[0] = hostCloseSig;
         closeSigs[1] = guestCloseSig;
         closeState.sigs = closeSigs;
-        
+
         vm.prank(host);
         custody.close(channelId, closeState, new State[](0));
     }
@@ -644,7 +624,7 @@ contract CustodyTest is Test {
         address[] memory participants = new address[](2);
         participants[0] = host;
         participants[1] = guest;
-        
+
         Channel memory newChan = Channel({
             participants: participants,
             adjudicator: address(adjudicator),

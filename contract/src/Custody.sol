@@ -269,8 +269,7 @@ contract Custody is IChannel, IDeposit {
 
             // Already in DISPUTE with an expired challenge - can proceed to finalization
             meta.stage = Status.FINAL;
-        }
-        else {
+        } else {
             revert InvalidStatus();
         }
 
@@ -405,7 +404,11 @@ contract Custody is IChannel, IDeposit {
      * @param previous The previous state to compare against
      * @return True if the candidate state is more recent than the previous state
      */
-    function _isMoreRecent(address adjudicator, State calldata candidate, State memory previous) internal view returns (bool) {
+    function _isMoreRecent(address adjudicator, State calldata candidate, State memory previous)
+        internal
+        view
+        returns (bool)
+    {
         return IComparable(adjudicator).compare(candidate, previous) > 0;
     }
 

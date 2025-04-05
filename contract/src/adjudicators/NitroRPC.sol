@@ -30,8 +30,8 @@ contract NitroRPC is IAdjudicator, IComparable {
         uint64 requestID;
         uint64 timestamp;
         string method;
-        bytes[] params;
-        bytes[] result;
+        bytes params;
+        bytes result;
     }
 
     function compare(State calldata candidate, State calldata previous) external pure returns (int8 result) {

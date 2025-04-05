@@ -23,6 +23,19 @@ This repository contains:
 
 - **[`/contract`](/contract)**: Solidity smart contracts for the state channel framework
 - **[`/sdk`](/sdk)**: TypeScript SDK for building applications with Nitrolite
+- **[`/docs`](/docs)**: Protocol specifications and documentation
+
+## Protocol
+
+Nitrolite implements a state channel protocol that enables secure off-chain communication with minimal on-chain operations. The protocol includes:
+
+- **Channel Creation**: A funding protocol where participants lock assets in the custody contract
+- **Off-Chain Updates**: A mechanism for exchanging and signing state updates off-chain
+- **Channel Closure**: Multiple resolution paths including cooperative close and challenge-response
+- **Checkpointing**: The ability to record valid states on-chain without closing the channel
+- **Reset Capability**: Support for resizing allocations by closing and reopening channels
+
+See the [protocol specification](/docs/PROTOCOL.md) for complete details.
 
 ## Smart Contracts
 
@@ -31,14 +44,16 @@ The Nitrolite contract system provides:
 - **Custody** of ERC-20 tokens for each channel
 - **Mutual close** when participants agree on a final state
 - **Challenge/response** mechanism for unilateral finalization
+- **Checkpointing** for recording valid states without closing
 
 ### Interface Structure
 
 The core interfaces include:
 
-- **IChannel**: Main interface for channel management
+- **IChannel**: Main interface for channel creation, joining, closing, and dispute resolution
 - **IAdjudicator**: Interface for state validation contracts
 - **IDeposit**: Interface for token deposits and withdrawals
+- **IComparable**: Interface for determining the ordering between states
 
 See the [contract README](/contract/README.md) for detailed contract documentation.
 
@@ -139,12 +154,24 @@ A state channel is a relationship between participants that allows them to excha
              +------------+
 ```
 
-### High-Level Flow
+### Channel Lifecycle
 
-1. **Channel Creation**: Participants deposit ERC20 tokens into the contract
-2. **Off-Chain Updates**: Parties exchange and co-sign states off-chain
-3. **Happy Path**: Both parties agree on a final state and close cooperatively
-4. **Unhappy Path**: If a party stops responding, the other can use the challenge mechanism to finalize
+1. **Creation**: Creator constructs channel config, defines initial state with `CHANOPEN` magic number
+2. **Joining**: Participants verify the channel and sign the same funding state
+3. **Active**: Once fully funded, the channel transitions to active state for off-chain operation
+4. **Off-chain Updates**: Participants exchange and sign state updates according to application logic
+5. **Resolution**:
+   - **Cooperative Close**: All parties sign a final state with `CHANCLOSE` magic number
+   - **Challenge-Response**: Participant can post a state on-chain and initiate challenge period
+   - **Checkpoint**: Record valid state on-chain without closing for future dispute resolution
+   - **Reset**: Close and reopen a channel to resize allocations
+
+### Data Structures
+
+- **Channel**: Configuration with participants, adjudicator, challenge period, and nonce
+- **State**: Application data, asset allocations, and signatures
+- **Allocation**: Destination address, token, and amount for each participant
+- **Status**: Channel lifecycle stages (VOID, INITIAL, ACTIVE, DISPUTE, FINAL)
 
 ## Development
 

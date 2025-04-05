@@ -1,9 +1,11 @@
 import { Abi } from 'abitype';
 
-export const ChannelOpenedEvent = 'ChannelOpened';
+export const ChannelOpenedEvent = 'Opened';
 export const ChannelClosedEvent = 'ChannelClosed';
-export const ChannelChallengedEvent = 'ChannelChallenged';
-export const ChannelCheckpointedEvent = 'ChannelCheckpointed';
+export const ChannelChallengedEvent = 'Challenged';
+export const ChannelCheckpointedEvent = 'Checkpointed';
+export const ChannelCreatedEvent = 'Created';
+export const ChannelJoinedEvent = 'Joined';
 
 /**
  * ABI for the Custody contract
@@ -31,8 +33,8 @@ export const CustodyAbi: Abi = [
                     },
                     {
                         name: 'allocations',
-                        type: 'tuple[2]',
-                        internalType: 'struct Allocation[2]',
+                        type: 'tuple[]',
+                        internalType: 'struct Allocation[]',
                         components: [
                             {
                                 name: 'destination',
@@ -87,8 +89,8 @@ export const CustodyAbi: Abi = [
                     },
                     {
                         name: 'allocations',
-                        type: 'tuple[2]',
-                        internalType: 'struct Allocation[2]',
+                        type: 'tuple[]',
+                        internalType: 'struct Allocation[]',
                         components: [
                             {
                                 name: 'destination',
@@ -156,8 +158,8 @@ export const CustodyAbi: Abi = [
                     },
                     {
                         name: 'allocations',
-                        type: 'tuple[2]',
-                        internalType: 'struct Allocation[2]',
+                        type: 'tuple[]',
+                        internalType: 'struct Allocation[]',
                         components: [
                             {
                                 name: 'destination',
@@ -212,8 +214,8 @@ export const CustodyAbi: Abi = [
                     },
                     {
                         name: 'allocations',
-                        type: 'tuple[2]',
-                        internalType: 'struct Allocation[2]',
+                        type: 'tuple[]',
+                        internalType: 'struct Allocation[]',
                         components: [
                             {
                                 name: 'destination',
@@ -281,8 +283,8 @@ export const CustodyAbi: Abi = [
                     },
                     {
                         name: 'allocations',
-                        type: 'tuple[2]',
-                        internalType: 'struct Allocation[2]',
+                        type: 'tuple[]',
+                        internalType: 'struct Allocation[]',
                         components: [
                             {
                                 name: 'destination',
@@ -337,8 +339,8 @@ export const CustodyAbi: Abi = [
                     },
                     {
                         name: 'allocations',
-                        type: 'tuple[2]',
-                        internalType: 'struct Allocation[2]',
+                        type: 'tuple[]',
+                        internalType: 'struct Allocation[]',
                         components: [
                             {
                                 name: 'destination',
@@ -452,7 +454,7 @@ export const CustodyAbi: Abi = [
     },
     {
         type: 'function',
-        name: 'open',
+        name: 'create',
         inputs: [
             {
                 name: 'ch',
@@ -461,8 +463,8 @@ export const CustodyAbi: Abi = [
                 components: [
                     {
                         name: 'participants',
-                        type: 'address[2]',
-                        internalType: 'address[2]',
+                        type: 'address[]',
+                        internalType: 'address[]',
                     },
                     {
                         name: 'adjudicator',
@@ -482,7 +484,7 @@ export const CustodyAbi: Abi = [
                 ],
             },
             {
-                name: 'depositState',
+                name: 'initial',
                 type: 'tuple',
                 internalType: 'struct State',
                 components: [
@@ -493,8 +495,8 @@ export const CustodyAbi: Abi = [
                     },
                     {
                         name: 'allocations',
-                        type: 'tuple[2]',
-                        internalType: 'struct Allocation[2]',
+                        type: 'tuple[]',
+                        internalType: 'struct Allocation[]',
                         components: [
                             {
                                 name: 'destination',
@@ -549,15 +551,48 @@ export const CustodyAbi: Abi = [
     },
     {
         type: 'function',
-        name: 'reclaim',
+        name: 'join',
         inputs: [
             {
                 name: 'channelId',
                 type: 'bytes32',
                 internalType: 'bytes32',
             },
+            {
+                name: 'index',
+                type: 'uint256',
+                internalType: 'uint256',
+            },
+            {
+                name: 'sig',
+                type: 'tuple',
+                internalType: 'struct Signature',
+                components: [
+                    {
+                        name: 'v',
+                        type: 'uint8',
+                        internalType: 'uint8',
+                    },
+                    {
+                        name: 'r',
+                        type: 'bytes32',
+                        internalType: 'bytes32',
+                    },
+                    {
+                        name: 's',
+                        type: 'bytes32',
+                        internalType: 'bytes32',
+                    },
+                ],
+            },
         ],
-        outputs: [],
+        outputs: [
+            {
+                name: '',
+                type: 'bytes32',
+                internalType: 'bytes32',
+            },
+        ],
         stateMutability: 'nonpayable',
     },
     {
@@ -581,8 +616,8 @@ export const CustodyAbi: Abi = [
                     },
                     {
                         name: 'allocations',
-                        type: 'tuple[2]',
-                        internalType: 'struct Allocation[2]',
+                        type: 'tuple[]',
+                        internalType: 'struct Allocation[]',
                         components: [
                             {
                                 name: 'destination',
@@ -637,8 +672,8 @@ export const CustodyAbi: Abi = [
                     },
                     {
                         name: 'allocations',
-                        type: 'tuple[2]',
-                        internalType: 'struct Allocation[2]',
+                        type: 'tuple[]',
+                        internalType: 'struct Allocation[]',
                         components: [
                             {
                                 name: 'destination',
@@ -688,8 +723,8 @@ export const CustodyAbi: Abi = [
                 components: [
                     {
                         name: 'participants',
-                        type: 'address[2]',
-                        internalType: 'address[2]',
+                        type: 'address[]',
+                        internalType: 'address[]',
                     },
                     {
                         name: 'adjudicator',
@@ -720,8 +755,8 @@ export const CustodyAbi: Abi = [
                     },
                     {
                         name: 'allocations',
-                        type: 'tuple[2]',
-                        internalType: 'struct Allocation[2]',
+                        type: 'tuple[]',
+                        internalType: 'struct Allocation[]',
                         components: [
                             {
                                 name: 'destination',
@@ -788,7 +823,7 @@ export const CustodyAbi: Abi = [
     },
     {
         type: 'event',
-        name: 'ChannelChallenged',
+        name: 'Challenged',
         inputs: [
             {
                 name: 'channelId',
@@ -807,7 +842,7 @@ export const CustodyAbi: Abi = [
     },
     {
         type: 'event',
-        name: 'ChannelCheckpointed',
+        name: 'Checkpointed',
         inputs: [
             {
                 name: 'channelId',
@@ -833,7 +868,7 @@ export const CustodyAbi: Abi = [
     },
     {
         type: 'event',
-        name: 'ChannelOpened',
+        name: 'Created',
         inputs: [
             {
                 name: 'channelId',
@@ -849,8 +884,8 @@ export const CustodyAbi: Abi = [
                 components: [
                     {
                         name: 'participants',
-                        type: 'address[2]',
-                        internalType: 'address[2]',
+                        type: 'address[]',
+                        internalType: 'address[]',
                     },
                     {
                         name: 'adjudicator',
@@ -866,6 +901,63 @@ export const CustodyAbi: Abi = [
                         name: 'nonce',
                         type: 'uint64',
                         internalType: 'uint64',
+                    },
+                ],
+            },
+            {
+                name: 'initial',
+                type: 'tuple',
+                indexed: false,
+                internalType: 'struct State',
+                components: [
+                    {
+                        name: 'data',
+                        type: 'bytes',
+                        internalType: 'bytes',
+                    },
+                    {
+                        name: 'allocations',
+                        type: 'tuple[]',
+                        internalType: 'struct Allocation[]',
+                        components: [
+                            {
+                                name: 'destination',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'token',
+                                type: 'address',
+                                internalType: 'address',
+                            },
+                            {
+                                name: 'amount',
+                                type: 'uint256',
+                                internalType: 'uint256',
+                            },
+                        ],
+                    },
+                    {
+                        name: 'sigs',
+                        type: 'tuple[]',
+                        internalType: 'struct Signature[]',
+                        components: [
+                            {
+                                name: 'v',
+                                type: 'uint8',
+                                internalType: 'uint8',
+                            },
+                            {
+                                name: 'r',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                            {
+                                name: 's',
+                                type: 'bytes32',
+                                internalType: 'bytes32',
+                            },
+                        ],
                     },
                 ],
             },
@@ -874,7 +966,7 @@ export const CustodyAbi: Abi = [
     },
     {
         type: 'event',
-        name: 'ChannelPartiallyFunded',
+        name: 'Joined',
         inputs: [
             {
                 name: 'channelId',
@@ -883,32 +975,23 @@ export const CustodyAbi: Abi = [
                 internalType: 'bytes32',
             },
             {
-                name: 'channel',
-                type: 'tuple',
+                name: 'index',
+                type: 'uint256',
                 indexed: false,
-                internalType: 'struct Channel',
-                components: [
-                    {
-                        name: 'participants',
-                        type: 'address[2]',
-                        internalType: 'address[2]',
-                    },
-                    {
-                        name: 'adjudicator',
-                        type: 'address',
-                        internalType: 'address',
-                    },
-                    {
-                        name: 'challenge',
-                        type: 'uint64',
-                        internalType: 'uint64',
-                    },
-                    {
-                        name: 'nonce',
-                        type: 'uint64',
-                        internalType: 'uint64',
-                    },
-                ],
+                internalType: 'uint256',
+            },
+        ],
+        anonymous: false,
+    },
+    {
+        type: 'event',
+        name: 'Opened',
+        inputs: [
+            {
+                name: 'channelId',
+                type: 'bytes32',
+                indexed: true,
+                internalType: 'bytes32',
             },
         ],
         anonymous: false,

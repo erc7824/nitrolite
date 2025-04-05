@@ -24,5 +24,4 @@ contract FlagAdjudicator is IAdjudicator {
         // Always return true to indicate that the state is valid
         return flag;
     }
-
 }

@@ -46,4 +46,29 @@ library Utils {
         address recoveredSigner = stateHash.toEthSignedMessageHash().recover(sig.v, sig.r, sig.s);
         return recoveredSigner == signer;
     }
+
+    /**
+     * @notice Verifies that all provided signatures are valid for the given state
+     * @param chan The channel configuration
+     * @param state The state to verify signatures for
+     * @return valid True if all provided signatures are valid
+     */
+    function verifyAllSignatures(Channel memory chan, State memory state) internal pure returns (bool valid) {
+        // Calculate the state hash once
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+
+        // Check if we have the right number of signatures
+        if (state.sigs.length > chan.participants.length) {
+            return false;
+        }
+
+        // Verify each signature
+        for (uint256 i = 0; i < state.sigs.length; i++) {
+            bool isValid = Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i]);
+            if (!isValid) {
+                return false;
+            }
+        }
+        return true;
+    }
 }

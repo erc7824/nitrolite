@@ -24,11 +24,17 @@ contract CustodyTest is Test {
     uint256 constant hostPrivKey = 1;
     uint256 constant guestPrivKey = 2;
     uint256 constant nonParticipantPrivKey = 3;
+    uint256 constant depositorPrivKey = 4;
+    uint256 constant hostParticipantPrivKey = 5;
+    uint256 constant guestParticipantPrivKey = 6;
 
     // Test users
     address public host;
     address public guest;
     address public nonParticipant;
+    address public depositor;
+    address public hostParticipant;
+    address public guestParticipant;
 
     // Common test values
     uint64 constant CHALLENGE_DURATION = 3600; // 1 hour
@@ -41,6 +47,9 @@ contract CustodyTest is Test {
         host = vm.addr(hostPrivKey);
         guest = vm.addr(guestPrivKey);
         nonParticipant = vm.addr(nonParticipantPrivKey);
+        depositor = vm.addr(depositorPrivKey);
+        hostParticipant = vm.addr(hostParticipantPrivKey);
+        guestParticipant = vm.addr(guestParticipantPrivKey);
 
         // Deploy contracts
         custody = new Custody();
@@ -51,6 +60,7 @@ contract CustodyTest is Test {
         token.mint(host, INITIAL_BALANCE);
         token.mint(guest, INITIAL_BALANCE);
         token.mint(nonParticipant, INITIAL_BALANCE);
+        token.mint(depositor, INITIAL_BALANCE);
 
         // Approve token transfers
         vm.startPrank(host);
@@ -64,6 +74,10 @@ contract CustodyTest is Test {
         vm.startPrank(nonParticipant);
         token.approve(address(custody), INITIAL_BALANCE);
         vm.stopPrank();
+
+        vm.startPrank(depositor);
+        token.approve(address(custody), INITIAL_BALANCE);
+        vm.stopPrank();
     }
 
     // Helper to create a standard test channel
@@ -71,6 +85,20 @@ contract CustodyTest is Test {
         address[] memory participants = new address[](2);
         participants[0] = host;
         participants[1] = guest;
+
+        return Channel({
+            participants: participants,
+            adjudicator: address(adjudicator),
+            challenge: CHALLENGE_DURATION,
+            nonce: NONCE
+        });
+    }
+
+    // Helper to create a test channel with separate participant addresses
+    function createTestChannelWithParticipants() internal view returns (Channel memory) {
+        address[] memory participants = new address[](2);
+        participants[0] = hostParticipant;
+        participants[1] = guestParticipant;
 
         return Channel({
             participants: participants,
@@ -100,6 +128,26 @@ contract CustodyTest is Test {
         });
     }
 
+    // Helper to create an initial state for testing with separate participants
+    function createInitialStateWithParticipants() internal view returns (State memory) {
+        // Create allocations for both participants
+        Allocation[] memory allocations = new Allocation[](2);
+
+        allocations[0] = Allocation({destination: hostParticipant, token: address(token), amount: DEPOSIT_AMOUNT});
+
+        allocations[1] = Allocation({destination: guestParticipant, token: address(token), amount: DEPOSIT_AMOUNT});
+
+        // Create openChannel magic number data
+        bytes memory data = abi.encode(CHANOPEN);
+
+        // Create unsigned state
+        return State({
+            data: data,
+            allocations: allocations,
+            sigs: new Signature[](0) // Empty initially
+        });
+    }
+
     // Helper to create a closing state
     function createClosingState() internal view returns (State memory) {
         // Create allocations for both participants
@@ -108,6 +156,26 @@ contract CustodyTest is Test {
         allocations[0] = Allocation({destination: host, token: address(token), amount: DEPOSIT_AMOUNT});
 
         allocations[1] = Allocation({destination: guest, token: address(token), amount: DEPOSIT_AMOUNT});
+
+        // Create closeChannel magic number data
+        bytes memory data = abi.encode(CHANCLOSE);
+
+        // Create unsigned state
+        return State({
+            data: data,
+            allocations: allocations,
+            sigs: new Signature[](0) // Empty initially
+        });
+    }
+
+    // Helper to create a closing state with separate participants
+    function createClosingStateWithParticipants() internal view returns (State memory) {
+        // Create allocations for both participants
+        Allocation[] memory allocations = new Allocation[](2);
+
+        allocations[0] = Allocation({destination: hostParticipant, token: address(token), amount: DEPOSIT_AMOUNT});
+
+        allocations[1] = Allocation({destination: guestParticipant, token: address(token), amount: DEPOSIT_AMOUNT});
 
         // Create closeChannel magic number data
         bytes memory data = abi.encode(CHANCLOSE);
@@ -651,5 +719,107 @@ contract CustodyTest is Test {
 
         bytes32 newChannelId = Utils.getChannelId(newChan);
         assertEq(hostChannels[0], newChannelId, "Host's channel should be the new one");
+    }
+
+    // ==== 7. Separate Depositor and Participant Addresses ====
+
+    function test_SeparateDepositorAndParticipant() public {
+        // 1. Prepare channel with different participant addresses
+        Channel memory chan = createTestChannelWithParticipants();
+        State memory initialState = createInitialStateWithParticipants();
+        // NOTE: depositor is specified instead of host in allocations
+        initialState.allocations[0].destination = depositor;
+
+        // 2. Sign the state by the host participant (not the depositor/creator)
+        Signature memory hostPartSig = signState(chan, initialState, hostParticipantPrivKey);
+        Signature[] memory sigs = new Signature[](1);
+        sigs[0] = hostPartSig;
+        initialState.sigs = sigs;
+
+        // 3. Depositor deposits tokens into the participant accounts first
+        vm.startPrank(depositor);
+        custody.deposit(address(token), DEPOSIT_AMOUNT);
+        vm.stopPrank();
+
+        // 4. Create the channel as host participant
+        vm.prank(depositor);
+        bytes32 channelId = custody.create(chan, initialState);
+
+        // 5. Verify the channel is created and funds are locked
+        (, uint256 locked, uint256 channelCount) = custody.getAccountInfo(depositor, address(token));
+        assertEq(locked, DEPOSIT_AMOUNT, "Depositor's tokens not locked correctly");
+        assertEq(channelCount, 1, "Depositor should have 1 channel");
+
+        // 6. Guest participant joins the channel
+        vm.startPrank(guestParticipant);
+        token.mint(guestParticipant, INITIAL_BALANCE);
+        token.approve(address(custody), INITIAL_BALANCE);
+        custody.deposit(address(token), DEPOSIT_AMOUNT);
+        vm.stopPrank();
+
+        // Sign the state by guest participant
+        Signature memory guestPartSig = signState(chan, initialState, guestParticipantPrivKey);
+
+        // Guest participant joins with their own signature
+        vm.prank(guestParticipant);
+        custody.join(channelId, 1, guestPartSig);
+
+        // 7. Verify channel is ACTIVE
+        bytes32[] memory depositorChannels = custody.getAccountChannels(depositor);
+        assertEq(depositorChannels.length, 1, "Depositor should have 1 channel");
+
+        bytes32[] memory guestChannels = custody.getAccountChannels(guestParticipant);
+        assertEq(guestChannels.length, 1, "Guest participant should have 1 channel");
+
+        // 8. Create a checkpoint state
+        State memory checkpointState = initialState;
+        checkpointState.data = abi.encode(42);
+
+        // Both participants sign the checkpoint state
+        Signature memory hostPartCheckpointSig = signState(chan, checkpointState, hostParticipantPrivKey);
+        Signature memory guestPartCheckpointSig = signState(chan, checkpointState, guestParticipantPrivKey);
+
+        Signature[] memory checkpointSigs = new Signature[](2);
+        checkpointSigs[0] = hostPartCheckpointSig;
+        checkpointSigs[1] = guestPartCheckpointSig;
+        checkpointState.sigs = checkpointSigs;
+
+        // 9. Checkpoint the state by the host participant
+        vm.prank(depositor);
+        custody.checkpoint(channelId, checkpointState, new State[](0));
+
+        // 10. Create a closing state
+        State memory finalState = createClosingStateWithParticipants();
+        finalState.allocations[0].destination = depositor;
+
+        // Both participants sign the final state
+        Signature memory hostPartFinalSig = signState(chan, finalState, hostParticipantPrivKey);
+        Signature memory guestPartFinalSig = signState(chan, finalState, guestParticipantPrivKey);
+
+        Signature[] memory finalSigs = new Signature[](2);
+        finalSigs[0] = hostPartFinalSig;
+        finalSigs[1] = guestPartFinalSig;
+        finalState.sigs = finalSigs;
+
+        // 11. Close the channel cooperatively
+        vm.prank(depositor);
+        custody.close(channelId, finalState, new State[](0));
+
+        // 12. Verify funds are returned correctly
+        bytes32[] memory depositorChannelsAfter = custody.getAccountChannels(depositor);
+        assertEq(depositorChannelsAfter.length, 0, "Depositor should have no channels after close");
+
+        bytes32[] memory guestChannelsAfter = custody.getAccountChannels(guestParticipant);
+        assertEq(guestChannelsAfter.length, 0, "Guest participant should have no channels after close");
+
+        (uint256 depositorAvailable, uint256 depositorLocked,) = custody.getAccountInfo(depositor, address(token));
+        (uint256 guestAvailable, uint256 guestLocked,) = custody.getAccountInfo(guestParticipant, address(token));
+
+        assertEq(depositorLocked, 0, "Depositor's tokens should be unlocked");
+        assertEq(guestLocked, 0, "Guest participant's tokens should be unlocked");
+
+        // In this flow, the funds go back to participants (who are also depositors)
+        assertEq(depositorAvailable, DEPOSIT_AMOUNT, "Depositor available balance incorrect");
+        assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest available balance incorrect");
     }
 }

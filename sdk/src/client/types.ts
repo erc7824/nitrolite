@@ -1,4 +1,4 @@
-import { Address, Hex } from 'viem';
+import { Address, Hex } from "viem";
 
 /**
  * Channel identifier
@@ -63,6 +63,6 @@ export enum AdjudicatorStatus {
  */
 export enum Role {
     UNDEFINED = -1,
-    HOST = 0,
+    CREATOR = 0,
     GUEST = 1,
 }

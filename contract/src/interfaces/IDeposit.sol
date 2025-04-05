@@ -22,24 +22,4 @@ interface IDeposit {
      * @param amount Amount of tokens to withdraw
      */
     function withdraw(address token, uint256 amount) external;
-
-    /**
-     * @notice Returns the list of channels associated with an account
-     * @param account The account address
-     * @return Array of channel identifiers linked to the account
-     */
-    function getAccountChannels(address account) external view returns (bytes32[] memory);
-
-    /**
-     * @notice Returns the account information for a specific token
-     * @param user The account address
-     * @param token The token address
-     * @return available Amount available for withdrawal or allocation
-     * @return locked Amount locked in active channels
-     * @return channelCount Number of associated channels
-     */
-    function getAccountInfo(address user, address token)
-        external
-        view
-        returns (uint256 available, uint256 locked, uint256 channelCount);
 }

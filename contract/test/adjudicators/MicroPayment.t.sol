@@ -46,7 +46,9 @@ contract MicroPaymentTest is Test {
         token = new MockERC20("Test Token", "TEST", 18);
 
         // Set up the channel
-        address[2] memory participants = [host, guest];
+        address[] memory participants = new address[](2);
+        participants[0] = host;
+        participants[1] = guest;
         channel = Channel({
             participants: participants,
             adjudicator: address(adjudicator),
@@ -71,7 +73,9 @@ contract MicroPaymentTest is Test {
     {
         State memory state;
         state.data = abi.encode(paymentAmount);
-        state.allocations = allocations;
+        state.allocations = new Allocation[](2);
+        state.allocations[0] = allocations[0];
+        state.allocations[1] = allocations[1];
         state.sigs = new Signature[](0); // Empty signatures to be filled later
         return state;
     }

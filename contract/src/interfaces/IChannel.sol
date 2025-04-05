@@ -13,9 +13,9 @@ interface IChannel {
      * @notice Emitted when a new channel is created
      * @param channelId Unique identifier for the channel
      * @param channel Channel configuration including participants and adjudicator
-     * @param expected Expected token deposits from each participant
+     * @param initial Initial state that the channel is opened with
      */
-    event Created(bytes32 indexed channelId, Channel channel, Amount[] expected);
+    event Created(bytes32 indexed channelId, Channel channel, State initial);
 
     /**
      * @notice Emitted when a participant joins a channel

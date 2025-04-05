@@ -36,6 +36,7 @@ contract Custody is IChannel, IDeposit {
         Channel chan; // Opener define channel configuration
         Status stage;
         address creator;
+        // TODO: replace 2 Amount[] arrays with EnumerableSet of participants that have joined
         Amount[] expectedDeposits; // Creator defines Token per participant
         Amount[] actualDeposits; // Tracks deposits made by each participant
         uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
@@ -116,9 +117,8 @@ contract Custody is IChannel, IDeposit {
         if (ch.challenge == 0) revert InvalidChallengePeriod();
 
         // Validate initial state for funding protocol
-        uint32 magicNumber;
-        // Decode the magic number from abi.encode(CHANOPEN)
-        (magicNumber) = abi.decode(initial.data, (uint32));
+        (uint32 magicNumber) = abi.decode(initial.data, (uint32));
+        // TODO: replace with `require(...)`
         if (magicNumber != CHANOPEN) revert InvalidState();
 
         // Generate channel ID and check it doesn't exist
@@ -127,7 +127,8 @@ contract Custody is IChannel, IDeposit {
 
         // Verify creator's signature
         bytes32 stateHash = Utils.getStateHash(ch, initial);
-        if (initial.sigs.length == 0) revert InvalidStateSignatures();
+        if (initial.sigs.length != 1) revert InvalidStateSignatures();
+        // TODO: later we can lift the restriction that first sig must be from participant 0
         bool validSig = Utils.verifySignature(stateHash, initial.sigs[0], ch.participants[0]);
         if (!validSig) revert InvalidStateSignatures();
 
@@ -141,20 +142,19 @@ contract Custody is IChannel, IDeposit {
         // Set up expected deposits from allocations
         uint256 participantCount = ch.participants.length;
         for (uint256 i = 0; i < participantCount; i++) {
-            address token;
-            uint256 amount;
-            
+            address token = address(0);
+            uint256 amount = 0;
+
             // Find the allocation for this participant if it exists
-            bool found = false;
             for (uint256 j = 0; j < initial.allocations.length; j++) {
                 if (initial.allocations[j].destination == ch.participants[i]) {
                     token = initial.allocations[j].token;
                     amount = initial.allocations[j].amount;
-                    found = true;
                     break;
                 }
             }
-            
+
+            // even if participant does not have an allocation, still track that
             meta.expectedDeposits.push(Amount(token, amount));
             meta.actualDeposits.push(Amount(address(0), 0)); // Initialize actual deposits to zero
         }
@@ -162,19 +162,19 @@ contract Custody is IChannel, IDeposit {
         // Lock creator's funds
         address participant = ch.participants[0];
         if (participant != msg.sender) revert InvalidParticipant();
-        
+
         Amount memory creatorDeposit = meta.expectedDeposits[0];
         _lockAccountFundsToChannel(msg.sender, channelId, creatorDeposit.token, creatorDeposit.amount);
-        
+
         // Record actual deposit
         meta.actualDeposits[0] = creatorDeposit;
-        
+
         // Add channel to the creator's ledger
         _ledgers[msg.sender].channels.add(channelId);
-        
+
         // Emit event
-        emit Created(channelId, ch, meta.expectedDeposits);
-        
+        emit Created(channelId, ch, initial);
+
         return channelId;
     }
 
@@ -187,36 +187,36 @@ contract Custody is IChannel, IDeposit {
      */
     function join(bytes32 channelId, uint256 index, Signature calldata sig) external returns (bytes32) {
         Metadata storage meta = _channels[channelId];
-        
+
         // Verify channel exists and is in INITIAL state
         if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
         if (meta.stage != Status.INITIAL) revert InvalidStatus();
-        
+
         // Verify index is valid and participant has not already joined
         if (index == 0 || index >= meta.chan.participants.length) revert InvalidParticipant();
         if (meta.actualDeposits[index].amount != 0) revert InvalidParticipant();
-        
+
         // Get participant address from channel config
         address participant = meta.chan.participants[index];
-        
+
         // Verify signature on funding stateHash
         bytes32 stateHash = Utils.getStateHash(meta.chan, meta.lastValidState);
         bool validSig = Utils.verifySignature(stateHash, sig, participant);
         if (!validSig) revert InvalidStateSignatures();
-        
+
         // Lock participant's funds according to expected deposit
         Amount memory expectedDeposit = meta.expectedDeposits[index];
         _lockAccountFundsToChannel(msg.sender, channelId, expectedDeposit.token, expectedDeposit.amount);
-        
+
         // Record actual deposit
         meta.actualDeposits[index] = expectedDeposit;
-        
+
         // Add channel to participant's ledger
         _ledgers[msg.sender].channels.add(channelId);
-        
+
         // Emit joined event
         emit Joined(channelId, index);
-        
+
         // Check if all participants have joined
         bool allJoined = true;
         for (uint256 i = 0; i < meta.actualDeposits.length; i++) {
@@ -225,13 +225,13 @@ contract Custody is IChannel, IDeposit {
                 break;
             }
         }
-        
+
         // If all participants have joined, set channel to ACTIVE
         if (allJoined) {
             meta.stage = Status.ACTIVE;
             emit Opened(channelId);
         }
-        
+
         return channelId;
     }
 
@@ -243,23 +243,21 @@ contract Custody is IChannel, IDeposit {
      */
     function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) public {
         Metadata storage meta = _channels[channelId];
-        
+
         // Verify channel exists and is not VOID
         if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
-        
+
         // Case 1: Mutual closing with CHANCLOSE magic number
-        if (meta.stage == Status.ACTIVE || meta.stage == Status.INITIAL) {
+        // Channel must not be in INITIAL stage (participants should close the channel with challenge then)
+        if (meta.stage == Status.ACTIVE) {
             // Check that this is a closing state with CHANCLOSE magic number
-            uint32 magicNumber;
-            // Decode the magic number from abi.encode(CHANCLOSE)
-            (magicNumber) = abi.decode(candidate.data, (uint32));
-            
+            (uint32 magicNumber) = abi.decode(candidate.data, (uint32));
             if (magicNumber != CHANCLOSE) revert InvalidState();
-            
+
             // Verify all participants have signed the closing state
             if (candidate.sigs.length != meta.chan.participants.length) revert InvalidStateSignatures();
             if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
-            
+
             // Store the final state
             meta.lastValidState = candidate;
             meta.stage = Status.FINAL;
@@ -268,16 +266,21 @@ contract Custody is IChannel, IDeposit {
         else if (meta.stage == Status.DISPUTE) {
             // Ensure challenge period has expired
             if (block.timestamp < meta.challengeExpire) revert ChallengeNotExpired();
-            
+
             // Already in DISPUTE with an expired challenge - can proceed to finalization
             meta.stage = Status.FINAL;
         }
         else {
             revert InvalidStatus();
         }
-        
+
         // At this point, the channel is in FINAL state, so we can close it
         _distributeAllocation(channelId, meta);
+
+        // Mark channel as closed by removing it
+        delete _channels[channelId];
+
+        emit ChannelClosed(channelId);
     }
 
     /**
@@ -286,31 +289,34 @@ contract Custody is IChannel, IDeposit {
      * @param candidate The latest known valid state
      * @param proofs is an array of valid state required by the adjudicator
      */
+    // TODO: add a challengerSig and check that it signed by either participant of the channel to disallow non-channel participants to challenge with stolen state
     function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = _channels[channelId];
-        
+
         // Verify channel exists and is in a valid state for challenge
         if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
         if (meta.stage == Status.FINAL) revert InvalidStatus();
-        
+
         // Verify that at least one participant signed the state
         if (candidate.sigs.length == 0) revert InvalidStateSignatures();
-        
+
         // Verify the state is valid according to the adjudicator
         bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
         if (!isValid) revert InvalidState();
-        
-        // If this is a new challenge or the candidate state is more recent than the current one
-        if (meta.stage != Status.DISPUTE || _isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
-            // Store the candidate as the last valid state
-            meta.lastValidState = candidate;
-            // Set or reset the challenge expiration
-            meta.challengeExpire = block.timestamp + meta.chan.challenge;
-            // Set the channel status to DISPUTE
-            meta.stage = Status.DISPUTE;
-            
-            emit Challenged(channelId, meta.challengeExpire);
+
+        // Revert if trying to challenge with an older state that is already known
+        if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
+            revert InvalidState();
         }
+
+        // Store the candidate as the last valid state
+        meta.lastValidState = candidate;
+        // Set or reset the challenge expiration
+        meta.challengeExpire = block.timestamp + meta.chan.challenge;
+        // Set the channel status to DISPUTE
+        meta.stage = Status.DISPUTE;
+
+        emit Challenged(channelId, meta.challengeExpire);
     }
 
     /**
@@ -321,31 +327,33 @@ contract Custody is IChannel, IDeposit {
      */
     function checkpoint(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = _channels[channelId];
-        
+
         // Verify channel exists and is not VOID or FINAL
         if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
         if (meta.stage == Status.FINAL) revert InvalidStatus();
-        
+
         // Verify that at least one participant signed the state
         if (candidate.sigs.length == 0) revert InvalidStateSignatures();
-        
+
         // Verify the state is valid according to the adjudicator
         bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
         if (!isValid) revert InvalidState();
-        
+
         // Verify this state is more recent than the current stored state
-        if (_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
-            // Store the candidate as the last valid state
-            meta.lastValidState = candidate;
-            
-            // If there's an ongoing challenge and this state is newer, cancel the challenge
-            if (meta.stage == Status.DISPUTE) {
-                meta.stage = Status.ACTIVE;
-                meta.challengeExpire = 0;
-            }
-            
-            emit Checkpointed(channelId);
+        if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
+            revert InvalidState();
         }
+
+        // Store the candidate as the last valid state
+        meta.lastValidState = candidate;
+
+        // If there's an ongoing challenge and this state is newer, cancel the challenge
+        if (meta.stage == Status.DISPUTE) {
+            meta.stage = Status.ACTIVE;
+            meta.challengeExpire = 0;
+        }
+
+        emit Checkpointed(channelId);
     }
 
     /**
@@ -388,11 +396,6 @@ contract Custody is IChannel, IDeposit {
             address participant = meta.chan.participants[i];
             _ledgers[participant].channels.remove(channelId);
         }
-
-        // Mark channel as closed by removing it
-        delete _channels[channelId];
-
-        emit ChannelClosed(channelId);
     }
 
     /**
@@ -403,14 +406,7 @@ contract Custody is IChannel, IDeposit {
      * @return True if the candidate state is more recent than the previous state
      */
     function _isMoreRecent(address adjudicator, State calldata candidate, State memory previous) internal view returns (bool) {
-        // Try to use IComparable interface if implemented
-        try IComparable(adjudicator).compare(candidate, previous) returns (int8 result) {
-            return result > 0;
-        } catch {
-            // Fallback logic if comparison fails
-            // Default to checking if the candidate has more signatures
-            return candidate.sigs.length > previous.sigs.length;
-        }
+        return IComparable(adjudicator).compare(candidate, previous) > 0;
     }
 
     function _transfer(address token, address to, uint256 amount) internal {

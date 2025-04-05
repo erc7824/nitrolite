@@ -6,4 +6,12 @@ via_ir = true
 
 [rpc_endpoints]
 unichain_sepolia = "https://sepolia.unichain.org"
+unichain_mainnet = "https://mainnet.unichain.org"
+base_sepolia = "https://sepolia.base.org"
+base_mainnet = "https://mainnet.base.org"
+world_mainnet = "https://worldchain-mainnet.g.alchemy.com/public"
+polygon_mainnet = "https://polygon-mainnet.infura.io/v3/d00b3e0d75e644458fad6ed5e886b84e"
+ethereum_mainnet = "https://mainnet.infura.io/v3/d00b3e0d75e644458fad6ed5e886b84e"
+optimism_mainnet = "https://optimism-mainnet.infura.io/v3/d00b3e0d75e644458fad6ed5e886b84e"
+celo_mainnet = "https://celo-mainnet.infura.io/v3/d00b3e0d75e644458fad6ed5e886b84e"
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

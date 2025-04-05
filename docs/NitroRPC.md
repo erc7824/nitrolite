@@ -74,8 +74,8 @@ type RPCMessage struct {
 struct RPCMessage {
     uint64 requestID;
     string method;
-    bytes[] params;
-    bytes[] result;
+    bytes params;
+    bytes result;
     uint64 timestamp;
 }
 
@@ -110,8 +110,7 @@ keccak256(
 
 ### Signatures
 
-RPCStateHash are signed using curve25519, with EIP-191 prefix as the protocol intend to be chain agnostic.
-
+RPCStateHash are signed using curve25519, without EIP-191 prefix as the protocol intend to be chain agnostic.
 In case the server rpc handler return an error in result field, it is NOT recommended to countersign the request.
 
 ## Adjudication rules

@@ -3,61 +3,90 @@ pragma solidity ^0.8.13;
 
 /**
  * @title State Channel Type Definitions
- * @notice Shared types used in the state channel system
+ * @notice Shared types used in the Nitrolite state channel system
+ */
+
+/**
+ * @notice Signature structure for digital signatures
+ * @dev Used for off-chain signatures verification in the state channel protocol
  */
 struct Signature {
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
+    uint8 v; // Recovery ID
+    bytes32 r; // R component of the signature
+    bytes32 s; // S component of the signature
 }
 
+/**
+ * @notice Amount structure for token value storage
+ * @dev Used to represent a token and its associated amount
+ */
 struct Amount {
-  address token; // ERC-20 token contract address
-  uint256 amount; // Token amount allocated
+    address token; // ERC-20 token contract address (address(0) for native tokens)
+    uint256 amount; // Token amount
 }
 
+/**
+ * @notice Allocation structure for channel fund distribution
+ * @dev Specifies where funds should be sent when a channel is closed
+ */
 struct Allocation {
     address destination; // Where funds are sent on channel closure
-    address token; // ERC-20 token contract address
+    address token; // ERC-20 token contract address (address(0) for native tokens)
     uint256 amount; // Token amount allocated
-    //TODO: consider using Amount
 }
 
+/**
+ * @notice Channel configuration structure
+ * @dev Defines the parameters of a state channel
+ */
 struct Channel {
-    address[] participants; // List of participants in the channel [Host, Guest]
-    address adjudicator; // Address of the contract that validates final states
-    uint64 challenge; // Duration in second, Participants can dispute by submitting newer valid state during challenge
+    address[] participants; // List of participants in the channel
+    address adjudicator; // Address of the contract that validates state transitions
+    uint64 challenge; // Duration in seconds for dispute resolution period
     uint64 nonce; // Unique per channel with same participants and adjudicator
 }
 
+/**
+ * @notice State structure for channel state representation
+ * @dev Contains application data, asset allocations, and signatures
+ */
 struct State {
     bytes data; // Application data encoded, decoded by the adjudicator for business logic
     Allocation[] allocations; // Combined asset allocation and destination for each participant
-    Signature[] sigs; // stateHash signatures
+    Signature[] sigs; // stateHash signatures from participants
 }
 
+/**
+ * @notice Status enum representing the lifecycle of a channel
+ * @dev Tracks the current state of a channel
+ */
 enum Status {
-    VOID, // VOID Channel was not created
+    VOID, // Channel was not created
     INITIAL, // Channel is created and in funding process
-    ACTIVE, // Channel fully funded and valid state
-    DISPUTE,
-    FINAL, // This is the FINAL state, channel can be closed
+    ACTIVE, // Channel fully funded and operational
+    DISPUTE, // Challenge period is active
+    FINAL // Final state, channel can be closed
+
 }
 
-constant uint256 CREATOR = 0; // participant index for the channel creator
-constant uint256 BROKER = 1; // participant index for the broker
+// Constants for participant indices
+uint256 constant CREATOR = 0; // Participant index for the channel creator
+uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
 
-// Funding protocol use State with expected deposits
-constant uint32 CHANOPEN = 7877; // State.data value for funding stateHash
-constant uint32 CHANCLOSE = 7879; // State.data value for closing stateHash
+// Magic numbers for funding protocol
+uint32 constant CHANOPEN = 7877; // State.data value for funding stateHash
+uint32 constant CHANCLOSE = 7879; // State.data value for closing stateHash
 
-// Reference storage type for IChannel implementation to be cdustomized
+/**
+ * @notice Reference metadata structure for channel implementation
+ * @dev Recommended storage structure for IChannel implementations
+ */
 struct Metadata {
-    Channel chan; // Opener define channel configuration
-    Status stage;
-    address creator;
-    Amount[] expectedDeposits; // Creator defines Token per participant
-    Amount[] actualDeposits; // Tracks deposits made by each participant
-    uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
-    State lastValidState; // Last valid state when adjudicator was called
+    Channel chan; // Channel configuration
+    Status stage; // Current channel status
+    address creator; // Creator address (caller of create function)
+    Amount[] expectedDeposits; // Token amounts expected from each participant
+    Amount[] actualDeposits; // Token amounts actually deposited by each participant
+    uint256 challengeExpire; // Timestamp when challenge period expires
+    State lastValidState; // Last valid state submitted on-chain
 }

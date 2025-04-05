@@ -149,6 +149,13 @@ export class NitroliteClient {
     }
 
     /**
+     * Close an old state and open a new one with a possibly different deposit
+     */
+    async resetChannel(channelId: ChannelId, candidate: State, proofs: State[], newChannel: Channel, newDeposit: State): Promise<void> {
+        return this.operations.resetChannel(channelId, candidate, proofs, newChannel, newDeposit);
+    }
+
+    /**
      * Challenge a channel when the counterparty is unresponsive
      */
     async challengeChannel(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<void> {

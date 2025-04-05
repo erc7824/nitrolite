@@ -1,6 +1,8 @@
 /**
  * Utility functions for NitroRPC
  */
+import { Hex, keccak256, stringToHex, encodeAbiParameters } from "viem";
+import { NitroliteRPCMessage, RPCMessage, RPCError } from "./types";
 
 /**
  * Get the current time in milliseconds
@@ -68,6 +70,19 @@ export function getResult(message: any): any[] {
 }
 
 /**
+ * Extract timestamp from a message
+ * 
+ * @param message The message to extract from
+ * @returns The timestamp, or undefined if not found
+ */
+export function getTimestamp(message: any): number | undefined {
+    if (message.req) return message.req[3];
+    if (message.res) return message.res[3];
+    if (message.err) return message.err[3];
+    return undefined;
+}
+
+/**
  * Extract error details from an error message
  *
  * @param message The error message
@@ -81,4 +96,55 @@ export function getError(message: any): { code: number; message: string } | unde
         };
     }
     return undefined;
+}
+
+/**
+ * Convert parameters or results to bytes format for smart contract interaction
+ * 
+ * @param values Array of values to convert
+ * @returns Array of hex strings
+ */
+export function toBytes(values: any[]): Hex[] {
+    return values.map(v => 
+        typeof v === 'string' 
+            ? stringToHex(v) 
+            : stringToHex(JSON.stringify(v))
+    );
+}
+
+
+/**
+ * Validates that a response timestamp is greater than the request timestamp
+ * 
+ * @param request The request message
+ * @param response The response message
+ * @returns True if the response timestamp is valid
+ */
+export function isValidResponseTimestamp(request: NitroliteRPCMessage, response: NitroliteRPCMessage): boolean {
+    const requestTimestamp = getTimestamp(request);
+    const responseTimestamp = getTimestamp(response);
+    
+    if (requestTimestamp === undefined || responseTimestamp === undefined) {
+        return false;
+    }
+    
+    return responseTimestamp > requestTimestamp;
+}
+
+/**
+ * Validates that a response request ID matches the request
+ * 
+ * @param request The request message
+ * @param response The response message
+ * @returns True if the response request ID is valid
+ */
+export function isValidResponseRequestId(request: NitroliteRPCMessage, response: NitroliteRPCMessage): boolean {
+    const requestId = getRequestId(request);
+    const responseId = getRequestId(response);
+    
+    if (requestId === undefined || responseId === undefined) {
+        return false;
+    }
+    
+    return responseId === requestId;
 }

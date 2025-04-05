@@ -46,6 +46,15 @@ The Nitrolite contract system provides:
 - **Challenge/response** mechanism for unilateral finalization
 - **Checkpointing** for recording valid states without closing
 
+### Deployments
+
+- CELO Custody: <https://celoscan.io/address/0xDB33fEC4e2994a675133320867a6439Da4A5acD8>
+- CELO NitroRPC: `0x6C68440eF55deecE7532CDa3b52D379d0Bb19cF5`
+- CELO Dummy: `0xC2BA5c5E2c4848F64187Aa1F3f32a331b0C031b9`
+- Polygon Custody: <https://polygonscan.com/address/0xDB33fEC4e2994a675133320867a6439Da4A5acD8>
+- Polygon NitroRPC: `0x6C68440eF55deecE7532CDa3b52D379d0Bb19cF5`
+- Polygon Dummy: `0xC2BA5c5E2c4848F64187Aa1F3f32a331b0C031b9`
+
 ### Interface Structure
 
 The core interfaces include:

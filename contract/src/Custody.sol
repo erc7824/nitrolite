@@ -23,6 +23,7 @@ contract Custody is IChannel, IDeposit {
     error InvalidParticipant();
     error InvalidStatus();
     error InvalidState();
+    error InvalidAllocations();
     error InvalidStateSignatures();
     error InvalidAdjudicator();
     error InvalidChallengePeriod();
@@ -132,6 +133,9 @@ contract Custody is IChannel, IDeposit {
         bool validSig = Utils.verifySignature(stateHash, initial.sigs[0], ch.participants[0]);
         if (!validSig) revert InvalidStateSignatures();
 
+        // NOTE: even if there is not allocation planned, it should be present as `Allocation{address(0), 0}`
+        if (initial.allocations.length != ch.participants.length) revert InvalidAllocations();
+
         // Initialize channel metadata
         Metadata storage meta = _channels[channelId];
         meta.chan = ch;
@@ -139,29 +143,20 @@ contract Custody is IChannel, IDeposit {
         meta.creator = msg.sender;
         meta.lastValidState = initial;
 
-        // Set up expected deposits from allocations
+        // NOTE: allocations MUST come in the same order as participants in deposit
         uint256 participantCount = ch.participants.length;
         for (uint256 i = 0; i < participantCount; i++) {
-            address token = address(0);
-            uint256 amount = 0;
-
-            // Find the allocation for this participant if it exists
-            for (uint256 j = 0; j < initial.allocations.length; j++) {
-                if (initial.allocations[j].destination == ch.participants[i]) {
-                    token = initial.allocations[j].token;
-                    amount = initial.allocations[j].amount;
-                    break;
-                }
-            }
+            address token = initial.allocations[i].token;
+            uint256 amount = initial.allocations[i].amount;
 
             // even if participant does not have an allocation, still track that
             meta.expectedDeposits.push(Amount(token, amount));
             meta.actualDeposits.push(Amount(address(0), 0)); // Initialize actual deposits to zero
         }
 
-        // Lock creator's funds
-        address participant = ch.participants[0];
-        if (participant != msg.sender) revert InvalidParticipant();
+        // NOTE: it is allowed for depositor (and msg.sender) to be different from channel creator (participant)
+        // This enables logic of "session keys" where a user can create a channel on behalf of another account, but will lock their own funds
+        // if (ch.participants[0]; != msg.sender) revert InvalidParticipant();
 
         Amount memory creatorDeposit = meta.expectedDeposits[0];
         _lockAccountFundsToChannel(msg.sender, channelId, creatorDeposit.token, creatorDeposit.amount);
@@ -239,9 +234,8 @@ contract Custody is IChannel, IDeposit {
      * @notice Finalize the channel with a mutually signed state
      * @param channelId Unique identifier for the channel
      * @param candidate The latest known valid state
-     * @param proofs is an array of valid state required by the adjudicator
      */
-    function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) public {
+    function close(bytes32 channelId, State calldata candidate, State[] calldata) public {
         Metadata storage meta = _channels[channelId];
 
         // Verify channel exists and is not VOID
@@ -275,6 +269,15 @@ contract Custody is IChannel, IDeposit {
 
         // At this point, the channel is in FINAL state, so we can close it
         _distributeAllocation(channelId, meta);
+
+        // TODO: implement a better way for this
+        // remove sender's channel in case they are a different account then participant
+        _ledgers[msg.sender].channels.remove(channelId);
+        uint256 participantsLength = meta.chan.participants.length;
+        for (uint256 i = 0; i < participantsLength; i++) {
+            address participant = meta.chan.participants[i];
+            _ledgers[participant].channels.remove(channelId);
+        }
 
         // Mark channel as closed by removing it
         delete _channels[channelId];
@@ -388,12 +391,6 @@ contract Custody is IChannel, IDeposit {
         for (uint256 i = 0; i < allocsLength; i++) {
             Allocation memory allocation = meta.lastValidState.allocations[i];
             _unlockChannelFundsToAccount(channelId, allocation.destination, allocation.token, allocation.amount);
-        }
-
-        uint256 participantsLength = meta.chan.participants.length;
-        for (uint256 i = 0; i < participantsLength; i++) {
-            address participant = meta.chan.participants[i];
-            _ledgers[participant].channels.remove(channelId);
         }
     }
 

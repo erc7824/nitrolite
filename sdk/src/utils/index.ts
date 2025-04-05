@@ -9,7 +9,7 @@ import { Channel, State, Signature, ChannelId, StateHash, AppLogic } from "../ty
 export function getChannelId(channel: Channel): ChannelId {
     const encoded = encodeAbiParameters(
         [
-            { name: "participants", type: "address[2]" },
+            { name: "participants", type: "address[]" },
             { name: "adjudicator", type: "address" },
             { name: "challenge", type: "uint64" },
             { name: "nonce", type: "uint64" },
@@ -33,7 +33,7 @@ export function getStateHash(channel: Channel, state: State): StateHash {
         [
             { name: "channelId", type: "bytes32" },
             { name: "data", type: "bytes" },
-            { name: "allocations", type: "tuple(address destination, address token, uint256 amount)[2]" },
+            { name: "allocations", type: "tuple(address destination, address token, uint256 amount)[]" },
         ],
         [channelId, state.data, state.allocations]
     );

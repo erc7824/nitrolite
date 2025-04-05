@@ -250,16 +250,13 @@ export class ChannelContext<T = unknown> {
         return this.client.getAccountChannels(this.client.account.address, tokenAddress);
     }
 
-    getStateHash(appState: T, tokenAddress: Address, amounts: [bigint, bigint]): ChannelId {
-        const data = this.appLogic.encode(appState);
-        const allocations = this.getAllocations(tokenAddress, amounts);
-
+    getStateHash(state: State): ChannelId {
         const encoded = encodeAbiParameters(
             [
                 { type: "bytes32" },
                 { type: "bytes" },
                 {
-                    type: "tuple[2]",
+                    type: "tuple[]",
                     components: [
                         { name: "destination", type: "address" },
                         { name: "token", type: "address" },
@@ -267,7 +264,7 @@ export class ChannelContext<T = unknown> {
                     ],
                 },
             ],
-            [this.channelId, data, allocations]
+            [this.channelId, state.data, state.allocations]
         );
 
         const stateHash = keccak256(encoded);

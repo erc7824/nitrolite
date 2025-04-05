@@ -1,8 +1,8 @@
-import { Address, encodeAbiParameters, Hex, keccak256 } from 'viem';
-import { getChannelId } from '../../utils';
-import type { NitroliteClient } from '../NitroliteClient';
-import { AppLogic, Signature } from '../../types';
-import { ChannelId, State, Role, Allocation, Channel } from '../types';
+import { Address, encodeAbiParameters, Hex, keccak256 } from "viem";
+import { getChannelId } from "../../utils";
+import type { NitroliteClient } from "../NitroliteClient";
+import { AppLogic, Signature } from "../../types";
+import { ChannelId, State, Role, Allocation, Channel } from "../types";
 
 /**
  * Channel context for managing application state
@@ -17,39 +17,20 @@ export class ChannelContext<T = unknown> {
     private role: Role;
 
     /**
-     * Create a new channel context
+     * Create a new channel context a
+     * @param client client to use
+     * @param channel channel to create or join
+     * @param initialState initial provided state
+     * @param appLogic application logic to use
      */
-    constructor(
-        client: NitroliteClient,
-        guest: Address,
-        appLogic: AppLogic<T>,
-        signerAttorneyAddress?: Address
-    ) {
+    constructor(client: NitroliteClient, channel: Channel, initialState: State, appLogic: AppLogic<T>) {
         this.client = client;
-        this.channel = {
-            participants: [client.account?.address as Address, guest],
-            adjudicator: appLogic.getAdjudicatorAddress(),
-            challenge: 100500n, // TODO:
-            nonce: BigInt(Date.now()), // TODO:
-        } as Channel;
-        this.channelId = getChannelId(this.channel);
+        this.channel = channel;
+        this.channelId = getChannelId(channel);
         this.appLogic = appLogic;
+        this.states.push(initialState);
 
-        // If there is no signer attorney, use the client's address
-        let participantAddress = (signerAttorneyAddress ||
-            client.account?.address) as Address | undefined;
-        if (!participantAddress) {
-            throw new Error('Channel participant is not provided');
-        }
-
-        // TODO:
-        // if (participantAddress === channel.participants[0]) {
-        this.role = Role.HOST;
-        // } else if (participantAddress === channel.participants[1]) {
-        // this.role = Role.GUEST;
-        // } else {
-        // throw new Error('Account is not a participant in this channel');
-        // }
+        this.role = Role.UNDEFINED;
     }
 
     /**
@@ -93,20 +74,13 @@ export class ChannelContext<T = unknown> {
      * Get the other participant's address
      */
     getOtherParticipant(): Address {
-        return this.channel.participants[
-            this.role === Role.HOST ? Role.GUEST : Role.HOST
-        ];
+        return this.channel.participants[this.role === Role.CREATOR ? Role.GUEST : Role.CREATOR];
     }
 
     /**
      * Create a channel state based on application state
      */
-    createChannelState(
-        appState: T,
-        tokenAddress: Address,
-        amounts: [bigint, bigint],
-        signatures: Signature[] = []
-    ): State {
+    createChannelState(appState: T, tokenAddress: Address, amounts: [bigint, bigint], signatures: Signature[] = []): State {
         // Encode the app state
         const data = this.appLogic.encode(appState);
 
@@ -123,65 +97,58 @@ export class ChannelContext<T = unknown> {
     /**
      * Open a channel with initial funding
      */
-    async open(
-        appState: T,
-        tokenAddress: Address,
-        amounts: [bigint, bigint],
-        signatures: Signature[] = []
-    ): Promise<void> {
-        // Create initial state
-        const initialState = await this.createChannelState(
-            appState,
-            tokenAddress,
-            amounts,
-            signatures
-        );
+    async create(): Promise<void> {
+        const initialState = this.getCurrentState();
 
-        // Save as current state
-        this.states.push(initialState);
+        if (!initialState) {
+            throw new Error("No initial state to create channel");
+        }
 
-        // Open the channel
-        return this.client.openChannel(this.channel, initialState, this.role);
+        await this.client.createChannel(this.channel, initialState);
+
+        this.role = Role.CREATOR;
+    }
+
+    /**
+     * Join an existing channel
+     */
+    async join(): Promise<void> {
+        const initialState = this.getCurrentState();
+
+        if (!initialState) {
+            throw new Error("No initial state to join channel");
+        }
+
+        // Assuming, that the channel is already created and consists of two participants,
+        // in this case the id of paticipant 0 is the creator and participant 1 is the guest
+        await this.client.joinChannel(this.channelId, 1, initialState.sigs[1]);
+
+        // Set the role
+        this.role = Role.GUEST;
     }
 
     /**
      * Append the application state
      */
-    appendAppState(
-        newAppState: T,
-        tokenAddress: Address,
-        amounts: [bigint, bigint],
-        signatures: Signature[] = []
-    ): State {
+    appendAppState(newAppState: T, tokenAddress: Address, amounts: [bigint, bigint], signatures: Signature[] = []): State {
         const currentState = this.getCurrentState();
         const currentAppState = this.getCurrentAppState();
 
         if (!currentAppState || !currentState) {
-            throw new Error(
-                'No current app state to update, open channel first'
-            );
+            throw new Error("No current app state to update, open channel first");
         }
 
         // Validate state transition if the app logic provides a validator
         if (this.appLogic.validateTransition) {
-            const isValid = this.appLogic.validateTransition(
-                this.channel,
-                currentAppState,
-                newAppState
-            );
+            const isValid = this.appLogic.validateTransition(this.channel, currentAppState, newAppState);
 
             if (!isValid) {
-                throw new Error('Invalid state transition');
+                throw new Error("Invalid state transition");
             }
         }
 
         // Create new state with existing allocations
-        const newState: State = this.createChannelState(
-            newAppState,
-            tokenAddress,
-            amounts,
-            signatures
-        );
+        const newState: State = this.createChannelState(newAppState, tokenAddress, amounts, signatures);
 
         // Append the channel state
         this.states.push(newState);
@@ -204,26 +171,16 @@ export class ChannelContext<T = unknown> {
     /**
      * Close the channel with the provided state
      */
-    async close(
-        newAppState: T,
-        tokenAddress: Address,
-        amounts: [bigint, bigint],
-        signatures: Signature[] = []
-    ): Promise<void> {
+    async close(newAppState: T, tokenAddress: Address, amounts: [bigint, bigint], signatures: Signature[] = []): Promise<void> {
         if (!this.appLogic.isFinal || !this.appLogic.isFinal(newAppState)) {
-            throw new Error('Provided state is not final');
+            throw new Error("Provided state is not final");
         }
 
         const finalState = this.createChannelState(newAppState, tokenAddress, amounts, signatures);
 
         let proofs: State[] = [];
         if (this.appLogic.provideProofs) {
-            proofs =
-                this.appLogic.provideProofs(
-                    this.channel,
-                    newAppState,
-                    this.states
-                ) || [];
+            proofs = this.appLogic.provideProofs(this.channel, newAppState, this.states) || [];
         }
 
         this.states.push(finalState);
@@ -239,24 +196,15 @@ export class ChannelContext<T = unknown> {
         const currentAppState = this.getCurrentAppState();
 
         if (!currentState || !currentAppState) {
-            throw new Error('No current state to challenge with');
+            throw new Error("No current state to challenge with");
         }
 
         let proofs: State[] = [];
         if (this.appLogic.provideProofs) {
-            proofs =
-                this.appLogic.provideProofs(
-                    this.channel,
-                    currentAppState,
-                    this.states
-                ) || [];
+            proofs = this.appLogic.provideProofs(this.channel, currentAppState, this.states) || [];
         }
 
-        return this.client.challengeChannel(
-            this.channelId,
-            currentState,
-            proofs
-        );
+        return this.client.challengeChannel(this.channelId, currentState, proofs);
     }
 
     /**
@@ -267,24 +215,15 @@ export class ChannelContext<T = unknown> {
         const currentAppState = this.getCurrentAppState();
 
         if (!currentState || !currentAppState) {
-            throw new Error('No current state to checkpoint');
+            throw new Error("No current state to checkpoint");
         }
 
         let proofs: State[] = [];
         if (this.appLogic.provideProofs) {
-            proofs =
-                this.appLogic.provideProofs(
-                    this.channel,
-                    currentAppState,
-                    this.states
-                ) || [];
+            proofs = this.appLogic.provideProofs(this.channel, currentAppState, this.states) || [];
         }
 
-        return this.client.checkpointChannel(
-            this.channelId,
-            currentState,
-            proofs
-        );
+        return this.client.checkpointChannel(this.channelId, currentState, proofs);
     }
 
     async deposit(tokenAddress: Address, amount: bigint): Promise<void> {
@@ -297,51 +236,34 @@ export class ChannelContext<T = unknown> {
 
     async getAvailableBalance(tokenAddress: Address): Promise<bigint> {
         if (!this.client.account?.address) {
-            throw new Error('Account address is not provided');
+            throw new Error("Account address is not provided");
         }
 
-        return this.client.getAvailableBalance(
-            this.client.account.address,
-            tokenAddress
-        );
+        return this.client.getAvailableBalance(this.client.account.address, tokenAddress);
     }
 
     async getAccountChannels(tokenAddress: Address): Promise<ChannelId[]> {
         if (!this.client.account?.address) {
-            throw new Error('Account address is not provided');
+            throw new Error("Account address is not provided");
         }
 
-        return this.client.getAccountChannels(
-            this.client.account.address,
-            tokenAddress
-        );
+        return this.client.getAccountChannels(this.client.account.address, tokenAddress);
     }
 
-    /**
-     * Reclaim funds after challenge period expires
-     */
-    async reclaim(): Promise<void> {
-        return this.client.reclaimChannel(this.channelId);
-    }
-
-    getStateHash(
-        appState: T,
-        tokenAddress: Address,
-        amounts: [bigint, bigint]
-    ): ChannelId {
+    getStateHash(appState: T, tokenAddress: Address, amounts: [bigint, bigint]): ChannelId {
         const data = this.appLogic.encode(appState);
         const allocations = this.getAllocations(tokenAddress, amounts);
 
         const encoded = encodeAbiParameters(
             [
-                { type: 'bytes32' },
-                { type: 'bytes' },
+                { type: "bytes32" },
+                { type: "bytes" },
                 {
-                    type: 'tuple[2]',
+                    type: "tuple[2]",
                     components: [
-                        { name: 'destination', type: 'address' },
-                        { name: 'token', type: 'address' },
-                        { name: 'amount', type: 'uint256' },
+                        { name: "destination", type: "address" },
+                        { name: "token", type: "address" },
+                        { name: "amount", type: "uint256" },
                     ],
                 },
             ],
@@ -353,10 +275,7 @@ export class ChannelContext<T = unknown> {
         return stateHash;
     }
 
-    private getAllocations(
-        tokenAddress: Address,
-        amounts: [bigint, bigint]
-    ): [Allocation, Allocation] {
+    private getAllocations(tokenAddress: Address, amounts: [bigint, bigint]): [Allocation, Allocation] {
         return [
             {
                 destination: this.channel.participants[0],

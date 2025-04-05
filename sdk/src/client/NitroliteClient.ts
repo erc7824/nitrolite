@@ -1,11 +1,11 @@
-import { Account, Address, PublicClient, WalletClient, Abi } from 'viem';
-import { AdjudicatorAbi, ContractAddresses } from '../abis';
-import Errors from '../errors'; // Import Errors
-import { Logger, defaultLogger } from '../config';
+import { Account, Address, PublicClient, WalletClient, Abi } from "viem";
+import { AdjudicatorAbi, ContractAddresses } from "../abis";
+import Errors from "../errors"; // Import Errors
+import { Logger, defaultLogger } from "../config";
 
-import { NitroliteClientConfig } from './config';
-import { ChannelOperations } from './operations';
-import { State, ChannelId, Channel, Role } from './types';
+import { NitroliteClientConfig } from "./config";
+import { ChannelOperations } from "./operations";
+import { State, ChannelId, Channel, Role, Signature } from "./types";
 
 /**
  * Main client for interacting with Nitrolite contracts
@@ -24,7 +24,7 @@ export class NitroliteClient {
     constructor(config: NitroliteClientConfig) {
         // TODO: Add more comprehensive configuration validation (e.g., address formats)
         if (!config.publicClient) {
-            throw new Errors.MissingParameterError('publicClient');
+            throw new Errors.MissingParameterError("publicClient");
         }
 
         // Use chain ID from the public client if not explicitly provided
@@ -32,12 +32,12 @@ export class NitroliteClient {
         if (!chainId) {
             chainId = config.publicClient.chain?.id;
             if (!chainId) {
-                throw new Errors.MissingParameterError('chainId');
+                throw new Errors.MissingParameterError("chainId");
             }
         }
 
         if (!config.addresses) {
-            throw new Errors.MissingParameterError('addresses');
+            throw new Errors.MissingParameterError("addresses");
         }
 
         this.publicClient = config.publicClient;
@@ -59,13 +59,7 @@ export class NitroliteClient {
         };
 
         // Initialize channel operations
-        this.operations = new ChannelOperations(
-            this.publicClient,
-            this.walletClient,
-            this.account,
-            this.custodyAddress,
-            this.logger
-        );
+        this.operations = new ChannelOperations(this.publicClient, this.walletClient, this.account, this.custodyAddress, this.logger);
     }
 
     /**
@@ -82,11 +76,11 @@ export class NitroliteClient {
      * @param type The adjudicator type
      * @returns The adjudicator ABI
      */
-    getAdjudicatorAbi(type: string = 'base'): Abi {
+    getAdjudicatorAbi(type: string = "base"): Abi {
         const abi = this.adjudicatorAbis[type];
         if (!abi) {
             // Fall back to base adjudicator ABI if specific type not found
-            return this.adjudicatorAbis['base'] || AdjudicatorAbi;
+            return this.adjudicatorAbis["base"] || AdjudicatorAbi;
         }
         return abi;
     }
@@ -125,96 +119,67 @@ export class NitroliteClient {
         return this.operations.withdraw(tokenAddress, amount);
     }
 
-    async getAvailableBalance(
-        account: Address,
-        tokenAddress: Address
-    ): Promise<bigint> {
+    async getAvailableBalance(account: Address, tokenAddress: Address): Promise<bigint> {
         return this.operations.getAvailableBalance(account, tokenAddress);
     }
 
-    async getAccountChannels(
-        account: Address,
-        tokenAddress: Address
-    ): Promise<ChannelId[]> {
+    async getAccountChannels(account: Address, tokenAddress: Address): Promise<ChannelId[]> {
         return this.operations.getAccountChannels(account, tokenAddress);
     }
 
     /**
-     * Open a new channel or join an existing one
+     * Create a new channel
      */
-    async openChannel(channel: Channel, deposit: State, participantIndex: Role = Role.UNDEFINED): Promise<void> {
-        return this.operations.openChannel(channel, deposit, participantIndex);
+    async createChannel(channel: Channel, deposit: State): Promise<void> {
+        return this.operations.createChannel(channel, deposit);
+    }
+
+    /**
+     * Join an existing channel
+     */
+    async joinChannel(channelId: ChannelId, index: number, sig: Signature): Promise<void> {
+        return this.operations.joinChannel(channelId, index, sig);
     }
 
     /**
      * Close a channel with a mutually signed state
      */
-    async closeChannel(
-        channelId: ChannelId,
-        candidate: State,
-        proofs: State[] = []
-    ): Promise<void> {
+    async closeChannel(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<void> {
         return this.operations.closeChannel(channelId, candidate, proofs);
     }
 
     /**
      * Challenge a channel when the counterparty is unresponsive
      */
-    async challengeChannel(
-        channelId: ChannelId,
-        candidate: State,
-        proofs: State[] = []
-    ): Promise<void> {
+    async challengeChannel(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<void> {
         return this.operations.challengeChannel(channelId, candidate, proofs);
     }
 
     /**
      * Checkpoint a state to store it on-chain
      */
-    async checkpointChannel(
-        channelId: ChannelId,
-        candidate: State,
-        proofs: State[] = []
-    ): Promise<void> {
+    async checkpointChannel(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<void> {
         return this.operations.checkpointChannel(channelId, candidate, proofs);
-    }
-
-    /**
-     * Reclaim funds after challenge period expires
-     */
-    async reclaimChannel(channelId: ChannelId): Promise<void> {
-        return this.operations.reclaimChannel(channelId);
     }
 
     /**
      * Approve tokens for the custody contract
      */
-    async approveTokens(
-        tokenAddress: Address,
-        amount: bigint,
-        spender: Address
-    ): Promise<void> {
+    async approveTokens(tokenAddress: Address, amount: bigint, spender: Address): Promise<void> {
         return this.operations.approveTokens(tokenAddress, amount, spender);
     }
 
     /**
      * Get token allowance
      */
-    async getTokenAllowance(
-        tokenAddress: Address,
-        owner: Address,
-        spender: Address
-    ): Promise<bigint> {
+    async getTokenAllowance(tokenAddress: Address, owner: Address, spender: Address): Promise<bigint> {
         return this.operations.getTokenAllowance(tokenAddress, owner, spender);
     }
 
     /**
      * Get token balance
      */
-    async getTokenBalance(
-        tokenAddress: Address,
-        account: Address
-    ): Promise<bigint> {
+    async getTokenBalance(tokenAddress: Address, account: Address): Promise<bigint> {
         return this.operations.getTokenBalance(tokenAddress, account);
     }
 }

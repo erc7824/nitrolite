@@ -41,7 +41,7 @@ contract CounterTest is Test {
         guest = vm.addr(guestPrivateKey);
 
         // Set up the channel with the two participants
-        address[2] memory participants;
+        address[] memory participants = new address[](2);
         participants[HOST_IDX] = host;
         participants[GUEST_IDX] = guest;
         channel = Channel({

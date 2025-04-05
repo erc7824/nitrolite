@@ -1,25 +1,21 @@
 # Nitrolite: State Channel Framework
 
-**Nitrolite** refers to a type of powdered, high-explosive material with an ammonium nitrate base, used in mining, construction, and military applications.
+**Nitrolite** is a lightweight state channel framework that enables off-chain interaction between participants, with an on-chain contract providing:
 
-This document describes a minimal **2-party state channel** that enables off-chain interaction between participants, with an on-chain contract providing:
-
-- **Custody** of ERC-20 tokens for each channel.
-- **Mutual close** when participants agree a final state.
+- **Custody** of tokens (ERC-20 and native) for each channel.
+- **Mutual close** when participants agree on a final state.
 - **Challenge/response** mechanism allowing a party to unilaterally finalize if needed.
-
-> **Note:** The current implementation has been simplified to support only 2 participants per channel. Once the protocol is battle-tested, we plan to extend support for multiple participants as outlined in the Roadmap.
 
 State channel infrastructure has two main components:
 
 - **IChannel** escrow which stores funds and can support and run adjudication on multiple channels
-- **Adjudicator** are small contracts which can validate state transitions to a candidate state against proofs
+- **Adjudicators** are small contracts which validate state transitions to a candidate state against proofs
 
 ## Interface Structure
 
 ### ChannelId
 
-ChannelId hash are computed the following way:
+ChannelId hash is computed as:
 
 ```solidity
 keccak256(
@@ -34,7 +30,7 @@ keccak256(
 
 ### StateHash
 
-StateHash are used in signature and often stored in `state.sigs`
+StateHash is used for signatures and stored in `state.sigs`:
 
 ```solidity
 keccak256(
@@ -45,6 +41,8 @@ keccak256(
   )
 );
 ```
+
+For signature verification, the stateHash is bare signed without EIP-191 since the protocol is intended to be chain-agnostic.
 
 ### `Types.sol`
 
@@ -57,41 +55,45 @@ struct Signature {
     bytes32 s;
 }
 
+struct Amount {
+    address token; // ERC-20 token address (address(0) for native tokens)
+    uint256 amount; // Token amount
+}
+
 struct Allocation {
     address destination; // Where funds are sent on channel closure
-    address token; // ERC-20 token contract address
+    address token; // ERC-20 token contract address (address(0) for native tokens)
     uint256 amount; // Token amount allocated
 }
 
 struct Channel {
-    address[2] participants; // List of participants in the channel [Host, Guest]
-    address adjudicator; // Address of the contract that validates final states
-    uint64 challenge; // Duration in second, Participants can dispute by submitting newer valid state during challenge
+    address[] participants; // List of participants in the channel
+    address adjudicator; // Address of the contract that validates state transitions
+    uint64 challenge; // Duration in seconds for dispute resolution period
     uint64 nonce; // Unique per channel with same participants and adjudicator
 }
 
 struct State {
     bytes data; // Application data encoded, decoded by the adjudicator for business logic
-    Allocation[2] allocations; // Combined asset allocation and destination for each participant
-    Signature[] sigs; // stateHash signatures
+    Allocation[] allocations; // Combined asset allocation and destination for each participant
+    Signature[] sigs; // stateHash signatures from participants
 }
 
 enum Status {
-    VOID,     // Channel was never active (zero-initialized)
-    PARTIAL,  // Partial funding waiting for other participants
-    ACTIVE,   // Channel fully funded and valid state
-    FINAL,    // This is the FINAL state, channel can be closed
-    INVALID   // Channel state is invalid
+    VOID,     // Channel not created
+    INITIAL,  // Creation in progress
+    ACTIVE,   // Fully funded and operational
+    DISPUTE,  // Challenge period active
+    FINAL     // Ready to be closed
 }
 
-// This struct has been moved to Custody.sol with additional fields
-// Kept here for backward compatibility, but should be migrated to use the Custody.sol version
-struct Metadata {
-    Channel chan; // Opener define channel configuration
-    Status status; // Current channel status
-    uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
-    State lastValidState; // Last valid state when adjudicator was called
-}
+// Constants for participant indices
+uint256 constant CREATOR = 0; // Participant index for the channel creator
+uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
+
+// Magic numbers for funding protocol
+uint32 constant CHANOPEN = 7877; // State.data value for funding stateHash
+uint32 constant CHANCLOSE = 7879; // State.data value for closing stateHash
 ```
 
 ### `IAdjudicator.sol`
@@ -101,12 +103,12 @@ The adjudicator contract must implement:
 ```solidity
 interface IAdjudicator {
     /**
-     * @notice Validates the application state and determines the outcome of a channel
-     * @dev This function evaluates the validity of a candidate state against provided proofs
-     * @param chan The channel information containing participants, adjudicator, nonce, and challenge period
+     * @notice Validates a candidate state based on application-specific rules
+     * @dev Used to determine if a state is valid during challenges or checkpoints
+     * @param chan The channel configuration with participants, adjudicator, challenge period, and nonce
      * @param candidate The proposed state to be validated
-     * @param proofs Array of previous states that may be used to validate the candidate state
-     * @return valid is true if the candidate is approved
+     * @param proofs Array of previous states that provide context for validation
+     * @return valid True if the candidate state is valid according to application rules
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
@@ -115,32 +117,24 @@ interface IAdjudicator {
 }
 ```
 
-
-- **Parameters**:
-  - `chan`: Channel configuration
-  - `candidate`: The proposed state to be validated
-  - `proofs`: Array of previous states that may be used to validate the candidate state
-- **Returns**:
-  - `valid`: Boolean indicating if the candidate state is approved
-
 ### `IDeposit.sol`
 
-Interface for contracts that allow users to deposit and withdraw token funds. This interface is about pre-funding the contract to make calls to reset easier when we want to resize a channel allocation. Participants usually make their respective Deposit before calling open or reset, and the initial deposit balance must be higher or equal than the allocation to the channel.
+Interface for contracts that allow users to deposit and withdraw token funds:
 
 ```solidity
 interface IDeposit {
     /**
      * @notice Deposits tokens into the contract
-     * @dev Any user can deposit tokens
-     * @param token Address of the ERC20 token to deposit
+     * @dev For native tokens, the value should be sent with the transaction
+     * @param token Token address (use address(0) for native tokens)
      * @param amount Amount of tokens to deposit
      */
     function deposit(address token, uint256 amount) external payable;
 
     /**
      * @notice Withdraws tokens from the contract
-     * @dev Any user can withdraw their previously deposited tokens
-     * @param token Address of the ERC20 token to withdraw
+     * @dev Can only withdraw available (not locked in channels) funds
+     * @param token Token address (use address(0) for native tokens)
      * @param amount Amount of tokens to withdraw
      */
     function withdraw(address token, uint256 amount) external;
@@ -153,144 +147,155 @@ The main state channel interface implements:
 
 ```solidity
 interface IChannel {
-    event ChannelPartiallyFunded(bytes32 indexed channelId, Channel channel);
-    event ChannelOpened(bytes32 indexed channelId, Channel channel);
-    event ChannelChallenged(bytes32 indexed channelId, uint256 expiration);
-    event ChannelCheckpointed(bytes32 indexed channelId);
+    event Created(bytes32 indexed channelId, Channel channel, Amount[] expected);
+    event Joined(bytes32 indexed channelId, uint256 index);
+    event Opened(bytes32 indexed channelId);
+    event Challenged(bytes32 indexed channelId, uint256 expiration);
+    event Checkpointed(bytes32 indexed channelId);
     event ChannelClosed(bytes32 indexed channelId);
 
     /**
-     * @notice Open or join a channel by depositing assets
-     * @param ch Channel configuration
-     * @param deposit is the initial State defined by the opener, it contains the expected allocation
-     * @return channelId Unique identifier for the channel
+     * @notice Creates a new channel and initializes funding
+     * @dev The creator must sign the funding state containing the CHANOPEN magic number
+     * @param ch Channel configuration with participants, adjudicator, challenge period, and nonce
+     * @param initial Initial state with CHANOPEN magic number and expected allocations
+     * @return channelId Unique identifier for the created channel
      */
-    function open(Channel calldata ch, State calldata deposit) external returns (bytes32 channelId);
+    function create(Channel calldata ch, State calldata initial) external returns (bytes32 channelId);
 
     /**
-     * @notice Finalize the channel with a mutually signed state
+     * @notice Allows a participant to join a channel by signing the funding state
+     * @dev Participant must provide signature on the same funding state with CHANOPEN magic number
+     * @param channelId Unique identifier for the channel
+     * @param index Index of the participant in the channel's participants array
+     * @param sig Signature of the participant on the funding state
+     * @return channelId Unique identifier for the joined channel
+     */
+    function join(bytes32 channelId, uint256 index, Signature calldata sig) external returns (bytes32);
+
+    /**
+     * @notice Finalizes a channel with a mutually signed closing state
      * @param channelId Unique identifier for the channel
      * @param candidate The latest known valid state
-     * @param proofs is an array of valid state required by the adjudicator
+     * @param proofs Additional states required by the adjudicator to validate the candidate
      */
     function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
 
     /**
-     * @notice Reset will close and open channel for resizing allocations
-     * @param channelId Unique identifier for the channel
-     * @param candidate The latest known valid state
-     * @param proofs is an array of valid state required by the adjudicator
-     * @param ch Channel configuration
-     * @param deposit is the initial State defined by the opener, it contains the expected allocation
+     * @notice Closes an existing channel and creates a new one with updated parameters
+     * @param channelId Unique identifier for the channel to close
+     * @param candidate The latest known valid state for closing the current channel
+     * @param proofs Additional states required by the adjudicator for closing
+     * @param ch New channel configuration for the replacement channel
+     * @param initial Initial state for the new channel with CHANOPEN magic number
      */
     function reset(
         bytes32 channelId,
         State calldata candidate,
         State[] calldata proofs,
         Channel calldata ch,
-        State calldata deposit
+        State calldata initial
     ) external;
 
     /**
-     * @notice Unilaterally post a state when the other party is uncooperative
+     * @notice Initiates or updates a challenge with a signed state
      * @param channelId Unique identifier for the channel
-     * @param candidate The latest known valid state
-     * @param proofs is an array of valid state required by the adjudicator
+     * @param candidate The state being submitted as the latest valid state
+     * @param proofs Additional states required by the adjudicator to validate the candidate
      */
     function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
 
     /**
-     * @notice Unilaterally post a state to store it on-chain to prevent future disputes
+     * @notice Records a valid state on-chain without initiating a challenge
      * @param channelId Unique identifier for the channel
-     * @param candidate The latest known valid state
-     * @param proofs is an array of valid state required by the adjudicator
+     * @param candidate The state to checkpoint
+     * @param proofs Additional states required by the adjudicator to validate the candidate
      */
     function checkpoint(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
-
-    /**
-     * @notice Conclude the channel after challenge period expires
-     * @param channelId Unique identifier for the channel
-     */
-    function reclaim(bytes32 channelId) external;
 }
 ```
 
-### Protocol Details
+## Funding Protocol
 
-1. **Open Channel**  
-   `open(Channel ch, State deposit) returns (bytes32 channelId)`
-   - **Purpose**: Open or join a channel by depositing participants assets into the contract.
-   First depositor is the Host, second depositor is the Guest.
-   - **Notice**: Participants are only used to sign state and might not be the caller of the smart-contract,
-   Moreover participant address are not payout destination addresses.
-   - **Process**:
-     - When first participant calls this method, they provide the initial allocation and expected number of participants for the adjudicator
-     - If their signature on the state is valid and their Allocation Transfer was successful (taking from initial `deposit()`), we check if state is valid with the adjudicator
-     - The channel status is moved from VOID to PARTIAL and an event is emitted
-     - Participants listen to the contract events, and if they approve the Allocation and State suggested by initiator, they can append their signature to the same State and call Open()
-     - Once the last participant has successfully locked allocation to the channel, channel becomes Status.ACTIVE, and they can transact off-chain
-   - **Effects**:  
-     - Transfers token amounts from the caller to the contract
-     - Call adjudicate to activate the channel
-     - Returns unique channelId
+### Creation Phase
 
-2. **Close Channel (Cooperative Close)**  
-   `close(bytes32 channelId, State candidate, State[] proofs)`  
-   - **Purpose**: Finalize the channel immediately with a valid state.
-   - **Logic**:
-     - Calls `adjudicate` on the channel's adjudicator with the candidate state and proofs
-     - Verifies all participant signatures are present
-     - If state is valid, sets Status.FINAL and unallocates funds back to their user balance
-     - Closes the channel
+1. The Creator must:
+   - Construct a channel configuration with participants, adjudicator, challenge period, and nonce
+   - Prepare an initial state where `state.data` is set to the magic number `CHANOPEN` (7877)
+   - Define expected token deposits for all participants in the `state.allocations` array
+   - Compute the Funding stateHash of this initial deposit state
+   - Include creator's stateHash signature in the `state.sigs` array at position 0
+   - Call the `create` function with the channel configuration and initial signed state
 
-3. **Reset Channel**
-`reset(bytes32 channelId, State candidate, State[] proofs, Channel ch, State deposit)`
-   - **Purpose**: Close and reopen a channel to resize allocations.
-   - **Logic**:
-     - Closes the existing channel with the valid candidate state
-     - Opens a new channel with the provided configuration and deposit
-     - Used when allocation adjustments (deposits/withdrawals) are needed
+2. The system must:
+   - Verify the Creator's signature on the funding stateHash
+   - Verify creator has sufficient balance to fund required allocation
+   - Lock the Creator's funds according to the allocation
+   - Set the channel status to `INITIAL`
+   - Emit a `Created` event with the channelId, channel configuration, and expected deposits
 
-4. **Challenge Channel**
-`challenge(bytes32 channelId, State candidate, State[] proofs)`  
-   - **Purpose**: Unilaterally post a state when the other party is uncooperative.
-   - **Logic**:
-     - Verifies the submitted state is valid via `adjudicate`
-     - Either party can Challenge with a valid State
-     - If valid, records the proposed state and starts the challenge period
+### Joining Phase
 
-5. **Checkpoint**
-`checkpoint(bytes32 channelId, State candidate, State[] proofs)`  
-   - **Purpose**: Store a valid state on-chain to prevent future disputes.
-   - **Logic**:
-     - Verifies the submitted state is valid via `adjudicate`
-     - Either party can Checkpoint with a valid State
-     - Records the state without initiating channel closure
+1. Each non-Creator participant must:
+   - Verify the channelId and expected allocations
+   - Sign the same funding stateHash (containing the magic number `CHANOPEN`)
+   - Call the `join` function with the channelId, their participant index, and signature
 
-6. **Reclaim**  
-`reclaim(bytes32 channelId)`  
-   - **Purpose**: Conclude the channel after challenge period expires.
-   - **Logic**:  
-     - Distributes tokens according to the last valid state's allocations
-     - Closes the channel
+2. The system must:
+   - Verify the participant's signature against the funding stateHash
+   - Confirm the signer matches the expected participant at the given index
+   - Lock the participant's funds according to the allocation
+   - Track the actual deposit in the channel metadata
+   - Emit a `Joined` event with the channelId and participant index
 
-## High-Level Flow
+3. When all participants have joined, the system must:
+   - Verify that all expected deposits are fulfilled
+   - Set the channel status to `ACTIVE`
+   - Emit an `Opened` event with the channelId
 
-1. **Channel Creation**:  
-   - Two participants deposit ERC20 tokens into the contract using `open` with an initial state.
-2. **Off-Chain Updates**:  
-   - The parties exchange and co-sign states off-chain, with application-specific data encoded in the `data` field.
-3. **Happy Path (Cooperative Close)**:  
-   - A final state is validated by the adjudicator.
-   - Either party calls `close` with the candidate state and any required proofs.
-   - The adjudicator verifies the state's validity, and the contract uses the state's allocations for distribution.
-4. **Intermediate State Record (Checkpoint)**:
-   - At any point, either party can call `checkpoint` to record a valid state on-chain.
-   - This doesn't close the channel but provides protection against future disputes.
-5. **Unhappy Path (Challenge)**:  
-   - One party calls `challenge` with their most recent valid state and any required proofs.
-   - The counterparty may respond with a more recent valid state using another `challenge`.
-   - After the challenge period expires, `reclaim` settles funds according to the allocations in the last adjudicated valid state.
+## Channel Closure
+
+### Cooperative Close
+
+1. To close cooperatively, any participant may:
+   - Prepare a final state where `state.data` is set to the magic number `CHANCLOSE` (7879)
+   - Collect signatures from all participants on this final state
+   - Call the `close` function with the channelId, final state, and any required proofs
+
+2. The system must:
+   - Verify all participant signatures on the closing stateHash
+   - Verify the state contains the `CHANCLOSE` magic number
+   - Distribute funds according to the final state's allocations
+   - Set the channel status to `FINAL`
+   - Delete the channel and emit a `Closed` event
+
+### Challenge-Response Process
+
+1. To initiate a challenge, a participant may:
+   - Call the `challenge` function with their latest valid state and required proofs
+
+2. The system must:
+   - Verify the submitted state via the adjudicator
+   - If valid, store the state and start the challenge period
+   - Set a challenge expiration timestamp (current time + challenge duration)
+   - Set the channel status to `DISPUTE`
+   - Emit a `Challenged` event with the channelId and expiration time
+
+3. During the challenge period, any participant may:
+   - Submit a more recent valid state by calling `challenge` again
+   - If the new state is valid and more recent, the system must update the stored state and reset the challenge period
+
+4. After the challenge period expires, any participant may call `close` to distribute funds according to the last valid challenged state
+
+### Checkpointing
+
+1. Any participant may:
+   - Call the `checkpoint` function with a valid state and required proofs
+
+2. The system must:
+   - Verify the submitted state via the adjudicator
+   - If valid and more recent, store the state without starting a challenge period
+   - Emit a `Checkpointed` event with the channelId
 
 ## Project Structure
 
@@ -303,60 +308,48 @@ src
 │   ├── Counter.sol
 │   ├── MicroPayment.sol
 └── interfaces
-    ├── IAdjudicator.sol  # Interface for state validation and outcome determination
+    ├── IAdjudicator.sol  # Interface for state validation
     ├── IChannel.sol      # Main interface for the state channel system
+    ├── IComparable.sol   # Interface for determining state ordering
     ├── IDeposit.sol      # Interface for token deposit and withdrawal
     └── Types.sol         # Shared types used in the state channel system
 ```
 
-### Custody.sol implementation
+### Custody Contract
 
-The `Custody.sol` contract implements the `IChannel` interface, managing the state channels and enforcing the rules for opening, closing, challenging, and reclaiming funds. It also contains the Status enum that defines the possible channel states.
-
-```solidity
-enum Status {
-    VOID,     // Channel was never active (zero-initialized)
-    PARTIAL,  // Partial funding waiting for other participants
-    ACTIVE,   // Channel fully funded and valid state
-    FINAL,    // This is the FINAL state, channel can be closed
-    INVALID   // Channel state is invalid
-}
-```
-
-#### Requirements
-
-- Only state which adjudicator returns valid can replace previously lastValidState
-- `open` is called first by the Host creating the initial funding State `deposit` which contains expected deposits
-  - When Guest join the channel a call to the adjudicator will be made to validate state transitions from PARTIAL to ACTIVE
-- `close` will be closing the channel if channel is ACTIVE, and adjudicator maybe return FINAL allowing token distribution
-- `challenge` if the adjudicator returns valid, State is saved and challenge can be start by setting challengeExpire = now + ch.challenge
-- `checkpoint` if the adjudicator returns valid, State is saved on-chain
-- `reclaim` is called after challengeExpire time to distribute the tokens
+The `Custody.sol` contract implements the `IChannel` and `IDeposit` interfaces, managing state channels and enforcing rules for creating, joining, closing, challenging, and checkpointing channels.
 
 ```solidity
-// This is the recommended internal structure for tracking channel state
 struct Metadata {
-    Channel chan;             // Opener define channel configuration
-    Status status;            // Current channel status
+    Channel chan;             // Channel configuration
+    Status stage;             // Current channel status
+    address creator;          // Creator address (caller of create function)
+    Amount[] expectedDeposits; // Creator defines Token per participant
+    Amount[] actualDeposits;  // Tracks deposits made by each participant
     uint256 challengeExpire;  // If non-zero channel will resolve to lastValidState when challenge Expires
     State lastValidState;     // Last valid state when adjudicator was called
+    mapping(address token => uint256 balance) tokenBalances; // Token balances for the channel
 }
 
-// ChannelId to Data
-mapping(bytes32 => Metadata) private channels;
+struct Account {
+    uint256 available;        // Available amount that can be withdrawn or allocated to channels
+    uint256 locked;           // Amount currently allocated to channels
+}
+
+struct Ledger {
+    mapping(address token => Account funds) tokens; // Token balances
+    EnumerableSet.Bytes32Set channels; // Set of user ChannelId
+}
 ```
-
-### Trivial Adjudicator
-
-The Trivial adjudicator provides a basic implementation for validating state transitions. It always returns ACTIVE status, allowing testing the framework with simple state validation rules.
 
 ## Roadmap
 
 The following features are planned for future development:
 
-1. **Support for multiparty channels**
-   - Refactor the `Channel.participants` structure to support variable-length arrays of participants
-   - Update allocation handling to match the number of participants
-   - Enhance the signature collection and verification process for multiple parties
-   - Modify adjudicators to support multi-party state validation
-   - Update state transition logic for partially funded channels with multiple participants
+1. **Enhanced multi-party channels support**
+   - Further refinement of multi-party state validation
+   - Improved handling of partially funded channels with multiple participants
+
+2. **Nitrolite protocol as a unified virtual ledger (clearnet)**
+   - Abstract from the underlying blockchain used
+   - Support for cross-chain applications

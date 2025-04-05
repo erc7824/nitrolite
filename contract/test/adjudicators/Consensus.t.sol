@@ -45,7 +45,9 @@ contract ConsensusTest is Test {
         token = new MockERC20("Test Token", "TEST", 18);
 
         // Set up the channel
-        address[2] memory participants = [host, guest];
+        address[] memory participants = new address[](2);
+        participants[0] = host;
+        participants[1] = guest;
         channel = Channel({
             participants: participants,
             adjudicator: address(adjudicator),
@@ -101,7 +103,9 @@ contract ConsensusTest is Test {
         // Create the state
         State memory state;
         state.data = abi.encode(appData);
-        state.allocations = allocations;
+        state.allocations = new Allocation[](2);
+        state.allocations[0] = allocations[0];
+        state.allocations[1] = allocations[1];
         state.sigs = new Signature[](1); // Create a dynamic array with 1 element
 
         // Calculate the state hash
@@ -139,7 +143,9 @@ contract ConsensusTest is Test {
         // Create the state
         State memory state;
         state.data = abi.encode(appData);
-        state.allocations = allocations;
+        state.allocations = new Allocation[](2);
+        state.allocations[0] = allocations[0];
+        state.allocations[1] = allocations[1];
         state.sigs = new Signature[](1); // Create a dynamic array with 1 element
 
         // Calculate the state hash
@@ -172,7 +178,9 @@ contract ConsensusTest is Test {
         // Create the state
         State memory state;
         state.data = abi.encode(appData);
-        state.allocations = allocations;
+        state.allocations = new Allocation[](2);
+        state.allocations[0] = allocations[0];
+        state.allocations[1] = allocations[1];
         state.sigs = new Signature[](2); // Create a dynamic array with 2 elements
 
         // Calculate the state hash
@@ -206,7 +214,9 @@ contract ConsensusTest is Test {
         // Create the state with empty signatures
         State memory state;
         state.data = abi.encode(appData);
-        state.allocations = allocations;
+        state.allocations = new Allocation[](2);
+        state.allocations[0] = allocations[0];
+        state.allocations[1] = allocations[1];
         // State.sigs defaults to empty values
 
         // Adjudicate and expect invalid result

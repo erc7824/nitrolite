@@ -93,7 +93,7 @@ export class NitroliteRPC {
         if (message.res) {
             const [requestID, method, result, timestamp] = message.res;
             // Extract params from a request if available, otherwise empty
-            const params = message.req ? message.req[2].map(this.toHex) : [];
+            const params = message.req ? (message.req[2] as any[]).map(this.toHex) : [];
 
             return {
                 requestID: BigInt(requestID),

@@ -7,5 +7,5 @@
 
 export * from "./nitrolite";
 export * from "./nitrolite.hash";
-export * from "./types";
+export { NitroliteRPCMessage, RPCMessage, MessageSigner, MessageVerifier, NitroliteErrorCode } from "./types";
 export * from "./utils";

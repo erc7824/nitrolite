@@ -57,9 +57,7 @@ contract NitroRPC is IAdjudicator, IComparable {
         bytes32 allocationsHash = keccak256(abi.encode(state.allocations));
 
         return keccak256(
-            abi.encode(
-                channelId, allocationsHash, message.requestID, message.method, message.params, message.timestamp
-            )
+            abi.encode(channelId, allocationsHash, message.requestID, message.method, message.params, message.timestamp)
         );
     }
 

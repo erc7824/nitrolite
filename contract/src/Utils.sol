@@ -2,7 +2,6 @@
 pragma solidity ^0.8.13;
 
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Channel, State, Signature} from "./interfaces/Types.sol";
 
 /**
@@ -11,7 +10,6 @@ import {Channel, State, Signature} from "./interfaces/Types.sol";
  */
 library Utils {
     using ECDSA for bytes32;
-    using MessageHashUtils for bytes32;
 
     /**
      * @notice Compute the unique identifier for a channel
@@ -42,8 +40,8 @@ library Utils {
      * @return True if the signature is valid, false otherwise
      */
     function verifySignature(bytes32 stateHash, Signature memory sig, address signer) internal pure returns (bool) {
-        // Verify the signature
-        address recoveredSigner = stateHash.toEthSignedMessageHash().recover(sig.v, sig.r, sig.s);
+        // Verify the signature directly on the stateHash without using EIP-191
+        address recoveredSigner = ECDSA.recover(stateHash, sig.v, sig.r, sig.s);
         return recoveredSigner == signer;
     }
 }

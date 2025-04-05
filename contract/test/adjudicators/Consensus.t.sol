@@ -5,7 +5,6 @@ import {Test} from "lib/forge-std/src/Test.sol";
 import {Vm} from "lib/forge-std/src/Vm.sol";
 
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
 import {TestUtils} from "../TestUtils.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
@@ -17,7 +16,6 @@ import {Utils} from "../../src/Utils.sol";
 
 contract ConsensusTest is Test {
     using ECDSA for bytes32;
-    using MessageHashUtils for bytes32;
 
     Consensus public adjudicator;
 
@@ -62,11 +60,11 @@ contract ConsensusTest is Test {
         // Simple message to sign
         bytes32 message = keccak256("test message");
 
-        // Sign with the prefixed hash as required by Ethereum
+        // Sign the message directly without EIP-191 prefix
         (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, hostPrivateKey, message);
 
-        // Directly recover using ecrecover (without prefix since we already signed prefixed hash)
-        address recovered = message.toEthSignedMessageHash().recover(v, r, s);
+        // Recover the signer using direct recovery (no prefix)
+        address recovered = ECDSA.recover(message, v, r, s);
 
         // This should pass - verifying our signing approach
         assertEq(recovered, host);
@@ -75,7 +73,7 @@ contract ConsensusTest is Test {
         Signature memory signature = Signature({v: v, r: r, s: s});
         bool isValid = Utils.verifySignature(message, signature, host);
 
-        // This should also pass as Utils.verifySignature adds the prefix
+        // This should also pass with our updated Utils.verifySignature
         assertTrue(isValid);
     }
 

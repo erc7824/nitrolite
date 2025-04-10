@@ -123,6 +123,10 @@ export class NitroliteClient {
         return this.operations.getAccountChannels(account);
     }
 
+    async getAccountInfo(account: Address, tokenAddress: Address): Promise<{ deposited: bigint; locked: bigint; channelCount: number }> {
+        return this.operations.getAccountInfo(account, tokenAddress);
+    }
+
     /**
      * Create a new channel
      */

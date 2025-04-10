@@ -302,34 +302,18 @@ export class ChannelOperations {
     }
 
     /**
-     * Get available balance for an account
-     */
-    async getAvailableBalance(account: Address, tokenAddress: Address): Promise<bigint> {
-        try {
-            return (await this.publicClient.readContract({
-                address: this.custodyAddress,
-                abi: CustodyAbi,
-                functionName: "getAvailableBalance",
-                args: [account, tokenAddress],
-            })) as bigint;
-        } catch (error: any) {
-            throw new Errors.ContractCallError(`Failed to get available balance: ${error.message}`, { cause: error, account, tokenAddress });
-        }
-    }
-
-    /**
      * Get channels associated with an account for a specific token
      */
-    async getAccountChannels(account: Address, tokenAddress: Address): Promise<ChannelId[]> {
+    async getAccountChannels(account: Address): Promise<ChannelId[]> {
         try {
             return (await this.publicClient.readContract({
                 address: this.custodyAddress,
                 abi: CustodyAbi,
                 functionName: "getAccountChannels",
-                args: [account, tokenAddress],
+                args: [account],
             })) as ChannelId[];
         } catch (error: any) {
-            throw new Errors.ContractCallError(`Failed to get account channels: ${error.message}`, { cause: error, account, tokenAddress });
+            throw new Errors.ContractCallError(`Failed to get account channels: ${error.message}`, { cause: error, account });
         }
     }
 

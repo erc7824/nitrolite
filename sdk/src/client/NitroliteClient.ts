@@ -119,12 +119,8 @@ export class NitroliteClient {
         return this.operations.withdraw(tokenAddress, amount);
     }
 
-    async getAvailableBalance(account: Address, tokenAddress: Address): Promise<bigint> {
-        return this.operations.getAvailableBalance(account, tokenAddress);
-    }
-
-    async getAccountChannels(account: Address, tokenAddress: Address): Promise<ChannelId[]> {
-        return this.operations.getAccountChannels(account, tokenAddress);
+    async getAccountChannels(account: Address): Promise<ChannelId[]> {
+        return this.operations.getAccountChannels(account);
     }
 
     /**

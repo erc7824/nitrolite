@@ -57,12 +57,3 @@ export enum AdjudicatorStatus {
     INVALID = 3, // Channel state is invalid
     FINAL = 4, // This is the FINAL State channel can be closed
 }
-
-/**
- * Participant roles in a channel
- */
-export enum Role {
-    UNDEFINED = -1,
-    CREATOR = 0,
-    GUEST = 1,
-}

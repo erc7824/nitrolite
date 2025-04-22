@@ -1,7 +1,7 @@
 import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress, SimulateContractReturnType } from "viem";
-import { CustodyAbi, ContractAddresses } from "../abis"; // Adjust path
-import { Errors } from "../errors"; // Use the namespace import
-import { Channel, ChannelId, Signature, State } from "./types";
+import { CustodyAbi, ContractAddresses } from "../../abis"; // Adjust path
+import { Errors } from "../../errors"; // Use the namespace import
+import { Channel, ChannelId, Signature, State } from "../types";
 
 /**
  * Service for interacting directly with the Nitrolite Custody smart contract.

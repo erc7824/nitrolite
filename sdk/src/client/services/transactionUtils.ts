@@ -1,5 +1,5 @@
 import { PublicClient, Hash, TransactionReceipt } from "viem";
-import { Errors } from "../errors";
+import { Errors } from "../../errors";
 
 /**
  * Waits for a transaction to be mined and returns the receipt.

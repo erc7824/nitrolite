@@ -1,17 +1,15 @@
 import { keccak256, encodeAbiParameters, Address, Hex, recoverMessageAddress, numberToHex } from "viem";
-import { State, StateHash, Signature, Channel } from "../services/types"; // Updated import path
+import { State, StateHash, Signature, Channel, ChannelId } from "../client/types"; // Updated import path
 import { getChannelId } from "./channel";
 import { secp256k1 } from "@noble/curves/secp256k1";
 
 /**
  * Compute the hash of a channel state in a canonical way (ignoring the signature)
- * @param channel The channel configuration
+ * @param channelId The channelId
  * @param state The state struct
  * @returns The state hash as Hex
  */
-export function getStateHash(channel: Channel, state: State): StateHash {
-    const channelId = getChannelId(channel);
-
+export function getStateHash(channelId: ChannelId, state: State): StateHash {
     const encoded = encodeAbiParameters(
         [
             { name: "channelId", type: "bytes32" },
@@ -32,7 +30,7 @@ type ParsedSignature = { r: Hex; s: Hex; v?: bigint | undefined; yParity?: numbe
  * @param signatureHex Signature in hex format.
  * @returns The structured signature {r, s, v?, yParity?}.
  */
-function parseSignature(signatureHex: Hex): ParsedSignature {
+export function parseSignature(signatureHex: Hex): ParsedSignature {
     // Ensure the input is a valid hex string
     if (!/^0x[0-9a-fA-F]*$/.test(signatureHex) || signatureHex.length !== 132) {
         throw new Error("Invalid signature hex format");

@@ -1,6 +1,6 @@
 import { Account, Address, PublicClient, WalletClient, Hash, SimulateContractReturnType } from "viem"; // Added SimulateContractReturnType
-import { Erc20Abi } from "../abis/token"; // Adjust path as needed
-import { Errors } from "../errors"; // Use the namespace import
+import { Erc20Abi } from "../../abis/token"; // Adjust path as needed
+import { Errors } from "../../errors"; // Use the namespace import
 
 /**
  * Service for interacting with ERC20 token contracts.

@@ -1,6 +1,6 @@
 import { encodeAbiParameters, Address, Hex } from "viem";
 import { AppLogic } from "../types"; // Updated import path
-import { Channel } from "../services/types"; // Import Channel if needed by validators
+import { Channel } from "../client/types"; // Import Channel if needed by validators
 
 /**
  * Common encoders for standard application data patterns.

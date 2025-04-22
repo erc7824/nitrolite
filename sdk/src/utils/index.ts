@@ -63,15 +63,12 @@ export async function signState(stateHash: StateHash, signer: any): Promise<Sign
 export async function verifySignature(stateHash: StateHash, signature: Signature, signer: Address): Promise<boolean> {
     try {
         // Convert signature parts to proper format
-        // Use a simplified approach to avoid fromHex spreading issues
         const r = fromHex(signature.r, { to: "bytes", size: 32 });
         const s = fromHex(signature.s, { to: "bytes", size: 32 });
 
-        // Concatenate the bytes
         const bytes = new Uint8Array([...r, ...s, signature.v]);
         const sigString = toHex(bytes);
 
-        // Recover address from signature
         const recoveredAddress = await recoverMessageAddress({
             message: { raw: stateHash },
             signature: sigString,

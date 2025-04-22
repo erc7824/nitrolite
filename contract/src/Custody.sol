@@ -344,6 +344,7 @@ contract Custody is IChannel, IDeposit {
      * @param candidate The latest known valid state
      * @param proofs is an array of valid state required by the adjudicator
      */
+    // TODO: add responding to CHANOPEN, CHANRESIZE challenge (should NOT call `adjudicate`)
     function checkpoint(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = _channels[channelId];
 

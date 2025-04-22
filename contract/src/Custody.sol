@@ -13,8 +13,13 @@ import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/
 /**
  * @title Custody
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
+ * @dev This implementation currently only supports 2 participant channels (CREATOR and BROKER)
  */
 contract Custody is IChannel, IDeposit {
+    // Constants for participant indices
+    uint256 constant CREATOR = 0; // Participant index for the channel creator
+    uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
+
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     // Errors
@@ -37,9 +42,9 @@ contract Custody is IChannel, IDeposit {
         Channel chan; // Opener define channel configuration
         Status stage;
         address creator;
-        // TODO: replace 2 Amount[] arrays with EnumerableSet of participants that have joined
-        Amount[] expectedDeposits; // Creator defines Token per participant
-        Amount[] actualDeposits; // Tracks deposits made by each participant
+        // Fixed arrays for exactly 2 participants (CREATOR and BROKER)
+        Amount[2] expectedDeposits; // Creator defines Token per participant
+        Amount[2] actualDeposits; // Tracks deposits made by each participant
         uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
         State lastValidState; // Last valid state when adjudicator was called
         mapping(address token => uint256 balance) tokenBalances; // Token balances for the channel
@@ -113,7 +118,7 @@ contract Custody is IChannel, IDeposit {
      */
     function create(Channel calldata ch, State calldata initial) public returns (bytes32 channelId) {
         // Validate channel configuration
-        if (ch.participants.length < 2) revert InvalidParticipant();
+        if (ch.participants.length != 2) revert InvalidParticipant();
         if (ch.adjudicator == address(0)) revert InvalidAdjudicator();
         if (ch.challenge == 0) revert InvalidChallengePeriod();
 
@@ -130,7 +135,7 @@ contract Custody is IChannel, IDeposit {
         bytes32 stateHash = Utils.getStateHash(ch, initial);
         if (initial.sigs.length != 1) revert InvalidStateSignatures();
         // TODO: later we can lift the restriction that first sig must be from participant 0
-        bool validSig = Utils.verifySignature(stateHash, initial.sigs[0], ch.participants[0]);
+        bool validSig = Utils.verifySignature(stateHash, initial.sigs[CREATOR], ch.participants[CREATOR]);
         if (!validSig) revert InvalidStateSignatures();
 
         // NOTE: even if there is not allocation planned, it should be present as `Allocation{address(0), 0}`
@@ -150,19 +155,19 @@ contract Custody is IChannel, IDeposit {
             uint256 amount = initial.allocations[i].amount;
 
             // even if participant does not have an allocation, still track that
-            meta.expectedDeposits.push(Amount(token, amount));
-            meta.actualDeposits.push(Amount(address(0), 0)); // Initialize actual deposits to zero
+            meta.expectedDeposits[i] = Amount(token, amount);
+            meta.actualDeposits[i] = Amount(address(0), 0); // Initialize actual deposits to zero
         }
 
         // NOTE: it is allowed for depositor (and msg.sender) to be different from channel creator (participant)
         // This enables logic of "session keys" where a user can create a channel on behalf of another account, but will lock their own funds
         // if (ch.participants[0]; != msg.sender) revert InvalidParticipant();
 
-        Amount memory creatorDeposit = meta.expectedDeposits[0];
+        Amount memory creatorDeposit = meta.expectedDeposits[CREATOR];
         _lockAccountFundsToChannel(msg.sender, channelId, creatorDeposit.token, creatorDeposit.amount);
 
         // Record actual deposit
-        meta.actualDeposits[0] = creatorDeposit;
+        meta.actualDeposits[CREATOR] = creatorDeposit;
 
         // Add channel to the creator's ledger
         _ledgers[msg.sender].channels.add(channelId);
@@ -176,7 +181,7 @@ contract Custody is IChannel, IDeposit {
     /**
      * @notice Allows a participant to join a channel by signing the funding state
      * @param channelId Unique identifier for the channel
-     * @param index Index of the participant in the channel's participants array
+     * @param index Index of the participant in the channel's participants array (must be 1 for BROKER)
      * @param sig Signature of the participant on the funding state
      * @return The channelId of the joined channel
      */
@@ -188,7 +193,8 @@ contract Custody is IChannel, IDeposit {
         if (meta.stage != Status.INITIAL) revert InvalidStatus();
 
         // Verify index is valid and participant has not already joined
-        if (index == 0 || index >= meta.chan.participants.length) revert InvalidParticipant();
+        // For 2-participant channels, index can only be BROKER (second participant)
+        if (index != BROKER) revert InvalidParticipant();
         if (meta.actualDeposits[index].amount != 0) revert InvalidParticipant();
 
         // Get participant address from channel config
@@ -212,14 +218,9 @@ contract Custody is IChannel, IDeposit {
         // Emit joined event
         emit Joined(channelId, index);
 
-        // Check if all participants have joined
-        bool allJoined = true;
-        for (uint256 i = 0; i < meta.actualDeposits.length; i++) {
-            if (meta.actualDeposits[i].amount != meta.expectedDeposits[i].amount) {
-                allJoined = false;
-                break;
-            }
-        }
+        // For 2-participant channels, just check if the second participant has joined
+        // since we know the first participant (creator) has already joined
+        bool allJoined = meta.actualDeposits[BROKER].amount == meta.expectedDeposits[BROKER].amount;
 
         // If all participants have joined, set channel to ACTIVE
         if (allJoined) {
@@ -249,7 +250,8 @@ contract Custody is IChannel, IDeposit {
             if (magicNumber != CHANCLOSE) revert InvalidState();
 
             // Verify all participants have signed the closing state
-            if (candidate.sigs.length != meta.chan.participants.length) revert InvalidStateSignatures();
+            // For our 2-participant channels, we need exactly 2 signatures
+            if (candidate.sigs.length != 2) revert InvalidStateSignatures();
             if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
 
             // Store the final state
@@ -363,7 +365,7 @@ contract Custody is IChannel, IDeposit {
      * @param channelId Unique identifier for the channel
      * @param candidate The latest known valid state
      * @param proofs An array of valid state required by the adjudicator
-     * @param newChannel New channel configuration
+     * @param newChannel New channel configuration (must have exactly 2 participants)
      * @param newDeposit Initial State defined by the opener, containing the expected allocation
      */
     function reset(
@@ -383,7 +385,7 @@ contract Custody is IChannel, IDeposit {
     /**
      * @notice Internal function to close a channel and distribute funds
      * @param channelId The channel identifier
-     * @param meta The channel's metadata
+     * @param meta The channel's metadata (assumes a 2-participant channel)
      */
     function _distributeAllocation(bytes32 channelId, Metadata storage meta) internal {
         // Distribute funds according to allocations
@@ -419,6 +421,10 @@ contract Custody is IChannel, IDeposit {
         if (!success) revert TransferFailed(token, to, amount);
     }
 
+    /**
+     * @notice Lock funds from an account to a channel
+     * @dev Used during channel creation and joining for 2-participant channels
+     */
     function _lockAccountFundsToChannel(address account, bytes32 channelId, address token, uint256 amount) internal {
         if (amount == 0) return;
 
@@ -457,26 +463,30 @@ contract Custody is IChannel, IDeposit {
     }
 
     /**
-     * @notice Verifies that all provided signatures are valid for the given state
+     * @notice Verifies that both signatures are valid for the given state in a 2-participant channel
      * @param chan The channel configuration
      * @param state The state to verify signatures for
-     * @return valid True if all provided signatures are valid
+     * @return valid True if both signatures are valid
      */
     function _verifyAllSignatures(Channel memory chan, State memory state) internal pure returns (bool valid) {
         // Calculate the state hash once
         bytes32 stateHash = Utils.getStateHash(chan, state);
 
-        // Check if we have the right number of signatures
-        if (state.sigs.length > chan.participants.length) {
+        // Check if we have exactly 2 signatures for our 2-participant channels
+        if (state.sigs.length != 2 || chan.participants.length != 2) {
             return false;
         }
 
-        // Verify each signature
-        for (uint256 i = 0; i < state.sigs.length; i++) {
-            bool isValid = Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i]);
-            if (!isValid) {
-                return false;
-            }
+        // Verify creator's signature
+        bool isCreatorValid = Utils.verifySignature(stateHash, state.sigs[CREATOR], chan.participants[CREATOR]);
+        if (!isCreatorValid) {
+            return false;
+        }
+
+        // Verify broker's signature
+        bool isBrokerValid = Utils.verifySignature(stateHash, state.sigs[BROKER], chan.participants[BROKER]);
+        if (!isBrokerValid) {
+            return false;
         }
 
         return true;

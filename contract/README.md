@@ -318,14 +318,18 @@ src
 ### Custody Contract
 
 The `Custody.sol` contract implements the `IChannel` and `IDeposit` interfaces, managing state channels and enforcing rules for creating, joining, closing, challenging, and checkpointing channels.
+This implementation strictly supports only 2-participant channels with fixed roles: CREATOR (index 0) and BROKER (index 1).
 
 ```solidity
+uint256 constant CREATOR = 0; // Participant index for the channel creator
+uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
+
 struct Metadata {
     Channel chan;             // Channel configuration
     Status stage;             // Current channel status
     address creator;          // Creator address (caller of create function)
-    Amount[] expectedDeposits; // Creator defines Token per participant
-    Amount[] actualDeposits;  // Tracks deposits made by each participant
+    Amount[2] expectedDeposits; // Fixed array for CREATOR (0) and BROKER (1) expected deposits
+    Amount[2] actualDeposits;  // Fixed array for tracking actual deposits by CREATOR and BROKER
     uint256 challengeExpire;  // If non-zero channel will resolve to lastValidState when challenge Expires
     State lastValidState;     // Last valid state when adjudicator was called
     mapping(address token => uint256 balance) tokenBalances; // Token balances for the channel

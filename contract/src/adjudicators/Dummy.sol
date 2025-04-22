@@ -35,11 +35,7 @@ contract Dummy is IAdjudicator, IComparable {
      * @param previous The reference state to compare against (unused in this implementation)
      * @return result Always returns 1 (candidate is newer)
      */
-    function compare(State calldata candidate, State calldata previous) 
-        external 
-        pure 
-        returns (int8 result)
-    {
+    function compare(State calldata candidate, State calldata previous) external pure returns (int8 result) {
         // Always indicate that the candidate state is newer
         return 1;
     }

@@ -109,6 +109,20 @@ export async function signState(
     }
 }
 
+export function removeQuotesFromRS(input: { r?: string; s?: string; [key: string]: any }): { [key: string]: any } {
+    const output = { ...input };
+
+    if (typeof output.r === "string") {
+        output.r = output.r.replace(/^"(.*)"$/, "$1");
+    }
+
+    if (typeof output.s === "string") {
+        output.s = output.s.replace(/^"(.*)"$/, "$1");
+    }
+
+    return output;
+}
+
 /**
  * Verifies that a state hash was signed by the expected signer.
  * @param stateHash The hash of the state.

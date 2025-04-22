@@ -1,100 +1,21 @@
-import {
-    Account,
-    Address,
-    Hex,
-    PublicClient,
-    WalletClient,
-    Chain,
-    Transport,
-    ParseAccount,
-    Hash,
-    zeroAddress,
-    decodeAbiParameters,
-    encodeAbiParameters,
-} from "viem";
+import { Account, Hex, PublicClient, WalletClient, Chain, Transport, ParseAccount, Hash, zeroAddress } from "viem";
 
 import { NitroliteService, Erc20Service } from "./services";
-import { Channel, State, Allocation, Signature, ChannelId, AdjudicatorStatus } from "./types";
-import { getStateHash, generateChannelNonce, verifySignature, parseSignature, getChannelId } from "../utils";
+import {
+    Channel,
+    State,
+    ChannelId,
+    NitroliteClientConfig,
+    CreateChannelParams,
+    CheckpointChannelParams,
+    ChallengeChannelParams,
+    CloseChannelParams,
+    AccountInfo,
+} from "./types";
+import { getStateHash, generateChannelNonce, getChannelId, encoders, removeQuotesFromRS, signState } from "../utils";
 import * as Errors from "../errors";
-import { ContractAddresses, CustodyAbi } from "../abis";
-
-// TODO: MOVE IT
-export const MAGIC_NUMBERS = {
-    MAGIC_NUMBER_OPEN: BigInt(7877),
-    MAGIC_NUMBER_CLOSE: BigInt(7879),
-};
-
-function removeQuotesFromRS(input: { r?: string; s?: string; [key: string]: any }): { [key: string]: any } {
-    const output = { ...input };
-
-    if (typeof output.r === "string") {
-        output.r = output.r.replace(/^"(.*)"$/, "$1");
-    }
-
-    if (typeof output.s === "string") {
-        output.s = output.s.replace(/^"(.*)"$/, "$1");
-    }
-
-    return output;
-}
-
-/**
- * Configuration for initializing the NitroliteClient.
- */
-export interface NitroliteClientConfig {
-    publicClient: PublicClient;
-    walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
-    addresses: ContractAddresses;
-    challengeDuration?: bigint;
-}
-
-/**
- * Parameters required for creating a new state channel.
- */
-export interface CreateChannelParams {
-    initialAllocationAmounts: [bigint, bigint];
-    stateData?: Hex;
-}
-
-/**
- * Parameters required for collaboratively closing a state channel.
- */
-export interface CloseChannelParams {
-    finalState: {
-        channel_id: ChannelId;
-        state_data: Hex;
-        allocations: [Allocation, Allocation];
-        server_signature: Signature[];
-    };
-}
-
-/**
- * Parameters required for challenging a state channel.
- */
-export interface ChallengeChannelParams {
-    channelId: ChannelId;
-    candidateState: State;
-    proofStates?: State[];
-}
-
-/**
- * Parameters required for checkpointing a state on-chain.
- */
-export interface CheckpointChannelParams {
-    channelId: ChannelId;
-    candidateState: State;
-    proofStates?: State[];
-}
-
-/**
- * Information about an account's funds in the custody contract.
- */
-export interface AccountInfo {
-    available: bigint;
-    locked: bigint;
-    channelCount: bigint;
-}
+import { ContractAddresses } from "../abis";
+import { MAGIC_NUMBERS } from "../config";
 
 /**
  * The main client class for interacting with the Nitrolite SDK.
@@ -108,42 +29,6 @@ export class NitroliteClient {
     private readonly nitroliteService: NitroliteService;
     private readonly erc20Service: Erc20Service;
     private readonly account: ParseAccount<Account>;
-
-    /**
-     * Example of a default application logic for the Nitrolite SDK.
-     * Encode application state to bytes for on-chain use
-     * @param data The application state to encode
-     * @returns Hex-encoded data
-     */
-    public encode(data: bigint): Hex {
-        return encodeAbiParameters(
-            [
-                {
-                    type: "uint256",
-                },
-            ],
-            [data]
-        );
-    }
-
-    /**
-     * Example of a default application logic for the Nitrolite SDK.
-     * Decode bytes back to application state
-     * @param encoded The encoded state
-     * @returns Decoded application state
-     */
-    public decode(encoded: Hex): bigint {
-        const [type] = decodeAbiParameters(
-            [
-                {
-                    type: "uint256",
-                },
-            ],
-            encoded
-        );
-
-        return type;
-    }
 
     constructor(config: NitroliteClientConfig) {
         if (!config.publicClient) throw new Errors.MissingParameterError("publicClient");
@@ -220,7 +105,7 @@ export class NitroliteClient {
             nonce: channelNonce,
         };
 
-        const initialAppData = stateData ?? this.encode(MAGIC_NUMBERS.MAGIC_NUMBER_OPEN);
+        const initialAppData = stateData ?? encoders["numeric"](MAGIC_NUMBERS.OPEN);
 
         const channelId = getChannelId(channel);
 
@@ -234,30 +119,9 @@ export class NitroliteClient {
         };
 
         const stateHash = getStateHash(channelId, initialState);
+        const accountSignature = await signState(stateHash, this.walletClient.signMessage);
 
-        let signatureHex: Hex;
-
-        try {
-            signatureHex = await this.walletClient.signMessage({
-                account: this.account,
-                message: { raw: stateHash },
-            });
-        } catch (err) {
-            throw new Errors.InvalidSignatureError("Failed to sign initial state", { cause: err as Error });
-        }
-
-        const parsedSig = parseSignature(signatureHex);
-        if (typeof parsedSig.v === "undefined") {
-            throw new Errors.InvalidSignatureError("Signature parsing did not return a 'v' value.");
-        }
-
-        const signature: Signature = {
-            r: parsedSig.r,
-            s: parsedSig.s,
-            v: Number(parsedSig.v),
-        };
-
-        initialState.sigs = [signature];
+        initialState.sigs = [accountSignature];
 
         try {
             const txHash = await this.nitroliteService.createChannel(channel, initialState);
@@ -337,20 +201,17 @@ export class NitroliteClient {
     async closeChannel(params: CloseChannelParams): Promise<Hash> {
         const { finalState } = params;
         const finalSignatures = removeQuotesFromRS(finalState.server_signature)["server_signature"];
-        const appState = MAGIC_NUMBERS.MAGIC_NUMBER_CLOSE;
+        const appState = MAGIC_NUMBERS.CLOSE;
 
         const state: State = {
-            data: this.encode(appState),
+            data: encoders["numeric"](appState),
             allocations: finalState.allocations,
             sigs: [],
         };
 
         const stateHash = getStateHash(finalState.channel_id, state); // Pass channelId if required by util
 
-        const signatureHex = await this.walletClient.signMessage({ account: this.account, message: { raw: stateHash } });
-        const parsedSig = parseSignature(signatureHex);
-        if (typeof parsedSig.v === "undefined") throw new Errors.InvalidSignatureError("Parsed signature missing 'v'");
-        const accountSignature: Signature = { r: parsedSig.r, s: parsedSig.s, v: Number(parsedSig.v) };
+        const accountSignature = await signState(stateHash, this.walletClient.signMessage);
 
         state.sigs = [accountSignature, ...finalSignatures];
 
@@ -367,7 +228,7 @@ export class NitroliteClient {
      * @param amount The amount of tokens/ETH to withdraw.
      * @returns The transaction hash.
      */
-    async withdrawDeposit(amount: bigint): Promise<Hash> {
+    async withdrawal(amount: bigint): Promise<Hash> {
         const tokenAddress = this.addresses.tokenAddress;
 
         try {

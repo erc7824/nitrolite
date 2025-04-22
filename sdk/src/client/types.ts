@@ -1,4 +1,5 @@
-import { Address, Hex } from "viem";
+import { Account, Hex, PublicClient, WalletClient, Chain, Transport, ParseAccount, Address } from "viem";
+import { ContractAddresses } from "../abis";
 
 /**
  * Channel identifier
@@ -56,4 +57,61 @@ export enum AdjudicatorStatus {
     ACTIVE = 2, // Channel fully funded using open or state are valid
     INVALID = 3, // Channel state is invalid
     FINAL = 4, // This is the FINAL State channel can be closed
+}
+
+/**
+ * Configuration for initializing the NitroliteClient.
+ */
+export interface NitroliteClientConfig {
+    publicClient: PublicClient;
+    walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
+    addresses: ContractAddresses;
+    challengeDuration?: bigint;
+}
+
+/**
+ * Parameters required for creating a new state channel.
+ */
+export interface CreateChannelParams {
+    initialAllocationAmounts: [bigint, bigint];
+    stateData?: Hex;
+}
+
+/**
+ * Parameters required for collaboratively closing a state channel.
+ */
+export interface CloseChannelParams {
+    finalState: {
+        channel_id: ChannelId;
+        state_data: Hex;
+        allocations: [Allocation, Allocation];
+        server_signature: Signature[];
+    };
+}
+
+/**
+ * Parameters required for challenging a state channel.
+ */
+export interface ChallengeChannelParams {
+    channelId: ChannelId;
+    candidateState: State;
+    proofStates?: State[];
+}
+
+/**
+ * Parameters required for checkpointing a state on-chain.
+ */
+export interface CheckpointChannelParams {
+    channelId: ChannelId;
+    candidateState: State;
+    proofStates?: State[];
+}
+
+/**
+ * Information about an account's funds in the custody contract.
+ */
+export interface AccountInfo {
+    available: bigint;
+    locked: bigint;
+    channelCount: bigint;
 }

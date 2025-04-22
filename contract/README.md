@@ -94,6 +94,7 @@ uint256 constant BROKER = 1; // Participant index for the broker in clearnet con
 // Magic numbers for funding protocol
 uint32 constant CHANOPEN = 7877; // State.data value for funding stateHash
 uint32 constant CHANCLOSE = 7879; // State.data value for closing stateHash
+uint32 constant CHANRESIZE = 7883; // State.data value for resize stateHash
 ```
 
 ### `IAdjudicator.sol`
@@ -152,7 +153,7 @@ interface IChannel {
     event Opened(bytes32 indexed channelId);
     event Challenged(bytes32 indexed channelId, uint256 expiration);
     event Checkpointed(bytes32 indexed channelId);
-    event ChannelClosed(bytes32 indexed channelId);
+    event Closed(bytes32 indexed channelId);
 
     /**
      * @notice Creates a new channel and initializes funding
@@ -182,19 +183,20 @@ interface IChannel {
     function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
 
     /**
-     * @notice Closes an existing channel and creates a new one with updated parameters
-     * @param channelId Unique identifier for the channel to close
-     * @param candidate The latest known valid state for closing the current channel
-     * @param proofs Additional states required by the adjudicator for closing
-     * @param ch New channel configuration for the replacement channel
-     * @param initial Initial state for the new channel with CHANOPEN magic number
+     * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
+     * @dev Used for resizing channel allocations without withdrawing funds
+     * @param channelId Unique identifier for the channel to resize
+     * @param candidate The latest known valid state
+     * @param proofs Additional states required by the adjudicator for validation
+     * @param ch Channel configuration (must match the existing channel)
+     * @param newFunding New allocation state with CHANRESIZE magic number
      */
-    function reset(
+    function resize(
         bytes32 channelId,
         State calldata candidate,
         State[] calldata proofs,
         Channel calldata ch,
-        State calldata initial
+        State calldata newFunding
     ) external;
 
     /**

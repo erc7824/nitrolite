@@ -47,7 +47,7 @@ interface IChannel {
      * @notice Emitted when a channel is closed and funds are distributed
      * @param channelId Unique identifier for the channel
      */
-    event ChannelClosed(bytes32 indexed channelId);
+    event Closed(bytes32 indexed channelId);
 
     /**
      * @notice Creates a new channel and initializes funding
@@ -79,20 +79,20 @@ interface IChannel {
     function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
 
     /**
-     * @notice Closes an existing channel and creates a new one with updated parameters
-     * @dev Used for resizing channel allocations without fully withdrawing funds
+     * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
+     * @dev Used for resizing channel allocations without withdrawing funds
      * @param channelId Unique identifier for the channel to close
      * @param candidate The latest known valid state for closing the current channel
      * @param proofs Additional states required by the adjudicator for closing
      * @param ch New channel configuration for the replacement channel
-     * @param initial Initial state for the new channel with CHANOPEN magic number
+     * @param newFunding new allocation state for the new channel with CHANRESIZE magic number
      */
-    function reset(
+    function resize(
         bytes32 channelId,
         State calldata candidate,
         State[] calldata proofs,
         Channel calldata ch,
-        State calldata initial
+        State calldata newFunding
     ) external;
 
     /**

@@ -72,3 +72,4 @@ enum Status {
 // Magic numbers for funding protocol
 uint32 constant CHANOPEN = 7877; // State.data value for funding stateHash
 uint32 constant CHANCLOSE = 7879; // State.data value for closing stateHash
+uint32 constant CHANRESIZE = 7883; // State.data value for resize stateHash

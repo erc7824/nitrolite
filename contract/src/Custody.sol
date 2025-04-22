@@ -360,27 +360,11 @@ contract Custody is IChannel, IDeposit {
         emit Checkpointed(channelId);
     }
 
-    /**
-     * @notice Reset will close and open channel for resizing allocations
-     * @param channelId Unique identifier for the channel
-     * @param candidate The latest known valid state
-     * @param proofs An array of valid state required by the adjudicator
-     * @param newChannel New channel configuration (must have exactly 2 participants)
-     * @param newDeposit Initial State defined by the opener, containing the expected allocation
-     */
-    function reset(
-        bytes32 channelId,
-        State calldata candidate,
-        State[] calldata proofs,
-        Channel calldata newChannel,
-        State calldata newDeposit
-    ) external {
-        // First close the existing channel
-        close(channelId, candidate, proofs);
-
-        // Then open a new channel with the provided configuration
-        create(newChannel, newDeposit);
-    }
+    //TODO: Implement resize
+    // validate channel, state is signed by both participants
+    // calculate the delta of funding between by deduction
+    // call _transfer to reflect the newFunding state desired
+    // Set ACTIVE
 
     /**
      * @notice Internal function to close a channel and distribute funds

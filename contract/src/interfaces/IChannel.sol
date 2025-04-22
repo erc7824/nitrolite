@@ -81,18 +81,13 @@ interface IChannel {
     /**
      * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
      * @dev Used for resizing channel allocations without withdrawing funds
-     * @param channelId Unique identifier for the channel to close
+     * @param channelId Unique identifier for the channel to resize
      * @param candidate The latest known valid state for closing the current channel
-     * @param proofs Additional states required by the adjudicator for closing
-     * @param ch New channel configuration for the replacement channel
-     * @param newFunding new allocation state for the new channel with CHANRESIZE magic number
+     * NOTE: no `proof` here as `adjudicate(...)` is NOT called, because candidate state does NOT contain app-specific logic
      */
     function resize(
         bytes32 channelId,
-        State calldata candidate,
-        State[] calldata proofs,
-        Channel calldata ch,
-        State calldata newFunding
+        State calldata candidate
     ) external;
 
     /**

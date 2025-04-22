@@ -5,7 +5,7 @@ import {IChannel} from "./interfaces/IChannel.sol";
 import {IDeposit} from "./interfaces/IDeposit.sol";
 import {IAdjudicator} from "./interfaces/IAdjudicator.sol";
 import {IComparable} from "./interfaces/IComparable.sol";
-import {Channel, State, Allocation, Status, Signature, Amount, CHANOPEN, CHANCLOSE} from "./interfaces/Types.sol";
+import {Channel, State, Allocation, Status, Signature, Amount, CHANOPEN, CHANCLOSE, CHANRESIZE} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
@@ -284,7 +284,7 @@ contract Custody is IChannel, IDeposit {
         // Mark channel as closed by removing it
         delete _channels[channelId];
 
-        emit ChannelClosed(channelId);
+        emit Closed(channelId);
     }
 
     /**
@@ -304,13 +304,28 @@ contract Custody is IChannel, IDeposit {
         // Verify that at least one participant signed the state
         if (candidate.sigs.length == 0) revert InvalidStateSignatures();
 
-        // Verify the state is valid according to the adjudicator
-        bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
-        if (!isValid) revert InvalidState();
+        if (candidate.data.length != 0) {
+            uint32 magicNumber = abi.decode(candidate.data, (uint32));
+            if (magicNumber == CHANOPEN) {
+                // TODO:
+            } else if (magicNumber == CHANRESIZE) {
+                uint256 deposited = meta.expectedDeposits[CREATOR].amount + meta.expectedDeposits[BROKER].amount;
+                uint256 expected = candidate.allocations[CREATOR].amount + candidate.allocations[BROKER].amount;
+                if (deposited != expected) {
+                    revert InvalidAllocations();
+                }
+            }
+        } else {
+            // if no state data or magic number is not CHANOPEN or CHANRESIZE, assume this is a normal state
 
-        // Revert if trying to challenge with an older state that is already known
-        if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
-            revert InvalidState();
+            // Verify the state is valid according to the adjudicator
+            bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
+            if (!isValid) revert InvalidState();
+
+            // Revert if trying to challenge with an older state that is already known
+            if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
+                revert InvalidState();
+            }
         }
 
         // Store the candidate as the last valid state
@@ -360,11 +375,66 @@ contract Custody is IChannel, IDeposit {
         emit Checkpointed(channelId);
     }
 
-    //TODO: Implement resize
-    // validate channel, state is signed by both participants
-    // calculate the delta of funding between by deduction
-    // call _transfer to reflect the newFunding state desired
-    // Set ACTIVE
+    /**
+     * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
+     * @param channelId Unique identifier for the channel to resize
+     * @param candidate The state with CHANRESIZE magic number and resize amounts
+     */
+    function resize(
+        bytes32 channelId,
+        State calldata candidate
+    ) external {
+        Metadata storage meta = _channels[channelId];
+
+        // Verify channel exists and is ACTIVE
+        if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
+        if (meta.stage != Status.ACTIVE) revert InvalidStatus();
+
+        // Verify all participants have signed the resize state
+        // For our 2-participant channels, we need exactly 2 signatures
+        if (candidate.sigs.length != 2) revert InvalidStateSignatures();
+        if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
+
+        // Decode the magic number and resize amounts
+        (uint32 magicNumber, int256[2] memory resizeAmounts) = abi.decode(candidate.data, (uint32, int256[2]));
+        if (magicNumber != CHANRESIZE) revert InvalidState();
+
+        // Process resize amounts for each participant
+        for (uint256 i = 0; i < 2; i++) {
+            address participant = meta.chan.participants[i];
+            address token = meta.expectedDeposits[i].token;
+            int256 resizeAmount = resizeAmounts[i];
+
+            // Positive resize: Lock more funds into the channel
+            if (resizeAmount > 0) {
+                uint256 amountToAdd = uint256(resizeAmount);
+                _lockAccountFundsToChannel(msg.sender, channelId, token, amountToAdd);
+
+                // Update the expected and actual deposits
+                meta.expectedDeposits[i].amount += amountToAdd;
+                meta.actualDeposits[i].amount += amountToAdd;
+            }
+            // Negative resize: Release funds from the channel
+            else if (resizeAmount < 0) {
+                uint256 amountToRelease = uint256(-resizeAmount);
+
+                // Check if there are enough funds in the channel for this participant
+                if (meta.actualDeposits[i].amount < amountToRelease) revert InsufficientBalance(meta.actualDeposits[i].amount, amountToRelease);
+
+                // Unlock funds from the channel to the participant
+                _unlockChannelFundsToAccount(channelId, participant, token, amountToRelease);
+
+                // Update the expected and actual deposits
+                meta.expectedDeposits[i].amount -= amountToRelease;
+                meta.actualDeposits[i].amount -= amountToRelease;
+            }
+        }
+
+        // Update the latest valid state
+        meta.lastValidState = candidate;
+
+        emit Checkpointed(channelId);
+    }
 
     /**
      * @notice Internal function to close a channel and distribute funds

@@ -5,7 +5,18 @@ import {IChannel} from "./interfaces/IChannel.sol";
 import {IDeposit} from "./interfaces/IDeposit.sol";
 import {IAdjudicator} from "./interfaces/IAdjudicator.sol";
 import {IComparable} from "./interfaces/IComparable.sol";
-import {Channel, State, Allocation, Status, Signature, Amount, CHANOPEN, CHANCLOSE} from "./interfaces/Types.sol";
+import {
+    Channel,
+    State,
+    Allocation,
+    Status,
+    Signature,
+    Amount,
+    CHANOPEN,
+    CHANCLOSE,
+    CREATOR,
+    BROKER
+} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";

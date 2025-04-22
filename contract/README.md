@@ -321,6 +321,9 @@ The `Custody.sol` contract implements the `IChannel` and `IDeposit` interfaces, 
 This implementation strictly supports only 2-participant channels with fixed roles: CREATOR (index 0) and BROKER (index 1).
 
 ```solidity
+uint256 constant CREATOR = 0; // Participant index for the channel creator
+uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
+
 struct Metadata {
     Channel chan;             // Channel configuration
     Status stage;             // Current channel status

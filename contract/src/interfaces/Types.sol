@@ -69,24 +69,6 @@ enum Status {
 
 }
 
-// Constants for participant indices
-uint256 constant CREATOR = 0; // Participant index for the channel creator
-uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
-
 // Magic numbers for funding protocol
 uint32 constant CHANOPEN = 7877; // State.data value for funding stateHash
 uint32 constant CHANCLOSE = 7879; // State.data value for closing stateHash
-
-/**
- * @notice Reference metadata structure for channel implementation
- * @dev Recommended storage structure for IChannel implementations
- */
-struct Metadata {
-    Channel chan; // Channel configuration
-    Status stage; // Current channel status
-    address creator; // Creator address (caller of create function)
-    Amount[] expectedDeposits; // Token amounts expected from each participant
-    Amount[] actualDeposits; // Token amounts actually deposited by each participant
-    uint256 challengeExpire; // Timestamp when challenge period expires
-    State lastValidState; // Last valid state submitted on-chain
-}

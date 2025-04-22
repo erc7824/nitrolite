@@ -5,18 +5,7 @@ import {IChannel} from "./interfaces/IChannel.sol";
 import {IDeposit} from "./interfaces/IDeposit.sol";
 import {IAdjudicator} from "./interfaces/IAdjudicator.sol";
 import {IComparable} from "./interfaces/IComparable.sol";
-import {
-    Channel,
-    State,
-    Allocation,
-    Status,
-    Signature,
-    Amount,
-    CHANOPEN,
-    CHANCLOSE,
-    CREATOR,
-    BROKER
-} from "./interfaces/Types.sol";
+import {Channel, State, Allocation, Status, Signature, Amount, CHANOPEN, CHANCLOSE} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
@@ -27,6 +16,10 @@ import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/
  * @dev This implementation currently only supports 2 participant channels (CREATOR and BROKER)
  */
 contract Custody is IChannel, IDeposit {
+    // Constants for participant indices
+    uint256 constant CREATOR = 0; // Participant index for the channel creator
+    uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
+
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     // Errors

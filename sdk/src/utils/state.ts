@@ -109,15 +109,15 @@ export async function signState(
     }
 }
 
-export function removeQuotesFromRS(input: { r?: string; s?: string; [key: string]: any }): { [key: string]: any } {
+export function removeQuotesFromRS(input: Signature): Signature {
     const output = { ...input };
 
     if (typeof output.r === "string") {
-        output.r = output.r.replace(/^"(.*)"$/, "$1");
+        output.r = output.r.replace(/^"(.*)"$/, "$1") as Hex;
     }
 
     if (typeof output.s === "string") {
-        output.s = output.s.replace(/^"(.*)"$/, "$1");
+        output.s = output.s.replace(/^"(.*)"$/, "$1") as Hex;
     }
 
     return output;

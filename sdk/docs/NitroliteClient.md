@@ -622,7 +622,7 @@ interface CloseChannelParams {
     channelId: ChannelId;                     // Channel to close
     stateData: Hex;                           // Final app state
     allocations: [Allocation, Allocation];    // Final fund distribution
-    serverSignature: Signature[];             // Guest's signature
+    serverSignature: Signature;             // Guest's signature
   };
 }
 

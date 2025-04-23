@@ -106,7 +106,7 @@ export interface CloseChannelParams {
         channelId: ChannelId;
         stateData: Hex;
         allocations: [Allocation, Allocation];
-        serverSignature: Signature[];
+        serverSignature: Signature;
     };
 }
 

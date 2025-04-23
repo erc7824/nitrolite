@@ -78,7 +78,7 @@ export async function _prepareAndSignFinalState(
     const { stateData, finalState } = params;
 
     const channelId = finalState.channelId;
-    const finalSignatures = removeQuotesFromRS(finalState.serverSignature)[0];
+    const serverSignature = removeQuotesFromRS(finalState.serverSignature);
 
     const appData = stateData ?? encoders["numeric"](MAGIC_NUMBERS.CLOSE);
 
@@ -92,9 +92,13 @@ export async function _prepareAndSignFinalState(
 
     const accountSignature = await signState(stateHash, deps.stateWalletClient.signMessage);
 
+    // Create a new state with signatures in the requested style
     const finalStateWithSigs: State = {
         ...stateToSign,
-        sigs: [accountSignature, ...finalSignatures],
+        sigs: [
+            accountSignature,
+            serverSignature
+        ],
     };
 
     return { finalStateWithSigs, channelId };

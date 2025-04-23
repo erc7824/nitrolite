@@ -676,6 +676,14 @@ contract CustodyTest is Test {
         vm.prank(guest);
         custody.join(channelId, 1, guestSig);
 
+        // 1.1 Check available and locked are correct
+        (, uint256 hostLocked,) = custody.getAccountInfo(host, address(token));
+        (uint256 guestAvailable, uint256 guestLocked,) = custody.getAccountInfo(guest, address(token));
+
+        assertEq(hostLocked, DEPOSIT_AMOUNT, "Host's initial locked tokens should be DEPOSIT_AMOUNT");
+        assertEq(guestLocked, DEPOSIT_AMOUNT, "Guest's initial locked tokens should be DEPOSIT_AMOUNT");
+        assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest's initial available tokens should be DEPOSIT_AMOUNT");
+
         // 2. Create a resize state with CHANRESIZE magic number
         State memory resizeState = initialState;
 
@@ -707,11 +715,22 @@ contract CustodyTest is Test {
         assertEq(hostChannels.length, 1, "Host should still have 1 channel after resize");
 
         // Check locked amounts have been updated correctly
-        (, uint256 hostLocked,) = custody.getAccountInfo(host, address(token));
-        (, uint256 guestLocked,) = custody.getAccountInfo(guest, address(token));
+        (, hostLocked,) = custody.getAccountInfo(host, address(token));
+        (guestAvailable, guestLocked,) = custody.getAccountInfo(guest, address(token));
 
         assertEq(hostLocked, DEPOSIT_AMOUNT * 2, "Host's locked tokens should be doubled");
         assertEq(guestLocked, DEPOSIT_AMOUNT / 2, "Guest's locked tokens should be halved");
+
+        // 5. Verify guest can withdrawn the unlocked tokens
+        assertEq(guestAvailable, DEPOSIT_AMOUNT * 3 / 2, "Guest should have 3/2x initial amount available");
+        vm.prank(guest);
+        custody.withdraw(address(token), DEPOSIT_AMOUNT / 2);
+        (guestAvailable, guestLocked,) = custody.getAccountInfo(guest, address(token));
+        assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest should have DEPOSIT_AMOUNT available after withdrawal");
+        assertEq(guestLocked, DEPOSIT_AMOUNT / 2, "Guest should still have DEPOSIT_AMOUNT/2 locked");
+
+        uint256 guestBalance = token.balanceOf(guest);
+        assertEq(guestBalance, INITIAL_BALANCE - DEPOSIT_AMOUNT * 3 / 2, "Guest should have correct tokens after withdrawal");
     }
 
     // ==== 7. Separate Depositor and Participant Addresses ====

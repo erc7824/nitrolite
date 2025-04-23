@@ -78,7 +78,7 @@ export async function _prepareAndSignFinalState(
     const { stateData, finalState } = params;
 
     const channelId = finalState.channelId;
-    const finalSignatures = removeQuotesFromRS(finalState.serverSignature)["server_signature"];
+    const finalSignatures = removeQuotesFromRS(finalState.serverSignature)[0];
 
     const appData = stateData ?? encoders["numeric"](MAGIC_NUMBERS.CLOSE);
 

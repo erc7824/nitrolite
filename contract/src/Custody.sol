@@ -304,8 +304,10 @@ contract Custody is IChannel, IDeposit {
         // Verify that at least one participant signed the state
         if (candidate.sigs.length == 0) revert InvalidStateSignatures();
 
+        uint32 magicNumber = 0;
+
         if (candidate.data.length != 0) {
-            uint32 magicNumber = abi.decode(candidate.data, (uint32));
+            magicNumber = abi.decode(candidate.data, (uint32));
             if (magicNumber == CHANOPEN) {
                 // TODO:
             } else if (magicNumber == CHANRESIZE) {
@@ -315,7 +317,9 @@ contract Custody is IChannel, IDeposit {
                     revert InvalidAllocations();
                 }
             }
-        } else {
+        }
+
+        if (candidate.data.length == 0 || (magicNumber != CHANOPEN && magicNumber != CHANRESIZE)) {
             // if no state data or magic number is not CHANOPEN or CHANRESIZE, assume this is a normal state
 
             // Verify the state is valid according to the adjudicator
@@ -397,8 +401,14 @@ contract Custody is IChannel, IDeposit {
         if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
 
         // Decode the magic number and resize amounts
-        (uint32 magicNumber, int256[2] memory resizeAmounts) = abi.decode(candidate.data, (uint32, int256[2]));
-        if (magicNumber != CHANRESIZE) revert InvalidState();
+        (uint32 magicNumber, int256[] memory resizeAmounts) = abi.decode(candidate.data, (uint32, int256[]));
+        if (magicNumber != CHANRESIZE || resizeAmounts.length != 2) revert InvalidState();
+
+        uint256 initialBalanceSum = meta.actualDeposits[0].amount + meta.actualDeposits[1].amount;
+        int256 finalBalanceSum = int256(initialBalanceSum) + resizeAmounts[0] + resizeAmounts[1];
+        if (finalBalanceSum < 0) revert InvalidState();
+        uint256 candidateBalanceSum = candidate.allocations[0].amount + candidate.allocations[1].amount;
+        if (uint256(finalBalanceSum) != candidateBalanceSum) revert InvalidState();
 
         // Process resize amounts for each participant
         for (uint256 i = 0; i < 2; i++) {
@@ -434,7 +444,7 @@ contract Custody is IChannel, IDeposit {
         // Update the latest valid state
         meta.lastValidState = candidate;
 
-        emit Checkpointed(channelId);
+        emit Resized(channelId, resizeAmounts);
     }
 
     /**

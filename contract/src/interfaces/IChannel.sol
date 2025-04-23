@@ -44,6 +44,12 @@ interface IChannel {
     event Checkpointed(bytes32 indexed channelId);
 
     /**
+     * @notice Emitted when a channel is resized
+     * @param channelId Unique identifier for the channel
+     */
+    event Resized(bytes32 indexed channelId, int256[] deltaAllocations);
+
+    /**
      * @notice Emitted when a channel is closed and funds are distributed
      * @param channelId Unique identifier for the channel
      */

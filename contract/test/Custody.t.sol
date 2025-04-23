@@ -9,7 +9,17 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 
 import {TestUtils} from "./TestUtils.sol";
 import {Custody} from "../src/Custody.sol";
-import {Channel, State, Allocation, Signature, Status, Amount, CHANOPEN, CHANCLOSE, CHANRESIZE} from "../src/interfaces/Types.sol";
+import {
+    Channel,
+    State,
+    Allocation,
+    Signature,
+    Status,
+    Amount,
+    CHANOPEN,
+    CHANCLOSE,
+    CHANRESIZE
+} from "../src/interfaces/Types.sol";
 import {Utils} from "../src/Utils.sol";
 
 import {FlagAdjudicator} from "./mocks/FlagAdjudicator.sol";
@@ -690,7 +700,7 @@ contract CustodyTest is Test {
         // Create resize data with magic number and resize amounts
         int256[] memory resizeAmounts = new int256[](2);
         resizeAmounts[0] = int256(DEPOSIT_AMOUNT); // Increase host's deposit by DEPOSIT_AMOUNT
-        resizeAmounts[1] = -int256(DEPOSIT_AMOUNT/2); // Decrease guest's deposit by DEPOSIT_AMOUNT/2
+        resizeAmounts[1] = -int256(DEPOSIT_AMOUNT / 2); // Decrease guest's deposit by DEPOSIT_AMOUNT/2
         resizeState.data = abi.encode(CHANRESIZE, resizeAmounts);
 
         // Update allocations to match the resize
@@ -730,7 +740,9 @@ contract CustodyTest is Test {
         assertEq(guestLocked, DEPOSIT_AMOUNT / 2, "Guest should still have DEPOSIT_AMOUNT/2 locked");
 
         uint256 guestBalance = token.balanceOf(guest);
-        assertEq(guestBalance, INITIAL_BALANCE - DEPOSIT_AMOUNT * 3 / 2, "Guest should have correct tokens after withdrawal");
+        assertEq(
+            guestBalance, INITIAL_BALANCE - DEPOSIT_AMOUNT * 3 / 2, "Guest should have correct tokens after withdrawal"
+        );
     }
 
     // ==== 7. Separate Depositor and Participant Addresses ====

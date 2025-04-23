@@ -95,10 +95,7 @@ interface IChannel {
      * NOTE: while the aforementioned in NOT implemented, participants should sign the candidate with `resize` only
      * after they have checked that the resize is possible, based on the previously known valid state.
      */
-    function resize(
-        bytes32 channelId,
-        State calldata candidate
-    ) external;
+    function resize(bytes32 channelId, State calldata candidate) external;
 
     /**
      * @notice Initiates or updates a challenge with a signed state

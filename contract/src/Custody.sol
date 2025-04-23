@@ -5,7 +5,17 @@ import {IChannel} from "./interfaces/IChannel.sol";
 import {IDeposit} from "./interfaces/IDeposit.sol";
 import {IAdjudicator} from "./interfaces/IAdjudicator.sol";
 import {IComparable} from "./interfaces/IComparable.sol";
-import {Channel, State, Allocation, Status, Signature, Amount, CHANOPEN, CHANCLOSE, CHANRESIZE} from "./interfaces/Types.sol";
+import {
+    Channel,
+    State,
+    Allocation,
+    Status,
+    Signature,
+    Amount,
+    CHANOPEN,
+    CHANCLOSE,
+    CHANRESIZE
+} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
@@ -387,10 +397,7 @@ contract Custody is IChannel, IDeposit {
      * @param channelId Unique identifier for the channel to resize
      * @param candidate The state with CHANRESIZE magic number and resize amounts
      */
-    function resize(
-        bytes32 channelId,
-        State calldata candidate
-    ) external {
+    function resize(bytes32 channelId, State calldata candidate) external {
         Metadata storage meta = _channels[channelId];
 
         // Verify channel exists and is ACTIVE
@@ -417,8 +424,8 @@ contract Custody is IChannel, IDeposit {
     }
 
     function _requireCorrectAllocations(Allocation[] memory allocations) internal pure {
-        if(allocations.length != 2) revert InvalidState();
-        if(allocations[CREATOR].token != allocations[BROKER].token) revert InvalidState();
+        if (allocations.length != 2) revert InvalidState();
+        if (allocations[CREATOR].token != allocations[BROKER].token) revert InvalidState();
     }
 
     function _transfer(address token, address to, uint256 amount) internal {
@@ -531,7 +538,11 @@ contract Custody is IChannel, IDeposit {
         return IComparable(adjudicator).compare(candidate, previous) > 0;
     }
 
-    function _requireCorrectDelta(Amount[2] memory initialDeposit, Allocation[] memory finalAllocations, int256[] memory delta) internal pure {
+    function _requireCorrectDelta(
+        Amount[2] memory initialDeposit,
+        Allocation[] memory finalAllocations,
+        int256[] memory delta
+    ) internal pure {
         if (delta.length != 2) revert InvalidState();
 
         // separately check for each participant to guarantee each of them can afford the delta
@@ -540,7 +551,9 @@ contract Custody is IChannel, IDeposit {
             int256 finalBalanceSum = int256(initialBalanceSum) + delta[i];
             uint256 candidateBalanceSum = finalAllocations[i].amount;
 
-            if (finalBalanceSum != int256(candidateBalanceSum)) revert InsufficientBalance(candidateBalanceSum, uint256(finalBalanceSum));
+            if (finalBalanceSum != int256(candidateBalanceSum)) {
+                revert InsufficientBalance(candidateBalanceSum, uint256(finalBalanceSum));
+            }
         }
     }
 

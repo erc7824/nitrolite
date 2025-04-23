@@ -90,6 +90,10 @@ interface IChannel {
      * @param channelId Unique identifier for the channel to resize
      * @param candidate The latest known valid state for closing the current channel
      * NOTE: no `proof` here as `adjudicate(...)` is NOT called, because candidate state does NOT contain app-specific logic
+     * TODO: On the other hand, `proof` can be used as a safeguard against an impossible resize, i.e. guaranteeing that
+     * there is enough funds in `proof` (should be state before candidate) to support the resize (delta).
+     * NOTE: while the aforementioned in NOT implemented, participants should sign the candidate with `resize` only
+     * after they have checked that the resize is possible, based on the previously known valid state.
      */
     function resize(
         bytes32 channelId,

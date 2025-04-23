@@ -44,10 +44,16 @@ interface IChannel {
     event Checkpointed(bytes32 indexed channelId);
 
     /**
+     * @notice Emitted when a channel is resized
+     * @param channelId Unique identifier for the channel
+     */
+    event Resized(bytes32 indexed channelId, int256[] deltaAllocations);
+
+    /**
      * @notice Emitted when a channel is closed and funds are distributed
      * @param channelId Unique identifier for the channel
      */
-    event ChannelClosed(bytes32 indexed channelId);
+    event Closed(bytes32 indexed channelId);
 
     /**
      * @notice Creates a new channel and initializes funding
@@ -79,21 +85,17 @@ interface IChannel {
     function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
 
     /**
-     * @notice Closes an existing channel and creates a new one with updated parameters
-     * @dev Used for resizing channel allocations without fully withdrawing funds
-     * @param channelId Unique identifier for the channel to close
+     * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
+     * @dev Used for resizing channel allocations without withdrawing funds
+     * @param channelId Unique identifier for the channel to resize
      * @param candidate The latest known valid state for closing the current channel
-     * @param proofs Additional states required by the adjudicator for closing
-     * @param ch New channel configuration for the replacement channel
-     * @param initial Initial state for the new channel with CHANOPEN magic number
+     * NOTE: no `proof` here as `adjudicate(...)` is NOT called, because candidate state does NOT contain app-specific logic
+     * TODO: On the other hand, `proof` can be used as a safeguard against an impossible resize, i.e. guaranteeing that
+     * there is enough funds in `proof` (should be state before candidate) to support the resize (delta).
+     * NOTE: while the aforementioned in NOT implemented, participants should sign the candidate with `resize` only
+     * after they have checked that the resize is possible, based on the previously known valid state.
      */
-    function reset(
-        bytes32 channelId,
-        State calldata candidate,
-        State[] calldata proofs,
-        Channel calldata ch,
-        State calldata initial
-    ) external;
+    function resize(bytes32 channelId, State calldata candidate) external;
 
     /**
      * @notice Initiates or updates a challenge with a signed state

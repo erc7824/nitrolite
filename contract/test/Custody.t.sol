@@ -9,7 +9,17 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 
 import {TestUtils} from "./TestUtils.sol";
 import {Custody} from "../src/Custody.sol";
-import {Channel, State, Allocation, Signature, Status, Amount, CHANOPEN, CHANCLOSE} from "../src/interfaces/Types.sol";
+import {
+    Channel,
+    State,
+    Allocation,
+    Signature,
+    Status,
+    Amount,
+    CHANOPEN,
+    CHANCLOSE,
+    CHANRESIZE
+} from "../src/interfaces/Types.sol";
 import {Utils} from "../src/Utils.sol";
 
 import {FlagAdjudicator} from "./mocks/FlagAdjudicator.sol";
@@ -652,9 +662,9 @@ contract CustodyTest is Test {
         vm.stopPrank();
     }
 
-    // ==== 6. Reset Function ====
+    // ==== 6. Resize Function ====
 
-    function test_Reset() public {
+    function test_Resize() public {
         // 1. Create and fund a channel
         Channel memory chan = createTestChannel();
         State memory initialState = createInitialState();
@@ -676,49 +686,63 @@ contract CustodyTest is Test {
         vm.prank(guest);
         custody.join(channelId, 1, guestSig);
 
-        // 2. Create a final state for closing
-        State memory finalState = createClosingState();
+        // 1.1 Check available and locked are correct
+        (, uint256 hostLocked,) = custody.getAccountInfo(host, address(token));
+        (uint256 guestAvailable, uint256 guestLocked,) = custody.getAccountInfo(guest, address(token));
 
-        // Both sign the final state
-        Signature memory hostFinalSig = signState(chan, finalState, hostPrivKey);
-        Signature memory guestFinalSig = signState(chan, finalState, guestPrivKey);
+        assertEq(hostLocked, DEPOSIT_AMOUNT, "Host's initial locked tokens should be DEPOSIT_AMOUNT");
+        assertEq(guestLocked, DEPOSIT_AMOUNT, "Guest's initial locked tokens should be DEPOSIT_AMOUNT");
+        assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest's initial available tokens should be DEPOSIT_AMOUNT");
 
-        Signature[] memory finalSigs = new Signature[](2);
-        finalSigs[0] = hostFinalSig;
-        finalSigs[1] = guestFinalSig;
-        finalState.sigs = finalSigs;
+        // 2. Create a resize state with CHANRESIZE magic number
+        State memory resizeState = initialState;
 
-        // 3. Create new channel config with different nonce
-        address[] memory participants = new address[](2);
-        participants[0] = host;
-        participants[1] = guest;
+        // Create resize data with magic number and resize amounts
+        int256[] memory resizeAmounts = new int256[](2);
+        resizeAmounts[0] = int256(DEPOSIT_AMOUNT); // Increase host's deposit by DEPOSIT_AMOUNT
+        resizeAmounts[1] = -int256(DEPOSIT_AMOUNT / 2); // Decrease guest's deposit by DEPOSIT_AMOUNT/2
+        resizeState.data = abi.encode(CHANRESIZE, resizeAmounts);
 
-        Channel memory newChan = Channel({
-            participants: participants,
-            adjudicator: address(adjudicator),
-            challenge: CHALLENGE_DURATION,
-            nonce: NONCE + 1
-        });
+        // Update allocations to match the resize
+        resizeState.allocations[0].amount = DEPOSIT_AMOUNT * 2; // Host now has 2x initial amount
+        resizeState.allocations[1].amount = DEPOSIT_AMOUNT / 2; // Guest now has half initial amount
 
-        // 4. Create new initial state for the new channel
-        State memory newInitialState = createInitialState();
+        // Both sign the resize state
+        Signature memory hostResizeSig = signState(chan, resizeState, hostPrivKey);
+        Signature memory guestResizeSig = signState(chan, resizeState, guestPrivKey);
 
-        // Host signs new initial state
-        Signature memory hostNewSig = signState(newChan, newInitialState, hostPrivKey);
-        Signature[] memory newHostSigs = new Signature[](1);
-        newHostSigs[0] = hostNewSig;
-        newInitialState.sigs = newHostSigs;
+        Signature[] memory resizeSigs = new Signature[](2);
+        resizeSigs[0] = hostResizeSig;
+        resizeSigs[1] = guestResizeSig;
+        resizeState.sigs = resizeSigs;
 
-        // 5. Reset the channel
+        // 3. Resize the channel
         vm.prank(host);
-        custody.reset(channelId, finalState, new State[](0), newChan, newInitialState);
+        custody.resize(channelId, resizeState);
 
-        // 6. Verify old channel is closed and new one is open
+        // 4. Verify channel has been resized correctly
         bytes32[] memory hostChannels = custody.getAccountChannels(host);
-        assertEq(hostChannels.length, 1, "Host should have 1 channel after reset");
+        assertEq(hostChannels.length, 1, "Host should still have 1 channel after resize");
 
-        bytes32 newChannelId = Utils.getChannelId(newChan);
-        assertEq(hostChannels[0], newChannelId, "Host's channel should be the new one");
+        // Check locked amounts have been updated correctly
+        (, hostLocked,) = custody.getAccountInfo(host, address(token));
+        (guestAvailable, guestLocked,) = custody.getAccountInfo(guest, address(token));
+
+        assertEq(hostLocked, DEPOSIT_AMOUNT * 2, "Host's locked tokens should be doubled");
+        assertEq(guestLocked, DEPOSIT_AMOUNT / 2, "Guest's locked tokens should be halved");
+
+        // 5. Verify guest can withdrawn the unlocked tokens
+        assertEq(guestAvailable, DEPOSIT_AMOUNT * 3 / 2, "Guest should have 3/2x initial amount available");
+        vm.prank(guest);
+        custody.withdraw(address(token), DEPOSIT_AMOUNT / 2);
+        (guestAvailable, guestLocked,) = custody.getAccountInfo(guest, address(token));
+        assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest should have DEPOSIT_AMOUNT available after withdrawal");
+        assertEq(guestLocked, DEPOSIT_AMOUNT / 2, "Guest should still have DEPOSIT_AMOUNT/2 locked");
+
+        uint256 guestBalance = token.balanceOf(guest);
+        assertEq(
+            guestBalance, INITIAL_BALANCE - DEPOSIT_AMOUNT * 3 / 2, "Guest should have correct tokens after withdrawal"
+        );
     }
 
     // ==== 7. Separate Depositor and Participant Addresses ====

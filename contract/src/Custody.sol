@@ -5,7 +5,17 @@ import {IChannel} from "./interfaces/IChannel.sol";
 import {IDeposit} from "./interfaces/IDeposit.sol";
 import {IAdjudicator} from "./interfaces/IAdjudicator.sol";
 import {IComparable} from "./interfaces/IComparable.sol";
-import {Channel, State, Allocation, Status, Signature, Amount, CHANOPEN, CHANCLOSE} from "./interfaces/Types.sol";
+import {
+    Channel,
+    State,
+    Allocation,
+    Status,
+    Signature,
+    Amount,
+    CHANOPEN,
+    CHANCLOSE,
+    CHANRESIZE
+} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
@@ -43,6 +53,7 @@ contract Custody is IChannel, IDeposit {
         Status stage;
         address creator;
         // Fixed arrays for exactly 2 participants (CREATOR and BROKER)
+        // TODO: store `uint256` instead of `Amount`, as tokens are the same
         Amount[2] expectedDeposits; // Creator defines Token per participant
         Amount[2] actualDeposits; // Tracks deposits made by each participant
         uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
@@ -63,25 +74,6 @@ contract Custody is IChannel, IDeposit {
 
     mapping(bytes32 channelId => Metadata chMeta) internal _channels;
     mapping(address account => Ledger ledger) internal _ledgers;
-
-    function deposit(address token, uint256 amount) external payable {
-        address account = msg.sender;
-        if (token == address(0)) {
-            if (msg.value != amount) revert InvalidAmount();
-        } else {
-            bool success = IERC20(token).transferFrom(account, address(this), amount);
-            if (!success) revert TransferFailed(token, address(this), amount);
-        }
-        _ledgers[msg.sender].tokens[token].available += amount;
-    }
-
-    function withdraw(address token, uint256 amount) external {
-        Ledger storage ledger = _ledgers[msg.sender];
-        uint256 available = ledger.tokens[token].available;
-        if (available < amount) revert InsufficientBalance(available, amount);
-        _transfer(token, msg.sender, amount);
-        ledger.tokens[token].available -= amount;
-    }
 
     /**
      * @notice Get channels associated with an account
@@ -110,6 +102,25 @@ contract Custody is IChannel, IDeposit {
         return (account.available, account.locked, ledger.channels.length());
     }
 
+    function deposit(address token, uint256 amount) external payable {
+        address account = msg.sender;
+        if (token == address(0)) {
+            if (msg.value != amount) revert InvalidAmount();
+        } else {
+            bool success = IERC20(token).transferFrom(account, address(this), amount);
+            if (!success) revert TransferFailed(token, address(this), amount);
+        }
+        _ledgers[msg.sender].tokens[token].available += amount;
+    }
+
+    function withdraw(address token, uint256 amount) external {
+        Ledger storage ledger = _ledgers[msg.sender];
+        uint256 available = ledger.tokens[token].available;
+        if (available < amount) revert InsufficientBalance(available, amount);
+        _transfer(token, msg.sender, amount);
+        ledger.tokens[token].available -= amount;
+    }
+
     /**
      * @notice Create a channel by depositing assets
      * @param ch Channel configuration
@@ -117,6 +128,7 @@ contract Custody is IChannel, IDeposit {
      * @return channelId Unique identifier for the channel
      */
     function create(Channel calldata ch, State calldata initial) public returns (bytes32 channelId) {
+        // TODO: add checks that there are only 2 allocations, they have the same token (here and throughout the code)
         // Validate channel configuration
         if (ch.participants.length != 2) revert InvalidParticipant();
         if (ch.adjudicator == address(0)) revert InvalidAdjudicator();
@@ -270,7 +282,7 @@ contract Custody is IChannel, IDeposit {
         }
 
         // At this point, the channel is in FINAL state, so we can close it
-        _distributeAllocation(channelId, meta);
+        _distributeAllocations(channelId, meta);
 
         // TODO: implement a better way for this
         // remove sender's channel in case they are a different account then participant
@@ -284,7 +296,7 @@ contract Custody is IChannel, IDeposit {
         // Mark channel as closed by removing it
         delete _channels[channelId];
 
-        emit ChannelClosed(channelId);
+        emit Closed(channelId);
     }
 
     /**
@@ -304,13 +316,32 @@ contract Custody is IChannel, IDeposit {
         // Verify that at least one participant signed the state
         if (candidate.sigs.length == 0) revert InvalidStateSignatures();
 
-        // Verify the state is valid according to the adjudicator
-        bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
-        if (!isValid) revert InvalidState();
+        uint32 magicNumber = 0;
 
-        // Revert if trying to challenge with an older state that is already known
-        if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
-            revert InvalidState();
+        if (candidate.data.length != 0) {
+            magicNumber = abi.decode(candidate.data, (uint32));
+            if (magicNumber == CHANOPEN) {
+                // TODO:
+            } else if (magicNumber == CHANRESIZE) {
+                uint256 deposited = meta.expectedDeposits[CREATOR].amount + meta.expectedDeposits[BROKER].amount;
+                uint256 expected = candidate.allocations[CREATOR].amount + candidate.allocations[BROKER].amount;
+                if (deposited != expected) {
+                    revert InvalidAllocations();
+                }
+            }
+        }
+
+        if (candidate.data.length == 0 || (magicNumber != CHANOPEN && magicNumber != CHANRESIZE)) {
+            // if no state data or magic number is not CHANOPEN or CHANRESIZE, assume this is a normal state
+
+            // Verify the state is valid according to the adjudicator
+            bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
+            if (!isValid) revert InvalidState();
+
+            // Revert if trying to challenge with an older state that is already known
+            if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
+                revert InvalidState();
+            }
         }
 
         // Store the candidate as the last valid state
@@ -329,6 +360,7 @@ contract Custody is IChannel, IDeposit {
      * @param candidate The latest known valid state
      * @param proofs is an array of valid state required by the adjudicator
      */
+    // TODO: add responding to CHANOPEN, CHANRESIZE challenge (should NOT call `adjudicate`)
     function checkpoint(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = _channels[channelId];
 
@@ -361,54 +393,39 @@ contract Custody is IChannel, IDeposit {
     }
 
     /**
-     * @notice Reset will close and open channel for resizing allocations
-     * @param channelId Unique identifier for the channel
-     * @param candidate The latest known valid state
-     * @param proofs An array of valid state required by the adjudicator
-     * @param newChannel New channel configuration (must have exactly 2 participants)
-     * @param newDeposit Initial State defined by the opener, containing the expected allocation
+     * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
+     * @param channelId Unique identifier for the channel to resize
+     * @param candidate The state with CHANRESIZE magic number and resize amounts
      */
-    function reset(
-        bytes32 channelId,
-        State calldata candidate,
-        State[] calldata proofs,
-        Channel calldata newChannel,
-        State calldata newDeposit
-    ) external {
-        // First close the existing channel
-        close(channelId, candidate, proofs);
+    function resize(bytes32 channelId, State calldata candidate) external {
+        Metadata storage meta = _channels[channelId];
 
-        // Then open a new channel with the provided configuration
-        create(newChannel, newDeposit);
+        // Verify channel exists and is ACTIVE
+        if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
+        if (meta.stage != Status.ACTIVE) revert InvalidStatus();
+
+        _requireCorrectAllocations(candidate.allocations);
+
+        // Verify all participants have signed the resize state
+        if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
+
+        // Decode the magic number and resize amounts
+        (uint32 magicNumber, int256[] memory resizeAmounts) = abi.decode(candidate.data, (uint32, int256[]));
+        if (magicNumber != CHANRESIZE) revert InvalidState();
+
+        _requireCorrectDelta(meta.expectedDeposits, candidate.allocations, resizeAmounts);
+
+        _processResize(channelId, meta, resizeAmounts);
+
+        // Update the latest valid state
+        meta.lastValidState = candidate;
+
+        emit Resized(channelId, resizeAmounts);
     }
 
-    /**
-     * @notice Internal function to close a channel and distribute funds
-     * @param channelId The channel identifier
-     * @param meta The channel's metadata (assumes a 2-participant channel)
-     */
-    function _distributeAllocation(bytes32 channelId, Metadata storage meta) internal {
-        // Distribute funds according to allocations
-        uint256 allocsLength = meta.lastValidState.allocations.length;
-        for (uint256 i = 0; i < allocsLength; i++) {
-            Allocation memory allocation = meta.lastValidState.allocations[i];
-            _unlockChannelFundsToAccount(channelId, allocation.destination, allocation.token, allocation.amount);
-        }
-    }
-
-    /**
-     * @notice Helper function to compare two states for recency
-     * @param adjudicator The adjudicator contract address
-     * @param candidate The candidate state
-     * @param previous The previous state to compare against
-     * @return True if the candidate state is more recent than the previous state
-     */
-    function _isMoreRecent(address adjudicator, State calldata candidate, State memory previous)
-        internal
-        view
-        returns (bool)
-    {
-        return IComparable(adjudicator).compare(candidate, previous) > 0;
+    function _requireCorrectAllocations(Allocation[] memory allocations) internal pure {
+        if (allocations.length != 2) revert InvalidState();
+        if (allocations[CREATOR].token != allocations[BROKER].token) revert InvalidState();
     }
 
     function _transfer(address token, address to, uint256 amount) internal {
@@ -437,6 +454,20 @@ contract Custody is IChannel, IDeposit {
 
         Metadata storage meta = _channels[channelId];
         meta.tokenBalances[token] += amount;
+    }
+
+    /**
+     * @notice Internal function to close a channel and distribute funds
+     * @param channelId The channel identifier
+     * @param meta The channel's metadata (assumes a 2-participant channel)
+     */
+    function _distributeAllocations(bytes32 channelId, Metadata storage meta) internal {
+        // Distribute funds according to allocations
+        uint256 allocsLength = meta.lastValidState.allocations.length;
+        for (uint256 i = 0; i < allocsLength; i++) {
+            Allocation memory allocation = meta.lastValidState.allocations[i];
+            _unlockChannelFundsToAccount(channelId, allocation.destination, allocation.token, allocation.amount);
+        }
     }
 
     // Does not perform checks to allow transferring partial balances in case of partial deposit
@@ -490,5 +521,71 @@ contract Custody is IChannel, IDeposit {
         }
 
         return true;
+    }
+
+    /**
+     * @notice Helper function to compare two states for recency
+     * @param adjudicator The adjudicator contract address
+     * @param candidate The candidate state
+     * @param previous The previous state to compare against
+     * @return True if the candidate state is more recent than the previous state
+     */
+    function _isMoreRecent(address adjudicator, State calldata candidate, State memory previous)
+        internal
+        view
+        returns (bool)
+    {
+        return IComparable(adjudicator).compare(candidate, previous) > 0;
+    }
+
+    function _requireCorrectDelta(
+        Amount[2] memory initialDeposit,
+        Allocation[] memory finalAllocations,
+        int256[] memory delta
+    ) internal pure {
+        if (delta.length != 2) revert InvalidState();
+
+        // separately check for each participant to guarantee each of them can afford the delta
+        for (uint256 i = 0; i < 2; i++) {
+            uint256 initialBalanceSum = initialDeposit[i].amount;
+            int256 finalBalanceSum = int256(initialBalanceSum) + delta[i];
+            uint256 candidateBalanceSum = finalAllocations[i].amount;
+
+            if (finalBalanceSum != int256(candidateBalanceSum)) {
+                revert InsufficientBalance(candidateBalanceSum, uint256(finalBalanceSum));
+            }
+        }
+    }
+
+    function _processResize(bytes32 channelId, Metadata storage chMeta, int256[] memory resizeAmounts) internal {
+        // NOTE: all tokens are the same
+        address token = chMeta.expectedDeposits[CREATOR].token;
+
+        // Process resize amounts for each participant
+        for (uint256 i = 0; i < 2; i++) {
+            address participant = chMeta.chan.participants[i];
+            int256 resizeAmount = resizeAmounts[i];
+
+            // Positive resize: Lock more funds into the channel
+            if (resizeAmount > 0) {
+                uint256 amountToAdd = uint256(resizeAmount);
+                _lockAccountFundsToChannel(participant, channelId, token, amountToAdd);
+
+                // Update the expected and actual deposits
+                chMeta.expectedDeposits[i].amount += amountToAdd;
+                chMeta.actualDeposits[i].amount += amountToAdd;
+            }
+            // Negative resize: Release funds from the channel
+            else if (resizeAmount < 0) {
+                uint256 amountToRelease = uint256(-resizeAmount);
+
+                // Unlock funds from the channel to the participant
+                _unlockChannelFundsToAccount(channelId, participant, token, amountToRelease);
+
+                // Update the expected and actual deposits
+                chMeta.expectedDeposits[i].amount -= amountToRelease;
+                chMeta.actualDeposits[i].amount -= amountToRelease;
+            }
+        }
     }
 }

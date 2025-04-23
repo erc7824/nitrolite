@@ -87,13 +87,33 @@ enum Status {
     FINAL     // Ready to be closed
 }
 
-// Constants for participant indices
-uint256 constant CREATOR = 0; // Participant index for the channel creator
-uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
-
 // Magic numbers for funding protocol
 uint32 constant CHANOPEN = 7877; // State.data value for funding stateHash
 uint32 constant CHANCLOSE = 7879; // State.data value for closing stateHash
+uint32 constant CHANRESIZE = 7883; // State.data value for resize stateHash
+```
+
+### `IComparable.sol`
+
+Interface for contracts that can determine ordering between states:
+
+```solidity
+interface IComparable {
+    /**
+     * @notice Compares two states to determine their relative ordering
+     * @dev Implementations should return:
+     *      -1 if candidate is less recent than previous
+     *       0 if candidate is equally recent as previous
+     *       1 if candidate is more recent than previous
+     * @param candidate The state being evaluated
+     * @param previous The reference state to compare against
+     * @return result The comparison result:
+     *         -1: candidate < previous (candidate is older)
+     *          0: candidate == previous (same recency)
+     *          1: candidate > previous (candidate is newer)
+     */
+    function compare(State calldata candidate, State calldata previous) external view returns (int8 result);
+}
 ```
 
 ### `IAdjudicator.sol`
@@ -141,18 +161,19 @@ interface IDeposit {
 }
 ```
 
-## `IChannel.sol` Interface
+### `IChannel.sol` Interface
 
 The main state channel interface implements:
 
 ```solidity
 interface IChannel {
-    event Created(bytes32 indexed channelId, Channel channel, Amount[] expected);
+    event Created(bytes32 indexed channelId, Channel channel, State initial);
     event Joined(bytes32 indexed channelId, uint256 index);
     event Opened(bytes32 indexed channelId);
     event Challenged(bytes32 indexed channelId, uint256 expiration);
     event Checkpointed(bytes32 indexed channelId);
-    event ChannelClosed(bytes32 indexed channelId);
+    event Resized(bytes32 indexed channelId, int256[] deltaAllocations);
+    event Closed(bytes32 indexed channelId);
 
     /**
      * @notice Creates a new channel and initializes funding
@@ -175,30 +196,28 @@ interface IChannel {
 
     /**
      * @notice Finalizes a channel with a mutually signed closing state
+     * @dev Requires all participants' signatures on a state with CHANCLOSE magic number,
+     *      or can be called after challenge period expires with the last valid state
      * @param channelId Unique identifier for the channel
-     * @param candidate The latest known valid state
+     * @param candidate The latest known valid state to be finalized
      * @param proofs Additional states required by the adjudicator to validate the candidate
      */
     function close(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
 
     /**
-     * @notice Closes an existing channel and creates a new one with updated parameters
-     * @param channelId Unique identifier for the channel to close
+     * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
+     * @dev Used for resizing channel allocations without withdrawing funds
+     * @param channelId Unique identifier for the channel to resize
      * @param candidate The latest known valid state for closing the current channel
-     * @param proofs Additional states required by the adjudicator for closing
-     * @param ch New channel configuration for the replacement channel
-     * @param initial Initial state for the new channel with CHANOPEN magic number
      */
-    function reset(
+    function resize(
         bytes32 channelId,
-        State calldata candidate,
-        State[] calldata proofs,
-        Channel calldata ch,
-        State calldata initial
+        State calldata candidate
     ) external;
 
     /**
      * @notice Initiates or updates a challenge with a signed state
+     * @dev Starts a challenge period during which participants can respond with newer states
      * @param channelId Unique identifier for the channel
      * @param candidate The state being submitted as the latest valid state
      * @param proofs Additional states required by the adjudicator to validate the candidate
@@ -207,6 +226,7 @@ interface IChannel {
 
     /**
      * @notice Records a valid state on-chain without initiating a challenge
+     * @dev Used to establish on-chain proof of the latest state to prevent future disputes
      * @param channelId Unique identifier for the channel
      * @param candidate The state to checkpoint
      * @param proofs Additional states required by the adjudicator to validate the candidate

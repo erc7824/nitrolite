@@ -81,11 +81,12 @@ export interface CreateChannelParams {
  * Parameters required for collaboratively closing a state channel.
  */
 export interface CloseChannelParams {
+    stateData?: Hex;
     finalState: {
-        channel_id: ChannelId;
-        state_data: Hex;
+        channelId: ChannelId;
+        stateData: Hex;
         allocations: [Allocation, Allocation];
-        server_signature: Signature[];
+        serverSignature: Signature[];
     };
 }
 

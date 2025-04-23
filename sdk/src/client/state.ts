@@ -1,34 +1,34 @@
 import { Hex } from "viem";
-import { NitroliteClient } from "./index"; // Import client type for context
 import { CreateChannelParams, State, Channel, ChannelId, CloseChannelParams } from "./types";
 import { generateChannelNonce, getChannelId, getStateHash, signState, encoders, removeQuotesFromRS } from "../utils";
 import { MAGIC_NUMBERS } from "../config";
 import * as Errors from "../errors";
+import { PreparerDependencies } from "./prepare";
 
 /**
  * Shared logic for preparing the channel object, initial state, and signing it.
  * Used by both direct execution (createChannel) and preparation (prepareCreateChannelTransaction).
- * @param client - The NitroliteClient instance for context (account, addresses, walletClient).
- * @param params - Parameters for channel creation.
+ * @param deps - The dependencies needed (account, addresses, walletClient, challengeDuration). See {@link PreparerDependencies}.
+ * @param params - Parameters for channel creation. See {@link CreateChannelParams}.
  * @returns An object containing the channel object, the signed initial state, and the channel ID.
  * @throws {Errors.MissingParameterError} If the default adjudicator address is missing.
  * @throws {Errors.InvalidParameterError} If participants are invalid.
  */
 export async function _prepareAndSignInitialState(
-    client: NitroliteClient,
+    deps: PreparerDependencies,
     params: CreateChannelParams
 ): Promise<{ channel: Channel; initialState: State; channelId: ChannelId }> {
     const { initialAllocationAmounts, stateData } = params;
     const channelNonce = generateChannelNonce();
 
-    const participants: [Hex, Hex] = [client.account.address, client.addresses.guestAddress];
-    const tokenAddress = client.addresses.tokenAddress;
-    const adjudicatorAddress = client.addresses.adjudicators?.["default"];
+    const participants: [Hex, Hex] = [deps.account.address, deps.addresses.guestAddress];
+    const tokenAddress = deps.addresses.tokenAddress;
+    const adjudicatorAddress = deps.addresses.adjudicators?.["default"];
     if (!adjudicatorAddress) {
         throw new Errors.MissingParameterError("Default adjudicator address is not configured in addresses.adjudicators");
     }
 
-    const challengeDuration = client.challengeDuration;
+    const challengeDuration = deps.challengeDuration;
 
     if (!participants || participants.length !== 2) {
         throw new Errors.InvalidParameterError("Channel must have two participants.");
@@ -54,7 +54,7 @@ export async function _prepareAndSignInitialState(
 
     const stateHash = getStateHash(channelId, stateToSign);
 
-    const accountSignature = await signState(stateHash, client.walletClient.signMessage);
+    const accountSignature = await signState(stateHash, deps.walletClient.signMessage);
 
     const initialState: State = {
         ...stateToSign,
@@ -67,20 +67,20 @@ export async function _prepareAndSignInitialState(
 /**
  * Shared logic for preparing the final state for closing a channel and signing it.
  * Used by both direct execution (closeChannel) and preparation (prepareCloseChannelTransaction).
- * @param client - The NitroliteClient instance for context (walletClient).
- * @param params - Parameters for closing the channel, containing the server-signed final state.
+ * @param deps - The dependencies needed (account, addresses, walletClient, challengeDuration). See {@link PreparerDependencies}.
+ * @param params - Parameters for closing the channel, containing the server-signed final state. See {@link CloseChannelParams}.
  * @returns An object containing the fully signed final state and the channel ID.
  */
 export async function _prepareAndSignFinalState(
-    client: NitroliteClient,
+    deps: PreparerDependencies,
     params: CloseChannelParams
 ): Promise<{ finalStateWithSigs: State; channelId: ChannelId }> {
-    const { finalState } = params;
+    const { stateData, finalState } = params;
 
-    const channelId = finalState.channel_id;
-    const finalSignatures = removeQuotesFromRS(finalState.server_signature)["server_signature"];
+    const channelId = finalState.channelId;
+    const finalSignatures = removeQuotesFromRS(finalState.serverSignature)["server_signature"];
 
-    const appData = encoders["numeric"](MAGIC_NUMBERS.CLOSE);
+    const appData = stateData ?? encoders["numeric"](MAGIC_NUMBERS.CLOSE);
 
     const stateToSign: State = {
         data: appData,
@@ -90,7 +90,7 @@ export async function _prepareAndSignFinalState(
 
     const stateHash = getStateHash(channelId, stateToSign);
 
-    const accountSignature = await signState(stateHash, client.walletClient.signMessage);
+    const accountSignature = await signState(stateHash, deps.walletClient.signMessage);
 
     const finalStateWithSigs: State = {
         ...stateToSign,

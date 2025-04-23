@@ -104,8 +104,8 @@ export class NitroliteService {
     /**
      * Prepares the request data for creating a new channel.
      * Useful for batching multiple calls in a single UserOperation.
-     * @param channel Channel configuration.
-     * @param initial Initial state.
+     * @param channel Channel configuration. See {@link Channel} for details.
+     * @param initial Initial state. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
     async prepareCreateChannel(channel: Channel, initial: State): Promise<SimulateContractReturnType["request"]> {
@@ -132,8 +132,8 @@ export class NitroliteService {
      * Create a new channel.
      * This method simulates and executes the transaction directly.
      * You do not need to call `prepareCreateChannel` separately unless batching operations.
-     * @param channel Channel configuration.
-     * @param initial Initial state.
+     * @param channel Channel configuration. See {@link Channel} for details.
+     * @param initial Initial state. See {@link State} for details.
      * @returns Transaction hash.
      * @error Throws ContractCallError | TransactionError
      */
@@ -208,9 +208,9 @@ export class NitroliteService {
     /**
      * Prepares the request data for checkpointing a state.
      * Useful for batching multiple calls in a single UserOperation.
-     * @param channelId Channel ID.
-     * @param candidate State to checkpoint.
-     * @param proofs Supporting proofs.
+     * @param channelId Channel ID. See {@link ChannelId} for details.
+     * @param candidate State to checkpoint. See {@link State} for details.
+     * @param proofs Supporting proofs. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
     async prepareCheckpoint(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<SimulateContractReturnType["request"]> {
@@ -238,8 +238,8 @@ export class NitroliteService {
      * This method simulates and executes the transaction directly.
      * You do not need to call `prepareCheckpoint` separately unless batching operations.
      * @param channelId Channel ID.
-     * @param candidate State to checkpoint.
-     * @param proofs Supporting proofs if required by adjudicator.
+     * @param candidate State to checkpoint. See {@link State} for details.
+     * @param proofs Supporting proofs if required by adjudicator. See {@link State} for details.
      * @returns Transaction hash.
      * @error Throws ContractCallError | TransactionError
      */
@@ -261,8 +261,8 @@ export class NitroliteService {
      * Prepares the request data for challenging a state.
      * Useful for batching multiple calls in a single UserOperation.
      * @param channelId Channel ID.
-     * @param candidate State being challenged.
-     * @param proofs Supporting proofs.
+     * @param candidate State being challenged. See {@link State} for details.
+     * @param proofs Supporting proofs. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
     async prepareChallenge(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<SimulateContractReturnType["request"]> {
@@ -290,8 +290,8 @@ export class NitroliteService {
      * This method simulates and executes the transaction directly.
      * You do not need to call `prepareChallenge` separately unless batching operations.
      * @param channelId Channel ID.
-     * @param candidate State being challenged.
-     * @param proofs Supporting proofs.
+     * @param candidate State being challenged. See {@link State} for details.
+     * @param proofs Supporting proofs. See {@link State} for details.
      * @returns Transaction hash.
      * @error Throws ContractCallError | TransactionError
      */
@@ -314,8 +314,8 @@ export class NitroliteService {
      * Prepares the request data for closing a channel.
      * Useful for batching multiple calls in a single UserOperation.
      * @param channelId Channel ID.
-     * @param candidate Final state.
-     * @param proofs Supporting proofs.
+     * @param candidate Final state. See {@link State} for details.
+     * @param proofs Supporting proofs. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
     async prepareClose(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<SimulateContractReturnType["request"]> {
@@ -343,8 +343,8 @@ export class NitroliteService {
      * This method simulates and executes the transaction directly.
      * You do not need to call `prepareClose` separately unless batching operations.
      * @param channelId Channel ID.
-     * @param candidate Final state.
-     * @param proofs Supporting proofs.
+     * @param candidate Final state. See {@link State} for details.
+     * @param proofs Supporting proofs. See {@link State} for details.
      * @returns Transaction hash.
      * @error Throws ContractCallError | TransactionError
      */
@@ -367,10 +367,10 @@ export class NitroliteService {
      * Prepares the request data for resetting a channel.
      * Useful for batching multiple calls in a single UserOperation.
      * @param channelId Old channel ID.
-     * @param candidate Final state for old channel.
-     * @param proofs Supporting proofs for old channel close.
-     * @param newChannel Configuration for the new channel.
-     * @param newDeposit Initial state for the new channel.
+     * @param candidate Final state for old channel. See {@link State} for details.
+     * @param proofs Supporting proofs for old channel close. See {@link State} for details.
+     * @param newChannel Configuration for the new channel. See {@link Channel} for details.
+     * @param newDeposit Initial state for the new channel. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
     async prepareReset(
@@ -404,10 +404,10 @@ export class NitroliteService {
      * This method simulates and executes the transaction directly.
      * You do not need to call `prepareReset` separately unless batching operations.
      * @param channelId Old channel ID.
-     * @param candidate Final state for old channel.
-     * @param proofs Supporting proofs for old channel close.
-     * @param newChannel Configuration for the new channel.
-     * @param newDeposit Initial state for the new channel.
+     * @param candidate Final state for old channel. See {@link State} for details.
+     * @param proofs Supporting proofs for old channel close. See {@link State} for details.
+     * @param newChannel Configuration for the new channel. See {@link Channel} for details.
+     * @param newDeposit Initial state for the new channel. See {@link State} for details.
      * @returns Transaction hash.
      * @error Throws ContractCallError | TransactionError
      */

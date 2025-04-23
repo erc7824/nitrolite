@@ -17,6 +17,7 @@ export interface PreparerDependencies {
     addresses: ContractAddresses;
     account: ParseAccount<Account>;
     walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
+    stateWalletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
     challengeDuration: bigint;
 }
 

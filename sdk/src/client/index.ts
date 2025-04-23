@@ -27,6 +27,7 @@ export class NitroliteClient {
     public readonly addresses: ContractAddresses;
     public readonly challengeDuration: bigint;
     public readonly txPreparer: NitroliteTransactionPreparer;
+    private readonly stateWalletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
     private readonly nitroliteService: NitroliteService;
     private readonly erc20Service: Erc20Service;
     private readonly sharedDeps: PreparerDependencies;
@@ -43,6 +44,8 @@ export class NitroliteClient {
 
         this.publicClient = config.publicClient;
         this.walletClient = config.walletClient;
+        // Determine which wallet client to use for state signing
+        this.stateWalletClient = config.stateWalletClient ?? config.walletClient;
         this.account = config.walletClient.account;
         this.addresses = config.addresses;
         this.challengeDuration = config.challengeDuration;
@@ -57,6 +60,7 @@ export class NitroliteClient {
             account: this.account,
             walletClient: this.walletClient,
             challengeDuration: this.challengeDuration,
+            stateWalletClient: this.stateWalletClient,
         };
 
         this.txPreparer = new NitroliteTransactionPreparer(this.sharedDeps);

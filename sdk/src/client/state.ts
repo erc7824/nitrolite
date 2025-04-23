@@ -54,7 +54,7 @@ export async function _prepareAndSignInitialState(
 
     const stateHash = getStateHash(channelId, stateToSign);
 
-    const accountSignature = await signState(stateHash, deps.walletClient.signMessage);
+    const accountSignature = await signState(stateHash, deps.stateWalletClient.signMessage);
 
     const initialState: State = {
         ...stateToSign,
@@ -90,7 +90,7 @@ export async function _prepareAndSignFinalState(
 
     const stateHash = getStateHash(channelId, stateToSign);
 
-    const accountSignature = await signState(stateHash, deps.walletClient.signMessage);
+    const accountSignature = await signState(stateHash, deps.stateWalletClient.signMessage);
 
     const finalStateWithSigs: State = {
         ...stateToSign,

@@ -63,9 +63,29 @@ export enum AdjudicatorStatus {
  * Configuration for initializing the NitroliteClient.
  */
 export interface NitroliteClientConfig {
+    /** The viem PublicClient for reading blockchain data. */
     publicClient: PublicClient;
+
+    /**
+     * The viem WalletClient used for:
+     * 1. Sending on-chain transactions in direct execution methods (e.g., `client.deposit`).
+     * 2. Providing the 'account' context for transaction preparation (`client.txPreparer`).
+     * 3. Signing off-chain states *if* `stateWalletClient` is not provided.
+     */
     walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
+
+    /**
+     * Optional: A separate viem WalletClient used *only* for signing off-chain state updates (`signMessage`).
+     * Provide this if you want to use a different key (e.g., a "hot" key from localStorage)
+     * for state signing than the one used for on-chain transactions.
+     * If omitted, `walletClient` will be used for state signing.
+     */
+    stateWalletClient?: WalletClient<Transport, Chain, ParseAccount<Account>>;
+
+    /** Contract addresses required by the SDK. */
     addresses: ContractAddresses;
+
+    /** Optional: Default challenge duration (in seconds) for new channels. Defaults to 0 if omitted. */
     challengeDuration?: bigint;
 }
 

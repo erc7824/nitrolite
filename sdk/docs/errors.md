@@ -1,18 +1,38 @@
-# TODO: UPDATE
 # Nitrolite SDK Error Handling Guide
 
-The Nitrolite SDK provides a comprehensive error handling system to help developers identify and address issues that may arise during development and production. This guide covers best practices for handling errors, understanding error categories, and troubleshooting common issues.
+The Nitrolite SDK provides a comprehensive error handling system that helps you identify and address issues that occur during development and production. All errors extend from the `NitroliteError` base class and provide detailed information to assist with troubleshooting.
 
-## Error Architecture
+## Table of Contents
 
-All errors in the Nitrolite SDK extend from the base `NitroliteError` class, which provides:
+- [Error Structure](#error-structure)
+- [Error Categories](#error-categories)
+  - [Validation Errors](#validation-errors)
+  - [Authentication Errors](#authentication-errors)
+  - [Contract Errors](#contract-errors)
+  - [Token Errors](#token-errors)
+  - [State Errors](#state-errors)
+- [Error Handling Examples](#error-handling-examples)
+  - [Basic Error Handling](#basic-error-handling)
+  - [Advanced Error Handling](#advanced-error-handling)
+- [Common Error Scenarios](#common-error-scenarios)
+  - [Deposit Failures](#deposit-failures)
+  - [Channel Creation Issues](#channel-creation-issues)
+  - [Checkpoint and Challenge Errors](#checkpoint-and-challenge-errors)
+- [Error Prevention Best Practices](#error-prevention-best-practices)
 
-- **code**: A unique string identifier for the error
-- **statusCode**: An HTTP-like status code
-- **suggestion**: A human-readable suggestion for resolving the error
-- **details**: Additional context-specific information about the error
+## Error Structure
 
-Errors are organized into categories to help with error handling and debugging.
+Each error in the SDK includes:
+
+| Property | Description |
+|----------|-------------|
+| `name` | The class name of the error (e.g., `ContractCallError`) |
+| `code` | A unique string identifier (e.g., `CONTRACT_CALL_FAILED`) |
+| `message` | A detailed description of what went wrong |
+| `statusCode` | An HTTP-like status code (e.g., `400`, `500`) |
+| `suggestion` | A human-readable suggestion for resolving the error |
+| `details` | Optional context-specific data about the error |
+| `cause` | Optional original error that triggered this one |
 
 ## Error Categories
 
@@ -20,533 +40,264 @@ Errors are organized into categories to help with error handling and debugging.
 
 Errors related to invalid inputs or parameters:
 
-| Error Class | Code | Status | Description |
-|-------------|------|--------|-------------|
-| `ValidationError` | `VALIDATION_ERROR` | 400 | Base validation error |
-| `InvalidParameterError` | `INVALID_PARAMETER` | 400 | An input parameter is invalid |
-| `MissingParameterError` | `MISSING_PARAMETER` | 400 | A required parameter is missing |
-| `MethodNotFoundError` | `METHOD_NOT_FOUND` | 404 | The requested method doesn't exist |
-| `InvalidRPCParamsError` | `INVALID_RPC_PARAMS` | 400 | RPC parameters are invalid |
+| Error Class | Code | Description |
+|-------------|------|-------------|
+| `ValidationError` | `VALIDATION_ERROR` | Base validation error |
+| `InvalidParameterError` | `INVALID_PARAMETER` | An input parameter is invalid |
+| `MissingParameterError` | `MISSING_PARAMETER` | A required parameter is missing |
 
 ### Authentication Errors
 
 Errors related to authentication and authorization:
 
-| Error Class | Code | Status | Description |
-|-------------|------|--------|-------------|
-| `AuthenticationError` | `AUTHENTICATION_ERROR` | 401 | Base authentication error |
-| `InvalidSignatureError` | `INVALID_SIGNATURE` | 401 | A signature is invalid |
-| `UnauthorizedError` | `UNAUTHORIZED` | 403 | Operation not authorized |
-| `NotParticipantError` | `NOT_PARTICIPANT` | 403 | Address is not a channel participant |
-
-### Network Errors
-
-Errors related to network connectivity and timeouts:
-
-| Error Class | Code | Status | Description |
-|-------------|------|--------|-------------|
-| `NetworkError` | `NETWORK_ERROR` | 500 | Base network error |
-| `ConnectionError` | `CONNECTION_FAILED` | 503 | Connection to server failed |
-| `ProviderNotConnectedError` | `PROVIDER_NOT_CONNECTED` | 503 | Provider not connected |
-| `TimeoutError` | `TIMEOUT_ERROR` | 408 | Base timeout error |
-| `RequestTimeoutError` | `REQUEST_TIMEOUT` | 408 | Request timed out |
-
-### State Errors
-
-Errors related to application state:
-
-| Error Class | Code | Status | Description |
-|-------------|------|--------|-------------|
-| `StateError` | `STATE_ERROR` | 400 | Base state error |
-| `InvalidStateTransitionError` | `INVALID_STATE_TRANSITION` | 400 | State transition is invalid |
-| `StateNotFoundError` | `STATE_NOT_FOUND` | 404 | State not found |
-| `StateNotInitializedError` | `STATE_NOT_INITIALIZED` | 400 | State not initialized |
-| `ChannelNotFoundError` | `CHANNEL_NOT_FOUND` | 404 | Channel not found |
-
-### Virtual Channel Errors
-
-Errors related to virtual channels:
-
-| Error Class | Code | Status | Description |
-|-------------|------|--------|-------------|
-| `VirtualChannelError` | `VIRTUAL_CHANNEL_ERROR` | 400 | Base virtual channel error |
-| `NoNextHopError` | `NO_NEXT_HOP` | 404 | No next hop found in channel path |
-| `RelayError` | `RELAY_FAILED` | 500 | Message relay failed |
+| Error Class | Code | Description |
+|-------------|------|-------------|
+| `AuthenticationError` | `AUTHENTICATION_ERROR` | Base authentication error |
+| `InvalidSignatureError` | `INVALID_SIGNATURE` | A signature is invalid |
+| `UnauthorizedError` | `UNAUTHORIZED` | Operation not authorized |
+| `NotParticipantError` | `NOT_PARTICIPANT` | Address is not a channel participant |
+| `WalletClientRequiredError` | `WALLET_CLIENT_REQUIRED` | Operation requires a wallet client |
+| `AccountRequiredError` | `ACCOUNT_REQUIRED` | Operation requires an account |
 
 ### Contract Errors
 
-Errors related to blockchain contracts:
+Errors related to blockchain and smart contract interactions:
 
-| Error Class | Code | Status | Description |
-|-------------|------|--------|-------------|
-| `ContractError` | `CONTRACT_ERROR` | 500 | Base contract error |
-| `ContractNotFoundError` | `CONTRACT_NOT_FOUND` | 404 | Contract not found |
-| `ContractCallError` | `CONTRACT_CALL_FAILED` | 500 | Contract call failed |
-| `TransactionError` | `TRANSACTION_FAILED` | 500 | Transaction failed |
+| Error Class | Code | Description |
+|-------------|------|-------------|
+| `ContractError` | `CONTRACT_ERROR` | Base contract error |
+| `ContractNotFoundError` | `CONTRACT_NOT_FOUND` | Contract not found at address |
+| `ContractReadError` | `CONTRACT_READ_FAILED` | Reading from contract failed |
+| `ContractCallError` | `CONTRACT_CALL_FAILED` | Contract call simulation failed |
+| `TransactionError` | `TRANSACTION_FAILED` | On-chain transaction failed |
 
-### RPC Errors
+### Token Errors
 
-Errors related to RPC protocol:
+Errors related to ERC20 tokens:
 
-| Error Class | Code | Status | Description |
-|-------------|------|--------|-------------|
-| `RPCError` | `RPC_ERROR_*` | 500 | Generic RPC error |
+| Error Class | Code | Description |
+|-------------|------|-------------|
+| `TokenError` | `TOKEN_ERROR` | Base token operation error |
+| `InsufficientBalanceError` | `INSUFFICIENT_BALANCE` | Insufficient token balance |
+| `InsufficientAllowanceError` | `INSUFFICIENT_ALLOWANCE` | Insufficient token allowance |
 
-## Standard RPC Error Codes
+### State Errors
 
-The SDK uses standard JSON-RPC error codes:
+Errors related to channel state:
 
-| Code | Constant | Description |
-|------|----------|-------------|
-| -32700 | `PARSE_ERROR` | Invalid JSON received |
-| -32600 | `INVALID_REQUEST` | JSON not a valid Request object |
-| -32601 | `METHOD_NOT_FOUND` | Method does not exist |
-| -32602 | `INVALID_PARAMS` | Invalid method parameters |
-| -32603 | `INTERNAL_ERROR` | Internal JSON-RPC error |
-| -32000 | `SERVER_ERROR` | Generic server error |
-| -32001 | `UNAUTHORIZED` | Not authorized to call method |
-| -32002 | `INVALID_STATE` | Invalid state transition |
-| -32003 | `CHANNEL_NOT_FOUND` | Channel not found |
-| -32004 | `INVALID_SIGNATURE` | Invalid signature |
-| -32005 | `INVALID_TRANSITION` | Invalid state transition |
-| -32006 | `VIRTUAL_CHANNEL_ERROR` | Virtual channel error |
-| -32007 | `TIMEOUT` | Operation timed out |
+| Error Class | Code | Description |
+|-------------|------|-------------|
+| `StateError` | `STATE_ERROR` | Base state error |
+| `InvalidStateTransitionError` | `INVALID_STATE_TRANSITION` | Invalid state transition |
+| `StateNotFoundError` | `STATE_NOT_FOUND` | State not found |
+| `ChannelNotFoundError` | `CHANNEL_NOT_FOUND` | Channel not found |
 
-## Error Handling Best Practices
+## Error Handling Examples
 
-### Using Instanceof Checks for Specific Handling
+### Basic Error Handling
 
 ```typescript
 import { 
   NitroliteError, 
-  TokenError, 
-  TransactionError,
-  NetworkError,
-  ValidationError 
-} from '@ethtaipei/Nitrolite-sdk-ts';
+  TokenError,
+  ContractError,
+  InsufficientAllowanceError
+} from '@erc7824/nitrolite';
 
 try {
-  await client.openChannel(channel, initialState);
+  await client.deposit(amount);
 } catch (error) {
   if (error instanceof TokenError) {
-    // Handle token-specific errors
-    console.error(`Token error: ${error.message}, Suggestion: ${error.suggestion}`);
-    if (error.code === 'INSUFFICIENT_BALANCE') {
-      console.log('Please add more tokens to your wallet');
-    } else if (error.code === 'INSUFFICIENT_ALLOWANCE') {
-      console.log('Approve token spending and try again');
+    // Handle token errors
+    console.error(`Token error: ${error.message}`);
+    console.error(`Suggestion: ${error.suggestion}`);
+    
+    if (error instanceof InsufficientAllowanceError) {
+      console.log("Approving tokens and retrying...");
+      await client.approveTokens(amount);
+      await client.deposit(amount);
     }
-  } else if (error instanceof TransactionError) {
-    // Handle transaction errors
-    console.error(`Transaction failed: ${error.message}`);
-    console.log('Receipt details:', error.details?.receipt);
-  } else if (error instanceof NetworkError) {
-    // Handle any network-related error
-    console.error(`Network issue: ${error.message}`);
-    // Wait and retry later
-  } else if (error instanceof ValidationError) {
-    // Handle validation issues
-    console.error(`Invalid input: ${error.message}`);
-    // Fix parameters
+  } else if (error instanceof ContractError) {
+    // Handle contract errors
+    console.error(`Contract error: ${error.message}`);
   } else if (error instanceof NitroliteError) {
-    // Handle general SDK errors
-    console.error(`Error: ${error.message}, Code: ${error.code}`);
+    // Handle other SDK errors
+    console.error(`Error: ${error.code} - ${error.message}`);
     console.error(`Suggestion: ${error.suggestion}`);
   } else {
     // Handle unexpected errors
-    console.error('Unknown error:', error);
+    console.error("Unexpected error:", error);
   }
 }
 ```
 
-### Implementing Retry Logic for Transient Errors
+### Advanced Error Handling
 
-```typescript
-import { NetworkError, TimeoutError } from '@ethtaipei/Nitrolite-sdk-ts';
-
-async function withRetry(operation, maxRetries = 3) {
-  let retries = 0;
-  while (true) {
-    try {
-      return await operation();
-    } catch (error) {
-      if (
-        error instanceof NetworkError || 
-        error instanceof TimeoutError
-      ) {
-        if (retries >= maxRetries) {
-          throw error;
-        }
-        retries++;
-        console.warn(`Retrying operation (${retries}/${maxRetries})...`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * retries));
-      } else {
-        throw error;
-      }
-    }
-  }
-}
-
-// Usage
-await withRetry(() => client.openChannel(channel, initialState));
-```
-
-### Creating Context-Aware Error Handlers
-
-```typescript
-import { NitroliteError, ChannelNotFoundError, InvalidStateTransitionError } from '@ethtaipei/Nitrolite-sdk-ts';
-
-// Create specialized error handlers for different operations
-const channelErrorHandler = (operation) => async (...args) => {
-  try {
-    return await operation(...args);
-  } catch (error) {
-    if (error instanceof ChannelNotFoundError) {
-      console.error(`Channel not found: ${error.message}`);
-      // Attempt recovery - maybe create a new channel
-      return await createNewChannel(...args);
-    } else if (error instanceof InvalidStateTransitionError) {
-      console.error(`Invalid state transition: ${error.message}`);
-      // Maybe fetch latest state and retry
-      return await retryWithLatestState(...args);
-    } else if (error instanceof NitroliteError) {
-      console.error(`Channel operation error: ${error.code} - ${error.message}`);
-      console.error(`Suggestion: ${error.suggestion}`);
-    }
-    throw error; // Re-throw if not handled
-  }
-};
-
-// Use the handler to wrap operations
-const safeUpdateState = channelErrorHandler(channel.updateAppState.bind(channel));
-await safeUpdateState(newState);
-```
-
-### Extracting and Logging Detailed Error Data
-
-```typescript
-import { NitroliteError, VirtualChannelError } from '@ethtaipei/Nitrolite-sdk-ts';
-
-function logDetailedError(error) {
-  if (error instanceof NitroliteError) {
-    console.error(`
-      Error: ${error.name} [${error.code}]
-      Message: ${error.message}
-      Status: ${error.statusCode}
-      Suggestion: ${error.suggestion}
-    `);
-    
-    // Log specific details based on error type
-    if (error instanceof VirtualChannelError) {
-      console.error('Virtual Channel Details:');
-      if (error.details?.lvci) {
-        console.error(`- Channel ID: ${error.details.lvci}`);
-      }
-      if (error.details?.position !== undefined) {
-        console.error(`- Position: ${error.details.position}`);
-      }
-      if (error.details?.nextHop) {
-        console.error(`- Failed at hop: ${error.details.nextHop}`);
-      }
-    }
-    
-    // Log other details
-    if (error.details?.cause) {
-      console.error('Root cause:', error.details.cause);
-    }
-  } else {
-    console.error('Unexpected error:', error);
-  }
-}
-```
-
-## Common Error Scenarios and Solutions
-
-### Channel Opening Errors
-
-Common issues when opening channels:
+Handle specific error situations with custom logic:
 
 ```typescript
 try {
-  const channelId = await client.openChannel(channel, initialState);
-  console.log(`Channel opened with ID: ${channelId}`);
+  await client.createChannel(params);
 } catch (error) {
-  if (error instanceof TokenError) {
-    // Token issues
-    if (error.code === 'INSUFFICIENT_BALANCE') {
-      console.error('Not enough tokens to fund the channel');
-      console.log('Current balance:', error.details?.balance);
-      console.log('Required amount:', error.details?.requiredAmount);
-    } else if (error.code === 'INSUFFICIENT_ALLOWANCE') {
-      console.error('Need to approve token spending');
-      // Approve tokens and retry
-      const amount = error.details?.requiredAmount || BigInt(1000);
-      await client.approveTokens(error.details?.token, amount, client.custodyAddress);
-      // Retry opening the channel
-      await client.openChannel(channel, initialState);
-    }
+  if (error instanceof InsufficientBalanceError) {
+    const { required, actual } = error.details || {};
+    console.error(`Insufficient balance. Required: ${required}, Available: ${actual}`);
+    
+    // Display UI for depositing more funds
+    showDepositUI(required - actual);
   } else if (error instanceof ContractCallError) {
-    console.error('Contract interaction failed:', error.message);
-    console.error('Suggestion:', error.suggestion);
-    // Check gas limit, contract parameters, etc.
-  } else if (error instanceof ValidationError) {
-    console.error('Invalid channel parameters:', error.message);
-    // Fix channel configuration and retry
-  }
-}
-```
-
-### State Update Errors
-
-Handling errors during state updates:
-
-```typescript
-try {
-  await rpcChannel.updateAppState(newState);
-} catch (error) {
-  if (error instanceof InvalidStateTransitionError) {
-    console.error('Invalid state transition:', error.message);
+    console.error(`Contract call failed: ${error.message}`);
     
-    // Get the latest state and merge changes
-    const currentState = rpcChannel.getCurrentAppState();
-    console.log('Current state:', currentState);
-    
-    // Create a corrected state based on the current one
-    const correctedState = {
-      ...currentState,
-      // Apply only valid changes
-      value: Math.max(currentState.value, newState.value),
-      sequence: currentState.sequence + 1n
-    };
-    
-    // Retry with corrected state
-    await rpcChannel.updateAppState(correctedState);
-    
-  } else if (error instanceof ConnectionError) {
-    console.error('Connection lost during update:', error.message);
-    // Try to reconnect RPC client
-    await rpcClient.connect();
-    // Then retry update
-    await rpcChannel.updateAppState(newState);
-  }
-}
-```
-
-### Virtual Channel Routing Errors
-
-Resolving issues with virtual channels:
-
-```typescript
-try {
-  await rpcClient.relayStateUpdate(lvci, state);
-} catch (error) {
-  if (error instanceof NoNextHopError) {
-    console.error('No valid next hop found:', error.message);
-    console.log('Current position:', error.details?.position);
-    console.log('Path:', error.details?.path);
-    
-    // Check all participants are connected
-    const connectedAddresses = await getConnectedParticipants();
-    const missingParticipants = lvci.path.filter(addr => !connectedAddresses.includes(addr));
-    
-    if (missingParticipants.length > 0) {
-      console.error('Missing participants:', missingParticipants);
-      // Notify users about missing participants
+    // Check for gas-related issues
+    if (error.message.includes('gas')) {
+      console.log("Try again with higher gas limit");
     }
-  } else if (error instanceof RelayError) {
-    console.error('Failed to relay message:', error.message);
-    console.log('Failed at hop:', error.details?.nextHop);
+  } else if (error instanceof TransactionError) {
+    // Get information about the failed transaction
+    const { hash } = error.details || {};
+    if (hash) {
+      console.log(`Transaction failed. Check explorer: ${getExplorerUrl(hash)}`);
+    }
+  } else if (error instanceof MissingParameterError) {
+    console.error(`Missing parameter: ${error.message}`);
     
-    // Check specific participant connection
-    const isHopConnected = await checkParticipantConnection(error.details?.nextHop);
-    if (!isHopConnected) {
-      console.error('Intermediary is offline:', error.details?.nextHop);
-      // Maybe try an alternative path
+    // Highlight the field in the UI
+    highlightMissingField(error.message);
+  }
+}
+```
+
+## Common Error Scenarios
+
+### Deposit Failures
+
+```typescript
+try {
+  await client.deposit(amount);
+} catch (error) {
+  if (error instanceof InsufficientBalanceError) {
+    console.error("Not enough tokens in wallet");
+    // Show current balance vs required amount
+    console.log(`Required: ${error.details?.required}, Available: ${error.details?.actual}`);
+  } else if (error instanceof InsufficientAllowanceError) {
+    // Token needs approval
+    console.log(`Current allowance: ${error.details?.actual}, Required: ${error.details?.required}`);
+    await client.approveTokens(amount);
+    await client.deposit(amount); // Retry
+  }
+}
+```
+
+### Channel Creation Issues
+
+```typescript
+try {
+  await client.createChannel(params);
+} catch (error) {
+  if (error.code === "CONTRACT_CALL_FAILED") {
+    console.error("Failed to create channel:", error.message);
+    console.log("Suggestion:", error.suggestion);
+  } else if (error.code === "INVALID_PARAMETER") {
+    console.error("Invalid parameters:", error.message);
+    
+    // Check for specific parameter issues
+    if (error.message.includes("participants")) {
+      console.log("Please check the participant addresses");
+    } else if (error.message.includes("allocation")) {
+      console.log("Please check the allocation amounts");
+    }
+  } else if (error.code === "MISSING_PARAMETER") {
+    // This handles cases where required configuration is missing
+    if (error.message.includes("adjudicator")) {
+      console.error("The adjudicator address is missing in the configuration");
     }
   }
 }
 ```
 
-### Token Approval and Transaction Errors
-
-Handling blockchain transaction issues:
+### Checkpoint and Challenge Errors
 
 ```typescript
 try {
-  await client.approveTokens(tokenAddress, amount, spender);
+  await client.checkpointChannel(params);
 } catch (error) {
-  if (error instanceof TransactionError) {
-    console.error('Transaction failed:', error.message);
-    
-    // Check transaction receipt for more details
-    if (error.details?.receipt) {
-      console.log('Gas used:', error.details.receipt.gasUsed);
-      console.log('Status:', error.details.receipt.status);
+  if (error.code === "INVALID_SIGNATURE") {
+    console.error("Invalid signatures on state");
+    // Check if states are properly signed
+    if (params.candidateState.sigs.length < 2) {
+      console.log("State must be signed by both participants");
     }
-    
-    // Check if gas price is too low
-    if (error.message.includes('underpriced')) {
-      console.log('Transaction underpriced, retrying with higher gas...');
-      // Retry with higher gas price
-      await client.approveTokens(tokenAddress, amount, spender, {
-        gasPrice: increasedGasPrice
-      });
-    }
+  } else if (error.code === "CHANNEL_NOT_FOUND") {
+    console.error("Channel does not exist on-chain");
+    console.log("Verify the channel ID:", params.channelId);
   } else if (error instanceof ContractCallError) {
-    console.error('Contract call simulation failed:', error.message);
-    // This usually means the transaction would fail if sent
-    console.log('Reason:', error.details?.cause?.message);
+    console.error("Contract call failed during checkpoint");
+    // Check if the channel is in a valid state for checkpointing
+    console.log("Verify that the channel is active and not closed");
   }
 }
-
-## Advanced Error Handling Techniques
-
-### Error Configuration Options
-
-You can adjust error-related settings in the SDK configuration:
-
-```typescript
-import { getConfigWithDefaults } from '@ethtaipei/Nitrolite-sdk-ts';
-
-const config = getConfigWithDefaults({
-  // Increase request timeout
-  requestTimeoutMs: 60000,
-  
-  // Increase maximum retries
-  maxRequestRetries: 5,
-  
-  // Enable detailed logging for debugging
-  logLevel: 'debug'
-});
-
-// Pass config to SDK components
-const client = new RPCClient({
-  provider,
-  address,
-  signer,
-  ...config
-});
 ```
 
-### Implementing a Global Error Handler
+## Error Prevention Best Practices
 
-For applications with many channel operations, a global error handler can be useful:
+1. **Validate inputs**: Check parameters before sending to methods
+   ```typescript
+   if (!channelId) {
+     throw new Errors.MissingParameterError('channelId');
+   }
+   ```
 
-```typescript
-import { 
-  NitroliteError, 
-  NetworkError,
-  TimeoutError,
-  ContractError,
-  StateError,
-  VirtualChannelError
-} from '@ethtaipei/Nitrolite-sdk-ts';
+2. **Check balances**: Verify sufficient funds before deposits/channel creation
+   ```typescript
+   const balance = await client.getTokenBalance();
+   if (balance < amount) {
+     throw new Errors.InsufficientBalanceError(tokenAddress, amount, balance);
+   }
+   ```
 
-// Create a global error handler
-class NitroliteErrorHandler {
-  constructor(options = {}) {
-    this.options = {
-      maxRetries: 3,
-      retryDelay: 1000,
-      shouldLogErrors: true,
-      onNetworkError: null,
-      onContractError: null,
-      ...options
-    };
-  }
-  
-  // Wrap an operation with error handling
-  async handle(operation, context = {}) {
-    let retries = 0;
-    
-    while (true) {
-      try {
-        return await operation();
-      } catch (error) {
-        // Log the error if enabled
-        if (this.options.shouldLogErrors) {
-          this.logError(error, context);
-        }
-        
-        // Handle retryable errors
-        if (this.isRetryableError(error) && retries < this.options.maxRetries) {
-          retries++;
-          console.warn(`Retrying operation (${retries}/${this.options.maxRetries})...`);
-          await new Promise(resolve => setTimeout(resolve, this.options.retryDelay * retries));
-          continue;
-        }
-        
-        // Handle specific error categories
-        if (error instanceof NetworkError && this.options.onNetworkError) {
-          await this.options.onNetworkError(error, context);
-        } else if (error instanceof ContractError && this.options.onContractError) {
-          await this.options.onContractError(error, context);
-        } else if (error instanceof StateError && this.options.onStateError) {
-          await this.options.onStateError(error, context);
-        } else if (error instanceof VirtualChannelError && this.options.onVirtualChannelError) {
-          await this.options.onVirtualChannelError(error, context);
-        }
-        
-        // Re-throw the error for the caller to handle
-        throw error;
-      }
-    }
-  }
-  
-  // Determine if an error is retryable
-  isRetryableError(error) {
-    return (
-      error instanceof NetworkError ||
-      error instanceof TimeoutError ||
-      (error instanceof ContractError && 
-        (error.message.includes('nonce') || error.message.includes('underpriced')))
-    );
-  }
-  
-  // Detailed error logging
-  logError(error, context) {
-    if (error instanceof NitroliteError) {
-      console.error(`
-        [${new Date().toISOString()}] ${error.name} [${error.code}]
-        Message: ${error.message}
-        Status: ${error.statusCode}
-        Suggestion: ${error.suggestion}
-        Context: ${JSON.stringify(context)}
-        ${error.details ? `Details: ${JSON.stringify(error.details, null, 2)}` : ''}
-      `);
-    } else {
-      console.error(`
-        [${new Date().toISOString()}] Unexpected Error
-        Message: ${error.message}
-        Stack: ${error.stack}
-        Context: ${JSON.stringify(context)}
-      `);
-    }
-  }
-}
+3. **Verify signatures**: Ensure all required signatures are present
+   ```typescript
+   if (!state.sigs || state.sigs.length < 2) {
+     throw new Errors.InvalidSignatureError('State must be signed by both participants');
+   }
+   ```
 
-// Usage
-const errorHandler = new NitroliteErrorHandler({
-  onNetworkError: async (error, context) => {
-    // Reconnect logic
-    if (context.client) {
-      await context.client.connect();
-    }
-  },
-  onContractError: async (error, context) => {
-    // Notify user about blockchain issues
-    notifyUser('Blockchain operation failed: ' + error.message);
-  }
-});
+4. **Handle network issues**: Implement retry logic for network-related errors
+   ```typescript
+   const MAX_RETRIES = 3;
+   let attempt = 0;
+   
+   while (attempt < MAX_RETRIES) {
+     try {
+       return await client.deposit(amount);
+     } catch (error) {
+       if (error instanceof TransactionError && error.message.includes('network')) {
+         attempt++;
+         await new Promise(r => setTimeout(r, 1000 * attempt));
+         continue;
+       }
+       throw error;
+     }
+   }
+   ```
 
-// Wrap operations with the handler
-try {
-  await errorHandler.handle(
-    () => client.openChannel(channel, initialState),
-    { client, channel, operation: 'openChannel' }
-  );
-} catch (error) {
-  // Handle unrecoverable errors
-  console.error('Operation failed after all recovery attempts:', error.message);
-}
-```
+5. **Use proper error handling**: Leverage the error hierarchy for targeted handling
+   ```typescript
+   try {
+     // Your code here
+   } catch (error) {
+     if (error instanceof TokenError) {
+       // Handle token errors
+     } else if (error instanceof StateError) {
+       // Handle state errors
+     } else if (error instanceof ContractError) {
+       // Handle contract errors
+     } else if (error instanceof NitroliteError) {
+       // Handle other SDK errors
+     } else {
+       // Handle unexpected errors
+     }
+   }
+   ```
+
+By following these guidelines and leveraging the SDK's structured error system, you can create more robust applications that gracefully handle errors and provide clear feedback to users.

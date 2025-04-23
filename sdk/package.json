@@ -1,6 +1,6 @@
 {
   "name": "@erc7824/nitrolite",
-  "version": "0.0.17-alpha",
+  "version": "0.0.18-alpha",
   "description": "TypeScript SDK for the Nitrolite state channels framework",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,11 +31,11 @@
     "url": "https://github.com/erc7824/nitrolite.git"
   },
   "dependencies": {
-    "viem": "^2.5.0",
-    "abitype": "^0.10.3"
+    "abitype": "^0.10.3",
+    "viem": "^2.5.0"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.12",
+    "@types/jest": "29.5.14",
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",

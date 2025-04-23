@@ -1,4 +1,4 @@
-import { Account, Hex, PublicClient, WalletClient, Chain, Transport, ParseAccount, Hash, zeroAddress } from "viem";
+import { Account, SimulateContractReturnType, PublicClient, WalletClient, Chain, Transport, ParseAccount, Hash, zeroAddress } from "viem";
 
 import { NitroliteService, Erc20Service } from "./services";
 import {
@@ -16,6 +16,9 @@ import { getStateHash, generateChannelNonce, getChannelId, encoders, removeQuote
 import * as Errors from "../errors";
 import { ContractAddresses } from "../abis";
 import { MAGIC_NUMBERS } from "../config";
+import { _prepareAndSignFinalState, _prepareAndSignInitialState } from "./state";
+
+export type PreparedTransaction = SimulateContractReturnType["request"];
 
 /**
  * The main client class for interacting with the Nitrolite SDK.
@@ -24,11 +27,11 @@ import { MAGIC_NUMBERS } from "../config";
 export class NitroliteClient {
     public readonly publicClient: PublicClient;
     public readonly walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
+    public readonly account: ParseAccount<Account>;
     public readonly addresses: ContractAddresses;
     public readonly challengeDuration: bigint;
     private readonly nitroliteService: NitroliteService;
     private readonly erc20Service: Erc20Service;
-    private readonly account: ParseAccount<Account>;
 
     constructor(config: NitroliteClientConfig) {
         if (!config.publicClient) throw new Errors.MissingParameterError("publicClient");
@@ -47,6 +50,42 @@ export class NitroliteClient {
 
         this.nitroliteService = new NitroliteService(this.publicClient, this.addresses, this.walletClient, this.account);
         this.erc20Service = new Erc20Service(this.publicClient, this.walletClient);
+    }
+
+    /**
+     * Prepares the transaction data necessary for a deposit operation,
+     * including ERC20 approval if required.
+     * Designed for use with Account Abstraction (UserOperations).
+     * @param amount The amount of tokens/ETH to deposit.
+     * @returns An array of PreparedTransaction objects (approve + deposit, or just deposit).
+     */
+    async prepareDepositTransactions(amount: bigint): Promise<PreparedTransaction[]> {
+        const transactions: PreparedTransaction[] = [];
+        const tokenAddress = this.addresses.tokenAddress;
+        const spender = this.addresses.custody;
+        const owner = this.account.address;
+
+        if (tokenAddress !== zeroAddress) {
+            const allowance = await this.erc20Service.getTokenAllowance(tokenAddress, owner, spender);
+            if (allowance < amount) {
+                try {
+                    const approveTx = await this.erc20Service.prepareApprove(tokenAddress, spender, amount);
+                    transactions.push(approveTx);
+                } catch (err) {
+                    // Throw a specific error indicating preparation failure
+                    throw new Errors.ContractCallError("prepareApprove (for deposit)", err as Error, { tokenAddress, spender, amount });
+                }
+            }
+        }
+
+        try {
+            const depositTx = await this.nitroliteService.prepareDeposit(tokenAddress, amount);
+            transactions.push(depositTx);
+        } catch (err) {
+            throw new Errors.ContractCallError("prepareDeposit", err as Error, { tokenAddress, amount });
+        }
+
+        return transactions;
     }
 
     /**
@@ -75,7 +114,27 @@ export class NitroliteClient {
         try {
             return await this.nitroliteService.deposit(tokenAddress, amount);
         } catch (err) {
-            throw new Errors.ContractError("Failed to execute deposit on contract", undefined, undefined, undefined, undefined, err as Error);
+            throw new Errors.ContractCallError("Failed to execute deposit on contract", err as Error);
+        }
+    }
+
+    /**
+     * Prepares the transaction data for creating a new state channel.
+     * Handles internal state construction and signing.
+     * Designed for use with Account Abstraction (UserOperations).
+     * @param params Parameters for channel creation.
+     * @returns The prepared transaction data ({ to, data, value }).
+     */
+    async prepareCreateChannelTransaction(params: CreateChannelParams): Promise<PreparedTransaction> {
+        try {
+            const { channel, initialState } = await _prepareAndSignInitialState(this, params);
+
+            const preparedTx = await this.nitroliteService.prepareCreateChannel(channel, initialState);
+
+            return preparedTx;
+        } catch (err) {
+            if (err instanceof Errors.NitroliteError) throw err;
+            throw new Errors.ContractCallError("prepareCreateChannelTransaction", err as Error, { params });
         }
     }
 
@@ -86,60 +145,81 @@ export class NitroliteClient {
      * @returns The channel ID, the signed initial state, and the transaction hash.
      */
     async createChannel(params: CreateChannelParams): Promise<{ channelId: ChannelId; initialState: State; txHash: Hash }> {
-        const { initialAllocationAmounts, stateData } = params;
-
-        const channelNonce = generateChannelNonce();
-        const participants: [Hex, Hex] = [this.account.address, this.addresses.guestAddress];
-        const tokenAddress = this.addresses.tokenAddress;
-        const adjudicatorAddress = this.addresses.adjudicators["default"];
-        const challengeDuration = this.challengeDuration;
-
-        if (!participants || participants.length !== 2) {
-            throw new Errors.InvalidParameterError("Channel must have two participants.");
-        }
-
-        const channel: Channel = {
-            participants,
-            adjudicator: adjudicatorAddress,
-            challenge: challengeDuration,
-            nonce: channelNonce,
-        };
-
-        const initialAppData = stateData ?? encoders["numeric"](MAGIC_NUMBERS.OPEN);
-
-        const channelId = getChannelId(channel);
-
-        const initialState: State = {
-            data: initialAppData,
-            allocations: [
-                { destination: participants[0], token: tokenAddress, amount: initialAllocationAmounts[0] },
-                { destination: participants[1], token: tokenAddress, amount: initialAllocationAmounts[1] },
-            ],
-            sigs: [],
-        };
-
-        const stateHash = getStateHash(channelId, initialState);
-        const accountSignature = await signState(stateHash, this.walletClient.signMessage);
-
-        initialState.sigs = [accountSignature];
-
         try {
+            const { channel, initialState, channelId } = await _prepareAndSignInitialState(this, params);
+
             const txHash = await this.nitroliteService.createChannel(channel, initialState);
 
             return { channelId, initialState, txHash };
         } catch (err) {
-            throw new Errors.ContractError("Failed to execute createChannel on contract", undefined, undefined, undefined, undefined, err as Error);
+            throw new Errors.ContractCallError("Failed to execute createChannel on contract", err as Error);
         }
     }
 
+    /**
+     * Prepares the transaction data for depositing funds and creating a channel in a single operation.
+     * Includes potential ERC20 approval. Designed for batching with Account Abstraction (UserOperations).
+     * @param depositAmount The amount to deposit.
+     * @param params Parameters for channel creation.
+     * @returns An array of PreparedTransaction objects (approve?, deposit, createChannel).
+     */
+    async prepareDepositAndCreateChannelTransactions(depositAmount: bigint, params: CreateChannelParams): Promise<PreparedTransaction[]> {
+        let allTransactions: PreparedTransaction[] = [];
+
+        try {
+            const depositTxs = await this.prepareDepositTransactions(depositAmount);
+            allTransactions = allTransactions.concat(depositTxs);
+        } catch (err) {
+            throw new Errors.ContractCallError("Failed to prepare deposit part of depositAndCreateChannel", err as Error);
+        }
+
+        try {
+            const createChannelTx = await this.prepareCreateChannelTransaction(params);
+            allTransactions.push(createChannelTx);
+        } catch (err) {
+            throw new Errors.ContractCallError("Failed to prepare createChannel part of depositAndCreateChannel", err as Error);
+        }
+
+        return allTransactions;
+    }
+
+    /**
+     * Deposits funds and creates a channel by sending sequential transactions (Direct Execution).
+     * Handles ERC20 approval if necessary for the deposit.
+     * @param depositAmount The amount to deposit.
+     * @param params Parameters for channel creation.
+     * @returns An object containing the channel ID, initial state, and transaction hashes for deposit and creation.
+     */
     async depositAndCreateChannel(
         depositAmount: bigint,
         params: CreateChannelParams
-    ): Promise<{ channelId: ChannelId; initialState: State; txHash: Hash }> {
+    ): Promise<{ channelId: ChannelId; initialState: State; depositTxHash: Hash; createChannelTxHash: Hash }> {
         const depositTxHash = await this.deposit(depositAmount);
         const { channelId, initialState, txHash } = await this.createChannel(params);
 
-        return { channelId, initialState, txHash: depositTxHash };
+        return { channelId, initialState, depositTxHash: depositTxHash, createChannelTxHash: txHash };
+    }
+
+    /**
+     * Prepares the transaction data for checkpointing a state on-chain.
+     * Requires the state to be signed by both participants.
+     * Designed for use with Account Abstraction (UserOperations).
+     * @param params Parameters for checkpointing the state.
+     * @returns The prepared transaction data ({ to, data, value }).
+     */
+    async prepareCheckpointChannelTransaction(params: CheckpointChannelParams): Promise<PreparedTransaction> {
+        const { channelId, candidateState, proofStates = [] } = params;
+
+        if (!candidateState.sigs || candidateState.sigs.length < 2) {
+            throw new Errors.InvalidParameterError("Candidate state for checkpoint must be signed by both participants.");
+        }
+
+        try {
+            return await this.nitroliteService.prepareCheckpoint(channelId, candidateState, proofStates);
+        } catch (err) {
+            if (err instanceof Errors.NitroliteError) throw err;
+            throw new Errors.ContractCallError("prepareCheckpointChannelTransaction", err as Error, { params });
+        }
     }
 
     /**
@@ -158,14 +238,24 @@ export class NitroliteClient {
         try {
             return await this.nitroliteService.checkpoint(channelId, candidateState, proofStates);
         } catch (err) {
-            throw new Errors.ContractError(
-                "Failed to execute checkpointChannel on contract",
-                undefined,
-                undefined,
-                undefined,
-                undefined,
-                err as Error
-            );
+            throw new Errors.ContractCallError("Failed to execute checkpointChannel on contract", err as Error);
+        }
+    }
+
+    /**
+     * Prepares the transaction data for challenging a channel on-chain.
+     * Designed for use with Account Abstraction (UserOperations).
+     * @param params Parameters for challenging the channel.
+     * @returns The prepared transaction data ({ to, data, value }).
+     */
+    async prepareChallengeChannelTransaction(params: ChallengeChannelParams): Promise<PreparedTransaction> {
+        const { channelId, candidateState, proofStates = [] } = params;
+
+        try {
+            return await this.nitroliteService.prepareChallenge(channelId, candidateState, proofStates);
+        } catch (err) {
+            if (err instanceof Errors.NitroliteError) throw err;
+            throw new Errors.ContractCallError("prepareChallengeChannelTransaction", err as Error, { params });
         }
     }
 
@@ -181,14 +271,25 @@ export class NitroliteClient {
         try {
             return await this.nitroliteService.challenge(channelId, candidateState, proofStates);
         } catch (err) {
-            throw new Errors.ContractError(
-                "Failed to execute challengeChannel on contract",
-                undefined,
-                undefined,
-                undefined,
-                undefined,
-                err as Error
-            );
+            throw new Errors.ContractCallError("Failed to execute challengeChannel on contract", err as Error);
+        }
+    }
+
+    /**
+     * Prepares the transaction data for closing a channel collaboratively.
+     * Handles internal state construction and signing.
+     * Designed for use with Account Abstraction (UserOperations).
+     * @param params Parameters for closing the channel.
+     * @returns The prepared transaction data ({ to, data, value }).
+     */
+    async prepareCloseChannelTransaction(params: CloseChannelParams): Promise<PreparedTransaction> {
+        try {
+            const { finalStateWithSigs, channelId } = await _prepareAndSignFinalState(this, params);
+
+            return await this.nitroliteService.prepareClose(channelId, finalStateWithSigs);
+        } catch (err) {
+            if (err instanceof Errors.NitroliteError) throw err;
+            throw new Errors.ContractCallError("prepareCloseChannelTransaction", err as Error, { params });
         }
     }
 
@@ -199,26 +300,30 @@ export class NitroliteClient {
      * @returns The transaction hash.
      */
     async closeChannel(params: CloseChannelParams): Promise<Hash> {
-        const { finalState } = params;
-        const finalSignatures = removeQuotesFromRS(finalState.server_signature)["server_signature"];
-        const appState = MAGIC_NUMBERS.CLOSE;
-
-        const state: State = {
-            data: encoders["numeric"](appState),
-            allocations: finalState.allocations,
-            sigs: [],
-        };
-
-        const stateHash = getStateHash(finalState.channel_id, state); // Pass channelId if required by util
-
-        const accountSignature = await signState(stateHash, this.walletClient.signMessage);
-
-        state.sigs = [accountSignature, ...finalSignatures];
-
         try {
-            return await this.nitroliteService.close(finalState.channel_id, state);
+            const { finalStateWithSigs, channelId } = await _prepareAndSignFinalState(this, params);
+
+            return await this.nitroliteService.close(channelId, finalStateWithSigs);
         } catch (err) {
             throw new Errors.ContractError("Failed to execute closeChannel on contract", undefined, undefined, undefined, undefined, err as Error);
+        }
+    }
+
+    /**
+     * Prepares the transaction data for withdrawing deposited funds from the custody contract.
+     * This does not withdraw funds locked in active channels.
+     * Designed for use with Account Abstraction (UserOperations).
+     * @param amount The amount of tokens/ETH to withdraw.
+     * @returns The prepared transaction data ({ to, data, value }).
+     */
+    async prepareWithdrawalTransaction(amount: bigint): Promise<PreparedTransaction> {
+        const tokenAddress = this.addresses.tokenAddress;
+
+        try {
+            return await this.nitroliteService.prepareWithdraw(tokenAddress, amount);
+        } catch (err) {
+            if (err instanceof Errors.NitroliteError) throw err;
+            throw new Errors.ContractCallError("prepareWithdrawalTransaction", err as Error, { amount, tokenAddress });
         }
     }
 

@@ -414,6 +414,12 @@ struct Ledger {
 }
 ```
 
+### Remittance Adjudicator
+
+The `Remittance.sol` contract implements `IAdjudicator` interface and `IComparable`, it must validate that Allocation transfers are valid at all times from offchain signed stateHash,
+The logic is that Adjudicator must be called with 2 proofs, funding and last valid state, the candidate state is valid if the participant which the allocation is decreasing (the payer) has signed the stateHash.
+Data field is an incremental counter version, every change of allocation must have a unique version number, the provided proof should be candidate version - 1, Comparable use the version to determine the newest valid state.
+
 ## Roadmap
 
 The following features are planned for future development:

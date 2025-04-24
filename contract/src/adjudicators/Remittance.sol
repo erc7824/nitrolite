@@ -3,40 +3,182 @@ pragma solidity ^0.8.13;
 
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
 import {IComparable} from "../interfaces/IComparable.sol";
-import {Amount, Channel, State, Status, Allocation, Signature} from "../interfaces/Types.sol";
+import {Channel, State, Allocation, Signature, Amount} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
 
 /**
  * @title Remittance Adjudicator
- * @notice Implements an adjudicator for simple remittance payments in state channels
- * @dev Validates transfers are signed by the payer and uses versioning to establish ordering.
- *      The data field contains a version counter that must increase with each allocation change.
+ * @notice An adjudicator that validates payment intent state transfers between participants
+ * @dev Validates that allocation transfers are valid from offchain signed stateHash
  */
 contract Remittance is IAdjudicator, IComparable {
+    uint256 constant CREATOR = 0;
+    uint256 constant BROKER = 1;
+
     /// @notice Error thrown when signature verification fails
     error InvalidSignature();
-    /// @notice Error thrown when version isn't higher than previous version
-    error InvalidVersion();
-    /// @notice Error thrown when payer hasn't signed the state
-    error PayerSignatureRequired();
-    /// @notice Error thrown when required proofs aren't provided
-    error InsufficientProofs();
-    /// @notice Error thrown when allocations are invalid
+    /// @notice Error thrown when insufficient signatures are provided
+    error InsufficientSignatures();
+    /// @notice Error thrown when transfer intent is invalid
+    error InvalidTransfer();
+    /// @notice Error thrown when allocations do not match
     error InvalidAllocations();
 
     /**
-     * @dev Remittance data structure
-     * @param version State version counter - must increase with each allocation change
+     * @dev Intent represents a payment transfer from one participant to another
+     * @param payer Index of the paying participant (0 for CREATOR, 1 for BROKER)
+     * @param transfer Amount and token being transferred
      */
-    struct Voucher {
+    struct Intent {
         uint8 payer; // Index of the Payer
         Amount transfer; // Amount and token should match the updated allocation
-        uint256 version;
     }
 
     /**
-     * @notice Compares two states based on their version numbers
-     * @dev Uses the version field from Voucher to determine state ordering
+     * @notice Validates state transitions based on payment intents
+     * @param chan The channel configuration
+     * @param candidate The proposed state
+     * @param proofs Array containing previous states (proofs[0] is funding state, proofs[1] is last valid state if needed)
+     * @return valid True if the state transition is valid, false otherwise
+     */
+    function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
+        external
+        pure
+        override
+        returns (bool valid)
+    {
+        // Check that we have at least one signature
+        if (candidate.sigs.length == 0) {
+            return false;
+        }
+
+        // First state after funding (version == 1) only requires funding proof
+        if (candidate.version == 1) {
+            // Must have funding proof
+            if (proofs.length == 0) {
+                return false;
+            }
+
+            // Decode the intent
+            Intent memory intent = abi.decode(candidate.data, (Intent));
+
+            // Verify payer's signature
+            bytes32 stateHash = Utils.getStateHash(chan, candidate);
+            if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[intent.payer])) {
+                return false;
+            }
+
+            // Check allocations based on funding state (proofs[0])
+            // Calculate expected allocations after applying intent
+            Allocation[] memory expectedAllocations = new Allocation[](2);
+
+            // Start with the funding allocations
+            expectedAllocations[CREATOR] = proofs[0].allocations[CREATOR];
+            expectedAllocations[BROKER] = proofs[0].allocations[BROKER];
+
+            // Apply the intent transfer
+            if (intent.payer == CREATOR) {
+                // CREATOR is paying, reduce CREATOR's amount and increase BROKER's amount
+                if (expectedAllocations[CREATOR].amount < intent.transfer.amount) {
+                    return false; // Insufficient funds
+                }
+                expectedAllocations[CREATOR].amount -= intent.transfer.amount;
+                expectedAllocations[BROKER].amount += intent.transfer.amount;
+            } else {
+                // BROKER is paying, reduce BROKER's amount and increase CREATOR's amount
+                if (expectedAllocations[BROKER].amount < intent.transfer.amount) {
+                    return false; // Insufficient funds
+                }
+                expectedAllocations[BROKER].amount -= intent.transfer.amount;
+                expectedAllocations[CREATOR].amount += intent.transfer.amount;
+            }
+
+            // Verify candidate allocations match expected allocations
+            if (candidate.allocations.length != 2) {
+                return false;
+            }
+
+            // Check that tokens and amounts match for both allocations
+            if (
+                candidate.allocations[CREATOR].token != expectedAllocations[CREATOR].token
+                    || candidate.allocations[CREATOR].amount != expectedAllocations[CREATOR].amount
+                    || candidate.allocations[BROKER].token != expectedAllocations[BROKER].token
+                    || candidate.allocations[BROKER].amount != expectedAllocations[BROKER].amount
+            ) {
+                return false;
+            }
+
+            return true;
+        }
+        // For states after the first transition (version > 1)
+        else if (candidate.version > 1) {
+            // Must have at least two proofs: funding state and last valid state
+            if (proofs.length < 2) {
+                return false;
+            }
+
+            // Decode the intent
+            Intent memory intent = abi.decode(candidate.data, (Intent));
+
+            // Verify payer's signature
+            bytes32 stateHash = Utils.getStateHash(chan, candidate);
+            if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[intent.payer])) {
+                return false;
+            }
+
+            // Check that version is incremented properly
+            if (candidate.version != proofs[1].version + 1) {
+                return false;
+            }
+
+            // Calculate expected allocations after applying intent to the last valid state
+            Allocation[] memory expectedAllocations = new Allocation[](2);
+
+            // Start with the last valid state allocations
+            expectedAllocations[CREATOR] = proofs[1].allocations[CREATOR];
+            expectedAllocations[BROKER] = proofs[1].allocations[BROKER];
+
+            // Apply the intent transfer
+            if (intent.payer == CREATOR) {
+                // CREATOR is paying, reduce CREATOR's amount and increase BROKER's amount
+                if (expectedAllocations[CREATOR].amount < intent.transfer.amount) {
+                    return false; // Insufficient funds
+                }
+                expectedAllocations[CREATOR].amount -= intent.transfer.amount;
+                expectedAllocations[BROKER].amount += intent.transfer.amount;
+            } else {
+                // BROKER is paying, reduce BROKER's amount and increase CREATOR's amount
+                if (expectedAllocations[BROKER].amount < intent.transfer.amount) {
+                    return false; // Insufficient funds
+                }
+                expectedAllocations[BROKER].amount -= intent.transfer.amount;
+                expectedAllocations[CREATOR].amount += intent.transfer.amount;
+            }
+
+            // Verify candidate allocations match expected allocations
+            if (candidate.allocations.length != 2) {
+                return false;
+            }
+
+            // Check that tokens and amounts match for both allocations
+            if (
+                candidate.allocations[CREATOR].token != expectedAllocations[CREATOR].token
+                    || candidate.allocations[CREATOR].amount != expectedAllocations[CREATOR].amount
+                    || candidate.allocations[BROKER].token != expectedAllocations[BROKER].token
+                    || candidate.allocations[BROKER].amount != expectedAllocations[BROKER].amount
+            ) {
+                return false;
+            }
+
+            return true;
+        }
+
+        // Any other state is invalid
+        return false;
+    }
+
+    /**
+     * @notice Compares two states to determine their relative ordering
      * @param candidate The state being evaluated
      * @param previous The reference state to compare against
      * @return result The comparison result:
@@ -45,90 +187,12 @@ contract Remittance is IAdjudicator, IComparable {
      *          1: candidate > previous (candidate is newer)
      */
     function compare(State calldata candidate, State calldata previous) external pure returns (int8 result) {
-        Voucher memory candidateData = abi.decode(candidate.data, (Voucher));
-        Voucher memory previousData = abi.decode(previous.data, (Voucher));
-
-        if (candidateData.version < previousData.version) return -1;
-        if (candidateData.version > previousData.version) return 1;
-        return 0;
-    }
-
-    /**
-     * @notice Identifies which participant's allocation is decreasing (the payer)
-     * @param current Current allocations
-     * @param previous Previous allocations
-     * @return payerIndex The index of the payer in the participants array
-     */
-    function identifyPayer(Allocation[] memory current, Allocation[] memory previous)
-        internal
-        pure
-        returns (uint256 payerIndex)
-    {
-        // Simple case with 2 participants
-        if (current.length != 2 || previous.length != 2) {
-            revert InvalidAllocations();
+        if (candidate.version < previous.version) {
+            return -1; // Candidate is older
+        } else if (candidate.version > previous.version) {
+            return 1; // Candidate is newer
+        } else {
+            return 0; // Same version
         }
-
-        // Search for participant with decreased allocation
-        for (uint256 i = 0; i < 2; i++) {
-            if (
-                current[i].token == previous[i].token && current[i].destination == previous[i].destination
-                    && current[i].amount < previous[i].amount
-            ) {
-                return i; // Found the payer
-            }
-        }
-
-        // If no allocations decreased, revert
-        revert InvalidAllocations();
-    }
-
-    /**
-     * @notice Validates remittance state transitions
-     * @dev Ensures the payer has signed states with decreased allocations and version is incremented
-     * @param chan The channel configuration
-     * @param candidate The proposed state to be validated
-     * @param proofs Array of previous states for validation context
-     * @return valid True if the state transition is valid
-     */
-    function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
-        external
-        pure
-        override
-        returns (bool valid)
-    {
-        // Need both funding proof and previous state for validation
-        if (proofs.length < 2) {
-            return false;
-        }
-
-        // Decode the version from the candidate state
-        Voucher memory candidateData = abi.decode(candidate.data, (Voucher));
-
-        // Get the previous state (most recent proof)
-        State memory previousState = proofs[0];
-        Voucher memory previousData = abi.decode(previousState.data, (Voucher));
-
-        // Version must increase with each allocation change
-        if (candidateData.version <= previousData.version) {
-            return false;
-        }
-
-        // Compute state hashes for verification
-        bytes32 stateHash = Utils.getStateHash(chan, candidate);
-
-        // Identify the payer (participant whose allocation is decreasing)
-        uint256 payerIndex = identifyPayer(candidate.allocations, previousState.allocations);
-
-        // Payer must have signed the candidate state
-        if (
-            candidate.sigs.length <= payerIndex
-                || !Utils.verifySignature(stateHash, candidate.sigs[payerIndex], chan.participants[payerIndex])
-        ) {
-            return false;
-        }
-
-        // All validations passed
-        return true;
     }
 }

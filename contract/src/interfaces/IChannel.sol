@@ -88,14 +88,11 @@ interface IChannel {
      * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
      * @dev Used for resizing channel allocations without withdrawing funds
      * @param channelId Unique identifier for the channel to resize
-     * @param candidate The latest known valid state for closing the current channel
-     * NOTE: no `proof` here as `adjudicate(...)` is NOT called, because candidate state does NOT contain app-specific logic
-     * TODO: On the other hand, `proof` can be used as a safeguard against an impossible resize, i.e. guaranteeing that
-     * there is enough funds in `proof` (should be state before candidate) to support the resize (delta).
-     * NOTE: while the aforementioned in NOT implemented, participants should sign the candidate with `resize` only
-     * after they have checked that the resize is possible, based on the previously known valid state.
+     * @param candidate The state that is to be true after resizing, containing the delta allocations
+     * @param proofs An array of states supporting the claim that the candidate is true
+     * NOTE: proofs are needed to improve UX and allow resized state to follow any state (no need for consensus)
      */
-    function resize(bytes32 channelId, State calldata candidate) external;
+    function resize(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
 
     /**
      * @notice Initiates or updates a challenge with a signed state

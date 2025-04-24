@@ -37,6 +37,7 @@ keccak256(
   abi.encode(
     channelId,
     state.data,
+    state.version,
     state.allocations
   )
 );
@@ -75,16 +76,17 @@ struct Channel {
 
 struct State {
     bytes data; // Application data encoded, decoded by the adjudicator for business logic
+    uint256 version; // State version incremental number to compare most recent
     Allocation[] allocations; // Combined asset allocation and destination for each participant
     Signature[] sigs; // stateHash signatures from participants
 }
 
 enum Status {
-    VOID,     // Channel not created
-    INITIAL,  // Creation in progress
-    ACTIVE,   // Fully funded and operational
-    DISPUTE,  // Challenge period active
-    FINAL     // Ready to be closed
+    VOID,     // Channel was not created, State.version must be 0
+    INITIAL,  // Channel is created and in funding process, State.version must be 0
+    ACTIVE,   // Channel fully funded and operational, State.version is greater than 0
+    DISPUTE,  // Challenge period is active
+    FINAL     // Final state, channel can be closed
 }
 
 // Magic numbers for funding protocol
@@ -273,6 +275,22 @@ interface IChannel {
    - Set the channel status to `ACTIVE`
    - Emit an `Opened` event with the channelId
 
+## State Versioning
+
+Each state in a channel is uniquely identified by an incremental version number, stored in the `state.version` field. This ensures proper ordering of states during challenges and checkpoints:
+
+1. When comparing two states during challenge/checkpoint operations, the system:
+   - First attempts to use the `IComparable` interface if the channel's adjudicator implements it
+   - If `IComparable` is not implemented, falls back to comparing `state.version` values directly
+   
+2. Version number rules:
+   - For channel creation, `state.version` must be 0 (corresponds to `INITIAL` status)
+   - For active channels, `state.version` must be greater than 0
+   - Each new state should have a higher version number than the previous state
+   - Higher version numbers indicate more recent states
+
+This approach ensures that the most recent valid state always prevails during dispute resolution.
+
 ## Channel Closure
 
 ### Cooperative Close
@@ -303,7 +321,7 @@ interface IChannel {
 
 3. During the challenge period, any participant may:
    - Submit a more recent valid state by calling `challenge` again
-   - If the new state is valid and more recent, the system must update the stored state and reset the challenge period
+   - If the new state is valid and more recent (determined by comparing version numbers or using IComparable), the system must update the stored state and reset the challenge period
 
 4. After the challenge period expires, any participant may call `close` to distribute funds according to the last valid challenged state
 
@@ -314,7 +332,7 @@ interface IChannel {
 
 2. The system must:
    - Verify the submitted state via the adjudicator
-   - If valid and more recent, store the state without starting a challenge period
+   - If valid and more recent (determined by comparing version numbers or using IComparable), store the state without starting a challenge period
    - Emit a `Checkpointed` event with the channelId
 
 ## Project Structure

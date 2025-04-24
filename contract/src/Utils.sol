@@ -25,11 +25,11 @@ library Utils {
      * @param ch The channel struct
      * @param state The state struct
      * @return The state hash as bytes32
-     * @dev The state hash is computed according to the specification in the README, using channelId, data, and allocations
+     * @dev The state hash is computed according to the specification in the README, using channelId, data, version, and allocations
      */
     function getStateHash(Channel memory ch, State memory state) internal pure returns (bytes32) {
         bytes32 channelId = getChannelId(ch);
-        return keccak256(abi.encode(channelId, state.data, state.allocations));
+        return keccak256(abi.encode(channelId, state.data, state.version, state.allocations));
     }
 
     /**

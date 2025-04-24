@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
+/**
+ * @notice State version convention used in tests:
+ * - Version 0: Initial state during channel creation (required for INITIAL state)
+ * - Version 41: State before resize operation
+ * - Version 42: Resize state
+ * - Version 43: State after resize operation
+ * - Version 55: Checkpoint state
+ * - Version 97: Challenge state
+ * - Version 98: Counter-challenge state
+ * - Version 100: Closing state
+ */
 import {Test, console} from "lib/forge-std/src/Test.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 
@@ -133,6 +144,7 @@ contract CustodyTest is Test {
         // Create unsigned state
         return State({
             data: data,
+            version: 0, // Initial state has version 0
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -153,6 +165,7 @@ contract CustodyTest is Test {
         // Create unsigned state
         return State({
             data: data,
+            version: 0, // Initial state has version 0
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -173,6 +186,7 @@ contract CustodyTest is Test {
         // Create unsigned state
         return State({
             data: data,
+            version: 0, // Initial state has version 0
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -193,6 +207,7 @@ contract CustodyTest is Test {
         // Create unsigned state
         return State({
             data: data,
+            version: 0, // Initial state has version 0
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -371,6 +386,7 @@ contract CustodyTest is Test {
 
         // 2. Create a final state that both participants sign
         State memory finalState = createClosingState();
+        finalState.version = 100; // Version 100 indicates a closing state
 
         // Both sign the final state
         hostSig = signState(chan, finalState, hostPrivKey);
@@ -446,6 +462,60 @@ contract CustodyTest is Test {
 
     // ==== 3. Challenge Mechanism ====
 
+    function test_RejectEqualVersionChallenge() public {
+        // 1. Create and fund a channel
+        Channel memory chan = createTestChannel();
+        State memory initialState = createInitialState();
+
+        // Set up signatures
+        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature[] memory hostSigs = new Signature[](1);
+        hostSigs[0] = hostSig;
+        initialState.sigs = hostSigs;
+
+        // Create channel with host
+        depositTokens(host, DEPOSIT_AMOUNT * 2);
+        vm.prank(host);
+        bytes32 channelId = custody.create(chan, initialState);
+
+        // Guest joins the channel
+        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
+        depositTokens(guest, DEPOSIT_AMOUNT * 2);
+        vm.prank(guest);
+        custody.join(channelId, 1, guestSig);
+
+        // 2. Create and submit first challenge state
+        State memory challengeState = initialState;
+        challengeState.data = abi.encode(42);
+        challengeState.version = 97; // Version 97 indicates a challenge state
+
+        // Host signs the challenge state
+        Signature memory hostChallengeSig = signState(chan, challengeState, hostPrivKey);
+        Signature[] memory challengeSigs = new Signature[](1);
+        challengeSigs[0] = hostChallengeSig;
+        challengeState.sigs = challengeSigs;
+
+        // Submit first challenge
+        vm.prank(host);
+        custody.challenge(channelId, challengeState, new State[](0));
+
+        // 3. Create a new challenge state with the same version number
+        State memory sameVersionChallenge = initialState;
+        sameVersionChallenge.data = abi.encode(43); // Different data but same version
+        sameVersionChallenge.version = 97; // Same version as previous challenge (97)
+
+        // Host signs the same version challenge
+        Signature memory hostSameVersionSig = signState(chan, sameVersionChallenge, hostPrivKey);
+        Signature[] memory sameVersionSigs = new Signature[](1);
+        sameVersionSigs[0] = hostSameVersionSig;
+        sameVersionChallenge.sigs = sameVersionSigs;
+
+        // 4. Try to challenge with the same version - should revert
+        vm.prank(host);
+        vm.expectRevert(Custody.InvalidState.selector);
+        custody.challenge(channelId, sameVersionChallenge, new State[](0));
+    }
+
     function test_ChannelChallenge() public {
         // 1. Create and fund a channel
         Channel memory chan = createTestChannel();
@@ -471,6 +541,7 @@ contract CustodyTest is Test {
         // 2. Create a challenge state
         State memory challengeState = initialState;
         challengeState.data = abi.encode(42);
+        challengeState.version = 97; // Version 97 indicates a challenge state
 
         // Host signs the challenge state
         Signature memory hostChallengeSig = signState(chan, challengeState, hostPrivKey);
@@ -482,9 +553,10 @@ contract CustodyTest is Test {
         vm.prank(host);
         custody.challenge(channelId, challengeState, new State[](0));
 
-        // 4. Create a counter-challenge state (more signatures = "newer")
+        // 4. Create a counter-challenge state
         State memory counterChallengeState = initialState;
         counterChallengeState.data = abi.encode(4242);
+        counterChallengeState.version = 98; // Higher version than the challenge state (97)
 
         // Both sign the counter-challenge
         Signature memory hostCounterSig = signState(chan, counterChallengeState, hostPrivKey);
@@ -541,6 +613,7 @@ contract CustodyTest is Test {
         // 2. Try to challenge with invalid state (adjudicator rejects)
         State memory invalidState = initialState;
         invalidState.data = abi.encode(42);
+        invalidState.version = 97; // Version 97 indicates a challenge state (but will be rejected)
         adjudicator.setFlag(false); // Set flag to false for invalid state
 
         // Host signs the invalid state
@@ -564,6 +637,66 @@ contract CustodyTest is Test {
     }
 
     // ==== 4. Checkpoint Mechanism ====
+
+    function test_RejectEqualVersion() public {
+        // 1. Create and fund a channel
+        Channel memory chan = createTestChannel();
+        State memory initialState = createInitialState();
+
+        // Set up signatures
+        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature[] memory hostSigs = new Signature[](1);
+        hostSigs[0] = hostSig;
+        initialState.sigs = hostSigs;
+
+        // Create channel with host
+        depositTokens(host, DEPOSIT_AMOUNT * 2);
+        vm.prank(host);
+        bytes32 channelId = custody.create(chan, initialState);
+
+        // Guest joins the channel
+        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
+        depositTokens(guest, DEPOSIT_AMOUNT * 2);
+        vm.prank(guest);
+        custody.join(channelId, 1, guestSig);
+
+        // 2. Create a checkpoint state
+        State memory checkpointState = initialState;
+        checkpointState.data = abi.encode(42);
+        checkpointState.version = 55; // Version 55 indicates a checkpoint state
+
+        // Both sign the checkpoint state
+        Signature memory hostCheckpointSig = signState(chan, checkpointState, hostPrivKey);
+        Signature memory guestCheckpointSig = signState(chan, checkpointState, guestPrivKey);
+
+        Signature[] memory checkpointSigs = new Signature[](2);
+        checkpointSigs[0] = hostCheckpointSig;
+        checkpointSigs[1] = guestCheckpointSig;
+        checkpointState.sigs = checkpointSigs;
+
+        // 3. Checkpoint the state
+        vm.prank(host);
+        custody.checkpoint(channelId, checkpointState, new State[](0));
+
+        // 4. Create a new state with the same version number
+        State memory sameVersionState = initialState;
+        sameVersionState.data = abi.encode(56); // Different data but same version
+        sameVersionState.version = 55; // Same version as previous checkpoint (55)
+
+        // Both sign the new state
+        Signature memory hostSameVersionSig = signState(chan, sameVersionState, hostPrivKey);
+        Signature memory guestSameVersionSig = signState(chan, sameVersionState, guestPrivKey);
+
+        Signature[] memory sameVersionSigs = new Signature[](2);
+        sameVersionSigs[0] = hostSameVersionSig;
+        sameVersionSigs[1] = guestSameVersionSig;
+        sameVersionState.sigs = sameVersionSigs;
+
+        // 5. Try to checkpoint with the same version - should revert
+        vm.prank(host);
+        vm.expectRevert(Custody.InvalidState.selector);
+        custody.checkpoint(channelId, sameVersionState, new State[](0));
+    }
 
     function test_Checkpoint() public {
         // 1. Create and fund a channel
@@ -590,6 +723,7 @@ contract CustodyTest is Test {
         // 2. Create a new state to checkpoint
         State memory checkpointState = initialState;
         checkpointState.data = abi.encode(42);
+        checkpointState.version = 55; // Version 55 indicates a checkpoint state
 
         // Both sign the checkpoint state
         Signature memory hostCheckpointSig = signState(chan, checkpointState, hostPrivKey);
@@ -607,6 +741,7 @@ contract CustodyTest is Test {
         // 4. Start a challenge with single-signed state
         State memory challengeState = initialState;
         challengeState.data = abi.encode(21);
+        challengeState.version = 97; // Version 97 indicates a challenge state (higher than checkpoint's 55)
         Signature memory hostChallengeSig = signState(chan, challengeState, hostPrivKey);
         Signature[] memory challengeSigs = new Signature[](1);
         challengeSigs[0] = hostChallengeSig;
@@ -615,15 +750,29 @@ contract CustodyTest is Test {
         vm.prank(host);
         custody.challenge(channelId, challengeState, new State[](0));
 
-        // 5. Checkpoint should resolve the challenge
+        // 5. Checkpoint should resolve the challenge with a higher version state
+        State memory resolveState = initialState;
+        resolveState.data = abi.encode(42);
+        resolveState.version = 98; // Even higher version to resolve the challenge
+
+        // Both sign the resolve state
+        Signature memory hostResolveSignature = signState(chan, resolveState, hostPrivKey);
+        Signature memory guestResolveSignature = signState(chan, resolveState, guestPrivKey);
+
+        Signature[] memory resolveSignatures = new Signature[](2);
+        resolveSignatures[0] = hostResolveSignature;
+        resolveSignatures[1] = guestResolveSignature;
+        resolveState.sigs = resolveSignatures;
+
         vm.prank(guest);
-        custody.checkpoint(channelId, checkpointState, new State[](0));
+        custody.checkpoint(channelId, resolveState, new State[](0));
 
         // Close with checkpointed state
         skipChallengeTime();
 
         // Try to close normally - should succeed because challenge timer expired
         State memory closeState = createClosingState();
+        closeState.version = 100; // Version 100 indicates a closing state
         // Add signatures
         Signature memory hostCloseSig = signState(chan, closeState, hostPrivKey);
         Signature memory guestCloseSig = signState(chan, closeState, guestPrivKey);
@@ -694,8 +843,27 @@ contract CustodyTest is Test {
         assertEq(guestLocked, DEPOSIT_AMOUNT, "Guest's initial locked tokens should be DEPOSIT_AMOUNT");
         assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest's initial available tokens should be DEPOSIT_AMOUNT");
 
+        // 1.2 Create a state before resize
+        State memory beforeResizeState = initialState;
+        beforeResizeState.data = abi.encode(41); // Simple application data
+        beforeResizeState.version = 41; // Version 41 indicates state before resize
+
+        // Both sign the state before resize
+        Signature memory hostBeforeSig = signState(chan, beforeResizeState, hostPrivKey);
+        Signature memory guestBeforeSig = signState(chan, beforeResizeState, guestPrivKey);
+
+        Signature[] memory beforeSigs = new Signature[](2);
+        beforeSigs[0] = hostBeforeSig;
+        beforeSigs[1] = guestBeforeSig;
+        beforeResizeState.sigs = beforeSigs;
+
+        // Checkpoint the state before resize
+        vm.prank(host);
+        custody.checkpoint(channelId, beforeResizeState, new State[](0));
+
         // 2. Create a resize state with CHANRESIZE magic number
         State memory resizeState = initialState;
+        resizeState.version = 42; // Version 42 indicates a resize state
 
         // Create resize data with magic number and resize amounts
         int256[] memory resizeAmounts = new int256[](2);
@@ -730,6 +898,28 @@ contract CustodyTest is Test {
 
         assertEq(hostLocked, DEPOSIT_AMOUNT * 2, "Host's locked tokens should be doubled");
         assertEq(guestLocked, DEPOSIT_AMOUNT / 2, "Guest's locked tokens should be halved");
+
+        // 4.1 Create a state after resize
+        State memory afterResizeState = initialState;
+        afterResizeState.data = abi.encode(43); // Simple application data
+        afterResizeState.version = 43; // Version 43 indicates state after resize
+
+        // Update allocations to match the resize results
+        afterResizeState.allocations[0].amount = DEPOSIT_AMOUNT * 2;
+        afterResizeState.allocations[1].amount = DEPOSIT_AMOUNT / 2;
+
+        // Both sign the state after resize
+        Signature memory hostAfterSig = signState(chan, afterResizeState, hostPrivKey);
+        Signature memory guestAfterSig = signState(chan, afterResizeState, guestPrivKey);
+
+        Signature[] memory afterSigs = new Signature[](2);
+        afterSigs[0] = hostAfterSig;
+        afterSigs[1] = guestAfterSig;
+        afterResizeState.sigs = afterSigs;
+
+        // Checkpoint the state after resize
+        vm.prank(host);
+        custody.checkpoint(channelId, afterResizeState, new State[](0));
 
         // 5. Verify guest can withdrawn the unlocked tokens
         assertEq(guestAvailable, DEPOSIT_AMOUNT * 3 / 2, "Guest should have 3/2x initial amount available");
@@ -798,6 +988,7 @@ contract CustodyTest is Test {
         // 8. Create a checkpoint state
         State memory checkpointState = initialState;
         checkpointState.data = abi.encode(42);
+        checkpointState.version = 55; // Version 55 indicates a checkpoint state
 
         // Both participants sign the checkpoint state
         Signature memory hostPartCheckpointSig = signState(chan, checkpointState, hostParticipantPrivKey);
@@ -814,6 +1005,7 @@ contract CustodyTest is Test {
 
         // 10. Create a closing state
         State memory finalState = createClosingStateWithParticipants();
+        finalState.version = 100; // Version 100 indicates a closing state
         finalState.allocations[0].destination = depositor;
 
         // Both participants sign the final state

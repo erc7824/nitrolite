@@ -52,6 +52,7 @@ struct Channel {
  */
 struct State {
     bytes data; // Application data encoded, decoded by the adjudicator for business logic
+    uint256 version; // State version incremental number to compare most recent
     Allocation[] allocations; // Combined asset allocation and destination for each participant
     Signature[] sigs; // stateHash signatures from participants
 }
@@ -61,15 +62,15 @@ struct State {
  * @dev Tracks the current state of a channel
  */
 enum Status {
-    VOID, // Channel was not created
-    INITIAL, // Channel is created and in funding process
-    ACTIVE, // Channel fully funded and operational
+    VOID, // Channel was not created, State.version must be 0
+    INITIAL, // Channel is created and in funding process, State.version must be 0
+    ACTIVE, // Channel fully funded and operational, State.version is greater than 0
     DISPUTE, // Challenge period is active
     FINAL // Final state, channel can be closed
 
 }
 
 // Magic numbers for funding protocol
-uint32 constant CHANOPEN = 7877; // State.data value for funding stateHash
+uint32 constant CHANOPEN = 7877; // State.data value for funding stateHash, State.version must be 0
 uint32 constant CHANCLOSE = 7879; // State.data value for closing stateHash
 uint32 constant CHANRESIZE = 7883; // State.data value for resize stateHash

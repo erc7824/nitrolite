@@ -139,6 +139,9 @@ contract Custody is IChannel, IDeposit {
         // TODO: replace with `require(...)`
         if (magicNumber != CHANOPEN) revert InvalidState();
 
+        // Validate version must be 0 for INITIAL state
+        if (initial.version != 0) revert InvalidState();
+
         // Generate channel ID and check it doesn't exist
         channelId = Utils.getChannelId(ch);
         if (_channels[channelId].stage != Status.VOID) revert InvalidStatus();
@@ -261,6 +264,9 @@ contract Custody is IChannel, IDeposit {
             (uint32 magicNumber) = abi.decode(candidate.data, (uint32));
             if (magicNumber != CHANCLOSE) revert InvalidState();
 
+            // For ACTIVE channels, version must be greater than 0
+            if (candidate.version == 0) revert InvalidState();
+
             // Verify all participants have signed the closing state
             // For our 2-participant channels, we need exactly 2 signatures
             if (candidate.sigs.length != 2) revert InvalidStateSignatures();
@@ -316,6 +322,10 @@ contract Custody is IChannel, IDeposit {
         // Verify that at least one participant signed the state
         if (candidate.sigs.length == 0) revert InvalidStateSignatures();
 
+        // Validate version based on channel status
+        if (meta.stage == Status.INITIAL && candidate.version != 0) revert InvalidState();
+        if (meta.stage == Status.ACTIVE && candidate.version == 0) revert InvalidState();
+
         uint32 magicNumber = 0;
 
         if (candidate.data.length != 0) {
@@ -337,6 +347,12 @@ contract Custody is IChannel, IDeposit {
             // Verify the state is valid according to the adjudicator
             bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
             if (!isValid) revert InvalidState();
+
+            // Reject states with equal version
+            if (candidate.version == meta.lastValidState.version) {
+                // Explicitly check for equal versions and reject them
+                revert InvalidState();
+            }
 
             // Revert if trying to challenge with an older state that is already known
             if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
@@ -371,11 +387,20 @@ contract Custody is IChannel, IDeposit {
         // Verify that at least one participant signed the state
         if (candidate.sigs.length == 0) revert InvalidStateSignatures();
 
+        // Validate version based on channel status
+        if (meta.stage == Status.INITIAL && candidate.version != 0) revert InvalidState();
+        if (meta.stage == Status.ACTIVE && candidate.version == 0) revert InvalidState();
+
         // Verify the state is valid according to the adjudicator
         bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
         if (!isValid) revert InvalidState();
 
         // Verify this state is more recent than the current stored state
+        if (candidate.version == meta.lastValidState.version) {
+            // Explicitly check for equal versions and reject them
+            revert InvalidState();
+        }
+
         if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
             revert InvalidState();
         }
@@ -403,6 +428,9 @@ contract Custody is IChannel, IDeposit {
         // Verify channel exists and is ACTIVE
         if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
         if (meta.stage != Status.ACTIVE) revert InvalidStatus();
+
+        // For ACTIVE channels, version must be greater than 0
+        if (candidate.version == 0) revert InvalidState();
 
         _requireCorrectAllocations(candidate.allocations);
 
@@ -528,14 +556,24 @@ contract Custody is IChannel, IDeposit {
      * @param adjudicator The adjudicator contract address
      * @param candidate The candidate state
      * @param previous The previous state to compare against
-     * @return True if the candidate state is more recent than the previous state
+     * @return True if the candidate state is strictly more recent than the previous state
+     * @dev Returns false if states have equal version numbers or if candidate is older
      */
     function _isMoreRecent(address adjudicator, State calldata candidate, State memory previous)
         internal
         view
         returns (bool)
     {
-        return IComparable(adjudicator).compare(candidate, previous) > 0;
+        // TODO: add support to ERC-165
+        // Try to use IComparable if the adjudicator implements it
+        try IComparable(adjudicator).compare(candidate, previous) returns (int8 result) {
+            // Must return strictly positive result (>0), equal versions (==0) are not considered more recent
+            return result > 0;
+        } catch {
+            // If IComparable is not implemented, fall back to comparing version numbers
+            // Must be strictly greater, equal versions are not considered more recent
+            return candidate.version > previous.version;
+        }
     }
 
     function _requireCorrectDelta(

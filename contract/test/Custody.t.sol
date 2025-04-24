@@ -843,50 +843,58 @@ contract CustodyTest is Test {
         assertEq(guestLocked, DEPOSIT_AMOUNT, "Guest's initial locked tokens should be DEPOSIT_AMOUNT");
         assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest's initial available tokens should be DEPOSIT_AMOUNT");
 
-        // 1.2 Create a state before resize
-        State memory beforeResizeState = initialState;
-        beforeResizeState.data = abi.encode(41); // Simple application data
-        beforeResizeState.version = 41; // Version 41 indicates state before resize
+        // 1.2 Create a state before resize (preceding state)
+        State memory precedingState = State({
+            data: abi.encode(41), // Simple application data
+            version: 41, // Version 41 indicates state before resize
+            allocations: initialState.allocations,
+            sigs: new Signature[](0) // Empty initially
+        });
 
-        // Both sign the state before resize
-        Signature memory hostBeforeSig = signState(chan, beforeResizeState, hostPrivKey);
-        Signature memory guestBeforeSig = signState(chan, beforeResizeState, guestPrivKey);
+        // If adjudicator allows, then only one can sign the preceding state
+        Signature memory hostPrecedingSig = signState(chan, precedingState, hostPrivKey);
 
-        Signature[] memory beforeSigs = new Signature[](2);
-        beforeSigs[0] = hostBeforeSig;
-        beforeSigs[1] = guestBeforeSig;
-        beforeResizeState.sigs = beforeSigs;
+        Signature[] memory precedingSigs = new Signature[](1);
+        precedingSigs[0] = hostPrecedingSig;
+        precedingState.sigs = precedingSigs;
 
-        // Checkpoint the state before resize
-        vm.prank(host);
-        custody.checkpoint(channelId, beforeResizeState, new State[](0));
-
-        // 2. Create a resize state with CHANRESIZE magic number
-        State memory resizeState = initialState;
-        resizeState.version = 42; // Version 42 indicates a resize state
-
+        // 2. Create a resize state with CHANRESIZE magic number (resized state)
         // Create resize data with magic number and resize amounts
         int256[] memory resizeAmounts = new int256[](2);
-        resizeAmounts[0] = int256(DEPOSIT_AMOUNT); // Increase host's deposit by DEPOSIT_AMOUNT
-        resizeAmounts[1] = -int256(DEPOSIT_AMOUNT / 2); // Decrease guest's deposit by DEPOSIT_AMOUNT/2
-        resizeState.data = abi.encode(CHANRESIZE, resizeAmounts);
+        int256 resizeHostDelta = int256(DEPOSIT_AMOUNT / 2); // add DEPOSIT_AMOUNT / 2 to host's deposit
+        int256 resizeGuestDelta = -int256(DEPOSIT_AMOUNT / 2); // withdraw DEPOSIT_AMOUNT / 2 from guest's deposit
+        resizeAmounts[0] = resizeHostDelta; // Increase host's deposit by corresponding amount
+        resizeAmounts[1] = resizeGuestDelta; // Decrease guest's deposit by corresponding amount
+
+        State memory resizedState = State({
+            data: abi.encode(CHANRESIZE, resizeAmounts),
+            version: 42, // Version 42 indicates a resize state
+            allocations: new Allocation[](2),
+            sigs: new Signature[](0) // Empty initially
+        });
+
+        uint256 resizedHostLockedBalance = uint256(int256(DEPOSIT_AMOUNT) + resizeHostDelta);
+        uint256 resizedGuestLockedBalance = uint256(int256(DEPOSIT_AMOUNT) + resizeGuestDelta);
 
         // Update allocations to match the resize
-        resizeState.allocations[0].amount = DEPOSIT_AMOUNT * 2; // Host now has 2x initial amount
-        resizeState.allocations[1].amount = DEPOSIT_AMOUNT / 2; // Guest now has half initial amount
+        resizedState.allocations[0].amount = resizedHostLockedBalance; // Host now has updated amount
+        resizedState.allocations[1].amount = resizedGuestLockedBalance; // Guest now has updated amount
 
-        // Both sign the resize state
-        Signature memory hostResizeSig = signState(chan, resizeState, hostPrivKey);
-        Signature memory guestResizeSig = signState(chan, resizeState, guestPrivKey);
+        // Both sign the resized state
+        Signature memory hostResizeSig = signState(chan, resizedState, hostPrivKey);
+        Signature memory guestResizeSig = signState(chan, resizedState, guestPrivKey);
 
         Signature[] memory resizeSigs = new Signature[](2);
         resizeSigs[0] = hostResizeSig;
         resizeSigs[1] = guestResizeSig;
-        resizeState.sigs = resizeSigs;
+        resizedState.sigs = resizeSigs;
 
-        // 3. Resize the channel
+        // Define empty preceding proof
+        State[] memory precedingProof = new State[](0);
+
+        // 3. Resize the channel with the new interface
         vm.prank(host);
-        custody.resize(channelId, resizeState);
+        custody.resize(channelId, precedingState, precedingProof, resizedState);
 
         // 4. Verify channel has been resized correctly
         bytes32[] memory hostChannels = custody.getAccountChannels(host);
@@ -896,8 +904,8 @@ contract CustodyTest is Test {
         (, hostLocked,) = custody.getAccountInfo(host, address(token));
         (guestAvailable, guestLocked,) = custody.getAccountInfo(guest, address(token));
 
-        assertEq(hostLocked, DEPOSIT_AMOUNT * 2, "Host's locked tokens should be doubled");
-        assertEq(guestLocked, DEPOSIT_AMOUNT / 2, "Guest's locked tokens should be halved");
+        assertEq(hostLocked, resizedHostLockedBalance, "Host's locked tokens should be doubled");
+        assertEq(guestLocked, resizedGuestLockedBalance, "Guest's locked tokens should be halved");
 
         // 4.1 Create a state after resize
         State memory afterResizeState = initialState;
@@ -905,8 +913,8 @@ contract CustodyTest is Test {
         afterResizeState.version = 43; // Version 43 indicates state after resize
 
         // Update allocations to match the resize results
-        afterResizeState.allocations[0].amount = DEPOSIT_AMOUNT * 2;
-        afterResizeState.allocations[1].amount = DEPOSIT_AMOUNT / 2;
+        afterResizeState.allocations[0].amount = resizedHostLockedBalance;
+        afterResizeState.allocations[1].amount = resizedGuestLockedBalance;
 
         // Both sign the state after resize
         Signature memory hostAfterSig = signState(chan, afterResizeState, hostPrivKey);
@@ -921,18 +929,32 @@ contract CustodyTest is Test {
         vm.prank(host);
         custody.checkpoint(channelId, afterResizeState, new State[](0));
 
-        // 5. Verify guest can withdrawn the unlocked tokens
-        assertEq(guestAvailable, DEPOSIT_AMOUNT * 3 / 2, "Guest should have 3/2x initial amount available");
-        vm.prank(guest);
-        custody.withdraw(address(token), DEPOSIT_AMOUNT / 2);
+        // 5. Check available and locked balances after resize
+        (uint256 hostAvailable,,) = custody.getAccountInfo(host, address(token));
+        // Use hostLocked that was already declared above
+        (, hostLocked,) = custody.getAccountInfo(host, address(token));
         (guestAvailable, guestLocked,) = custody.getAccountInfo(guest, address(token));
-        assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest should have DEPOSIT_AMOUNT available after withdrawal");
-        assertEq(guestLocked, DEPOSIT_AMOUNT / 2, "Guest should still have DEPOSIT_AMOUNT/2 locked");
 
+        assertEq(hostAvailable, DEPOSIT_AMOUNT * 2 - resizedHostLockedBalance, "Host's available balance should be correctly updated");
+        assertEq(hostLocked, resizedHostLockedBalance, "Host's locked tokens should be correctly updated");
+
+        assertEq(guestAvailable, DEPOSIT_AMOUNT * 2 - resizedGuestLockedBalance, "Guest's available balance should be correctly updated");
+        assertEq(guestLocked, resizedGuestLockedBalance, "Guest's locked tokens should be correctly updated");
+
+        uint256 absResizeGuestDelta = uint256(resizeGuestDelta > 0 ? resizeGuestDelta : -resizeGuestDelta);
+
+        // Verify guest can withdraw some of the unlocked tokens
+        vm.prank(guest);
+        custody.withdraw(address(token), absResizeGuestDelta);
+
+        // Check balances after withdrawal
+        (guestAvailable, guestLocked,) = custody.getAccountInfo(guest, address(token));
+        assertEq(guestAvailable,  DEPOSIT_AMOUNT * 2 - resizedGuestLockedBalance - absResizeGuestDelta, "Guest should have correct available balance after withdrawal");
+        assertEq(guestLocked, resizedGuestLockedBalance, "Guest's locked tokens should remain unchanged");
+
+        // Check actual token balance
         uint256 guestBalance = token.balanceOf(guest);
-        assertEq(
-            guestBalance, INITIAL_BALANCE - DEPOSIT_AMOUNT * 3 / 2, "Guest should have correct tokens after withdrawal"
-        );
+        assertEq(guestBalance, INITIAL_BALANCE - DEPOSIT_AMOUNT * 2 + absResizeGuestDelta, "Guest should have correct token balance after deposits and withdrawal");
     }
 
     // ==== 7. Separate Depositor and Participant Addresses ====

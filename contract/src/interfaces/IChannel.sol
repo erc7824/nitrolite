@@ -88,12 +88,11 @@ interface IChannel {
      * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
      * @dev Used for resizing channel allocations without withdrawing funds
      * @param channelId Unique identifier for the channel to resize
-     * @param preceding The state preceding the resized state, i.e. with initial allocations
-     * @param precedingProof States preceding the one before the resized state, comprising the proof
-     * NOTE: preceding proof is needed to improve UX and allow resized state to follow any state (no need for consensus)
-     * @param resized The state that is to be true after resizing, containing the delta allocations
+     * @param candidate The state that is to be true after resizing, containing the delta allocations
+     * @param proofs An array of states supporting the claim that the candidate is true
+     * NOTE: proofs are needed to improve UX and allow resized state to follow any state (no need for consensus)
      */
-    function resize(bytes32 channelId, State calldata preceding, State[] calldata precedingProof, State calldata resized) external;
+    function resize(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
 
     /**
      * @notice Initiates or updates a challenge with a signed state

@@ -210,11 +210,14 @@ interface IChannel {
      * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
      * @dev Used for resizing channel allocations without withdrawing funds
      * @param channelId Unique identifier for the channel to resize
-     * @param candidate The latest known valid state for closing the current channel
+     * @param candidate The state that is to be true after resizing, containing the delta allocations
+     * @param proofs An array of states supporting the claim that the candidate is true
+     * NOTE: proof is needed to improve UX and allow resized state to follow any state (no need for consensus)
      */
     function resize(
         bytes32 channelId,
-        State calldata candidate
+        State calldata candidate,
+        State[] calldata proofs
     ) external;
 
     /**
@@ -282,7 +285,6 @@ Each state in a channel is uniquely identified by an incremental version number,
 1. When comparing two states during challenge/checkpoint operations, the system:
    - First attempts to use the `IComparable` interface if the channel's adjudicator implements it
    - If `IComparable` is not implemented, falls back to comparing `state.version` values directly
-   
 2. Version number rules:
    - For channel creation, `state.version` must be 0 (corresponds to `INITIAL` status)
    - For active channels, `state.version` must be greater than 0
@@ -337,7 +339,7 @@ This approach ensures that the most recent valid state always prevails during di
 
 ## Project Structure
 
-```
+```txt
 src
 ├── Custody.sol
 ├── Utils.sol

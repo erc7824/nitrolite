@@ -890,11 +890,12 @@ contract CustodyTest is Test {
         resizedState.sigs = resizeSigs;
 
         // Define empty preceding proof
-        State[] memory precedingProof = new State[](0);
+        State[] memory proof = new State[](1);
+        proof[0] = precedingState;
 
         // 3. Resize the channel with the new interface
         vm.prank(host);
-        custody.resize(channelId, precedingState, precedingProof, resizedState);
+        custody.resize(channelId, resizedState, proof);
 
         // 4. Verify channel has been resized correctly
         bytes32[] memory hostChannels = custody.getAccountChannels(host);

@@ -421,41 +421,48 @@ contract Custody is IChannel, IDeposit {
      * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
      * @dev Used for resizing channel allocations without withdrawing funds
      * @param channelId Unique identifier for the channel to resize
-     * @param preceding The state preceding the resized state, i.e. with initial allocations
-     * @param precedingProof States preceding the one before the resized state, comprising the proof
-     * @param resized The state that is to be true after resizing, containing the delta allocations
-     * NOTE: no `proof` here as `adjudicate(...)` is NOT called, because candidate state does NOT contain app-specific logic
+     * @param candidate The state that is to be true after resizing, containing the delta allocations
+     * @param proofs An array of states supporting the claim that the candidate is true
+     * NOTE: proof is needed to improve UX and allow resized state to follow any state (no need for consensus)
      */
-    function resize(bytes32 channelId, State calldata preceding, State[] calldata precedingProof, State calldata resized) external {
+    function resize(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
         Metadata storage meta = _channels[channelId];
 
         // Verify channel exists and is ACTIVE
         if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
         if (meta.stage != Status.ACTIVE) revert InvalidStatus();
 
+        if (proofs.length == 0) revert InvalidState();
+        State memory precedingState = proofs[0];
+        // NOTE: this is required as `proofs[0:]` over arrays of dynamic types (State is dynamic) is not supported by Solidity compiler as of 0.8.29.
+        State[] memory precedingProofs = new State[](proofs.length - 1);
+        for (uint256 i = 1; i < proofs.length; i++) {
+            precedingProofs[i - 1] = proofs[i];
+        }
+
         // Verify the preceding state is valid according to the adjudicator
-        bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, preceding, precedingProof);
+        bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, precedingState, precedingProofs);
         if (!isValid) revert InvalidState();
 
         // resized state should be the successor of the preceding state
-        if (resized.version != preceding.version + 1) revert InvalidState();
+        if (candidate.version != precedingState.version + 1) revert InvalidState();
 
-        _requireCorrectAllocations(resized.allocations);
+        _requireCorrectAllocations(candidate.allocations);
 
         // Verify all participants have signed the resize state
-        if (!_verifyAllSignatures(meta.chan, resized)) revert InvalidStateSignatures();
+        if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
 
         // Decode the magic number and resize amounts
-        (uint32 magicNumber, int256[] memory resizeAmounts) = abi.decode(resized.data, (uint32, int256[]));
+        (uint32 magicNumber, int256[] memory resizeAmounts) = abi.decode(candidate.data, (uint32, int256[]));
 
         if (magicNumber != CHANRESIZE) revert InvalidState();
 
-        _requireCorrectDelta(preceding.allocations, resized.allocations, resizeAmounts);
+        _requireCorrectDelta(precedingState.allocations, candidate.allocations, resizeAmounts);
 
         _processResize(channelId, meta, resizeAmounts);
 
         // Update the latest valid state
-        meta.lastValidState = resized;
+        meta.lastValidState = candidate;
 
         emit Resized(channelId, resizeAmounts);
     }

@@ -419,34 +419,43 @@ contract Custody is IChannel, IDeposit {
 
     /**
      * @notice All participants agree in setting a new allocation resulting in locking or unlocking funds
+     * @dev Used for resizing channel allocations without withdrawing funds
      * @param channelId Unique identifier for the channel to resize
-     * @param candidate The state with CHANRESIZE magic number and resize amounts
+     * @param preceding The state preceding the resized state, i.e. with initial allocations
+     * @param precedingProof States preceding the one before the resized state, comprising the proof
+     * @param resized The state that is to be true after resizing, containing the delta allocations
+     * NOTE: no `proof` here as `adjudicate(...)` is NOT called, because candidate state does NOT contain app-specific logic
      */
-    function resize(bytes32 channelId, State calldata candidate) external {
+    function resize(bytes32 channelId, State calldata preceding, State[] calldata precedingProof, State calldata resized) external {
         Metadata storage meta = _channels[channelId];
 
         // Verify channel exists and is ACTIVE
         if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
         if (meta.stage != Status.ACTIVE) revert InvalidStatus();
 
-        // For ACTIVE channels, version must be greater than 0
-        if (candidate.version == 0) revert InvalidState();
+        // Verify the preceding state is valid according to the adjudicator
+        bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, preceding, precedingProof);
+        if (!isValid) revert InvalidState();
 
-        _requireCorrectAllocations(candidate.allocations);
+        // resized state should be the successor of the preceding state
+        if (resized.version != preceding.version + 1) revert InvalidState();
+
+        _requireCorrectAllocations(resized.allocations);
 
         // Verify all participants have signed the resize state
-        if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
+        if (!_verifyAllSignatures(meta.chan, resized)) revert InvalidStateSignatures();
 
         // Decode the magic number and resize amounts
-        (uint32 magicNumber, int256[] memory resizeAmounts) = abi.decode(candidate.data, (uint32, int256[]));
+        (uint32 magicNumber, int256[] memory resizeAmounts) = abi.decode(resized.data, (uint32, int256[]));
+
         if (magicNumber != CHANRESIZE) revert InvalidState();
 
-        _requireCorrectDelta(meta.expectedDeposits, candidate.allocations, resizeAmounts);
+        _requireCorrectDelta(preceding.allocations, resized.allocations, resizeAmounts);
 
         _processResize(channelId, meta, resizeAmounts);
 
         // Update the latest valid state
-        meta.lastValidState = candidate;
+        meta.lastValidState = resized;
 
         emit Resized(channelId, resizeAmounts);
     }
@@ -577,7 +586,7 @@ contract Custody is IChannel, IDeposit {
     }
 
     function _requireCorrectDelta(
-        Amount[2] memory initialDeposit,
+        Allocation[] memory initialAllocations,
         Allocation[] memory finalAllocations,
         int256[] memory delta
     ) internal pure {
@@ -585,7 +594,7 @@ contract Custody is IChannel, IDeposit {
 
         // separately check for each participant to guarantee each of them can afford the delta
         for (uint256 i = 0; i < 2; i++) {
-            uint256 initialBalanceSum = initialDeposit[i].amount;
+            uint256 initialBalanceSum = initialAllocations[i].amount;
             int256 finalBalanceSum = int256(initialBalanceSum) + delta[i];
             uint256 candidateBalanceSum = finalAllocations[i].amount;
 

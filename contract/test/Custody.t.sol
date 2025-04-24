@@ -133,6 +133,7 @@ contract CustodyTest is Test {
         // Create unsigned state
         return State({
             data: data,
+            version: 0, // Initial state has version 0
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -153,6 +154,7 @@ contract CustodyTest is Test {
         // Create unsigned state
         return State({
             data: data,
+            version: 0, // Initial state has version 0
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -173,6 +175,7 @@ contract CustodyTest is Test {
         // Create unsigned state
         return State({
             data: data,
+            version: 0, // Initial state has version 0
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -193,6 +196,7 @@ contract CustodyTest is Test {
         // Create unsigned state
         return State({
             data: data,
+            version: 0, // Initial state has version 0
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -471,6 +475,7 @@ contract CustodyTest is Test {
         // 2. Create a challenge state
         State memory challengeState = initialState;
         challengeState.data = abi.encode(42);
+        challengeState.version = 1; // Increase version for the challenge state
 
         // Host signs the challenge state
         Signature memory hostChallengeSig = signState(chan, challengeState, hostPrivKey);
@@ -482,9 +487,10 @@ contract CustodyTest is Test {
         vm.prank(host);
         custody.challenge(channelId, challengeState, new State[](0));
 
-        // 4. Create a counter-challenge state (more signatures = "newer")
+        // 4. Create a counter-challenge state
         State memory counterChallengeState = initialState;
         counterChallengeState.data = abi.encode(4242);
+        counterChallengeState.version = 2; // Higher version than the challenge state
 
         // Both sign the counter-challenge
         Signature memory hostCounterSig = signState(chan, counterChallengeState, hostPrivKey);
@@ -541,6 +547,7 @@ contract CustodyTest is Test {
         // 2. Try to challenge with invalid state (adjudicator rejects)
         State memory invalidState = initialState;
         invalidState.data = abi.encode(42);
+        invalidState.version = 1; // Increase version for the invalid state
         adjudicator.setFlag(false); // Set flag to false for invalid state
 
         // Host signs the invalid state
@@ -590,6 +597,7 @@ contract CustodyTest is Test {
         // 2. Create a new state to checkpoint
         State memory checkpointState = initialState;
         checkpointState.data = abi.encode(42);
+        checkpointState.version = 1; // Increase version for the checkpoint state
 
         // Both sign the checkpoint state
         Signature memory hostCheckpointSig = signState(chan, checkpointState, hostPrivKey);
@@ -607,6 +615,7 @@ contract CustodyTest is Test {
         // 4. Start a challenge with single-signed state
         State memory challengeState = initialState;
         challengeState.data = abi.encode(21);
+        challengeState.version = 1; // Same version as checkpointState, so it won't override it
         Signature memory hostChallengeSig = signState(chan, challengeState, hostPrivKey);
         Signature[] memory challengeSigs = new Signature[](1);
         challengeSigs[0] = hostChallengeSig;
@@ -624,6 +633,7 @@ contract CustodyTest is Test {
 
         // Try to close normally - should succeed because challenge timer expired
         State memory closeState = createClosingState();
+        closeState.version = 2; // Higher version than both challenge and checkpoint states
         // Add signatures
         Signature memory hostCloseSig = signState(chan, closeState, hostPrivKey);
         Signature memory guestCloseSig = signState(chan, closeState, guestPrivKey);
@@ -696,6 +706,7 @@ contract CustodyTest is Test {
 
         // 2. Create a resize state with CHANRESIZE magic number
         State memory resizeState = initialState;
+        resizeState.version = 1; // Increase version for the resize state
 
         // Create resize data with magic number and resize amounts
         int256[] memory resizeAmounts = new int256[](2);
@@ -798,6 +809,7 @@ contract CustodyTest is Test {
         // 8. Create a checkpoint state
         State memory checkpointState = initialState;
         checkpointState.data = abi.encode(42);
+        checkpointState.version = 1; // Increase version for the checkpoint state
 
         // Both participants sign the checkpoint state
         Signature memory hostPartCheckpointSig = signState(chan, checkpointState, hostParticipantPrivKey);

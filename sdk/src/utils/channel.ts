@@ -28,8 +28,10 @@ export function getChannelId(channel: Channel): ChannelId {
  * @returns A unique BigInt nonce suitable for Channel.channelNonce.
  */
 export function generateChannelNonce(address?: Address): bigint {
-    const timestamp = BigInt(Date.now());
+    const timestamp = BigInt(Math.floor(Date.now() / 1000));
+
     const randomComponent = BigInt(Math.floor(Math.random() * 0xffffffff));
+
     let nonce = (timestamp << 32n) | randomComponent;
 
     if (address) {

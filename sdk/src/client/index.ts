@@ -105,7 +105,6 @@ export class NitroliteClient {
     async createChannel(params: CreateChannelParams): Promise<{ channelId: ChannelId; initialState: State; txHash: Hash }> {
         try {
             const { channel, initialState, channelId } = await _prepareAndSignInitialState(this.sharedDeps, params);
-
             const txHash = await this.nitroliteService.createChannel(channel, initialState);
 
             return { channelId, initialState, txHash };

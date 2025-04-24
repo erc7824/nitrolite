@@ -19,9 +19,10 @@ export async function _prepareAndSignInitialState(
     params: CreateChannelParams
 ): Promise<{ channel: Channel; initialState: State; channelId: ChannelId }> {
     const { initialAllocationAmounts, stateData } = params;
-    const channelNonce = generateChannelNonce();
+    const channelNonce = generateChannelNonce(deps.account.address);
 
     const participants: [Hex, Hex] = [deps.account.address, deps.addresses.guestAddress];
+    const channelParticipants: [Hex, Hex] = [deps.stateWalletClient.account.address, deps.addresses.guestAddress];
     const tokenAddress = deps.addresses.tokenAddress;
     const adjudicatorAddress = deps.addresses.adjudicators?.["default"];
     if (!adjudicatorAddress) {
@@ -38,7 +39,12 @@ export async function _prepareAndSignInitialState(
         throw new Errors.InvalidParameterError("Initial allocation amounts must be provided for both participants.");
     }
 
-    const channel: Channel = { participants, adjudicator: adjudicatorAddress, challenge: challengeDuration, nonce: channelNonce };
+    const channel: Channel = {
+        participants: channelParticipants,
+        adjudicator: adjudicatorAddress,
+        challenge: challengeDuration,
+        nonce: channelNonce,
+    };
 
     const initialAppData = stateData ?? encoders["numeric"](MAGIC_NUMBERS.OPEN);
     const channelId = getChannelId(channel);
@@ -55,7 +61,6 @@ export async function _prepareAndSignInitialState(
     const stateHash = getStateHash(channelId, stateToSign);
 
     const accountSignature = await signState(stateHash, deps.stateWalletClient.signMessage);
-
     const initialState: State = {
         ...stateToSign,
         sigs: [accountSignature],
@@ -95,10 +100,7 @@ export async function _prepareAndSignFinalState(
     // Create a new state with signatures in the requested style
     const finalStateWithSigs: State = {
         ...stateToSign,
-        sigs: [
-            accountSignature,
-            serverSignature
-        ],
+        sigs: [accountSignature, serverSignature],
     };
 
     return { finalStateWithSigs, channelId };

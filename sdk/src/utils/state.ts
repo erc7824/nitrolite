@@ -1,6 +1,5 @@
-import { keccak256, encodeAbiParameters, Address, Hex, recoverMessageAddress, numberToHex } from "viem";
-import { State, StateHash, Signature, Channel, ChannelId } from "../client/types"; // Updated import path
-import { getChannelId } from "./channel";
+import { keccak256, encodeAbiParameters, Address, Hex, recoverMessageAddress, numberToHex, parseSignature } from "viem";
+import { State, StateHash, Signature, ChannelId } from "../client/types"; // Updated import path
 import { secp256k1 } from "@noble/curves/secp256k1";
 
 /**
@@ -10,11 +9,20 @@ import { secp256k1 } from "@noble/curves/secp256k1";
  * @returns The state hash as Hex
  */
 export function getStateHash(channelId: ChannelId, state: State): StateHash {
+    console.log("State hash parameters:", channelId, state);
     const encoded = encodeAbiParameters(
         [
             { name: "channelId", type: "bytes32" },
             { name: "data", type: "bytes" },
-            { name: "allocations", type: "tuple(address destination, address token, uint256 amount)[]" },
+            {
+                name: "allocations",
+                type: "tuple[]",
+                components: [
+                    { name: "destination", type: "address" },
+                    { name: "token", type: "address" },
+                    { name: "amount", type: "uint256" },
+                ],
+            },
         ],
         [channelId, state.data, state.allocations]
     );
@@ -22,59 +30,10 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
     return keccak256(encoded);
 }
 
-type ParsedSignature = { r: Hex; s: Hex; v?: bigint | undefined; yParity?: number | undefined };
-
-/**
- * @description Parses a hex formatted signature into a structured signature.
- * (Copied from viem source for local use)
- * @param signatureHex Signature in hex format.
- * @returns The structured signature {r, s, v?, yParity?}.
- */
-export function parseSignature(signatureHex: Hex): ParsedSignature {
-    // Ensure the input is a valid hex string
-    if (!/^0x[0-9a-fA-F]*$/.test(signatureHex) || signatureHex.length !== 132) {
-        throw new Error("Invalid signature hex format");
-    }
-    try {
-        const signatureBytes = Buffer.from(signatureHex.slice(2), "hex");
-        // Use fromCompact directly on the relevant bytes (first 64 bytes for r,s)
-        const sig = secp256k1.Signature.fromCompact(signatureBytes.slice(0, 64));
-        const r = sig.r;
-        const s = sig.s;
-
-        // The last byte is yParityOrV
-        const yParityOrV = signatureBytes[64];
-
-        const [v, yParity] = (() => {
-            if (yParityOrV === 0 || yParityOrV === 1) return [undefined, yParityOrV]; // Only yParity
-            if (yParityOrV === 27) return [BigInt(yParityOrV), 0]; // v = 27, yParity = 0
-            if (yParityOrV === 28) return [BigInt(yParityOrV), 1]; // v = 28, yParity = 1
-            // Handle EIP-155 replay protected signatures (v = chainId * 2 + 35 + yParity)
-            // This basic parser might not fully handle EIP-155 decoding back to 27/28 + chainId
-            // For simplicity here, we'll assume 27/28 or 0/1 based on the copied logic
-            if (yParityOrV >= 35) {
-                const yParityEIP155 = (yParityOrV - 35) % 2;
-                return [BigInt(yParityOrV), yParityEIP155]; // Return the raw EIP-155 'v' and derived yParity
-            }
-            throw new Error(`Invalid yParityOrV value: ${yParityOrV}`);
-        })();
-
-        const result: ParsedSignature = {
-            r: numberToHex(r, { size: 32 }),
-            s: numberToHex(s, { size: 32 }),
-        };
-        if (v !== undefined) result.v = v;
-        if (yParity !== undefined) result.yParity = yParity;
-
-        return result;
-    } catch (error) {
-        throw new Error(`Failed to parse signature: ${error instanceof Error ? error.message : String(error)}`);
-    }
-}
-
 type SignMessageFn = (args: { message: { raw: Hex } | string }) => Promise<Hex>;
 
 /**
+ * Should not include prefix EIP191
  * Create a signature for a state hash using a Viem WalletClient or Account compatible signer.
  * Uses the locally defined parseSignature function.
  * @param stateHash The hash of the state to sign.
@@ -84,7 +43,7 @@ type SignMessageFn = (args: { message: { raw: Hex } | string }) => Promise<Hex>;
  */
 export async function signState(
     stateHash: StateHash,
-    signMessage: SignMessageFn // Pass the function directly
+    signMessage: SignMessageFn
 ): Promise<{
     r: Hex;
     s: Hex;

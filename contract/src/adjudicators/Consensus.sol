@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature} from "../interfaces/Types.sol";
+import {Channel, State, Allocation, Signature, CHANOPEN} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
 
 /**
@@ -13,23 +13,6 @@ import {Utils} from "../Utils.sol";
 contract Consensus is IAdjudicator {
     uint256 constant HOST = 0;
     uint256 constant GUEST = 1;
-
-    /// @notice Error thrown when signature verification fails
-    error InvalidSignature();
-
-    /// @notice Error thrown when insufficient signatures are provided
-    error InsufficientSignatures();
-
-    enum AppStatus {
-        Starting,
-        Ready,
-        Finish
-    }
-
-    struct AppData {
-        bytes appData; // Application-specific data
-        AppStatus status; // Application-specific Status
-    }
 
     /**
      * @notice Validates that the state is signed by both participants
@@ -44,41 +27,68 @@ contract Consensus is IAdjudicator {
         override
         returns (bool valid)
     {
-        // Check for insufficient signatures
-        if (candidate.sigs.length == 0) return false;
+        // FIXME: add `resize` handling
+        // NOTE: candidate is never initial state, as this can only happen during challenge or checkpoint, in which case
+        // initial state is handled in the protocol layer
+        // NOTE: However, initial state can be proofs[0], in which case it should contain signatures from all participants
+        // (which can be obtained from blockchain events as all participants are required to join the channel)
 
-        // Get the state hash for signature verification
-        bytes32 stateHash = Utils.getStateHash(chan, candidate);
-
-        // Decode application data
-        AppData memory appData = abi.decode(candidate.data, (AppData));
-
-        // Check if we have at least one signature (host)
-        // For the initial state (with no proofs)
-        if (proofs.length == 0 && appData.status == AppStatus.Starting) {
-            // Verify Host's signature (first participant)
-            if (!Utils.verifySignature(stateHash, candidate.sigs[HOST], chan.participants[HOST])) {
-                return false;
-            }
-
-            // Initial state is valid with just Host's signature
-            return true;
-        }
-
-        // For normal state transitions and final state
-        // Check if we have signatures from both participants
-
-        // Verify Host's signature (first participant)
-        if (!Utils.verifySignature(stateHash, candidate.sigs[HOST], chan.participants[HOST])) {
+        if (proofs.length != 1) {
             return false;
         }
 
-        // Verify Guest's signature (second participant)
-        if (!Utils.verifySignature(stateHash, candidate.sigs[GUEST], chan.participants[GUEST])) {
+        if (candidate.version == 1) {
+            return _validateStateTransition(candidate, proofs[0]) &&
+                    _validateInitialState(chan, proofs[0]) &&
+                    _validateStateSigs(chan, candidate);
+        }
+
+        return _validateStateTransition(candidate, proofs[0]) &&
+                _validateStateSigs(chan, proofs[0]) &&
+                _validateStateSigs(chan, candidate);
+    }
+
+
+    function _validateInitialState(Channel calldata chan, State calldata state) internal pure returns (bool) {
+        if (state.version != 0 ||  state.sigs.length != 2) {
             return false;
         }
 
-        // If both signatures are valid, the state is valid
+        uint32 magicNumber = abi.decode(state.data, (uint32));
+        if (magicNumber != CHANOPEN) {
+            return false;
+        }
+
+        // Compute the state hash for signature verification.
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+
+        return Utils.verifySignature(stateHash, state.sigs[0], chan.participants[HOST])
+            && Utils.verifySignature(stateHash, state.sigs[1], chan.participants[GUEST]);
+    }
+
+    function _validateStateTransition(State calldata candidate, State calldata previous) internal pure returns (bool) {
+        if (candidate.version != previous.version + 1) {
+            return false;
+        }
+
+        uint256 candidateSum = candidate.allocations[0].amount + candidate.allocations[1].amount;
+        uint256 previousSum = previous.allocations[0].amount + previous.allocations[1].amount;
+
+        if (candidateSum != previousSum) {
+            return false;
+        }
+
         return true;
+    }
+
+    function _validateStateSigs(Channel calldata chan, State calldata state) internal pure returns (bool) {
+        if (state.sigs.length != 2) {
+            return false;
+        }
+
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+
+        return Utils.verifySignature(stateHash, state.sigs[HOST], chan.participants[HOST]) &&
+                Utils.verifySignature(stateHash, state.sigs[GUEST], chan.participants[GUEST]);
     }
 }

@@ -47,9 +47,12 @@ contract Counter is IAdjudicator {
         // post-resize: 43. Should be signed by guest (as host was the last alone signer), but from SC perspective it should be signed by host again (as version % 2 == 1)
         // TODO: also a good idea may be to make magic number a field of state, not encoded in the data, so that initial and resize states can more easily held app-specific data
         // and "magic" states are more easily distinguishable from common ones.
-        if (proofs.length == 0) {
-            return _validateInitialState(chan, candidate);
-        }
+
+
+        // NOTE: candidate is never initial state, as this can only happen during challenge or checkpoint, in which case
+        // initial state is handled in the protocol layer
+        // NOTE: However, initial state can be proofs[0], in which case it should contain signatures from all participants
+        // (which can be obtained from blockchain events as all participants are required to join the channel)
 
         if (proofs.length != 1) {
             return false;

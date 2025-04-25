@@ -28,6 +28,25 @@ keccak256(
 );
 ```
 
+### AppId
+
+The `App` structure is the equivalent of the `Channel` type but for the off-chain realm. While channels operate on-chain with adjudicators validating state transitions, apps operate off-chain using a quorum-based consensus mechanism where participants have configurable weights toward meeting a required quorum threshold.
+
+AppId hash is computed as:
+
+```solidity
+keccak256(
+  abi.encode(
+    app.protocol,
+    app.participants,
+    app.weights,
+    app.quorum,
+    app.challenge,
+    app.nonce
+  )
+);
+```
+
 ### StateHash
 
 StateHash is used for signatures and stored in `state.sigs`:
@@ -70,6 +89,15 @@ struct Allocation {
 struct Channel {
     address[] participants; // List of participants in the channel
     address adjudicator; // Address of the contract that validates state transitions
+    uint64 challenge; // Duration in seconds for dispute resolution period
+    uint64 nonce; // Unique per channel with same participants and adjudicator
+}
+
+struct App {
+    string protocol; // String protocol/version "NitroRPC/0.2"
+    address[] participants; // Array of participants in the app
+    uint8[] weights; // Signers weights for this app [50, 50, 80, 20, 20]
+    uint64 quorum; // Example value 100 would be the signature threshold
     uint64 challenge; // Duration in seconds for dispute resolution period
     uint64 nonce; // Unique per channel with same participants and adjudicator
 }

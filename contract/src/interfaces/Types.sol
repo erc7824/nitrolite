@@ -74,3 +74,16 @@ enum Status {
 uint32 constant CHANOPEN = 7877; // State.data value for funding stateHash, State.version must be 0
 uint32 constant CHANCLOSE = 7879; // State.data value for closing stateHash
 uint32 constant CHANRESIZE = 7883; // State.data value for resize stateHash
+
+/**
+ * @notice App structure for virtual ledger layer
+ * @dev vApp definition for off-chain quorum
+ */
+struct App {
+    string protocol; // String protocol/version "NitroRPC/0.2"
+    address[] participants; // Array of participants in the app
+    uint8[] weights; // Signers weights for this app [50, 50, 80, 20, 20]
+    uint64 quorum; // Example value 100 would be the signature threshold
+    uint64 challenge; // Duration in seconds for dispute resolution period
+    uint64 nonce; // Unique per channel with same participants and adjudicator
+}

@@ -936,10 +936,18 @@ contract CustodyTest is Test {
         (, hostLocked,) = custody.getAccountInfo(host, address(token));
         (guestAvailable, guestLocked,) = custody.getAccountInfo(guest, address(token));
 
-        assertEq(hostAvailable, DEPOSIT_AMOUNT * 2 - resizedHostLockedBalance, "Host's available balance should be correctly updated");
+        assertEq(
+            hostAvailable,
+            DEPOSIT_AMOUNT * 2 - resizedHostLockedBalance,
+            "Host's available balance should be correctly updated"
+        );
         assertEq(hostLocked, resizedHostLockedBalance, "Host's locked tokens should be correctly updated");
 
-        assertEq(guestAvailable, DEPOSIT_AMOUNT * 2 - resizedGuestLockedBalance, "Guest's available balance should be correctly updated");
+        assertEq(
+            guestAvailable,
+            DEPOSIT_AMOUNT * 2 - resizedGuestLockedBalance,
+            "Guest's available balance should be correctly updated"
+        );
         assertEq(guestLocked, resizedGuestLockedBalance, "Guest's locked tokens should be correctly updated");
 
         uint256 absResizeGuestDelta = uint256(resizeGuestDelta > 0 ? resizeGuestDelta : -resizeGuestDelta);
@@ -950,12 +958,20 @@ contract CustodyTest is Test {
 
         // Check balances after withdrawal
         (guestAvailable, guestLocked,) = custody.getAccountInfo(guest, address(token));
-        assertEq(guestAvailable,  DEPOSIT_AMOUNT * 2 - resizedGuestLockedBalance - absResizeGuestDelta, "Guest should have correct available balance after withdrawal");
+        assertEq(
+            guestAvailable,
+            DEPOSIT_AMOUNT * 2 - resizedGuestLockedBalance - absResizeGuestDelta,
+            "Guest should have correct available balance after withdrawal"
+        );
         assertEq(guestLocked, resizedGuestLockedBalance, "Guest's locked tokens should remain unchanged");
 
         // Check actual token balance
         uint256 guestBalance = token.balanceOf(guest);
-        assertEq(guestBalance, INITIAL_BALANCE - DEPOSIT_AMOUNT * 2 + absResizeGuestDelta, "Guest should have correct token balance after deposits and withdrawal");
+        assertEq(
+            guestBalance,
+            INITIAL_BALANCE - DEPOSIT_AMOUNT * 2 + absResizeGuestDelta,
+            "Guest should have correct token balance after deposits and withdrawal"
+        );
     }
 
     // ==== 7. Separate Depositor and Participant Addresses ====

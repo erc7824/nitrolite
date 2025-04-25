@@ -2,8 +2,10 @@
 pragma solidity ^0.8.13;
 
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature} from "../interfaces/Types.sol";
+import {Channel, State, Allocation, Signature, CHANOPEN} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
+
+import {console} from "forge-std/console.sol";
 
 /**
  * @title Counter Adjudicator
@@ -13,30 +15,15 @@ import {Utils} from "../Utils.sol";
  *      When the counter reaches the target, the game ends with FINAL status.
  */
 contract Counter is IAdjudicator {
-    /// @notice Error thrown when signature verification fails
-    error InvalidSignature();
-    /// @notice Error thrown when turn order is violated
-    error InvalidTurn();
-    /// @notice Error thrown when the counter increment is invalid
-    error InvalidIncrement();
-    /// @notice Error thrown when counter value is invalid
-    error InvalidCounter();
-    /// @notice Error thrown when insufficient signatures are provided
-    error InsufficientSignatures();
-
     uint256 private constant HOST = 0;
     uint256 private constant GUEST = 1;
 
     /**
-     * @dev CounterApp represents the game state.
-     * @param counter Current counter value.
+     * @dev Data represents the game state.
      * @param target  Target counter value at which the game ends.
-     * @param version State version number starting from 0.
      */
-    struct CounterApp {
-        uint256 counter;
+    struct Data {
         uint256 target;
-        uint256 version;
     }
 
     /**
@@ -52,53 +39,96 @@ contract Counter is IAdjudicator {
         override
         returns (bool valid)
     {
-        // Ensure the candidate state is signed by both participants.
-        if (candidate.sigs.length != 2) {
+        // FIXME: resize state should be considered by an Adjudicator to support states coming after it, because it changes the allocations.
+        // Or another solution would be to delegate allocation handling to the protocol layer.
+        // NOTE: Another reason why Adjudicator cares about "resize" state is when it enters the states chain.
+        // However, if users sign "resize" state, then numbering becomes broken:
+        // pre-presize: 41, signed by host; resize: 42, signed unanimously;
+        // post-resize: 43. Should be signed by guest (as host was the last alone signer), but from SC perspective it should be signed by host again (as version % 2 == 1)
+        // TODO: also a good idea may be to make magic number a field of state, not encoded in the data, so that initial and resize states can more easily held app-specific data
+        // and "magic" states are more easily distinguishable from common ones.
+        if (proofs.length == 0) {
+            return _validateInitialState(chan, candidate);
+        }
+
+        if (proofs.length != 1) {
+            return false;
+        }
+
+        // for state 1+ validate it does NOT exceed the target
+        Data memory candidateData = abi.decode(candidate.data, (Data));
+        if (candidate.version > candidateData.target) {
+            return false;
+        }
+
+        if (candidate.version == 1) {
+            return _validateStateTransition(candidate, proofs[0]) &&
+                    _validateInitialState(chan, proofs[0]) &&
+                    _validateStateSig(chan, candidate);
+        }
+
+        return _validateStateTransition(candidate, proofs[0]) &&
+                _validateStateSig(chan, proofs[0]) &&
+                _validateStateSig(chan, candidate);
+    }
+
+    function _validateInitialState(Channel calldata chan, State calldata state) internal pure returns (bool) {
+        if (state.version != 0 ||  state.sigs.length != 2) {
+            return false;
+        }
+
+        (uint32 magicNumber,) = abi.decode(state.data, (uint32, Data));
+        if (magicNumber != CHANOPEN) {
             return false;
         }
 
         // Compute the state hash for signature verification.
-        bytes32 stateHash = Utils.getStateHash(chan, candidate);
+        bytes32 stateHash = Utils.getStateHash(chan, state);
 
-        // Decode the candidate state data.
-        CounterApp memory candidateState = abi.decode(candidate.data, (CounterApp));
+        return Utils.verifySignature(stateHash, state.sigs[0], chan.participants[HOST])
+            && Utils.verifySignature(stateHash, state.sigs[1], chan.participants[GUEST]);
+    }
 
-        // INITIAL STATE: version 0 requires both signatures.
-        if (candidateState.version == 0) {
-            // true if both signatures are valid
-            return Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])
-                && Utils.verifySignature(stateHash, candidate.sigs[1], chan.participants[GUEST]);
-        }
-
-        // For non-initial states, ensure a previous state is provided.
-        if (proofs.length == 0) {
+    function _validateStateTransition(State calldata candidate, State calldata previous) internal pure returns (bool) {
+        if (candidate.version != previous.version + 1) {
             return false;
         }
 
-        // Decode the previous state.
-        CounterApp memory previousState = abi.decode(proofs[0].data, (CounterApp));
+        uint256 candidateSum = candidate.allocations[0].amount + candidate.allocations[1].amount;
+        uint256 previousSum = previous.allocations[0].amount + previous.allocations[1].amount;
 
-        // Validate that the counter increment is exactly 1.
-        if (candidateState.counter != previousState.counter + 1) {
+        if (candidateSum != previousSum) {
             return false;
         }
 
-        // Validate that the version increment is exactly 1.
-        if (candidateState.version != previousState.version + 1) {
+        Data memory candidateData = abi.decode(candidate.data, (Data));
+        Data memory previousData;
+        if (previous.version == 0) {
+            // first state also contains CHANOPEN magic number
+            (, previousData) = abi.decode(previous.data, (uint32, Data));
+        } else {
+            previousData = abi.decode(previous.data, (Data));
+        }
+
+        if (candidateData.target != previousData.target) {
             return false;
         }
 
-        // Ensure the rules of the game are consistent, for simplisity.
-        if (candidateState.target != previousState.target) {
-            return false;
-        }
-
-        // Ensure the candidate counter does not exceed its target.
-        if (candidateState.counter > candidateState.target) {
-            return false;
-        }
-
-        // All validations passed.
         return true;
+    }
+
+    function _validateStateSig(Channel calldata chan, State calldata state) internal pure returns (bool) {
+        if (state.sigs.length != 1) {
+            return false;
+        }
+
+        // NOTE: 0th state is unanimously signed, 1st - by host, 2nd - by guest and so on
+        uint256 signerIdx = 0; // host signer by default
+
+        if (state.version % 2 == 0) {
+            signerIdx = 1; // guest signer
+        }
+
+        return Utils.verifySignature(Utils.getStateHash(chan, state), state.sigs[0], chan.participants[signerIdx]);
     }
 }

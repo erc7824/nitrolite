@@ -16,6 +16,8 @@
         "lint": "eslint src --ext .ts",
         "typecheck": "tsc --noEmit",
         "test": "jest",
+        "test:integration": "jest --config jest.integration.config.js",
+        "test:ci": "npm run test && npm run test:integration",
         "prepublishOnly": "npm run clean && npm run build:prod"
     },
     "keywords": [
@@ -46,6 +48,12 @@
         "viem": "^2.5.0"
     },
     "devDependencies": {
+        "@ethereumjs/blockchain": "^10.0.0",
+        "@ethereumjs/common": "^10.0.0",
+        "@ethereumjs/evm": "^10.0.0",
+        "@ethereumjs/statemanager": "^10.0.0",
+        "@ethereumjs/util": "^10.0.0",
+        "@ethereumjs/vm": "^10.0.0",
         "@types/jest": "29.5.14",
         "@types/node": "^20.10.0",
         "@typescript-eslint/eslint-plugin": "^7.0.0",

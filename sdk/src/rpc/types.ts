@@ -14,11 +14,11 @@ export type Intent = number[];
 /** Represents a cryptographic signature as a Hex string. */
 export type Signature = Hex;
 
-/** Represents the data payload within a request message: [requestId, method, params, timestamp]. */
-export type RequestData = [RequestID, string, any[], Timestamp];
+/** Represents the data payload within a request message: [requestId, method, params, timestamp?]. */
+export type RequestData = [RequestID, string, any[], Timestamp?];
 
-/** Represents the data payload within a successful response message: [requestId, method, result, timestamp]. */
-export type ResponseData = [RequestID, string, any[], Timestamp];
+/** Represents the data payload within a successful response message: [requestId, method, result, timestamp?]. */
+export type ResponseData = [RequestID, string, any[], Timestamp?];
 
 /**
  * Represents the structure of an error object within an error response payload.
@@ -27,8 +27,8 @@ export interface NitroliteRPCErrorDetail {
     error: string;
 }
 
-/** Represents the data payload for an error response: [requestId, "error", [errorDetail], timestamp]. */
-export type ErrorResponseData = [RequestID, "error", [NitroliteRPCErrorDetail], Timestamp];
+/** Represents the data payload for an error response: [requestId, "error", [errorDetail], timestamp?]. */
+export type ErrorResponseData = [RequestID, "error", [NitroliteRPCErrorDetail], Timestamp?];
 
 /** Union type for the 'res' payload, covering both success and error responses. */
 export type ResponsePayload = ResponseData | ErrorResponseData;
@@ -108,7 +108,7 @@ export interface AppDefinition {
 /**
  * Defines the parameters required for the 'create_application' RPC method.
  */
-export interface CreateApplicationRequest {
+export interface CreateAppSessionRequest {
     /** The detailed definition of the application being created. 
      * Example:
      * {
@@ -137,7 +137,7 @@ export interface CreateApplicationRequest {
 /**
  * Defines the parameters required for the 'close_application' RPC method.
  */
-export interface CloseApplicationRequest {
+export interface CloseAppSessionRequest {
     /** The unique identifier (AccountID) of the application to be closed. */
     appId: Hex;
     /** The final allocation distribution among participants upon closing the application. Order corresponds to the participants array in the application's definition. */

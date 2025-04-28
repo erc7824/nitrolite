@@ -29,7 +29,7 @@ library Utils {
      */
     function getStateHash(Channel memory ch, State memory state) internal pure returns (bytes32) {
         bytes32 channelId = getChannelId(ch);
-        return keccak256(abi.encode(channelId, state.data, state.version, state.allocations));
+        return keccak256(abi.encode(channelId, state.intent, state.version, state.data,  state.allocations));
     }
 
     /**

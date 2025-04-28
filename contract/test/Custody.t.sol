@@ -25,11 +25,9 @@ import {
     State,
     Allocation,
     Signature,
-    Status,
-    Amount,
-    CHANOPEN,
-    CHANCLOSE,
-    CHANRESIZE
+    ChannelStatus,
+    StateIntent,
+    Amount
 } from "../src/interfaces/Types.sol";
 import {Utils} from "../src/Utils.sol";
 
@@ -138,13 +136,11 @@ contract CustodyTest is Test {
 
         allocations[1] = Allocation({destination: guest, token: address(token), amount: DEPOSIT_AMOUNT});
 
-        // Create openChannel magic number data
-        bytes memory data = abi.encode(CHANOPEN);
-
-        // Create unsigned state
+        // Create unsigned state with INITIALIZE intent
         return State({
-            data: data,
+            intent: StateIntent.INITIALIZE,
             version: 0, // Initial state has version 0
+            data: bytes(""), // Empty data
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -159,13 +155,11 @@ contract CustodyTest is Test {
 
         allocations[1] = Allocation({destination: guestParticipant, token: address(token), amount: DEPOSIT_AMOUNT});
 
-        // Create openChannel magic number data
-        bytes memory data = abi.encode(CHANOPEN);
-
-        // Create unsigned state
+        // Create unsigned state with INITIALIZE intent
         return State({
-            data: data,
+            intent: StateIntent.INITIALIZE,
             version: 0, // Initial state has version 0
+            data: bytes(""), // Empty data
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -180,13 +174,11 @@ contract CustodyTest is Test {
 
         allocations[1] = Allocation({destination: guest, token: address(token), amount: DEPOSIT_AMOUNT});
 
-        // Create closeChannel magic number data
-        bytes memory data = abi.encode(CHANCLOSE);
-
-        // Create unsigned state
+        // Create unsigned state with FINALIZE intent
         return State({
-            data: data,
+            intent: StateIntent.FINALIZE,
             version: 0, // Initial state has version 0
+            data: bytes(""), // Empty data
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -201,13 +193,11 @@ contract CustodyTest is Test {
 
         allocations[1] = Allocation({destination: guestParticipant, token: address(token), amount: DEPOSIT_AMOUNT});
 
-        // Create closeChannel magic number data
-        bytes memory data = abi.encode(CHANCLOSE);
-
-        // Create unsigned state
+        // Create unsigned state with FINALIZE intent
         return State({
-            data: data,
+            intent: StateIntent.FINALIZE,
             version: 0, // Initial state has version 0
+            data: bytes(""), // Empty data
             allocations: allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -486,6 +476,7 @@ contract CustodyTest is Test {
 
         // 2. Create and submit first challenge state
         State memory challengeState = initialState;
+        challengeState.intent = StateIntent.OPERATE;
         challengeState.data = abi.encode(42);
         challengeState.version = 97; // Version 97 indicates a challenge state
 
@@ -501,6 +492,7 @@ contract CustodyTest is Test {
 
         // 3. Create a new challenge state with the same version number
         State memory sameVersionChallenge = initialState;
+        sameVersionChallenge.intent = StateIntent.OPERATE;
         sameVersionChallenge.data = abi.encode(43); // Different data but same version
         sameVersionChallenge.version = 97; // Same version as previous challenge (97)
 
@@ -540,6 +532,7 @@ contract CustodyTest is Test {
 
         // 2. Create a challenge state
         State memory challengeState = initialState;
+        challengeState.intent = StateIntent.OPERATE;
         challengeState.data = abi.encode(42);
         challengeState.version = 97; // Version 97 indicates a challenge state
 
@@ -555,6 +548,7 @@ contract CustodyTest is Test {
 
         // 4. Create a counter-challenge state
         State memory counterChallengeState = initialState;
+        counterChallengeState.intent = StateIntent.OPERATE;
         counterChallengeState.data = abi.encode(4242);
         counterChallengeState.version = 98; // Higher version than the challenge state (97)
 
@@ -612,6 +606,7 @@ contract CustodyTest is Test {
 
         // 2. Try to challenge with invalid state (adjudicator rejects)
         State memory invalidState = initialState;
+        invalidState.intent = StateIntent.OPERATE;
         invalidState.data = abi.encode(42);
         invalidState.version = 97; // Version 97 indicates a challenge state (but will be rejected)
         adjudicator.setFlag(false); // Set flag to false for invalid state
@@ -662,6 +657,7 @@ contract CustodyTest is Test {
 
         // 2. Create a checkpoint state
         State memory checkpointState = initialState;
+        checkpointState.intent = StateIntent.OPERATE;
         checkpointState.data = abi.encode(42);
         checkpointState.version = 55; // Version 55 indicates a checkpoint state
 
@@ -680,6 +676,7 @@ contract CustodyTest is Test {
 
         // 4. Create a new state with the same version number
         State memory sameVersionState = initialState;
+        sameVersionState.intent = StateIntent.OPERATE;
         sameVersionState.data = abi.encode(56); // Different data but same version
         sameVersionState.version = 55; // Same version as previous checkpoint (55)
 
@@ -722,6 +719,7 @@ contract CustodyTest is Test {
 
         // 2. Create a new state to checkpoint
         State memory checkpointState = initialState;
+        checkpointState.intent = StateIntent.OPERATE;
         checkpointState.data = abi.encode(42);
         checkpointState.version = 55; // Version 55 indicates a checkpoint state
 
@@ -740,6 +738,7 @@ contract CustodyTest is Test {
 
         // 4. Start a challenge with single-signed state
         State memory challengeState = initialState;
+        challengeState.intent = StateIntent.OPERATE;
         challengeState.data = abi.encode(21);
         challengeState.version = 97; // Version 97 indicates a challenge state (higher than checkpoint's 55)
         Signature memory hostChallengeSig = signState(chan, challengeState, hostPrivKey);
@@ -752,6 +751,7 @@ contract CustodyTest is Test {
 
         // 5. Checkpoint should resolve the challenge with a higher version state
         State memory resolveState = initialState;
+        resolveState.intent = StateIntent.OPERATE;
         resolveState.data = abi.encode(42);
         resolveState.version = 98; // Even higher version to resolve the challenge
 
@@ -845,8 +845,9 @@ contract CustodyTest is Test {
 
         // 1.2 Create a state before resize (preceding state)
         State memory precedingState = State({
-            data: abi.encode(41), // Simple application data
+            intent: StateIntent.OPERATE,
             version: 41, // Version 41 indicates state before resize
+            data: abi.encode(41), // Simple application data
             allocations: initialState.allocations,
             sigs: new Signature[](0) // Empty initially
         });
@@ -858,8 +859,8 @@ contract CustodyTest is Test {
         precedingSigs[0] = hostPrecedingSig;
         precedingState.sigs = precedingSigs;
 
-        // 2. Create a resize state with CHANRESIZE magic number (resized state)
-        // Create resize data with magic number and resize amounts
+        // 2. Create a resize state with RESIZE intent
+        // Create resize data with resize amounts
         int256[] memory resizeAmounts = new int256[](2);
         int256 resizeHostDelta = int256(DEPOSIT_AMOUNT / 2); // add DEPOSIT_AMOUNT / 2 to host's deposit
         int256 resizeGuestDelta = -int256(DEPOSIT_AMOUNT / 2); // withdraw DEPOSIT_AMOUNT / 2 from guest's deposit
@@ -867,8 +868,9 @@ contract CustodyTest is Test {
         resizeAmounts[1] = resizeGuestDelta; // Decrease guest's deposit by corresponding amount
 
         State memory resizedState = State({
-            data: abi.encode(CHANRESIZE, resizeAmounts),
+            intent: StateIntent.RESIZE,
             version: 42, // Version 42 indicates a resize state
+            data: abi.encode(resizeAmounts),
             allocations: new Allocation[](2),
             sigs: new Signature[](0) // Empty initially
         });
@@ -910,6 +912,7 @@ contract CustodyTest is Test {
 
         // 4.1 Create a state after resize
         State memory afterResizeState = initialState;
+        afterResizeState.intent = StateIntent.OPERATE;
         afterResizeState.data = abi.encode(43); // Simple application data
         afterResizeState.version = 43; // Version 43 indicates state after resize
 
@@ -1026,6 +1029,7 @@ contract CustodyTest is Test {
 
         // 8. Create a checkpoint state
         State memory checkpointState = initialState;
+        checkpointState.intent = StateIntent.OPERATE;
         checkpointState.data = abi.encode(42);
         checkpointState.version = 55; // Version 55 indicates a checkpoint state
 

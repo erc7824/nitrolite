@@ -5,17 +5,7 @@ import {IChannel} from "./interfaces/IChannel.sol";
 import {IDeposit} from "./interfaces/IDeposit.sol";
 import {IAdjudicator} from "./interfaces/IAdjudicator.sol";
 import {IComparable} from "./interfaces/IComparable.sol";
-import {
-    Channel,
-    State,
-    Allocation,
-    Status,
-    Signature,
-    Amount,
-    CHANOPEN,
-    CHANCLOSE,
-    CHANRESIZE
-} from "./interfaces/Types.sol";
+import {Channel, State, Allocation, ChannelStatus, StateIntent, Signature, Amount} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
@@ -50,7 +40,7 @@ contract Custody is IChannel, IDeposit {
     // Recommended structure to keep track of states
     struct Metadata {
         Channel chan; // Opener define channel configuration
-        Status stage;
+        ChannelStatus stage;
         address creator;
         // Fixed arrays for exactly 2 participants (CREATOR and BROKER)
         // TODO: store `uint256` instead of `Amount`, as tokens are the same
@@ -134,17 +124,15 @@ contract Custody is IChannel, IDeposit {
         if (ch.adjudicator == address(0)) revert InvalidAdjudicator();
         if (ch.challenge == 0) revert InvalidChallengePeriod();
 
-        // Validate initial state for funding protocol
-        (uint32 magicNumber) = abi.decode(initial.data, (uint32));
         // TODO: replace with `require(...)`
-        if (magicNumber != CHANOPEN) revert InvalidState();
+        if (initial.intent != StateIntent.INITIALIZE) revert InvalidState();
 
         // Validate version must be 0 for INITIAL state
         if (initial.version != 0) revert InvalidState();
 
         // Generate channel ID and check it doesn't exist
         channelId = Utils.getChannelId(ch);
-        if (_channels[channelId].stage != Status.VOID) revert InvalidStatus();
+        if (_channels[channelId].stage != ChannelStatus.VOID) revert InvalidStatus();
 
         // Verify creator's signature
         bytes32 stateHash = Utils.getStateHash(ch, initial);
@@ -159,7 +147,7 @@ contract Custody is IChannel, IDeposit {
         // Initialize channel metadata
         Metadata storage meta = _channels[channelId];
         meta.chan = ch;
-        meta.stage = Status.INITIAL;
+        meta.stage = ChannelStatus.INITIAL;
         meta.creator = msg.sender;
         meta.lastValidState = initial;
 
@@ -204,8 +192,8 @@ contract Custody is IChannel, IDeposit {
         Metadata storage meta = _channels[channelId];
 
         // Verify channel exists and is in INITIAL state
-        if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
-        if (meta.stage != Status.INITIAL) revert InvalidStatus();
+        if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
+        if (meta.stage != ChannelStatus.INITIAL) revert InvalidStatus();
 
         // Verify index is valid and participant has not already joined
         // For 2-participant channels, index can only be BROKER (second participant)
@@ -239,7 +227,7 @@ contract Custody is IChannel, IDeposit {
 
         // If all participants have joined, set channel to ACTIVE
         if (allJoined) {
-            meta.stage = Status.ACTIVE;
+            meta.stage = ChannelStatus.ACTIVE;
             emit Opened(channelId);
         }
 
@@ -255,14 +243,13 @@ contract Custody is IChannel, IDeposit {
         Metadata storage meta = _channels[channelId];
 
         // Verify channel exists and is not VOID
-        if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
+        if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
 
         // Case 1: Mutual closing with CHANCLOSE magic number
         // Channel must not be in INITIAL stage (participants should close the channel with challenge then)
-        if (meta.stage == Status.ACTIVE) {
+        if (meta.stage == ChannelStatus.ACTIVE) {
             // Check that this is a closing state with CHANCLOSE magic number
-            (uint32 magicNumber) = abi.decode(candidate.data, (uint32));
-            if (magicNumber != CHANCLOSE) revert InvalidState();
+            if (candidate.intent != StateIntent.FINALIZE) revert InvalidState();
 
             // For ACTIVE channels, version must be greater than 0
             if (candidate.version == 0) revert InvalidState();
@@ -274,15 +261,15 @@ contract Custody is IChannel, IDeposit {
 
             // Store the final state
             meta.lastValidState = candidate;
-            meta.stage = Status.FINAL;
+            meta.stage = ChannelStatus.FINAL;
         }
         // Case 2: Challenge resolution (after challenge period expires)
-        else if (meta.stage == Status.DISPUTE) {
+        else if (meta.stage == ChannelStatus.DISPUTE) {
             // Ensure challenge period has expired
             if (block.timestamp < meta.challengeExpire) revert ChallengeNotExpired();
 
             // Already in DISPUTE with an expired challenge - can proceed to finalization
-            meta.stage = Status.FINAL;
+            meta.stage = ChannelStatus.FINAL;
         } else {
             revert InvalidStatus();
         }
@@ -316,23 +303,20 @@ contract Custody is IChannel, IDeposit {
         Metadata storage meta = _channels[channelId];
 
         // Verify channel exists and is in a valid state for challenge
-        if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
-        if (meta.stage == Status.FINAL) revert InvalidStatus();
+        if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
+        if (meta.stage == ChannelStatus.FINAL) revert InvalidStatus();
 
         // Verify that at least one participant signed the state
         if (candidate.sigs.length == 0) revert InvalidStateSignatures();
 
         // Validate version based on channel status
-        if (meta.stage == Status.INITIAL && candidate.version != 0) revert InvalidState();
-        if (meta.stage == Status.ACTIVE && candidate.version == 0) revert InvalidState();
-
-        uint32 magicNumber = 0;
+        if (meta.stage == ChannelStatus.INITIAL && candidate.version != 0) revert InvalidState();
+        if (meta.stage == ChannelStatus.ACTIVE && candidate.version == 0) revert InvalidState();
 
         if (candidate.data.length != 0) {
-            magicNumber = abi.decode(candidate.data, (uint32));
-            if (magicNumber == CHANOPEN) {
+            if (candidate.intent == StateIntent.INITIALIZE) {
                 // TODO:
-            } else if (magicNumber == CHANRESIZE) {
+            } else if (candidate.intent == StateIntent.RESIZE) {
                 uint256 deposited = meta.expectedDeposits[CREATOR].amount + meta.expectedDeposits[BROKER].amount;
                 uint256 expected = candidate.allocations[CREATOR].amount + candidate.allocations[BROKER].amount;
                 if (deposited != expected) {
@@ -341,7 +325,10 @@ contract Custody is IChannel, IDeposit {
             }
         }
 
-        if (candidate.data.length == 0 || (magicNumber != CHANOPEN && magicNumber != CHANRESIZE)) {
+        if (
+            candidate.data.length == 0
+                || (candidate.intent != StateIntent.INITIALIZE && candidate.intent != StateIntent.RESIZE)
+        ) {
             // if no state data or magic number is not CHANOPEN or CHANRESIZE, assume this is a normal state
 
             // Verify the state is valid according to the adjudicator
@@ -365,7 +352,7 @@ contract Custody is IChannel, IDeposit {
         // Set or reset the challenge expiration
         meta.challengeExpire = block.timestamp + meta.chan.challenge;
         // Set the channel status to DISPUTE
-        meta.stage = Status.DISPUTE;
+        meta.stage = ChannelStatus.DISPUTE;
 
         emit Challenged(channelId, meta.challengeExpire);
     }
@@ -381,15 +368,15 @@ contract Custody is IChannel, IDeposit {
         Metadata storage meta = _channels[channelId];
 
         // Verify channel exists and is not VOID or FINAL
-        if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
-        if (meta.stage == Status.FINAL) revert InvalidStatus();
+        if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
+        if (meta.stage == ChannelStatus.FINAL) revert InvalidStatus();
 
         // Verify that at least one participant signed the state
         if (candidate.sigs.length == 0) revert InvalidStateSignatures();
 
         // Validate version based on channel status
-        if (meta.stage == Status.INITIAL && candidate.version != 0) revert InvalidState();
-        if (meta.stage == Status.ACTIVE && candidate.version == 0) revert InvalidState();
+        if (meta.stage == ChannelStatus.INITIAL && candidate.version != 0) revert InvalidState();
+        if (meta.stage == ChannelStatus.ACTIVE && candidate.version == 0) revert InvalidState();
 
         // Verify the state is valid according to the adjudicator
         bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
@@ -409,8 +396,8 @@ contract Custody is IChannel, IDeposit {
         meta.lastValidState = candidate;
 
         // If there's an ongoing challenge and this state is newer, cancel the challenge
-        if (meta.stage == Status.DISPUTE) {
-            meta.stage = Status.ACTIVE;
+        if (meta.stage == ChannelStatus.DISPUTE) {
+            meta.stage = ChannelStatus.ACTIVE;
             meta.challengeExpire = 0;
         }
 
@@ -429,8 +416,8 @@ contract Custody is IChannel, IDeposit {
         Metadata storage meta = _channels[channelId];
 
         // Verify channel exists and is ACTIVE
-        if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
-        if (meta.stage != Status.ACTIVE) revert InvalidStatus();
+        if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
+        if (meta.stage != ChannelStatus.ACTIVE) revert InvalidStatus();
 
         if (proofs.length == 0) revert InvalidState();
         State memory precedingState = proofs[0];
@@ -453,9 +440,9 @@ contract Custody is IChannel, IDeposit {
         if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
 
         // Decode the magic number and resize amounts
-        (uint32 magicNumber, int256[] memory resizeAmounts) = abi.decode(candidate.data, (uint32, int256[]));
+        int256[] memory resizeAmounts = abi.decode(candidate.data, (int256[]));
 
-        if (magicNumber != CHANRESIZE) revert InvalidState();
+        if (candidate.intent != StateIntent.RESIZE) revert InvalidState();
 
         _requireCorrectDelta(precedingState.allocations, candidate.allocations, resizeAmounts);
 

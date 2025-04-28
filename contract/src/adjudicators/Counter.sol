@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature, CHANOPEN} from "../interfaces/Types.sol";
+import {Channel, State, Allocation, Signature, StateIntent} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
 
 import {console} from "forge-std/console.sol";
@@ -80,8 +80,7 @@ contract Counter is IAdjudicator {
             return false;
         }
 
-        (uint32 magicNumber,) = abi.decode(state.data, (uint32, Data));
-        if (magicNumber != CHANOPEN) {
+        if (state.intent != StateIntent.INITIALIZE) {
             return false;
         }
 
@@ -105,13 +104,7 @@ contract Counter is IAdjudicator {
         }
 
         Data memory candidateData = abi.decode(candidate.data, (Data));
-        Data memory previousData;
-        if (previous.version == 0) {
-            // first state also contains CHANOPEN magic number
-            (, previousData) = abi.decode(previous.data, (uint32, Data));
-        } else {
-            previousData = abi.decode(previous.data, (Data));
-        }
+        Data memory previousData = abi.decode(previous.data, (Data));
 
         if (candidateData.target != previousData.target) {
             return false;

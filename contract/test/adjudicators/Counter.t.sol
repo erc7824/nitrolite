@@ -10,7 +10,7 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 import {TestUtils} from "../TestUtils.sol";
 
 import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature, CHANOPEN} from "../../src/interfaces/Types.sol";
+import {Channel, State, Allocation, Signature, StateIntent} from "../../src/interfaces/Types.sol";
 import {Counter, Counter as CounterContract} from "../../src/adjudicators/Counter.sol";
 import {Utils} from "../../src/Utils.sol";
 
@@ -56,10 +56,9 @@ contract CounterTest is Test {
 
     function _createInitialState(uint256 target) internal pure returns (State memory) {
         State memory state;
+        state.intent = StateIntent.INITIALIZE;
         state.version = 0;
-
-        // Encode CHANOPEN magic number followed by the target data
-        state.data = abi.encode(CHANOPEN, Counter.Data({target: target}));
+        state.data = abi.encode(Counter.Data({target: target}));
 
         // Create dummy allocations
         state.allocations = new Allocation[](2);

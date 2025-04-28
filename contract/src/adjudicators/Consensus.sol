@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature, CHANOPEN} from "../interfaces/Types.sol";
+import {Channel, State, Allocation, Signature, StateIntent} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
 
 /**
@@ -54,8 +54,7 @@ contract Consensus is IAdjudicator {
             return false;
         }
 
-        uint32 magicNumber = abi.decode(state.data, (uint32));
-        if (magicNumber != CHANOPEN) {
+        if (state.intent != StateIntent.INITIALIZE) {
             return false;
         }
 

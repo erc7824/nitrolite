@@ -1,138 +1,136 @@
-import { describe, test, expect, jest, beforeEach } from "@jest/globals";
+import { describe, test, expect, beforeEach, jest } from "@jest/globals";
 import { Erc20Service } from "../../../src/client/services/Erc20Service";
 import { Errors } from "../../../src/errors";
-import { Address, Hash, PublicClient, SimulateContractReturnType, WalletClient } from "viem";
-
-// Mock data
-const mockWalletClient = {
-    account: {
-        address: "0xUserAddress" as Address,
-    },
-    writeContract: jest.fn(() => Promise.resolve("0xTransactionHash" as Hash)),
-} as unknown as WalletClient;
-
-const mockPublicClient = {
-    readContract: jest.fn(),
-    simulateContract: jest.fn(),
-} as unknown as PublicClient;
+import { Address, SimulateContractReturnType } from "viem";
 
 describe("Erc20Service", () => {
+    const tokenAddress = "0x0000000000000000000000000000000000000001" as Address;
+    const owner = "0x0000000000000000000000000000000000000002" as Address;
+    const spender = "0x0000000000000000000000000000000000000003" as Address;
+    const account = "0x0000000000000000000000000000000000000004" as Address;
+
+    let mockPublicClient: any;
+    let mockWalletClient: any;
     let service: Erc20Service;
-    const tokenAddress = "0xTokenAddress" as Address;
-    const spender = "0xSpenderAddress" as Address;
-    const owner = "0xOwnerAddress" as Address;
-    const amount = BigInt(100);
 
     beforeEach(() => {
-        jest.clearAllMocks();
-        mockPublicClient.simulateContract.mockImplementation(() => Promise.resolve({ request: { to: "0x123", data: "0x456" } }));
-        mockPublicClient.readContract.mockImplementation(() => Promise.resolve(BigInt(0)));
-
-        service = new Erc20Service(mockPublicClient, mockWalletClient);
+        mockPublicClient = {
+            readContract: jest.fn(),
+            simulateContract: jest.fn(),
+        };
+        mockWalletClient = {
+            writeContract: jest.fn(),
+            account: account,
+        };
+        service = new Erc20Service(mockPublicClient as any, mockWalletClient as any, account);
     });
 
     describe("constructor", () => {
-        test("should throw when publicClient is missing", () => {
-            expect(() => new Erc20Service(null as unknown as PublicClient, mockWalletClient)).toThrow(Errors.MissingParameterError);
-        });
-
-        test("should initialize correctly", () => {
-            expect(service).toBeDefined();
-        });
-    });
-
-    describe("ensureWalletClient", () => {
-        test("should throw when walletClient is missing", () => {
-            const serviceWithoutWallet = new Erc20Service(mockPublicClient);
-
-            expect(() => {
-                // @ts-ignore - Accessing private method for testing
-                serviceWithoutWallet.ensureWalletClient();
-            }).toThrow(Errors.WalletClientRequiredError);
+        test("should throw if publicClient is missing", () => {
+            expect(() => new Erc20Service(undefined as any)).toThrow(Errors.MissingParameterError);
         });
     });
 
     describe("getTokenBalance", () => {
-        test("should call readContract with correct parameters", async () => {
-            const mockBalance = BigInt(1000);
-            mockPublicClient.readContract.mockImplementationOnce(() => Promise.resolve(mockBalance));
-
+        test("should return balance", async () => {
+            (mockPublicClient.readContract as any).mockResolvedValue(100n);
             const result = await service.getTokenBalance(tokenAddress, owner);
-
-            expect(mockPublicClient.readContract).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    address: tokenAddress,
-                    functionName: "balanceOf",
-                    args: [owner],
-                })
-            );
-
-            expect(result).toEqual(mockBalance);
+            expect(mockPublicClient.readContract).toHaveBeenCalledWith({
+                address: tokenAddress,
+                abi: expect.anything(),
+                functionName: "balanceOf",
+                args: [owner],
+            });
+            expect(result).toBe(100n);
         });
 
-        test("should handle read errors", async () => {
-            mockPublicClient.readContract.mockImplementationOnce(() => Promise.reject(new Error("Read failed")));
-
+        test("should throw ContractReadError on error", async () => {
+            (mockPublicClient.readContract as any).mockRejectedValue(new Error("fail"));
             await expect(service.getTokenBalance(tokenAddress, owner)).rejects.toThrow(Errors.ContractReadError);
+        });
+
+        test("should rethrow NitroliteError", async () => {
+            const nitroErr = new Errors.MissingParameterError("test");
+            (mockPublicClient.readContract as any).mockRejectedValue(nitroErr);
+            await expect(service.getTokenBalance(tokenAddress, owner)).rejects.toThrow(nitroErr);
         });
     });
 
     describe("getTokenAllowance", () => {
-        test("should call readContract with correct parameters", async () => {
-            const mockAllowance = BigInt(500);
-            mockPublicClient.readContract.mockImplementationOnce(() => Promise.resolve(mockAllowance));
-
+        test("should return allowance", async () => {
+            (mockPublicClient.readContract as any).mockResolvedValue(50n);
             const result = await service.getTokenAllowance(tokenAddress, owner, spender);
-
-            expect(mockPublicClient.readContract).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    address: tokenAddress,
-                    functionName: "allowance",
-                    args: [owner, spender],
-                })
-            );
-
-            expect(result).toEqual(mockAllowance);
-        });
-    });
-
-    describe("approve", () => {
-        test("should prepare and submit an approve transaction", async () => {
-            await expect(service.approve(tokenAddress, spender, amount)).resolves.toBe("0xTransactionHash");
-
-            expect(mockPublicClient.simulateContract).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    address: tokenAddress,
-                    functionName: "approve",
-                    args: [spender, amount],
-                })
-            );
-
-            expect(mockWalletClient.writeContract).toHaveBeenCalled();
+            expect(mockPublicClient.readContract).toHaveBeenCalledWith({
+                address: tokenAddress,
+                abi: expect.anything(),
+                functionName: "allowance",
+                args: [owner, spender],
+            });
+            expect(result).toBe(50n);
         });
 
-        test("should handle simulation errors", async () => {
-            mockPublicClient.simulateContract.mockImplementationOnce(() => Promise.reject(new Error("Simulation failed")));
-
-            await expect(service.approve(tokenAddress, spender, amount)).rejects.toThrow(Errors.ContractCallError);
+        test("should throw ContractReadError on error", async () => {
+            (mockPublicClient.readContract as any).mockRejectedValue(new Error("fail"));
+            await expect(service.getTokenAllowance(tokenAddress, owner, spender)).rejects.toThrow(Errors.ContractReadError);
         });
 
-        test("should handle transaction errors", async () => {
-            mockWalletClient.writeContract.mockImplementationOnce(() => Promise.reject(new Error("Transaction failed")));
-
-            await expect(service.approve(tokenAddress, spender, amount)).rejects.toThrow(Errors.TransactionError);
+        test("should rethrow NitroliteError", async () => {
+            const nitroErr = new Errors.WalletClientRequiredError();
+            (mockPublicClient.readContract as any).mockRejectedValue(nitroErr);
+            await expect(service.getTokenAllowance(tokenAddress, owner, spender)).rejects.toThrow(nitroErr);
         });
     });
 
     describe("prepareApprove", () => {
-        test("should return a valid request object", async () => {
-            const mockRequest = { to: "0xTo", data: "0xData" };
+        test("should return request", async () => {
+            const requestObj = { to: "0x", data: "0x" } as unknown as SimulateContractReturnType["request"];
+            // simulateContract returns { request, result }
+            (mockPublicClient.simulateContract as any).mockResolvedValue({
+                request: requestObj,
+                result: undefined as any, // Add missing 'result' property
+            });
+            const result = await service.prepareApprove(tokenAddress, spender, 123n);
+            expect(mockPublicClient.simulateContract).toHaveBeenCalledWith({
+                address: tokenAddress,
+                abi: expect.anything(),
+                functionName: "approve",
+                args: [spender, 123n],
+                account,
+            });
+            expect(result).toBe(requestObj);
+        });
+    });
 
-            mockPublicClient.simulateContract.mockImplementationOnce(() => Promise.resolve({ request: mockRequest }));
+    describe("approve", () => {
+        test("should execute and return tx hash", async () => {
+            const requestObj = { to: "0x", data: "0x" } as unknown as SimulateContractReturnType["request"];
+            // simulateContract returns { request, result }
+            (mockPublicClient.simulateContract as any).mockResolvedValue({
+                request: requestObj,
+                result: undefined as any, // Add missing 'result' property
+            });
+            (mockWalletClient.writeContract as any).mockResolvedValue("0xhash");
+            const result = await service.approve(tokenAddress, spender, 123n);
+            expect(mockWalletClient.writeContract).toHaveBeenCalledWith({
+                ...requestObj,
+                account,
+            });
+            expect(result).toBe("0xhash");
+        });
 
-            const result = await service.prepareApprove(tokenAddress, spender, amount);
+        test("should throw WalletClientRequiredError if walletClient missing", async () => {
+            const svc = new Erc20Service(mockPublicClient as any, undefined, account);
+            await expect(svc.approve(tokenAddress, spender, 123n)).rejects.toThrow(Errors.WalletClientRequiredError);
+        });
 
-            expect(result).toEqual(mockRequest);
+        test("should throw TransactionError on error", async () => {
+            const requestObj = { to: "0x", data: "0x" } as unknown as SimulateContractReturnType["request"];
+            (mockPublicClient.simulateContract as any).mockResolvedValue({
+                request: requestObj,
+                result: undefined as any,
+            });
+            (mockWalletClient.writeContract as any).mockRejectedValue(new Error("fail"));
+            await expect(service.approve(tokenAddress, spender, 123n)).rejects.toThrow(Errors.TransactionError);
         });
     });
 });

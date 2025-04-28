@@ -11,9 +11,6 @@ export type AccountID = Hex;
 /** Represents the allocation intent change as an array of numbers. */
 export type Intent = number[];
 
-/** Represents a cryptographic signature as a Hex string. */
-export type Signature = Hex;
-
 /** Represents the data payload within a request message: [requestId, method, params, timestamp?]. */
 export type RequestData = [RequestID, string, any[], Timestamp?];
 
@@ -46,7 +43,7 @@ export interface NitroliteRPCMessage {
     /** Optional allocation intent change. */
     int?: Intent;
     /** Optional cryptographic signature(s). */
-    sig?: Signature[];
+    sig?: Hex[];
 }
 
 /**
@@ -173,7 +170,7 @@ export enum NitroliteErrorCode {
  * @param payload - The RequestData or ResponsePayload object (array) to sign.
  * @returns A Promise that resolves to the cryptographic signature as a Hex string.
  */
-export type MessageSigner = (payload: RequestData | ResponsePayload) => Promise<Signature>;
+export type MessageSigner = (payload: RequestData | ResponsePayload) => Promise<Hex>;
 
 /**
  * Defines the function signature for verifying a single message signature against its payload.
@@ -182,7 +179,7 @@ export type MessageSigner = (payload: RequestData | ResponsePayload) => Promise<
  * @param address - The Ethereum address of the expected signer.
  * @returns A Promise that resolves to true if the signature is valid for the given payload and address, false otherwise.
  */
-export type SingleMessageVerifier = (payload: RequestData | ResponsePayload, signature: Signature, address: Address) => Promise<boolean>;
+export type SingleMessageVerifier = (payload: RequestData | ResponsePayload, signature: Hex, address: Address) => Promise<boolean>;
 
 /**
  * Defines the function signature for verifying multiple message signatures against a payload.
@@ -192,4 +189,4 @@ export type SingleMessageVerifier = (payload: RequestData | ResponsePayload, sig
  * @param expectedSigners - An array of Ethereum addresses of the required signers. The implementation determines if order matters.
  * @returns A Promise that resolves to true if all required signatures from the expected signers are present and valid, false otherwise.
  */
-export type MultiMessageVerifier = (payload: RequestData | ResponsePayload, signatures: Signature[], expectedSigners: Address[]) => Promise<boolean>;
+export type MultiMessageVerifier = (payload: RequestData | ResponsePayload, signatures: Hex[], expectedSigners: Address[]) => Promise<boolean>;

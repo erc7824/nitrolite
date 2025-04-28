@@ -44,6 +44,7 @@ export interface Channel {
  */
 export interface State {
     data: Hex; // Application data encoded, decoded by the adjudicator for business logic
+    version: bigint; // Version of the state, incremented for each update
     allocations: [Allocation, Allocation]; // Combined asset allocation and destination for each participant
     sigs: Signature[]; // stateHash signatures
 }
@@ -106,6 +107,7 @@ export interface CloseChannelParams {
         channelId: ChannelId;
         stateData: Hex;
         allocations: [Allocation, Allocation];
+        version: bigint;
         serverSignature: Signature;
     };
 }

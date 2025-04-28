@@ -55,6 +55,8 @@ export async function _prepareAndSignInitialState(
             { destination: participants[0], token: tokenAddress, amount: initialAllocationAmounts[0] },
             { destination: participants[1], token: tokenAddress, amount: initialAllocationAmounts[1] },
         ],
+        // The state version is set to 0 for the initial state.
+        version: 0n,
         sigs: [],
     };
 
@@ -90,6 +92,7 @@ export async function _prepareAndSignFinalState(
     const stateToSign: State = {
         data: appData,
         allocations: finalState.allocations,
+        version: finalState.version,
         sigs: [],
     };
 

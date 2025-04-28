@@ -1,6 +1,5 @@
 import { keccak256, encodeAbiParameters, Address, Hex, recoverMessageAddress, numberToHex, parseSignature } from "viem";
 import { State, StateHash, Signature, ChannelId } from "../client/types"; // Updated import path
-import { secp256k1 } from "@noble/curves/secp256k1";
 
 /**
  * Compute the hash of a channel state in a canonical way (ignoring the signature)
@@ -9,11 +8,16 @@ import { secp256k1 } from "@noble/curves/secp256k1";
  * @returns The state hash as Hex
  */
 export function getStateHash(channelId: ChannelId, state: State): StateHash {
-    console.log("State hash parameters:", channelId, state);
     const encoded = encodeAbiParameters(
         [
             { name: "channelId", type: "bytes32" },
             { name: "data", type: "bytes" },
+            // For channel creation, state.version must be 0 (corresponds to INITIAL status)
+            // For active channels, state.version must be greater than 0
+            {
+                name: "version",
+                type: "uint256",
+            },
             {
                 name: "allocations",
                 type: "tuple[]",
@@ -24,7 +28,7 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
                 ],
             },
         ],
-        [channelId, state.data, state.allocations]
+        [channelId, state.data, state.version, state.allocations]
     );
 
     return keccak256(encoded);

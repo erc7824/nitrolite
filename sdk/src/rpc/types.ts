@@ -99,7 +99,7 @@ export interface AppDefinition {
     /** A parameter related to the challenge period or mechanism within the application's protocol. */
     challenge: number;
     /** A unique number used once, often for preventing replay attacks or ensuring uniqueness of the application instance. */
-    nonce: number;
+    nonce?: number;
 }
 
 /**
@@ -125,10 +125,6 @@ export interface CreateAppSessionRequest {
     token: Hex;
     /** The initial allocation distribution among participants. Order corresponds to the participants array in the definition. */
     allocation: Hex[]; // Assuming Hex representation of amounts
-    /** An array of channel IDs that this application will be associated with or funded by. */
-    channels: Hex[];
-    /** An array of addresses authorized to sign for state updates or actions within this application. */
-    signers: Hex[];
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, test, expect, jest } from "@jest/globals";
-import { Address, Hex } from "viem";
+import { Hex } from "viem";
 import {
     createAuthRequestMessage,
     createAuthVerifyMessageFromChallenge,
@@ -135,8 +135,6 @@ describe("API message creators", () => {
                 },
                 token: "0x",
                 allocation: ["0x"],
-                channels: ["0x"],
-                signers: ["0x"],
             },
         ];
         const msgStr = await createAppSessionMessage(signer, params, sampleIntent, requestId, timestamp);

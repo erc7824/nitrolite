@@ -61,17 +61,6 @@ export interface State {
 }
 
 /**
- * Adjudicator status enum
- */
-export enum adjudicatorStatus {
-    VOID = 0, // Channel was never active or have an anomaly
-    PARTIAL = 1, // Partial funding waiting for other participants
-    ACTIVE = 2, // Channel fully funded using open or state are valid
-    INVALID = 3, // Channel state is invalid
-    FINAL = 4, // This is the FINAL State channel can be closed
-}
-
-/**
  * Configuration for initializing the NitroliteClient.
  */
 export interface NitroliteClientConfig {

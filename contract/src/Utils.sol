@@ -55,7 +55,7 @@ library Utils {
      * @param chan The channel configuration
      * @return True if the state is a valid initial state, false otherwise
      */
-    function validateInitialState(State calldata state, Channel calldata chan) internal pure returns (bool) {
+    function validateInitialState(State memory state, Channel memory chan) internal pure returns (bool) {
         if (state.version != 0) {
             return false;
         }
@@ -74,7 +74,7 @@ library Utils {
      * @param chan The channel configuration
      * @return True if the state has valid signatures from both participants, false otherwise
      */
-    function validateUnanimousSignatures(State calldata state, Channel calldata chan) internal pure returns (bool) {
+    function validateUnanimousSignatures(State memory state, Channel memory chan) internal pure returns (bool) {
         if (state.sigs.length != 2) {
             return false;
         }
@@ -93,7 +93,7 @@ library Utils {
      * @param candidate The candidate new state
      * @return True if the transition is valid, false otherwise
      */
-    function validateTransitionTo(State calldata previous, State calldata candidate) internal pure returns (bool) {
+    function validateTransitionTo(State memory previous, State memory candidate) internal pure returns (bool) {
         if (candidate.version != previous.version + 1) {
             return false;
         }

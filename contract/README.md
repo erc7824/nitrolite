@@ -313,6 +313,7 @@ Each state in a channel is uniquely identified by an incremental version number,
 1. When comparing two states during challenge/checkpoint operations, the system:
    - First attempts to use the `IComparable` interface if the channel's adjudicator implements it
    - If `IComparable` is not implemented, falls back to comparing `state.version` values directly
+
 2. Version number rules:
    - For channel creation, `state.version` must be 0 (corresponds to `INITIAL` status)
    - For active channels, `state.version` must be greater than 0
@@ -413,6 +414,33 @@ struct Ledger {
     EnumerableSet.Bytes32Set channels; // Set of user ChannelId
 }
 ```
+
+### Remittance Adjudicator
+
+The `Remittance.sol` contract implements the `IAdjudicator` and `IComparable` interfaces. Its purpose is to validate that allocation transfers between participants are legitimate based on cryptographically signed state hashes.
+
+State data in the Remittance adjudicator contains a payment intent with the following structure:
+
+```solidity
+struct Intent {
+    uint8 payer;      // Index of the paying participant (0 for CREATOR, 1 for BROKER)
+    Amount transfer;  // Amount and token being transferred
+}
+```
+
+When validating a state transition, the adjudicator requires:
+
+- For the first state transition (version == 1): The funding state as proof (`proofs[0]`)
+- For subsequent transitions (version > 1): Both the funding state (`proofs[0]`) and the previous valid state (`proofs[1]`)
+
+A state transition is considered valid when:
+
+1. The payer (participant whose allocation decreases) has signed the state hash
+2. The allocation changes correctly reflect the intended transfer
+3. The new allocations equal the previous allocations plus the intent transfer
+4. The state version is incremented properly
+
+This verification process ensures that all fund transfers between participants are authorized and accurately recorded.
 
 ## Roadmap
 

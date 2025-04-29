@@ -13,13 +13,9 @@ import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/
 /**
  * @title Custody
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
- * @dev This implementation currently only supports 2 participant channels (CREATOR and BROKER)
+ * @dev This implementation currently only supports 2 participant channels (CLIENT and SERVER)
  */
 contract Custody is IChannel, IDeposit {
-    // Constants for participant indices
-    uint256 constant CREATOR = 0; // Participant index for the channel creator
-    uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
-
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     // Errors
@@ -37,14 +33,18 @@ contract Custody is IChannel, IDeposit {
     error ChallengeNotExpired();
     error InsufficientBalance(uint256 available, uint256 required);
 
+    // Constants for participant indices
+    uint256 constant CLIENT = 0; // Participant index for the channel creator
+    uint256 constant SERVER = 1; // Participant index for the server in clearnet context
+
     // Recommended structure to keep track of states
     struct Metadata {
         Channel chan; // Opener define channel configuration
         ChannelStatus stage;
         address creator;
-        // Fixed arrays for exactly 2 participants (CREATOR and BROKER)
+        // Fixed arrays for exactly 2 participants (CLIENT and SERVER)
         // TODO: store `uint256` instead of `Amount`, as tokens are the same
-        Amount[2] expectedDeposits; // Creator defines Token per participant
+        Amount[2] expectedDeposits; // CLIENT defines Token per participant
         Amount[2] actualDeposits; // Tracks deposits made by each participant
         uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
         State lastValidState; // Last valid state when adjudicator was called
@@ -138,7 +138,7 @@ contract Custody is IChannel, IDeposit {
         bytes32 stateHash = Utils.getStateHash(ch, initial);
         if (initial.sigs.length != 1) revert InvalidStateSignatures();
         // TODO: later we can lift the restriction that first sig must be from participant 0
-        bool validSig = Utils.verifySignature(stateHash, initial.sigs[CREATOR], ch.participants[CREATOR]);
+        bool validSig = Utils.verifySignature(stateHash, initial.sigs[CLIENT], ch.participants[CLIENT]);
         if (!validSig) revert InvalidStateSignatures();
 
         // NOTE: even if there is not allocation planned, it should be present as `Allocation{address(0), 0}`
@@ -166,11 +166,11 @@ contract Custody is IChannel, IDeposit {
         // This enables logic of "session keys" where a user can create a channel on behalf of another account, but will lock their own funds
         // if (ch.participants[0]; != msg.sender) revert InvalidParticipant();
 
-        Amount memory creatorDeposit = meta.expectedDeposits[CREATOR];
+        Amount memory creatorDeposit = meta.expectedDeposits[CLIENT];
         _lockAccountFundsToChannel(msg.sender, channelId, creatorDeposit.token, creatorDeposit.amount);
 
         // Record actual deposit
-        meta.actualDeposits[CREATOR] = creatorDeposit;
+        meta.actualDeposits[CLIENT] = creatorDeposit;
 
         // Add channel to the creator's ledger
         _ledgers[msg.sender].channels.add(channelId);
@@ -184,7 +184,7 @@ contract Custody is IChannel, IDeposit {
     /**
      * @notice Allows a participant to join a channel by signing the funding state
      * @param channelId Unique identifier for the channel
-     * @param index Index of the participant in the channel's participants array (must be 1 for BROKER)
+     * @param index Index of the participant in the channel's participants array (must be 1 for SERVER)
      * @param sig Signature of the participant on the funding state
      * @return The channelId of the joined channel
      */
@@ -196,8 +196,8 @@ contract Custody is IChannel, IDeposit {
         if (meta.stage != ChannelStatus.INITIAL) revert InvalidStatus();
 
         // Verify index is valid and participant has not already joined
-        // For 2-participant channels, index can only be BROKER (second participant)
-        if (index != BROKER) revert InvalidParticipant();
+        // For 2-participant channels, index can only be SERVER (second participant)
+        if (index != SERVER) revert InvalidParticipant();
         if (meta.actualDeposits[index].amount != 0) revert InvalidParticipant();
 
         // Get participant address from channel config
@@ -222,8 +222,8 @@ contract Custody is IChannel, IDeposit {
         emit Joined(channelId, index);
 
         // For 2-participant channels, just check if the second participant has joined
-        // since we know the first participant (creator) has already joined
-        bool allJoined = meta.actualDeposits[BROKER].amount == meta.expectedDeposits[BROKER].amount;
+        // since we know the first participant (CLIENT) has already joined
+        bool allJoined = meta.actualDeposits[SERVER].amount == meta.expectedDeposits[SERVER].amount;
 
         // If all participants have joined, set channel to ACTIVE
         if (allJoined) {
@@ -317,8 +317,8 @@ contract Custody is IChannel, IDeposit {
             if (candidate.intent == StateIntent.INITIALIZE) {
                 // TODO:
             } else if (candidate.intent == StateIntent.RESIZE) {
-                uint256 deposited = meta.expectedDeposits[CREATOR].amount + meta.expectedDeposits[BROKER].amount;
-                uint256 expected = candidate.allocations[CREATOR].amount + candidate.allocations[BROKER].amount;
+                uint256 deposited = meta.expectedDeposits[CLIENT].amount + meta.expectedDeposits[SERVER].amount;
+                uint256 expected = candidate.allocations[CLIENT].amount + candidate.allocations[SERVER].amount;
                 if (deposited != expected) {
                     revert InvalidAllocations();
                 }
@@ -440,6 +440,7 @@ contract Custody is IChannel, IDeposit {
         if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
 
         // Decode the magic number and resize amounts
+        // TODO: extract `int256[]` into an alias type
         int256[] memory resizeAmounts = abi.decode(candidate.data, (int256[]));
 
         if (candidate.intent != StateIntent.RESIZE) revert InvalidState();
@@ -456,7 +457,7 @@ contract Custody is IChannel, IDeposit {
 
     function _requireCorrectAllocations(Allocation[] memory allocations) internal pure {
         if (allocations.length != 2) revert InvalidState();
-        if (allocations[CREATOR].token != allocations[BROKER].token) revert InvalidState();
+        if (allocations[CLIENT].token != allocations[SERVER].token) revert InvalidState();
     }
 
     function _transfer(address token, address to, uint256 amount) internal {
@@ -539,15 +540,15 @@ contract Custody is IChannel, IDeposit {
             return false;
         }
 
-        // Verify creator's signature
-        bool isCreatorValid = Utils.verifySignature(stateHash, state.sigs[CREATOR], chan.participants[CREATOR]);
-        if (!isCreatorValid) {
+        // Verify client's signature
+        bool isClientValid = Utils.verifySignature(stateHash, state.sigs[CLIENT], chan.participants[CLIENT]);
+        if (!isClientValid) {
             return false;
         }
 
-        // Verify broker's signature
-        bool isBrokerValid = Utils.verifySignature(stateHash, state.sigs[BROKER], chan.participants[BROKER]);
-        if (!isBrokerValid) {
+        // Verify server's signature
+        bool isServerValid = Utils.verifySignature(stateHash, state.sigs[SERVER], chan.participants[SERVER]);
+        if (!isServerValid) {
             return false;
         }
 
@@ -600,7 +601,7 @@ contract Custody is IChannel, IDeposit {
 
     function _processResize(bytes32 channelId, Metadata storage chMeta, int256[] memory resizeAmounts) internal {
         // NOTE: all tokens are the same
-        address token = chMeta.expectedDeposits[CREATOR].token;
+        address token = chMeta.expectedDeposits[CLIENT].token;
 
         // Process resize amounts for each participant
         for (uint256 i = 0; i < 2; i++) {

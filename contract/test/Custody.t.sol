@@ -20,15 +20,7 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 
 import {TestUtils} from "./TestUtils.sol";
 import {Custody} from "../src/Custody.sol";
-import {
-    Channel,
-    State,
-    Allocation,
-    Signature,
-    ChannelStatus,
-    StateIntent,
-    Amount
-} from "../src/interfaces/Types.sol";
+import {Channel, State, Allocation, Signature, ChannelStatus, StateIntent, Amount} from "../src/interfaces/Types.sol";
 import {Utils} from "../src/Utils.sol";
 
 import {FlagAdjudicator} from "./mocks/FlagAdjudicator.sol";

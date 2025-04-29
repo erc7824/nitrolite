@@ -10,7 +10,7 @@ import {TestUtils} from "../TestUtils.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 
 import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature} from "../../src/interfaces/Types.sol";
+import {Channel, State, Allocation, Signature, StateIntent} from "../../src/interfaces/Types.sol";
 import {Consensus} from "../../src/adjudicators/Consensus.sol";
 import {Utils} from "../../src/Utils.sol";
 
@@ -29,6 +29,10 @@ contract ConsensusTest is Test {
     Channel public channel;
     MockERC20 public token;
 
+    // Constants for participant ordering
+    uint256 private constant HOST = 0;
+    uint256 private constant GUEST = 1;
+
     function setUp() public {
         // Deploy the adjudicator contract
         adjudicator = new Consensus();
@@ -44,8 +48,8 @@ contract ConsensusTest is Test {
 
         // Set up the channel
         address[] memory participants = new address[](2);
-        participants[0] = host;
-        participants[1] = guest;
+        participants[HOST] = host;
+        participants[GUEST] = guest;
         channel = Channel({
             participants: participants,
             adjudicator: address(adjudicator),
@@ -81,144 +85,307 @@ contract ConsensusTest is Test {
     function createAllocations(uint256 hostAmount, uint256 guestAmount) internal view returns (Allocation[2] memory) {
         Allocation[2] memory allocations;
 
-        allocations[0] = Allocation({destination: host, token: address(token), amount: hostAmount});
+        allocations[HOST] = Allocation({destination: host, token: address(token), amount: hostAmount});
 
-        allocations[1] = Allocation({destination: guest, token: address(token), amount: guestAmount});
+        allocations[GUEST] = Allocation({destination: guest, token: address(token), amount: guestAmount});
 
         return allocations;
     }
 
-    // Create an initial state signed by host only
-    function test_DirectInitialState() public view {
+    // Helper function to create an initial state
+    function _createInitialState(string memory data) internal view returns (State memory) {
         // Create allocations
         Allocation[2] memory allocations = createAllocations(50, 50);
-
-        // Create the app data
-        Consensus.AppData memory appData;
-        appData.appData = "initial state";
-        appData.status = Consensus.AppStatus.Starting;
 
         // Create the state
         State memory state;
-        state.data = abi.encode(appData);
+        state.intent = StateIntent.INITIALIZE;
+        state.version = 0;
+        state.data = bytes(data);
         state.allocations = new Allocation[](2);
-        state.allocations[0] = allocations[0];
-        state.allocations[1] = allocations[1];
-        state.sigs = new Signature[](1); // Create a dynamic array with 1 element
+        state.allocations[HOST] = allocations[HOST];
+        state.allocations[GUEST] = allocations[GUEST];
+        state.sigs = new Signature[](0);
 
-        // Calculate the state hash
-        bytes32 stateHash = Utils.getStateHash(channel, state);
-
-        // Sign the Ethereum signed message hash with host key
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, hostPrivateKey, stateHash);
-
-        // Create the signature
-        state.sigs[0] = Signature({v: v, r: r, s: s});
-
-        // Verify the signature directly with Utils
-        bool hostSigValid = Utils.verifySignature(stateHash, state.sigs[0], host);
-
-        // This should pass if our approach is correct
-        assertTrue(hostSigValid, "Host signature verification failed in Utils");
-
-        // Adjudicate using the contract
-        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
-
-        // Check the state is valid
-        assertTrue(isValid, "State should be valid");
+        return state;
     }
 
-    // Test corrupt host signature
-    function test_CorruptHostSignature() public {
+    // Helper function to create an operation state
+    function _createOperateState(string memory data, uint256 version) internal view returns (State memory) {
         // Create allocations
         Allocation[2] memory allocations = createAllocations(50, 50);
-
-        // Create the app data
-        Consensus.AppData memory appData;
-        appData.appData = "initial state";
-        appData.status = Consensus.AppStatus.Starting;
 
         // Create the state
         State memory state;
-        state.data = abi.encode(appData);
+        state.intent = StateIntent.OPERATE;
+        state.version = version;
+        state.data = bytes(data);
         state.allocations = new Allocation[](2);
-        state.allocations[0] = allocations[0];
-        state.allocations[1] = allocations[1];
-        state.sigs = new Signature[](1); // Create a dynamic array with 1 element
+        state.allocations[HOST] = allocations[HOST];
+        state.allocations[GUEST] = allocations[GUEST];
+        state.sigs = new Signature[](0);
 
-        // Calculate the state hash
-        bytes32 stateHash = Utils.getStateHash(channel, state);
-
-        // Sign the state hash with host key
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, hostPrivateKey, stateHash);
-
-        // Corrupt the signature by changing r
-        r = bytes32(0);
-
-        // Create the signature
-        state.sigs[0] = Signature({v: v, r: r, s: s});
-
-        // Adjudicate and expect invalid result
-        vm.expectRevert(ECDSA.ECDSAInvalidSignature.selector);
-        adjudicator.adjudicate(channel, state, new State[](0));
+        return state;
     }
 
-    // Test corrupt guest signature
-    function test_CorruptGuestSignature() public {
+    // Helper function to create a resize state
+    function _createResizeState(string memory data, uint256 version, int256[] memory resizeAmounts)
+        internal
+        view
+        returns (State memory)
+    {
         // Create allocations
         Allocation[2] memory allocations = createAllocations(50, 50);
-
-        // Create the app data
-        Consensus.AppData memory appData;
-        appData.appData = "ready state";
-        appData.status = Consensus.AppStatus.Ready;
 
         // Create the state
         State memory state;
-        state.data = abi.encode(appData);
+        state.intent = StateIntent.RESIZE;
+        state.version = version;
+        state.data = abi.encode(resizeAmounts, bytes(data));
         state.allocations = new Allocation[](2);
-        state.allocations[0] = allocations[0];
-        state.allocations[1] = allocations[1];
-        state.sigs = new Signature[](2); // Create a dynamic array with 2 elements
+        state.allocations[HOST] = allocations[HOST];
+        state.allocations[GUEST] = allocations[GUEST];
+        state.sigs = new Signature[](0);
 
-        // Calculate the state hash
-        bytes32 stateHash = Utils.getStateHash(channel, state);
-
-        // Sign the state hash with both keys
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, hostPrivateKey, stateHash);
-        state.sigs[0] = Signature({v: v, r: r, s: s});
-
-        // Corrupt the guest signature
-        (v, r, s) = vm.sign(guestPrivateKey, stateHash);
-        r = bytes32(0); // Corrupt r
-        state.sigs[1] = Signature({v: v, r: r, s: s});
-
-        // Adjudicate and expect invalid result
-        vm.expectRevert(ECDSA.ECDSAInvalidSignature.selector);
-        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
-        assertFalse(isValid, "State should be invalid");
+        return state;
     }
 
-    // Test insufficient signatures
-    function test_InsufficientSignatures() public view {
-        // Create allocations
-        Allocation[2] memory allocations = createAllocations(50, 50);
+    // Helper to sign a state
+    function _signState(State memory state, uint256 privateKey) internal view returns (Signature memory) {
+        bytes32 stateHash = Utils.getStateHash(channel, state);
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, stateHash);
+        return Signature({v: v, r: r, s: s});
+    }
 
-        // Create the app data
-        Consensus.AppData memory appData;
-        appData.appData = "initial state";
-        appData.status = Consensus.AppStatus.Starting;
+    // -------------------- FIRST STATE TRANSITION TESTS --------------------
 
-        // Create the state with empty signatures
-        State memory state;
-        state.data = abi.encode(appData);
-        state.allocations = new Allocation[](2);
-        state.allocations[0] = allocations[0];
-        state.allocations[1] = allocations[1];
-        // State.sigs defaults to empty values
+    function test_adjudicate_firstState_valid() public view {
+        // Create initial state with both signatures
+        State memory initialState = _createInitialState("initial state");
+        initialState.sigs = new Signature[](2);
+        initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
+        initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 
-        // Adjudicate and expect invalid result
-        bool isValid = adjudicator.adjudicate(channel, state, new State[](0));
-        assertFalse(isValid, "State should be invalid");
+        // Create first operate state with both signatures
+        State memory firstState = _createOperateState("first state", 1);
+        firstState.sigs = new Signature[](2);
+        firstState.sigs[HOST] = _signState(firstState, hostPrivateKey);
+        firstState.sigs[GUEST] = _signState(firstState, guestPrivateKey);
+
+        // Provide the initial state as proof
+        State[] memory proofs = new State[](1);
+        proofs[0] = initialState;
+
+        // Verify that the transition is valid
+        bool valid = adjudicator.adjudicate(channel, firstState, proofs);
+        assertTrue(valid, "Valid first state transition should be accepted");
+    }
+
+    function test_adjudicate_firstState_revert_whenMissingParticipantSignature() public view {
+        // Create initial state with both signatures
+        State memory initialState = _createInitialState("initial state");
+        initialState.sigs = new Signature[](2);
+        initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
+        initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
+
+        // Create first operate state with only one signature
+        State memory firstState = _createOperateState("first state", 1);
+        firstState.sigs = new Signature[](1);
+        firstState.sigs[0] = _signState(firstState, hostPrivateKey);
+
+        // Provide the initial state as proof
+        State[] memory proofs = new State[](1);
+        proofs[0] = initialState;
+
+        // Verify that the transition is rejected
+        bool valid = adjudicator.adjudicate(channel, firstState, proofs);
+        assertFalse(valid, "First state without both signatures should be rejected");
+    }
+
+    function test_adjudicate_firstState_revert_whenIncorrectVersion() public view {
+        // Create initial state with both signatures
+        State memory initialState = _createInitialState("initial state");
+        initialState.sigs = new Signature[](2);
+        initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
+        initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
+
+        // Create first operate state with incorrect version (2 instead of 1)
+        State memory firstState = _createOperateState("first state", 2);
+        firstState.sigs = new Signature[](2);
+        firstState.sigs[HOST] = _signState(firstState, hostPrivateKey);
+        firstState.sigs[GUEST] = _signState(firstState, guestPrivateKey);
+
+        // Provide the initial state as proof
+        State[] memory proofs = new State[](1);
+        proofs[0] = initialState;
+
+        // Verify that the transition is rejected
+        bool valid = adjudicator.adjudicate(channel, firstState, proofs);
+        assertFalse(valid, "First state with incorrect version should be rejected");
+    }
+
+    // -------------------- LATER STATE TRANSITION TESTS --------------------
+
+    function test_adjudicate_laterState_valid() public view {
+        // Create state 1 with both signatures
+        State memory state1 = _createOperateState("state 1", 1);
+        state1.sigs = new Signature[](2);
+        state1.sigs[HOST] = _signState(state1, hostPrivateKey);
+        state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
+
+        // Create state 2 with both signatures
+        State memory state2 = _createOperateState("state 2", 2);
+        state2.sigs = new Signature[](2);
+        state2.sigs[HOST] = _signState(state2, hostPrivateKey);
+        state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
+
+        // Provide state 1 as proof for state 2
+        State[] memory proofs = new State[](1);
+        proofs[0] = state1;
+
+        // Verify that the transition is valid
+        bool valid = adjudicator.adjudicate(channel, state2, proofs);
+        assertTrue(valid, "Valid state transition from 1 to 2 should be accepted");
+    }
+
+    function test_adjudicate_laterState_revert_whenIncorrectVersionIncrement() public view {
+        // Create state 1 with both signatures
+        State memory state1 = _createOperateState("state 1", 1);
+        state1.sigs = new Signature[](2);
+        state1.sigs[HOST] = _signState(state1, hostPrivateKey);
+        state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
+
+        // Create state 3 with both signatures (skipping version 2)
+        State memory state3 = _createOperateState("state 3", 3);
+        state3.sigs = new Signature[](2);
+        state3.sigs[HOST] = _signState(state3, hostPrivateKey);
+        state3.sigs[GUEST] = _signState(state3, guestPrivateKey);
+
+        // Provide state 1 as proof for state 3
+        State[] memory proofs = new State[](1);
+        proofs[0] = state1;
+
+        // Verify that the transition is rejected
+        bool valid = adjudicator.adjudicate(channel, state3, proofs);
+        assertFalse(valid, "State with non-sequential version should be rejected");
+    }
+
+    function test_adjudicate_laterState_revert_whenAllocationSumChanged() public view {
+        // Create state 1 with both signatures
+        State memory state1 = _createOperateState("state 1", 1);
+        state1.sigs = new Signature[](2);
+        state1.sigs[HOST] = _signState(state1, hostPrivateKey);
+        state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
+
+        // Create state 2 with different allocation sums
+        State memory state2 = _createOperateState("state 2", 2);
+        state2.allocations[HOST].amount = 60; // Changed from 50
+        state2.allocations[GUEST].amount = 50; // Kept at 50, total sum is now 110 instead of 100
+        state2.sigs = new Signature[](2);
+        state2.sigs[HOST] = _signState(state2, hostPrivateKey);
+        state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
+
+        // Provide state 1 as proof for state 2
+        State[] memory proofs = new State[](1);
+        proofs[0] = state1;
+
+        // Verify that the transition is rejected
+        bool valid = adjudicator.adjudicate(channel, state2, proofs);
+        assertFalse(valid, "State with changed allocation sum should be rejected");
+    }
+
+    function test_adjudicate_revert_whenNoStateProof() public view {
+        // Create state 2 without providing a proof
+        State memory state2 = _createOperateState("state 2", 2);
+        state2.sigs = new Signature[](2);
+        state2.sigs[HOST] = _signState(state2, hostPrivateKey);
+        state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
+
+        // Provide empty proofs array
+        State[] memory emptyProofs = new State[](0);
+
+        // Verify that the adjudication is rejected
+        bool valid = adjudicator.adjudicate(channel, state2, emptyProofs);
+        assertFalse(valid, "State without proof should be rejected");
+    }
+
+    function test_adjudicate_revert_whenTooManyProofs() public view {
+        // Create state 1
+        State memory state1 = _createOperateState("state 1", 1);
+        state1.sigs = new Signature[](2);
+        state1.sigs[HOST] = _signState(state1, hostPrivateKey);
+        state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
+
+        // Create state 2
+        State memory state2 = _createOperateState("state 2", 2);
+        state2.sigs = new Signature[](2);
+        state2.sigs[HOST] = _signState(state2, hostPrivateKey);
+        state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
+
+        // Provide both initial state and state 1 as proofs (too many)
+        State[] memory tooManyProofs = new State[](2);
+        tooManyProofs[0] = _createInitialState("initial state");
+        tooManyProofs[1] = state1;
+
+        // Verify that the adjudication is rejected
+        bool valid = adjudicator.adjudicate(channel, state2, tooManyProofs);
+        assertFalse(valid, "State with too many proofs should be rejected");
+    }
+
+    // -------------------- RESIZE STATE TRANSITION TESTS --------------------
+
+    function test_adjudicate_afterResize_valid() public view {
+        // Create state 1 with both signatures
+        State memory state1 = _createOperateState("state 1", 1);
+        state1.sigs = new Signature[](2);
+        state1.sigs[HOST] = _signState(state1, hostPrivateKey);
+        state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
+
+        // Create resize state 2
+        int256[] memory resizeAmounts = new int256[](2);
+        resizeAmounts[HOST] = 10;
+        resizeAmounts[GUEST] = -10;
+        State memory resizeState = _createResizeState("resize state", 2, resizeAmounts);
+        resizeState.sigs = new Signature[](2);
+        resizeState.sigs[HOST] = _signState(resizeState, hostPrivateKey);
+        resizeState.sigs[GUEST] = _signState(resizeState, guestPrivateKey);
+
+        // Create state 3 after resize
+        State memory state3 = _createOperateState("state 3", 3);
+        state3.sigs = new Signature[](2);
+        state3.sigs[HOST] = _signState(state3, hostPrivateKey);
+        state3.sigs[GUEST] = _signState(state3, guestPrivateKey);
+
+        // Provide resize state as proof for state 3
+        State[] memory proofs = new State[](1);
+        proofs[0] = resizeState;
+
+        // Verify that the transition is valid
+        bool valid = adjudicator.adjudicate(channel, state3, proofs);
+        assertTrue(valid, "Valid state transition after resize should be accepted");
+    }
+
+    // Test signature validation using a non-corrupt signature but wrong signer
+    function test_WrongSignerRejected() public view {
+        // Create state with signatures from wrong participants
+        State memory state = _createOperateState("state", 1);
+        state.sigs = new Signature[](2);
+
+        // Use guest's signature for both slots
+        state.sigs[HOST] = _signState(state, guestPrivateKey); // Should be host, but using guest
+        state.sigs[GUEST] = _signState(state, guestPrivateKey);
+
+        // Create a valid initial state as proof
+        State memory initialState = _createInitialState("initial state");
+        initialState.sigs = new Signature[](2);
+        initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
+        initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
+
+        State[] memory proofs = new State[](1);
+        proofs[0] = initialState;
+
+        // Verify that the signature from wrong participant is rejected
+        bool valid = adjudicator.adjudicate(channel, state, proofs);
+        assertFalse(valid, "State with wrong signer should be rejected");
     }
 }

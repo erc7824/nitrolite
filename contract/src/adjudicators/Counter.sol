@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature} from "../interfaces/Types.sol";
+import {Channel, State, Allocation, Signature, StateIntent} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
 
 /**
@@ -13,30 +13,14 @@ import {Utils} from "../Utils.sol";
  *      When the counter reaches the target, the game ends with FINAL status.
  */
 contract Counter is IAdjudicator {
-    /// @notice Error thrown when signature verification fails
-    error InvalidSignature();
-    /// @notice Error thrown when turn order is violated
-    error InvalidTurn();
-    /// @notice Error thrown when the counter increment is invalid
-    error InvalidIncrement();
-    /// @notice Error thrown when counter value is invalid
-    error InvalidCounter();
-    /// @notice Error thrown when insufficient signatures are provided
-    error InsufficientSignatures();
-
-    uint256 private constant HOST = 0;
-    uint256 private constant GUEST = 1;
+    using Utils for State;
 
     /**
-     * @dev CounterApp represents the game state.
-     * @param counter Current counter value.
+     * @dev Data represents the game state.
      * @param target  Target counter value at which the game ends.
-     * @param version State version number starting from 0.
      */
-    struct CounterApp {
-        uint256 counter;
+    struct Data {
         uint256 target;
-        uint256 version;
     }
 
     /**
@@ -52,53 +36,67 @@ contract Counter is IAdjudicator {
         override
         returns (bool valid)
     {
-        // Ensure the candidate state is signed by both participants.
-        if (candidate.sigs.length != 2) {
+        // NOTE: Another reason why Adjudicator cares about "resize" state is when it enters the states chain.
+        // NOTE: candidate is never initial state, as this can only happen during challenge or checkpoint, in which case
+        // initial state is handled in the protocol layer
+        // NOTE: However, initial state can be proofs[0], in which case it should contain signatures from all participants
+        // (which can be obtained from blockchain events as all participants are required to join the channel)
+
+        if (proofs.length != 1) {
             return false;
         }
 
-        // Compute the state hash for signature verification.
-        bytes32 stateHash = Utils.getStateHash(chan, candidate);
-
-        // Decode the candidate state data.
-        CounterApp memory candidateState = abi.decode(candidate.data, (CounterApp));
-
-        // INITIAL STATE: version 0 requires both signatures.
-        if (candidateState.version == 0) {
-            // true if both signatures are valid
-            return Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[HOST])
-                && Utils.verifySignature(stateHash, candidate.sigs[1], chan.participants[GUEST]);
-        }
-
-        // For non-initial states, ensure a previous state is provided.
-        if (proofs.length == 0) {
+        // for state 1+ validate it does NOT exceed the target
+        Data memory candidateData = abi.decode(candidate.data, (Data));
+        if (candidate.version > candidateData.target) {
             return false;
         }
 
-        // Decode the previous state.
-        CounterApp memory previousState = abi.decode(proofs[0].data, (CounterApp));
-
-        // Validate that the counter increment is exactly 1.
-        if (candidateState.counter != previousState.counter + 1) {
+        if (candidate.intent != StateIntent.OPERATE) {
             return false;
         }
 
-        // Validate that the version increment is exactly 1.
-        if (candidateState.version != previousState.version + 1) {
+        // proof is Initialize State
+        if (candidate.version == 1) {
+            return proofs[0].validateTransitionTo(candidate) && _validateAppTransitionTo(proofs[0].data, candidate.data)
+                && proofs[0].validateInitialState(chan) && _validateStateSig(chan, candidate);
+        }
+
+        bytes memory proofData = proofs[0].data;
+
+        if (proofs[0].intent == StateIntent.RESIZE) {
+            // NOTE: this approach requires double encoding of Data: `abi.encode(resizeAmounts,abi.encode(Data))`
+            (, proofData) = abi.decode(proofs[0].data, (int256[], bytes));
+        }
+
+        // proof is Operate or Resize State
+        return proofs[0].validateTransitionTo(candidate) && _validateAppTransitionTo(proofData, candidate.data)
+            && _validateStateSig(chan, proofs[0]) && _validateStateSig(chan, candidate);
+    }
+
+    function _validateAppTransitionTo(bytes memory previousData, bytes memory candidateData)
+        internal
+        pure
+        returns (bool)
+    {
+        Data memory candidateDataDecoded = abi.decode(candidateData, (Data));
+        Data memory previousDataDecoded = abi.decode(previousData, (Data));
+
+        return candidateDataDecoded.target == previousDataDecoded.target;
+    }
+
+    function _validateStateSig(Channel calldata chan, State calldata state) internal pure returns (bool) {
+        if (state.sigs.length != 1) {
             return false;
         }
 
-        // Ensure the rules of the game are consistent, for simplisity.
-        if (candidateState.target != previousState.target) {
-            return false;
+        // NOTE: 0th state is unanimously signed, 1st - by host, 2nd - by guest and so on
+        uint256 signerIdx = 0; // host signer by default
+
+        if (state.version % 2 == 0) {
+            signerIdx = 1; // guest signer
         }
 
-        // Ensure the candidate counter does not exceed its target.
-        if (candidateState.counter > candidateState.target) {
-            return false;
-        }
-
-        // All validations passed.
-        return true;
+        return Utils.verifySignature(Utils.getStateHash(chan, state), state.sigs[0], chan.participants[signerIdx]);
     }
 }

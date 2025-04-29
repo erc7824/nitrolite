@@ -91,15 +91,11 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
         uint256 proofsLength = proofs.length;
 
         if (proofsLength == 0) {
-            if (_validateRemittanceState(chan, candidate)) {
+            if (!_validateRemittanceState(chan, candidate)) {
                 return false;
             }
 
-            if (_validateRemittanceTransition(proofs[0], candidate)) {
-                return false;
-            }
-        } else {
-
+            return _validateRemittanceTransition(proofs[0], candidate);
         }
 
         State memory previousState;
@@ -108,11 +104,11 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
             previousState = currentState;
             currentState = proofs[currIdx];
 
-            if (_validateRemittanceState(chan, currentState)) {
+            if (!_validateRemittanceState(chan, currentState)) {
                 return false;
             }
 
-            if (_validateRemittanceTransition(previousState, currentState)) {
+            if (!_validateRemittanceTransition(previousState, currentState)) {
                 return false;
             }
         }
@@ -144,7 +140,7 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
 
     function _validateRemittanceTransition(State memory previousState, State memory currentState) internal pure returns (bool) {
         // basic validations: version, allocations sum
-        if (previousState.validateTransitionTo(currentState)) {
+        if (!previousState.validateTransitionTo(currentState)) {
             return false;
         }
 

@@ -97,11 +97,11 @@ describe("NitroliteService", () => {
             fn: "close",
         },
         {
-            prepareName: "prepareReset",
-            execName: "reset",
-            prepare: () => service.prepareReset(channelId, candidateState, proofs, newChannelConfig, newDepositState),
-            exec: () => service.reset(channelId, candidateState, proofs, newChannelConfig, newDepositState),
-            fn: "reset",
+            prepareName: "prepareResize",
+            execName: "resize",
+            prepare: () => service.prepareResize(channelId, candidateState, proofs),
+            exec: () => service.resize(channelId, candidateState, proofs),
+            fn: "resize",
         },
         {
             prepareName: "prepareWithdraw",

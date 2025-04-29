@@ -19,14 +19,13 @@ describe("NitroliteTransactionPreparer", () => {
     const accountAddress = "0xACC" as const;
     const guestAddress = "0xGUEST" as const;
 
-    const adjudicators = {
-        default: "0xADD" as const,
-    };
+    const adjudicator = "0xADD" as const;
+
     const addresses: ContractAddresses = {
         tokenAddress,
         custody,
         guestAddress,
-        adjudicators,
+        adjudicator,
     };
     const account = { address: accountAddress };
 

@@ -202,7 +202,7 @@ export class NitroliteRPC {
         const signature = message.sig[0];
 
         if (message.sig.length > 1) {
-            console.warn("verifySingleSignature called on message with multiple signatures. Verifying only the first one.");
+            console.error("verifySingleSignature called on message with multiple signatures. Verifying only the first one.");
         }
 
         try {

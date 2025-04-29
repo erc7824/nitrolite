@@ -121,6 +121,12 @@ export interface ChallengeChannelParams {
     proofStates?: State[];
 }
 
+export interface ResizeChannelParams {
+    channelId: ChannelId;
+    candidateState: State;
+    proofStates?: State[];
+}
+
 /**
  * Parameters required for checkpointing a state on-chain.
  */

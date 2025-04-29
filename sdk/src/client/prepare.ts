@@ -1,6 +1,6 @@
 import { Account, SimulateContractReturnType, WalletClient, Chain, Transport, ParseAccount, zeroAddress } from "viem";
 import { NitroliteService, Erc20Service } from "./services";
-import { CreateChannelParams, CheckpointChannelParams, ChallengeChannelParams, CloseChannelParams } from "./types";
+import { CreateChannelParams, CheckpointChannelParams, ChallengeChannelParams, CloseChannelParams, ResizeChannelParams } from "./types";
 import { ContractAddresses } from "../abis";
 import * as Errors from "../errors";
 import { _prepareAndSignInitialState, _prepareAndSignFinalState } from "./state";
@@ -146,6 +146,22 @@ export class NitroliteTransactionPreparer {
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
             throw new Errors.ContractCallError("prepareChallengeChannelTransaction", err as Error, { params });
+        }
+    }
+
+    /**
+     * Prepares the transaction data for resize a channel on-chain.
+     * @param params Parameters for resizing the channel. See {@link ResizeChannelParams}.
+     * @returns The prepared transaction data ({ to, data, value }).
+     */
+    async prepareResizeChannelTransaction(params: ResizeChannelParams): Promise<PreparedTransaction> {
+        const { channelId, candidateState, proofStates = [] } = params;
+
+        try {
+            return await this.deps.nitroliteService.prepareResize(channelId, candidateState, proofStates);
+        } catch (err) {
+            if (err instanceof Errors.NitroliteError) throw err;
+            throw new Errors.ContractCallError("prepareResizeChannelTransaction", err as Error, { params });
         }
     }
 

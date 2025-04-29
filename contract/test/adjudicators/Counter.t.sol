@@ -79,10 +79,36 @@ contract CounterTest is Test {
 
     function _createCounterState(uint256 target, uint256 version) internal pure returns (State memory) {
         State memory state;
+        state.intent = StateIntent.OPERATE; // Set the proper intent for operation
         state.version = version;
 
         // Encode the Counter data
         state.data = abi.encode(Counter.Data({target: target}));
+
+        // Create dummy allocations
+        state.allocations = new Allocation[](2);
+        state.allocations[HOST] = Allocation({
+            destination: address(0),
+            token: address(0),
+            amount: 100
+        });
+        state.allocations[GUEST] = Allocation({
+            destination: address(0),
+            token: address(0),
+            amount: 100
+        });
+
+        state.sigs = new Signature[](0);
+        return state;
+    }
+
+    function _createResizeState(uint256 target, uint256 version, int256[] memory resizeAmounts) internal pure returns (State memory) {
+        State memory state;
+        state.intent = StateIntent.RESIZE;
+        state.version = version;
+
+        // Encode resize amounts and the Counter data
+        state.data = abi.encode(resizeAmounts, abi.encode(Counter.Data({target: target})));
 
         // Create dummy allocations
         state.allocations = new Allocation[](2);
@@ -172,15 +198,31 @@ contract CounterTest is Test {
         assertFalse(valid, "First state signed by incorrect participant should be rejected");
     }
 
-    // -------------------- LATER STATE TRANSITION TESTS --------------------
-
-    function test_adjudicate_laterState_valid() public view {
-        // Create the initial state
+    function test_adjudicate_firstState_revert_whenWrongIntent() public view {
+        // Create initial state with target 10
         State memory initialState = _createInitialState(10);
         initialState.sigs = new Signature[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 
+        // Create first state with incorrect intent
+        State memory firstState = _createCounterState(10, 1);
+        firstState.intent = StateIntent.FINALIZE; // Wrong intent for first operational state
+        firstState.sigs = new Signature[](1);
+        firstState.sigs[0] = _signState(firstState, hostPrivateKey);
+
+        // Provide the initial state as proof
+        State[] memory proofs = new State[](1);
+        proofs[0] = initialState;
+
+        // Verify that the transition is rejected
+        bool valid = counter.adjudicate(channel, firstState, proofs);
+        assertFalse(valid, "State with incorrect intent should be rejected");
+    }
+
+    // -------------------- LATER STATE TRANSITION TESTS --------------------
+
+    function test_adjudicate_laterState_valid() public view {
         // Create state 1
         State memory state1 = _createCounterState(10, 1);
         state1.sigs = new Signature[](1);
@@ -315,5 +357,58 @@ contract CounterTest is Test {
         // Verify that the adjudication is rejected
         bool valid = counter.adjudicate(channel, state2, tooManyProofs);
         assertFalse(valid, "State with too many proofs should be rejected");
+    }
+
+    // -------------------- RESIZE STATE TRANSITION TESTS --------------------
+
+    function test_adjudicate_afterResize_valid() public view {
+        // Create state 1
+        State memory state1 = _createCounterState(10, 1);
+        state1.sigs = new Signature[](1);
+        state1.sigs[0] = _signState(state1, hostPrivateKey);
+
+        // Create resize state 2
+        int256[] memory resizeAmounts = new int256[](2);
+        resizeAmounts[0] = 20;
+        resizeAmounts[1] = -20;
+        State memory resizeState = _createResizeState(10, 2, resizeAmounts);
+        resizeState.sigs = new Signature[](1);
+        resizeState.sigs[0] = _signState(resizeState, guestPrivateKey);
+
+        // Create state 3 after resize (valid operation state)
+        State memory state3 = _createCounterState(10, 3);
+        state3.sigs = new Signature[](1);
+        state3.sigs[0] = _signState(state3, hostPrivateKey);
+
+        // Provide resize state as proof for state 3
+        State[] memory proofs = new State[](1);
+        proofs[0] = resizeState;
+
+        // Verify that the transition is valid
+        bool valid = counter.adjudicate(channel, state3, proofs);
+        assertTrue(valid, "Valid state transition after resize should be accepted");
+    }
+
+    function test_adjudicate_afterResize_revert_whenTargetChanged() public view {
+        // Create resize state 2
+        int256[] memory resizeAmounts = new int256[](2);
+        resizeAmounts[0] = 20;
+        resizeAmounts[1] = -20;
+        State memory resizeState = _createResizeState(10, 2, resizeAmounts);
+        resizeState.sigs = new Signature[](1);
+        resizeState.sigs[0] = _signState(resizeState, guestPrivateKey);
+
+        // Create state 3 after resize with different target
+        State memory state3 = _createCounterState(15, 3); // Changed target from 10 to 15
+        state3.sigs = new Signature[](1);
+        state3.sigs[0] = _signState(state3, hostPrivateKey);
+
+        // Provide resize state as proof for state 3
+        State[] memory proofs = new State[](1);
+        proofs[0] = resizeState;
+
+        // Verify that the transition is rejected
+        bool valid = counter.adjudicate(channel, state3, proofs);
+        assertFalse(valid, "State with changed target after resize should be rejected");
     }
 }

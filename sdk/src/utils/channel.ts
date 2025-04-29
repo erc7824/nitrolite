@@ -22,22 +22,24 @@ export function getChannelId(channel: Channel): ChannelId {
 }
 
 /**
- * Generate a robust nonce for channel creation.
+ * Generate a robust nonce for channel creation, ensuring it fits within uint64.
  * This mitigates collision risks by combining timestamp, randomness, and optionally an address.
  * @param address Optional address to mix into the nonce for further uniqueness.
  * @returns A unique BigInt nonce suitable for Channel.channelNonce.
  */
 export function generateChannelNonce(address?: Address): bigint {
     const timestamp = BigInt(Math.floor(Date.now() / 1000));
-
     const randomComponent = BigInt(Math.floor(Math.random() * 0xffffffff));
 
-    let nonce = (timestamp << 32n) | randomComponent;
+    let combinedNonce = (timestamp << 32n) | randomComponent;
 
     if (address) {
         const addressComponent = BigInt(`0x${address.slice(-16)}`);
-        nonce = nonce ^ addressComponent;
+        combinedNonce = combinedNonce ^ addressComponent;
     }
+
+    const maxUint64 = 0xffffffffffffffffn;
+    const nonce = combinedNonce & maxUint64;
 
     return nonce;
 }

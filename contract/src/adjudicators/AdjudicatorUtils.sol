@@ -30,4 +30,19 @@ library AdjudicatorUtils {
         return Utils.verifySignature(stateHash, state.sigs[0], chan.participants[CREATOR])
             && Utils.verifySignature(stateHash, state.sigs[1], chan.participants[BROKER]);
     }
+
+    function validateTransitionTo(State calldata previous, State calldata candidate) internal pure returns (bool) {
+        if (candidate.version != previous.version + 1) {
+            return false;
+        }
+
+        uint256 candidateSum = candidate.allocations[0].amount + candidate.allocations[1].amount;
+        uint256 previousSum = previous.allocations[0].amount + previous.allocations[1].amount;
+
+        if (candidateSum != previousSum) {
+            return false;
+        }
+
+        return true;
+    }
 }

@@ -16,10 +16,6 @@ import {AdjudicatorUtils} from "../adjudicators/AdjudicatorUtils.sol";
 contract Counter is IAdjudicator {
     using AdjudicatorUtils for State;
 
-    // TODO: replace with constants from Custody
-    uint256 private constant HOST = 0;
-    uint256 private constant GUEST = 1;
-
     /**
      * @dev Data represents the game state.
      * @param target  Target counter value at which the game ends.
@@ -63,51 +59,31 @@ contract Counter is IAdjudicator {
 
         // proof is Initialize State
         if (candidate.version == 1) {
-            return _validateStateTransition(candidate, proofs[0]) &&
+            return proofs[0].validateTransitionTo(candidate) &&
+                    _validateAppTransitionTo(proofs[0].data, candidate.data) &&
                      proofs[0].validateInitialState(chan) &&
                     _validateStateSig(chan, candidate);
         }
 
-        // proof is Resize State
+        bytes memory proofData = proofs[0].data;
+
         if (proofs[0].intent == StateIntent.RESIZE) {
-            return _validateStateTransition(candidate, proofs[0]) &&
-                 proofs[0].validateUnanimousSignatures(chan) &&
-                _validateStateSig(chan, candidate);
+            // NOTE: this approach requires double encoding of Data: `abi.encode(resizeAmounts,abi.encode(Data))`
+            (, proofData) = abi.decode(proofs[0].data, (int256[], bytes));
         }
 
-        // proof is Operate State
-        return _validateStateTransition(candidate, proofs[0]) &&
+        // proof is Operate or Resize State
+        return proofs[0].validateTransitionTo(candidate) &&
+                _validateAppTransitionTo(proofData, candidate.data) &&
                 _validateStateSig(chan, proofs[0]) &&
                 _validateStateSig(chan, candidate);
     }
 
-    function _validateStateTransition(State calldata candidate, State calldata previous) internal pure returns (bool) {
-        if (candidate.version != previous.version + 1) {
-            return false;
-        }
+    function _validateAppTransitionTo(bytes memory previousData, bytes memory candidateData) internal pure returns (bool) {
+        Data memory candidateDataDecoded = abi.decode(candidateData, (Data));
+        Data memory previousDataDecoded = abi.decode(previousData, (Data));
 
-        uint256 candidateSum = candidate.allocations[0].amount + candidate.allocations[1].amount;
-        uint256 previousSum = previous.allocations[0].amount + previous.allocations[1].amount;
-
-        if (candidateSum != previousSum) {
-            return false;
-        }
-
-        Data memory candidateData = abi.decode(candidate.data, (Data));
-        Data memory previousData;
-
-        // candidate can be based on a RESIZE proof, which contains resize amounts apart from the AppData
-        if (candidate.intent == StateIntent.RESIZE) {
-           (,previousData) = abi.decode(previous.data, (int256[], Data));
-        } else {
-            previousData = abi.decode(candidate.data, (Data));
-        }
-
-        if (candidateData.target != previousData.target) {
-            return false;
-        }
-
-        return true;
+        return candidateDataDecoded.target == previousDataDecoded.target;
     }
 
     function _validateStateSig(Channel calldata chan, State calldata state) internal pure returns (bool) {

@@ -3,42 +3,38 @@ pragma solidity ^0.8.13;
 
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
 import {IComparable} from "../interfaces/IComparable.sol";
-import {Channel, State, Allocation, Signature, Amount} from "../interfaces/Types.sol";
+import {Channel, State, Allocation, Signature, Amount, StateIntent} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
 
 /**
  * @title Remittance Adjudicator
- * @notice An adjudicator that validates payment intent state transfers between participants
- * @dev Validates that allocation transfers are valid from offchain signed stateHash
+ * @notice An adjudicator that validates payment state transfers requiring only the sender's signature
+ * @dev Validates that the participant who is decreasing their allocation has signed the state
+ *      This prevents forging "more balance out of thin air" since only the person giving up funds
+ *      needs to sign, making it secure for two-party channels with single allocations per party
  */
-contract Remittance is IAdjudicator, IComparable {
-    uint256 constant CREATOR = 0;
-    uint256 constant BROKER = 1;
+contract RemittanceAdjudicator is IAdjudicator, IComparable {
+    using Utils for State;
 
-    /// @notice Error thrown when signature verification fails
-    error InvalidSignature();
-    /// @notice Error thrown when insufficient signatures are provided
-    error InsufficientSignatures();
-    /// @notice Error thrown when transfer intent is invalid
-    error InvalidTransfer();
-    /// @notice Error thrown when allocations do not match
-    error InvalidAllocations();
+    uint8 constant CREATOR = 0;
+    uint8 constant BROKER = 1;
 
     /**
-     * @dev Intent represents a payment transfer from one participant to another
-     * @param payer Index of the paying participant (0 for CREATOR, 1 for BROKER)
-     * @param transfer Amount and token being transferred
+     * @dev Remittance represents a payment transfer from one participant to another
+     * @param sender Index of the participant sending funds (0 for CREATOR, 1 for BROKER)
+     * @param amount Amount and token being transferred
      */
-    struct Intent {
-        uint8 payer; // Index of the Payer
-        Amount transfer; // Amount and token should match the updated allocation
+    struct Remittance {
+        uint8 sender; // Index of the participant sending funds
+        Amount amount; // Amount and token being transferred
     }
 
     /**
-     * @notice Validates state transitions based on payment intents
+     * @notice Validates state transitions based on the principle that only the sender needs to sign
      * @param chan The channel configuration
      * @param candidate The proposed state
-     * @param proofs Array containing previous states (proofs[0] is funding state, proofs[1] is last valid state if needed)
+     * @param proofs Array containing previous states in increasing order up to a starting state, which is either INITIALIZE, RESIZE or state signed by the other party
+     * I.e. if the same party has consequently been signing Remittances, they should supply all their subsequent states, based on a starting state.
      * @return valid True if the state transition is valid, false otherwise
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
@@ -47,134 +43,146 @@ contract Remittance is IAdjudicator, IComparable {
         override
         returns (bool valid)
     {
-        // Check that we have at least one signature
-        if (candidate.sigs.length == 0) {
+        // Must have at least one proof
+        if (proofs.length == 0) {
             return false;
         }
 
-        // First state after funding (version == 1) only requires funding proof
-        if (candidate.version == 1) {
-            // Must have funding proof
-            if (proofs.length == 0) {
+        Remittance memory candidateRemittance = abi.decode(candidate.data, (Remittance));
+
+        // The last proof must be either INITIALIZE, RESIZE, or signed by the other party
+        State memory earliestProof = proofs[0];
+
+        // Check if the last proof is a valid starting point
+        if (earliestProof.intent == StateIntent.INITIALIZE) {
+            if (!earliestProof.validateInitialState(chan)) {
                 return false;
             }
-
-            // Decode the intent
-            Intent memory intent = abi.decode(candidate.data, (Intent));
-
-            // Verify payer's signature
-            bytes32 stateHash = Utils.getStateHash(chan, candidate);
-            if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[intent.payer])) {
-                return false;
-            }
-
-            // Check allocations based on funding state (proofs[0])
-            // Calculate expected allocations after applying intent
-            Allocation[] memory expectedAllocations = new Allocation[](2);
-
-            // Start with the funding allocations
-            expectedAllocations[CREATOR] = proofs[0].allocations[CREATOR];
-            expectedAllocations[BROKER] = proofs[0].allocations[BROKER];
-
-            // Apply the intent transfer
-            if (intent.payer == CREATOR) {
-                // CREATOR is paying, reduce CREATOR's amount and increase BROKER's amount
-                if (expectedAllocations[CREATOR].amount < intent.transfer.amount) {
-                    return false; // Insufficient funds
-                }
-                expectedAllocations[CREATOR].amount -= intent.transfer.amount;
-                expectedAllocations[BROKER].amount += intent.transfer.amount;
-            } else {
-                // BROKER is paying, reduce BROKER's amount and increase CREATOR's amount
-                if (expectedAllocations[BROKER].amount < intent.transfer.amount) {
-                    return false; // Insufficient funds
-                }
-                expectedAllocations[BROKER].amount -= intent.transfer.amount;
-                expectedAllocations[CREATOR].amount += intent.transfer.amount;
-            }
-
-            // Verify candidate allocations match expected allocations
-            if (candidate.allocations.length != 2) {
-                return false;
-            }
-
-            // Check that tokens and amounts match for both allocations
-            if (
-                candidate.allocations[CREATOR].token != expectedAllocations[CREATOR].token
-                    || candidate.allocations[CREATOR].amount != expectedAllocations[CREATOR].amount
-                    || candidate.allocations[BROKER].token != expectedAllocations[BROKER].token
-                    || candidate.allocations[BROKER].amount != expectedAllocations[BROKER].amount
-            ) {
-                return false;
-            }
-
-            return true;
         }
-        // For states after the first transition (version > 1)
-        else if (candidate.version > 1) {
-            // Must have at least two proofs: funding state and last valid state
-            if (proofs.length < 2) {
+        else if (earliestProof.intent == StateIntent.RESIZE) {
+            if (!earliestProof.validateUnanimousSignatures(chan)) {
+                return false;
+            }
+            // NOTE: "extract" resize amounts, keep only the RESIZE state data
+            // Remittance is encoded in "bytes"
+            (, earliestProof.data) = abi.decode(earliestProof.data, (int256[], bytes));
+        }
+        else if (earliestProof.intent == StateIntent.OPERATE) {
+            // Otherwise, it must be signed by the other party (not the sender in candidate)
+            // The last proof must have exactly one signature
+            if (earliestProof.sigs.length != 1) {
                 return false;
             }
 
-            // Decode the intent
-            Intent memory intent = abi.decode(candidate.data, (Intent));
+            // Get the other participant who is not the sender in candidate
+            uint8 otherParty = candidateRemittance.sender == CREATOR ? BROKER : CREATOR;
 
-            // Verify payer's signature
-            bytes32 stateHash = Utils.getStateHash(chan, candidate);
-            if (!Utils.verifySignature(stateHash, candidate.sigs[0], chan.participants[intent.payer])) {
+            // Verify the other party signed the last proof
+            bytes32 lastProofHash = Utils.getStateHash(chan, earliestProof);
+            if (!Utils.verifySignature(lastProofHash, earliestProof.sigs[0], chan.participants[otherParty])) {
                 return false;
             }
-
-            // Check that version is incremented properly
-            if (candidate.version != proofs[1].version + 1) {
-                return false;
-            }
-
-            // Calculate expected allocations after applying intent to the last valid state
-            Allocation[] memory expectedAllocations = new Allocation[](2);
-
-            // Start with the last valid state allocations
-            expectedAllocations[CREATOR] = proofs[1].allocations[CREATOR];
-            expectedAllocations[BROKER] = proofs[1].allocations[BROKER];
-
-            // Apply the intent transfer
-            if (intent.payer == CREATOR) {
-                // CREATOR is paying, reduce CREATOR's amount and increase BROKER's amount
-                if (expectedAllocations[CREATOR].amount < intent.transfer.amount) {
-                    return false; // Insufficient funds
-                }
-                expectedAllocations[CREATOR].amount -= intent.transfer.amount;
-                expectedAllocations[BROKER].amount += intent.transfer.amount;
-            } else {
-                // BROKER is paying, reduce BROKER's amount and increase CREATOR's amount
-                if (expectedAllocations[BROKER].amount < intent.transfer.amount) {
-                    return false; // Insufficient funds
-                }
-                expectedAllocations[BROKER].amount -= intent.transfer.amount;
-                expectedAllocations[CREATOR].amount += intent.transfer.amount;
-            }
-
-            // Verify candidate allocations match expected allocations
-            if (candidate.allocations.length != 2) {
-                return false;
-            }
-
-            // Check that tokens and amounts match for both allocations
-            if (
-                candidate.allocations[CREATOR].token != expectedAllocations[CREATOR].token
-                    || candidate.allocations[CREATOR].amount != expectedAllocations[CREATOR].amount
-                    || candidate.allocations[BROKER].token != expectedAllocations[BROKER].token
-                    || candidate.allocations[BROKER].amount != expectedAllocations[BROKER].amount
-            ) {
-                return false;
-            }
-
-            return true;
+        } else {
+            // Invalid intent
+            return false;
         }
 
-        // Any other state is invalid
-        return false;
+        // FIXME: INITIALIZE state does NOT have a Remittance packed
+        uint256 proofsLength = proofs.length;
+
+        if (proofsLength == 0) {
+            if (_validateRemittanceState(chan, candidate)) {
+                return false;
+            }
+
+            if (_validateRemittanceTransition(proofs[0], candidate)) {
+                return false;
+            }
+        } else {
+
+        }
+
+        State memory previousState;
+        State memory currentState = proofs[0];
+        for (uint256 currIdx = 1; currIdx < proofsLength; currIdx++) {
+            previousState = currentState;
+            currentState = proofs[currIdx];
+
+            if (_validateRemittanceState(chan, currentState)) {
+                return false;
+            }
+
+            if (_validateRemittanceTransition(previousState, currentState)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function _validateRemittanceState(Channel calldata chan, State memory state) internal pure returns (bool) {
+        if (state.intent != StateIntent.OPERATE) {
+            return false;
+        }
+
+        if (state.sigs.length != 1) {
+            return false;
+        }
+
+        Remittance memory currentRemittance = abi.decode(state.data, (Remittance));
+
+        // NOTE: token must be the same
+        if (currentRemittance.amount.token != state.allocations[0].token ||
+            currentRemittance.amount.token != state.allocations[1].token) {
+            return false;
+        }
+
+        // Verify signature is from the sender
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+        return Utils.verifySignature(stateHash, state.sigs[0], chan.participants[currentRemittance.sender]);
+    }
+
+    function _validateRemittanceTransition(State memory previousState, State memory currentState) internal pure returns (bool) {
+        // basic validations: version, allocations sum
+        if (previousState.validateTransitionTo(currentState)) {
+            return false;
+        }
+
+        Remittance memory previousRemittance = abi.decode(previousState.data, (Remittance));
+        Remittance memory currentRemittance = abi.decode(currentState.data, (Remittance));
+
+        if (currentRemittance.sender != previousRemittance.sender) {
+            return false;
+        }
+
+        // Verify prev and curr tokens match
+        /// @dev prev and curr states are already confirmed to have only one token, so check if this is the same token
+        if (currentState.allocations[0].token != previousState.allocations[0].token) {
+            return false;
+        }
+
+        return _validateRemittanceIsApplied(currentRemittance, previousState.allocations, currentState.allocations);
+    }
+
+    function _validateRemittanceIsApplied(Remittance memory remittance, Allocation[] memory prevAllocations, Allocation[] memory currAllocations) internal pure returns (bool) {
+        // Verify sender's balance is decreasing
+        if (prevAllocations[remittance.sender].amount <= currAllocations[remittance.sender].amount) {
+            return false;
+        }
+
+        // Verify receiver's balance is increasing by the same amount
+        uint8 receiver = remittance.sender == CREATOR ? BROKER : CREATOR;
+        uint256 senderDecrease = prevAllocations[remittance.sender].amount -
+                                currAllocations[remittance.sender].amount;
+        uint256 receiverIncrease = currAllocations[receiver].amount -
+                                    prevAllocations[receiver].amount;
+
+        if (senderDecrease != receiverIncrease) {
+            return false;
+        }
+
+        // Verify that the remittance amount matches the actual balance changes
+        return remittance.amount.amount == senderDecrease;
     }
 
     /**

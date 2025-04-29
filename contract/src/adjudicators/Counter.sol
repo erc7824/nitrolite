@@ -4,8 +4,7 @@ pragma solidity ^0.8.13;
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
 import {Channel, State, Allocation, Signature, StateIntent} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
-
-import {console} from "forge-std/console.sol";
+import {AdjudicatorUtils} from "../adjudicators/AdjudicatorUtils.sol";
 
 /**
  * @title Counter Adjudicator
@@ -15,6 +14,9 @@ import {console} from "forge-std/console.sol";
  *      When the counter reaches the target, the game ends with FINAL status.
  */
 contract Counter is IAdjudicator {
+    using AdjudicatorUtils for State;
+
+    // TODO: replace with constants from Custody
     uint256 private constant HOST = 0;
     uint256 private constant GUEST = 1;
 
@@ -39,16 +41,7 @@ contract Counter is IAdjudicator {
         override
         returns (bool valid)
     {
-        // FIXME: resize state should be considered by an Adjudicator to support states coming after it, because it changes the allocations.
-        // Or another solution would be to delegate allocation handling to the protocol layer.
         // NOTE: Another reason why Adjudicator cares about "resize" state is when it enters the states chain.
-        // However, if users sign "resize" state, then numbering becomes broken:
-        // pre-presize: 41, signed by host; resize: 42, signed unanimously;
-        // post-resize: 43. Should be signed by guest (as host was the last alone signer), but from SC perspective it should be signed by host again (as version % 2 == 1)
-        // TODO: also a good idea may be to make magic number a field of state, not encoded in the data, so that initial and resize states can more easily held app-specific data
-        // and "magic" states are more easily distinguishable from common ones.
-
-
         // NOTE: candidate is never initial state, as this can only happen during challenge or checkpoint, in which case
         // initial state is handled in the protocol layer
         // NOTE: However, initial state can be proofs[0], in which case it should contain signatures from all participants
@@ -64,31 +57,28 @@ contract Counter is IAdjudicator {
             return false;
         }
 
+        if (candidate.intent != StateIntent.OPERATE) {
+            return false;
+        }
+
+        // proof is Initialize State
         if (candidate.version == 1) {
             return _validateStateTransition(candidate, proofs[0]) &&
-                    _validateInitialState(chan, proofs[0]) &&
+                     proofs[0].validateInitialState(chan) &&
                     _validateStateSig(chan, candidate);
         }
 
+        // proof is Resize State
+        if (proofs[0].intent == StateIntent.RESIZE) {
+            return _validateStateTransition(candidate, proofs[0]) &&
+                 proofs[0].validateUnanimousSignatures(chan) &&
+                _validateStateSig(chan, candidate);
+        }
+
+        // proof is Operate State
         return _validateStateTransition(candidate, proofs[0]) &&
                 _validateStateSig(chan, proofs[0]) &&
                 _validateStateSig(chan, candidate);
-    }
-
-    function _validateInitialState(Channel calldata chan, State calldata state) internal pure returns (bool) {
-        if (state.version != 0 ||  state.sigs.length != 2) {
-            return false;
-        }
-
-        if (state.intent != StateIntent.INITIALIZE) {
-            return false;
-        }
-
-        // Compute the state hash for signature verification.
-        bytes32 stateHash = Utils.getStateHash(chan, state);
-
-        return Utils.verifySignature(stateHash, state.sigs[0], chan.participants[HOST])
-            && Utils.verifySignature(stateHash, state.sigs[1], chan.participants[GUEST]);
     }
 
     function _validateStateTransition(State calldata candidate, State calldata previous) internal pure returns (bool) {
@@ -104,7 +94,14 @@ contract Counter is IAdjudicator {
         }
 
         Data memory candidateData = abi.decode(candidate.data, (Data));
-        Data memory previousData = abi.decode(previous.data, (Data));
+        Data memory previousData;
+
+        // candidate can be based on a RESIZE proof, which contains resize amounts apart from the AppData
+        if (candidate.intent == StateIntent.RESIZE) {
+           (,previousData) = abi.decode(previous.data, (int256[], Data));
+        } else {
+            previousData = abi.decode(candidate.data, (Data));
+        }
 
         if (candidateData.target != previousData.target) {
             return false;

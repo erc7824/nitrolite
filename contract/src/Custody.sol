@@ -10,15 +10,17 @@ import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
+
+// Constants for participant indices
+uint256 constant CREATOR = 0; // Participant index for the channel creator
+uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
+
 /**
  * @title Custody
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
  * @dev This implementation currently only supports 2 participant channels (CREATOR and BROKER)
  */
 contract Custody is IChannel, IDeposit {
-    // Constants for participant indices
-    uint256 constant CREATOR = 0; // Participant index for the channel creator
-    uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
 
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
@@ -440,6 +442,7 @@ contract Custody is IChannel, IDeposit {
         if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
 
         // Decode the magic number and resize amounts
+        // TODO: extract `int256[]` into an alias type
         int256[] memory resizeAmounts = abi.decode(candidate.data, (int256[]));
 
         if (candidate.intent != StateIntent.RESIZE) revert InvalidState();

@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
 import {Channel, State, Allocation, Signature, StateIntent} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
+import {AdjudicatorUtils} from "../adjudicators/AdjudicatorUtils.sol";
 
 /**
  * @title MutualConsent Adjudicator
@@ -11,6 +12,9 @@ import {Utils} from "../Utils.sol";
  * @dev Any state is considered valid as long as it's signed by both participants
  */
 contract Consensus is IAdjudicator {
+    using AdjudicatorUtils for State;
+
+    // TODO: replace with constants from Custody
     uint256 constant HOST = 0;
     uint256 constant GUEST = 1;
 
@@ -27,7 +31,6 @@ contract Consensus is IAdjudicator {
         override
         returns (bool valid)
     {
-        // FIXME: add `resize` handling
         // NOTE: candidate is never initial state, as this can only happen during challenge or checkpoint, in which case
         // initial state is handled in the protocol layer
         // NOTE: However, initial state can be proofs[0], in which case it should contain signatures from all participants
@@ -37,15 +40,17 @@ contract Consensus is IAdjudicator {
             return false;
         }
 
+        // proof is Initialize State
         if (candidate.version == 1) {
             return _validateStateTransition(candidate, proofs[0]) &&
-                    _validateInitialState(chan, proofs[0]) &&
-                    _validateStateSigs(chan, candidate);
+                    proofs[0].validateInitialState(chan) &&
+                    candidate.validateUnanimousSignatures(chan);
         }
 
-        return _validateStateTransition(candidate, proofs[0]) &&
-                _validateStateSigs(chan, proofs[0]) &&
-                _validateStateSigs(chan, candidate);
+        // proof is Operate or Resize State (both have same validation)
+         return _validateStateTransition(candidate, proofs[0]) &&
+                proofs[0].validateUnanimousSignatures(chan) &&
+                candidate.validateUnanimousSignatures(chan);
     }
 
 
@@ -78,16 +83,5 @@ contract Consensus is IAdjudicator {
         }
 
         return true;
-    }
-
-    function _validateStateSigs(Channel calldata chan, State calldata state) internal pure returns (bool) {
-        if (state.sigs.length != 2) {
-            return false;
-        }
-
-        bytes32 stateHash = Utils.getStateHash(chan, state);
-
-        return Utils.verifySignature(stateHash, state.sigs[HOST], chan.participants[HOST]) &&
-                Utils.verifySignature(stateHash, state.sigs[GUEST], chan.participants[GUEST]);
     }
 }

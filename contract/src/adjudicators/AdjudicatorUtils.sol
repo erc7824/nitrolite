@@ -6,8 +6,8 @@ import {Channel, State, Signature, StateIntent} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
 
 library AdjudicatorUtils {
-    uint256 constant CREATOR = 0;
-    uint256 constant BROKER = 1;
+    uint256 constant CLIENT = 0;
+    uint256 constant SERVER = 1;
 
     function validateInitialState(State calldata state, Channel calldata chan) internal pure returns (bool) {
         if (state.version != 0) {
@@ -29,8 +29,8 @@ library AdjudicatorUtils {
         // Compute the state hash for signature verification.
         bytes32 stateHash = Utils.getStateHash(chan, state);
 
-        return Utils.verifySignature(stateHash, state.sigs[0], chan.participants[CREATOR])
-            && Utils.verifySignature(stateHash, state.sigs[1], chan.participants[BROKER]);
+        return Utils.verifySignature(stateHash, state.sigs[0], chan.participants[CLIENT])
+            && Utils.verifySignature(stateHash, state.sigs[1], chan.participants[SERVER]);
     }
 
     function validateTransitionTo(State calldata previous, State calldata candidate) internal pure returns (bool) {

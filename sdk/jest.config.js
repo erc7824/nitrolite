@@ -8,11 +8,9 @@ module.exports = {
     '!src/**/index.ts',
     '!src/**/*.d.ts'
   ],
-  coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov'],
-  globals: {
-    'ts-jest': {
-      isolatedModules: true
-    }
+  collectCoverage: true,
+  coverageReporters: ['text'],
+  transform: {
+    '^.+\\.ts$': 'ts-jest'
   }
 };

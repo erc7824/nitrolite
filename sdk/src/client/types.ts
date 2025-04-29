@@ -40,24 +40,24 @@ export interface Channel {
 }
 
 /**
- * Channel state structure
+ * Channel status enum
  */
-export interface State {
-    data: Hex; // Application data encoded, decoded by the adjudicator for business logic
-    version: bigint; // Version of the state, incremented for each update
-    allocations: [Allocation, Allocation]; // Combined asset allocation and destination for each participant
-    sigs: Signature[]; // stateHash signatures
+export enum StateIntent {
+    OPERATE, // Operate the state application
+    INITIALIZE, // Initial funding state
+    RESIZE, // Resize state
+    FINALIZE, // Final closing state
 }
 
 /**
- * Adjudicator status enum
+ * Channel state structure
  */
-export enum AdjudicatorStatus {
-    VOID = 0, // Channel was never active or have an anomaly
-    PARTIAL = 1, // Partial funding waiting for other participants
-    ACTIVE = 2, // Channel fully funded using open or state are valid
-    INVALID = 3, // Channel state is invalid
-    FINAL = 4, // This is the FINAL State channel can be closed
+export interface State {
+    intent: StateIntent; // Intent of the state (e.g., INITIAL, ACTIVE, FINAL)
+    version: bigint; // Version of the state, incremented for each update
+    data: Hex; // Application data encoded, decoded by the adjudicator for business logic
+    allocations: [Allocation, Allocation]; // Combined asset allocation and destination for each participant
+    sigs: Signature[]; // stateHash signatures
 }
 
 /**
@@ -116,6 +116,12 @@ export interface CloseChannelParams {
  * Parameters required for challenging a state channel.
  */
 export interface ChallengeChannelParams {
+    channelId: ChannelId;
+    candidateState: State;
+    proofStates?: State[];
+}
+
+export interface ResizeChannelParams {
     channelId: ChannelId;
     candidateState: State;
     proofStates?: State[];

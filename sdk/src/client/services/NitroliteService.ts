@@ -311,6 +311,59 @@ export class NitroliteService {
     }
 
     /**
+     * Prepares the request data for resize a channel.
+     * Useful for batching multiple calls in a single UserOperation.
+     * @param channelId Channel ID.
+     * @param candidate Candidate state for the resizing channel. See {@link State} for details.
+     * @param proofs Supporting proofs. See {@link State} for details.
+     * @returns The prepared transaction request object.
+     */
+    async prepareResize(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<SimulateContractReturnType["request"]> {
+        const account = this.ensureAccount();
+        const operationName = "prepareResize";
+
+        try {
+            const { request } = await this.publicClient.simulateContract({
+                address: this.custodyAddress,
+                abi: CustodyAbi,
+                functionName: "resize",
+                args: [channelId, candidate, proofs],
+                account: account,
+            });
+
+            return request;
+        } catch (error: any) {
+            if (error instanceof Errors.NitroliteError) throw error;
+            throw new Errors.ContractCallError(operationName, error, { channelId });
+        }
+    }
+
+    /**
+     * Resize a channel.
+     * This method simulates and executes the transaction directly.
+     * You do not need to call `prepareResize` separately unless batching operations.
+     * @param channelId Channel ID.
+     * @param candidate Candidate state for the resizing channel. See {@link State} for details.
+     * @param proofs Supporting proofs. See {@link State} for details.
+     * @returns Transaction hash.
+     * @error Throws ContractCallError | TransactionError
+     */
+    async resize(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<Hash> {
+        const walletClient = this.ensureWalletClient();
+        const account = this.ensureAccount();
+        const operationName = "resize";
+
+        try {
+            const request = await this.prepareResize(channelId, candidate, proofs);
+
+            return await walletClient.writeContract({ ...request, account });
+        } catch (error: any) {
+            if (error instanceof Errors.NitroliteError) throw error;
+            throw new Errors.TransactionError(operationName, error, { channelId });
+        }
+    }
+
+    /**
      * Prepares the request data for closing a channel.
      * Useful for batching multiple calls in a single UserOperation.
      * @param channelId Channel ID.
@@ -355,69 +408,6 @@ export class NitroliteService {
 
         try {
             const request = await this.prepareClose(channelId, candidate, proofs);
-
-            return await walletClient.writeContract({ ...request, account });
-        } catch (error: any) {
-            if (error instanceof Errors.NitroliteError) throw error;
-            throw new Errors.TransactionError(operationName, error, { channelId });
-        }
-    }
-
-    /**
-     * Prepares the request data for resetting a channel.
-     * Useful for batching multiple calls in a single UserOperation.
-     * @param channelId Old channel ID.
-     * @param candidate Final state for old channel. See {@link State} for details.
-     * @param proofs Supporting proofs for old channel close. See {@link State} for details.
-     * @param newChannel Configuration for the new channel. See {@link Channel} for details.
-     * @param newDeposit Initial state for the new channel. See {@link State} for details.
-     * @returns The prepared transaction request object.
-     */
-    async prepareReset(
-        channelId: ChannelId,
-        candidate: State,
-        proofs: State[],
-        newChannel: Channel,
-        newDeposit: State
-    ): Promise<SimulateContractReturnType["request"]> {
-        const account = this.ensureAccount();
-        const operationName = "prepareReset";
-
-        try {
-            const { request } = await this.publicClient.simulateContract({
-                address: this.custodyAddress,
-                abi: CustodyAbi,
-                functionName: "reset",
-                args: [channelId, candidate, proofs, newChannel, newDeposit],
-                account: account,
-            });
-
-            return request;
-        } catch (error: any) {
-            if (error instanceof Errors.NitroliteError) throw error;
-            throw new Errors.ContractCallError(operationName, error, { channelId });
-        }
-    }
-
-    /**
-     * Reset a channel (close old, create new).
-     * This method simulates and executes the transaction directly.
-     * You do not need to call `prepareReset` separately unless batching operations.
-     * @param channelId Old channel ID.
-     * @param candidate Final state for old channel. See {@link State} for details.
-     * @param proofs Supporting proofs for old channel close. See {@link State} for details.
-     * @param newChannel Configuration for the new channel. See {@link Channel} for details.
-     * @param newDeposit Initial state for the new channel. See {@link State} for details.
-     * @returns Transaction hash.
-     * @error Throws ContractCallError | TransactionError
-     */
-    async reset(channelId: ChannelId, candidate: State, proofs: State[], newChannel: Channel, newDeposit: State): Promise<Hash> {
-        const walletClient = this.ensureWalletClient();
-        const account = this.ensureAccount();
-        const operationName = "reset";
-
-        try {
-            const request = await this.prepareReset(channelId, candidate, proofs, newChannel, newDeposit);
 
             return await walletClient.writeContract({ ...request, account });
         } catch (error: any) {

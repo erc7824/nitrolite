@@ -1,167 +1,242 @@
-import { Address, Hex, stringToHex } from "viem";
-import { NitroliteRPCMessage, NitroliteErrorCode, MessageSigner, MessageVerifier, RPCMessage } from "./types";
+import { Address } from "viem";
+import {
+    NitroliteRPCMessage,
+    RequestData,
+    NitroliteRPCErrorDetail,
+    AccountID,
+    Intent,
+    MessageSigner,
+    SingleMessageVerifier,
+    MultiMessageVerifier,
+    ParsedResponse, // Assuming ParsedResponse type is defined (without originalMessage)
+    ResponsePayload,
+    ApplicationRPCMessage,
+} from "./types";
 import { getCurrentTimestamp, generateRequestId } from "./utils";
 
 /**
- * NitroliteRPC utility class for creating and signing RPC messages
- *
- * This class provides core utilities for creating RPC messages
- * which are used for communication between clients and servers in the Nitrolite protocol.
- * It handles request/response messages as well as error messages.
+ * NitroliteRPC utility class for creating, signing, and parsing RPC messages
+ * according to the Clearnet protocol specification (which uses NitroRPC principles).
  */
 export class NitroliteRPC {
-    /** Constant representing the Host role (Client) */
-    static readonly HOST = 0;
-
-    /** Constant representing the Guest role (Server) */
-    static readonly GUEST = 1;
-
     /**
-     * Creates a NitroliteRPC request message
+     * Creates a NitroliteRPC request message.
      *
-     * @param method - The RPC method to call
-     * @param params - The parameters for the method call
-     * @param requestId - The unique ID for this request
-     * @param timestamp - The timestamp for this request
-     * @returns A formatted NitroliteRPCMessage object containing the request
+     * @param requestId - Unique ID for the request. Defaults to a generated ID.
+     * @param method - The RPC method name.
+     * @param params - Parameters for the method call.
+     * @param timestamp - Timestamp for the request. Defaults to the current time.
+     * @param int - Optional allocation intent change.
+     * @returns A formatted NitroliteRPCMessage object for the request.
      */
     static createRequest(
+        requestId: number = generateRequestId(),
         method: string,
         params: any[] = [],
-        requestId: number = generateRequestId(),
-        timestamp: number = getCurrentTimestamp()
+        timestamp: number = getCurrentTimestamp(),
+        int?: Intent
     ): NitroliteRPCMessage {
-        return { req: [requestId, method, params, timestamp] };
+        const requestData: RequestData = [requestId, method, params, timestamp];
+        const message: NitroliteRPCMessage = { req: requestData };
+
+        if (int !== undefined) {
+            message.int = int;
+        }
+
+        return message;
     }
 
     /**
-     * Creates a NitroliteRPC response message
+     * Creates a ApplicationRPCMessage request message.
      *
-     * @param requestId - The ID of the request this response is for
-     * @param method - The method that was called
-     * @param result - The result data from the method call
-     * @param timestamp - The timestamp for this response
-     * @returns A formatted NitroliteRPCMessage object containing the response
+     * @param requestId - Unique ID for the request. Defaults to a generated ID.
+     * @param method - The RPC method name.
+     * @param params - Parameters for the method call.
+     * @param timestamp - Timestamp for the request. Defaults to the current time.
+     * @param acc - The mandatory Account ID (channelId or appId).
+     * @param int - Optional allocation intent change.
+     * @returns A formatted NitroliteRPCMessage object for the request.
      */
-    static createResponse(requestId: number, method: string, result: any[] = [], timestamp: number = getCurrentTimestamp()): NitroliteRPCMessage {
-        return { res: [requestId, method, result, timestamp] };
+    static createAppRequest(
+        requestId: number = generateRequestId(),
+        method: string,
+        params: any[] = [],
+        timestamp: number = getCurrentTimestamp(),
+        acc: AccountID,
+        int?: Intent
+    ): ApplicationRPCMessage {
+        const requestData: RequestData = [requestId, method, params, timestamp];
+        const message: ApplicationRPCMessage = { req: requestData, acc };
+
+        if (int !== undefined) {
+            message.int = int;
+        }
+
+        return message;
     }
 
     /**
-     * Creates a NitroliteRPC error message
+     * Parses a raw message string or object received from the broker,
+     * validating its structure as a Nitrolite RPC response. Handles both
+     * messages with and without the top-level 'acc' field.
+     * Does NOT verify the signature.
      *
-     * @param requestId - The ID of the request that caused the error
-     * @param code - The error code
-     * @param message - The error message
-     * @param timestamp - The timestamp for this error
-     * @returns A formatted NitroliteRPCMessage object containing the error
+     * @param rawMessage - The raw JSON string or pre-parsed object received.
+     * @returns A ParsedResponse object containing the extracted data and validation status.
      */
-    static createError(requestId: number, code: number, message: string, timestamp: number = getCurrentTimestamp()): NitroliteRPCMessage {
-        return { err: [requestId, code, message, timestamp] };
+    static parseResponse(rawMessage: string | object): ParsedResponse {
+        let message: any;
+
+        try {
+            message = typeof rawMessage === "string" ? JSON.parse(rawMessage) : rawMessage;
+        } catch (e) {
+            console.error("Failed to parse incoming message:", e);
+            return {
+                isValid: false,
+                error: "Message parsing failed",
+            };
+        }
+
+        if (!message || typeof message !== "object" || !message.res || !Array.isArray(message.res) || message.res.length !== 4) {
+            return {
+                isValid: false,
+                error: "Invalid message structure: Missing or invalid 'res' array.",
+            };
+        }
+
+        const [requestId, method, dataPayload, timestamp] = message.res;
+        const acc = typeof message.acc === "string" ? message.acc : undefined;
+        const int = message.int;
+
+        if (typeof requestId !== "number" || typeof method !== "string" || !Array.isArray(dataPayload) || typeof timestamp !== "number") {
+            return {
+                isValid: false,
+                requestId,
+                method,
+                acc,
+                timestamp,
+                error: "Invalid 'res' payload structure or types.",
+            };
+        }
+
+        let data: any[] | NitroliteRPCErrorDetail;
+        let isError = false;
+        if (method === "error") {
+            isError = true;
+            if (dataPayload.length > 0 && typeof dataPayload[0] === "object" && dataPayload[0] !== null && "error" in dataPayload[0]) {
+                data = dataPayload[0] as NitroliteRPCErrorDetail;
+            } else {
+                return {
+                    isValid: false,
+                    requestId,
+                    method,
+                    acc,
+                    timestamp,
+                    error: "Malformed error response payload.",
+                };
+            }
+        } else {
+            data = dataPayload;
+        }
+
+        return {
+            isValid: true,
+            isError: isError,
+            requestId: requestId,
+            method: method,
+            data: data,
+            acc: acc,
+            int: int,
+            timestamp: timestamp,
+        };
     }
 
     /**
-     * Converts any value to a hex string representation
+     * Extracts the payload (req or res array) from a message for signing or verification.
      *
-     * @param value - The value to convert to hex
-     * @returns The value as a Hex string
+     * @param message - The NitroliteRPCMessage to extract the payload from.
+     * @returns The payload array (RequestData, ResponseData, or ErrorResponseData).
+     * @throws Error if the message doesn't contain a 'req' or 'res' field.
      * @private
      */
-    private static toHex(value: any): Hex {
-        return typeof value === "string" ? stringToHex(value) : stringToHex(JSON.stringify(value));
+    private static getMessagePayload(message: NitroliteRPCMessage): RequestData | ResponsePayload {
+        if (message.req) return message.req;
+        if (message.res) return message.res;
+        throw new Error("Invalid message: must contain 'req' or 'res' field to define payload.");
     }
 
     /**
-     * Converts a NitroliteRPCMessage to the RPCMessage format for contract interaction
+     * Signs a NitroliteRPC request message using the provided signer function.
+     * The signature is added to the 'sig' field as an array.
+     * The original message object is mutated.
      *
-     * @param message - The NitroliteRPCMessage to convert
-     * @returns The formatted RPCMessage suitable for use with contracts
-     * @throws Error if the message doesn't contain req, res, or err field
+     * @param message - The request message to sign (must contain 'req').
+     * @param signer - The signing function that takes the payload array and returns a signature.
+     * @returns The original message object mutated with the signature attached.
      */
-    static toRPCMessage(message: NitroliteRPCMessage): RPCMessage {
-        if (message.req) {
-            const [requestID, method, params, timestamp] = message.req;
-            return {
-                requestID: BigInt(requestID),
-                method,
-                params: params.map(this.toHex),
-                result: [],
-                timestamp: BigInt(timestamp),
-            };
+    static async signRequestMessage(message: NitroliteRPCMessage, signer: MessageSigner): Promise<NitroliteRPCMessage> {
+        if (!message.req) {
+            throw new Error("signRequestMessage can only sign request messages containing 'req'.");
         }
-
-        if (message.res) {
-            const [requestID, method, result, timestamp] = message.res;
-            // Extract params from a request if available, otherwise empty
-            const params = message.req ? (message.req[2] as any[]).map(this.toHex) : [];
-
-            return {
-                requestID: BigInt(requestID),
-                method,
-                params,
-                result: result.map(this.toHex),
-                timestamp: BigInt(timestamp),
-            };
-        }
-
-        if (message.err) {
-            const [requestID, code, errorMessage, timestamp] = message.err;
-            return {
-                requestID: BigInt(requestID),
-                method: "error",
-                params: [stringToHex(code.toString())],
-                result: [stringToHex(errorMessage)],
-                timestamp: BigInt(timestamp),
-            };
-        }
-
-        throw new Error("Invalid message: must contain req, res, or err field");
-    }
-
-    /**
-     * Extracts the payload from a message for signing
-     *
-     * @param message - The NitroliteRPCMessage to extract the payload from
-     * @returns The stringified payload ready for signing
-     * @throws Error if the message doesn't contain req, res, or err field
-     * @private
-     */
-    static getMessagePayload(message: NitroliteRPCMessage): string {
-        if (message.req) return JSON.stringify(message.req);
-        if (message.res) return JSON.stringify(message.res);
-        if (message.err) return JSON.stringify(message.err);
-        throw new Error("Invalid message: must contain req, res, or err field");
-    }
-
-    /**
-     * Signs a NitroliteRPC message using the provided signer function
-     *
-     * @param message - The message to sign
-     * @param signer - The signing function that will produce the signature
-     * @returns The original message with the signature attached
-     */
-    static async signMessage(message: NitroliteRPCMessage, signer: MessageSigner): Promise<NitroliteRPCMessage> {
         const payload = this.getMessagePayload(message);
         const signature = await signer(payload);
-
-        return { ...message, sig: signature };
+        message.sig = [signature];
+        return message;
     }
 
     /**
-     * Verifies a signature for a NitroliteRPC message
+     * Verifies a single signature for a NitroliteRPC message.
+     * Assumes the signature is the first (or only) element in the 'sig' array.
+     * NOTE: This is NOT called by parseResponse.
      *
-     * @param message - The signed message to verify
-     * @param expectedSigner - The address of the expected signer
-     * @param verifier - The verification function to use
-     * @returns True if the signature is valid, false otherwise
+     * @param message - The signed message to verify.
+     * @param expectedSigner - The Ethereum address of the expected signer.
+     * @param verifier - The verification function for single signatures.
+     * @returns A Promise resolving to true if the signature exists and is valid, false otherwise.
      */
-    static async verifyMessage(message: NitroliteRPCMessage, expectedSigner: Address, verifier: MessageVerifier): Promise<boolean> {
-        if (!message.sig) return false;
+    static async verifySingleSignature(message: NitroliteRPCMessage, expectedSigner: Address, verifier: SingleMessageVerifier): Promise<boolean> {
+        if (!message.sig || !Array.isArray(message.sig) || message.sig.length === 0) {
+            return false;
+        }
+
+        const signature = message.sig[0];
+
+        if (message.sig.length > 1) {
+            console.error("verifySingleSignature called on message with multiple signatures. Verifying only the first one.");
+        }
 
         try {
             const payload = this.getMessagePayload(message);
-            return verifier(payload, message.sig, expectedSigner);
+            return await verifier(payload, signature, expectedSigner);
         } catch (error) {
+            console.error("Error during single signature verification:", error);
+            return false;
+        }
+    }
+
+    /**
+     * Verifies multiple signatures for a NitroliteRPC message (e.g., for closing applications).
+     * NOTE: This is NOT called by parseResponse.
+     *
+     * @param message - The signed message to verify (expects 'sig' to be an array).
+     * @param expectedSigners - An array of Ethereum addresses of the required signers.
+     * @param verifier - The verification function for multiple signatures.
+     * @returns A Promise resolving to true if the signature field contains a valid set of signatures from the expected signers, false otherwise.
+     */
+    static async verifyMultipleSignatures(
+        message: NitroliteRPCMessage,
+        expectedSigners: Address[],
+        verifier: MultiMessageVerifier
+    ): Promise<boolean> {
+        if (!message.sig || !Array.isArray(message.sig)) {
+            return false;
+        }
+
+        try {
+            const payload = this.getMessagePayload(message);
+            return await verifier(payload, message.sig, expectedSigners);
+        } catch (error) {
+            console.error("Error during multiple signature verification:", error);
             return false;
         }
     }

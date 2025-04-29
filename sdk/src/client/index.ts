@@ -10,6 +10,7 @@ import {
     ChallengeChannelParams,
     CloseChannelParams,
     AccountInfo,
+    ResizeChannelParams,
 } from "./types";
 import * as Errors from "../errors";
 import { ContractAddresses } from "../abis";
@@ -38,7 +39,7 @@ export class NitroliteClient {
         if (!config.walletClient.account) throw new Errors.MissingParameterError("walletClient.account");
         if (!config.challengeDuration) throw new Errors.MissingParameterError("challengeDuration");
         if (!config.addresses?.custody) throw new Errors.MissingParameterError("addresses.custody");
-        if (!config.addresses?.adjudicators) throw new Errors.MissingParameterError("addresses.adjudicators");
+        if (!config.addresses?.adjudicator) throw new Errors.MissingParameterError("addresses.adjudicator");
         if (!config.addresses?.guestAddress) throw new Errors.MissingParameterError("addresses.guestAddress");
         if (!config.addresses?.tokenAddress) throw new Errors.MissingParameterError("addresses.tokenAddress");
 
@@ -162,6 +163,22 @@ export class NitroliteClient {
             return await this.nitroliteService.challenge(channelId, candidateState, proofStates);
         } catch (err) {
             throw new Errors.ContractCallError("Failed to execute challengeChannel on contract", err as Error);
+        }
+    }
+
+    /**
+     * Resize a channel on-chain using candidate state.
+     * Requires the candidate state.
+     * @param params Parameters for resizing the channel. See {@link CloseChannelParams}.
+     * @returns The transaction hash.
+     */
+    async resizeChannel(params: ResizeChannelParams): Promise<Hash> {
+        const { channelId, candidateState, proofStates = [] } = params;
+
+        try {
+            return await this.nitroliteService.resize(channelId, candidateState, proofStates);
+        } catch (err) {
+            throw new Errors.ContractCallError("Failed to execute resizeChannel on contract", err as Error);
         }
     }
 

@@ -11,13 +11,17 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
     const encoded = encodeAbiParameters(
         [
             { name: "channelId", type: "bytes32" },
-            { name: "data", type: "bytes" },
             // For channel creation, state.version must be 0 (corresponds to INITIAL status)
             // For active channels, state.version must be greater than 0
+            {
+                name: "intent",
+                type: "uint8",
+            },
             {
                 name: "version",
                 type: "uint256",
             },
+            { name: "data", type: "bytes" },
             {
                 name: "allocations",
                 type: "tuple[]",
@@ -28,7 +32,7 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
                 ],
             },
         ],
-        [channelId, state.data, state.version, state.allocations]
+        [channelId, state.intent, state.version, state.data, state.allocations]
     );
 
     return keccak256(encoded);

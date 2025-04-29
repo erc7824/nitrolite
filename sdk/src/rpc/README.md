@@ -1,6 +1,37 @@
+# Nitrolite RPC Module
+
+This module provides RPC communication capabilities for the Nitrolite SDK, allowing clients to interact with Nitrolite nodes through WebSocket connections.
+
+## API Functions
+
+| Function | Description | Parameters |
+|----------|-------------|------------|
+| `createAuthRequestMessage` | Creates a signed auth request message for initial authentication | `signer`, `clientAddress`, `requestId?`, `timestamp?` |
+| `createAuthVerifyMessageFromChallenge` | Creates a signed auth verify message using an explicit challenge | `signer`, `clientAddress`, `challenge`, `requestId?`, `timestamp?` |
+| `createAuthVerifyMessage` | Creates a signed auth verify message from a raw challenge response | `signer`, `rawChallengeResponse`, `clientAddress`, `requestId?`, `timestamp?` |
+| `createPingMessage` | Creates a signed ping message to check connection | `signer`, `requestId?`, `timestamp?` |
+| `createGetConfigMessage` | Creates a signed get_config message | `signer`, `channelId`, `requestId?`, `timestamp?` |
+| `createGetLedgerBalancesMessage` | Creates a signed get_ledger_balances message | `signer`, `channelId`, `requestId?`, `timestamp?` |
+| `createGetAppDefinitionMessage` | Creates a signed get_app_definition message | `signer`, `appId`, `requestId?`, `timestamp?` |
+| `createAppSessionMessage` | Creates a signed create_app_session message | `signer`, `params`, `intent`, `requestId?`, `timestamp?` |
+| `createCloseAppSessionMessage` | Creates a signed close_app_session message | `signer`, `params`, `intent`, `requestId?`, `timestamp?` |
+| `createApplicationMessage` | Creates a signed application message | `signer`, `appId`, `messageParams`, `requestId?`, `timestamp?` |
+| `createCloseChannelMessage` | Creates a signed close_channel message | `signer`, `channelId`, `requestId?`, `timestamp?` |
+
+## NitroliteRPC Class Methods
+
+| Method | Description | Parameters |
+|--------|-------------|------------|
+| `createRequest` | Creates a NitroliteRPC request message | `requestId?`, `method`, `params?`, `timestamp?`, `int?` |
+| `createAppRequest` | Creates an application-specific RPC message | `requestId?`, `method`, `params?`, `timestamp?`, `acc`, `int?` |
+| `parseResponse` | Parses and validates a raw response | `rawMessage` |
+| `signRequestMessage` | Signs a request message with the provided signer | `message`, `signer` |
+| `verifySingleSignature` | Verifies a single signature on a message | `message`, `expectedSigner`, `verifier` |
+| `verifyMultipleSignatures` | Verifies multiple signatures on a message | `message`, `expectedSigners`, `verifier` |
+
 # NitroliteRPC - Simple RPC for State Channels
 
-A minimalist implementation of the NitroliteRPC protocol for communicating with state channel brokers.
+A minimalist implementation of the NitroliteRPC protocol for communicating.
 
 ## Overview
 
@@ -36,191 +67,57 @@ NitroliteRPC is a lightweight RPC protocol designed for state channels. Messages
 - `res`: RPC message payload `[request_id, method, result, timestamp]`
 - `sig`: Payload signature
 
-### Errors
+## Architecture
 
-```json
-{
-  "err": [1001, -32601, "Method not found", 1741344819814],
-  "sig": "0xd73268362b04516451ec52170f5c8ca189d35d9ac5e9041c156c9f0faf9aebd2891309e3b2b5d8788578ab3449c96f7aa81aefb25482b53f02bac42c65f806e5"
-}
-```
+The RPC module is organized into two main layers:
 
-- `err`: RPC message payload `[request_id, error_code, error_message, timestamp]`
-- `sig`: Payload signature
+1. **High-level API (`api.ts`)**: Provides user-friendly functions for creating specific types of RPC messages. Each function returns a JSON-stringified, signed message ready to be sent over a WebSocket connection.
+
+2. **Low-level Core (`nitrolite.ts`)**: Contains the `NitroliteRPC` class implementing core functionality for creating, signing, and parsing RPC messages according to the Nitrolite protocol specification.
 
 ## Using NitroliteRPC
 
-The `NitroliteRPC` class provides utilities for creating and signing these messages. It's designed to be simple and straightforward:
+The Nitrolite SDK provides convenient API functions for creating properly formatted and signed messages:
 
 ```typescript
-import { NitroliteRPC, NitroliteRPCMessage } from '@erc7824/nitrolite';
+import { createAuthRequestMessage, createPingMessage } from '@nitrolite/sdk/rpc';
+import { MessageSigner } from '@nitrolite/sdk/rpc/types';
 
-// Create a request message
-const request = NitroliteRPC.createRequest(
-  'subtract',     // Method name
-  [42, 23],       // Method parameters
-  1001            // Optional: Request ID
+// Assuming you have a signing function that returns a Promise<Hex>
+const signer: MessageSigner = async (payload) => {
+  // Your signing implementation
+  return "0x..."; // Signed message
+};
+
+// Create an auth request message
+const authRequestMessage = await createAuthRequestMessage(
+  signer,
+  "0xYourAddress"
 );
 
-// Sign the request with your own signer function
-const signedRequest = await NitroliteRPC.signMessage(
-  request,
-  (message) => yourSigningFunction(message)
-);
+// Create a ping message
+const pingMessage = await createPingMessage(signer);
 
-// Send the message via your own WebSocket connection
-ws.send(JSON.stringify(signedRequest));
+// Send the messages via WebSocket
+websocket.send(authRequestMessage);
+websocket.send(pingMessage);
 ```
 
-## Integrating with Your Application
+## Types
 
-NitroliteRPC is transport-agnostic, meaning you can use any WebSocket library or other transport mechanism. Here's how to integrate it:
+The module defines TypeScript interfaces and types for RPC messages, requests, and responses in `types.ts`. Key types include:
 
-1. **Create Messages**:
-   ```typescript
-   const request = NitroliteRPC.createRequest(method, params, requestId);
-   const response = NitroliteRPC.createResponse(requestId, method, result);
-   const error = NitroliteRPC.createError(requestId, errorCode, errorMessage);
-   ```
+- `NitroliteRPCMessage`: Base interface for all RPC messages
+- `ApplicationRPCMessage`: Interface for application-specific RPC messages
+- `ParsedResponse`: Interface representing parsed RPC responses
+- `MessageSigner`: Function type for signing message payloads
+- `NitroliteErrorCode`: Enum of standard error codes for the Nitrolite RPC protocol
 
-2. **Sign Messages**:
-   ```typescript
-   const signedMessage = await NitroliteRPC.signMessage(message, yourSigningFunction);
-   ```
+## Error Handling
 
-3. **Verify Messages**:
-   ```typescript
-   const isValid = await NitroliteRPC.verifyMessage(
-     message,
-     expectedSignerAddress,
-     yourVerifyFunction
-   );
-   ```
+Messages returned from the server can be parsed using `NitroliteRPC.parseResponse()`, which returns a `ParsedResponse` object containing validation status and extracted fields.
 
-4. **Send and Receive**:
-   ```typescript
-   // Sending
-   ws.send(JSON.stringify(signedMessage));
-   
-   // Receiving
-   ws.onmessage = (event) => {
-     const message = JSON.parse(event.data);
-     // Check if it's a request, response, or error
-     if (message.req) { /* ... */ }
-     else if (message.res) { /* ... */ }
-     else if (message.err) { /* ... */ }
-   };
-   ```
-
-## Building a WebSocket Client
-
-For WebSocket communication, you'll need to implement a client that can:
-
-1. **Connect to the broker server**: Establish a WebSocket connection
-2. **Authenticate**: Sign and send an authentication message using your Ethereum key
-3. **Process messages**: Handle incoming requests, responses, and errors
-4. **Send messages**: Create, sign, and send NitroliteRPC messages
-
-Here's a simplified example:
-
-```typescript
-import { NitroliteRPC } from '@erc7824/nitrolite';
-import { Hex } from 'viem';
-
-// Interface for the wallet signer
-interface WalletSigner {
-  publicKey: string;
-  address?: string;
-  sign: (message: string) => Promise<Hex>;
-}
-
-class WebSocketClient {
-  private ws: WebSocket | null = null;
-  private signer: WalletSigner;
-  
-  constructor(url: string, signer: WalletSigner) {
-    this.signer = signer;
-  }
-  
-  async connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(url);
-      
-      this.ws.onopen = async () => {
-        try {
-          // Authenticate upon connection
-          await this.authenticate();
-          resolve();
-        } catch (error) {
-          reject(error);
-        }
-      };
-      
-      // Set up message handling
-      this.ws.onmessage = (event) => {
-        const response = JSON.parse(event.data);
-        // Handle messages...
-      };
-    });
-  }
-  
-  private async authenticate(): Promise<void> {
-    // Create and send authentication request
-    const authRequest = NitroliteRPC.createRequest(
-      'auth', 
-      [this.signer.publicKey]
-    );
-    
-    const signedRequest = await NitroliteRPC.signMessage(
-      authRequest,
-      this.signer.sign
-    );
-    
-    this.ws!.send(JSON.stringify(signedRequest));
-    
-    // Wait for auth response...
-  }
-  
-  async sendRequest(method: string, params: any[] = []): Promise<any> {
-    const request = NitroliteRPC.createRequest(method, params);
-    const signedRequest = await NitroliteRPC.signMessage(request, this.signer.sign);
-    
-    // Send and wait for response...
-    this.ws!.send(JSON.stringify(signedRequest));
-  }
-}
-```
-
-For a complete implementation, see our [NextJS example](https://github.com/erc7824/nitrolite/tree/main/sdk-ts/examples/nextjs-ts-example).
-
-## Common Message Types
-
-Nitrolite applications typically use these standard RPC method types:
-
-| Method | Description | Parameters |
-|--------|-------------|------------|
-| `auth` | Authenticate with the broker | `[publicKey]` |
-| `subscribe` | Subscribe to a channel | `[channelName]` |
-| `publish` | Publish a message to a channel | `[channelName, messageData]` |
-| `ping` | Check connection latency | `[timestamp]` |
-| `get_balance` | Check token balance | `[tokenAddress]` |
-| `state_update` | Update channel state | `[channelId, stateData, signature]` |
-
-## Error Codes
-
-Standard JSON-RPC error codes:
-
-- `-32700`: Parse Error - Invalid JSON
-- `-32600`: Invalid Request - Not a valid request object
-- `-32601`: Method Not Found - Method doesn't exist
-- `-32602`: Invalid Params - Invalid method parameters
-- `-32603`: Internal Error - Internal JSON-RPC error
-
-Nitrolite-specific error codes:
-
-- `-32001`: Invalid State - Invalid state transition
-- `-32002`: Channel Not Found - Referenced channel doesn't exist
-- `-32003`: Invalid Signature - Signature verification failed
+Error responses follow the JSON-RPC error format, with specific error codes defined in `NitroliteErrorCode`.
 
 ## Security Considerations
 

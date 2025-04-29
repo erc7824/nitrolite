@@ -1,6 +1,6 @@
 import { describe, test, expect, jest } from "@jest/globals";
 import { getStateHash, signState, removeQuotesFromRS, verifySignature } from "../../src/utils/state";
-import type { State, Signature, Allocation } from "../../src/client/types";
+import { type State, type Signature, type Allocation, StateIntent } from "../../src/client/types";
 import { Hex, Address, recoverMessageAddress, parseSignature, encodeAbiParameters, keccak256 } from "viem";
 
 jest.mock("viem", () => ({
@@ -23,6 +23,7 @@ describe("getStateHash", () => {
         const state: State = {
             data: "0xdata" as Hex,
             version: 1n,
+            intent: StateIntent.INITIALIZE,
             allocations: [
                 { destination: "0xA" as Address, token: "0xT" as Address, amount: 10n },
                 { destination: "0xB" as Address, token: "0xT" as Address, amount: 10n },
@@ -33,8 +34,9 @@ describe("getStateHash", () => {
         expect(encodeAbiParameters).toHaveBeenCalledWith(
             [
                 { name: "channelId", type: "bytes32" },
-                { name: "data", type: "bytes" },
+                { name: "intent", type: "uint8" },
                 { name: "version", type: "uint256" },
+                { name: "data", type: "bytes" },
                 {
                     name: "allocations",
                     type: "tuple[]",
@@ -45,7 +47,7 @@ describe("getStateHash", () => {
                     ],
                 },
             ],
-            [channelId, state.data, state.version, state.allocations]
+            [channelId, state.intent, state.version, state.data, state.allocations]
         );
         expect(keccak256).toHaveBeenCalledWith("0xencoded");
         expect(hash).toBe("0xhash");

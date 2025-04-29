@@ -6,6 +6,7 @@ import { Hex } from "viem";
 import { _prepareAndSignInitialState, _prepareAndSignFinalState } from "../../src/client/state";
 import * as utils from "../../src/utils";
 import { Errors } from "../../src/errors";
+import { StateIntent } from "../../src/client/types";
 
 // Mock utils
 jest.mock("../../src/utils", () => ({
@@ -15,11 +16,6 @@ jest.mock("../../src/utils", () => ({
     signState: jest.fn(async () => "accSig"),
     encoders: { numeric: jest.fn(() => "encData") },
     removeQuotesFromRS: jest.fn((s: string) => s.replace(/"/g, "")),
-}));
-
-// Mock config
-jest.mock("../../src/config", () => ({
-    MAGIC_NUMBERS: { OPEN: 1, CLOSE: 2 },
 }));
 
 describe("_prepareAndSignInitialState", () => {
@@ -39,7 +35,7 @@ describe("_prepareAndSignInitialState", () => {
             addresses: {
                 guestAddress,
                 tokenAddress,
-                adjudicators: { default: adjudicatorAddress },
+                adjudicator: adjudicatorAddress,
             },
             challengeDuration,
         };
@@ -65,6 +61,7 @@ describe("_prepareAndSignInitialState", () => {
         // State fields
         expect(initialState).toEqual({
             data: "customData",
+            intent: StateIntent.INITIALIZE,
             allocations: [
                 { destination: deps.account.address, token: tokenAddress, amount: 10n },
                 { destination: guestAddress, token: tokenAddress, amount: 20n },
@@ -75,6 +72,7 @@ describe("_prepareAndSignInitialState", () => {
         // Hash and sign calls
         expect(utils.getStateHash).toHaveBeenCalledWith("cid", {
             data: "customData",
+            intent: StateIntent.INITIALIZE,
             allocations: expect.any(Array),
             version: 0n,
             sigs: [],
@@ -83,7 +81,7 @@ describe("_prepareAndSignInitialState", () => {
     });
 
     test("throws if no adjudicator", async () => {
-        deps.addresses.adjudicators = {};
+        deps.addresses.adjudicator = undefined;
         await expect(
             _prepareAndSignInitialState(deps, {
                 initialAllocationAmounts: [1n, 2n],
@@ -129,6 +127,7 @@ describe("_prepareAndSignFinalState", () => {
         const params = {
             stateData: "finalData",
             finalState: {
+                intent: StateIntent.FINALIZE,
                 channelId: channelIdArg,
                 allocations,
                 version,
@@ -141,12 +140,14 @@ describe("_prepareAndSignFinalState", () => {
         // Data and allocations
         expect(finalStateWithSigs).toEqual({
             data: "finalData",
+            intent: StateIntent.FINALIZE,
             allocations,
             version,
             sigs: ["accSig", "srvSig"],
         });
         expect(utils.getStateHash).toHaveBeenCalledWith(channelIdArg, {
             data: "finalData",
+            intent: StateIntent.FINALIZE,
             allocations,
             version,
             sigs: [],
@@ -155,7 +156,7 @@ describe("_prepareAndSignFinalState", () => {
         expect(utils.removeQuotesFromRS).toHaveBeenCalledWith(serverSigRaw);
     });
 
-    test("uses encoder when no stateData", async () => {
+    test("throws if no stateData", async () => {
         const params = {
             stateData: undefined,
             finalState: {
@@ -165,8 +166,6 @@ describe("_prepareAndSignFinalState", () => {
                 serverSignature: serverSigRaw,
             },
         };
-        const { finalStateWithSigs } = await _prepareAndSignFinalState(deps, params as any);
-        // encoders.numeric(CLOSE) returns "encData"
-        expect(finalStateWithSigs.data).toBe("encData");
+        await expect(_prepareAndSignFinalState(deps, params as any)).rejects.toThrow(Errors.MissingParameterError);
     });
 });

@@ -1,7 +1,6 @@
 import { Hex } from "viem";
-import { CreateChannelParams, State, Channel, ChannelId, CloseChannelParams } from "./types";
-import { generateChannelNonce, getChannelId, getStateHash, signState, encoders, removeQuotesFromRS } from "../utils";
-import { MAGIC_NUMBERS } from "../config";
+import { CreateChannelParams, State, Channel, ChannelId, CloseChannelParams, StateIntent } from "./types";
+import { generateChannelNonce, getChannelId, getStateHash, signState, removeQuotesFromRS } from "../utils";
 import * as Errors from "../errors";
 import { PreparerDependencies } from "./prepare";
 
@@ -19,14 +18,19 @@ export async function _prepareAndSignInitialState(
     params: CreateChannelParams
 ): Promise<{ channel: Channel; initialState: State; channelId: ChannelId }> {
     const { initialAllocationAmounts, stateData } = params;
+
+    if (!stateData) {
+        throw new Errors.MissingParameterError("State data is required for creating the channel.");
+    }
+
     const channelNonce = generateChannelNonce(deps.account.address);
 
     const participants: [Hex, Hex] = [deps.account.address, deps.addresses.guestAddress];
     const channelParticipants: [Hex, Hex] = [deps.stateWalletClient.account.address, deps.addresses.guestAddress];
     const tokenAddress = deps.addresses.tokenAddress;
-    const adjudicatorAddress = deps.addresses.adjudicators?.["default"];
+    const adjudicatorAddress = deps.addresses.adjudicator;
     if (!adjudicatorAddress) {
-        throw new Errors.MissingParameterError("Default adjudicator address is not configured in addresses.adjudicators");
+        throw new Errors.MissingParameterError("Default adjudicator address is not configured in addresses.adjudicator");
     }
 
     const challengeDuration = deps.challengeDuration;
@@ -46,11 +50,11 @@ export async function _prepareAndSignInitialState(
         nonce: channelNonce,
     };
 
-    const initialAppData = stateData ?? encoders["numeric"](MAGIC_NUMBERS.OPEN);
     const channelId = getChannelId(channel);
 
     const stateToSign: State = {
-        data: initialAppData,
+        data: stateData,
+        intent: StateIntent.INITIALIZE,
         allocations: [
             { destination: participants[0], token: tokenAddress, amount: initialAllocationAmounts[0] },
             { destination: participants[1], token: tokenAddress, amount: initialAllocationAmounts[1] },
@@ -84,13 +88,16 @@ export async function _prepareAndSignFinalState(
 ): Promise<{ finalStateWithSigs: State; channelId: ChannelId }> {
     const { stateData, finalState } = params;
 
+    if (!stateData) {
+        throw new Errors.MissingParameterError("State data is required for closing the channel.");
+    }
+
     const channelId = finalState.channelId;
     const serverSignature = removeQuotesFromRS(finalState.serverSignature);
 
-    const appData = stateData ?? encoders["numeric"](MAGIC_NUMBERS.CLOSE);
-
     const stateToSign: State = {
-        data: appData,
+        data: stateData,
+        intent: StateIntent.FINALIZE,
         allocations: finalState.allocations,
         version: finalState.version,
         sigs: [],

@@ -40,11 +40,22 @@ export interface Channel {
 }
 
 /**
+ * Channel status enum
+ */
+export enum StateIntent {
+    OPERATE, // Operate the state application
+    INITIALIZE, // Initial funding state
+    RESIZE, // Resize state
+    FINALIZE, // Final closing state
+}
+
+/**
  * Channel state structure
  */
 export interface State {
-    data: Hex; // Application data encoded, decoded by the adjudicator for business logic
+    intent: StateIntent; // Intent of the state (e.g., INITIAL, ACTIVE, FINAL)
     version: bigint; // Version of the state, incremented for each update
+    data: Hex; // Application data encoded, decoded by the adjudicator for business logic
     allocations: [Allocation, Allocation]; // Combined asset allocation and destination for each participant
     sigs: Signature[]; // stateHash signatures
 }
@@ -52,7 +63,7 @@ export interface State {
 /**
  * Adjudicator status enum
  */
-export enum AdjudicatorStatus {
+export enum adjudicatorStatus {
     VOID = 0, // Channel was never active or have an anomaly
     PARTIAL = 1, // Partial funding waiting for other participants
     ACTIVE = 2, // Channel fully funded using open or state are valid

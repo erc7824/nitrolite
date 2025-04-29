@@ -38,7 +38,7 @@ export class NitroliteClient {
         if (!config.walletClient.account) throw new Errors.MissingParameterError("walletClient.account");
         if (!config.challengeDuration) throw new Errors.MissingParameterError("challengeDuration");
         if (!config.addresses?.custody) throw new Errors.MissingParameterError("addresses.custody");
-        if (!config.addresses?.adjudicators) throw new Errors.MissingParameterError("addresses.adjudicators");
+        if (!config.addresses?.adjudicator) throw new Errors.MissingParameterError("addresses.adjudicator");
         if (!config.addresses?.guestAddress) throw new Errors.MissingParameterError("addresses.guestAddress");
         if (!config.addresses?.tokenAddress) throw new Errors.MissingParameterError("addresses.tokenAddress");
 

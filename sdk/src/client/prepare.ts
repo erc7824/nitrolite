@@ -1,6 +1,6 @@
-import { Account, SimulateContractReturnType, WalletClient, Chain, Transport, ParseAccount, Hash, Address, zeroAddress, Hex } from "viem";
+import { Account, SimulateContractReturnType, WalletClient, Chain, Transport, ParseAccount, zeroAddress } from "viem";
 import { NitroliteService, Erc20Service } from "./services";
-import { CreateChannelParams, CheckpointChannelParams, ChallengeChannelParams, CloseChannelParams, State, Channel, ChannelId } from "./types";
+import { CreateChannelParams, CheckpointChannelParams, ChallengeChannelParams, CloseChannelParams } from "./types";
 import { ContractAddresses } from "../abis";
 import * as Errors from "../errors";
 import { _prepareAndSignInitialState, _prepareAndSignFinalState } from "./state";

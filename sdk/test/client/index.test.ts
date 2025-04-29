@@ -3,7 +3,7 @@ import { NitroliteClient } from "../../src/client/index";
 import { Errors } from "../../src/errors";
 import { Address, Hash, Hex } from "viem";
 import * as stateModule from "../../src/client/state";
-import { Allocation, Channel } from "../../src/client/types";
+import { Allocation, Channel, StateIntent } from "../../src/client/types";
 
 describe("NitroliteClient", () => {
     let client: NitroliteClient;
@@ -12,7 +12,7 @@ describe("NitroliteClient", () => {
     const mockWalletClient = { account: mockAccount } as any;
     const mockAddresses = {
         custody: "0xCUST" as Address,
-        adjudicators: { default: "0xADJ" as Address },
+        adjudicator: "0xADJ" as Address,
         guestAddress: "0xGUEST" as Address,
         tokenAddress: "0xTOKEN" as Address,
     };
@@ -98,12 +98,13 @@ describe("NitroliteClient", () => {
         test("success", async () => {
             const channel: Channel = {
                 participants: ["0x0", "0x1"], // List of participants in the channel [Host, Guest]
-                adjudicator: mockAddresses.adjudicators.default, // Address of the contract that validates final states
+                adjudicator: mockAddresses.adjudicator, // Address of the contract that validates final states
                 challenge: challengeDuration, // Duration in seconds for challenge period
                 nonce: 1n, // Unique per channel with same participants and adjudicator
             };
             const initialState = {
                 data: "0x00" as Hex,
+                intent: StateIntent.INITIALIZE,
                 allocations: [
                     { destination: "0x0" as Hex, token: "0x0", amount: 1n } as Allocation,
                     { destination: "0x1" as Hex, token: "0x0", amount: 2n } as Allocation,

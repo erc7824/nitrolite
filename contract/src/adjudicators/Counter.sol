@@ -4,7 +4,6 @@ pragma solidity ^0.8.13;
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
 import {Channel, State, Allocation, Signature, StateIntent} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
-import {AdjudicatorUtils} from "../adjudicators/AdjudicatorUtils.sol";
 
 /**
  * @title Counter Adjudicator
@@ -14,7 +13,7 @@ import {AdjudicatorUtils} from "../adjudicators/AdjudicatorUtils.sol";
  *      When the counter reaches the target, the game ends with FINAL status.
  */
 contract Counter is IAdjudicator {
-    using AdjudicatorUtils for State;
+    using Utils for State;
 
     /**
      * @dev Data represents the game state.
@@ -59,10 +58,8 @@ contract Counter is IAdjudicator {
 
         // proof is Initialize State
         if (candidate.version == 1) {
-            return proofs[0].validateTransitionTo(candidate) &&
-                    _validateAppTransitionTo(proofs[0].data, candidate.data) &&
-                     proofs[0].validateInitialState(chan) &&
-                    _validateStateSig(chan, candidate);
+            return proofs[0].validateTransitionTo(candidate) && _validateAppTransitionTo(proofs[0].data, candidate.data)
+                && proofs[0].validateInitialState(chan) && _validateStateSig(chan, candidate);
         }
 
         bytes memory proofData = proofs[0].data;
@@ -73,13 +70,15 @@ contract Counter is IAdjudicator {
         }
 
         // proof is Operate or Resize State
-        return proofs[0].validateTransitionTo(candidate) &&
-                _validateAppTransitionTo(proofData, candidate.data) &&
-                _validateStateSig(chan, proofs[0]) &&
-                _validateStateSig(chan, candidate);
+        return proofs[0].validateTransitionTo(candidate) && _validateAppTransitionTo(proofData, candidate.data)
+            && _validateStateSig(chan, proofs[0]) && _validateStateSig(chan, candidate);
     }
 
-    function _validateAppTransitionTo(bytes memory previousData, bytes memory candidateData) internal pure returns (bool) {
+    function _validateAppTransitionTo(bytes memory previousData, bytes memory candidateData)
+        internal
+        pure
+        returns (bool)
+    {
         Data memory candidateDataDecoded = abi.decode(candidateData, (Data));
         Data memory previousDataDecoded = abi.decode(previousData, (Data));
 

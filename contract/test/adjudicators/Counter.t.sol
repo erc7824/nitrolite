@@ -62,16 +62,8 @@ contract CounterTest is Test {
 
         // Create dummy allocations
         state.allocations = new Allocation[](2);
-        state.allocations[HOST] = Allocation({
-            destination: address(0),
-            token: address(0),
-            amount: 100
-        });
-        state.allocations[GUEST] = Allocation({
-            destination: address(0),
-            token: address(0),
-            amount: 100
-        });
+        state.allocations[HOST] = Allocation({destination: address(0), token: address(0), amount: 100});
+        state.allocations[GUEST] = Allocation({destination: address(0), token: address(0), amount: 100});
 
         state.sigs = new Signature[](0);
         return state;
@@ -87,22 +79,18 @@ contract CounterTest is Test {
 
         // Create dummy allocations
         state.allocations = new Allocation[](2);
-        state.allocations[HOST] = Allocation({
-            destination: address(0),
-            token: address(0),
-            amount: 100
-        });
-        state.allocations[GUEST] = Allocation({
-            destination: address(0),
-            token: address(0),
-            amount: 100
-        });
+        state.allocations[HOST] = Allocation({destination: address(0), token: address(0), amount: 100});
+        state.allocations[GUEST] = Allocation({destination: address(0), token: address(0), amount: 100});
 
         state.sigs = new Signature[](0);
         return state;
     }
 
-    function _createResizeState(uint256 target, uint256 version, int256[] memory resizeAmounts) internal pure returns (State memory) {
+    function _createResizeState(uint256 target, uint256 version, int256[] memory resizeAmounts)
+        internal
+        pure
+        returns (State memory)
+    {
         State memory state;
         state.intent = StateIntent.RESIZE;
         state.version = version;
@@ -112,16 +100,8 @@ contract CounterTest is Test {
 
         // Create dummy allocations
         state.allocations = new Allocation[](2);
-        state.allocations[HOST] = Allocation({
-            destination: address(0),
-            token: address(0),
-            amount: 100
-        });
-        state.allocations[GUEST] = Allocation({
-            destination: address(0),
-            token: address(0),
-            amount: 100
-        });
+        state.allocations[HOST] = Allocation({destination: address(0), token: address(0), amount: 100});
+        state.allocations[GUEST] = Allocation({destination: address(0), token: address(0), amount: 100});
 
         state.sigs = new Signature[](0);
         return state;

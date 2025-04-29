@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import {Channel, State, Signature} from "./interfaces/Types.sol";
+import {Channel, State, Signature, StateIntent} from "./interfaces/Types.sol";
 
 /**
  * @title Channel Utilities
@@ -10,6 +10,9 @@ import {Channel, State, Signature} from "./interfaces/Types.sol";
  */
 library Utils {
     using ECDSA for bytes32;
+
+    uint256 constant CLIENT = 0;
+    uint256 constant SERVER = 1;
 
     /**
      * @notice Compute the unique identifier for a channel
@@ -29,7 +32,7 @@ library Utils {
      */
     function getStateHash(Channel memory ch, State memory state) internal pure returns (bytes32) {
         bytes32 channelId = getChannelId(ch);
-        return keccak256(abi.encode(channelId, state.intent, state.version, state.data,  state.allocations));
+        return keccak256(abi.encode(channelId, state.intent, state.version, state.data, state.allocations));
     }
 
     /**
@@ -43,5 +46,65 @@ library Utils {
         // Verify the signature directly on the stateHash without using EIP-191
         address recoveredSigner = ECDSA.recover(stateHash, sig.v, sig.r, sig.s);
         return recoveredSigner == signer;
+    }
+
+    /**
+     * @notice Validates that a state is a valid initial state for a channel
+     * @dev Initial states must have version 0 and INITIALIZE intent
+     * @param state The state to validate
+     * @param chan The channel configuration
+     * @return True if the state is a valid initial state, false otherwise
+     */
+    function validateInitialState(State calldata state, Channel calldata chan) internal pure returns (bool) {
+        if (state.version != 0) {
+            return false;
+        }
+
+        if (state.intent != StateIntent.INITIALIZE) {
+            return false;
+        }
+
+        return validateUnanimousSignatures(state, chan);
+    }
+
+    /**
+     * @notice Validates that a state has signatures from both participants
+     * @dev For 2-participant channels, both must sign to establish unanimous consent
+     * @param state The state to validate
+     * @param chan The channel configuration
+     * @return True if the state has valid signatures from both participants, false otherwise
+     */
+    function validateUnanimousSignatures(State calldata state, Channel calldata chan) internal pure returns (bool) {
+        if (state.sigs.length != 2) {
+            return false;
+        }
+
+        // Compute the state hash for signature verification.
+        bytes32 stateHash = getStateHash(chan, state);
+
+        return verifySignature(stateHash, state.sigs[0], chan.participants[CLIENT])
+            && verifySignature(stateHash, state.sigs[1], chan.participants[SERVER]);
+    }
+
+    /**
+     * @notice Validates that a state transition is valid according to basic rules
+     * @dev Ensures version increments by 1 and total allocation sum remains constant
+     * @param previous The previous state
+     * @param candidate The candidate new state
+     * @return True if the transition is valid, false otherwise
+     */
+    function validateTransitionTo(State calldata previous, State calldata candidate) internal pure returns (bool) {
+        if (candidate.version != previous.version + 1) {
+            return false;
+        }
+
+        uint256 candidateSum = candidate.allocations[0].amount + candidate.allocations[1].amount;
+        uint256 previousSum = previous.allocations[0].amount + previous.allocations[1].amount;
+
+        if (candidateSum != previousSum) {
+            return false;
+        }
+
+        return true;
     }
 }

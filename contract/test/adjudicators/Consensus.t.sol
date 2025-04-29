@@ -85,17 +85,9 @@ contract ConsensusTest is Test {
     function createAllocations(uint256 hostAmount, uint256 guestAmount) internal view returns (Allocation[2] memory) {
         Allocation[2] memory allocations;
 
-        allocations[HOST] = Allocation({
-            destination: host, 
-            token: address(token), 
-            amount: hostAmount
-        });
+        allocations[HOST] = Allocation({destination: host, token: address(token), amount: hostAmount});
 
-        allocations[GUEST] = Allocation({
-            destination: guest, 
-            token: address(token), 
-            amount: guestAmount
-        });
+        allocations[GUEST] = Allocation({destination: guest, token: address(token), amount: guestAmount});
 
         return allocations;
     }
@@ -137,7 +129,11 @@ contract ConsensusTest is Test {
     }
 
     // Helper function to create a resize state
-    function _createResizeState(string memory data, uint256 version, int256[] memory resizeAmounts) internal view returns (State memory) {
+    function _createResizeState(string memory data, uint256 version, int256[] memory resizeAmounts)
+        internal
+        view
+        returns (State memory)
+    {
         // Create allocations
         Allocation[2] memory allocations = createAllocations(50, 50);
 
@@ -374,7 +370,7 @@ contract ConsensusTest is Test {
         // Create state with signatures from wrong participants
         State memory state = _createOperateState("state", 1);
         state.sigs = new Signature[](2);
-        
+
         // Use guest's signature for both slots
         state.sigs[HOST] = _signState(state, guestPrivateKey); // Should be host, but using guest
         state.sigs[GUEST] = _signState(state, guestPrivateKey);

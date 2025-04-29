@@ -4,7 +4,6 @@ pragma solidity ^0.8.13;
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
 import {Channel, State, Allocation, Signature, StateIntent} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
-import {AdjudicatorUtils} from "../adjudicators/AdjudicatorUtils.sol";
 
 /**
  * @title MutualConsent Adjudicator
@@ -12,7 +11,7 @@ import {AdjudicatorUtils} from "../adjudicators/AdjudicatorUtils.sol";
  * @dev Any state is considered valid as long as it's signed by both participants
  */
 contract Consensus is IAdjudicator {
-    using AdjudicatorUtils for State;
+    using Utils for State;
 
     /**
      * @notice Validates that the state is signed by both participants
@@ -38,14 +37,12 @@ contract Consensus is IAdjudicator {
 
         // proof is Initialize State
         if (candidate.version == 1) {
-            return proofs[0].validateTransitionTo(candidate) &&
-                    proofs[0].validateInitialState(chan) &&
-                    candidate.validateUnanimousSignatures(chan);
+            return proofs[0].validateTransitionTo(candidate) && proofs[0].validateInitialState(chan)
+                && candidate.validateUnanimousSignatures(chan);
         }
 
         // proof is Operate or Resize State (both have same validation)
-         return proofs[0].validateTransitionTo(candidate) &&
-                proofs[0].validateUnanimousSignatures(chan) &&
-                candidate.validateUnanimousSignatures(chan);
+        return proofs[0].validateTransitionTo(candidate) && proofs[0].validateUnanimousSignatures(chan)
+            && candidate.validateUnanimousSignatures(chan);
     }
 }

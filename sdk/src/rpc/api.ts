@@ -271,10 +271,11 @@ export async function createApplicationMessage(
 export async function createCloseChannelMessage(
     signer: MessageSigner,
     channelId: AccountID,
+    fundDestination: Address,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const params = [{ channel_id: channelId }];
+    const params = [{ channel_id: channelId, fund_destination: fundDestination }];
     const request = NitroliteRPC.createRequest(requestId, "close_channel", params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 

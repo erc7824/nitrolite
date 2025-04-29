@@ -1,5 +1,5 @@
 import { describe, test, expect, jest } from "@jest/globals";
-import { Hex } from "viem";
+import { Address, Hex } from "viem";
 import {
     createAuthRequestMessage,
     createAuthVerifyMessageFromChallenge,
@@ -22,6 +22,7 @@ describe("API message creators", () => {
     const clientAddress = "0x000000000000000000000000000000000000abcd" as Hex;
     const channelId = "0x000000000000000000000000000000000000cdef" as Hex;
     const appId = "0x000000000000000000000000000000000000ffff" as Hex;
+    const fundDestination = "0x" as Address;
     const sampleIntent = [1, 2, 3];
 
     afterEach(() => {
@@ -172,11 +173,11 @@ describe("API message creators", () => {
     });
 
     test("createCloseChannelMessage", async () => {
-        const msgStr = await createCloseChannelMessage(signer, channelId, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, "close_channel", [{ channel_id: channelId }], timestamp]);
+        const msgStr = await createCloseChannelMessage(signer, channelId, fundDestination, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, "close_channel", [{ channel_id: channelId, fund_destination: fundDestination }], timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, "close_channel", [{ channel_id: channelId }], timestamp],
+            req: [requestId, "close_channel", [{ channel_id: channelId, fund_destination: fundDestination }], timestamp],
             sig: ["0xsig"],
         });
     });

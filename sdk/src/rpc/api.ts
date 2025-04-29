@@ -159,7 +159,7 @@ export async function createGetLedgerBalancesMessage(
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
     const params = [{ acc: channelId }];
-    const request = NitroliteRPC.createRequest(requestId, "get_ledger_balances", [params], timestamp);
+    const request = NitroliteRPC.createRequest(requestId, "get_ledger_balances", params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);

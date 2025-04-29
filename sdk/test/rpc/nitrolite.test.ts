@@ -312,7 +312,7 @@ describe("NitroliteRPC", () => {
             const result = await NitroliteRPC.verifySingleSignature(message, expectedSigner, mockVerifier);
 
             expect(mockVerifier).toHaveBeenCalledWith(message.req, "0xsignature1", expectedSigner);
-            expect(console.warn).toHaveBeenCalled();
+            expect(console.error).toHaveBeenCalled();
             expect(result).toBe(true);
         });
     });

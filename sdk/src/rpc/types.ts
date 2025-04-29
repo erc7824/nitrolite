@@ -9,7 +9,7 @@ export type Timestamp = number;
 /** Type alias for Account ID (channelId or appId) */
 export type AccountID = Hex;
 /** Represents the allocation intent change as an array of numbers. */
-export type Intent = number[];
+export type Intent = bigint[];
 
 /** Represents the data payload within a request message: [requestId, method, params, timestamp?]. */
 export type RequestData = [RequestID, string, any[], Timestamp?];
@@ -124,7 +124,7 @@ export interface CreateAppSessionRequest {
     /** The address of the token contract used for allocations within the application. */
     token: Hex;
     /** The initial allocation distribution among participants. Order corresponds to the participants array in the definition. */
-    allocation: Hex[]; // Assuming Hex representation of amounts
+    allocation: bigint[]; // Assuming Hex representation of amounts
 }
 
 /**

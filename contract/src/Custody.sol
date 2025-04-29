@@ -10,18 +10,12 @@ import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
-
-// Constants for participant indices
-uint256 constant CREATOR = 0; // Participant index for the channel creator
-uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
-
 /**
  * @title Custody
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
  * @dev This implementation currently only supports 2 participant channels (CREATOR and BROKER)
  */
 contract Custody is IChannel, IDeposit {
-
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     // Errors
@@ -38,6 +32,10 @@ contract Custody is IChannel, IDeposit {
     error TransferFailed(address token, address to, uint256 amount);
     error ChallengeNotExpired();
     error InsufficientBalance(uint256 available, uint256 required);
+
+    // Constants for participant indices
+    uint256 constant CREATOR = 0; // Participant index for the channel creator
+    uint256 constant BROKER = 1; // Participant index for the broker in clearnet context
 
     // Recommended structure to keep track of states
     struct Metadata {

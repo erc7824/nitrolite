@@ -3,10 +3,12 @@ pragma solidity ^0.8.13;
 
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {Channel, State, Signature, StateIntent} from "../interfaces/Types.sol";
-import {CREATOR, BROKER} from "../Custody.sol";
 import {Utils} from "../Utils.sol";
 
 library AdjudicatorUtils {
+    uint256 constant CREATOR = 0;
+    uint256 constant BROKER = 1;
+
     function validateInitialState(State calldata state, Channel calldata chan) internal pure returns (bool) {
         if (state.version != 0) {
             return false;

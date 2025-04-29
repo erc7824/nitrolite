@@ -104,10 +104,10 @@ describe("API message creators", () => {
     test("createGetLedgerBalancesMessage", async () => {
         const ledgerParams = [{ acc: channelId }];
         const msgStr = await createGetLedgerBalancesMessage(signer, channelId, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, "get_ledger_balances", [ledgerParams], timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, "get_ledger_balances", ledgerParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, "get_ledger_balances", [ledgerParams], timestamp],
+            req: [requestId, "get_ledger_balances", ledgerParams, timestamp],
             sig: ["0xsig"],
         });
     });
@@ -135,9 +135,11 @@ describe("API message creators", () => {
                     nonce: 0,
                 },
                 token: "0x",
-                allocation: ["0x"],
+                // @ts-ignore
+                allocation: [100, 0],
             },
         ];
+        // @ts-ignore
         const msgStr = await createAppSessionMessage(signer, params, sampleIntent, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, "create_app_session", params, timestamp]);
         const parsed = JSON.parse(msgStr);
@@ -150,6 +152,7 @@ describe("API message creators", () => {
 
     test("createCloseAppSessionMessage", async () => {
         const closeParams = [{ appId, allocation: [] }];
+        // @ts-ignore
         const msgStr = await createCloseAppSessionMessage(signer, closeParams, sampleIntent, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, "close_app_session", closeParams, timestamp]);
         const parsed = JSON.parse(msgStr);

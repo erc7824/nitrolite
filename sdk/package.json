@@ -1,6 +1,6 @@
 {
   "name": "@erc7824/nitrolite",
-  "version": "0.0.26-alpha",
+  "version": "0.0.27-alpha",
   "description": "TypeScript SDK for the Nitrolite state channels framework",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

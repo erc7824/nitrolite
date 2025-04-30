@@ -124,7 +124,7 @@ export interface CreateAppSessionRequest {
     /** The address of the token contract used for allocations within the application. */
     token: Hex;
     /** The initial allocation distribution among participants. Order corresponds to the participants array in the definition. */
-    allocation: bigint[]; // Assuming Hex representation of amounts
+    allocations: bigint[]; // Assuming Hex representation of amounts
 }
 
 /**
@@ -134,7 +134,7 @@ export interface CloseAppSessionRequest {
     /** The unique identifier (AccountID) of the application to be closed. */
     appId: Hex;
     /** The final allocation distribution among participants upon closing the application. Order corresponds to the participants array in the application's definition. */
-    allocation: bigint[]; // Assuming Hex representation of amounts
+    allocations: bigint[]; // Assuming Hex representation of amounts
 }
 
 /**

@@ -521,8 +521,8 @@ contract Custody is IChannel, IDeposit {
 
         if (amountToUnlock > 0) {
             ledger.tokens[token].locked -= amountToUnlock;
+            ledger.tokens[token].available += amountToUnlock;
         }
-        ledger.tokens[token].available += amountToUnlock;
     }
 
     /**

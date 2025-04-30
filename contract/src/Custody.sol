@@ -268,7 +268,7 @@ contract Custody is IChannel, IDeposit {
         }
 
         // At this point, the channel is in FINAL state, so we can close it
-        _distributeAllocation(channelId, meta);
+        _applyAllocations(channelId, meta.chan.participants, meta.lastValidState.allocations);
 
         // TODO: implement a better way for this
         // remove sender's channel in case they are a different account then participant
@@ -381,16 +381,16 @@ contract Custody is IChannel, IDeposit {
     }
 
     /**
-     * @notice Internal function to close a channel and distribute funds
+     * @notice Internal function to apply channel allocations
      * @param channelId The channel identifier
-     * @param meta The channel's metadata
+     * @param allocations The channel's allocations
      */
-    function _distributeAllocation(bytes32 channelId, Metadata storage meta) internal {
-        // Distribute funds according to allocations
-        uint256 allocsLength = meta.lastValidState.allocations.length;
+    function _applyAllocations(bytes32 channelId, address[] memory participants, Allocation[] memory allocations) internal {
+        uint256 allocsLength = allocations.length;
+        if (allocsLength != participants.length) revert InvalidAllocations();
+
         for (uint256 i = 0; i < allocsLength; i++) {
-            Allocation memory allocation = meta.lastValidState.allocations[i];
-            _unlockChannelFundsToAccount(channelId, allocation.destination, allocation.token, allocation.amount);
+            _applyAllocation(channelId, participants[i], allocations[i]);
         }
     }
 
@@ -433,27 +433,29 @@ contract Custody is IChannel, IDeposit {
         meta.tokenBalances[token] += amount;
     }
 
-    // Does not perform checks to allow transferring partial balances in case of partial deposit
-    function _unlockChannelFundsToAccount(bytes32 channelId, address account, address token, uint256 amount) internal {
-        if (amount == 0) return;
+    // FIXME: depositor may differ from participant, therefore `payer` may not have funds locked.
+    // Supports transferring partial balances to allow challenging a partial deposit
+    function _applyAllocation(bytes32 channelId, address payer, Allocation memory alloc) internal {
+        if (alloc.amount == 0) return;
 
         Metadata storage meta = _channels[channelId];
-        uint256 channelBalance = meta.tokenBalances[token];
+        uint256 channelBalance = meta.tokenBalances[alloc.token];
         if (channelBalance == 0) return;
 
-        uint256 correctedAmount = channelBalance > amount ? amount : channelBalance;
-        meta.tokenBalances[token] -= correctedAmount;
+        uint256 correctedAmount = channelBalance > alloc.amount ? alloc.amount : channelBalance;
+        meta.tokenBalances[alloc.token] -= correctedAmount;
 
-        Ledger storage ledger = _ledgers[account];
+        Ledger storage payerLedger = _ledgers[payer];
 
         // Check locked amount before subtracting to prevent underflow
-        uint256 lockedAmount = ledger.tokens[token].locked;
+        uint256 lockedAmount = payerLedger.tokens[alloc.token].locked;
         uint256 amountToUnlock = lockedAmount > correctedAmount ? correctedAmount : lockedAmount;
 
         if (amountToUnlock > 0) {
-            ledger.tokens[token].locked -= amountToUnlock;
+            // subtract from payer and add to destination
+            payerLedger.tokens[alloc.token].locked -= amountToUnlock;
+            _ledgers[alloc.destination].tokens[alloc.token].available += amountToUnlock;
         }
-        ledger.tokens[token].available += amountToUnlock;
     }
 
     /**

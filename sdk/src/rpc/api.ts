@@ -1,5 +1,15 @@
 import { Address } from "viem";
-import { MessageSigner, AccountID, Intent, RequestID, Timestamp, ParsedResponse, CloseAppSessionRequest, CreateAppSessionRequest } from "./types"; // Added ParsedResponse
+import {
+    MessageSigner,
+    AccountID,
+    Intent,
+    RequestID,
+    Timestamp,
+    ParsedResponse,
+    CloseAppSessionRequest,
+    CreateAppSessionRequest,
+    ResizeChannel,
+} from "./types"; // Added ParsedResponse
 import { NitroliteRPC } from "./nitrolite";
 import { generateRequestId, getCurrentTimestamp } from "./utils";
 
@@ -277,6 +287,27 @@ export async function createCloseChannelMessage(
 ): Promise<string> {
     const params = [{ channel_id: channelId, fund_destination: fundDestination }];
     const request = NitroliteRPC.createRequest(requestId, "close_channel", params, timestamp);
+    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+
+    return JSON.stringify(signedRequest);
+}
+
+/**
+ * Creates the signed, stringified message body for a 'resize_channel' request.
+ *
+ * @param signer - The function to sign the request payload.
+ * @param params - Any specific parameters required by 'resize_channel'. See {@link ResizeChannel} for details.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ */
+export async function createResizeChannelMessage(
+    signer: MessageSigner,
+    params: ResizeChannel[],
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp()
+): Promise<string> {
+    const request = NitroliteRPC.createRequest(requestId, "resize_channel", params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);

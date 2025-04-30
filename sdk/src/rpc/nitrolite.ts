@@ -178,7 +178,10 @@ export class NitroliteRPC {
         if (!message.req) {
             throw new Error("signRequestMessage can only sign request messages containing 'req'.");
         }
+        console.warn("signRequestMessage", message);
         const payload = this.getMessagePayload(message);
+        console.warn("payload", payload);
+
         const signature = await signer(payload);
         message.sig = [signature];
         return message;

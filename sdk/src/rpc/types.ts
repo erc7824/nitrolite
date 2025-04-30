@@ -132,9 +132,18 @@ export interface CreateAppSessionRequest {
  */
 export interface CloseAppSessionRequest {
     /** The unique identifier (AccountID) of the application to be closed. */
-    appId: Hex;
+    app_id: Hex;
     /** The final allocation distribution among participants upon closing the application. Order corresponds to the participants array in the application's definition. */
     allocations: bigint[]; // Assuming Hex representation of amounts
+}
+
+/**
+ * Defines the parameters required for the 'update_allocation' RPC method.
+ */
+export interface ResizeChannel {
+    channel_id: Hex; // The unique identifier of the channel to be resized.
+    participant_change: bigint; // The change in the participant allocation, represented as a bigint.
+    funds_destination: Hex; // The address where the resized funds will be sent.
 }
 
 /**

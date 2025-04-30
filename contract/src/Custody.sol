@@ -172,8 +172,8 @@ contract Custody is IChannel, IDeposit {
         // Record actual deposit
         meta.actualDeposits[CLIENT] = creatorDeposit;
 
-        // Add channel to the creator's ledger
-        _ledgers[msg.sender].channels.add(channelId);
+        // NOTE: channel is added to PARTICIPANT's ledger
+        _ledgers[ch.participants[CLIENT]].channels.add(channelId);
 
         // Emit event
         emit Created(channelId, ch, initial);
@@ -208,15 +208,15 @@ contract Custody is IChannel, IDeposit {
         bool validSig = Utils.verifySignature(stateHash, sig, participant);
         if (!validSig) revert InvalidStateSignatures();
 
-        // Lock participant's funds according to expected deposit
+        // NOTE: lock SENDER's funds according to expected deposit
         Amount memory expectedDeposit = meta.expectedDeposits[index];
         _lockAccountFundsToChannel(msg.sender, channelId, expectedDeposit.token, expectedDeposit.amount);
 
         // Record actual deposit
         meta.actualDeposits[index] = expectedDeposit;
 
-        // Add channel to participant's ledger
-        _ledgers[msg.sender].channels.add(channelId);
+        // NOTE: channel is added to PARTICIPANT's ledger
+        _ledgers[meta.chan.participants[SERVER]].channels.add(channelId);
 
         // Emit joined event
         emit Joined(channelId, index);

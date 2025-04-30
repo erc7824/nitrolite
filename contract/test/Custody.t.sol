@@ -996,7 +996,10 @@ contract CustodyTest is Test {
         // 5. Verify the channel is created and funds are locked
         (, uint256 locked, uint256 channelCount) = custody.getAccountInfo(depositor, address(token));
         assertEq(locked, DEPOSIT_AMOUNT, "Depositor's tokens not locked correctly");
-        assertEq(channelCount, 1, "Depositor should have 1 channel");
+        assertEq(channelCount, 0, "Depositor should have 0 channels");
+
+        bytes32[] memory hostChannels = custody.getAccountChannels(hostParticipant);
+        assertEq(hostChannels.length, 1, "Host should have 1 channel");
 
         // 6. Guest participant joins the channel
         vm.startPrank(guestParticipant);
@@ -1014,7 +1017,10 @@ contract CustodyTest is Test {
 
         // 7. Verify channel is ACTIVE
         bytes32[] memory depositorChannels = custody.getAccountChannels(depositor);
-        assertEq(depositorChannels.length, 1, "Depositor should have 1 channel");
+        assertEq(depositorChannels.length, 0, "Depositor should have 0 channels");
+
+        hostChannels = custody.getAccountChannels(hostParticipant);
+        assertEq(hostChannels.length, 1, "Host should have 1 channel");
 
         bytes32[] memory guestChannels = custody.getAccountChannels(guestParticipant);
         assertEq(guestChannels.length, 1, "Guest participant should have 1 channel");

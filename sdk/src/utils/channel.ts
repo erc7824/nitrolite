@@ -22,10 +22,11 @@ export function getChannelId(channel: Channel): ChannelId {
 }
 
 /**
- * Generate a robust nonce for channel creation, ensuring it fits within uint64.
+ * Generate a nonce for channel creation, ensuring it fits within int64 for database compatibility.
  * This mitigates collision risks by combining timestamp, randomness, and optionally an address.
+ * NOTE: This reduces the potential range compared to a full uint64.
  * @param address Optional address to mix into the nonce for further uniqueness.
- * @returns A unique BigInt nonce suitable for Channel.channelNonce.
+ * @returns A unique BigInt nonce suitable for int64 storage.
  */
 export function generateChannelNonce(address?: Address): bigint {
     const timestamp = BigInt(Math.floor(Date.now() / 1000));
@@ -38,8 +39,10 @@ export function generateChannelNonce(address?: Address): bigint {
         combinedNonce = combinedNonce ^ addressComponent;
     }
 
-    const maxUint64 = 0xffffffffffffffffn;
-    const nonce = combinedNonce & maxUint64;
+    // Mask to ensure the value fits within int64 (max value 0x7fffffffffffffff)
+    // This clears the most significant bit (sign bit for int64).
+    const maxInt64 = 0x7fffffffffffffffn;
+    const nonce = combinedNonce & maxInt64;
 
     return nonce;
 }

@@ -134,7 +134,7 @@ export interface CloseAppSessionRequest {
     /** The unique identifier (AccountID) of the application to be closed. */
     appId: Hex;
     /** The final allocation distribution among participants upon closing the application. Order corresponds to the participants array in the application's definition. */
-    allocation: Hex[]; // Assuming Hex representation of amounts
+    allocation: bigint[]; // Assuming Hex representation of amounts
 }
 
 /**

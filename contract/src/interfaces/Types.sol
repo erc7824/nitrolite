@@ -66,9 +66,8 @@ enum ChannelStatus {
 enum StateIntent {
     OPERATE, // Operate the state application
     INITIALIZE, // Initial funding state
-    FINALIZE, // Final closing state
-    RESIZE // Resize state
-
+    RESIZE, // Resize state
+    FINALIZE // Final closing state
 }
 
 /**

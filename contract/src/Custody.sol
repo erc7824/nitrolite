@@ -159,7 +159,7 @@ contract Custody is IChannel, IDeposit {
         // This enables logic of "session keys" where a user can create a channel on behalf of another account, but will lock their own funds
         // if (ch.participants[0]; != msg.sender) revert InvalidParticipant();
 
-        // NOTE: on the other hand, msg.sender should be the one receiving the first allocation
+        // NOTE: on the other hand, msg.sender and destination in the respective allocation must be the same
         if (msg.sender != initial.allocations[0].destination) revert CallerNotDestination(initial.allocations[0].destination, msg.sender);
         _lockAllocation(channelId, initial.allocations[0]);
 
@@ -203,7 +203,7 @@ contract Custody is IChannel, IDeposit {
 
         Allocation memory allocation = meta.lastValidState.allocations[index];
 
-        // NOTE: here msg.sender should be the one receiving the respective allocation
+        // NOTE: msg.sender and destination in the respective allocation must be the same
         if (msg.sender != allocation.destination) revert CallerNotDestination(allocation.destination, msg.sender);
         _lockAllocation(channelId, allocation);
 

@@ -446,18 +446,17 @@ contract Custody is IChannel, IDeposit {
         uint256 channelBalance = meta.tokenBalances[alloc.token];
         if (channelBalance == 0) return;
 
-        uint256 correctedAmount = channelBalance > alloc.amount ? alloc.amount : channelBalance;
-        meta.tokenBalances[alloc.token] -= correctedAmount;
-
         Ledger storage ledger = _ledgers[alloc.destination];
 
         // Check locked amount before subtracting to prevent underflow
         uint256 lockedAmount = ledger.tokens[alloc.token].locked;
+        uint256 correctedAmount = channelBalance > alloc.amount ? alloc.amount : channelBalance;
         uint256 amountToUnlock = lockedAmount > correctedAmount ? correctedAmount : lockedAmount;
 
         if (amountToUnlock > 0) {
             ledger.tokens[alloc.token].locked -= amountToUnlock;
             ledger.tokens[alloc.token].available += amountToUnlock;
+            meta.tokenBalances[alloc.token] -= amountToUnlock;
         }
     }
 

@@ -423,6 +423,7 @@ contract Custody is IChannel, IDeposit {
         if (!success) revert TransferFailed(token, to, amount);
     }
 
+    // NOTE: by Custody's design, the channel creator/joiner is the one locking funds (not participant address, though these can be equal), and must be the same as `alloc.destination`
     function _lockAllocation(bytes32 channelId, Allocation memory alloc) internal {
         if (alloc.amount == 0) return;
 
@@ -437,7 +438,7 @@ contract Custody is IChannel, IDeposit {
         meta.tokenBalances[alloc.token] += alloc.amount;
     }
 
-    // NOTE: by Custody's design, the channel creator is responsible for locking, and must be the same as `alloc.destination`
+    // NOTE: by Custody's design, the channel creator/joiner is the one locking funds (not participant address, though these can be equal), and must be the same as `alloc.destination`
     // Supports transferring partial balances to allow challenging a partial deposit
     function _unlockAllocation(bytes32 channelId, Allocation memory alloc) internal {
         if (alloc.amount == 0) return;
@@ -449,15 +450,15 @@ contract Custody is IChannel, IDeposit {
         uint256 correctedAmount = channelBalance > alloc.amount ? alloc.amount : channelBalance;
         meta.tokenBalances[alloc.token] -= correctedAmount;
 
-        Ledger storage payerLedger = _ledgers[alloc.destination];
+        Ledger storage ledger = _ledgers[alloc.destination];
 
         // Check locked amount before subtracting to prevent underflow
-        uint256 lockedAmount = payerLedger.tokens[alloc.token].locked;
+        uint256 lockedAmount = ledger.tokens[alloc.token].locked;
         uint256 amountToUnlock = lockedAmount > correctedAmount ? correctedAmount : lockedAmount;
 
         if (amountToUnlock > 0) {
-            payerLedger.tokens[alloc.token].locked -= amountToUnlock;
-            _ledgers[alloc.destination].tokens[alloc.token].available += amountToUnlock;
+            ledger.tokens[alloc.token].locked -= amountToUnlock;
+            ledger.tokens[alloc.token].available += amountToUnlock;
         }
     }
 

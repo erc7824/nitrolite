@@ -272,7 +272,7 @@ contract Custody is IChannel, IDeposit {
         }
 
         // At this point, the channel is in FINAL state, so we can close it
-        _unlockAllocations(channelId, meta.chan.participants, meta.lastValidState.allocations);
+        _unlockAllocations(channelId, meta.lastValidState.allocations);
 
         // TODO: implement a better way for this
         // remove sender's channel in case they are a different account then participant
@@ -389,9 +389,8 @@ contract Custody is IChannel, IDeposit {
      * @param channelId The channel identifier
      * @param allocations The channel's allocations
      */
-    function _unlockAllocations(bytes32 channelId, address[] memory participants, Allocation[] memory allocations) internal {
+    function _unlockAllocations(bytes32 channelId, Allocation[] memory allocations) internal {
         uint256 allocsLength = allocations.length;
-        if (allocsLength != participants.length) revert InvalidAllocations();
 
         for (uint256 i = 0; i < allocsLength; i++) {
             _unlockAllocation(channelId, allocations[i]);

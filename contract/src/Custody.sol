@@ -31,6 +31,7 @@ contract Custody is IChannel, IDeposit {
     error TransferFailed(address token, address to, uint256 amount);
     error ChallengeNotExpired();
     error InsufficientBalance(uint256 available, uint256 required);
+    error CallerNotDestination(address expected, address actual);
 
     // Recommended structure to keep track of states
     struct Metadata {
@@ -158,11 +159,12 @@ contract Custody is IChannel, IDeposit {
         // This enables logic of "session keys" where a user can create a channel on behalf of another account, but will lock their own funds
         // if (ch.participants[0]; != msg.sender) revert InvalidParticipant();
 
-        Amount memory creatorDeposit = meta.expectedDeposits[0];
-        _lockAccountFundsToChannel(msg.sender, channelId, creatorDeposit.token, creatorDeposit.amount);
+        // NOTE: on the other hand, msg.sender should be the one receiving the first allocation
+        if (msg.sender != initial.allocations[0].destination) revert CallerNotDestination(initial.allocations[0].destination, msg.sender);
+        _lockAllocation(channelId, initial.allocations[0]);
 
         // Record actual deposit
-        meta.actualDeposits[0] = creatorDeposit;
+        meta.actualDeposits[0] = meta.expectedDeposits[0];
 
         // Add channel to the creator's ledger
         _ledgers[msg.sender].channels.add(channelId);
@@ -199,12 +201,14 @@ contract Custody is IChannel, IDeposit {
         bool validSig = Utils.verifySignature(stateHash, sig, participant);
         if (!validSig) revert InvalidStateSignatures();
 
-        // Lock participant's funds according to expected deposit
-        Amount memory expectedDeposit = meta.expectedDeposits[index];
-        _lockAccountFundsToChannel(msg.sender, channelId, expectedDeposit.token, expectedDeposit.amount);
+        Allocation memory allocation = meta.lastValidState.allocations[index];
+
+        // NOTE: here msg.sender should be the one receiving the respective allocation
+        if (msg.sender != allocation.destination) revert CallerNotDestination(allocation.destination, msg.sender);
+        _lockAllocation(channelId, allocation);
 
         // Record actual deposit
-        meta.actualDeposits[index] = expectedDeposit;
+        meta.actualDeposits[index] = meta.expectedDeposits[index];
 
         // Add channel to participant's ledger
         _ledgers[msg.sender].channels.add(channelId);
@@ -268,7 +272,7 @@ contract Custody is IChannel, IDeposit {
         }
 
         // At this point, the channel is in FINAL state, so we can close it
-        _applyAllocations(channelId, meta.chan.participants, meta.lastValidState.allocations);
+        _unlockAllocations(channelId, meta.chan.participants, meta.lastValidState.allocations);
 
         // TODO: implement a better way for this
         // remove sender's channel in case they are a different account then participant
@@ -385,12 +389,12 @@ contract Custody is IChannel, IDeposit {
      * @param channelId The channel identifier
      * @param allocations The channel's allocations
      */
-    function _applyAllocations(bytes32 channelId, address[] memory participants, Allocation[] memory allocations) internal {
+    function _unlockAllocations(bytes32 channelId, address[] memory participants, Allocation[] memory allocations) internal {
         uint256 allocsLength = allocations.length;
         if (allocsLength != participants.length) revert InvalidAllocations();
 
         for (uint256 i = 0; i < allocsLength; i++) {
-            _applyAllocation(channelId, participants[i], allocations[i]);
+            _unlockAllocation(channelId, allocations[i]);
         }
     }
 
@@ -419,23 +423,23 @@ contract Custody is IChannel, IDeposit {
         if (!success) revert TransferFailed(token, to, amount);
     }
 
-    function _lockAccountFundsToChannel(address account, bytes32 channelId, address token, uint256 amount) internal {
-        if (amount == 0) return;
+    function _lockAllocation(bytes32 channelId, Allocation memory alloc) internal {
+        if (alloc.amount == 0) return;
 
-        Ledger storage ledger = _ledgers[account];
-        uint256 available = ledger.tokens[token].available;
-        if (available < amount) revert InsufficientBalance(available, amount);
+        Ledger storage ledger = _ledgers[alloc.destination];
+        uint256 available = ledger.tokens[alloc.token].available;
+        if (available < alloc.amount) revert InsufficientBalance(available, alloc.amount);
 
-        ledger.tokens[token].available -= amount;
-        ledger.tokens[token].locked += amount;
+        ledger.tokens[alloc.token].available -= alloc.amount;
+        ledger.tokens[alloc.token].locked += alloc.amount;
 
         Metadata storage meta = _channels[channelId];
-        meta.tokenBalances[token] += amount;
+        meta.tokenBalances[alloc.token] += alloc.amount;
     }
 
-    // FIXME: depositor may differ from participant, therefore `payer` may not have funds locked.
+    // NOTE: by Custody's design, the channel creator is responsible for locking, and must be the same as `alloc.destination`
     // Supports transferring partial balances to allow challenging a partial deposit
-    function _applyAllocation(bytes32 channelId, address payer, Allocation memory alloc) internal {
+    function _unlockAllocation(bytes32 channelId, Allocation memory alloc) internal {
         if (alloc.amount == 0) return;
 
         Metadata storage meta = _channels[channelId];
@@ -445,14 +449,13 @@ contract Custody is IChannel, IDeposit {
         uint256 correctedAmount = channelBalance > alloc.amount ? alloc.amount : channelBalance;
         meta.tokenBalances[alloc.token] -= correctedAmount;
 
-        Ledger storage payerLedger = _ledgers[payer];
+        Ledger storage payerLedger = _ledgers[alloc.destination];
 
         // Check locked amount before subtracting to prevent underflow
         uint256 lockedAmount = payerLedger.tokens[alloc.token].locked;
         uint256 amountToUnlock = lockedAmount > correctedAmount ? correctedAmount : lockedAmount;
 
         if (amountToUnlock > 0) {
-            // subtract from payer and add to destination
             payerLedger.tokens[alloc.token].locked -= amountToUnlock;
             _ledgers[alloc.destination].tokens[alloc.token].available += amountToUnlock;
         }

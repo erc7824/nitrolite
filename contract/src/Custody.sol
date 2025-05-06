@@ -377,7 +377,6 @@ contract Custody is IChannel, IDeposit {
 
         // Validate version based on channel status
         if (meta.stage == ChannelStatus.INITIAL && candidate.version != 0) revert InvalidState();
-        if (meta.stage == ChannelStatus.ACTIVE && candidate.version == 0) revert InvalidState();
 
         // Verify the state is valid according to the adjudicator
         bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);

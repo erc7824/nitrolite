@@ -440,7 +440,7 @@ contract Custody is IChannel, IDeposit {
 
         _requireCorrectDelta(precedingState.allocations, candidate.allocations, resizeAmounts);
 
-        _processResize(channelId, meta, resizeAmounts);
+        _processResize(channelId, meta, resizeAmounts, candidate.allocations);
 
         // Update the latest valid state
         meta.lastValidState = candidate;
@@ -581,37 +581,27 @@ contract Custody is IChannel, IDeposit {
 
     /// @notice Supports "implicit transfer"
     /// @dev Positive deltas must be processed first as they add more funds to the channel that the negative delta may want to withdraw
-    function _processResize(bytes32 channelId, Metadata storage chMeta, int256[] memory resizeAmounts) internal {
+    function _processResize(bytes32 channelId, Metadata storage chMeta, int256[] memory resizeAmounts, Allocation[] memory finalAllocations) internal {
         // NOTE: all tokens are the same
         address token = chMeta.expectedDeposits[CLIENT].token;
 
         // First pass: Process all positive resizes
         for (uint256 i = 0; i < 2; i++) {
             if (resizeAmounts[i] > 0) {
-                address participant = chMeta.chan.participants[i];
-                uint256 amountToAdd = uint256(resizeAmounts[i]);
-
-                _lockAccountFundsToChannel(participant, channelId, token, amountToAdd);
-
-                // Update the expected and actual deposits
-                chMeta.expectedDeposits[i].amount += amountToAdd;
-                chMeta.actualDeposits[i].amount += amountToAdd;
+                _lockAccountFundsToChannel(chMeta.chan.participants[i], channelId, token, uint256(resizeAmounts[i]));
             }
         }
 
         // Second pass: Process all negative resizes
         for (uint256 i = 0; i < 2; i++) {
             if (resizeAmounts[i] < 0) {
-                address participant = chMeta.chan.participants[i];
-                uint256 amountToRelease = uint256(-resizeAmounts[i]);
-
-                // Unlock funds from the channel to the participant
-                _unlockAllocation(channelId, Allocation(participant, token, amountToRelease));
-
-                // Update the expected and actual deposits
-                chMeta.expectedDeposits[i].amount -= amountToRelease;
-                chMeta.actualDeposits[i].amount -= amountToRelease;
+                _unlockAllocation(channelId, Allocation(chMeta.chan.participants[i], token, uint256(-resizeAmounts[i])));
             }
+        }
+
+        for (uint256 i = 0; i < 2; i++) {
+            chMeta.expectedDeposits[i].amount = finalAllocations[i].amount;
+            chMeta.actualDeposits[i].amount = finalAllocations[i].amount;
         }
     }
 }

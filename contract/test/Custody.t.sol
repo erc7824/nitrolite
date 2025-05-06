@@ -1058,8 +1058,8 @@ contract CustodyTest is Test {
 
         // 5. Verify channel has been resized correctly with implicit transfer
         // Check locked amounts have been updated correctly
-        (uint256 hostAvailableAfterResize, ,) = custody.getAccountInfo(host, address(token));
-        (uint256 guestAvailableAfterResize, ,) = custody.getAccountInfo(guest, address(token));
+        (uint256 hostAvailableAfterResize,) = custody.getAccountInfo(host, address(token));
+        (uint256 guestAvailableAfterResize,) = custody.getAccountInfo(guest, address(token));
 
         assertEq(hostAvailableAfterResize, 0, "Host's available tokens should be updated to new amount");
         // Guest should have received the withdrawn amount

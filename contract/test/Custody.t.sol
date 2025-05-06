@@ -53,7 +53,7 @@ contract CustodyTest is Test {
 
         // Deploy contracts
         custody = new Custody();
-        adjudicator = new FlagAdjudicator(true);
+        adjudicator = new FlagAdjudicator();
         token = new MockERC20("Test Token", "TST", 18);
 
         // Fund accounts
@@ -199,6 +199,18 @@ contract CustodyTest is Test {
         return Signature({v: v, r: r, s: s});
     }
 
+    // Helper to sign a challenge
+    function signChallenge(Channel memory chan, State memory state, uint256 privateKey)
+        internal
+        pure
+        returns (Signature memory)
+    {
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+        bytes32 challengeHash = keccak256(abi.encode(stateHash, "challenge"));
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, challengeHash);
+        return Signature({v: v, r: r, s: s});
+    }
+
     // Helper to deposit tokens using prank instead of startPrank
     function depositTokens(address user, uint256 amount) internal {
         vm.prank(user);
@@ -237,8 +249,8 @@ contract CustodyTest is Test {
         bytes32 channelId = custody.create(chan, initialState);
 
         // Verify the channel is created and in INITIAL state
-        (, uint256 locked, uint256 channelCount) = custody.getAccountInfo(host, address(token));
-        assertEq(locked, DEPOSIT_AMOUNT, "Host's tokens not locked correctly");
+        (uint256 available, uint256 channelCount) = custody.getAccountInfo(host, address(token));
+        assertEq(available, DEPOSIT_AMOUNT, "Host should have correct available balance");
         assertEq(channelCount, 1, "Host should have 1 channel");
 
         // Also check that the channelId is consistent
@@ -276,12 +288,12 @@ contract CustodyTest is Test {
         bytes32[] memory guestChannels = custody.getAccountChannels(guest);
         assertEq(guestChannels.length, 1, "Guest should have 1 channel");
 
-        // Check locked amounts
-        (, uint256 hostLocked,) = custody.getAccountInfo(host, address(token));
-        (, uint256 guestLocked,) = custody.getAccountInfo(guest, address(token));
+        // Check available amounts
+        (uint256 hostAvailable,) = custody.getAccountInfo(host, address(token));
+        (uint256 guestAvailable,) = custody.getAccountInfo(guest, address(token));
 
-        assertEq(hostLocked, DEPOSIT_AMOUNT, "Host's tokens not locked correctly");
-        assertEq(guestLocked, DEPOSIT_AMOUNT, "Guest's tokens not locked correctly");
+        assertEq(hostAvailable, DEPOSIT_AMOUNT, "Host should have correct available balance");
+        assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest should have correct available balance");
     }
 
     function test_InvalidChannelCreation() public {
@@ -379,11 +391,9 @@ contract CustodyTest is Test {
         bytes32[] memory hostChannels = custody.getAccountChannels(host);
         assertEq(hostChannels.length, 0, "Host should have no channels after close");
 
-        (uint256 hostAvailable, uint256 hostLocked,) = custody.getAccountInfo(host, address(token));
-        (uint256 guestAvailable, uint256 guestLocked,) = custody.getAccountInfo(guest, address(token));
+        (uint256 hostAvailable,) = custody.getAccountInfo(host, address(token));
+        (uint256 guestAvailable,) = custody.getAccountInfo(guest, address(token));
 
-        assertEq(hostLocked, 0, "Host's tokens should be unlocked");
-        assertEq(guestLocked, 0, "Guest's tokens should be unlocked");
         assertEq(hostAvailable, DEPOSIT_AMOUNT, "Host's available balance incorrect");
         assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest's available balance incorrect");
     }
@@ -468,9 +478,10 @@ contract CustodyTest is Test {
         challengeSigs[0] = hostChallengeSig;
         challengeState.sigs = challengeSigs;
 
-        // 3. Host challenges with this state
+        // 3. Host challenges with this state and signs the challenge
+        Signature memory hostChallengeSigFinal = signChallenge(chan, challengeState, hostPrivKey);
         vm.prank(host);
-        custody.challenge(channelId, challengeState, new State[](0));
+        custody.challenge(channelId, challengeState, new State[](0), hostChallengeSigFinal);
 
         // 4. Create a counter-challenge state (more signatures = "newer")
         State memory counterChallengeState = initialState;
@@ -485,9 +496,10 @@ contract CustodyTest is Test {
         counterChallengeSigs[1] = guestCounterSig;
         counterChallengeState.sigs = counterChallengeSigs;
 
-        // 5. Guest counter-challenges
+        // 5. Guest counter-challenges with their own signature
+        Signature memory guestChallengeSignature = signChallenge(chan, counterChallengeState, guestPrivKey);
         vm.prank(guest);
-        custody.challenge(channelId, counterChallengeState, new State[](0));
+        custody.challenge(channelId, counterChallengeState, new State[](0), guestChallengeSignature);
 
         // 6. Skip time and close the channel
         skipChallengeTime();
@@ -499,11 +511,11 @@ contract CustodyTest is Test {
         bytes32[] memory hostChannels = custody.getAccountChannels(host);
         assertEq(hostChannels.length, 0, "Host should have no channels after challenge resolution");
 
-        (, uint256 hostLocked,) = custody.getAccountInfo(host, address(token));
-        (, uint256 guestLocked,) = custody.getAccountInfo(guest, address(token));
+        (uint256 hostAvailable,) = custody.getAccountInfo(host, address(token));
+        (uint256 guestAvailable,) = custody.getAccountInfo(guest, address(token));
 
-        assertEq(hostLocked, 0, "Host's tokens should be unlocked");
-        assertEq(guestLocked, 0, "Guest's tokens should be unlocked");
+        assertEq(hostAvailable, DEPOSIT_AMOUNT * 2, "Host's available balance incorrect");
+        assertEq(guestAvailable, DEPOSIT_AMOUNT * 2, "Guest's available balance incorrect");
     }
 
     function test_InvalidChallenge() public {
@@ -531,7 +543,7 @@ contract CustodyTest is Test {
         // 2. Try to challenge with invalid state (adjudicator rejects)
         State memory invalidState = initialState;
         invalidState.data = abi.encode(42);
-        adjudicator.setFlag(false); // Set flag to false for invalid state
+        adjudicator.setAdjudicateReturnValue(false); // Set adjudicate return value to false for invalid state
 
         // Host signs the invalid state
         Signature memory hostInvalidSig = signState(chan, invalidState, hostPrivKey);
@@ -540,17 +552,59 @@ contract CustodyTest is Test {
         invalidState.sigs = invalidSigs;
 
         // Attempt to challenge with invalid state
+        Signature memory hostInvalidChallengeSig = signChallenge(chan, invalidState, hostPrivKey);
         vm.prank(host);
         vm.expectRevert(Custody.InvalidState.selector);
-        custody.challenge(channelId, invalidState, new State[](0));
+        custody.challenge(channelId, invalidState, new State[](0), hostInvalidChallengeSig);
 
         // 3. Try to challenge non-existent channel
         bytes32 nonExistentChannelId = bytes32(uint256(1234));
-        adjudicator.setFlag(true); // Set flag back to true
+        adjudicator.setAdjudicateReturnValue(true); // Set flag back to true
 
         vm.prank(host);
         vm.expectRevert(abi.encodeWithSelector(Custody.ChannelNotFound.selector, nonExistentChannelId));
-        custody.challenge(nonExistentChannelId, invalidState, new State[](0));
+        custody.challenge(nonExistentChannelId, invalidState, new State[](0), hostInvalidChallengeSig);
+    }
+
+    function test_InvalidChallengerSignature() public {
+        // 1. Create and fund a channel
+        Channel memory chan = createTestChannel();
+        State memory initialState = createInitialState();
+
+        // Set up signatures
+        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature[] memory hostSigs = new Signature[](1);
+        hostSigs[0] = hostSig;
+        initialState.sigs = hostSigs;
+
+        // Create channel with host
+        depositTokens(host, DEPOSIT_AMOUNT * 2);
+        vm.prank(host);
+        bytes32 channelId = custody.create(chan, initialState);
+
+        // Guest joins the channel
+        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
+        depositTokens(guest, DEPOSIT_AMOUNT * 2);
+        vm.prank(guest);
+        custody.join(channelId, 1, guestSig);
+
+        // 2. Create a challenge state
+        State memory challengeState = initialState;
+        challengeState.data = abi.encode(42);
+
+        // Host signs the challenge state
+        Signature memory hostChallengeSig = signState(chan, challengeState, hostPrivKey);
+        Signature[] memory challengeSigs = new Signature[](1);
+        challengeSigs[0] = hostChallengeSig;
+        challengeState.sigs = challengeSigs;
+
+        // 3. Non-participant tries to challenge with a signature from non-participant
+        Signature memory nonParticipantSig = signChallenge(chan, challengeState, nonParticipantPrivKey);
+        adjudicator.setAdjudicateReturnValue(true); // Make sure adjudicator allows the state
+
+        vm.prank(nonParticipant);
+        vm.expectRevert(Custody.InvalidChallengerSignature.selector);
+        custody.challenge(channelId, challengeState, new State[](0), nonParticipantSig);
     }
 
     // ==== 4. Checkpoint Mechanism ====
@@ -602,8 +656,11 @@ contract CustodyTest is Test {
         challengeSigs[0] = hostChallengeSig;
         challengeState.sigs = challengeSigs;
 
+        Signature memory hostChallengeForCheckpoint = signChallenge(chan, challengeState, hostPrivKey);
+        adjudicator.setCompareReturnValue(false); // make sure adjudicator allows the state
         vm.prank(host);
-        custody.challenge(channelId, challengeState, new State[](0));
+        custody.challenge(channelId, challengeState, new State[](0), hostChallengeForCheckpoint);
+        adjudicator.setCompareReturnValue(true); // set value back
 
         // 5. Checkpoint should resolve the challenge
         vm.prank(guest);
@@ -633,14 +690,13 @@ contract CustodyTest is Test {
         vm.startPrank(host);
         custody.deposit(address(token), DEPOSIT_AMOUNT);
 
-        (uint256 available, uint256 locked,) = custody.getAccountInfo(host, address(token));
+        (uint256 available,) = custody.getAccountInfo(host, address(token));
         assertEq(available, DEPOSIT_AMOUNT, "Deposit not recorded correctly");
-        assertEq(locked, 0, "No funds should be locked initially");
 
         // 2. Test withdrawal
         custody.withdraw(address(token), DEPOSIT_AMOUNT / 2);
 
-        (available, locked,) = custody.getAccountInfo(host, address(token));
+        (available,) = custody.getAccountInfo(host, address(token));
         assertEq(available, DEPOSIT_AMOUNT / 2, "Withdrawal not processed correctly");
 
         // 3. Test insufficient balance for withdrawal
@@ -745,10 +801,13 @@ contract CustodyTest is Test {
         vm.prank(depositor);
         bytes32 channelId = custody.create(chan, initialState);
 
-        // 5. Verify the channel is created and funds are locked
-        (, uint256 locked, uint256 channelCount) = custody.getAccountInfo(depositor, address(token));
-        assertEq(locked, DEPOSIT_AMOUNT, "Depositor's tokens not locked correctly");
-        assertEq(channelCount, 1, "Depositor should have 1 channel");
+        // 5. Verify the channel is created
+        (uint256 available, uint256 channelCount) = custody.getAccountInfo(depositor, address(token));
+        assertEq(available, 0, "Depositor should have no available balance after locking");
+        assertEq(channelCount, 0, "Depositor should have 0 channels");
+        (uint256 hostParticipantAvailable, uint256 hostParticipantChannelCount) = custody.getAccountInfo(hostParticipant, address(token));
+        assertEq(hostParticipantAvailable, 0, "hostParticipant should not have available tokens");
+        assertEq(hostParticipantChannelCount, 1, "hostParticipant should have 1 channel after creation");
 
         // 6. Guest participant joins the channel
         vm.startPrank(guestParticipant);
@@ -765,8 +824,8 @@ contract CustodyTest is Test {
         custody.join(channelId, 1, guestPartSig);
 
         // 7. Verify channel is ACTIVE
-        bytes32[] memory depositorChannels = custody.getAccountChannels(depositor);
-        assertEq(depositorChannels.length, 1, "Depositor should have 1 channel");
+        bytes32[] memory hostParticipantChannels = custody.getAccountChannels(hostParticipant);
+        assertEq(hostParticipantChannels.length, 1, "hostParticipant should have 1 channel");
 
         bytes32[] memory guestChannels = custody.getAccountChannels(guestParticipant);
         assertEq(guestChannels.length, 1, "Guest participant should have 1 channel");
@@ -806,17 +865,14 @@ contract CustodyTest is Test {
         custody.close(channelId, finalState, new State[](0));
 
         // 12. Verify funds are returned correctly
-        bytes32[] memory depositorChannelsAfter = custody.getAccountChannels(depositor);
-        assertEq(depositorChannelsAfter.length, 0, "Depositor should have no channels after close");
+        bytes32[] memory hostParticipantChannelsAfter = custody.getAccountChannels(hostParticipant);
+        assertEq(hostParticipantChannelsAfter.length, 0, "hostParticipant should have no channels after close");
 
         bytes32[] memory guestChannelsAfter = custody.getAccountChannels(guestParticipant);
         assertEq(guestChannelsAfter.length, 0, "Guest participant should have no channels after close");
 
-        (uint256 depositorAvailable, uint256 depositorLocked,) = custody.getAccountInfo(depositor, address(token));
-        (uint256 guestAvailable, uint256 guestLocked,) = custody.getAccountInfo(guestParticipant, address(token));
-
-        assertEq(depositorLocked, 0, "Depositor's tokens should be unlocked");
-        assertEq(guestLocked, 0, "Guest participant's tokens should be unlocked");
+        (uint256 depositorAvailable,) = custody.getAccountInfo(depositor, address(token));
+        (uint256 guestAvailable,) = custody.getAccountInfo(guestParticipant, address(token));
 
         // In this flow, the funds go back to participants (who are also depositors)
         assertEq(depositorAvailable, DEPOSIT_AMOUNT, "Depositor available balance incorrect");

@@ -8,6 +8,7 @@ import {IComparable} from "./interfaces/IComparable.sol";
 import {Channel, State, Allocation, Status, Signature, Amount, CHANOPEN, CHANCLOSE} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
+import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
 /**
@@ -16,6 +17,7 @@ import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/
  */
 contract Custody is IChannel, IDeposit {
     using EnumerableSet for EnumerableSet.Bytes32Set;
+    using SafeERC20 for IERC20;
 
     // Errors
     error ChannelNotFound(bytes32 channelId);

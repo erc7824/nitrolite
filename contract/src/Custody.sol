@@ -88,22 +88,31 @@ contract Custody is IChannel, IDeposit {
     }
 
     function deposit(address token, uint256 amount) external payable {
+        if (amount == 0) revert InvalidAmount();
+
         address account = msg.sender;
         if (token == address(0)) {
             if (msg.value != amount) revert InvalidValue();
         } else {
             if (msg.value != 0) revert InvalidValue();
+        }
+
+        _ledgers[msg.sender].tokens[token] += amount;
+
+        if (token != address(0)) {
             IERC20(token).safeTransferFrom(account, address(this), amount);
         }
-        _ledgers[msg.sender].tokens[token] += amount;
     }
 
     function withdraw(address token, uint256 amount) external {
-        Ledger storage ledger = _ledgers[msg.sender];
+        address account = msg.sender;
+        Ledger storage ledger = _ledgers[account];
         uint256 available = ledger.tokens[token];
         if (available < amount) revert InsufficientBalance(available, amount);
-        _transfer(token, msg.sender, amount);
+
         ledger.tokens[token] -= amount;
+
+        _transfer(token, account, amount);
     }
 
     /**

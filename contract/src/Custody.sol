@@ -29,6 +29,7 @@ contract Custody is IChannel, IDeposit {
     error InvalidStateSignatures();
     error InvalidAdjudicator();
     error InvalidChallengePeriod();
+    error InvalidValue();
     error InvalidAmount();
     error TransferFailed(address token, address to, uint256 amount);
     error ChallengeNotExpired();
@@ -58,8 +59,9 @@ contract Custody is IChannel, IDeposit {
     function deposit(address token, uint256 amount) external payable {
         address account = msg.sender;
         if (token == address(0)) {
-            if (msg.value != amount) revert InvalidAmount();
+            if (msg.value != amount) revert InvalidValue();
         } else {
+            if (msg.value != 0) revert InvalidValue();
             bool success = IERC20(token).transferFrom(account, address(this), amount);
             if (!success) revert TransferFailed(token, address(this), amount);
         }

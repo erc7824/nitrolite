@@ -65,6 +65,7 @@ contract Custody is IChannel, IDeposit {
             bool success = IERC20(token).transferFrom(account, address(this), amount);
             if (!success) revert TransferFailed(token, address(this), amount);
         }
+
         _ledgers[msg.sender].tokens[token] += amount;
     }
 
@@ -72,8 +73,10 @@ contract Custody is IChannel, IDeposit {
         Ledger storage ledger = _ledgers[msg.sender];
         uint256 available = ledger.tokens[token];
         if (available < amount) revert InsufficientBalance(available, amount);
-        _transfer(token, msg.sender, amount);
+
         ledger.tokens[token] -= amount;
+
+        _transfer(token, msg.sender, amount);
     }
 
     /**

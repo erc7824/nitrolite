@@ -45,14 +45,8 @@ contract Custody is IChannel, IDeposit {
         mapping(address token => uint256 balance) tokenBalances; // Token balances for the channel
     }
 
-    // Account is a ledger account per unique depositor and token
-    struct Account {
-        uint256 available; // Available amount that can be withdrawn or allocated to channels
-        uint256 locked; // Amount currently allocated to channels
-    }
-
     struct Ledger {
-        mapping(address token => Account funds) tokens; // Token balances
+        mapping(address token => uint256 available) tokens; // Available amount that can be withdrawn or allocated to channels
         EnumerableSet.Bytes32Set channels; // Set of user ChannelId
     }
 
@@ -67,15 +61,15 @@ contract Custody is IChannel, IDeposit {
             bool success = IERC20(token).transferFrom(account, address(this), amount);
             if (!success) revert TransferFailed(token, address(this), amount);
         }
-        _ledgers[msg.sender].tokens[token].available += amount;
+        _ledgers[msg.sender].tokens[token] += amount;
     }
 
     function withdraw(address token, uint256 amount) external {
         Ledger storage ledger = _ledgers[msg.sender];
-        uint256 available = ledger.tokens[token].available;
+        uint256 available = ledger.tokens[token];
         if (available < amount) revert InsufficientBalance(available, amount);
         _transfer(token, msg.sender, amount);
-        ledger.tokens[token].available -= amount;
+        ledger.tokens[token] -= amount;
     }
 
     /**
@@ -92,17 +86,15 @@ contract Custody is IChannel, IDeposit {
      * @param user The account address
      * @param token The token address
      * @return available Amount available for withdrawal or allocation
-     * @return locked Amount locked in channels
      * @return channelCount Number of associated channels
      */
     function getAccountInfo(address user, address token)
         public
         view
-        returns (uint256 available, uint256 locked, uint256 channelCount)
+        returns (uint256 available, uint256 channelCount)
     {
         Ledger storage ledger = _ledgers[user];
-        Account storage account = ledger.tokens[token];
-        return (account.available, account.locked, ledger.channels.length());
+        return (ledger.tokens[token], ledger.channels.length());
     }
 
     /**
@@ -268,7 +260,7 @@ contract Custody is IChannel, IDeposit {
         }
 
         // At this point, the channel is in FINAL state, so we can close it
-        _distributeAllocation(channelId, meta);
+        _unlockAllocations(channelId, candidate.allocations);
 
         // TODO: implement a better way for this
         // remove sender's channel in case they are a different account then participant
@@ -383,14 +375,13 @@ contract Custody is IChannel, IDeposit {
     /**
      * @notice Internal function to close a channel and distribute funds
      * @param channelId The channel identifier
-     * @param meta The channel's metadata
+     * @param allocations The allocations to distribute
      */
-    function _distributeAllocation(bytes32 channelId, Metadata storage meta) internal {
+    function _unlockAllocations(bytes32 channelId, Allocation[] memory allocations) internal {
         // Distribute funds according to allocations
-        uint256 allocsLength = meta.lastValidState.allocations.length;
+        uint256 allocsLength = allocations.length;
         for (uint256 i = 0; i < allocsLength; i++) {
-            Allocation memory allocation = meta.lastValidState.allocations[i];
-            _unlockChannelFundsToAccount(channelId, allocation.destination, allocation.token, allocation.amount);
+            _unlockAllocation(channelId, allocations[i]);
         }
     }
 
@@ -423,37 +414,24 @@ contract Custody is IChannel, IDeposit {
         if (amount == 0) return;
 
         Ledger storage ledger = _ledgers[account];
-        uint256 available = ledger.tokens[token].available;
+        uint256 available = ledger.tokens[token];
         if (available < amount) revert InsufficientBalance(available, amount);
 
-        ledger.tokens[token].available -= amount;
-        ledger.tokens[token].locked += amount;
-
-        Metadata storage meta = _channels[channelId];
-        meta.tokenBalances[token] += amount;
+        ledger.tokens[token] -= amount;
+        _channels[channelId].tokenBalances[token] += amount;
     }
 
     // Does not perform checks to allow transferring partial balances in case of partial deposit
-    function _unlockChannelFundsToAccount(bytes32 channelId, address account, address token, uint256 amount) internal {
-        if (amount == 0) return;
+    function _unlockAllocation(bytes32 channelId, Allocation memory alloc) internal {
+        if (alloc.amount == 0) return;
 
         Metadata storage meta = _channels[channelId];
-        uint256 channelBalance = meta.tokenBalances[token];
+        uint256 channelBalance = meta.tokenBalances[alloc.token];
         if (channelBalance == 0) return;
 
-        uint256 correctedAmount = channelBalance > amount ? amount : channelBalance;
-        meta.tokenBalances[token] -= correctedAmount;
-
-        Ledger storage ledger = _ledgers[account];
-
-        // Check locked amount before subtracting to prevent underflow
-        uint256 lockedAmount = ledger.tokens[token].locked;
-        uint256 amountToUnlock = lockedAmount > correctedAmount ? correctedAmount : lockedAmount;
-
-        if (amountToUnlock > 0) {
-            ledger.tokens[token].locked -= amountToUnlock;
-        }
-        ledger.tokens[token].available += amountToUnlock;
+        uint256 correctedAmount = channelBalance > alloc.amount ? alloc.amount : channelBalance;
+        meta.tokenBalances[alloc.token] -= correctedAmount;
+        _ledgers[alloc.destination].tokens[alloc.token] += correctedAmount;
     }
 
     /**

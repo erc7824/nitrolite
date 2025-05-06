@@ -311,7 +311,6 @@ contract Custody is IChannel, IDeposit {
 
         // Validate version based on channel status
         if (meta.stage == ChannelStatus.INITIAL && candidate.version != 0) revert InvalidState();
-        if (meta.stage == ChannelStatus.ACTIVE && candidate.version == 0) revert InvalidState();
 
         if (candidate.data.length != 0) {
             if (candidate.intent == StateIntent.INITIALIZE) {
@@ -324,6 +323,8 @@ contract Custody is IChannel, IDeposit {
                 }
             }
         }
+
+        // ([("0xe601dfaFbDBc16a4d997d04fCEE655Caab831798","0x3c93C321634a80FB3657CFAC707718A11cA57cBf"],"0xC2BA5c5E2c4848F64187Aa1F3f32a331b0C031b9","1","2987423159340149059"),("1","0","0x",[("0x21F7D1F35979B125f6F7918fC16Cb9101e5882d7","0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359","2000"),("0x3c93C321634a80FB3657CFAC707718A11cA57cBf","0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359","0")],[("28","0x7b112e1433ec0146568c95d98f6a087d9db2c5c9b63731c05ebaefbcfd68afc4","0x7fd74770a1189b5e1f3b0fc03eadaaf8dd78f942700a62d98b1674ccd38d48a8")]),[])
 
         if (
             candidate.data.length == 0

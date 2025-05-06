@@ -6,14 +6,15 @@ import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
 import {IComparable} from "../../src/interfaces/IComparable.sol";
 
 contract FlagAdjudicator is IAdjudicator, IComparable {
-    bool public flag;
+    bool public adjudicateReturnValue = true;
+    bool public compareReturnValue = true;
 
-    constructor(bool flag_) {
-        flag = flag_;
+    function setAdjudicateReturnValue(bool value) external {
+        adjudicateReturnValue = value;
     }
 
-    function setFlag(bool _flag) external {
-        flag = _flag;
+    function setCompareReturnValue(bool value) external {
+        compareReturnValue = value;
     }
 
     function adjudicate(Channel calldata, State calldata, State[] calldata)
@@ -23,11 +24,10 @@ contract FlagAdjudicator is IAdjudicator, IComparable {
         returns (bool valid)
     {
         // Always return true to indicate that the state is valid
-        return flag;
+        return adjudicateReturnValue;
     }
 
-    function compare(State calldata, State calldata) external pure override returns (int8) {
-        // Always return 1 to indicate the candidate state is newer
-        return 1;
+    function compare(State calldata, State calldata) external view override returns (int8) {
+        return compareReturnValue ? int8(1) : -1;
     }
 }

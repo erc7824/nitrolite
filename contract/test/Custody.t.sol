@@ -960,7 +960,113 @@ contract CustodyTest is Test {
         );
     }
 
-    // ==== 7. Separate Depositor and Participant Addresses ====
+    // ==== 7. Implicit Transfer in Resize ====
+
+    /**
+     * @notice Test case for basic implicit transfer functionality
+     * In this test, the host tops up their funds while the guest withdraws their initial deposit
+     */
+    function test_ImplicitTransfer() public {
+        // 1. Create and fund a channel
+        Channel memory chan = createTestChannel();
+        State memory initialState = createInitialState();
+
+        // Set up signatures
+        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature[] memory hostSigs = new Signature[](1);
+        hostSigs[0] = hostSig;
+        initialState.sigs = hostSigs;
+
+        // Create channel with host, giving extra deposit for future top-up
+        depositTokens(host, DEPOSIT_AMOUNT * 2);
+        vm.prank(host);
+        bytes32 channelId = custody.create(chan, initialState);
+
+        // Guest joins the channel
+        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
+        depositTokens(guest, DEPOSIT_AMOUNT * 2);
+        vm.prank(guest);
+        custody.join(channelId, 1, guestSig);
+
+        // 2. Create a state before resize (preceding state)
+        State memory precedingState = State({
+            intent: StateIntent.OPERATE,
+            version: 41, // Version 41 indicates state before resize
+            data: abi.encode(41), // Simple application data
+            allocations: initialState.allocations,
+            sigs: new Signature[](0) // Empty initially
+        });
+
+        // Host signs the preceding state
+        Signature memory hostPrecedingSig = signState(chan, precedingState, hostPrivKey);
+        Signature[] memory precedingSigs = new Signature[](1);
+        precedingSigs[0] = hostPrecedingSig;
+        precedingState.sigs = precedingSigs;
+
+        // 3. Create a resize state with implicit transfer
+        // To ensure the equation (initial_sum + delta_sum = final_sum) is balanced:
+        // Initial: [D, D] - Sum: 2*D
+        // Delta: [D, -2*D] - Sum: -D
+        // Final: [D, 0] - Sum: D
+        // Available after resize: [0, 3*D]
+
+        int256[] memory resizeAmounts = new int256[](2);
+        resizeAmounts[0] = int256(DEPOSIT_AMOUNT);             // Host tops up with DEPOSIT_AMOUNT
+        resizeAmounts[1] = -int256(2 * DEPOSIT_AMOUNT);        // Guest withdraws their 2 * DEPOSIT_AMOUNT
+
+        // Create resize state with new allocations
+        State memory resizedState = State({
+            intent: StateIntent.RESIZE,
+            version: 42, // Version 42 indicates a resize state
+            data: abi.encode(resizeAmounts),
+            allocations: new Allocation[](2),
+            sigs: new Signature[](0) // Empty initially
+        });
+
+        // Calculate new allocation amounts
+        uint256 newHostAmount = DEPOSIT_AMOUNT;  // Original
+        uint256 newGuestAmount = 0;              // Zero after withdrawal
+
+        // Set allocations to match the resize - both must have the SAME token
+        resizedState.allocations[0] = Allocation({
+            destination: host,
+            token: address(token),
+            amount: newHostAmount
+        });
+
+        resizedState.allocations[1] = Allocation({
+            destination: guest,
+            token: address(token), // Must be the same token as in allocation[0]
+            amount: newGuestAmount
+        });
+
+        // Both sign the resized state
+        Signature memory hostResizeSig = signState(chan, resizedState, hostPrivKey);
+        Signature memory guestResizeSig = signState(chan, resizedState, guestPrivKey);
+
+        Signature[] memory resizeSigs = new Signature[](2);
+        resizeSigs[0] = hostResizeSig;
+        resizeSigs[1] = guestResizeSig;
+        resizedState.sigs = resizeSigs;
+
+        // 4. Resize the channel with implicit transfer
+        State[] memory proof = new State[](1);
+        proof[0] = precedingState;
+
+        vm.prank(host);
+        custody.resize(channelId, resizedState, proof);
+
+        // 5. Verify channel has been resized correctly with implicit transfer
+        // Check locked amounts have been updated correctly
+        (uint256 hostAvailableAfterResize,) = custody.getAccountInfo(host, address(token));
+        (uint256 guestAvailableAfterResize,) = custody.getAccountInfo(guest, address(token));
+
+        assertEq(hostAvailableAfterResize, 0, "Host's available tokens should be updated to new amount");
+        // Guest should have received the withdrawn amount
+        assertEq(guestAvailableAfterResize, 3 * DEPOSIT_AMOUNT, "Guest should have their 3 * deposit available");
+    }
+
+    // ==== 8. Separate Depositor and Participant Addresses ====
 
     function test_SeparateDepositorAndParticipant() public {
         // 1. Prepare channel with different participant addresses

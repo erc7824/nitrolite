@@ -1,5 +1,5 @@
 import { Hex } from "viem";
-import { CreateChannelParams, State, Channel, ChannelId, CloseChannelParams, StateIntent } from "./types";
+import { CreateChannelParams, State, Channel, ChannelId, CloseChannelParams, StateIntent, ResizeChannelParams } from "./types";
 import { generateChannelNonce, getChannelId, getStateHash, signState, removeQuotesFromRS } from "../utils";
 import * as Errors from "../errors";
 import { PreparerDependencies } from "./prepare";
@@ -73,6 +73,47 @@ export async function _prepareAndSignInitialState(
     };
 
     return { channel, initialState, channelId };
+}
+
+/**
+ * Shared logic for preparing the resize state for a channel and signing it.
+ * Used by both direct execution (resizeChannel) and preparation (prepareResizeChannelTransaction).
+ * @param deps - The dependencies needed (account, addresses, walletClient, challengeDuration). See {@link PreparerDependencies}.
+ * @param params - Parameters for resizing the channel, containing the server-signed final state. See {@link ResizeChannelParams}.
+ * @returns An object containing the fully signed resize state and the channel ID.
+ */
+export async function _prepareAndSignResizeState(
+    deps: PreparerDependencies,
+    params: ResizeChannelParams
+): Promise<{ resizeStateWithSigs: State; channelId: ChannelId }> {
+    const { resizeState } = params;
+
+    if (!resizeState.stateData) {
+        throw new Errors.MissingParameterError("State data is required for closing the channel.");
+    }
+
+    const channelId = resizeState.channelId;
+    const serverSignature = removeQuotesFromRS(resizeState.serverSignature);
+
+    const stateToSign: State = {
+        data: resizeState.stateData,
+        intent: resizeState.intent,
+        allocations: resizeState.allocations,
+        version: resizeState.version,
+        sigs: [],
+    };
+
+    const stateHash = getStateHash(channelId, stateToSign);
+
+    const accountSignature = await signState(stateHash, deps.stateWalletClient.signMessage);
+
+    // Create a new state with signatures in the requested style
+    const resizeStateWithSigs: State = {
+        ...stateToSign,
+        sigs: [accountSignature, serverSignature],
+    };
+
+    return { resizeStateWithSigs, channelId };
 }
 
 /**

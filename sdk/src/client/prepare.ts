@@ -3,7 +3,7 @@ import { NitroliteService, Erc20Service } from "./services";
 import { CreateChannelParams, CheckpointChannelParams, ChallengeChannelParams, CloseChannelParams, ResizeChannelParams } from "./types";
 import { ContractAddresses } from "../abis";
 import * as Errors from "../errors";
-import { _prepareAndSignInitialState, _prepareAndSignFinalState } from "./state";
+import { _prepareAndSignInitialState, _prepareAndSignFinalState, _prepareAndSignResizeState } from "./state";
 
 /**
  * Represents the data needed to construct a transaction or UserOperation call.
@@ -155,10 +155,10 @@ export class NitroliteTransactionPreparer {
      * @returns The prepared transaction data ({ to, data, value }).
      */
     async prepareResizeChannelTransaction(params: ResizeChannelParams): Promise<PreparedTransaction> {
-        const { channelId, candidateState, proofStates = [] } = params;
+        const { resizeStateWithSigs, channelId } = await _prepareAndSignResizeState(this.deps, params);
 
         try {
-            return await this.deps.nitroliteService.prepareResize(channelId, candidateState, proofStates);
+            return await this.deps.nitroliteService.prepareResize(channelId, resizeStateWithSigs);
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
             throw new Errors.ContractCallError("prepareResizeChannelTransaction", err as Error, { params });

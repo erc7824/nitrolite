@@ -14,7 +14,7 @@ import {
 } from "./types";
 import * as Errors from "../errors";
 import { ContractAddresses } from "../abis";
-import { _prepareAndSignFinalState, _prepareAndSignInitialState } from "./state";
+import { _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from "./state";
 import { NitroliteTransactionPreparer, PreparerDependencies } from "./prepare";
 
 /**
@@ -169,14 +169,14 @@ export class NitroliteClient {
     /**
      * Resize a channel on-chain using candidate state.
      * Requires the candidate state.
-     * @param params Parameters for resizing the channel. See {@link CloseChannelParams}.
+     * @param params Parameters for resizing the channel. See {@link ResizeChannelParams}.
      * @returns The transaction hash.
      */
     async resizeChannel(params: ResizeChannelParams): Promise<Hash> {
-        const { channelId, candidateState, proofStates = [] } = params;
+        const { resizeStateWithSigs, channelId } = await _prepareAndSignResizeState(this.sharedDeps, params);
 
         try {
-            return await this.nitroliteService.resize(channelId, candidateState, proofStates);
+            return await this.nitroliteService.resize(channelId, resizeStateWithSigs);
         } catch (err) {
             throw new Errors.ContractCallError("Failed to execute resizeChannel on contract", err as Error);
         }

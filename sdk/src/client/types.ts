@@ -121,10 +121,18 @@ export interface ChallengeChannelParams {
     proofStates?: State[];
 }
 
+/**
+ * Parameters required for resizing a state channel.
+ */
 export interface ResizeChannelParams {
-    channelId: ChannelId;
-    candidateState: State;
-    proofStates?: State[];
+    resizeState: {
+        channelId: ChannelId;
+        stateData: Hex;
+        allocations: [Allocation, Allocation];
+        version: bigint;
+        intent: StateIntent;
+        serverSignature: Signature;
+    };
 }
 
 /**

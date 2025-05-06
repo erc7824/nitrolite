@@ -161,7 +161,7 @@ contract Custody is IChannel, IDeposit {
         meta.actualDeposits[0] = creatorDeposit;
 
         // Add channel to the creator's ledger
-        _ledgers[msg.sender].channels.add(channelId);
+        _ledgers[ch.participants[0]].channels.add(channelId);
 
         // Emit event
         emit Created(channelId, ch, initial);
@@ -203,7 +203,7 @@ contract Custody is IChannel, IDeposit {
         meta.actualDeposits[index] = expectedDeposit;
 
         // Add channel to participant's ledger
-        _ledgers[msg.sender].channels.add(channelId);
+        _ledgers[meta.chan.participants[index]].channels.add(channelId);
 
         // Emit joined event
         emit Joined(channelId, index);

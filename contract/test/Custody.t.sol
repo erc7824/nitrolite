@@ -745,7 +745,10 @@ contract CustodyTest is Test {
         // 5. Verify the channel is created
         (uint256 available, uint256 channelCount) = custody.getAccountInfo(depositor, address(token));
         assertEq(available, 0, "Depositor should have no available balance after locking");
-        assertEq(channelCount, 1, "Depositor should have 1 channel");
+        assertEq(channelCount, 0, "Depositor should have 0 channels");
+        (uint256 hostParticipantAvailable, uint256 hostParticipantChannelCount) = custody.getAccountInfo(hostParticipant, address(token));
+        assertEq(hostParticipantAvailable, 0, "hostParticipant should not have available tokens");
+        assertEq(hostParticipantChannelCount, 1, "hostParticipant should have 1 channel after creation");
 
         // 6. Guest participant joins the channel
         vm.startPrank(guestParticipant);
@@ -762,8 +765,8 @@ contract CustodyTest is Test {
         custody.join(channelId, 1, guestPartSig);
 
         // 7. Verify channel is ACTIVE
-        bytes32[] memory depositorChannels = custody.getAccountChannels(depositor);
-        assertEq(depositorChannels.length, 1, "Depositor should have 1 channel");
+        bytes32[] memory hostParticipantChannels = custody.getAccountChannels(hostParticipant);
+        assertEq(hostParticipantChannels.length, 1, "hostParticipant should have 1 channel");
 
         bytes32[] memory guestChannels = custody.getAccountChannels(guestParticipant);
         assertEq(guestChannels.length, 1, "Guest participant should have 1 channel");
@@ -803,8 +806,8 @@ contract CustodyTest is Test {
         custody.close(channelId, finalState, new State[](0));
 
         // 12. Verify funds are returned correctly
-        bytes32[] memory depositorChannelsAfter = custody.getAccountChannels(depositor);
-        assertEq(depositorChannelsAfter.length, 0, "Depositor should have no channels after close");
+        bytes32[] memory hostParticipantChannelsAfter = custody.getAccountChannels(hostParticipant);
+        assertEq(hostParticipantChannelsAfter.length, 0, "hostParticipant should have no channels after close");
 
         bytes32[] memory guestChannelsAfter = custody.getAccountChannels(guestParticipant);
         assertEq(guestChannelsAfter.length, 0, "Guest participant should have no channels after close");

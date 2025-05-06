@@ -426,6 +426,7 @@ contract Custody is IChannel, IDeposit {
         // resized state should be the successor of the preceding state
         if (candidate.version != precedingState.version + 1) revert InvalidState();
 
+        _requireCorrectAllocations(precedingState.allocations);
         _requireCorrectAllocations(candidate.allocations);
 
         // Verify all participants have signed the resize state
@@ -558,6 +559,10 @@ contract Custody is IChannel, IDeposit {
         }
     }
 
+    /// @notice Allows "implicit transfer" between CLIENT and SERVER, which is useful in situations where
+    /// a participant wants to top-up a channel only to transfer funds to the other participant, so they can withdraw it
+    /// @dev "implicit transfer" means that only the sum of "initial + resize == final" is checked, not the individual amounts_channels
+    /// Explicit delta can be calculated as |final[i] - initial[i] - resize[i]|, where i can be CLIENT or SERVER
     function _requireCorrectDelta(
         Allocation[] memory initialAllocations,
         Allocation[] memory finalAllocations,
@@ -565,39 +570,40 @@ contract Custody is IChannel, IDeposit {
     ) internal pure {
         if (delta.length != 2) revert InvalidState();
 
-        // separately check for each participant to guarantee each of them can afford the delta
-        for (uint256 i = 0; i < 2; i++) {
-            uint256 initialBalanceSum = initialAllocations[i].amount;
-            int256 finalBalanceSum = int256(initialBalanceSum) + delta[i];
-            uint256 candidateBalanceSum = finalAllocations[i].amount;
+        uint256 sumBefore = initialAllocations[CLIENT].amount + initialAllocations[SERVER].amount;
+        int256 sumDelta = delta[CLIENT] + delta[SERVER];
+        uint256 sumAfter = finalAllocations[CLIENT].amount + finalAllocations[SERVER].amount;
 
-            if (finalBalanceSum != int256(candidateBalanceSum)) {
-                revert InsufficientBalance(candidateBalanceSum, uint256(finalBalanceSum));
-            }
+        if (int256(sumBefore) + sumDelta != int256(sumAfter)) {
+            revert InvalidAllocations();
         }
     }
 
+    /// @notice Supports "implicit transfer"
+    /// @dev Positive deltas must be processed first as they add more funds to the channel that the negative delta may want to withdraw
     function _processResize(bytes32 channelId, Metadata storage chMeta, int256[] memory resizeAmounts) internal {
         // NOTE: all tokens are the same
         address token = chMeta.expectedDeposits[CLIENT].token;
 
-        // Process resize amounts for each participant
+        // First pass: Process all positive resizes
         for (uint256 i = 0; i < 2; i++) {
-            address participant = chMeta.chan.participants[i];
-            int256 resizeAmount = resizeAmounts[i];
+            if (resizeAmounts[i] > 0) {
+                address participant = chMeta.chan.participants[i];
+                uint256 amountToAdd = uint256(resizeAmounts[i]);
 
-            // Positive resize: Lock more funds into the channel
-            if (resizeAmount > 0) {
-                uint256 amountToAdd = uint256(resizeAmount);
                 _lockAccountFundsToChannel(participant, channelId, token, amountToAdd);
 
                 // Update the expected and actual deposits
                 chMeta.expectedDeposits[i].amount += amountToAdd;
                 chMeta.actualDeposits[i].amount += amountToAdd;
             }
-            // Negative resize: Release funds from the channel
-            else if (resizeAmount < 0) {
-                uint256 amountToRelease = uint256(-resizeAmount);
+        }
+
+        // Second pass: Process all negative resizes
+        for (uint256 i = 0; i < 2; i++) {
+            if (resizeAmounts[i] < 0) {
+                address participant = chMeta.chan.participants[i];
+                uint256 amountToRelease = uint256(-resizeAmounts[i]);
 
                 // Unlock funds from the channel to the participant
                 _unlockAllocation(channelId, Allocation(participant, token, amountToRelease));

@@ -133,6 +133,7 @@ export interface ResizeChannelParams {
         intent: StateIntent;
         serverSignature: Signature;
     };
+    proofStates: State[];
 }
 
 /**
@@ -149,6 +150,5 @@ export interface CheckpointChannelParams {
  */
 export interface AccountInfo {
     available: bigint;
-    locked: bigint;
     channelCount: bigint;
 }

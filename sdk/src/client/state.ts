@@ -85,8 +85,8 @@ export async function _prepareAndSignInitialState(
 export async function _prepareAndSignResizeState(
     deps: PreparerDependencies,
     params: ResizeChannelParams
-): Promise<{ resizeStateWithSigs: State; channelId: ChannelId }> {
-    const { resizeState } = params;
+): Promise<{ resizeStateWithSigs: State; proofs: State[]; channelId: ChannelId }> {
+    const { resizeState, proofStates } = params;
 
     if (!resizeState.stateData) {
         throw new Errors.MissingParameterError("State data is required for closing the channel.");
@@ -113,7 +113,10 @@ export async function _prepareAndSignResizeState(
         sigs: [accountSignature, serverSignature],
     };
 
-    return { resizeStateWithSigs, channelId };
+    let proofs: State[] = [...proofStates];
+    proofs.push(resizeStateWithSigs);
+
+    return { resizeStateWithSigs, proofs, channelId };
 }
 
 /**

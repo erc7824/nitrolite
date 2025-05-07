@@ -173,10 +173,10 @@ export class NitroliteClient {
      * @returns The transaction hash.
      */
     async resizeChannel(params: ResizeChannelParams): Promise<Hash> {
-        const { resizeStateWithSigs, channelId } = await _prepareAndSignResizeState(this.sharedDeps, params);
+        const { resizeStateWithSigs, proofs, channelId } = await _prepareAndSignResizeState(this.sharedDeps, params);
 
         try {
-            return await this.nitroliteService.resize(channelId, resizeStateWithSigs);
+            return await this.nitroliteService.resize(channelId, resizeStateWithSigs, proofs);
         } catch (err) {
             throw new Errors.ContractCallError("Failed to execute resizeChannel on contract", err as Error);
         }

@@ -498,7 +498,7 @@ export class NitroliteService {
      * @returns An object containing available balance, locked balance, and channel count.
      * @error Throws ContractReadError if the read operation fails.
      */
-    async getAccountInfo(user: Address, token: Address): Promise<{ available: bigint; locked: bigint; channelCount: bigint }> {
+    async getAccountInfo(user: Address, token: Address): Promise<{ available: bigint; channelCount: bigint }> {
         const functionName = "getAccountInfo";
 
         try {
@@ -509,11 +509,10 @@ export class NitroliteService {
                 args: [user, token],
             });
 
-            const [available, locked, channelCount] = result as [bigint, bigint, bigint];
+            const [available, channelCount] = result as [bigint, bigint];
 
             return {
                 available: available,
-                locked: locked,
                 channelCount: channelCount,
             };
         } catch (error: any) {

@@ -294,7 +294,6 @@ export const CustodyAbi: Abi = [
         ],
         outputs: [
             { name: "available", type: "uint256", internalType: "uint256" },
-            { name: "locked", type: "uint256", internalType: "uint256" },
             { name: "channelCount", type: "uint256", internalType: "uint256" },
         ],
         stateMutability: "view",

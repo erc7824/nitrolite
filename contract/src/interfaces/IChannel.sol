@@ -101,8 +101,9 @@ interface IChannel {
      * @param channelId Unique identifier for the channel
      * @param candidate The state being submitted as the latest valid state
      * @param proofs Additional states required by the adjudicator to validate the candidate
+     * @param challengerSig Signature of the challenger on the candidate state. Must be signed by one of the participants
      */
-    function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs) external;
+    function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs, Signature calldata challengerSig) external;
 
     /**
      * @notice Records a valid state on-chain without initiating a challenge

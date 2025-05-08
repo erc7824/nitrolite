@@ -198,6 +198,18 @@ contract CustodyTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, stateHash);
         return Signature({v: v, r: r, s: s});
     }
+    
+    // Helper to sign a challenge
+    function signChallenge(Channel memory chan, State memory state, uint256 privateKey)
+        internal
+        pure
+        returns (Signature memory)
+    {
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+        bytes32 challengeHash = keccak256(abi.encode(stateHash, "challenge"));
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, challengeHash);
+        return Signature({v: v, r: r, s: s});
+    }
 
     // Helper to deposit tokens using prank instead of startPrank
     function depositTokens(address user, uint256 amount) internal {
@@ -466,9 +478,10 @@ contract CustodyTest is Test {
         challengeSigs[0] = hostChallengeSig;
         challengeState.sigs = challengeSigs;
 
-        // 3. Host challenges with this state
+        // 3. Host challenges with this state and signs the challenge
+        Signature memory hostChallengeSigFinal = signChallenge(chan, challengeState, hostPrivKey);
         vm.prank(host);
-        custody.challenge(channelId, challengeState, new State[](0));
+        custody.challenge(channelId, challengeState, new State[](0), hostChallengeSigFinal);
 
         // 4. Create a counter-challenge state (more signatures = "newer")
         State memory counterChallengeState = initialState;
@@ -483,9 +496,10 @@ contract CustodyTest is Test {
         counterChallengeSigs[1] = guestCounterSig;
         counterChallengeState.sigs = counterChallengeSigs;
 
-        // 5. Guest counter-challenges
+        // 5. Guest counter-challenges with their own signature
+        Signature memory guestChallengeSignature = signChallenge(chan, counterChallengeState, guestPrivKey);
         vm.prank(guest);
-        custody.challenge(channelId, counterChallengeState, new State[](0));
+        custody.challenge(channelId, counterChallengeState, new State[](0), guestChallengeSignature);
 
         // 6. Skip time and close the channel
         skipChallengeTime();
@@ -538,9 +552,10 @@ contract CustodyTest is Test {
         invalidState.sigs = invalidSigs;
 
         // Attempt to challenge with invalid state
+        Signature memory hostInvalidChallengeSig = signChallenge(chan, invalidState, hostPrivKey);
         vm.prank(host);
         vm.expectRevert(Custody.InvalidState.selector);
-        custody.challenge(channelId, invalidState, new State[](0));
+        custody.challenge(channelId, invalidState, new State[](0), hostInvalidChallengeSig);
 
         // 3. Try to challenge non-existent channel
         bytes32 nonExistentChannelId = bytes32(uint256(1234));
@@ -548,7 +563,48 @@ contract CustodyTest is Test {
 
         vm.prank(host);
         vm.expectRevert(abi.encodeWithSelector(Custody.ChannelNotFound.selector, nonExistentChannelId));
-        custody.challenge(nonExistentChannelId, invalidState, new State[](0));
+        custody.challenge(nonExistentChannelId, invalidState, new State[](0), hostInvalidChallengeSig);
+    }
+    
+    function test_InvalidChallengerSignature() public {
+        // 1. Create and fund a channel
+        Channel memory chan = createTestChannel();
+        State memory initialState = createInitialState();
+
+        // Set up signatures
+        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature[] memory hostSigs = new Signature[](1);
+        hostSigs[0] = hostSig;
+        initialState.sigs = hostSigs;
+
+        // Create channel with host
+        depositTokens(host, DEPOSIT_AMOUNT * 2);
+        vm.prank(host);
+        bytes32 channelId = custody.create(chan, initialState);
+
+        // Guest joins the channel
+        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
+        depositTokens(guest, DEPOSIT_AMOUNT * 2);
+        vm.prank(guest);
+        custody.join(channelId, 1, guestSig);
+
+        // 2. Create a challenge state
+        State memory challengeState = initialState;
+        challengeState.data = abi.encode(42);
+
+        // Host signs the challenge state
+        Signature memory hostChallengeSig = signState(chan, challengeState, hostPrivKey);
+        Signature[] memory challengeSigs = new Signature[](1);
+        challengeSigs[0] = hostChallengeSig;
+        challengeState.sigs = challengeSigs;
+
+        // 3. Non-participant tries to challenge with a signature from non-participant
+        Signature memory nonParticipantSig = signChallenge(chan, challengeState, nonParticipantPrivKey);
+        adjudicator.setFlag(true); // Make sure adjudicator allows the state
+        
+        vm.prank(nonParticipant);
+        vm.expectRevert(Custody.InvalidChallengerSignature.selector);
+        custody.challenge(channelId, challengeState, new State[](0), nonParticipantSig);
     }
 
     // ==== 4. Checkpoint Mechanism ====
@@ -600,8 +656,9 @@ contract CustodyTest is Test {
         challengeSigs[0] = hostChallengeSig;
         challengeState.sigs = challengeSigs;
 
+        Signature memory hostChallengeForCheckpoint = signChallenge(chan, challengeState, hostPrivKey);
         vm.prank(host);
-        custody.challenge(channelId, challengeState, new State[](0));
+        custody.challenge(channelId, challengeState, new State[](0), hostChallengeForCheckpoint);
 
         // 5. Checkpoint should resolve the challenge
         vm.prank(guest);

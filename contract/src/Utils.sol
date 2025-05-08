@@ -35,6 +35,17 @@ library Utils {
     }
 
     /**
+     * @notice Recovers the signer of a state hash from a signature
+     * @param stateHash The hash of the state to verify (computed using the canonical form)
+     * @param sig The signature to verify
+     * @return The address of the signer
+     */
+    function recoverSigner(bytes32 stateHash, Signature memory sig) internal pure returns (address) {
+        // Verify the signature directly on the stateHash without using EIP-191
+        return ECDSA.recover(stateHash, sig.v, sig.r, sig.s);
+    }
+
+    /**
      * @notice Verifies that a state is signed by the specified participant
      * @param stateHash The hash of the state to verify (computed using the canonical form)
      * @param sig The signature to verify
@@ -42,8 +53,7 @@ library Utils {
      * @return True if the signature is valid, false otherwise
      */
     function verifySignature(bytes32 stateHash, Signature memory sig, address signer) internal pure returns (bool) {
-        // Verify the signature directly on the stateHash without using EIP-191
-        address recoveredSigner = ECDSA.recover(stateHash, sig.v, sig.r, sig.s);
+        address recoveredSigner = recoverSigner(stateHash, sig);
         return recoveredSigner == signer;
     }
 }

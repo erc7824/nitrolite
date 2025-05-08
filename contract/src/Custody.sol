@@ -234,6 +234,7 @@ contract Custody is IChannel, IDeposit {
      * @notice Finalize the channel with a mutually signed state
      * @param channelId Unique identifier for the channel
      * @param candidate The latest known valid state
+     * NOTE: Custody implementation does NOT require the `proofs` parameter for the close function.
      */
     function close(bytes32 channelId, State calldata candidate, State[] calldata) public {
         Metadata storage meta = _channels[channelId];

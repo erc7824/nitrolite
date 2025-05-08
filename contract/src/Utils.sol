@@ -42,7 +42,7 @@ library Utils {
      */
     function recoverSigner(bytes32 stateHash, Signature memory sig) internal pure returns (address) {
         // Verify the signature directly on the stateHash without using EIP-191
-        return ECDSA.recover(stateHash, sig.v, sig.r, sig.s);
+        return stateHash.recover(sig.v, sig.r, sig.s);
     }
 
     /**

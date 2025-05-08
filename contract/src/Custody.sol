@@ -71,8 +71,9 @@ contract Custody is IChannel, IDeposit {
             if (msg.value != amount) revert InvalidValue();
         } else {
             if (msg.value != 0) revert InvalidValue();
-            bool success = IERC20(token).transferFrom(account, address(this), amount);
-            if (!success) revert TransferFailed(token, address(this), amount);
+            if (!IERC20(token).transferFrom(account, address(this), amount)) {
+                revert TransferFailed(token, address(this), amount);
+            }
         }
 
         _ledgers[msg.sender].tokens[token] += amount;
@@ -128,7 +129,7 @@ contract Custody is IChannel, IDeposit {
         if (ch.challenge == 0) revert InvalidChallengePeriod();
 
         // Validate initial state for funding protocol
-        (uint32 magicNumber) = abi.decode(initial.data, (uint32));
+        uint32 magicNumber = abi.decode(initial.data, (uint32));
         // TODO: replace with `require(...)`
         if (magicNumber != CHANOPEN) revert InvalidState();
 
@@ -140,8 +141,9 @@ contract Custody is IChannel, IDeposit {
         bytes32 stateHash = Utils.getStateHash(ch, initial);
         if (initial.sigs.length != 1) revert InvalidStateSignatures();
         // TODO: later we can lift the restriction that first sig must be from CLIENT
-        bool validSig = Utils.verifySignature(stateHash, initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX]);
-        if (!validSig) revert InvalidStateSignatures();
+        if (!Utils.verifySignature(stateHash, initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX])) {
+            revert InvalidStateSignatures();
+        }
 
         // NOTE: even if there is not allocation planned, it should be present as `Allocation{address(0), 0}`
         if (initial.allocations.length != ch.participants.length) revert InvalidAllocations();
@@ -159,8 +161,8 @@ contract Custody is IChannel, IDeposit {
             uint256 amount = initial.allocations[i].amount;
 
             // even if participant does not have an allocation, still track that
-            meta.expectedDeposits[i] = Amount(token, amount);
-            meta.actualDeposits[i] = Amount(address(0), 0); // Initialize actual deposits to zero
+            meta.expectedDeposits[i] = Amount({token: token, amount: amount});
+            meta.actualDeposits[i] = Amount({token: address(0), amount: 0}); // Initialize actual deposits to zero
         }
 
         // NOTE: it is allowed for depositor (and msg.sender) to be different from channel creator (participant)
@@ -202,11 +204,9 @@ contract Custody is IChannel, IDeposit {
         if (index != SERVER_IDX) revert InvalidParticipant();
         if (meta.actualDeposits[SERVER_IDX].amount != 0) revert InvalidParticipant();
 
-        address serverAddr = meta.chan.participants[SERVER_IDX];
-
         // Verify SERVER signature on funding stateHash
         bytes32 stateHash = Utils.getStateHash(meta.chan, meta.lastValidState);
-        bool validSig = Utils.verifySignature(stateHash, sig, serverAddr);
+        bool validSig = Utils.verifySignature(stateHash, sig, meta.chan.participants[SERVER_IDX]);
         if (!validSig) revert InvalidStateSignatures();
         // add signature to the state
         meta.lastValidState.sigs.push(sig);
@@ -244,12 +244,9 @@ contract Custody is IChannel, IDeposit {
         // Case 1: Mutual closing with CHANCLOSE magic number
         // Channel must not be in INITIAL stage (participants should close the channel with challenge then)
         if (meta.stage == Status.ACTIVE) {
-            // Check that this is a closing state with CHANCLOSE magic number
-            (uint32 magicNumber) = abi.decode(candidate.data, (uint32));
+            uint32 magicNumber = abi.decode(candidate.data, (uint32));
             if (magicNumber != CHANCLOSE) revert InvalidState();
 
-            // Verify all participants have signed the closing state
-            if (candidate.sigs.length != meta.chan.participants.length) revert InvalidStateSignatures();
             if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
 
             // Store the final state
@@ -309,9 +306,7 @@ contract Custody is IChannel, IDeposit {
         // Verify that at least one participant signed the state
         if (candidate.sigs.length == 0) revert InvalidStateSignatures();
 
-        // Verify the state is valid according to the adjudicator
-        bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
-        if (!isValid) revert InvalidState();
+        if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
 
         // Revert if trying to challenge with an older state that is already known
         if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
@@ -344,9 +339,7 @@ contract Custody is IChannel, IDeposit {
         // Verify that at least one participant signed the state
         if (candidate.sigs.length == 0) revert InvalidStateSignatures();
 
-        // Verify the state is valid according to the adjudicator
-        bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
-        if (!isValid) revert InvalidState();
+        if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
 
         // Verify this state is more recent than the current stored state
         if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
@@ -431,7 +424,7 @@ contract Custody is IChannel, IDeposit {
         uint256 available = ledger.tokens[token];
         if (available < amount) revert InsufficientBalance(available, amount);
 
-        ledger.tokens[token] -= amount;
+        ledger.tokens[token] = available - amount; // avoiding "-=" saves gas on a storage lookup
         _channels[channelId].tokenBalances[token] += amount;
     }
 
@@ -444,7 +437,7 @@ contract Custody is IChannel, IDeposit {
         if (channelBalance == 0) return;
 
         uint256 correctedAmount = channelBalance > alloc.amount ? alloc.amount : channelBalance;
-        meta.tokenBalances[alloc.token] -= correctedAmount;
+        meta.tokenBalances[alloc.token] = channelBalance - correctedAmount; // avoiding "-=" saves gas on a storage lookup
         _ledgers[alloc.destination].tokens[alloc.token] += correctedAmount;
     }
 
@@ -462,10 +455,7 @@ contract Custody is IChannel, IDeposit {
         }
 
         for (uint256 i = 0; i < PART_NUM; i++) {
-            bool isValid = Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i]);
-            if (!isValid) {
-                return false;
-            }
+            if (!Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i])) return false;
         }
 
         return true;

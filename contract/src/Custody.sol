@@ -124,7 +124,11 @@ contract Custody is IChannel, IDeposit {
      */
     function create(Channel calldata ch, State calldata initial) public returns (bytes32 channelId) {
         // Validate channel configuration
-        if (ch.participants.length != PART_NUM) revert InvalidParticipant();
+        if (ch.participants.length != PART_NUM ||
+                ch.participants[CLIENT_IDX] == address(0) ||
+                ch.participants[SERVER_IDX] == address(0) ||
+                ch.participants[CLIENT_IDX] == ch.participants[SERVER_IDX]
+        ) revert InvalidParticipant();
         if (ch.adjudicator == address(0)) revert InvalidAdjudicator();
         if (ch.challenge == 0) revert InvalidChallengePeriod();
 

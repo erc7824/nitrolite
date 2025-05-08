@@ -40,6 +40,17 @@ library Utils {
     }
 
     /**
+     * @notice Recovers the signer of a state hash from a signature
+     * @param stateHash The hash of the state to verify (computed using the canonical form)
+     * @param sig The signature to verify
+     * @return The address of the signer
+     */
+    function recoverSigner(bytes32 stateHash, Signature memory sig) internal pure returns (address) {
+        // Verify the signature directly on the stateHash without using EIP-191
+        return stateHash.recover(sig.v, sig.r, sig.s);
+    }
+
+    /**
      * @notice Verifies that a state is signed by the specified participant
      * @param stateHash The hash of the state to verify (computed using the canonical form)
      * @param sig The signature to verify

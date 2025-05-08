@@ -145,8 +145,9 @@ contract Custody is IChannel, IDeposit {
         bytes32 stateHash = Utils.getStateHash(ch, initial);
         if (initial.sigs.length != 1) revert InvalidStateSignatures();
         // TODO: later we can lift the restriction that first sig must be from CLIENT
-        bool validSig = Utils.verifySignature(stateHash, initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX]);
-        if (!validSig) revert InvalidStateSignatures();
+        if (!Utils.verifySignature(stateHash, initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX])) {
+            revert InvalidStateSignatures();
+        }
 
         // NOTE: even if there is not allocation planned, it should be present as `Allocation{address(0), 0}`
         if (initial.allocations.length != PART_NUM) revert InvalidAllocations();
@@ -164,8 +165,8 @@ contract Custody is IChannel, IDeposit {
             uint256 amount = initial.allocations[i].amount;
 
             // even if participant does not have an allocation, still track that
-            meta.expectedDeposits[i] = Amount(token, amount);
-            meta.actualDeposits[i] = Amount(address(0), 0); // Initialize actual deposits to zero
+            meta.expectedDeposits[i] = Amount({token: token, amount: amount});
+            meta.actualDeposits[i] = Amount({token: address(0), amount: 0}); // Initialize actual deposits to zero
         }
 
         // NOTE: it is allowed for depositor (and msg.sender) to be different from channel creator (participant)
@@ -205,11 +206,9 @@ contract Custody is IChannel, IDeposit {
         if (index != SERVER_IDX) revert InvalidParticipant();
         if (meta.actualDeposits[SERVER_IDX].amount != 0) revert InvalidParticipant();
 
-        address serverAddr = meta.chan.participants[SERVER_IDX];
-
         // Verify SERVER signature on funding stateHash
         bytes32 stateHash = Utils.getStateHash(meta.chan, meta.lastValidState);
-        if (!Utils.verifySignature(stateHash, sig, serverAddr)) revert InvalidStateSignatures();
+        if (!Utils.verifySignature(stateHash, sig, meta.chan.participants[SERVER_IDX])) revert InvalidStateSignatures();
         // add signature to the state
         meta.lastValidState.sigs.push(sig);
 
@@ -236,6 +235,7 @@ contract Custody is IChannel, IDeposit {
      * @notice Finalize the channel with a mutually signed state
      * @param channelId Unique identifier for the channel
      * @param candidate The latest known valid state
+     * NOTE: Custody implementation does NOT require the `proofs` parameter for the close function.
      */
     function close(bytes32 channelId, State calldata candidate, State[] calldata) public {
         Metadata storage meta = _channels[channelId];
@@ -321,8 +321,6 @@ contract Custody is IChannel, IDeposit {
             }
         }
 
-        // ([("0xe601dfaFbDBc16a4d997d04fCEE655Caab831798","0x3c93C321634a80FB3657CFAC707718A11cA57cBf"],"0xC2BA5c5E2c4848F64187Aa1F3f32a331b0C031b9","1","2987423159340149059"),("1","0","0x",[("0x21F7D1F35979B125f6F7918fC16Cb9101e5882d7","0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359","2000"),("0x3c93C321634a80FB3657CFAC707718A11cA57cBf","0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359","0")],[("28","0x7b112e1433ec0146568c95d98f6a087d9db2c5c9b63731c05ebaefbcfd68afc4","0x7fd74770a1189b5e1f3b0fc03eadaaf8dd78f942700a62d98b1674ccd38d48a8")]),[])
-
         if (
             candidate.data.length == 0
                 || (candidate.intent != StateIntent.INITIALIZE && candidate.intent != StateIntent.RESIZE)
@@ -330,8 +328,7 @@ contract Custody is IChannel, IDeposit {
             // if no state data or magic number is not CHANOPEN or CHANRESIZE, assume this is a normal state
 
             // Verify the state is valid according to the adjudicator
-            bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
-            if (!isValid) revert InvalidState();
+            if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
 
             // Reject states with equal version
             if (candidate.version == meta.lastValidState.version) {
@@ -375,9 +372,7 @@ contract Custody is IChannel, IDeposit {
         // Validate version based on channel status
         if (meta.stage == ChannelStatus.INITIAL && candidate.version != 0) revert InvalidState();
 
-        // Verify the state is valid according to the adjudicator
-        bool isValid = IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs);
-        if (!isValid) revert InvalidState();
+        if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
 
         // Verify this state is more recent than the current stored state
         if (candidate.version == meta.lastValidState.version) {
@@ -471,7 +466,7 @@ contract Custody is IChannel, IDeposit {
         uint256 available = ledger.tokens[token];
         if (available < amount) revert InsufficientBalance(available, amount);
 
-        ledger.tokens[token] -= amount;
+        ledger.tokens[token] = available - amount; // avoiding "-=" saves gas on a storage lookup
         _channels[channelId].tokenBalances[token] += amount;
     }
 
@@ -497,7 +492,7 @@ contract Custody is IChannel, IDeposit {
         if (channelBalance == 0) return;
 
         uint256 correctedAmount = channelBalance > alloc.amount ? alloc.amount : channelBalance;
-        meta.tokenBalances[alloc.token] -= correctedAmount;
+        meta.tokenBalances[alloc.token] = channelBalance - correctedAmount; // avoiding "-=" saves gas on a storage lookup
         _ledgers[alloc.destination].tokens[alloc.token] += correctedAmount;
     }
 
@@ -515,10 +510,7 @@ contract Custody is IChannel, IDeposit {
         }
 
         for (uint256 i = 0; i < PART_NUM; i++) {
-            bool isValid = Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i]);
-            if (!isValid) {
-                return false;
-            }
+            if (!Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i])) return false;
         }
 
         return true;

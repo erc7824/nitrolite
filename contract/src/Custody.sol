@@ -11,6 +11,7 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
+
 /**
  * @title Custody
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
@@ -41,8 +42,8 @@ contract Custody is IChannel, IDeposit {
         Status stage;
         address creator;
         // TODO: replace 2 Amount[] arrays with EnumerableSet of participants that have joined
-        Amount[] expectedDeposits; // Creator defines Token per participant
-        Amount[] actualDeposits; // Tracks deposits made by each participant
+        Amount[2] expectedDeposits; // Creator defines Token per participant
+        Amount[2] actualDeposits; // Tracks deposits made by each participant
         uint256 challengeExpire; // If non-zero channel will resolve to lastValidState when challenge Expires
         State lastValidState; // Last valid state when adjudicator was called
         mapping(address token => uint256 balance) tokenBalances; // Token balances for the channel
@@ -52,6 +53,12 @@ contract Custody is IChannel, IDeposit {
         mapping(address token => uint256 available) tokens; // Available amount that can be withdrawn or allocated to channels
         EnumerableSet.Bytes32Set channels; // Set of user ChannelId
     }
+
+    // Custody contract restricts number of participants to 2
+    uint256 constant PART_NUM = 2;
+    uint256 constant CLIENT_IDX = 0; // Participant index for the channel creator
+    uint256 constant SERVER_IDX = 1; // Participant index for the server in clearnet context
+
 
     mapping(bytes32 channelId => Metadata chMeta) internal _channels;
     mapping(address account => Ledger ledger) internal _ledgers;
@@ -112,7 +119,7 @@ contract Custody is IChannel, IDeposit {
      */
     function create(Channel calldata ch, State calldata initial) public returns (bytes32 channelId) {
         // Validate channel configuration
-        if (ch.participants.length < 2) revert InvalidParticipant();
+        if (ch.participants.length != PART_NUM) revert InvalidParticipant();
         if (ch.adjudicator == address(0)) revert InvalidAdjudicator();
         if (ch.challenge == 0) revert InvalidChallengePeriod();
 
@@ -128,8 +135,8 @@ contract Custody is IChannel, IDeposit {
         // Verify creator's signature
         bytes32 stateHash = Utils.getStateHash(ch, initial);
         if (initial.sigs.length != 1) revert InvalidStateSignatures();
-        // TODO: later we can lift the restriction that first sig must be from participant 0
-        bool validSig = Utils.verifySignature(stateHash, initial.sigs[0], ch.participants[0]);
+        // TODO: later we can lift the restriction that first sig must be from CLIENT
+        bool validSig = Utils.verifySignature(stateHash, initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX]);
         if (!validSig) revert InvalidStateSignatures();
 
         // NOTE: even if there is not allocation planned, it should be present as `Allocation{address(0), 0}`
@@ -143,28 +150,27 @@ contract Custody is IChannel, IDeposit {
         meta.lastValidState = initial;
 
         // NOTE: allocations MUST come in the same order as participants in deposit
-        uint256 participantCount = ch.participants.length;
-        for (uint256 i = 0; i < participantCount; i++) {
+        for (uint256 i = 0; i < PART_NUM; i++) {
             address token = initial.allocations[i].token;
             uint256 amount = initial.allocations[i].amount;
 
             // even if participant does not have an allocation, still track that
-            meta.expectedDeposits.push(Amount(token, amount));
-            meta.actualDeposits.push(Amount(address(0), 0)); // Initialize actual deposits to zero
+            meta.expectedDeposits[i] = Amount(token, amount);
+            meta.actualDeposits[i] = Amount(address(0), 0); // Initialize actual deposits to zero
         }
 
         // NOTE: it is allowed for depositor (and msg.sender) to be different from channel creator (participant)
         // This enables logic of "session keys" where a user can create a channel on behalf of another account, but will lock their own funds
-        // if (ch.participants[0]; != msg.sender) revert InvalidParticipant();
+        // if (ch.participants[CLIENT_IDX]; != msg.sender) revert InvalidParticipant();
 
-        Amount memory creatorDeposit = meta.expectedDeposits[0];
+        Amount memory creatorDeposit = meta.expectedDeposits[CLIENT_IDX];
         _lockAccountFundsToChannel(msg.sender, channelId, creatorDeposit.token, creatorDeposit.amount);
 
         // Record actual deposit
-        meta.actualDeposits[0] = creatorDeposit;
+        meta.actualDeposits[CLIENT_IDX] = creatorDeposit;
 
         // Add channel to the creator's ledger
-        _ledgers[ch.participants[0]].channels.add(channelId);
+        _ledgers[ch.participants[CLIENT_IDX]].channels.add(channelId);
 
         // Emit event
         emit Created(channelId, ch, initial);
@@ -173,10 +179,10 @@ contract Custody is IChannel, IDeposit {
     }
 
     /**
-     * @notice Allows a participant to join a channel by signing the funding state
+     * @notice Allows a SERVER to join a channel by signing the funding state
      * @param channelId Unique identifier for the channel
-     * @param index Index of the participant in the channel's participants array
-     * @param sig Signature of the participant on the funding state
+     * @param index Index of the participant in the channel's participants array (must be 1 for SERVER)
+     * @param sig Signature of SERVER on the funding state
      * @return The channelId of the joined channel
      */
     function join(bytes32 channelId, uint256 index, Signature calldata sig) external returns (bytes32) {
@@ -186,45 +192,34 @@ contract Custody is IChannel, IDeposit {
         if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
         if (meta.stage != Status.INITIAL) revert InvalidStatus();
 
-        // Verify index is valid and participant has not already joined
-        if (index == 0 || index >= meta.chan.participants.length) revert InvalidParticipant();
-        if (meta.actualDeposits[index].amount != 0) revert InvalidParticipant();
+        // Verify index is a SERVER index
+        if (index != SERVER_IDX) revert InvalidParticipant();
+        if (meta.actualDeposits[SERVER_IDX].amount != 0) revert InvalidParticipant();
 
-        // Get participant address from channel config
-        address participant = meta.chan.participants[index];
+        address serverAddr = meta.chan.participants[SERVER_IDX];
 
-        // Verify signature on funding stateHash
+        // Verify SERVER signature on funding stateHash
         bytes32 stateHash = Utils.getStateHash(meta.chan, meta.lastValidState);
-        bool validSig = Utils.verifySignature(stateHash, sig, participant);
+        bool validSig = Utils.verifySignature(stateHash, sig, serverAddr);
         if (!validSig) revert InvalidStateSignatures();
+        // add signature to the state
+        meta.lastValidState.sigs.push(sig);
 
-        // Lock participant's funds according to expected deposit
-        Amount memory expectedDeposit = meta.expectedDeposits[index];
+        // Lock SERVER's funds according to expected deposit
+        Amount memory expectedDeposit = meta.expectedDeposits[SERVER_IDX];
         _lockAccountFundsToChannel(msg.sender, channelId, expectedDeposit.token, expectedDeposit.amount);
 
         // Record actual deposit
-        meta.actualDeposits[index] = expectedDeposit;
+        meta.actualDeposits[SERVER_IDX] = expectedDeposit;
 
         // Add channel to participant's ledger
-        _ledgers[meta.chan.participants[index]].channels.add(channelId);
+        _ledgers[meta.chan.participants[SERVER_IDX]].channels.add(channelId);
+
+        meta.stage = Status.ACTIVE;
 
         // Emit joined event
-        emit Joined(channelId, index);
-
-        // Check if all participants have joined
-        bool allJoined = true;
-        for (uint256 i = 0; i < meta.actualDeposits.length; i++) {
-            if (meta.actualDeposits[i].amount != meta.expectedDeposits[i].amount) {
-                allJoined = false;
-                break;
-            }
-        }
-
-        // If all participants have joined, set channel to ACTIVE
-        if (allJoined) {
-            meta.stage = Status.ACTIVE;
-            emit Opened(channelId);
-        }
+        emit Joined(channelId, SERVER_IDX);
+        emit Opened(channelId);
 
         return channelId;
     }
@@ -272,8 +267,7 @@ contract Custody is IChannel, IDeposit {
         // TODO: implement a better way for this
         // remove sender's channel in case they are a different account then participant
         _ledgers[msg.sender].channels.remove(channelId);
-        uint256 participantsLength = meta.chan.participants.length;
-        for (uint256 i = 0; i < participantsLength; i++) {
+        for (uint256 i = 0; i < PART_NUM; i++) {
             address participant = meta.chan.participants[i];
             _ledgers[participant].channels.remove(channelId);
         }
@@ -385,7 +379,6 @@ contract Custody is IChannel, IDeposit {
      * @param allocations The allocations to distribute
      */
     function _unlockAllocations(bytes32 channelId, Allocation[] memory allocations) internal {
-        // Distribute funds according to allocations
         uint256 allocsLength = allocations.length;
         for (uint256 i = 0; i < allocsLength; i++) {
             _unlockAllocation(channelId, allocations[i]);
@@ -448,16 +441,13 @@ contract Custody is IChannel, IDeposit {
      * @return valid True if all provided signatures are valid
      */
     function _verifyAllSignatures(Channel memory chan, State memory state) internal pure returns (bool valid) {
-        // Calculate the state hash once
         bytes32 stateHash = Utils.getStateHash(chan, state);
 
-        // Check if we have the right number of signatures
-        if (state.sigs.length > chan.participants.length) {
+        if (state.sigs.length != PART_NUM) {
             return false;
         }
 
-        // Verify each signature
-        for (uint256 i = 0; i < state.sigs.length; i++) {
+        for (uint256 i = 0; i < PART_NUM; i++) {
             bool isValid = Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i]);
             if (!isValid) {
                 return false;

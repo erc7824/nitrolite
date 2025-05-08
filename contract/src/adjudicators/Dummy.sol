@@ -14,12 +14,8 @@ contract Dummy is IAdjudicator, IComparable {
     /**
      * @notice Always validates candidate states as true
      * @dev This implementation accepts any state regardless of content
-     * @param chan The channel configuration (unused in this implementation)
-     * @param candidate The proposed state to be validated (unused in this implementation)
-     * @param proofs Array of previous states (unused in this implementation)
-     * @return valid Always returns true
      */
-    function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
+    function adjudicate(Channel calldata, State calldata, State[] calldata)
         external
         pure
         returns (bool valid)
@@ -31,13 +27,10 @@ contract Dummy is IAdjudicator, IComparable {
     /**
      * @notice Always considers candidate state as newer than previous state
      * @dev This implementation always returns 1 to indicate candidate is more recent
-     * @param candidate The state being evaluated (unused in this implementation)
-     * @param previous The reference state to compare against (unused in this implementation)
-     * @return result Always returns 1 (candidate is newer)
      */
-    function compare(State calldata candidate, State calldata previous) 
-        external 
-        pure 
+    function compare(State calldata, State calldata)
+        external
+        pure
         returns (int8 result)
     {
         // Always indicate that the candidate state is newer

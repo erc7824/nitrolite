@@ -4,10 +4,10 @@
 
 ### Challenge
 
-HORIZONTAL: what is the last known on-chain state of a channel being challenged
-VERTICAL: what is the status of a channel being challenged
-CHANOPEN: a magic number showing a state is the first deposit state
-CHANCLOSE: a magic number showing a state is final
+- HORIZONTAL: what is the last known on-chain state of a channel being challenged
+- VERTICAL: what is the status of a channel being challenged
+- CHANOPEN: a magic number showing a state is the first deposit state
+- CHANCLOSE: a magic number showing a state is final
 
 Here is an overview of possible scenarios a channel might be in while being challenged:
 
@@ -17,6 +17,11 @@ Here is an overview of possible scenarios a channel might be in while being chal
 | ACTIVE  | ❌                      | ✅                  | ✅               | ❌        |
 | DISPUTE | ✅                      | ✅                  | ✅               | ❌        |
 | FINAL   | ❌                      | ❌                  | ❌               | ❌        |
+
+> NOTE: "not all joined" and "all joined" are characteristics of CHANOPEN state and can be determined by the number of signatures in the state.
+
+> NOTE: when influencing a channel with `checkpoint` or `challenge`, the current on-chain situation may have changed since the one pointed in by `meta.lastValidState`,
+> i.e. some parties may have joined the channel.
 
 As you can see, the channel can not be challenged in a FINAL status or while having CHANCLOSE state.
 
@@ -36,7 +41,7 @@ Another general rule is that after all checks there are the following on-chain c
 > The main goal: to verify Y is valid and >= X.
 
 ```md
-- X is CHANOPEN not all joined:
+- X is "CHANOPEN not all joined":
   - if (Y is CHANOPEN):
     - verify Y is a valid CHANOPEN state (has no proof, has CHANOPEN magic number)
       verify Y has not less signatures than X
@@ -52,7 +57,7 @@ Another general rule is that after all checks there are the following on-chain c
 > The main goal: to verify Y is valid and >= X.
 
 ```md
-- X is CHANOPEN all joined:
+- X is "CHANOPEN all joined":
   - if (Y is CHANOPEN):
     - verify Y is a valid CHANOPEN state
       verify Y contains all signatures
@@ -70,7 +75,7 @@ Another general rule is that after all checks there are the following on-chain c
 > The main goal: to verify Y is valid and > X.
 
 ```md
-- X is CHANOPEN not all joined:
+- X is "CHANOPEN not all joined":
   - if (Y is CHANOPEN):
     - verify Y is a valid CHANOPEN state
       verify Y has more signatures than X
@@ -79,7 +84,7 @@ Another general rule is that after all checks there are the following on-chain c
   - else
     - verify all participants have deposited
       verify adjudicate(Y, proof)
-- X is CHANOPEN all joined:
+- X is "CHANOPEN all joined":
   - if (Y is CHANOPEN):
     - verify Y is a valid CHANOPEN state
       verify Y contains all signatures
@@ -94,10 +99,10 @@ Another general rule is that after all checks there are the following on-chain c
 
 ### Checkpoint
 
-HORIZONTAL: what is the last known on-chain state of a channel being checkpointed
-VERTICAL: what is the status of a channel being checkpointed
-CHANOPEN: a magic number showing a state is the first deposit state
-CHANCLOSE: a magic number showing a state is final
+- HORIZONTAL: what is the last known on-chain state of a channel being checkpointed
+- VERTICAL: what is the status of a channel being checkpointed
+- CHANOPEN: a magic number showing a state is the first deposit state
+- CHANCLOSE: a magic number showing a state is final
 
 Here is an overview of possible scenarios a channel might be in while being checkpointed:
 
@@ -107,6 +112,11 @@ Here is an overview of possible scenarios a channel might be in while being chec
 | ACTIVE  | ❌                      | ✅                  | ✅               | ❌        |
 | DISPUTE | ✅                      | ✅                  | ✅               | ❌        |
 | FINAL   | ❌                      | ❌                  | ❌               | ❌        |
+
+> NOTE: "not all joined" and "all joined" are characteristics of CHANOPEN state and can be determined by the number of signatures in the state.
+
+> NOTE: when influencing a channel with `checkpoint` or `challenge`, the current on-chain situation may have changed since the one pointed in by `meta.lastValidState`,
+> i.e. some parties may have joined the channel.
 
 As you can see, the channel can not be checkpointed in a FINAL status or while having CHANCLOSE state.
 
@@ -125,7 +135,7 @@ Another general rule is that after all checks there are the following on-chain c
 #### INITIAL status
 
 ```md
-- X is CHANOPEN not all joined:
+- X is "CHANOPEN not all joined":
   - if (Y is CHANOPEN):
     - verify Y has all signatures (disallow checkpointing with not fully CHANOPEN state when it is NOT DISPUTE)
       verify Y is a valid CHANOPEN state (has no proof, has CHANOPEN magic number)
@@ -141,7 +151,7 @@ updatedStatus = ACTIVE
 #### ACTIVE status
 
 ```md
-- X is CHANOPEN all joined:
+- X is "CHANOPEN all joined":
   - verify Y is NOT a CHANOPEN state (disallow checkpointing with the same CHANOPEN state - it is already on-chain)
     verify adjudicate(Y, proof)
 - X is operatable state:
@@ -155,7 +165,7 @@ updatedStatus = ACTIVE
 #### DISPUTE status
 
 ```md
-- X is CHANOPEN not all joined:
+- X is "CHANOPEN not all joined":
   - if (Y is CHANOPEN):
     - verify Y is a valid CHANOPEN state
       verify Y has more signatures than X
@@ -167,7 +177,7 @@ updatedStatus = ACTIVE
     - verify all participants have deposited
       verify adjudicate(Y, proof)
       updatedStatus = ACTIVE
-- X is CHANOPEN all joined:
+- X is "CHANOPEN all joined":
   - if (Y is CHANOPEN):
     - verify Y is a valid CHANOPEN state
       verify Y contains all signatures

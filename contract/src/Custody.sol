@@ -113,6 +113,8 @@ contract Custody is IChannel, IDeposit {
 
     /**
      * @notice Create a channel by depositing assets
+     * @dev CLIENT and SERVER had NO prior agreement on the channel parameters. SERVER itself decides whether to join or not.
+     * In the same time, it should be noted that SERVER should have a manifest of channel parameters it agrees to join automatically.
      * @param ch Channel configuration
      * @param initial is the initial State defined by the opener, it contains the expected allocation
      * @return channelId Unique identifier for the channel
@@ -180,6 +182,8 @@ contract Custody is IChannel, IDeposit {
 
     /**
      * @notice Allows a SERVER to join a channel by signing the funding state
+     * @dev CLIENT and SERVER had NO prior agreement on the channel parameters. SERVER itself decides whether to join or not.
+     * In the same time, it should be noted that SERVER should have a manifest of channel parameters it agrees to join automatically.
      * @param channelId Unique identifier for the channel
      * @param index Index of the participant in the channel's participants array (must be 1 for SERVER)
      * @param sig Signature of SERVER on the funding state

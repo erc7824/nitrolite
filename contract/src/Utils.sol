@@ -13,6 +13,8 @@ library Utils {
 
     /**
      * @notice Compute the unique identifier for a channel
+     * @dev Similar channels with different participants order are considered to be different, because some IChannel implementations
+     * may rely on the order, rendering different logic for different participants orders.
      * @param ch The channel struct
      * @return The channel identifier as bytes32
      */

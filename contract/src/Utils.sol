@@ -19,8 +19,12 @@ library Utils {
      * @param ch The channel struct
      * @return The channel identifier as bytes32
      */
-    function getChannelId(Channel memory ch) internal pure returns (bytes32) {
-        return keccak256(abi.encode(ch.participants, ch.adjudicator, ch.challenge, ch.nonce));
+    function getChannelId(Channel memory ch) internal view returns (bytes32) {
+        uint256 chainId;
+        assembly {
+            chainId := chainid()
+        }
+        return keccak256(abi.encode(ch.participants, ch.adjudicator, ch.challenge, ch.nonce, chainId));
     }
 
     /**
@@ -32,11 +36,7 @@ library Utils {
      */
     function getStateHash(Channel memory ch, State memory state) internal view returns (bytes32) {
         bytes32 channelId = getChannelId(ch);
-        uint256 chainId;
-        assembly {
-            chainId := chainid()
-        }
-        return keccak256(abi.encode(channelId, state.intent, state.version, state.data, state.allocations, chainId));
+        return keccak256(abi.encode(channelId, state.intent, state.version, state.data, state.allocations));
     }
 
     /**

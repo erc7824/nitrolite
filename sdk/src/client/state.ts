@@ -48,6 +48,7 @@ export async function _prepareAndSignInitialState(
         adjudicator: adjudicatorAddress,
         challenge: challengeDuration,
         nonce: channelNonce,
+        chainId: deps.chainId,
     };
 
     const channelId = getChannelId(channel);

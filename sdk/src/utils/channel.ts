@@ -14,8 +14,9 @@ export function getChannelId(channel: Channel): ChannelId {
             { name: "adjudicator", type: "address" },
             { name: "challenge", type: "uint64" },
             { name: "nonce", type: "uint64" },
+            { name: "chainId", type: "uint256" },
         ],
-        [channel.participants, channel.adjudicator, channel.challenge, channel.nonce]
+        [channel.participants, channel.adjudicator, channel.challenge, channel.nonce, channel.chainId]
     );
 
     return keccak256(encoded);

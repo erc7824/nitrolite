@@ -32,7 +32,7 @@ contract Counter is IAdjudicator {
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
-        pure
+        view
         override
         returns (bool valid)
     {
@@ -85,7 +85,7 @@ contract Counter is IAdjudicator {
         return candidateDataDecoded.target == previousDataDecoded.target;
     }
 
-    function _validateStateSig(Channel calldata chan, State calldata state) internal pure returns (bool) {
+    function _validateStateSig(Channel calldata chan, State calldata state) internal view returns (bool) {
         if (state.sigs.length != 1) {
             return false;
         }

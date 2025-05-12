@@ -19,8 +19,12 @@ library Utils {
      * @param ch The channel struct
      * @return The channel identifier as bytes32
      */
-    function getChannelId(Channel memory ch) internal pure returns (bytes32) {
-        return keccak256(abi.encode(ch.participants, ch.adjudicator, ch.challenge, ch.nonce));
+    function getChannelId(Channel memory ch) internal view returns (bytes32) {
+        uint256 chainId;
+        assembly {
+            chainId := chainid()
+        }
+        return keccak256(abi.encode(ch.participants, ch.adjudicator, ch.challenge, ch.nonce, chainId));
     }
 
     /**
@@ -30,7 +34,7 @@ library Utils {
      * @return The state hash as bytes32
      * @dev The state hash is computed according to the specification in the README, using channelId, data, version, and allocations
      */
-    function getStateHash(Channel memory ch, State memory state) internal pure returns (bytes32) {
+    function getStateHash(Channel memory ch, State memory state) internal view returns (bytes32) {
         bytes32 channelId = getChannelId(ch);
         return keccak256(abi.encode(channelId, state.intent, state.version, state.data, state.allocations));
     }
@@ -55,7 +59,7 @@ library Utils {
      * @param chan The channel configuration
      * @return True if the state is a valid initial state, false otherwise
      */
-    function validateInitialState(State memory state, Channel memory chan) internal pure returns (bool) {
+    function validateInitialState(State memory state, Channel memory chan) internal view returns (bool) {
         if (state.version != 0) {
             return false;
         }
@@ -74,7 +78,7 @@ library Utils {
      * @param chan The channel configuration
      * @return True if the state has valid signatures from both participants, false otherwise
      */
-    function validateUnanimousSignatures(State memory state, Channel memory chan) internal pure returns (bool) {
+    function validateUnanimousSignatures(State memory state, Channel memory chan) internal view returns (bool) {
         if (state.sigs.length != 2) {
             return false;
         }

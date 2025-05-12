@@ -198,7 +198,7 @@ contract CustodyTest is Test {
     // Helper to sign a state
     function signState(Channel memory chan, State memory state, uint256 privateKey)
         internal
-        pure
+        view
         returns (Signature memory)
     {
         bytes32 stateHash = Utils.getStateHash(chan, state);

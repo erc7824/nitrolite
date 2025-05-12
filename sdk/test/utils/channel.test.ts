@@ -14,6 +14,7 @@ describe("getChannelId", () => {
         adjudicator: "0x3333333333333333333333333333333333333333" as Address,
         challenge: 100n,
         nonce: 200n,
+        chainId: 1,
     };
 
     test("encodes parameters and hashes correctly", () => {
@@ -24,8 +25,9 @@ describe("getChannelId", () => {
                 { name: "adjudicator", type: "address" },
                 { name: "challenge", type: "uint64" },
                 { name: "nonce", type: "uint64" },
+                { name: "chainId", type: "uint256" },
             ],
-            [channel.participants, channel.adjudicator, channel.challenge, channel.nonce]
+            [channel.participants, channel.adjudicator, channel.challenge, channel.nonce, channel.chainId]
         );
         expect(keccak256).toHaveBeenCalledWith("0xdeadbeef");
         expect(id).toBe("0xabc123");

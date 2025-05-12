@@ -37,6 +37,7 @@ export interface Channel {
     adjudicator: Address; // Address of the contract that validates final states
     challenge: bigint; // Duration in seconds for challenge period
     nonce: bigint; // Unique per channel with same participants and adjudicator
+    chainId: number; // Chain ID for the channel
 }
 
 /**
@@ -85,6 +86,9 @@ export interface NitroliteClientConfig {
 
     /** Contract addresses required by the SDK. */
     addresses: ContractAddresses;
+
+    /** Chain ID for the channel */
+    chainId: number;
 
     /** Optional: Default challenge duration (in seconds) for new channels. Defaults to 0 if omitted. */
     challengeDuration?: bigint;

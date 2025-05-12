@@ -49,9 +49,6 @@ Thumbs.db
 .temp/
 tmp/
 
-# CLAUDE
-CLAUDE.md
-
 # Lock files (depending on your workflow)
 # package-lock.json
 # yarn.lock

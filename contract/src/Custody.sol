@@ -510,7 +510,7 @@ contract Custody is IChannel, IDeposit {
      * @param state The state to verify signatures for
      * @return valid True if both signatures are valid
      */
-    function _verifyAllSignatures(Channel memory chan, State memory state) internal pure returns (bool valid) {
+    function _verifyAllSignatures(Channel memory chan, State memory state) internal view returns (bool valid) {
         // Calculate the state hash once
         bytes32 stateHash = Utils.getStateHash(chan, state);
 

@@ -39,7 +39,7 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
-        pure
+        view
         override
         returns (bool valid)
     {
@@ -116,7 +116,7 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
         return true;
     }
 
-    function _validateRemittanceState(Channel calldata chan, State memory state) internal pure returns (bool) {
+    function _validateRemittanceState(Channel calldata chan, State memory state) internal view returns (bool) {
         if (state.intent != StateIntent.OPERATE) {
             return false;
         }

@@ -177,10 +177,10 @@ describe("API message creators", () => {
 
     test("createCloseChannelMessage", async () => {
         const msgStr = await createCloseChannelMessage(signer, channelId, fundDestination, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, "close_channel", [{ channel_id: channelId, fund_destination: fundDestination }], timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, "close_channel", [{ channel_id: channelId, funds_destination: fundDestination }], timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, "close_channel", [{ channel_id: channelId, fund_destination: fundDestination }], timestamp],
+            req: [requestId, "close_channel", [{ channel_id: channelId, funds_destination: fundDestination }], timestamp],
             sig: ["0xsig"],
         });
     });

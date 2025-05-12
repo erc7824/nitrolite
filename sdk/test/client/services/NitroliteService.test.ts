@@ -9,6 +9,7 @@ describe("NitroliteService", () => {
     const custodyAddress = "0x0000000000000000000000000000000000000001" as Address;
     const addresses: ContractAddresses = { custody: custodyAddress } as any;
     const account = "0x0000000000000000000000000000000000000002" as Address;
+    const chaindId = 1;
 
     // Dummy data for channel methods
     const channelConfig = {} as Channel;
@@ -186,10 +187,10 @@ describe("NitroliteService", () => {
 
     describe("getAccountInfo", () => {
         test("success", async () => {
-            const data = [1n, 2n, 3n] as [bigint, bigint, bigint];
+            const data = [1n, 3n] as [bigint, bigint];
             (mockPublicClient.readContract as any).mockResolvedValue(data);
             const info = await service.getAccountInfo(account, custodyAddress);
-            expect(info).toEqual({ available: 1n, locked: 2n, channelCount: 3n });
+            expect(info).toEqual({ available: 1n, channelCount: 3n });
             expect(mockPublicClient.readContract).toHaveBeenCalledWith({
                 address: custodyAddress,
                 abi: CustodyAbi,

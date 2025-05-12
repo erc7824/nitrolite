@@ -17,6 +17,7 @@ describe("NitroliteClient", () => {
         tokenAddress: "0xTOKEN" as Address,
     };
     const challengeDuration = 123n;
+    const chainId = 1;
 
     let mockNitroService: any;
     let mockErc20Service: any;
@@ -28,6 +29,7 @@ describe("NitroliteClient", () => {
             walletClient: mockWalletClient,
             addresses: mockAddresses,
             challengeDuration,
+            chainId: chainId,
         });
         mockNitroService = {
             deposit: jest.fn(),

@@ -28,7 +28,7 @@ export class NitroliteClient {
     public readonly addresses: ContractAddresses;
     public readonly challengeDuration: bigint;
     public readonly txPreparer: NitroliteTransactionPreparer;
-    public readonly chainId: bigint;
+    public readonly chainId: number;
     private readonly stateWalletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
     private readonly nitroliteService: NitroliteService;
     private readonly erc20Service: Erc20Service;

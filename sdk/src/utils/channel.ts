@@ -16,6 +16,7 @@ export function getChannelId(channel: Channel): ChannelId {
             { name: "nonce", type: "uint64" },
             { name: "chainId", type: "uint256" },
         ],
+        // @ts-ignore
         [channel.participants, channel.adjudicator, channel.challenge, channel.nonce, channel.chainId]
     );
 

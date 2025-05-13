@@ -53,7 +53,7 @@ contract CustodyTest is Test {
 
         // Deploy contracts
         custody = new Custody();
-        adjudicator = new FlagAdjudicator(true);
+        adjudicator = new FlagAdjudicator();
         token = new MockERC20("Test Token", "TST", 18);
 
         // Fund accounts
@@ -198,7 +198,7 @@ contract CustodyTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, stateHash);
         return Signature({v: v, r: r, s: s});
     }
-    
+
     // Helper to sign a challenge
     function signChallenge(Channel memory chan, State memory state, uint256 privateKey)
         internal
@@ -543,7 +543,7 @@ contract CustodyTest is Test {
         // 2. Try to challenge with invalid state (adjudicator rejects)
         State memory invalidState = initialState;
         invalidState.data = abi.encode(42);
-        adjudicator.setFlag(false); // Set flag to false for invalid state
+        adjudicator.setAdjudicateReturnValue(false); // Set adjudicate return value to false for invalid state
 
         // Host signs the invalid state
         Signature memory hostInvalidSig = signState(chan, invalidState, hostPrivKey);
@@ -559,13 +559,13 @@ contract CustodyTest is Test {
 
         // 3. Try to challenge non-existent channel
         bytes32 nonExistentChannelId = bytes32(uint256(1234));
-        adjudicator.setFlag(true); // Set flag back to true
+        adjudicator.setAdjudicateReturnValue(true); // Set flag back to true
 
         vm.prank(host);
         vm.expectRevert(abi.encodeWithSelector(Custody.ChannelNotFound.selector, nonExistentChannelId));
         custody.challenge(nonExistentChannelId, invalidState, new State[](0), hostInvalidChallengeSig);
     }
-    
+
     function test_InvalidChallengerSignature() public {
         // 1. Create and fund a channel
         Channel memory chan = createTestChannel();
@@ -600,8 +600,8 @@ contract CustodyTest is Test {
 
         // 3. Non-participant tries to challenge with a signature from non-participant
         Signature memory nonParticipantSig = signChallenge(chan, challengeState, nonParticipantPrivKey);
-        adjudicator.setFlag(true); // Make sure adjudicator allows the state
-        
+        adjudicator.setAdjudicateReturnValue(true); // Make sure adjudicator allows the state
+
         vm.prank(nonParticipant);
         vm.expectRevert(Custody.InvalidChallengerSignature.selector);
         custody.challenge(channelId, challengeState, new State[](0), nonParticipantSig);
@@ -657,8 +657,10 @@ contract CustodyTest is Test {
         challengeState.sigs = challengeSigs;
 
         Signature memory hostChallengeForCheckpoint = signChallenge(chan, challengeState, hostPrivKey);
+        adjudicator.setCompareReturnValue(false); // make sure adjudicator allows the state
         vm.prank(host);
         custody.challenge(channelId, challengeState, new State[](0), hostChallengeForCheckpoint);
+        adjudicator.setCompareReturnValue(true); // set value back
 
         // 5. Checkpoint should resolve the challenge
         vm.prank(guest);

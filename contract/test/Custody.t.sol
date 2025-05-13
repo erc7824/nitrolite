@@ -64,7 +64,7 @@ contract CustodyTest is Test {
 
         // Deploy contracts
         custody = new Custody();
-        adjudicator = new FlagAdjudicator(true);
+        adjudicator = new FlagAdjudicator();
         token = new MockERC20("Test Token", "TST", 18);
 
         // Fund accounts
@@ -195,6 +195,29 @@ contract CustodyTest is Test {
     {
         bytes32 stateHash = Utils.getStateHash(chan, state);
         (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, stateHash);
+        return Signature({v: v, r: r, s: s});
+    }
+
+    // Helper to sign a challenge
+    function signChallenge(Channel memory chan, State memory state, uint256 privateKey)
+        internal
+        view
+        returns (Signature memory)
+    {
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+        bytes32 challengeHash = keccak256(abi.encode(stateHash, "challenge"));
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, challengeHash);
+        return Signature({v: v, r: r, s: s});
+    }
+
+    function signChallenge(Channel memory chan, State memory state, uint256 privateKey)
+        internal
+        view
+        returns (Signature memory)
+    {
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+        bytes32 challengeHash = keccak256(abi.encode(stateHash, "challenge"));
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, challengeHash);
         return Signature({v: v, r: r, s: s});
     }
 
@@ -589,7 +612,7 @@ contract CustodyTest is Test {
         invalidState.intent = StateIntent.OPERATE;
         invalidState.data = abi.encode(42);
         invalidState.version = 97; // Version 97 indicates a challenge state (but will be rejected)
-        adjudicator.setFlag(false); // Set flag to false for invalid state
+        adjudicator.setAdjudicateReturnValue(false); // Set adjudicate return value to false for invalid state
 
         // Host signs the invalid state
         Signature memory hostInvalidSig = signState(chan, invalidState, hostSKPrivKey);
@@ -604,7 +627,7 @@ contract CustodyTest is Test {
 
         // 3. Try to challenge non-existent channel
         bytes32 nonExistentChannelId = bytes32(uint256(1234));
-        adjudicator.setFlag(true); // Set flag back to true
+        adjudicator.setAdjudicateReturnValue(true); // Set flag back to true
 
         vm.prank(hostSK);
         vm.expectRevert(abi.encodeWithSelector(Custody.ChannelNotFound.selector, nonExistentChannelId));
@@ -726,7 +749,12 @@ contract CustodyTest is Test {
         challengeSigs[0] = hostChallengeSig;
         challengeState.sigs = challengeSigs;
 
+        adjudicator.setCompareReturnValue(false); // make sure adjudicator allows the state
         vm.prank(hostSK);
+        custody.challenge(channelId, challengeState, new State[](0));
+        adjudicator.setCompareReturnValue(true); // set value back
+
+        // 5. Checkpoint should resolve the challenge
         custody.challenge(channelId, challengeState, new State[](0));
 
         // 5. Checkpoint should resolve the challenge with a higher version state

@@ -27,6 +27,8 @@ contract Custody is IChannel, IDeposit {
     error InvalidStatus();
     error InvalidState();
     error InvalidAllocations();
+    error DepositAlreadyFulfilled();
+    error DepositsNotFulfilled(uint256 expectedFulfilled, uint256 actualFulfilled);
     error InvalidStateSignatures();
     error InvalidAdjudicator();
     error InvalidChallengePeriod();
@@ -209,11 +211,13 @@ contract Custody is IChannel, IDeposit {
 
         // Verify channel exists and is in INITIAL state
         if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
-        if (meta.stage != ChannelStatus.INITIAL) revert InvalidStatus();
+        // allow joining after previous participant has either joined or challenged the fact that the next participant is not joining
+        if (meta.stage != ChannelStatus.INITIAL && meta.stage != ChannelStatus.DISPUTE) revert InvalidStatus();
 
         // Verify index is a SERVER index
         if (index != SERVER_IDX) revert InvalidParticipant();
-        if (meta.actualDeposits[SERVER_IDX].amount != 0) revert InvalidParticipant();
+        // forbid joining several times
+        if (meta.actualDeposits[SERVER_IDX].amount != 0) revert DepositAlreadyFulfilled();
 
         // Verify SERVER signature on funding stateHash
         bytes32 stateHash = Utils.getStateHash(meta.chan, meta.lastValidState);
@@ -251,8 +255,8 @@ contract Custody is IChannel, IDeposit {
     function close(bytes32 channelId, State calldata candidate, State[] calldata) public {
         Metadata storage meta = _channels[channelId];
 
-        // Verify channel exists and is not VOID
         if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
+        if (meta.stage == ChannelStatus.INITIAL || meta.stage == ChannelStatus.FINAL) revert InvalidStatus();
 
         // Case 1: Mutual closing with StateIntent.FINALIZE
         // Channel must not be in INITIAL stage (participants should close the channel with challenge then)
@@ -268,22 +272,25 @@ contract Custody is IChannel, IDeposit {
             if (candidate.sigs.length != PART_NUM) revert InvalidStateSignatures();
             if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
 
-            // Store the final state
             meta.lastValidState = candidate;
             meta.stage = ChannelStatus.FINAL;
-        }
-        // Case 2: Challenge resolution (after challenge period expires)
-        else if (meta.stage == ChannelStatus.DISPUTE) {
-            // Ensure challenge period has expired
-            if (block.timestamp < meta.challengeExpire) revert ChallengeNotExpired();
+        } else { //meta.stage == Status.DISPUTE
+            // Can overwrite any challenge state with a valid final state
+            if (block.timestamp < meta.challengeExpire) {
+                uint32 magicNumber = abi.decode(candidate.data, (uint32));
+                if (candidate.intent != StateIntent.FINALIZE) revert InvalidState();
 
-            // Already in DISPUTE with an expired challenge - can proceed to finalization
-            meta.stage = ChannelStatus.FINAL;
-        } else {
-            revert InvalidStatus();
+                if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
+
+                meta.challengeExpire = 0;
+                meta.lastValidState = candidate;
+                meta.stage = ChannelStatus.FINAL;
+            } else {
+                // Already in DISPUTE with an expired challenge - can proceed to finalization
+                meta.stage = ChannelStatus.FINAL;
+            }
         }
 
-        // At this point, the channel is in FINAL state, so we can close it
         _unlockAllocations(channelId, candidate.allocations);
 
         // TODO: implement a better way for this
@@ -294,7 +301,6 @@ contract Custody is IChannel, IDeposit {
             _ledgers[participant].channels.remove(channelId);
         }
 
-        // Mark channel as closed by removing it
         delete _channels[channelId];
 
         emit Closed(channelId, candidate);
@@ -314,48 +320,60 @@ contract Custody is IChannel, IDeposit {
         if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
         if (meta.stage == ChannelStatus.FINAL) revert InvalidStatus();
 
-        // Verify that at least one participant signed the state
-        if (candidate.sigs.length == 0) revert InvalidStateSignatures();
+        uint32 candidateMagicNumber = abi.decode(candidate.data, (uint32));
+        if (candidateMagicNumber == CHANCLOSE) revert InvalidState();
 
-        // Validate version based on channel status
-        if (meta.stage == ChannelStatus.INITIAL && candidate.version != 0) revert InvalidState();
+        uint32 lastValidStateMagicNumber = abi.decode(meta.lastValidState.data, (uint32));
 
-        if (candidate.data.length != 0) {
-            if (candidate.intent == StateIntent.INITIALIZE) {
-                // TODO:
-            } else if (candidate.intent == StateIntent.RESIZE) {
-                uint256 deposited = meta.expectedDeposits[CLIENT_IDX].amount + meta.expectedDeposits[SERVER_IDX].amount;
-                uint256 expected = candidate.allocations[CLIENT_IDX].amount + candidate.allocations[SERVER_IDX].amount;
-                if (deposited != expected) {
-                    revert InvalidAllocations();
+        if (meta.stage == Status.INITIAL) {
+            // main goal: verify Candidate is valid and >= LastValidState
+            if (candidateMagicNumber == CHANOPEN) {
+                if (proofs.length != 0) revert InvalidState();
+                if (candidate.sigs.length < meta.lastValidState.sigs.length) revert InvalidState();
+                _requireValidSignatures(meta.chan, candidate);
+                _requireChannelHasNFulfilledDeposits(channelId, candidate.sigs.length);
+            } else {
+                _requireChannelHasNFulfilledDeposits(channelId, PART_NUM);
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+            }
+        } else if (meta.stage == Status.ACTIVE) {
+
+            // main goal: verify Candidate is valid and >= LastValidState
+            if (lastValidStateMagicNumber == CHANOPEN) {
+                if (candidateMagicNumber == CHANOPEN) {
+                    if (proofs.length != 0) revert InvalidState();
+                    if (candidate.sigs.length == PART_NUM) revert InvalidState();
+                    _requireValidSignatures(meta.chan, candidate);
+                } else {
+                    if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
                 }
+            } else {
+                if (candidateMagicNumber == CHANOPEN) revert InvalidState();
+                if (_isMoreRecent(meta.chan.adjudicator, meta.lastValidState, candidate)) revert InvalidState();
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+            }
+        } else { // meta.stage == DISPUTE
+            // main goal: verify Candidate is valid and > LastValidState
+            if (lastValidStateMagicNumber == CHANOPEN) {
+                if (meta.lastValidState.sigs.length != PART_NUM) {
+                    _requireChannelHasNFulfilledDeposits(channelId, PART_NUM);
+                }
+
+                if (candidateMagicNumber == CHANOPEN) {
+                    if (proofs.length != 0) revert InvalidState();
+                    if (candidate.sigs.length != PART_NUM) revert InvalidState();
+                    _requireValidSignatures(meta.chan, candidate);
+                } else {
+                    if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+                }
+            } else {
+                if (candidateMagicNumber == CHANOPEN) revert InvalidState();
+                if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
             }
         }
 
-        if (
-            candidate.data.length == 0
-                || (candidate.intent != StateIntent.INITIALIZE && candidate.intent != StateIntent.RESIZE)
-        ) {
-            // if no state data or intent is not INITIALIZE or RESIZE, assume this is a normal state
-
-            // Verify the state is valid according to the adjudicator
-            if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
-
-            // Reject states with equal version
-            if (candidate.version == meta.lastValidState.version) {
-                // Explicitly check for equal versions and reject them
-                revert InvalidState();
-            }
-
-            // Revert if trying to challenge with an older state that is already known
-            if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
-                revert InvalidState();
-            }
-        }
-
-        // Store the candidate as the last valid state
         meta.lastValidState = candidate;
-        // Set or reset the challenge expiration
         meta.challengeExpire = block.timestamp + meta.chan.challenge;
         // Set the channel status to DISPUTE
         meta.stage = ChannelStatus.DISPUTE;
@@ -377,32 +395,45 @@ contract Custody is IChannel, IDeposit {
         if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
         if (meta.stage == ChannelStatus.FINAL) revert InvalidStatus();
 
-        // Verify that at least one participant signed the state
-        if (candidate.sigs.length == 0) revert InvalidStateSignatures();
-
-        // Validate version based on channel status
-        if (meta.stage == ChannelStatus.INITIAL && candidate.version != 0) revert InvalidState();
-
-        if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
-
-        // Verify this state is more recent than the current stored state
-        if (candidate.version == meta.lastValidState.version) {
-            // Explicitly check for equal versions and reject them
-            revert InvalidState();
+        uint32 candidateMagicNumber = abi.decode(candidate.data, (uint32));
+        if (candidateMagicNumber == CHANOPEN || // disallow checkpointing a funding state as `join` already does that
+            candidateMagicNumber == CHANCLOSE) { // disallow checkpointing a closing state as `close` already does that
+                revert InvalidState();
         }
 
-        if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
-            revert InvalidState();
-        }
+        uint32 lastValidStateMagicNumber = abi.decode(meta.lastValidState.data, (uint32));
 
-        // Store the candidate as the last valid state
-        meta.lastValidState = candidate;
+        // main goal: verify Candidate is valid and > LastValidState
 
-        // If there's an ongoing challenge and this state is newer, cancel the challenge
-        if (meta.stage == ChannelStatus.DISPUTE) {
-            meta.stage = ChannelStatus.ACTIVE;
+        if (meta.stage == Status.INITIAL) {
+            // LastValidState can only be a CHANOPEN and where NOT ALL parties have joined
+
+            _requireChannelHasNFulfilledDeposits(channelId, PART_NUM);
+            if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+        } else if (meta.stage == Status.ACTIVE) {
+            if (lastValidStateMagicNumber != CHANOPEN) {
+                if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
+            }
+
+            if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+        } else { // meta.stage == DISPUTE
+            if (lastValidStateMagicNumber == CHANOPEN) {
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+
+                if (meta.lastValidState.sigs.length != PART_NUM) {
+                    _requireChannelHasNFulfilledDeposits(channelId, PART_NUM);
+                }
+            } else {
+                if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+            }
+
             meta.challengeExpire = 0;
         }
+
+        meta.stage = Status.ACTIVE;
+        meta.lastValidState = candidate;
+
 
         emit Checkpointed(channelId);
     }
@@ -527,6 +558,30 @@ contract Custody is IChannel, IDeposit {
         }
 
         return true;
+    }
+
+    function _requireValidSignatures(Channel memory chan, State memory state) internal pure {
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+        uint256 sigsLength = state.sigs.length;
+
+        for (uint256 i = 0; i < sigsLength; i++) {
+            if (!Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i])) {
+                revert InvalidStateSignatures();
+            }
+        }
+    }
+
+    function _requireChannelHasNFulfilledDeposits(bytes32 channelId, uint256 n) internal view {
+        Metadata storage meta = _channels[channelId];
+
+        uint256 fulfilledDeposits = 0;
+        for (uint256 i = 0; i < PART_NUM; i++) {
+            if (meta.actualDeposits[i].amount != meta.expectedDeposits[i].amount) {
+                fulfilledDeposits++;
+            }
+        }
+
+        if (fulfilledDeposits < n) revert DepositsNotFulfilled(n, fulfilledDeposits);
     }
 
     /**

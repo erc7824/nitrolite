@@ -11,6 +11,7 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
+import {console} from "forge-std/console.sol";
 
 /**
  * @title Custody
@@ -28,6 +29,7 @@ contract Custody is IChannel, IDeposit {
     error InvalidStatus();
     error InvalidState();
     error InvalidAllocations();
+    error DepositsNotFulfilled(uint256 expectedFulfilled, uint256 actualFulfilled);
     error InvalidStateSignatures();
     error InvalidAdjudicator();
     error InvalidChallengerSignature();
@@ -202,7 +204,8 @@ contract Custody is IChannel, IDeposit {
 
         // Verify channel exists and is in INITIAL state
         if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
-        if (meta.stage != Status.INITIAL) revert InvalidStatus();
+        // allow joining after previous participant has either joined or challenged the fact that the next participant is not joining
+        if (meta.stage != Status.INITIAL && meta.stage != Status.DISPUTE) revert InvalidStatus();
 
         // Verify index is a SERVER index
         if (index != SERVER_IDX) revert InvalidParticipant();
@@ -221,6 +224,7 @@ contract Custody is IChannel, IDeposit {
 
         // Record actual deposit
         meta.actualDeposits[SERVER_IDX] = expectedDeposit;
+        meta.challengeExpire = 0; // Reset challenge expiration
 
         // Add channel to participant's ledger
         _ledgers[meta.chan.participants[SERVER_IDX]].channels.add(channelId);
@@ -243,10 +247,9 @@ contract Custody is IChannel, IDeposit {
     function close(bytes32 channelId, State calldata candidate, State[] calldata) public {
         Metadata storage meta = _channels[channelId];
 
-        // Verify channel exists and is not VOID
         if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
+        if (meta.stage == Status.INITIAL || meta.stage == Status.FINAL) revert InvalidStatus();
 
-        // Case 1: Mutual closing with CHANCLOSE magic number
         // Channel must not be in INITIAL stage (participants should close the channel with challenge then)
         if (meta.stage == Status.ACTIVE) {
             uint32 magicNumber = abi.decode(candidate.data, (uint32));
@@ -254,22 +257,25 @@ contract Custody is IChannel, IDeposit {
 
             if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
 
-            // Store the final state
             meta.lastValidState = candidate;
             meta.stage = Status.FINAL;
-        }
-        // Case 2: Challenge resolution (after challenge period expires)
-        else if (meta.stage == Status.DISPUTE) {
-            // Ensure challenge period has expired
-            if (block.timestamp < meta.challengeExpire) revert ChallengeNotExpired();
+        } else { //meta.stage == Status.DISPUTE
+            // Can overwrite any challenge state with a valid final state
+            if (block.timestamp < meta.challengeExpire) {
+                uint32 magicNumber = abi.decode(candidate.data, (uint32));
+                if (magicNumber != CHANCLOSE) revert InvalidState();
 
-            // Already in DISPUTE with an expired challenge - can proceed to finalization
-            meta.stage = Status.FINAL;
-        } else {
-            revert InvalidStatus();
+                if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
+
+                meta.challengeExpire = 0;
+                meta.lastValidState = candidate;
+                meta.stage = Status.FINAL;
+            } else {
+                // Already in DISPUTE with an expired challenge - can proceed to finalization
+                meta.stage = Status.FINAL;
+            }
         }
 
-        // At this point, the channel is in FINAL state, so we can close it
         _unlockAllocations(channelId, candidate.allocations);
 
         // TODO: implement a better way for this
@@ -280,7 +286,6 @@ contract Custody is IChannel, IDeposit {
             _ledgers[participant].channels.remove(channelId);
         }
 
-        // Mark channel as closed by removing it
         delete _channels[channelId];
 
         emit ChannelClosed(channelId);
@@ -294,7 +299,6 @@ contract Custody is IChannel, IDeposit {
      * @param challengerSig Challenger signature over `keccak256(abi.encode(stateHash, "challenge"))` to disallow 3rd party
      * to challenge with a stolen state and its signature
      */
-    // TODO: add a challengerSig and check that it signed by either participant of the channel to disallow non-channel participants to challenge with stolen state
     function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs, Signature calldata challengerSig) external {
         Metadata storage meta = _channels[channelId];
 
@@ -308,21 +312,67 @@ contract Custody is IChannel, IDeposit {
             challengerSig
         );
 
-        // Verify that at least one participant signed the state
-        if (candidate.sigs.length == 0) revert InvalidStateSignatures();
+        uint32 candidateMagicNumber = abi.decode(candidate.data, (uint32));
+        if (candidateMagicNumber == CHANCLOSE) revert InvalidState();
 
-        if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+        uint32 lastValidStateMagicNumber = abi.decode(meta.lastValidState.data, (uint32));
 
-        // Revert if trying to challenge with an older state that is already known
-        if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
-            revert InvalidState();
+        if (meta.stage == Status.INITIAL) {
+            // main goal: verify Candidate is valid and >= LastValidState
+            if (candidateMagicNumber == CHANOPEN) {
+                if (proofs.length != 0) revert InvalidState();
+                if (candidate.sigs.length < meta.lastValidState.sigs.length) revert InvalidState();
+                _requireValidSignatures(meta.chan, candidate);
+                _requireChannelHasNFulfilledDeposits(channelId, candidate.sigs.length);
+            } else {
+                _requireChannelHasNFulfilledDeposits(channelId, PART_NUM);
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+            }
+        } else if (meta.stage == Status.ACTIVE) {
+            console.log("challenge: meta.stage == Status.ACTIVE");
+
+            // main goal: verify Candidate is valid and >= LastValidState
+            if (lastValidStateMagicNumber == CHANOPEN) {
+                if (candidateMagicNumber == CHANOPEN) {
+                    if (proofs.length != 0) revert InvalidState();
+                    if (candidate.sigs.length == PART_NUM) revert InvalidState();
+                    _requireValidSignatures(meta.chan, candidate);
+                } else {
+                    if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+                }
+            } else {
+                console.log("challenge: lastValidStateMagicNumber != CHANOPEN");
+
+                if (candidateMagicNumber == CHANOPEN) revert InvalidState();
+                if (_isMoreRecent(meta.chan.adjudicator, meta.lastValidState, candidate)) {
+                    console.log("challenge: _isMoreRecent(meta.chan.adjudicator, meta.lastValidState, candidate)");
+                    revert InvalidState();
+                }
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+            }
+        } else { // meta.stage == DISPUTE
+            // main goal: verify Candidate is valid and > LastValidState
+            if (lastValidStateMagicNumber == CHANOPEN) {
+                if (meta.lastValidState.sigs.length != PART_NUM) {
+                    _requireChannelHasNFulfilledDeposits(channelId, PART_NUM);
+                }
+
+                if (candidateMagicNumber == CHANOPEN) {
+                    if (proofs.length != 0) revert InvalidState();
+                    if (candidate.sigs.length != PART_NUM) revert InvalidState();
+                    _requireValidSignatures(meta.chan, candidate);
+                } else {
+                    if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+                }
+            } else {
+                if (candidateMagicNumber == CHANOPEN) revert InvalidState();
+                if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+            }
         }
 
-        // Store the candidate as the last valid state
         meta.lastValidState = candidate;
-        // Set or reset the challenge expiration
         meta.challengeExpire = block.timestamp + meta.chan.challenge;
-        // Set the channel status to DISPUTE
         meta.stage = Status.DISPUTE;
 
         emit Challenged(channelId, meta.challengeExpire);
@@ -341,24 +391,45 @@ contract Custody is IChannel, IDeposit {
         if (meta.stage == Status.VOID) revert ChannelNotFound(channelId);
         if (meta.stage == Status.FINAL) revert InvalidStatus();
 
-        // Verify that at least one participant signed the state
-        if (candidate.sigs.length == 0) revert InvalidStateSignatures();
-
-        if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
-
-        // Verify this state is more recent than the current stored state
-        if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) {
-            revert InvalidState();
+        uint32 candidateMagicNumber = abi.decode(candidate.data, (uint32));
+        if (candidateMagicNumber == CHANOPEN || // disallow checkpointing a funding state as `join` already does that
+            candidateMagicNumber == CHANCLOSE) { // disallow checkpointing a closing state as `close` already does that
+                revert InvalidState();
         }
 
-        // Store the candidate as the last valid state
-        meta.lastValidState = candidate;
+        uint32 lastValidStateMagicNumber = abi.decode(meta.lastValidState.data, (uint32));
 
-        // If there's an ongoing challenge and this state is newer, cancel the challenge
-        if (meta.stage == Status.DISPUTE) {
-            meta.stage = Status.ACTIVE;
+        // main goal: verify Candidate is valid and > LastValidState
+
+        if (meta.stage == Status.INITIAL) {
+            // LastValidState can only be a CHANOPEN and where NOT ALL parties have joined
+
+            _requireChannelHasNFulfilledDeposits(channelId, PART_NUM);
+            if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+        } else if (meta.stage == Status.ACTIVE) {
+            if (lastValidStateMagicNumber != CHANOPEN) {
+                if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
+            }
+
+            if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+        } else { // meta.stage == DISPUTE
+            if (lastValidStateMagicNumber == CHANOPEN) {
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+
+                if (meta.lastValidState.sigs.length != PART_NUM) {
+                    _requireChannelHasNFulfilledDeposits(channelId, PART_NUM);
+                }
+            } else {
+                if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
+            }
+
             meta.challengeExpire = 0;
         }
+
+        meta.stage = Status.ACTIVE;
+        meta.lastValidState = candidate;
+
 
         emit Checkpointed(channelId);
     }
@@ -400,16 +471,16 @@ contract Custody is IChannel, IDeposit {
     /**
      * @notice Helper function to compare two states for recency
      * @param adjudicator The adjudicator contract address
-     * @param candidate The candidate state
-     * @param previous The previous state to compare against
-     * @return True if the candidate state is more recent than the previous state
+     * @param stateA The first state to compare
+     * @param stateB The second state to compare against
+     * @return True if state A is more recent than state B state
      */
-    function _isMoreRecent(address adjudicator, State calldata candidate, State memory previous)
+    function _isMoreRecent(address adjudicator, State memory stateA, State memory stateB)
         internal
         view
         returns (bool)
     {
-        return IComparable(adjudicator).compare(candidate, previous) > 0;
+        return IComparable(adjudicator).compare(stateA, stateB) > 0;
     }
 
     function _transfer(address token, address to, uint256 amount) internal {
@@ -464,6 +535,30 @@ contract Custody is IChannel, IDeposit {
         }
 
         return true;
+    }
+
+    function _requireValidSignatures(Channel memory chan, State memory state) internal pure {
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+        uint256 sigsLength = state.sigs.length;
+
+        for (uint256 i = 0; i < sigsLength; i++) {
+            if (!Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i])) {
+                revert InvalidStateSignatures();
+            }
+        }
+    }
+
+    function _requireChannelHasNFulfilledDeposits(bytes32 channelId, uint256 n) internal view {
+        Metadata storage meta = _channels[channelId];
+
+        uint256 fulfilledDeposits = 0;
+        for (uint256 i = 0; i < PART_NUM; i++) {
+            if (meta.actualDeposits[i].amount != meta.expectedDeposits[i].amount) {
+                fulfilledDeposits++;
+            }
+        }
+
+        if (fulfilledDeposits < n) revert DepositsNotFulfilled(n, fulfilledDeposits);
     }
 
     function _requireChallengerIsParticipant(

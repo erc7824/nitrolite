@@ -11,8 +11,6 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
-import {console} from "forge-std/console.sol";
-
 /**
  * @title Custody
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
@@ -331,7 +329,6 @@ contract Custody is IChannel, IDeposit {
                 if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
             }
         } else if (meta.stage == Status.ACTIVE) {
-            console.log("challenge: meta.stage == Status.ACTIVE");
 
             // main goal: verify Candidate is valid and >= LastValidState
             if (lastValidStateMagicNumber == CHANOPEN) {
@@ -343,13 +340,8 @@ contract Custody is IChannel, IDeposit {
                     if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
                 }
             } else {
-                console.log("challenge: lastValidStateMagicNumber != CHANOPEN");
-
                 if (candidateMagicNumber == CHANOPEN) revert InvalidState();
-                if (_isMoreRecent(meta.chan.adjudicator, meta.lastValidState, candidate)) {
-                    console.log("challenge: _isMoreRecent(meta.chan.adjudicator, meta.lastValidState, candidate)");
-                    revert InvalidState();
-                }
+                if (_isMoreRecent(meta.chan.adjudicator, meta.lastValidState, candidate)) revert InvalidState();
                 if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
             }
         } else { // meta.stage == DISPUTE

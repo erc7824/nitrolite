@@ -29,6 +29,7 @@ contract Custody is IChannel, IDeposit {
     error InvalidStatus();
     error InvalidState();
     error InvalidAllocations();
+    error DepositAlreadyFulfilled();
     error DepositsNotFulfilled(uint256 expectedFulfilled, uint256 actualFulfilled);
     error InvalidStateSignatures();
     error InvalidAdjudicator();
@@ -209,7 +210,8 @@ contract Custody is IChannel, IDeposit {
 
         // Verify index is a SERVER index
         if (index != SERVER_IDX) revert InvalidParticipant();
-        if (meta.actualDeposits[SERVER_IDX].amount != 0) revert InvalidParticipant();
+        // forbid joining several times
+        if (meta.actualDeposits[SERVER_IDX].amount != 0) revert DepositAlreadyFulfilled();
 
         // Verify SERVER signature on funding stateHash
         bytes32 stateHash = Utils.getStateHash(meta.chan, meta.lastValidState);

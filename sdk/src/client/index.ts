@@ -1,6 +1,6 @@
 import { Account, PublicClient, WalletClient, Chain, Transport, ParseAccount, Hash, zeroAddress } from "viem";
 
-import { NitroliteService, Erc20Service } from "./services";
+import { NitroliteService, Erc20Service, waitForTransaction } from "./services";
 import {
     State,
     ChannelId,
@@ -86,7 +86,8 @@ export class NitroliteClient {
             const allowance = await this.erc20Service.getTokenAllowance(tokenAddress, owner, spender);
             if (allowance < amount) {
                 try {
-                    await this.erc20Service.approve(tokenAddress, spender, amount);
+                    const hash = await this.erc20Service.approve(tokenAddress, spender, amount);
+                    await waitForTransaction(this.publicClient, hash);
                 } catch (err) {
                     const error = new Errors.TokenError("Failed to approve tokens for deposit");
                     throw error;
@@ -95,7 +96,10 @@ export class NitroliteClient {
         }
 
         try {
-            return await this.nitroliteService.deposit(tokenAddress, amount);
+            const depositHash = await this.nitroliteService.deposit(tokenAddress, amount);
+            await waitForTransaction(this.publicClient, depositHash);
+
+            return depositHash;
         } catch (err) {
             throw new Errors.ContractCallError("Failed to execute deposit on contract", err as Error);
         }

@@ -11,7 +11,7 @@ describe("NitroliteRPC", () => {
         (console.error as jest.Mock).mockRestore();
     });
     describe("createRequest", () => {
-        test("should create a valid request message without intent", () => {
+        test("should create a valid request message", () => {
             const requestId = 12345;
             const method = "test_method";
             const params = ["param1", "param2"];
@@ -21,21 +21,6 @@ describe("NitroliteRPC", () => {
 
             expect(result).toEqual({
                 req: [requestId, method, params, timestamp],
-            });
-        });
-
-        test("should create a valid request message with intent", () => {
-            const requestId = 12345;
-            const method = "test_method";
-            const params = ["param1", "param2"];
-            const timestamp = 1619876543210;
-            const intent = [1, 2, 3];
-
-            const result = NitroliteRPC.createRequest(requestId, method, params, timestamp, intent);
-
-            expect(result).toEqual({
-                req: [requestId, method, params, timestamp],
-                int: intent,
             });
         });
 
@@ -63,24 +48,7 @@ describe("NitroliteRPC", () => {
 
             expect(result).toEqual({
                 req: [requestId, method, params, timestamp],
-                acc: accountId,
-            });
-        });
-
-        test("should create a valid application request message with intent", () => {
-            const requestId = 12345;
-            const method = "test_method";
-            const params = ["param1", "param2"];
-            const timestamp = 1619876543210;
-            const accountId = "0xaccountId" as Hex;
-            const intent = [1, 2, 3];
-
-            const result = NitroliteRPC.createAppRequest(requestId, method, params, timestamp, accountId, intent);
-
-            expect(result).toEqual({
-                req: [requestId, method, params, timestamp],
-                acc: accountId,
-                int: intent,
+                sid: accountId,
             });
         });
     });
@@ -120,10 +88,10 @@ describe("NitroliteRPC", () => {
             });
         });
 
-        test("should parse a valid response message with acc field", () => {
+        test("should parse a valid response message with sid field", () => {
             const responseObj = {
                 res: [12345, "test_method", ["result1", "result2"], 1619876543210],
-                acc: "0xaccountId" as Hex,
+                sid: "0xaccountId" as Hex,
             };
 
             const result = NitroliteRPC.parseResponse(responseObj);
@@ -134,26 +102,7 @@ describe("NitroliteRPC", () => {
                 requestId: 12345,
                 method: "test_method",
                 data: ["result1", "result2"],
-                acc: "0xaccountId",
-                timestamp: 1619876543210,
-            });
-        });
-
-        test("should parse a valid response message with intent", () => {
-            const responseObj = {
-                res: [12345, "test_method", ["result1", "result2"], 1619876543210],
-                int: [1, 2, 3],
-            };
-
-            const result = NitroliteRPC.parseResponse(responseObj);
-
-            expect(result).toEqual({
-                isValid: true,
-                isError: false,
-                requestId: 12345,
-                method: "test_method",
-                data: ["result1", "result2"],
-                int: [1, 2, 3],
+                sid: "0xaccountId",
                 timestamp: 1619876543210,
             });
         });

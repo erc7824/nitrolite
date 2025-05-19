@@ -1,8 +1,7 @@
-import { Address } from "viem";
+import { Address, Hex } from "viem";
 import {
     MessageSigner,
     AccountID,
-    Intent,
     RequestID,
     Timestamp,
     ParsedResponse,
@@ -143,7 +142,6 @@ export async function createPingMessage(
  */
 export async function createGetConfigMessage(
     signer: MessageSigner,
-    channelId: AccountID,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
@@ -157,18 +155,18 @@ export async function createGetConfigMessage(
  * Creates the signed, stringified message body for a 'get_ledger_balances' request.
  *
  * @param signer - The function to sign the request payload.
- * @param channelId - The Channel ID to get ledger balances.
+ * @param participant - The participant address.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
  */
 export async function createGetLedgerBalancesMessage(
     signer: MessageSigner,
-    channelId: AccountID,
+    participant: Address,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const params = [{ acc: channelId }];
+    const params = [{ participant: participant }];
     const request = NitroliteRPC.createRequest(requestId, "get_ledger_balances", params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
@@ -179,18 +177,18 @@ export async function createGetLedgerBalancesMessage(
  * Creates the signed, stringified message body for a 'get_app_definition' request.
  *
  * @param signer - The function to sign the request payload.
- * @param appId - The Application ID to get the definition for.
+ * @param appSessionId - The Application Session ID to get the definition for.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
  */
 export async function createGetAppDefinitionMessage(
     signer: MessageSigner,
-    appId: AccountID,
+    appSessionId: AccountID,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const params = [{ acc: appId }];
+    const params = [{ app_session_id: appSessionId }];
     const request = NitroliteRPC.createRequest(requestId, "get_app_definition", params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
@@ -198,11 +196,10 @@ export async function createGetAppDefinitionMessage(
 }
 
 /**
- * Creates the signed, stringified message body for a 'create_application' request.
+ * Creates the signed, stringified message body for a 'create_app_session' request.
  *
  * @param signer - The function to sign the request payload.
- * @param params - The specific parameters required by 'create_application'. See {@link CreateAppSessionRequest} for details.
- * @param intent - The initial allocation intent for the application.
+ * @param params - The specific parameters required by 'create_app_session'. See {@link CreateAppSessionRequest} for details.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
@@ -210,11 +207,10 @@ export async function createGetAppDefinitionMessage(
 export async function createAppSessionMessage(
     signer: MessageSigner,
     params: CreateAppSessionRequest[],
-    intent: Intent,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const request = NitroliteRPC.createRequest(requestId, "create_app_session", params, timestamp, intent);
+    const request = NitroliteRPC.createRequest(requestId, "create_app_session", params, timestamp);
 
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
@@ -222,12 +218,11 @@ export async function createAppSessionMessage(
 }
 
 /**
- * Creates the signed, stringified message body for a 'close_application' request.
+ * Creates the signed, stringified message body for a 'close_app_session' request.
  * Note: This function only adds the *caller's* signature. Multi-sig coordination happens externally.
  *
  * @param signer - The function to sign the request payload.
- * @param params - The specific parameters required by 'close_application' (e.g., final allocations).
- * @param intent - The final allocation intent.
+ * @param params - The specific parameters required by 'close_app_session' (e.g., final allocations).
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage (with single signature).
@@ -235,11 +230,10 @@ export async function createAppSessionMessage(
 export async function createCloseAppSessionMessage(
     signer: MessageSigner,
     params: CloseAppSessionRequest[],
-    intent: Intent,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const request = NitroliteRPC.createRequest(requestId, "close_app_session", params, timestamp, intent);
+    const request = NitroliteRPC.createRequest(requestId, "close_app_session", params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);
@@ -249,7 +243,7 @@ export async function createCloseAppSessionMessage(
  * Creates the signed, stringified message body for sending a generic 'message' within an application.
  *
  * @param signer - The function to sign the request payload.
- * @param appId - The Application ID the message is scoped to.
+ * @param appSessionId - The Application Session ID the message is scoped to.
  * @param messageParams - The actual message content/parameters being sent.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
@@ -257,12 +251,12 @@ export async function createCloseAppSessionMessage(
  */
 export async function createApplicationMessage(
     signer: MessageSigner,
-    appId: AccountID,
+    appSessionId: Hex,
     messageParams: any[],
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const request = NitroliteRPC.createAppRequest(requestId, "message", messageParams, timestamp, appId);
+    const request = NitroliteRPC.createAppRequest(requestId, "message", messageParams, timestamp, appSessionId);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);
@@ -308,6 +302,27 @@ export async function createResizeChannelMessage(
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
     const request = NitroliteRPC.createRequest(requestId, "resize_channel", params, timestamp);
+    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+
+    return JSON.stringify(signedRequest);
+}
+
+/**
+ * Creates the signed, stringified message body for a 'get_channels' request.
+ *
+ * @param signer - The function to sign the request payload.
+ * @param participant - The participant address.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ */
+export async function createGetChannelsMessage(
+    signer: MessageSigner,
+    participant: Address,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp()
+): Promise<string> {
+    const request = NitroliteRPC.createRequest(requestId, "get_channels", [{ participant }], timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);

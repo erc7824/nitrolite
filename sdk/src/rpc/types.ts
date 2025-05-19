@@ -8,14 +8,22 @@ export type Timestamp = number;
 
 /** Type alias for Account ID (channelId or appId) */
 export type AccountID = Hex;
-/** Represents the allocation intent change as an array of numbers. */
-export type Intent = bigint[];
 
 /** Represents the data payload within a request message: [requestId, method, params, timestamp?]. */
 export type RequestData = [RequestID, string, any[], Timestamp?];
 
 /** Represents the data payload within a successful response message: [requestId, method, result, timestamp?]. */
 export type ResponseData = [RequestID, string, any[], Timestamp?];
+
+/** Represents the allocation of assets within an application session.
+ * This structure is used to define the initial allocation of assets among participants.
+ * It includes the participant's address, the asset (usdc, usdt, etc) being allocated, and the amount.
+ */
+export type AppSessionAllocation = {
+    participant: Address;
+    asset: string;
+    amount: string;
+};
 
 /**
  * Represents the structure of an error object within an error response payload.
@@ -40,8 +48,6 @@ export interface NitroliteRPCMessage {
     req?: RequestData;
     /** Contains the response or error payload if this is a response message. */
     res?: ResponsePayload;
-    /** Optional allocation intent change. */
-    int?: Intent;
     /** Optional cryptographic signature(s). */
     sig?: Hex[];
 }
@@ -52,10 +58,10 @@ export interface NitroliteRPCMessage {
  */
 export interface ApplicationRPCMessage extends NitroliteRPCMessage {
     /**
-     * Ledger account identifier (channelId or appId). Mandatory.
+     * Application Session ID. Mandatory.
      * This field also serves as the destination pubsub topic for the message.
      */
-    acc: AccountID;
+    sid: Hex;
 }
 
 /**
@@ -76,10 +82,8 @@ export interface ParsedResponse {
     method?: string;
     /** The extracted data payload (result array for success, error detail object for error). Undefined if structure is invalid or error payload malformed. */
     data?: any[] | NitroliteRPCErrorDetail;
-    /** The Account ID from the message envelope. Undefined if structure is invalid. */
-    acc?: AccountID;
-    /** The Intent from the message envelope, if present. */
-    int?: Intent;
+    /** The Application Session ID from the message envelope. Undefined if structure is invalid. */
+    sid?: Hex;
     /** The Timestamp from the response payload. Undefined if structure is invalid. */
     timestamp?: Timestamp;
 }
@@ -121,20 +125,18 @@ export interface CreateAppSessionRequest {
         }
     */
     definition: AppDefinition;
-    /** The address of the token contract used for allocations within the application. */
-    token: Hex;
     /** The initial allocation distribution among participants. Order corresponds to the participants array in the definition. */
-    allocations: bigint[]; // Assuming Hex representation of amounts
+    allocations: AppSessionAllocation[];
 }
 
 /**
  * Defines the parameters required for the 'close_application' RPC method.
  */
 export interface CloseAppSessionRequest {
-    /** The unique identifier (AccountID) of the application to be closed. */
-    app_id: Hex;
+    /** The unique identifier of the application session to be closed. */
+    app_session_id: Hex;
     /** The final allocation distribution among participants upon closing the application. Order corresponds to the participants array in the application's definition. */
-    allocations: bigint[]; // Assuming Hex representation of amounts
+    allocations: AppSessionAllocation[];
 }
 
 /**
@@ -142,7 +144,8 @@ export interface CloseAppSessionRequest {
  */
 export interface ResizeChannel {
     channel_id: Hex; // The unique identifier of the channel to be resized.
-    participant_change: bigint; // The change in the participant allocation, represented as a bigint.
+    resize_amount?: bigint; // How much user wants to deposit or withdraw from a token-network specific channel.
+    allocate_amount?: bigint; // How much more token user wants to allocate to this token-network specific channel from his unified balance.
     funds_destination: Hex; // The address where the resized funds will be sent.
 }
 

@@ -1,10 +1,9 @@
-import { Address } from "viem";
+import { Address, Hex } from "viem";
 import {
     NitroliteRPCMessage,
     RequestData,
     NitroliteRPCErrorDetail,
     AccountID,
-    Intent,
     MessageSigner,
     SingleMessageVerifier,
     MultiMessageVerifier,
@@ -26,22 +25,16 @@ export class NitroliteRPC {
      * @param method - The RPC method name.
      * @param params - Parameters for the method call.
      * @param timestamp - Timestamp for the request. Defaults to the current time.
-     * @param int - Optional allocation intent change.
      * @returns A formatted NitroliteRPCMessage object for the request.
      */
     static createRequest(
         requestId: number = generateRequestId(),
         method: string,
         params: any[] = [],
-        timestamp: number = getCurrentTimestamp(),
-        int?: Intent
+        timestamp: number = getCurrentTimestamp()
     ): NitroliteRPCMessage {
         const requestData: RequestData = [requestId, method, params, timestamp];
         const message: NitroliteRPCMessage = { req: requestData };
-
-        if (int !== undefined) {
-            message.int = int;
-        }
 
         return message;
     }
@@ -53,8 +46,7 @@ export class NitroliteRPC {
      * @param method - The RPC method name.
      * @param params - Parameters for the method call.
      * @param timestamp - Timestamp for the request. Defaults to the current time.
-     * @param acc - The mandatory Account ID (channelId or appId).
-     * @param int - Optional allocation intent change.
+     * @param sid - Application session ID.
      * @returns A formatted NitroliteRPCMessage object for the request.
      */
     static createAppRequest(
@@ -62,15 +54,10 @@ export class NitroliteRPC {
         method: string,
         params: any[] = [],
         timestamp: number = getCurrentTimestamp(),
-        acc: AccountID,
-        int?: Intent
+        sid: Hex
     ): ApplicationRPCMessage {
         const requestData: RequestData = [requestId, method, params, timestamp];
-        const message: ApplicationRPCMessage = { req: requestData, acc };
-
-        if (int !== undefined) {
-            message.int = int;
-        }
+        const message: ApplicationRPCMessage = { req: requestData, sid };
 
         return message;
     }
@@ -78,7 +65,7 @@ export class NitroliteRPC {
     /**
      * Parses a raw message string or object received from the broker,
      * validating its structure as a Nitrolite RPC response. Handles both
-     * messages with and without the top-level 'acc' field.
+     * messages with and without the top-level 'sid' field.
      * Does NOT verify the signature.
      *
      * @param rawMessage - The raw JSON string or pre-parsed object received.
@@ -105,15 +92,14 @@ export class NitroliteRPC {
         }
 
         const [requestId, method, dataPayload, timestamp] = message.res;
-        const acc = typeof message.acc === "string" ? message.acc : undefined;
-        const int = message.int;
+        const sid = typeof message.sid === "string" ? message.sid : undefined;
 
         if (typeof requestId !== "number" || typeof method !== "string" || !Array.isArray(dataPayload) || typeof timestamp !== "number") {
             return {
                 isValid: false,
                 requestId,
                 method,
-                acc,
+                sid,
                 timestamp,
                 error: "Invalid 'res' payload structure or types.",
             };
@@ -130,7 +116,7 @@ export class NitroliteRPC {
                     isValid: false,
                     requestId,
                     method,
-                    acc,
+                    sid,
                     timestamp,
                     error: "Malformed error response payload.",
                 };
@@ -145,8 +131,7 @@ export class NitroliteRPC {
             requestId: requestId,
             method: method,
             data: data,
-            acc: acc,
-            int: int,
+            sid: sid,
             timestamp: timestamp,
         };
     }

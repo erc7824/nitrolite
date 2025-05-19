@@ -12,6 +12,7 @@ import {
     createCloseAppSessionMessage,
     createApplicationMessage,
     createCloseChannelMessage,
+    createGetChannelsMessage,
 } from "../../src/rpc/api";
 import { CreateAppSessionRequest, MessageSigner } from "../../src/rpc/types";
 
@@ -92,7 +93,7 @@ describe("API message creators", () => {
     });
 
     test("createGetConfigMessage", async () => {
-        const msgStr = await createGetConfigMessage(signer, channelId, requestId, timestamp);
+        const msgStr = await createGetConfigMessage(signer, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, "get_config", [], timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
@@ -102,8 +103,9 @@ describe("API message creators", () => {
     });
 
     test("createGetLedgerBalancesMessage", async () => {
-        const ledgerParams = [{ acc: channelId }];
-        const msgStr = await createGetLedgerBalancesMessage(signer, channelId, requestId, timestamp);
+        const participant = "0x01231241241241" as Address;
+        const ledgerParams = [{ participant }];
+        const msgStr = await createGetLedgerBalancesMessage(signer, participant, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, "get_ledger_balances", ledgerParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
@@ -113,7 +115,7 @@ describe("API message creators", () => {
     });
 
     test("createGetAppDefinitionMessage", async () => {
-        const appParams = [{ acc: appId }];
+        const appParams = [{ app_session_id: appId }];
         const msgStr = await createGetAppDefinitionMessage(signer, appId, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, "get_app_definition", appParams, timestamp]);
         const parsed = JSON.parse(msgStr);
@@ -134,31 +136,38 @@ describe("API message creators", () => {
                     challenge: 0,
                     nonce: 0,
                 },
-                token: "0x",
-                // @ts-ignore
-                allocation: [100, 0],
+                allocations: [
+                    {
+                        participant: "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
+                        asset: "usdc",
+                        amount: "0.0",
+                    },
+                    {
+                        participant: "0x00112233445566778899AaBbCcDdEeFf00112233",
+                        asset: "usdc",
+                        amount: "200.0",
+                    },
+                ],
             },
         ];
         // @ts-ignore
-        const msgStr = await createAppSessionMessage(signer, params, sampleIntent, requestId, timestamp);
+        const msgStr = await createAppSessionMessage(signer, params, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, "create_app_session", params, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, "create_app_session", params, timestamp],
-            int: sampleIntent,
             sig: ["0xsig"],
         });
     });
 
     test("createCloseAppSessionMessage", async () => {
-        const closeParams = [{ appId, allocation: [] }];
+        const closeParams = [{ app_session_id: appId, allocation: [] }];
         // @ts-ignore
-        const msgStr = await createCloseAppSessionMessage(signer, closeParams, sampleIntent, requestId, timestamp);
+        const msgStr = await createCloseAppSessionMessage(signer, closeParams, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, "close_app_session", closeParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, "close_app_session", closeParams, timestamp],
-            int: sampleIntent,
             sig: ["0xsig"],
         });
     });
@@ -170,7 +179,7 @@ describe("API message creators", () => {
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, "message", messageParams, timestamp],
-            acc: appId,
+            sid: appId,
             sig: ["0xsig"],
         });
     });
@@ -181,6 +190,16 @@ describe("API message creators", () => {
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, "close_channel", [{ channel_id: channelId, funds_destination: fundDestination }], timestamp],
+            sig: ["0xsig"],
+        });
+    });
+
+    test("createGetChannelsMessage", async () => {
+        const msgStr = await createGetChannelsMessage(signer, "0x0123124124124131", requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, "get_channels", [{ participant: "0x0123124124124131" }], timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, "get_channels", [{ participant: "0x0123124124124131" }], timestamp],
             sig: ["0xsig"],
         });
     });

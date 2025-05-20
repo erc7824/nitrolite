@@ -1,0 +1,94 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  height: 100%;
+}
+
+/* Enhanced Glowing X and O elements */
+.cell-x {
+  text-shadow: 0 0 10px #00e5ff, 0 0 20px #00e5ff50, 0 0 30px #00e5ff30;
+  position: relative;
+}
+
+.cell-o {
+  text-shadow: 0 0 10px #ff49e1, 0 0 20px #ff49e150, 0 0 30px #ff49e130;
+  position: relative;
+}
+
+/* Cell with X - before/after decorations */
+.cell-x::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 8px;
+  background: radial-gradient(circle at center, rgba(0, 229, 255, 0.2) 0%, transparent 70%);
+  opacity: 0.5;
+  z-index: -1;
+}
+
+/* Cell with O - before/after decorations */
+.cell-o::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 8px;
+  background: radial-gradient(circle at center, rgba(255, 73, 225, 0.2) 0%, transparent 70%);
+  opacity: 0.5;
+  z-index: -1;
+}
+
+/* Particle effects for cells */
+.cell-x::after,
+.cell-o::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-image: radial-gradient(circle, #ffffff 1px, transparent 1px);
+  background-size: 16px 16px;
+  opacity: 0.05;
+  mix-blend-mode: screen;
+  animation: float 8s infinite linear;
+  pointer-events: none;
+}
+
+@keyframes float {
+  0% { background-position: 0 0; }
+  100% { background-position: 100px 100px; }
+}
+
+/* Improved pulse animation for cells */
+@keyframes pulse-cyan {
+  0% { box-shadow: 0 0 10px rgba(0, 229, 255, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(0, 229, 255, 0.7), 0 0 30px rgba(0, 229, 255, 0.3); }
+  100% { box-shadow: 0 0 10px rgba(0, 229, 255, 0.5); }
+}
+
+@keyframes pulse-magenta {
+  0% { box-shadow: 0 0 10px rgba(255, 73, 225, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(255, 73, 225, 0.7), 0 0 30px rgba(255, 73, 225, 0.3); }
+  100% { box-shadow: 0 0 10px rgba(255, 73, 225, 0.5); }
+}
+
+/* Line growth animation */
+@keyframes lineGrow {
+  0% {
+    width: 0;
+    opacity: 0.8;
+  }
+  100% {
+    width: 50px;
+    opacity: 0;
+  }
+}
+
+/* Fade out animation */
+@keyframes fadeOut {
+  0% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+  }
+}

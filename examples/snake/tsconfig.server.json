@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist-server",
+    "noEmit": false,
+    "isolatedModules": false
+  },
+  "include": ["server/**/*"],
+  "exclude": ["node_modules"]
+}

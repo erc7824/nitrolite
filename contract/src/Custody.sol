@@ -454,9 +454,8 @@ contract Custody is IChannel, IDeposit {
     }
 
     function _transfer(address token, address to, uint256 amount) internal {
-        bool success;
         if (token == address(0)) {
-            (success,) = to.call{value: amount}("");
+            (bool success,) = to.call{value: amount}("");
             if (!success) revert TransferFailed(token, to, amount);
         } else {
             IERC20(token).safeTransfer(to, amount);

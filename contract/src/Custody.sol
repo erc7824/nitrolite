@@ -91,8 +91,7 @@ contract Custody is IChannel, IDeposit {
         if (token == address(0)) {
             if (msg.value != amount) revert InvalidAmount();
         } else {
-            bool success = IERC20(token).transferFrom(account, address(this), amount);
-            if (!success) revert TransferFailed(token, address(this), amount);
+            IERC20(token).safeTransferFrom(account, address(this), amount);
         }
         _ledgers[msg.sender].tokens[token] += amount;
     }
@@ -199,8 +198,7 @@ contract Custody is IChannel, IDeposit {
 
         // Verify signature on funding stateHash
         bytes32 stateHash = Utils.getStateHash(meta.chan, meta.lastValidState);
-        bool validSig = Utils.verifySignature(stateHash, sig, participant);
-        if (!validSig) revert InvalidStateSignatures();
+        if (!Utils.verifySignature(stateHash, sig, participant)) revert InvalidStateSignatures();
 
         // NOTE: lock SENDER's funds according to expected deposit
         Amount memory expectedDeposit = meta.expectedDeposits[index];
@@ -459,10 +457,10 @@ contract Custody is IChannel, IDeposit {
         bool success;
         if (token == address(0)) {
             (success,) = to.call{value: amount}("");
+            if (!success) revert TransferFailed(token, to, amount);
         } else {
-            success = IERC20(token).transfer(to, amount);
+            IERC20(token).safeTransfer(to, amount);
         }
-        if (!success) revert TransferFailed(token, to, amount);
     }
 
     /**

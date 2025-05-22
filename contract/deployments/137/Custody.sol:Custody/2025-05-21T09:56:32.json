@@ -1,0 +1,11 @@
+{
+  "deployer": "0xcfdc977a4b75b77e47a80c0d2b2ab7ade72abd2b",
+  "deployedTo": "0x3b21e4a6aB2eb42cE2918B1C7E63BA0c9915B34E",
+  "transactionHash": "0x231acafdad502d14f152a5ffb2bed32253badf19aaac459e1d2a9210c62e1532",
+  "commit": "b88581ad65aa0b27066a4ae0c4ddaa1644bec057",
+  "timestamp": 1747821392,
+  "chainId": 137,
+  "contractPath": "./src/Custody.sol:Custody",
+  "constructorArgs": [],
+  "comment": "PROD"
+}

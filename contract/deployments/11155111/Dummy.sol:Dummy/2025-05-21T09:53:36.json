@@ -1,0 +1,11 @@
+{
+  "deployer": "0xcfdc977a4b75b77e47a80c0d2b2ab7ade72abd2b",
+  "deployedTo": "0x6D3B5EFa1f81f65037cD842F48E44BcBCa48CBEF",
+  "transactionHash": "0xc68f9cecf94a380b6b217c20c89829f91e47502ca2f9e8b0df7a9f2c17c68073",
+  "commit": "b88581ad65aa0b27066a4ae0c4ddaa1644bec057",
+  "timestamp": 1747821216,
+  "chainId": 11155111,
+  "contractPath": "./src/adjudicators/Dummy.sol:Dummy",
+  "constructorArgs": [],
+  "comment": "UAT"
+}

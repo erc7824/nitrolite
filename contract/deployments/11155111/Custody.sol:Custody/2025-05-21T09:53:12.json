@@ -1,0 +1,11 @@
+{
+  "deployer": "0xcfdc977a4b75b77e47a80c0d2b2ab7ade72abd2b",
+  "deployedTo": "0xa3f2f64455c9f8D68d9dCAeC2605D64680FaF898",
+  "transactionHash": "0x6a279ad20e8575db9e419bf10249f114d8240753027e4587c2565c8cc557b1e8",
+  "commit": "b88581ad65aa0b27066a4ae0c4ddaa1644bec057",
+  "timestamp": 1747821192,
+  "chainId": 11155111,
+  "contractPath": "./src/Custody.sol:Custody",
+  "constructorArgs": [],
+  "comment": "UAT"
+}

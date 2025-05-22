@@ -38,7 +38,6 @@ export class NitroliteClient {
         if (!config.publicClient) throw new Errors.MissingParameterError("publicClient");
         if (!config.walletClient) throw new Errors.MissingParameterError("walletClient");
         if (!config.walletClient.account) throw new Errors.MissingParameterError("walletClient.account");
-        if (!config.challengeDuration) throw new Errors.MissingParameterError("challengeDuration");
         if (!config.addresses?.custody) throw new Errors.MissingParameterError("addresses.custody");
         if (!config.addresses?.adjudicator) throw new Errors.MissingParameterError("addresses.adjudicator");
         if (!config.addresses?.guestAddress) throw new Errors.MissingParameterError("addresses.guestAddress");
@@ -51,7 +50,7 @@ export class NitroliteClient {
         this.stateWalletClient = config.stateWalletClient ?? config.walletClient;
         this.account = config.walletClient.account;
         this.addresses = config.addresses;
-        this.challengeDuration = config.challengeDuration;
+        this.challengeDuration = config.challengeDuration || BigInt(0);
         this.chainId = config.chainId;
 
         this.nitroliteService = new NitroliteService(this.publicClient, this.addresses, this.walletClient, this.account);

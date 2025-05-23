@@ -1,0 +1,12 @@
+docs/
+chart/
+scripts/
+
+.dockerignore
+Dockerfile
+.gitignore
+.git/
+.github/
+LICENSE
+
+*.md

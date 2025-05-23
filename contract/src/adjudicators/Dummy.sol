@@ -15,11 +15,7 @@ contract Dummy is IAdjudicator, IComparable {
      * @notice Always validates candidate states as true
      * @dev This implementation accepts any state regardless of content
      */
-    function adjudicate(Channel calldata, State calldata, State[] calldata)
-        external
-        pure
-        returns (bool valid)
-    {
+    function adjudicate(Channel calldata, State calldata, State[] calldata) external pure returns (bool valid) {
         // Always return true regardless of inputs
         return true;
     }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math/big"
 
 	"log"
 	"net"
@@ -18,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gorilla/websocket"
+	"github.com/shopspring/decimal"
 )
 
 // Signer handles signing operations using a private key
@@ -50,6 +52,78 @@ func (m RPCData) MarshalJSON() ([]byte, error) {
 		m.Params,
 		m.Timestamp,
 	})
+}
+
+// AppDefinition represents the definition of an application on the ledger
+type AppDefinition struct {
+	Protocol           string   `json:"protocol"`
+	ParticipantWallets []string `json:"participants"` // Participants from channels with broker
+	Weights            []uint64 `json:"weights"`      // Signature weight for each participant
+	Quorum             uint64   `json:"quorum"`
+	Challenge          uint64   `json:"challenge"`
+	Nonce              uint64   `json:"nonce"`
+}
+
+// CreateAppSessionParams represents parameters needed for virtual app creation
+type CreateAppSessionParams struct {
+	Definition  AppDefinition   `json:"definition"`
+	Allocations []AppAllocation `json:"allocations"`
+}
+
+type AppAllocation struct {
+	ParticipantWallet string          `json:"participant"`
+	AssetSymbol       string          `json:"asset"`
+	Amount            decimal.Decimal `json:"amount"`
+}
+
+type CreateAppSignData struct {
+	RequestID uint64
+	Method    string
+	Params    []CreateAppSessionParams
+	Timestamp uint64
+}
+
+func (r CreateAppSignData) MarshalJSON() ([]byte, error) {
+	arr := []interface{}{r.RequestID, r.Method, r.Params, r.Timestamp}
+	return json.Marshal(arr)
+}
+
+// CloseAppSessionParams represents parameters needed for virtual app closure
+type CloseAppSessionParams struct {
+	AppSessionID string          `json:"app_session_id"`
+	Allocations  []AppAllocation `json:"allocations"`
+}
+
+type CloseAppSignData struct {
+	RequestID uint64
+	Method    string
+	Params    []CloseAppSessionParams
+	Timestamp uint64
+}
+
+func (r CloseAppSignData) MarshalJSON() ([]byte, error) {
+	arr := []interface{}{r.RequestID, r.Method, r.Params, r.Timestamp}
+	return json.Marshal(arr)
+}
+
+// ResizeChannelParams represents parameters needed for resizing a channel
+type ResizeChannelParams struct {
+	ChannelID        string   `json:"channel_id"`
+	AllocateAmount   *big.Int `json:"allocate_amount,omitempty"`
+	ResizeAmount     *big.Int `json:"resize_amount,omitempty"`
+	FundsDestination string   `json:"funds_destination"`
+}
+
+type ResizeChannelSignData struct {
+	RequestID uint64
+	Method    string
+	Params    []ResizeChannelParams
+	Timestamp uint64
+}
+
+func (r ResizeChannelSignData) MarshalJSON() ([]byte, error) {
+	arr := []interface{}{r.RequestID, r.Method, r.Params, r.Timestamp}
+	return json.Marshal(arr)
 }
 
 // NewSigner creates a new signer from a hex-encoded private key
@@ -573,25 +647,106 @@ func main() {
 		Timestamp: uint64(time.Now().UnixMilli()),
 	}
 
-	// Serialize RPC data for signing
-	dataBytes, err := json.Marshal(rpcData)
-	if err != nil {
-		log.Fatalf("Error marshaling RPC data: %v", err)
-	}
-
 	// Initialize signatures with an empty array (not null)
 	signatures := []string{}
 
 	// Only collect signatures if nosign flag is not set
 	if !*noSignFlag {
+		// Depending on the method, we need to use special SignData structures
+		var dataToSign []byte
+		var err error
+
 		// Create a temporary client to collect signatures
 		tempClient := &Client{
 			signers: signers,
 		}
 
+		switch rpcData.Method {
+		case "create_app_session":
+			// Special handling for create_app_session
+			var createParams CreateAppSessionParams
+			paramsJSON, err := json.Marshal(rpcData.Params[0])
+			if err != nil {
+				log.Fatalf("Error marshaling create app session params: %v", err)
+			}
+			if err := json.Unmarshal(paramsJSON, &createParams); err != nil {
+				log.Fatalf("Error unmarshaling create app session params: %v", err)
+			}
+
+			// Create the special sign data structure
+			signData := CreateAppSignData{
+				RequestID: rpcData.RequestID,
+				Method:    rpcData.Method,
+				Params:    []CreateAppSessionParams{createParams},
+				Timestamp: rpcData.Timestamp,
+			}
+
+			// Marshal using the custom MarshalJSON method
+			dataToSign, err = signData.MarshalJSON()
+			if err != nil {
+				log.Fatalf("Error marshaling sign data: %v", err)
+			}
+
+		case "close_app_session":
+			// Special handling for close_app_session
+			var closeParams CloseAppSessionParams
+			paramsJSON, err := json.Marshal(rpcData.Params[0])
+			if err != nil {
+				log.Fatalf("Error marshaling close app session params: %v", err)
+			}
+			if err := json.Unmarshal(paramsJSON, &closeParams); err != nil {
+				log.Fatalf("Error unmarshaling close app session params: %v", err)
+			}
+
+			// Create the special sign data structure
+			signData := CloseAppSignData{
+				RequestID: rpcData.RequestID,
+				Method:    rpcData.Method,
+				Params:    []CloseAppSessionParams{closeParams},
+				Timestamp: rpcData.Timestamp,
+			}
+
+			// Marshal using the custom MarshalJSON method
+			dataToSign, err = signData.MarshalJSON()
+			if err != nil {
+				log.Fatalf("Error marshaling sign data: %v", err)
+			}
+
+		case "resize_channel":
+			// Special handling for resize_channel
+			var resizeParams ResizeChannelParams
+			paramsJSON, err := json.Marshal(rpcData.Params[0])
+			if err != nil {
+				log.Fatalf("Error marshaling resize channel params: %v", err)
+			}
+			if err := json.Unmarshal(paramsJSON, &resizeParams); err != nil {
+				log.Fatalf("Error unmarshaling resize channel params: %v", err)
+			}
+
+			// Create the special sign data structure
+			signData := ResizeChannelSignData{
+				RequestID: rpcData.RequestID,
+				Method:    rpcData.Method,
+				Params:    []ResizeChannelParams{resizeParams},
+				Timestamp: rpcData.Timestamp,
+			}
+
+			// Marshal using the custom MarshalJSON method
+			dataToSign, err = signData.MarshalJSON()
+			if err != nil {
+				log.Fatalf("Error marshaling sign data: %v", err)
+			}
+
+		default:
+			// Standard marshaling for other methods
+			dataToSign, err = json.Marshal(rpcData)
+			if err != nil {
+				log.Fatalf("Error marshaling RPC data: %v", err)
+			}
+		}
+
 		// Collect signatures from all signers
-		var err error
-		signatures, err = tempClient.collectSignatures(dataBytes)
+		signatures, err = tempClient.collectSignatures(dataToSign)
 		if err != nil {
 			log.Fatalf("Error signing data: %v", err)
 		}

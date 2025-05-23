@@ -131,7 +131,7 @@ go run . --method get_config --send --server ws://localhost:8000/ws
 
 ```bash
 # Get balances for the participant
-go run . --method get_ledger_balances --params '[{"participant":"0xParticipantAddress"}]' --send --server ws://localhost:8000/ws
+go run . --method get_ledger_balances --params '[{"account_id":"0x70997970C51812dc3A010C7d01b50e0d17dc79C8"}]' --auth 10 --send --server ws://localhost:8000/ws
 
 # Get detailed ledger entries for a specific account and asset
 go run . --method get_ledger_entries --params '[{"account_id":"0xYourAccountID","asset":"usdc"}]' --send --server ws://localhost:8000/ws
@@ -178,17 +178,25 @@ go run . --method close_channel --params '[{
 go run . --method create_app_session --params '[{
   "definition": {
     "protocol": "NitroRPC/0.2",
-    "participants": ["0xYourAddress", "0xOtherParticipantAddress"],
-    "weights": [50, 50],
+    "participants": ["0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "0xF13EFAA6aEc3301Def39A23B8B15a1a43140191F"],
+    "weights": [100, 0],
     "quorum": 100,
     "challenge": 86400,
     "nonce": 1
   },
   "allocations": [
-    {"participant": "0xYourAddress", "asset": "usdc", "amount": "5.0"},
-    {"participant": "0xOtherParticipantAddress", "asset": "usdc", "amount": "5.0"}
+    {"participant": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "asset": "usd", "amount": "0.000000000000000004"},
+    {"participant": "0xF13EFAA6aEc3301Def39A23B8B15a1a43140191F", "asset": "usd", "amount": "0.0"}
   ]
-}]' --send --server ws://localhost:8000/ws
+}]' --auth 10 --signers 10 --send --server ws://localhost:8000/ws
+
+go run . --method close_app_session --params '[{
+  "app_session_id": "0x2b1843390eef1ed7406826b01fa95135e71ea2266222761ffa2efeaad6b81f84",
+  "allocations": [
+    {"participant": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "asset": "usd", "amount": "0.0"},
+    {"participant": "0xF13EFAA6aEc3301Def39A23B8B15a1a43140191F", "asset": "usd", "amount": "0.000000000000000004"}
+  ]
+}]' --auth 10 --signers 10 --send --server ws://localhost:8000/ws
 
 # Get app session details
 go run . --method get_app_definition --params '[{

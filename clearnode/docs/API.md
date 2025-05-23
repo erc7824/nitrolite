@@ -180,11 +180,16 @@ Retrieves the balances of all participants in a specific ledger account.
 ```json
 {
   "req": [1, "get_ledger_balances", [{
-    "participant": "0x1234567890abcdef..."
+    "participant": "0x1234567890abcdef...", // TO BE DEPRECATED
+    // OR
+    "account_id": "0x1234567890abcdef..."
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
+
+If no params passed, it returns the ledger balance of user's wallet.
+To get balance in a specific virtual app session, specify `app_session_id` as account_id.
 
 **Response:**
 

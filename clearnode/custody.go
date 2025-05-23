@@ -25,15 +25,16 @@ var (
 
 // Custody implements the BlockchainClient interface using the Custody contract
 type Custody struct {
-	client            *ethclient.Client
-	custody           *nitrolite.Custody
-	db                *gorm.DB
-	custodyAddr       common.Address
-	transactOpts      *bind.TransactOpts
-	chainID           uint32
-	signer            *Signer
-	sendBalanceUpdate func(string)
-	sendChannelUpdate func(Channel)
+	client                *ethclient.Client
+	custody               *nitrolite.Custody
+	db                    *gorm.DB
+	custodyAddr           common.Address
+	transactOpts          *bind.TransactOpts
+	chainID               uint32
+	signer                *Signer
+	supportedAdjudicators []string
+	sendBalanceUpdate     func(string)
+	sendChannelUpdate     func(Channel)
 }
 
 // NewCustody initializes the Ethereum client and custody contract wrapper.
@@ -63,15 +64,16 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 	}
 
 	return &Custody{
-		client:            client,
-		custody:           custody,
-		db:                db,
-		custodyAddr:       custodyAddress,
-		transactOpts:      auth,
-		chainID:           uint32(chainID.Int64()),
-		signer:            signer,
-		sendBalanceUpdate: sendBalanceUpdate,
-		sendChannelUpdate: sendChannelUpdate,
+		client:                client,
+		custody:               custody,
+		db:                    db,
+		custodyAddr:           custodyAddress,
+		transactOpts:          auth,
+		chainID:               uint32(chainID.Int64()),
+		signer:                signer,
+		supportedAdjudicators: []string{}, // TODO: add config
+		sendBalanceUpdate:     sendBalanceUpdate,
+		sendChannelUpdate:     sendChannelUpdate,
 	}, nil
 }
 
@@ -129,20 +131,47 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			return
 		}
 
-		participantA := ev.Channel.Participants[0].Hex()
+		wallet := ev.Wallet.Hex()
+		participantSigner := ev.Channel.Participants[0].Hex()
 		nonce := ev.Channel.Nonce
-		participantB := ev.Channel.Participants[1]
+		broker := ev.Channel.Participants[1]
 		tokenAddress := ev.Initial.Allocations[0].Token.Hex()
 		tokenAmount := ev.Initial.Allocations[0].Amount.Int64()
+		adjudictor := ev.Channel.Adjudicator.Hex()
+		challenge := ev.Channel.Challenge
+
+		brokerAmount := ev.Initial.Allocations[1].Amount.Int64()
+		if brokerAmount != 0 {
+			log.Printf("[Created] Error: broker amount should be 0, got %d\n", brokerAmount)
+			return
+		}
+
+		if challenge < 3600 {
+			log.Printf("[Created] Error: invalid challenge period: %d\n", challenge)
+			return
+		}
+
+		found := false
+		for _, a := range c.supportedAdjudicators {
+			if a == adjudictor {
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Printf("[Created] Error: unsupported adjudicator %s\n", adjudictor)
+			// TODO: uncomment return after supported adjudicators are configured
+			// return
+		}
 
 		// Check if channel was created with the broker.
-		if participantB != c.signer.GetAddress() {
-			log.Printf("participantB %s is not Broker %s\n", participantB, c.signer.GetAddress().Hex())
+		if broker != c.signer.GetAddress() {
+			log.Printf("participantB %s is not Broker %s\n", broker, c.signer.GetAddress().Hex())
 			return
 		}
 
 		// Check if there is already existing open channel with the broker
-		existingOpenChannel, err := CheckExistingChannels(c.db, participantA, tokenAddress, c.chainID)
+		existingOpenChannel, err := CheckExistingChannels(c.db, participantSigner, tokenAddress, c.chainID)
 		if err != nil {
 			log.Printf("[Created] Error checking channels in database: %v", err)
 			return
@@ -153,13 +182,21 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			return
 		}
 
+		err = AddSigner(c.db, wallet, participantSigner)
+		if err != nil {
+			log.Printf("[Created] Error recording signer in database: %v", err)
+			return
+		}
+
 		channelID := common.BytesToHash(ev.ChannelId[:]).Hex()
 		ch, err := CreateChannel(
 			c.db,
 			channelID,
-			participantA,
+			wallet,
+			participantSigner,
 			nonce,
-			ev.Channel.Adjudicator.Hex(),
+			challenge,
+			adjudictor,
 			c.chainID,
 			tokenAddress,
 			uint64(tokenAmount),
@@ -222,19 +259,19 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 
 			tokenAmount := decimal.NewFromBigInt(big.NewInt(int64(channel.Amount)), -int32(asset.Decimals))
 
-			ledger := GetParticipantLedger(tx, channel.Participant)
-			if err := ledger.Record(channel.Participant, asset.Symbol, tokenAmount); err != nil {
-				log.Printf("[Joined] Error recording balance update for participant A: %v", err)
+			ledger := GetWalletLedger(tx, channel.Wallet)
+			if err := ledger.Record(channel.Wallet, asset.Symbol, tokenAmount); err != nil {
+				log.Printf("[Joined] Error recording balance update for wallet: %v", err)
 				return err
 			}
 
 			return nil
 		})
 		if err != nil {
-			log.Printf("[Joined] Error closing channel in database: %v", err)
+			log.Printf("[Joined] Error joining: %v", err)
 			return
 		}
-		c.sendBalanceUpdate(channel.Participant)
+		c.sendBalanceUpdate(channel.Wallet)
 		c.sendChannelUpdate(channel)
 
 	case custodyAbi.Events["Closed"].ID:
@@ -267,8 +304,8 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 
 			tokenAmount := decimal.NewFromBigInt(big.NewInt(int64(channel.Amount)), -int32(asset.Decimals))
 
-			ledger := GetParticipantLedger(tx, channel.Participant)
-			if err := ledger.Record(channel.Participant, asset.Symbol, tokenAmount.Neg()); err != nil {
+			ledger := GetWalletLedger(tx, channel.Wallet)
+			if err := ledger.Record(channel.Wallet, asset.Symbol, tokenAmount.Neg()); err != nil {
 				log.Printf("[Closed] Error recording balance update for participant: %v", err)
 				return err
 			}
@@ -290,7 +327,7 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			log.Printf("[Closed] Error closing channel: %v", err)
 			return
 		}
-		c.sendBalanceUpdate(channel.Participant)
+		c.sendBalanceUpdate(channel.Wallet)
 		c.sendChannelUpdate(channel)
 
 	case custodyAbi.Events["Resized"].ID:
@@ -333,8 +370,8 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 				}
 
 				amount := decimal.NewFromBigInt(resizeAmount, -int32(asset.Decimals))
-				ledger := GetParticipantLedger(tx, channel.Participant)
-				if err := ledger.Record(channel.Participant, asset.Symbol, amount); err != nil {
+				ledger := GetWalletLedger(tx, channel.Wallet)
+				if err := ledger.Record(channel.Wallet, asset.Symbol, amount); err != nil {
 					log.Printf("[Resized] Error recording balance update for participant: %v", err)
 					return err
 				}
@@ -348,7 +385,7 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			return
 		}
 
-		c.sendBalanceUpdate(channel.Participant)
+		c.sendBalanceUpdate(channel.Wallet)
 		c.sendChannelUpdate(channel)
 	default:
 		log.Println("Unknown event ID:", eventID.Hex())

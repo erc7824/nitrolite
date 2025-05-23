@@ -27,6 +27,11 @@ func main() {
 		log.Fatalf("Failed to setup database: %v", err)
 	}
 
+	err = loadWalletCache(db)
+	if err != nil {
+		log.Fatalf("Failed to load wallet cache: %v", err)
+	}
+
 	signer, err := NewSigner(config.privateKeyHex)
 	if err != nil {
 		log.Fatalf("failed to initialise signer: %v", err)

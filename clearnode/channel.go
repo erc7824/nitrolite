@@ -23,6 +23,7 @@ type Channel struct {
 	ChannelID   string        `gorm:"column:channel_id;primaryKey;"`
 	ChainID     uint32        `gorm:"column:chain_id;not null"`
 	Token       string        `gorm:"column:token;not null"`
+	Wallet      string        `gorm:"column:wallet;not null"`
 	Participant string        `gorm:"column:participant;not null"`
 	Amount      uint64        `gorm:"column:amount;not null"`
 	Status      ChannelStatus `gorm:"column:status;not null;"`
@@ -41,14 +42,16 @@ func (Channel) TableName() string {
 
 // CreateChannel creates a new channel in the database
 // For real channels, participantB is always the broker application
-func CreateChannel(tx *gorm.DB, channelID, participantA string, nonce uint64, adjudicator string, chainID uint32, tokenAddress string, amount uint64) (Channel, error) {
+func CreateChannel(tx *gorm.DB, channelID, wallet, participantSigner string, nonce uint64, challenge uint64, adjudicator string, chainID uint32, tokenAddress string, amount uint64) (Channel, error) {
 	channel := Channel{
 		ChannelID:   channelID,
-		Participant: participantA,
+		Wallet:      wallet,
+		Participant: participantSigner,
 		ChainID:     chainID, // Set the network ID for channels
 		Status:      ChannelStatusJoining,
 		Nonce:       nonce,
 		Adjudicator: adjudicator,
+		Challenge:   challenge,
 		Token:       tokenAddress,
 		Amount:      amount,
 		CreatedAt:   time.Now(),
@@ -76,25 +79,25 @@ func GetChannelByID(tx *gorm.DB, channelID string) (*Channel, error) {
 	return &channel, nil
 }
 
-// getChannelsByParticipant finds all channels for a participant
-func getChannelsByParticipant(tx *gorm.DB, participant string, status string) ([]Channel, error) {
+// getChannelsByWallet finds all channels for a wallet
+func getChannelsByWallet(tx *gorm.DB, wallet string, status string) ([]Channel, error) {
 	var channels []Channel
-	q := tx.Where("participant = ?", participant)
+	q := tx.Where("wallet = ?", wallet)
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}
 
 	if err := q.Order("created_at DESC").Find(&channels).Error; err != nil {
-		return nil, fmt.Errorf("error finding channels for participant %s: %w", participant, err)
+		return nil, fmt.Errorf("error finding channels for a wallet %s: %w", wallet, err)
 	}
 
 	return channels, nil
 }
 
 // CheckExistingChannels checks if there is an existing open channel on the same network between participant and broker
-func CheckExistingChannels(tx *gorm.DB, participantA, token string, chainID uint32) (*Channel, error) {
+func CheckExistingChannels(tx *gorm.DB, wallet, token string, chainID uint32) (*Channel, error) {
 	var channel Channel
-	err := tx.Where("participant = ? AND token = ? AND chain_id = ? AND status = ?", participantA, token, chainID, ChannelStatusOpen).
+	err := tx.Where("wallet = ? AND token = ? AND chain_id = ? AND status = ?", wallet, token, chainID, ChannelStatusOpen).
 		First(&channel).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

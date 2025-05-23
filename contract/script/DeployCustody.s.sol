@@ -2,18 +2,18 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Custody} from "../src/Custody.sol";
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
-contract CustodyScript is Script {
+import {Custody} from "../src/Custody.sol";
+import {Channel, State, Allocation, Signature, ChannelStatus, StateIntent, Amount} from "../src/interfaces/Types.sol";
+
+contract DeployCustodyScript is Script {
     Custody public custody;
 
     function setUp() public {}
 
     function run() public {
-        vm.startBroadcast();
-
+        vm.broadcast();
         custody = new Custody();
-
-        vm.stopBroadcast();
     }
 }

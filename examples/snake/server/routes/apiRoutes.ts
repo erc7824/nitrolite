@@ -1,19 +1,19 @@
 import { Express, RequestHandler } from 'express';
 import { ethers } from 'ethers';
 import { randomBytes } from 'crypto';
-import { SERVER_PRIVATE_KEY, CONTRACT_ADDRESSES } from '../config';
-import { getRoom, getAllRooms } from '../services/stateService';
-import { clearNetRPC } from '../services/gameService';
+import { SERVER_PRIVATE_KEY, CONTRACT_ADDRESSES } from '../config/index.ts';
+import { getRoom, getAllRooms } from '../services/stateService.ts';
+import { clearNetRPC } from '../services/gameService.ts';
 import {
   signStateData,
   verifySignature,
   isAuthenticatedWithBroker
-} from '../services/brokerService';
+} from '../services/brokerService.ts';
 import {
   generateChallenge,
   verifyChallengeSignature
-} from '../middlewares/authMiddleware';
-import { Room } from '../interfaces';
+} from '../middlewares/authMiddleware.ts';
+import { Room } from '../interfaces/index.ts';
 import { Hex } from 'viem';
 
 // Setup API routes for the Express app

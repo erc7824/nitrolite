@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { verifySignature } from '../services/brokerService';
+import { verifySignature } from '../services/brokerService.ts';
 
 // Simple challenge store - in production, this should use a proper database or Redis
 const challenges = new Map<string, { challenge: string, timestamp: number }>();

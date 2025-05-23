@@ -2,8 +2,12 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist-server",
-    "noEmit": false,
-    "isolatedModules": false
+    "target": "ES2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
   "include": ["server/**/*"],
   "exclude": ["node_modules"]

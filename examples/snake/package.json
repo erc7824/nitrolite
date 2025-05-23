@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "server": "npx tsx server/server.ts",
     "build:server": "tsc -p tsconfig.server.json",
-    "start:server": "node dist-server/server/server.js"
+    "start:server": "node dist-server/server.js"
   },
   "dependencies": {
     "@erc7824/nitrolite": "^0.1.3",

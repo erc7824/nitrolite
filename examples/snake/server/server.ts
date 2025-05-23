@@ -21,10 +21,10 @@ const wss = new WebSocketServer({ server });
 export { server, wss };
 
 // Import after exports to avoid circular dependencies
-import { connectToBroker } from './services/brokerService';
-import { setupWebSocketHandlers } from './services/websocketService';
-import { setupApiRoutes } from './routes/apiRoutes';
-import { gracefulShutdown } from './utils/shutdown';
+import { connectToBroker } from './services/brokerService.ts';
+import { setupWebSocketHandlers } from './services/websocketService.ts';
+import { setupApiRoutes } from './routes/apiRoutes.ts';
+import { gracefulShutdown } from './utils/shutdown.ts';
 
 // Setup API routes
 setupApiRoutes(app);

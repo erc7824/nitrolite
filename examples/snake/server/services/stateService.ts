@@ -1,5 +1,5 @@
 import { WebSocket } from 'ws';
-import { Room, PendingRequest } from '../interfaces';
+import { Room, PendingRequest } from '../interfaces/index.ts';
 
 // Global state
 export const rooms = new Map<string, Room>();

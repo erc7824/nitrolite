@@ -1,4 +1,4 @@
-import { WebSocket } from "ws";
+import WebSocket from "ws";
 import { ethers } from "ethers";
 import {
     createAuthRequestMessage,
@@ -14,8 +14,8 @@ import {
     CreateAppSessionRequest,
     CloseAppSessionRequest,
 } from "@erc7824/nitrolite";
-import { BROKER_WS_URL, CONTRACT_ADDRESSES, POLYGON_RPC_URL, WALLET_PRIVATE_KEY } from "../config";
-import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService";
+import { BROKER_WS_URL, CONTRACT_ADDRESSES, POLYGON_RPC_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
+import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
 import { Hex, createWalletClient, createPublicClient, http } from "viem";
 import { polygon } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
@@ -171,7 +171,7 @@ async function authenticateWithBroker(): Promise<void> {
         };
 
         // Create a one-time message handler for authentication
-        const authMessageHandler = async (data: WebSocket.Data) => {
+        const authMessageHandler = async (data: WebSocket.RawData) => {
             try {
                 const message = JSON.parse(data.toString());
                 console.log("Auth process message received:", message);

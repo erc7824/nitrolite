@@ -107,6 +107,8 @@ contract Custody is IChannel, IDeposit {
         if (token != address(0)) {
             IERC20(token).safeTransferFrom(account, address(this), amount);
         }
+
+        emit Deposited(account, token, amount);
     }
 
     function withdraw(address token, uint256 amount) external {
@@ -118,6 +120,8 @@ contract Custody is IChannel, IDeposit {
         ledger.tokens[token] -= amount;
 
         _transfer(token, account, amount);
+
+        emit Withdrawn(account, token, amount);
     }
 
     /**

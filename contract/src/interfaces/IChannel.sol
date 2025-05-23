@@ -12,10 +12,11 @@ interface IChannel {
     /**
      * @notice Emitted when a new channel is created
      * @param channelId Unique identifier for the channel
+     * @param wallet Account that created the channel and supplied the funds
      * @param channel Channel configuration including participants and adjudicator
      * @param initial Initial state that the channel is opened with
      */
-    event Created(bytes32 indexed channelId, Channel channel, State initial);
+    event Created(bytes32 indexed channelId, address indexed wallet, Channel channel, State initial);
 
     /**
      * @notice Emitted when a participant joins a channel

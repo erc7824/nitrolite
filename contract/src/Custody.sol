@@ -46,7 +46,7 @@ contract Custody is IChannel, IDeposit {
     struct Metadata {
         Channel chan; // Opener define channel configuration
         ChannelStatus stage;
-        address creator;
+        address wallet;
         // Fixed arrays for exactly 2 participants (CLIENT and SERVER)
         // TODO: store `uint256` instead of `Amount`, as tokens are the same
         Amount[2] expectedDeposits; // CLIENT defines Token per participant
@@ -100,7 +100,7 @@ contract Custody is IChannel, IDeposit {
             if (msg.value != 0) revert InvalidValue();
         }
 
-        _ledgers[msg.sender].tokens[token] += amount;
+        _ledgers[account].tokens[token] += amount;
 
         if (token != address(0)) {
             IERC20(token).safeTransferFrom(account, address(this), amount);
@@ -156,11 +156,11 @@ contract Custody is IChannel, IDeposit {
         // NOTE: even if there is not allocation planned, it should be present as `Allocation{address(0), 0}`
         if (initial.allocations.length != PART_NUM) revert InvalidAllocations();
 
-        // Initialize channel metadata
+        address wallet = msg.sender;
         Metadata storage meta = _channels[channelId];
         meta.chan = ch;
         meta.stage = ChannelStatus.INITIAL;
-        meta.creator = msg.sender;
+        meta.wallet =wallet;
         meta.lastValidState = initial;
 
         // NOTE: allocations MUST come in the same order as participants in deposit
@@ -173,12 +173,12 @@ contract Custody is IChannel, IDeposit {
             meta.actualDeposits[i] = Amount({token: address(0), amount: 0}); // Initialize actual deposits to zero
         }
 
-        // NOTE: it is allowed for depositor (and msg.sender) to be different from channel creator (participant)
+        // NOTE: it is allowed for depositor (and wallet) to be different from channel creator (participant)
         // This enables logic of "session keys" where a user can create a channel on behalf of another account, but will lock their own funds
-        // if (ch.participants[CLIENT_IDX]; != msg.sender) revert InvalidParticipant();
+        // if (ch.participants[CLIENT_IDX]; != wallet) revert InvalidParticipant();
 
         Amount memory creatorDeposit = meta.expectedDeposits[CLIENT_IDX];
-        _lockAccountFundsToChannel(msg.sender, channelId, creatorDeposit.token, creatorDeposit.amount);
+        _lockAccountFundsToChannel(wallet, channelId, creatorDeposit.token, creatorDeposit.amount);
 
         // Record actual deposit
         meta.actualDeposits[CLIENT_IDX] = creatorDeposit;
@@ -187,7 +187,7 @@ contract Custody is IChannel, IDeposit {
         _ledgers[ch.participants[CLIENT_IDX]].channels.add(channelId);
 
         // Emit event
-        emit Created(channelId, ch, initial);
+        emit Created(channelId, wallet, ch, initial);
 
         return channelId;
     }

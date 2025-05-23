@@ -296,7 +296,7 @@ contract Custody is IChannel, IDeposit {
         // Mark channel as closed by removing it
         delete _channels[channelId];
 
-        emit Closed(channelId);
+        emit Closed(channelId, candidate);
     }
 
     /**

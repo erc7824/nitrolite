@@ -53,8 +53,9 @@ interface IChannel {
     /**
      * @notice Emitted when a channel is closed and funds are distributed
      * @param channelId Unique identifier for the channel
+     * @param finalState The state the channel is closed with
      */
-    event Closed(bytes32 indexed channelId);
+    event Closed(bytes32 indexed channelId, State finalState);
 
     /**
      * @notice Creates a new channel and initializes funding

@@ -90,8 +90,8 @@ export interface NitroliteClientConfig {
     /** Chain ID for the channel */
     chainId: number;
 
-    /** Optional: Default challenge duration (in seconds) for new channels. Defaults to 0 if omitted. */
-    challengeDuration?: bigint;
+    /** Default challenge duration (in seconds) for new channels. */
+    challengeDuration: bigint;
 }
 
 /**

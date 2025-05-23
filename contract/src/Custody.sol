@@ -42,6 +42,8 @@ contract Custody is IChannel, IDeposit {
     uint256 constant CLIENT_IDX = 0; // Participant index for the channel creator
     uint256 constant SERVER_IDX = 1; // Participant index for the server in clearnet context
 
+    uint256 constant MIN_CHALLENGE_PERIOD = 1 hours;
+
     // Recommended structure to keep track of states
     struct Metadata {
         Channel chan; // Opener define channel configuration
@@ -133,7 +135,7 @@ contract Custody is IChannel, IDeposit {
                 ch.participants[CLIENT_IDX] == ch.participants[SERVER_IDX]
         ) revert InvalidParticipant();
         if (ch.adjudicator == address(0)) revert InvalidAdjudicator();
-        if (ch.challenge == 0) revert InvalidChallengePeriod();
+        if (ch.challenge < MIN_CHALLENGE_PERIOD) revert InvalidChallengePeriod();
 
         // TODO: replace with `require(...)`
         if (initial.intent != StateIntent.INITIALIZE) revert InvalidState();

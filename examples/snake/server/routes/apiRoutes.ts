@@ -10,7 +10,6 @@ import {
   isAuthenticatedWithBroker
 } from '../services/brokerService';
 import {
-  requireAuth,
   generateChallenge,
   verifyChallengeSignature
 } from '../middlewares/authMiddleware';
@@ -284,17 +283,4 @@ export function setupApiRoutes(app: Express): void {
       res.status(500).json({ error: 'Failed to verify authentication' });
     }
   }) as RequestHandler);
-
-  // Protected route example that requires authentication
-  app.get('/api/protected/user-info', requireAuth, (req, res) => {
-    // The middleware adds the authenticated address to the request
-    const address = (req as any).authenticatedAddress;
-
-    res.json({
-      success: true,
-      address,
-      authenticatedAt: Date.now(),
-      // In a real implementation, fetch and return user data from a database
-    });
-  });
 }

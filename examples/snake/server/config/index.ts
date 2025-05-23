@@ -1,10 +1,10 @@
 import { ContractAddresses } from "@erc7824/nitrolite";
 import { Hex } from "viem";
 
-export const BROKER_WS_URL = process.env.BROKER_WS_URL;
+export const BROKER_WS_URL = process.env.BROKER_WS_URL as string;
 export const SERVER_PRIVATE_KEY = process.env.SERVER_PRIVATE_KEY as Hex;
 export const WALLET_PRIVATE_KEY = process.env.WALLET_PRIVATE_KEY as Hex;
-export const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL;
+export const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL as string;
 
 // Contract addresses
 export const CONTRACT_ADDRESSES: ContractAddresses = {

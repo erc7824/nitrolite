@@ -36,7 +36,7 @@ func setupTestSqlite(t testing.TB) *gorm.DB {
 	require.NoError(t, err)
 
 	// Auto migrate all required models
-	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{})
+	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{})
 	require.NoError(t, err)
 
 	return db
@@ -165,24 +165,24 @@ func TestHandleCloseVirtualApp(t *testing.T) {
 	// Create a virtual app
 	vAppID := "0xVApp123"
 	require.NoError(t, db.Create(&AppSession{
-		SessionID:    vAppID,
-		Participants: []string{participantA, participantB},
-		Status:       ChannelStatusOpen,
-		Challenge:    60,
-		Weights:      []int64{100, 0},
-		Quorum:       100,
+		SessionID:          vAppID,
+		ParticipantWallets: []string{participantA, participantB},
+		Status:             ChannelStatusOpen,
+		Challenge:          60,
+		Weights:            []int64{100, 0},
+		Quorum:             100,
 	}).Error)
 
 	assetSymbol := "usdc"
 
-	require.NoError(t, GetParticipantLedger(db, participantA).Record(vAppID, assetSymbol, decimal.NewFromInt(200)))
-	require.NoError(t, GetParticipantLedger(db, participantB).Record(vAppID, assetSymbol, decimal.NewFromInt(300)))
+	require.NoError(t, GetWalletLedger(db, participantA).Record(vAppID, assetSymbol, decimal.NewFromInt(200)))
+	require.NoError(t, GetWalletLedger(db, participantB).Record(vAppID, assetSymbol, decimal.NewFromInt(300)))
 
 	closeParams := CloseAppSessionParams{
 		AppSessionID: vAppID,
 		Allocations: []AppAllocation{
-			{Participant: participantA, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
-			{Participant: participantB, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+			{ParticipantWallet: participantA, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+			{ParticipantWallet: participantB, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
 		},
 	}
 
@@ -215,14 +215,14 @@ func TestHandleCloseVirtualApp(t *testing.T) {
 	assert.Equal(t, ChannelStatusClosed, updated.Status)
 
 	// Check that funds were transferred back to channels according to allocations
-	balA, _ := GetParticipantLedger(db, participantA).Balance(participantA, "usdc")
-	balB, _ := GetParticipantLedger(db, participantB).Balance(participantB, "usdc")
+	balA, _ := GetWalletLedger(db, participantA).Balance(participantA, "usdc")
+	balB, _ := GetWalletLedger(db, participantB).Balance(participantB, "usdc")
 	assert.Equal(t, decimal.NewFromInt(250), balA)
 	assert.Equal(t, decimal.NewFromInt(250), balB)
 
 	// ► v-app accounts drained
-	vBalA, _ := GetParticipantLedger(db, participantA).Balance(vAppID, "usdc")
-	vBalB, _ := GetParticipantLedger(db, participantB).Balance(vAppID, "usdc")
+	vBalA, _ := GetWalletLedger(db, participantA).Balance(vAppID, "usdc")
+	vBalB, _ := GetWalletLedger(db, participantB).Balance(vAppID, "usdc")
 
 	assert.True(t, vBalA.IsZero(), "Participant A vApp balance should be zero")
 	assert.True(t, vBalB.IsZero(), "Participant B vApp balance should be zero")
@@ -245,32 +245,36 @@ func TestHandleCreateVirtualApp(t *testing.T) {
 	for i, p := range []string{addrA, addrB} {
 		ch := &Channel{
 			ChannelID:   fmt.Sprintf("0xChannel%c", 'A'+i),
+			Wallet:      p,
 			Participant: p,
 			Status:      ChannelStatusOpen,
 			Token:       token,
 			Nonce:       1,
 		}
 		require.NoError(t, db.Create(ch).Error)
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: p, Wallet: p,
+		}).Error)
 	}
 
-	require.NoError(t, GetParticipantLedger(db, addrA).Record(addrA, "usdc", decimal.NewFromInt(100)))
-	require.NoError(t, GetParticipantLedger(db, addrB).Record(addrB, "usdc", decimal.NewFromInt(200)))
+	require.NoError(t, GetWalletLedger(db, addrA).Record(addrA, "usdc", decimal.NewFromInt(100)))
+	require.NoError(t, GetWalletLedger(db, addrB).Record(addrB, "usdc", decimal.NewFromInt(200)))
 
 	ts := uint64(time.Now().Unix())
 	def := AppDefinition{
-		Protocol:     "test-proto",
-		Participants: []string{addrA, addrB},
-		Weights:      []uint64{1, 1},
-		Quorum:       2,
-		Challenge:    60,
-		Nonce:        ts, // if omitted, handler would use ts anyway
+		Protocol:           "test-proto",
+		ParticipantWallets: []string{addrA, addrB},
+		Weights:            []uint64{1, 1},
+		Quorum:             2,
+		Challenge:          60,
+		Nonce:              ts, // if omitted, handler would use ts anyway
 	}
 	asset := "usdc"
 	createParams := CreateAppSessionParams{
 		Definition: def,
 		Allocations: []AppAllocation{
-			{Participant: addrA, AssetSymbol: asset, Amount: decimal.NewFromInt(100)},
-			{Participant: addrB, AssetSymbol: asset, Amount: decimal.NewFromInt(200)},
+			{ParticipantWallet: addrA, AssetSymbol: asset, Amount: decimal.NewFromInt(100)},
+			{ParticipantWallet: addrB, AssetSymbol: asset, Amount: decimal.NewFromInt(200)},
 		},
 	}
 
@@ -307,17 +311,17 @@ func TestHandleCreateVirtualApp(t *testing.T) {
 	// ► v-app row exists
 	var vApp AppSession
 	require.NoError(t, db.Where("session_id = ?", appResp.AppSessionID).First(&vApp).Error)
-	assert.ElementsMatch(t, []string{addrA, addrB}, vApp.Participants)
+	assert.ElementsMatch(t, []string{addrA, addrB}, vApp.ParticipantWallets)
 
 	// ► participant accounts drained
-	partBalA, _ := GetParticipantLedger(db, addrA).Balance(addrA, "usdc")
-	partBalB, _ := GetParticipantLedger(db, addrB).Balance(addrB, "usdc")
+	partBalA, _ := GetWalletLedger(db, addrA).Balance(addrA, "usdc")
+	partBalB, _ := GetWalletLedger(db, addrB).Balance(addrB, "usdc")
 	assert.True(t, partBalA.IsZero(), "Participant A balance should be zero")
 	assert.True(t, partBalB.IsZero(), "Participant B balance should be zero")
 
 	// ► virtual-app funded - each participant can see the total app session balance (300)
-	vBalA, _ := GetParticipantLedger(db, addrA).Balance(appResp.AppSessionID, "usdc")
-	vBalB, _ := GetParticipantLedger(db, addrB).Balance(appResp.AppSessionID, "usdc")
+	vBalA, _ := GetWalletLedger(db, addrA).Balance(appResp.AppSessionID, "usdc")
+	vBalB, _ := GetWalletLedger(db, addrB).Balance(appResp.AppSessionID, "usdc")
 	assert.Equal(t, decimal.NewFromInt(100).String(), vBalA.String())
 	assert.Equal(t, decimal.NewFromInt(200).String(), vBalB.String())
 }
@@ -328,13 +332,13 @@ func TestHandleGetLedgerBalances(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	ledger := GetParticipantLedger(db, "0xParticipant1")
+	ledger := GetWalletLedger(db, "0xParticipant1")
 	err := ledger.Record("0xParticipant1", "usdc", decimal.NewFromInt(1000))
 	require.NoError(t, err)
 
 	// Create RPC request with token address parameter
 	params := map[string]string{
-		"participant": "0xParticipant1",
+		"account_id": "0xParticipant1",
 	}
 	paramsJSON, err := json.Marshal(params)
 	require.NoError(t, err)
@@ -466,7 +470,8 @@ func TestHandleGetChannels(t *testing.T) {
 	rawKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	signer := Signer{privateKey: rawKey}
-	participantAddr := signer.GetAddress().Hex()
+	participantSigner := signer.GetAddress().Hex()
+	participantWallet := "wallet_address"
 
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
@@ -477,7 +482,8 @@ func TestHandleGetChannels(t *testing.T) {
 	channels := []Channel{
 		{
 			ChannelID:   "0xChannel1",
-			Participant: participantAddr,
+			Wallet:      participantWallet,
+			Participant: participantSigner,
 			Status:      ChannelStatusOpen,
 			Token:       tokenAddress + "1",
 			ChainID:     chainID,
@@ -491,7 +497,8 @@ func TestHandleGetChannels(t *testing.T) {
 		},
 		{
 			ChannelID:   "0xChannel2",
-			Participant: participantAddr,
+			Wallet:      participantWallet,
+			Participant: participantSigner,
 			Status:      ChannelStatusClosed,
 			Token:       tokenAddress + "2",
 			ChainID:     chainID,
@@ -505,7 +512,8 @@ func TestHandleGetChannels(t *testing.T) {
 		},
 		{
 			ChannelID:   "0xChannel3",
-			Participant: participantAddr,
+			Wallet:      participantWallet,
+			Participant: participantSigner,
 			Status:      ChannelStatusJoining,
 			Token:       tokenAddress + "3",
 			ChainID:     chainID,
@@ -540,7 +548,7 @@ func TestHandleGetChannels(t *testing.T) {
 	require.NoError(t, db.Create(&otherChannel).Error)
 
 	params := map[string]string{
-		"participant": participantAddr,
+		"wallet": participantWallet,
 	}
 	paramsJSON, err := json.Marshal(params)
 	require.NoError(t, err)
@@ -553,12 +561,6 @@ func TestHandleGetChannels(t *testing.T) {
 			Timestamp: uint64(time.Now().Unix()),
 		},
 	}
-
-	reqBytes, err := json.Marshal(rpcRequest.Req)
-	require.NoError(t, err)
-	signed, err := signer.Sign(reqBytes)
-	require.NoError(t, err)
-	rpcRequest.Sig = []string{hexutil.Encode(signed)}
 
 	response, err := HandleGetChannels(rpcRequest, db)
 	require.NoError(t, err)
@@ -581,7 +583,7 @@ func TestHandleGetChannels(t *testing.T) {
 
 	// Verify channel data is correct
 	for _, ch := range channelsSlice {
-		assert.Equal(t, participantAddr, ch.Participant, "ParticipantA should match")
+		assert.Equal(t, participantSigner, ch.Participant, "ParticipantA should match")
 		// Token now has a suffix, so we check it starts with the base token address
 		assert.True(t, strings.HasPrefix(ch.Token, tokenAddress), "Token should start with the base token address")
 		assert.Equal(t, chainID, ch.ChainID, "NetworkID should match")
@@ -607,8 +609,8 @@ func TestHandleGetChannels(t *testing.T) {
 
 	// Test with status filter for "open" channels
 	openStatusParams := map[string]string{
-		"participant": participantAddr,
-		"status":      string(ChannelStatusOpen),
+		"wallet": participantWallet,
+		"status": string(ChannelStatusOpen),
 	}
 	openStatusParamsJSON, err := json.Marshal(openStatusParams)
 	require.NoError(t, err)
@@ -621,12 +623,6 @@ func TestHandleGetChannels(t *testing.T) {
 			Timestamp: uint64(time.Now().Unix()),
 		},
 	}
-
-	reqBytes, err = json.Marshal(openStatusRequest.Req)
-	require.NoError(t, err)
-	signed, err = signer.Sign(reqBytes)
-	require.NoError(t, err)
-	openStatusRequest.Sig = []string{hexutil.Encode(signed)}
 
 	openStatusResponse, err := HandleGetChannels(openStatusRequest, db)
 	require.NoError(t, err)
@@ -641,8 +637,8 @@ func TestHandleGetChannels(t *testing.T) {
 
 	// Test with status filter for "closed" channels
 	closedStatusParams := map[string]string{
-		"participant": participantAddr,
-		"status":      string(ChannelStatusClosed),
+		"wallet": participantWallet,
+		"status": string(ChannelStatusClosed),
 	}
 	closedStatusParamsJSON, err := json.Marshal(closedStatusParams)
 	require.NoError(t, err)
@@ -655,12 +651,6 @@ func TestHandleGetChannels(t *testing.T) {
 			Timestamp: uint64(time.Now().Unix()),
 		},
 	}
-
-	reqBytes, err = json.Marshal(closedStatusRequest.Req)
-	require.NoError(t, err)
-	signed, err = signer.Sign(reqBytes)
-	require.NoError(t, err)
-	closedStatusRequest.Sig = []string{hexutil.Encode(signed)}
 
 	closedStatusResponse, err := HandleGetChannels(closedStatusRequest, db)
 	require.NoError(t, err)
@@ -675,8 +665,8 @@ func TestHandleGetChannels(t *testing.T) {
 
 	// Test with status filter for "joining" channels
 	joiningStatusParams := map[string]string{
-		"participant": participantAddr,
-		"status":      string(ChannelStatusJoining),
+		"wallet": participantWallet,
+		"status": string(ChannelStatusJoining),
 	}
 	joiningStatusParamsJSON, err := json.Marshal(joiningStatusParams)
 	require.NoError(t, err)
@@ -689,12 +679,6 @@ func TestHandleGetChannels(t *testing.T) {
 			Timestamp: uint64(time.Now().Unix()),
 		},
 	}
-
-	reqBytes, err = json.Marshal(joiningStatusRequest.Req)
-	require.NoError(t, err)
-	signed, err = signer.Sign(reqBytes)
-	require.NoError(t, err)
-	joiningStatusRequest.Sig = []string{hexutil.Encode(signed)}
 
 	joiningStatusResponse, err := HandleGetChannels(joiningStatusRequest, db)
 	require.NoError(t, err)
@@ -715,7 +699,7 @@ func TestHandleGetChannels(t *testing.T) {
 			Params:    []any{map[string]string{}}, // Empty map
 			Timestamp: uint64(time.Now().Unix()),
 		},
-		Sig: []string{hexutil.Encode(signed)},
+		Sig: []string{},
 	}
 
 	_, err = HandleGetChannels(missingParamReq, db)
@@ -930,37 +914,37 @@ func TestHandleGetAppSessions(t *testing.T) {
 	// Create some test app sessions
 	sessions := []AppSession{
 		{
-			SessionID:    "0xSession1",
-			Participants: []string{participantAddr, "0xParticipant2"},
-			Status:       ChannelStatusOpen,
-			Protocol:     "test-app-1",
-			Challenge:    60,
-			Weights:      []int64{50, 50},
-			Quorum:       75,
-			Nonce:        1,
-			Version:      1,
+			SessionID:          "0xSession1",
+			ParticipantWallets: []string{participantAddr, "0xParticipant2"},
+			Status:             ChannelStatusOpen,
+			Protocol:           "test-app-1",
+			Challenge:          60,
+			Weights:            []int64{50, 50},
+			Quorum:             75,
+			Nonce:              1,
+			Version:            1,
 		},
 		{
-			SessionID:    "0xSession2",
-			Participants: []string{participantAddr, "0xParticipant3"},
-			Status:       ChannelStatusClosed,
-			Protocol:     "test-app-2",
-			Challenge:    120,
-			Weights:      []int64{30, 70},
-			Quorum:       80,
-			Nonce:        2,
-			Version:      2,
+			SessionID:          "0xSession2",
+			ParticipantWallets: []string{participantAddr, "0xParticipant3"},
+			Status:             ChannelStatusClosed,
+			Protocol:           "test-app-2",
+			Challenge:          120,
+			Weights:            []int64{30, 70},
+			Quorum:             80,
+			Nonce:              2,
+			Version:            2,
 		},
 		{
-			SessionID:    "0xSession3",
-			Participants: []string{"0xParticipant4", "0xParticipant5"},
-			Status:       ChannelStatusOpen,
-			Protocol:     "test-app-3",
-			Challenge:    90,
-			Weights:      []int64{40, 60},
-			Quorum:       60,
-			Nonce:        3,
-			Version:      3,
+			SessionID:          "0xSession3",
+			ParticipantWallets: []string{"0xParticipant4", "0xParticipant5"},
+			Status:             ChannelStatusOpen,
+			Protocol:           "test-app-3",
+			Challenge:          90,
+			Weights:            []int64{40, 60},
+			Quorum:             60,
+			Nonce:              3,
+			Version:            3,
 		},
 	}
 
@@ -1184,7 +1168,7 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	defer cleanup()
 
 	participant := "0xParticipant1"
-	ledger := GetParticipantLedger(db, participant)
+	ledger := GetWalletLedger(db, participant)
 
 	// Create test entries with different assets
 	testData := []struct {

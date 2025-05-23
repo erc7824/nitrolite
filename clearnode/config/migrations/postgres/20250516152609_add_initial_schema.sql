@@ -4,6 +4,7 @@ CREATE TABLE channels (
     channel_id VARCHAR PRIMARY KEY,
     chain_id BIGINT NOT NULL,
     token VARCHAR NOT NULL,
+    wallet VARCHAR NOT NULL,
     participant VARCHAR NOT NULL,
     amount BIGINT NOT NULL,
     status VARCHAR NOT NULL,
@@ -29,7 +30,7 @@ CREATE TABLE ledger (
     account_id VARCHAR NOT NULL,
     account_type BIGINT NOT NULL,
     asset_symbol VARCHAR NOT NULL,
-    participant VARCHAR NOT NULL,
+    wallet VARCHAR NOT NULL,
     credit DECIMAL(64,18) NOT NULL,
     debit DECIMAL(64,18)NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

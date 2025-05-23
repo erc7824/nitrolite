@@ -72,7 +72,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 	h.metrics.ConnectedClients.Inc()
 	defer h.metrics.ConnectedClients.Dec()
 
-	var address string
+	var signerAddress string
 	var authenticated bool
 
 	// Read messages until authentication completes
@@ -89,13 +89,13 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		var rpcMsg RPCMessage
 		if err := json.Unmarshal(message, &rpcMsg); err != nil {
 			log.Printf("Invalid message format: %v", err)
-			h.sendErrorResponse(address, nil, conn, "Invalid message format")
+			h.sendErrorResponse("", nil, conn, "Invalid message format")
 			return
 		}
 
 		if err := validate.Struct(&rpcMsg); err != nil {
 			log.Printf("Invalid message format: %v", err)
-			h.sendErrorResponse(address, nil, conn, "Invalid message format")
+			h.sendErrorResponse("", nil, conn, "Invalid message format")
 			return
 		}
 
@@ -109,7 +109,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			err := HandleAuthRequest(h.signer, conn, &rpcMsg, h.authManager)
 			if err != nil {
 				log.Printf("Auth initialization failed: %v", err)
-				h.sendErrorResponse(address, nil, conn, err.Error())
+				h.sendErrorResponse("", nil, conn, err.Error())
 				h.metrics.AuthFailure.Inc()
 			}
 			continue
@@ -119,47 +119,58 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			authAddr, err := HandleAuthVerify(conn, &rpcMsg, h.authManager, h.signer)
 			if err != nil {
 				log.Printf("Authentication verification failed: %v", err)
-				h.sendErrorResponse(address, nil, conn, err.Error())
+				h.sendErrorResponse("", nil, conn, err.Error())
 				h.metrics.AuthFailure.Inc()
 				continue
 			}
 
 			// Authentication successful
-			address = authAddr
+			signerAddress = authAddr
 			authenticated = true
 			h.metrics.AuthSuccess.Inc()
 
 		default:
 			// Reject any other messages before authentication
 			log.Printf("Unexpected message method during authentication: %s", rpcMsg.Req.Method)
-			h.sendErrorResponse(address, nil, conn, "Authentication required. Please send auth_request first.")
+			h.sendErrorResponse("", nil, conn, "Authentication required. Please send auth_request first.")
 		}
 	}
 
-	log.Printf("Authentication successful for: %s", address)
+	log.Printf("Authentication successful for: %s", signerAddress)
+
+	walletAddress, err := GetWalletBySigner(h.db, signerAddress)
+	if err != nil {
+		log.Printf("Error retrieving wallet address for participant %s: %v", signerAddress, err)
+		h.sendErrorResponse("", nil, conn, "Failed to retrieve wallet address")
+		return
+	}
+	if walletAddress == "" {
+		walletAddress = signerAddress
+	}
 
 	// Store connection for authenticated user
 	h.connectionsMu.Lock()
-	h.connections[address] = conn
+	// Currently, only one connection per wallet is allowed
+	h.connections[walletAddress] = conn
 	h.connectionsMu.Unlock()
 
 	defer func() {
 		h.connectionsMu.Lock()
-		delete(h.connections, address)
+		delete(h.connections, walletAddress)
 		h.connectionsMu.Unlock()
-		log.Printf("Connection closed for participant: %s", address)
+		log.Printf("Connection closed for wallet: %s", walletAddress)
 	}()
 
-	log.Printf("Participant authenticated: %s", address)
+	log.Printf("Participant authenticated: %s", walletAddress)
 
 	// Send initial balance and channels information in form of balance and channel updates
-	channels, err := getChannelsByParticipant(h.db, address, string(ChannelStatusOpen))
+	channels, err := getChannelsByWallet(h.db, walletAddress, string(ChannelStatusOpen))
 	if err != nil {
-		log.Printf("Error retrieving channels for participant %s: %v", address, err)
+		log.Printf("Error retrieving channels for participant %s: %v", walletAddress, err)
 	}
 
-	h.sendChannelsUpdate(address, channels)
-	h.sendBalanceUpdate(address)
+	h.sendChannelsUpdate(walletAddress, channels)
+	h.sendBalanceUpdate(walletAddress)
 
 	for {
 		_, messageBytes, err := conn.ReadMessage()
@@ -176,32 +187,32 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		h.metrics.MessageReceived.Inc()
 
 		// Check if session is still valid
-		if !h.authManager.ValidateSession(address) {
-			log.Printf("Session expired for participant: %s", address)
-			h.sendErrorResponse(address, nil, conn, "Session expired. Please re-authenticate.")
+		if !h.authManager.ValidateSession(signerAddress) {
+			log.Printf("Session expired for wallet: %s", signerAddress)
+			h.sendErrorResponse(signerAddress, nil, conn, "Session expired. Please re-authenticate.")
 			break
 		}
 
 		// Update session activity timestamp
-		h.authManager.UpdateSession(address)
+		h.authManager.UpdateSession(signerAddress)
 
 		// Forward request or response for internal vApp communication.
 		var msg RPCMessage
 		if err := json.Unmarshal(messageBytes, &msg); err != nil {
-			h.sendErrorResponse(address, nil, conn, "Invalid message format")
+			h.sendErrorResponse(walletAddress, nil, conn, "Invalid message format")
 			continue
 		}
 
 		if err := validate.Struct(&msg); err != nil {
 			log.Printf("Invalid message format: %v", err)
-			h.sendErrorResponse(address, nil, conn, "Invalid message format")
+			h.sendErrorResponse(walletAddress, nil, conn, "Invalid message format")
 			return
 		}
 
 		if msg.AppSessionID != "" {
-			if err := forwardMessage(&msg, messageBytes, address, h); err != nil {
+			if err := forwardMessage(&msg, messageBytes, walletAddress, h); err != nil {
 				log.Printf("Error forwarding message: %v", err)
-				h.sendErrorResponse(address, nil, conn, "Failed to forward message: "+err.Error())
+				h.sendErrorResponse(walletAddress, nil, conn, "Failed to forward message: "+err.Error())
 				continue
 			}
 			continue
@@ -213,7 +224,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 		if err = ValidateTimestamp(msg.Req.Timestamp, h.config.msgExpiryTime); err != nil {
 			log.Printf("Message timestamp validation failed: %v", err)
-			h.sendErrorResponse(address, &msg, conn, fmt.Sprintf("Message timestamp validation failed: %v", err))
+			h.sendErrorResponse(walletAddress, &msg, conn, fmt.Sprintf("Message timestamp validation failed: %v", err))
 			continue
 		}
 
@@ -229,7 +240,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			rpcResponse, handlerErr = HandlePing(&msg)
 			if handlerErr != nil {
 				log.Printf("Error handling ping: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to process ping: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to process ping: "+handlerErr.Error())
 				continue
 			}
 
@@ -237,7 +248,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			rpcResponse, handlerErr = HandleGetConfig(&msg, h.config, h.signer)
 			if handlerErr != nil {
 				log.Printf("Error handling get_config: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to get config: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get config: "+handlerErr.Error())
 				continue
 			}
 
@@ -245,23 +256,23 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			rpcResponse, handlerErr = HandleGetAssets(&msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_assets: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to get assets: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get assets: "+handlerErr.Error())
 				continue
 			}
 
 		case "get_ledger_balances":
-			rpcResponse, handlerErr = HandleGetLedgerBalances(&msg, address, h.db)
+			rpcResponse, handlerErr = HandleGetLedgerBalances(&msg, walletAddress, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_ledger_balances: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to get ledger balances: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get ledger balances: "+handlerErr.Error())
 				continue
 			}
 
 		case "get_ledger_entries":
-			rpcResponse, handlerErr = HandleGetLedgerEntries(&msg, address, h.db)
+			rpcResponse, handlerErr = HandleGetLedgerEntries(&msg, walletAddress, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_ledger_entries: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to get ledger entries: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get ledger entries: "+handlerErr.Error())
 				continue
 			}
 
@@ -269,7 +280,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			rpcResponse, handlerErr = HandleGetAppDefinition(&msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_app_definition: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to get app definition: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get app definition: "+handlerErr.Error())
 				continue
 			}
 
@@ -277,25 +288,25 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			rpcResponse, handlerErr = HandleCreateApplication(&msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling create_app_session: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to create application: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to create application: "+handlerErr.Error())
 				continue
 			}
-			h.sendBalanceUpdate(address)
+			h.sendBalanceUpdate(walletAddress)
 			recordHistory = true
 		case "close_app_session":
 			rpcResponse, handlerErr = HandleCloseApplication(&msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling close_app_session: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to close application: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to close application: "+handlerErr.Error())
 				continue
 			}
-			h.sendBalanceUpdate(address)
+			h.sendBalanceUpdate(walletAddress)
 			recordHistory = true
 		case "get_app_sessions":
 			rpcResponse, handlerErr = HandleGetAppSessions(&msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_app_sessions: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to get app sessions: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get app sessions: "+handlerErr.Error())
 				continue
 			}
 
@@ -303,7 +314,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			rpcResponse, handlerErr = HandleResizeChannel(&msg, h.db, h.signer)
 			if handlerErr != nil {
 				log.Printf("Error handling resize_channel: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to resize channel: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to resize channel: "+handlerErr.Error())
 				continue
 			}
 			recordHistory = true
@@ -311,7 +322,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			rpcResponse, handlerErr = HandleCloseChannel(&msg, h.db, h.signer)
 			if handlerErr != nil {
 				log.Printf("Error handling close_channel: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to close channel: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to close channel: "+handlerErr.Error())
 				continue
 			}
 			recordHistory = true
@@ -319,20 +330,20 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			rpcResponse, handlerErr = HandleGetChannels(&msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_channels: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to get channels: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get channels: "+handlerErr.Error())
 				continue
 			}
 
 		case "get_rpc_history":
-			rpcResponse, handlerErr = HandleGetRPCHistory(address, &msg, h.rpcStore)
+			rpcResponse, handlerErr = HandleGetRPCHistory(walletAddress, &msg, h.rpcStore)
 			if handlerErr != nil {
 				log.Printf("Error handling get_rpc_history: %v", handlerErr)
-				h.sendErrorResponse(address, &msg, conn, "Failed to get RPC history: "+handlerErr.Error())
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get RPC history: "+handlerErr.Error())
 				continue
 			}
 
 		default:
-			h.sendErrorResponse(address, &msg, conn, "Unsupported method")
+			h.sendErrorResponse(walletAddress, &msg, conn, "Unsupported method")
 			continue
 		}
 
@@ -343,7 +354,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		wsResponseData, _ := json.Marshal(rpcResponse)
 
 		if recordHistory {
-			if err := h.rpcStore.StoreMessage(address, msg.Req, msg.Sig, byteData, rpcResponse.Sig); err != nil {
+			if err := h.rpcStore.StoreMessage(walletAddress, msg.Req, msg.Sig, byteData, rpcResponse.Sig); err != nil {
 				log.Printf("Failed to store RPC message: %v", err)
 				// continue processing even if storage fails
 			}
@@ -405,7 +416,7 @@ func forwardMessage(rpc *RPCMessage, msg []byte, fromAddress string, h *UnifiedW
 	}
 
 	// Iterate over all recipients in a virtual app and send the message
-	for _, recipient := range vApp.Participants {
+	for _, recipient := range vApp.ParticipantWallets {
 		if recipient == fromAddress {
 			continue
 		}
@@ -547,7 +558,7 @@ func (h *UnifiedWSHandler) sendResponse(recipient string, method string, payload
 
 // sendBalanceUpdate sends balance updates to the client
 func (h *UnifiedWSHandler) sendBalanceUpdate(sender string) {
-	balances, err := GetParticipantLedger(h.db, sender).GetBalances(sender)
+	balances, err := GetWalletLedger(h.db, sender).GetBalances(sender)
 	if err != nil {
 		log.Printf("Error getting balances for %s: %v", sender, err)
 		return
@@ -593,7 +604,7 @@ func (h *UnifiedWSHandler) sendChannelUpdate(channel Channel) {
 		CreatedAt:   channel.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   channel.UpdatedAt.Format(time.RFC3339),
 	}
-	h.sendResponse(channel.Participant, "cu", []any{channelResponse}, "channel")
+	h.sendResponse(channel.Wallet, "cu", []any{channelResponse}, "channel")
 }
 
 // CloseAllConnections closes all open WebSocket connections during shutdown

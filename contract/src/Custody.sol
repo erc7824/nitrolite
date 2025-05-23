@@ -11,7 +11,6 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
 
-
 /**
  * @title Custody
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
@@ -62,7 +61,6 @@ contract Custody is IChannel, IDeposit {
         mapping(address token => uint256 available) tokens; // Available amount that can be withdrawn or allocated to channels
         EnumerableSet.Bytes32Set channels; // Set of user ChannelId
     }
-
 
     mapping(bytes32 channelId => Metadata chMeta) internal _channels;
     mapping(address account => Ledger ledger) internal _ledgers;
@@ -133,10 +131,9 @@ contract Custody is IChannel, IDeposit {
     function create(Channel calldata ch, State calldata initial) public returns (bytes32 channelId) {
         // TODO: add checks that there are only 2 allocations, they have the same token (here and throughout the code)
         // Validate channel configuration
-        if (ch.participants.length != PART_NUM ||
-                ch.participants[CLIENT_IDX] == address(0) ||
-                ch.participants[SERVER_IDX] == address(0) ||
-                ch.participants[CLIENT_IDX] == ch.participants[SERVER_IDX]
+        if (
+            ch.participants.length != PART_NUM || ch.participants[CLIENT_IDX] == address(0)
+                || ch.participants[SERVER_IDX] == address(0) || ch.participants[CLIENT_IDX] == ch.participants[SERVER_IDX]
         ) revert InvalidParticipant();
         if (ch.adjudicator == address(0)) revert InvalidAdjudicator();
         if (ch.challenge < MIN_CHALLENGE_PERIOD) revert InvalidChallengePeriod();
@@ -168,7 +165,7 @@ contract Custody is IChannel, IDeposit {
         Metadata storage meta = _channels[channelId];
         meta.chan = ch;
         meta.stage = ChannelStatus.INITIAL;
-        meta.wallet =wallet;
+        meta.wallet = wallet;
         meta.lastValidState = initial;
 
         // NOTE: allocations MUST come in the same order as participants in deposit
@@ -431,7 +428,9 @@ contract Custody is IChannel, IDeposit {
             precedingProofs[i - 1] = proofs[i];
         }
 
-        if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, precedingState, precedingProofs)) revert InvalidState();
+        if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, precedingState, precedingProofs)) {
+            revert InvalidState();
+        }
 
         // resized state should be the successor of the preceding state
         if (candidate.version != precedingState.version + 1) revert InvalidState();
@@ -580,7 +579,12 @@ contract Custody is IChannel, IDeposit {
 
     /// @notice Supports "implicit transfer"
     /// @dev Positive deltas must be processed first as they add more funds to the channel that the negative delta may want to withdraw
-    function _processResize(bytes32 channelId, Metadata storage chMeta, int256[] memory resizeAmounts, Allocation[] memory finalAllocations) internal {
+    function _processResize(
+        bytes32 channelId,
+        Metadata storage chMeta,
+        int256[] memory resizeAmounts,
+        Allocation[] memory finalAllocations
+    ) internal {
         // NOTE: all tokens are the same
         address token = chMeta.expectedDeposits[CLIENT_IDX].token;
 

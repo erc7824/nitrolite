@@ -141,6 +141,8 @@ contract Custody is IChannel, IDeposit {
         if (ch.adjudicator == address(0)) revert InvalidAdjudicator();
         if (ch.challenge < MIN_CHALLENGE_PERIOD) revert InvalidChallengePeriod();
 
+        // TODO: security hardening: check that `participants[0]` is authorized by the wallet
+
         // TODO: replace with `require(...)`
         if (initial.intent != StateIntent.INITIALIZE) revert InvalidState();
 

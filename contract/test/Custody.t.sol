@@ -895,8 +895,12 @@ contract CustodyTest is Test {
         (hostAvailable,) = custody.getAccountInfo(host, address(token));
         (guestAvailable,) = custody.getAccountInfo(guest, address(token));
 
-        assertEq(hostAvailable, DEPOSIT_AMOUNT * 2 - resizedHostLockedBalance, "Host's available tokens should decrease");
-        assertEq(guestAvailable, DEPOSIT_AMOUNT * 2 - resizedGuestLockedBalance, "Guest's available tokens should increase");
+        assertEq(
+            hostAvailable, DEPOSIT_AMOUNT * 2 - resizedHostLockedBalance, "Host's available tokens should decrease"
+        );
+        assertEq(
+            guestAvailable, DEPOSIT_AMOUNT * 2 - resizedGuestLockedBalance, "Guest's available tokens should increase"
+        );
 
         // 4.1 Create a state after resize
         State memory afterResizeState = initialState;
@@ -1011,8 +1015,8 @@ contract CustodyTest is Test {
         // Available after resize: [0, 3*D]
 
         int256[] memory resizeAmounts = new int256[](2);
-        resizeAmounts[0] = int256(DEPOSIT_AMOUNT);             // Host tops up with DEPOSIT_AMOUNT
-        resizeAmounts[1] = -int256(2 * DEPOSIT_AMOUNT);        // Guest withdraws their 2 * DEPOSIT_AMOUNT
+        resizeAmounts[0] = int256(DEPOSIT_AMOUNT); // Host tops up with DEPOSIT_AMOUNT
+        resizeAmounts[1] = -int256(2 * DEPOSIT_AMOUNT); // Guest withdraws their 2 * DEPOSIT_AMOUNT
 
         // Create resize state with new allocations
         State memory resizedState = State({
@@ -1024,15 +1028,11 @@ contract CustodyTest is Test {
         });
 
         // Calculate new allocation amounts
-        uint256 newHostAmount = DEPOSIT_AMOUNT;  // Original
-        uint256 newGuestAmount = 0;              // Zero after withdrawal
+        uint256 newHostAmount = DEPOSIT_AMOUNT; // Original
+        uint256 newGuestAmount = 0; // Zero after withdrawal
 
         // Set allocations to match the resize - both must have the SAME token
-        resizedState.allocations[0] = Allocation({
-            destination: host,
-            token: address(token),
-            amount: newHostAmount
-        });
+        resizedState.allocations[0] = Allocation({destination: host, token: address(token), amount: newHostAmount});
 
         resizedState.allocations[1] = Allocation({
             destination: guest,

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "start": "serve dist -l 3000 --host 0.0.0.0"
   },
   "dependencies": {
     "@erc7824/nitrolite": "^0.1.3",

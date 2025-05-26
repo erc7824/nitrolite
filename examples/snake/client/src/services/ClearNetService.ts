@@ -27,13 +27,13 @@ class ClearNetService {
         {
             resolve: (value: any) => void;
             reject: (reason: Error) => void;
-            timeout: NodeJS.Timeout;
+            timeout: number;
         }
     >();
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
     private reconnectDelay = 1000;
-    private reconnectTimeout: NodeJS.Timeout | null = null;
+    private reconnectTimeout: number | null = null;
     private authenticationInProgress: Promise<void> | null = null;
 
     constructor() {
@@ -214,7 +214,7 @@ class ClearNetService {
             this.initializeWebSocket().catch(() => {
                 console.log("Reconnect attempt failed");
             });
-        }, delay);
+        }, delay) as unknown as number;
     }
 
     private async authenticateWithBroker(): Promise<void> {
@@ -253,7 +253,7 @@ class ClearNetService {
 
         // Create a new authentication promise and store it
         const authPromise = new Promise<void>((resolve, reject) => {
-            let authTimeout: NodeJS.Timeout;
+            let authTimeout: number;
 
             // Create a one-time message handler for authentication
             const authMessageHandler = async (event: MessageEvent) => {
@@ -360,7 +360,7 @@ class ClearNetService {
             authTimeout = setTimeout(() => {
                 cleanup();
                 reject(new Error("Authentication timeout"));
-            }, 15000); // 15 second timeout
+            }, 15000) as unknown as number; // 15 second timeout
 
             // Add temporary listener for authentication messages
             this.wsConnection?.addEventListener("message", authMessageHandler);

@@ -31,7 +31,7 @@ class GameService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 3;
   private isConnecting = false;
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectTimeout: number | null = null;
 
   constructor() {
     this.setupMessageHandlers();
@@ -171,7 +171,7 @@ class GameService {
         console.log('Attempting to reconnect...');
         this.connect();
       }
-    }, 1000);
+    }, 1000) as unknown as number;
   }
 
   private handleDisconnection() {

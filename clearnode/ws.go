@@ -692,12 +692,7 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 		return "", errors.New("missing signature in request")
 	}
 
-	reqBytes, err := json.Marshal(rpc.Req)
-	if err != nil {
-		return "", errors.New("error serializing auth message")
-	}
-
-	isValid, err := ValidateSignature(reqBytes, rpc.Sig[0], addr)
+	isValid, err := VerifyEip712Data(addr, authParams.Challenge.String(), rpc.Sig[0])
 	if err != nil || !isValid {
 		return "", errors.New("invalid signature")
 	}

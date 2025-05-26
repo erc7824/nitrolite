@@ -2,4 +2,4 @@
 cmds = ['npm install']
 
 [start]
-cmd = 'npm run preview --host 0.0.0.0'
+cmd = 'npm run preview'

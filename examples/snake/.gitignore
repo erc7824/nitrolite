@@ -27,3 +27,4 @@ dist-server
 *.njsproj
 *.sln
 *.sw?
+*.tsbuildinfo

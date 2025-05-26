@@ -1,0 +1,106 @@
+name: Stable Tag
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  build-and-publish-clearnode:
+    name: Build and Publish (Clearnode)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image-tag: ${{ steps.tagger.outputs.tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract tag name without 'v' prefix
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: clearnode
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/clearnode:${{ steps.tag.outputs.tag }}
+            ghcr.io/${{ github.repository }}/clearnode:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-clearnode:
+    name: Deploy PROD (Clearnode)
+    needs: build-and-publish-clearnode
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+      GKE_CLUSTER_NAME: uat
+      GKE_CLUSTER_ZONE: europe-central2
+      GKE_BASTION_NAME: gke-uat-bastion
+      GKE_BASTION_ZONE: europe-central2-a
+      HELM_NAMESPACE: clearnet-prod
+      HELM_RELEASE: clearnode
+      HELM_CONFIG_ENV: prod
+      KUBECONFIG: kubeconfig.conf
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: '${{ secrets.GKE_PROD_SA_KEY }}'
+
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: ${{ secrets.GKE_PROJECT }}
+        install_components: gke-gcloud-auth-plugin
+
+    - name: Get GKE credentials
+      run: |-
+        gcloud container clusters get-credentials ${GKE_CLUSTER_NAME} \
+          --project ${PROJECT_ID} \
+          --zone ${GKE_CLUSTER_ZONE} \
+          --internal-ip
+
+    - name: Port-forward to GKE Bastion
+      run: |-
+        gcloud compute ssh ${GKE_BASTION_NAME} \
+          --tunnel-through-iap \
+          --project ${PROJECT_ID} \
+          --zone ${GKE_BASTION_ZONE} \
+          -- -NL8888:127.0.0.1:8888 &
+        sleep 5
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+
+    - name: Release
+      env:
+        HTTPS_PROXY: http://localhost:8888
+      run: |-
+        helm upgrade -i ${HELM_RELEASE} clearnode/chart \
+          -n ${HELM_NAMESPACE} \
+          --reuse-values \
+          -f clearnode/chart/config/${HELM_CONFIG_ENV}/clearnode.yaml \
+          --set image.tag="${{ needs.build-and-publish.outputs.image-tag }}"

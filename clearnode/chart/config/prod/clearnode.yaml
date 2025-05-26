@@ -9,11 +9,11 @@ config:
     user: clearnet_prod_admin
   envSecret: ""
   extraEnvs:
-    POLYGON_CUSTODY_CONTRACT_ADDRESS: "0x3b21e4a6aB2eb42cE2918B1C7E63BA0c9915B34E"
-    WORLD_CHAIN_CUSTODY_CONTRACT_ADDRESS: "0xcFdC977a4b75B77E47a80C0D2b2aB7ade72ABD2b"
+    POLYGON_CUSTODY_CONTRACT_ADDRESS: "0xc2F8Fca0A2dFa200728D3dae130dF6065b7da986"
+    # WORLD_CHAIN_CUSTODY_CONTRACT_ADDRESS: "0xcFdC977a4b75B77E47a80C0D2b2aB7ade72ABD2b"
 
 image:
-  repository: ghcr.io/erc7824/clearnode
+  repository: ghcr.io/erc7824/nitrolite/clearnode
   tag: 0.0.1
 
 service:
@@ -41,7 +41,6 @@ resources:
 
 autoscaling:
   enabled: false
-
 
 networking:
   externalHostname: clearnet.yellow.com

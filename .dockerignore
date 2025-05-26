@@ -1,0 +1,14 @@
+.dockerignore
+.gitignore
+.git/
+.github/
+LICENSE
+
+*.md
+
+# clearnode
+clearnode/Dockerfile
+clearnode/.gitignore
+clearndoe/docs/
+clearndoe/chart/
+clearndoe/scripts/

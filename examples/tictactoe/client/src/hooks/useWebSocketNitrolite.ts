@@ -12,22 +12,22 @@ export function useWebSocketNitrolite() {
         // Connection status
         status: context.status,
         isConnected: context.isConnected,
-
+        
         // Key management
         keyPair: context.keyPair,
         hasKeys: context.hasKeys,
         generateKeys: context.generateKeys,
         clearKeys: context.clearKeys,
-
+        
         // Channel management
         wsChannel: context.wsChannel,
         currentNitroliteChannel: context.currentNitroliteChannel,
         setNitroliteChannel: context.setNitroliteChannel,
-
+        
         // Connection management
         connect: context.connect,
         disconnect: context.disconnect,
-
+        
         // Message handling
         sendPing: context.sendPing,
         sendRequest: context.sendRequest,

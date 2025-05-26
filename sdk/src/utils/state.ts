@@ -41,9 +41,9 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
 type SignMessageFn = (args: { message: { raw: Hex } | string }) => Promise<Hex>;
 
 /**
- * Should not include prefix EIP191
  * Create a signature for a state hash using a Viem WalletClient or Account compatible signer.
  * Uses the locally defined parseSignature function.
+ * @dev `signMessage` function should NOT add an EIP-191 prefix to the stateHash.
  * @param stateHash The hash of the state to sign.
  * @param signer An object with a `signMessage` method compatible with Viem's interface (e.g., WalletClient, Account).
  * @returns The signature object { v, r, s }

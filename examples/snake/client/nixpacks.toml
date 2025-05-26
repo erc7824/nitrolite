@@ -1,2 +1,5 @@
 [phases.install]
 cmds = ['npm install']
+
+[start]
+cmd = 'serve dist -l 3000 --host 0.0.0.0'

@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
-    "start": "serve dist -l 3000 --host 0.0.0.0"
+    "build": "vue-tsc -b && vite build"
   },
   "dependencies": {
     "@erc7824/nitrolite": "^0.1.3",

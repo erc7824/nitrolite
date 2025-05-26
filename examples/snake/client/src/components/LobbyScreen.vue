@@ -84,11 +84,6 @@ const onChannelCreated = async (data: any) => {
   channelInfo.value = data;
 };
 
-const onChannelJoined = async (data: any) => {
-  isChannelCreated.value = true;
-  channelInfo.value = data;
-};
-
 const onError = (error: string) => {
   emit('update:errorMessage', error);
 };
@@ -109,11 +104,7 @@ function generateRoomId(): string {
 <template>
   <div class="lobby">
     <!-- Wallet Connection Card -->
-    <WalletConnect
-      @wallet-connected="onWalletConnected"
-      @wallet-disconnected="onWalletDisconnected"
-      @error="onError"
-    />
+    <WalletConnect @wallet-connected="onWalletConnected" @wallet-disconnected="onWalletDisconnected" @error="onError" />
 
     <!-- Username Card -->
     <div class="form-container">
@@ -121,27 +112,15 @@ function generateRoomId(): string {
 
       <div class="form-group">
         <label for="nickname">Your Nickname:</label>
-        <input
-          id="nickname"
-          type="text"
-          :value="nickname"
-          @input="updateNickname"
-          placeholder="Enter your nickname"
-          :disabled="isCreatingRoom || isJoiningRoom"
-        />
+        <input id="nickname" type="text" :value="nickname" @input="updateNickname" placeholder="Enter your nickname"
+          :disabled="isCreatingRoom || isJoiningRoom" />
       </div>
     </div>
 
     <!-- Channel Setup -->
-    <ChannelSetup
-      v-if="isWalletConnected && nickname"
-      :isWalletConnected="isWalletConnected"
-      :roomId="roomId || generateRoomId()"
-      :roomCreator="!roomId"
-      @channel-created="onChannelCreated"
-      @channel-joined="onChannelJoined"
-      @error="onError"
-    />
+    <ChannelSetup v-if="isWalletConnected && nickname" :isWalletConnected="isWalletConnected"
+      :roomId="roomId || generateRoomId()" :roomCreator="!roomId" @channel-created="onChannelCreated"
+      @error="onError" />
 
     <!-- Game Actions Card -->
     <div class="form-container">
@@ -149,18 +128,16 @@ function generateRoomId(): string {
 
       <div class="actions">
         <div class="action-group">
-          <button
-            @click="createRoom"
-            class="btn primary"
-            :disabled="!nickname || !isWalletConnected || !isChannelCreated || isCreatingRoom"
-          >
+          <button @click="createRoom" class="btn primary"
+            :disabled="!nickname || !isWalletConnected || !isChannelCreated || isCreatingRoom">
             {{ isCreatingRoom ? 'Creating Room...' : 'Create New Room' }}
           </button>
 
           <div class="requirements" v-if="!isWalletConnected || !nickname || !isChannelCreated">
             <div v-if="!isWalletConnected" class="requirement">⚠️ Connect wallet first</div>
             <div v-if="!nickname" class="requirement">⚠️ Set a nickname first</div>
-            <div v-if="isWalletConnected && nickname && !isChannelCreated" class="requirement">⚠️ Create a channel first</div>
+            <div v-if="isWalletConnected && nickname && !isChannelCreated" class="requirement">⚠️ Create a channel first
+            </div>
           </div>
         </div>
 
@@ -169,20 +146,11 @@ function generateRoomId(): string {
         <div class="action-group">
           <div class="form-group">
             <label for="roomId">Room ID:</label>
-            <input
-              id="roomId"
-              type="text"
-              :value="roomId"
-              @input="updateRoomId"
-              placeholder="Enter room ID"
-              :disabled="isJoiningRoom"
-            />
+            <input id="roomId" type="text" :value="roomId" @input="updateRoomId" placeholder="Enter room ID"
+              :disabled="isJoiningRoom" />
           </div>
-          <button
-            @click="joinRoom"
-            class="btn secondary"
-            :disabled="!nickname || !roomId || !isWalletConnected || !isChannelCreated || isJoiningRoom"
-          >
+          <button @click="joinRoom" class="btn secondary"
+            :disabled="!nickname || !roomId || !isWalletConnected || !isChannelCreated || isJoiningRoom">
             {{ isJoiningRoom ? 'Joining Room...' : 'Join Existing Room' }}
           </button>
 
@@ -190,7 +158,8 @@ function generateRoomId(): string {
             <div v-if="!isWalletConnected" class="requirement">⚠️ Connect wallet first</div>
             <div v-if="!nickname" class="requirement">⚠️ Set a nickname first</div>
             <div v-if="!roomId" class="requirement">⚠️ Enter a room ID</div>
-            <div v-if="isWalletConnected && nickname && roomId && !isChannelCreated" class="requirement">⚠️ Join a channel first</div>
+            <div v-if="isWalletConnected && nickname && roomId && !isChannelCreated" class="requirement">⚠️ Join a
+              channel first</div>
           </div>
         </div>
       </div>

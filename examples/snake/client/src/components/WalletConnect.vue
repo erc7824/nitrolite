@@ -109,7 +109,9 @@ async function connectWallet() {
 
             // Create a proper stateWalletClient for signing state updates
             const stateWalletClient = {
-                account: { address: stateWallet.address, },
+                account: {
+                    address: stateWallet.address,
+                },
                 signMessage: async ({ message: { raw } }: { message: { raw: string } }) => {
                     try {
                         const flatSignature = stateWallet._signingKey().signDigest(raw);
@@ -146,6 +148,7 @@ async function connectWallet() {
             const nitroConfig: NitroliteClientConfig = {
                 publicClient,
                 walletClient,
+                // @ts-ignore
                 stateWalletClient,
                 addresses: CONTRACT_ADDRESSES,
                 chainId: polygon.id,

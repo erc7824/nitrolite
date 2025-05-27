@@ -39,6 +39,7 @@ export class NitroliteClient {
         if (!config.walletClient) throw new Errors.MissingParameterError("walletClient");
         if (!config.walletClient.account) throw new Errors.MissingParameterError("walletClient.account");
         if (!config.challengeDuration) throw new Errors.MissingParameterError("challengeDuration");
+        if (config.challengeDuration < 3600n) throw new Errors.InvalidParameterError("The minimum challenge duration is 3600 seconds");
         if (!config.addresses?.custody) throw new Errors.MissingParameterError("addresses.custody");
         if (!config.addresses?.adjudicator) throw new Errors.MissingParameterError("addresses.adjudicator");
         if (!config.addresses?.guestAddress) throw new Errors.MissingParameterError("addresses.guestAddress");

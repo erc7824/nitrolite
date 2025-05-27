@@ -137,7 +137,7 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 		broker := ev.Channel.Participants[1]
 		tokenAddress := ev.Initial.Allocations[0].Token.Hex()
 		tokenAmount := ev.Initial.Allocations[0].Amount.Int64()
-		adjudictor := ev.Channel.Adjudicator
+		adjudicator := ev.Channel.Adjudicator
 		challenge := ev.Channel.Challenge
 
 		brokerAmount := ev.Initial.Allocations[1].Amount.Int64()
@@ -151,8 +151,8 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			return
 		}
 
-		if adjudictor != c.adjudicatorAddress {
-			log.Printf("[Created] Error: unsupported adjudicator %s\n", adjudictor)
+		if adjudicator != c.adjudicatorAddress {
+			log.Printf("[Created] Error: unsupported adjudicator %s, expected %s\n", adjudicator.Hex(), c.adjudicatorAddress.Hex())
 			return
 		}
 
@@ -188,7 +188,7 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			participantSigner,
 			nonce,
 			challenge,
-			adjudictor.Hex(),
+			adjudicator.Hex(),
 			c.chainID,
 			tokenAddress,
 			uint64(tokenAmount),

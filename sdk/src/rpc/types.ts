@@ -49,7 +49,7 @@ export interface NitroliteRPCMessage {
     /** Contains the response or error payload if this is a response message. */
     res?: ResponsePayload;
     /** Optional cryptographic signature(s). */
-    sig?: Hex[];
+    sig?: Hex[] | [""];
 }
 
 /**
@@ -174,7 +174,14 @@ export enum NitroliteErrorCode {
 
 /**
  * Defines the function signature for signing message payloads (req or res objects).
- * Implementations should sign the provided payload object (typically after serialization).
+ * Implementations can use either signMessage or signStateData depending on the use case.
+ * For general RPC messages, signMessage is typically used.
+ * For state channel operations, signStateData may be more appropriate.
+ *
+ * Example implementations:
+ * - Using signMessage: (payload) => walletClient.signMessage({ message: JSON.stringify(payload) })
+ * - Using signStateData: (payload) => walletClient.signStateData({ data: encodeAbiParameters([...], payload) })
+ *
  * @param payload - The RequestData or ResponsePayload object (array) to sign.
  * @returns A Promise that resolves to the cryptographic signature as a Hex string.
  */

@@ -157,6 +157,7 @@ export class NitroliteRPC {
      *
      * @param message - The request message to sign (must contain 'req').
      * @param signer - The signing function that takes the payload array and returns a signature.
+     *                 Can use either signMessage (for general RPC messages) or signStateData (for state channel operations).
      * @returns The original message object mutated with the signature attached.
      */
     static async signRequestMessage(message: NitroliteRPCMessage, signer: MessageSigner): Promise<NitroliteRPCMessage> {

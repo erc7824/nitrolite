@@ -16,14 +16,12 @@ import { generateRequestId, getCurrentTimestamp } from "./utils";
  * Creates the signed, stringified message body for an 'auth_request'.
  * This request is sent in the context of a specific direct channel with the broker.
  *
- * @param signer - The function to sign the request payload.
  * @param clientAddress - The Ethereum address of the client authenticating.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
  */
 export async function createAuthRequestMessage(
-    signer: MessageSigner,
     clientAddress: Address,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
@@ -31,9 +29,10 @@ export async function createAuthRequestMessage(
     const params = [clientAddress];
 
     const request = NitroliteRPC.createRequest(requestId, "auth_request", params, timestamp);
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
-    return JSON.stringify(signedRequest);
+    request.sig = [""];
+
+    return JSON.stringify(request);
 }
 
 /**

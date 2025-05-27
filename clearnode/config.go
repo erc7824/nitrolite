@@ -113,7 +113,7 @@ func LoadConfig() (*Config, error) {
 			} else if strings.HasPrefix(key, network+"_CUSTODY_CONTRACT_ADDRESS") {
 				custodyAddress = value
 			} else if strings.HasPrefix(key, network+"_ADJUDICATOR_ADDRESS") {
-				custodyAddress = value
+				adjudicatorAddress = value
 			}
 		}
 

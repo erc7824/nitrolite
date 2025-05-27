@@ -363,7 +363,7 @@ func HandleCreateApplication(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) 
 			return nil, errors.New("invalid signature")
 		}
 
-		walletAddress, err := GetWalletBySigner(db, addr)
+		walletAddress, err := GetWalletBySigner(addr)
 		if err != nil {
 			continue
 		}
@@ -508,7 +508,7 @@ func HandleCloseApplication(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 
 		for address := range recoveredAddresses {
 			addr := address
-			walletAddress, _ := GetWalletBySigner(db, address)
+			walletAddress, _ := GetWalletBySigner(address)
 			if walletAddress != "" {
 				addr = walletAddress
 			}
@@ -716,7 +716,7 @@ func HandleResizeChannel(rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMess
 		return nil, err
 	}
 
-	walletAddress, _ := GetWalletBySigner(db, recoveredAddress)
+	walletAddress, _ := GetWalletBySigner(recoveredAddress)
 	if walletAddress != "" {
 		recoveredAddress = walletAddress
 	}
@@ -857,7 +857,7 @@ func HandleCloseChannel(rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMessa
 		return nil, err
 	}
 
-	walletAddress, _ := GetWalletBySigner(db, recoveredAddress)
+	walletAddress, _ := GetWalletBySigner(recoveredAddress)
 	if walletAddress != "" {
 		recoveredAddress = walletAddress
 	}

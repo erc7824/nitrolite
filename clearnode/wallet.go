@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type SignerWallet struct {
@@ -28,38 +29,23 @@ func loadWalletCache(db *gorm.DB) error {
 	return nil
 }
 
-func GetWalletBySigner(db *gorm.DB, signerAddress string) (string, error) {
-	w, ok := walletCache.Load(signerAddress)
-	if ok {
+func GetWalletBySigner(signer string) (string, error) {
+	if w, ok := walletCache.Load(signer); ok {
 		return w.(string), nil
-	} else {
-		return "", nil
 	}
+	return "", nil
 }
 
-func AddSigner(db *gorm.DB, walletAddress, signerAddress string) error {
-	sw := &SignerWallet{
-		Signer: signerAddress,
-		Wallet: walletAddress,
+func AddSigner(db *gorm.DB, wallet, signer string) error {
+	sw := &SignerWallet{Signer: signer, Wallet: wallet}
+
+	if err := db.
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(sw).Error; err != nil {
+		return err
 	}
 
-	if err := db.Create(sw).Error; err != nil {
-		// Check if it's a primary key conflict (duplicate key error)
-		// For Postgres, use error code "23505" for unique_violation
-		//
-		// If so - ignore it
-		// var pgErr *pgconn.PgError
-		// if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		// 	return nil
-		// } else {
-		// 	return err
-		// }
-
-		// FIXME
-		return nil
-	}
-
-	walletCache.Store(signerAddress, walletAddress)
+	walletCache.Store(signer, wallet)
 	return nil
 }
 

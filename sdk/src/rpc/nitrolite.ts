@@ -194,7 +194,10 @@ export class NitroliteRPC {
 
         try {
             const payload = this.getMessagePayload(message);
-            return await verifier(payload, signature, expectedSigner);
+            if (typeof signature !== "string" || signature === "") {
+                return false;
+            }
+            return await verifier(payload, signature as Hex, expectedSigner);
         } catch (error) {
             console.error("Error during single signature verification:", error);
             return false;
@@ -221,6 +224,9 @@ export class NitroliteRPC {
 
         try {
             const payload = this.getMessagePayload(message);
+            if (typeof message.sig !== "string" || message.sig === "") {
+                return false;
+            }
             return await verifier(payload, message.sig, expectedSigners);
         } catch (error) {
             console.error("Error during multiple signature verification:", error);

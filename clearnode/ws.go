@@ -73,6 +73,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 	defer h.metrics.ConnectedClients.Dec()
 
 	var signerAddress string
+	var signerSessionKey string
 	var authenticated bool
 
 	// Read messages until authentication completes
@@ -116,7 +117,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 		case "auth_verify":
 			// Client is responding to a challenge
-			authAddr, err := HandleAuthVerify(conn, &rpcMsg, h.authManager, h.signer)
+			authAddr, authSessionKey, err := HandleAuthVerify(conn, &rpcMsg, h.authManager, h.signer, h.db)
 			if err != nil {
 				log.Printf("Authentication verification failed: %v", err)
 				h.sendErrorResponse("", nil, conn, err.Error())
@@ -126,6 +127,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 			// Authentication successful
 			signerAddress = authAddr
+			signerSessionKey = authSessionKey
 			authenticated = true
 			h.metrics.AuthSuccess.Inc()
 
@@ -159,6 +161,8 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		delete(h.connections, walletAddress)
 		h.connectionsMu.Unlock()
 		log.Printf("Connection closed for wallet: %s", walletAddress)
+		// Remove signer from DB
+		RemoveSigner(h.db, walletAddress, signerSessionKey)
 	}()
 
 	log.Printf("Participant authenticated: %s", walletAddress)
@@ -625,14 +629,16 @@ type AuthResponse struct {
 
 // AuthVerifyParams represents parameters for completing authentication
 type AuthVerifyParams struct {
-	Challenge uuid.UUID `json:"challenge"` // The challenge token
-	Address   string    `json:"address"`   // The client's address
+	Challenge  uuid.UUID `json:"challenge"`   // The challenge token
+	Address    string    `json:"address"`     // The client's address
+	SessionKey string    `json:"session_key"` // Connection session key
+	AppName    string    `json:"app_name"`    // Application name
 }
 
 // HandleAuthRequest initializes the authentication process by generating a challenge
 func HandleAuthRequest(signer *Signer, conn *websocket.Conn, rpc *RPCMessage, authManager *AuthManager) error {
 	// Parse the parameters
-	if len(rpc.Req.Params) < 1 {
+	if len(rpc.Req.Params) < 3 {
 		return errors.New("missing parameters")
 	}
 
@@ -641,8 +647,18 @@ func HandleAuthRequest(signer *Signer, conn *websocket.Conn, rpc *RPCMessage, au
 		return errors.New("invalid address")
 	}
 
+	sessionKey, ok := rpc.Req.Params[1].(string)
+	if !ok || sessionKey == "" {
+		return errors.New("invalid session key")
+	}
+
+	appName, ok := rpc.Req.Params[2].(string)
+	if !ok || sessionKey == "" {
+		return errors.New("invalid app name")
+	}
+
 	// Generate a challenge for this address
-	token, err := authManager.GenerateChallenge(addr)
+	token, err := authManager.GenerateChallenge(addr, sessionKey, appName)
 	if err != nil {
 		return fmt.Errorf("failed to generate challenge: %w", err)
 	}
@@ -666,19 +682,20 @@ func HandleAuthRequest(signer *Signer, conn *websocket.Conn, rpc *RPCMessage, au
 }
 
 // HandleAuthVerify verifies an authentication response to a challenge
-func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthManager, signer *Signer) (string, error) {
+func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthManager, signer *Signer, db *gorm.DB) (string, string, error) {
 	if len(rpc.Req.Params) < 1 {
-		return "", errors.New("missing parameters")
+		return "", "", errors.New("missing parameters")
 	}
 
 	var authParams AuthVerifyParams
 	paramsJSON, err := json.Marshal(rpc.Req.Params[0])
 	if err != nil {
-		return "", fmt.Errorf("failed to parse parameters: %w", err)
+		return "", "", fmt.Errorf("failed to parse parameters: %w", err)
+
 	}
 
 	if err := json.Unmarshal(paramsJSON, &authParams); err != nil {
-		return "", fmt.Errorf("invalid parameters format: %w", err)
+		return "", "", fmt.Errorf("invalid parameters format: %w", err)
 	}
 
 	// Ensure address has 0x prefix
@@ -687,25 +704,36 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 		addr = "0x" + addr
 	}
 
+	sessionKey := authParams.SessionKey
+	appName := authParams.AppName
+
 	// Validate the request signature
 	if len(rpc.Sig) == 0 {
-		return "", errors.New("missing signature in request")
+		return "", "", errors.New("missing signature in request")
 	}
 
-	isValid, err := VerifyEip712Data(addr, authParams.Challenge.String(), rpc.Sig[0])
+	isValid, err := VerifyEip712Data(addr, authParams.Challenge.String(), sessionKey, appName, rpc.Sig[0])
 	if err != nil || !isValid {
-		return "", errors.New("invalid signature")
+		return "", "", errors.New("invalid signature")
 	}
 
-	err = authManager.ValidateChallenge(authParams.Challenge, addr)
+	err = authManager.ValidateChallenge(authParams.Challenge, addr, sessionKey, appName)
 	if err != nil {
 		log.Printf("Challenge verification failed: %v", err)
-		return "", err
+		return "", "", err
+	}
+
+	// Store signer
+	err = AddSigner(db, authParams.Address, sessionKey)
+	if err != nil {
+		log.Printf("Failed to create signer in db: %v", err)
+		return "", "", err
 	}
 
 	response := CreateResponse(rpc.Req.RequestID, "auth_verify", []any{map[string]any{
-		"address": addr,
-		"success": true,
+		"address":     addr,
+		"session_key": sessionKey,
+		"success":     true,
 	}}, time.Now())
 
 	// Sign the response with the server's key
@@ -716,10 +744,10 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 	responseData, _ := json.Marshal(response)
 	if err = conn.WriteMessage(websocket.TextMessage, responseData); err != nil {
 		log.Printf("Error sending auth success: %v", err)
-		return "", err
+		return "", "", err
 	}
 
-	return addr, nil
+	return addr, sessionKey, nil
 }
 
 func ValidateTimestamp(ts uint64, expirySeconds int) error {

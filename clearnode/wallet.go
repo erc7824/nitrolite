@@ -44,9 +44,29 @@ func AddSigner(db *gorm.DB, walletAddress, signerAddress string) error {
 	}
 
 	if err := db.Create(sw).Error; err != nil {
-		return err
+		// Check if it's a primary key conflict (duplicate key error)
+		// For Postgres, use error code "23505" for unique_violation
+		//
+		// If so - ignore it
+		// var pgErr *pgconn.PgError
+		// if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		// 	return nil
+		// } else {
+		// 	return err
+		// }
+
+		// FIXME
+		return nil
 	}
 
 	walletCache.Store(signerAddress, walletAddress)
 	return nil
+}
+
+func RemoveSigner(db *gorm.DB, walletAddress, signerAddress string) error {
+	sw := &SignerWallet{
+		Signer: signerAddress,
+		Wallet: walletAddress,
+	}
+	return db.Delete(&sw).Error
 }

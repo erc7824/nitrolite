@@ -21,7 +21,7 @@ export const createDeterministicPrivateKey = async (
     nonce: number = 0,
 ): Promise<Hex> => {
     // NOTE: keep in mind that this key should be used only for the respective adjudicator and app address
-    const nonceMessage = `${walletClient.account.address}/${adjudicatorAddress}/${appAddress}/0/${nonce}`
+    const nonceMessage = `nitrolite/${adjudicatorAddress}/${appAddress}/${walletClient.account.address}/0/${nonce}`
 
     const seed = await walletClient.signMessage({
         message: nonceMessage,

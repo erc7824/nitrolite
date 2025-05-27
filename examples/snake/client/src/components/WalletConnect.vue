@@ -27,7 +27,7 @@ const emit = defineEmits<{
     error: [string];
 }>();
 
-onMounted(() => { connectWallet(); });
+onMounted(connectWallet);
 
 // Wallet signer interface following server implementation
 interface WalletSigner {
@@ -207,7 +207,7 @@ function formatAddress(address: string): string {
 <template>
     <div class="wallet-connect">
         <div v-if="!isConnected" class="connect-container">
-            <button class="connect-btn" :disabled="isConnecting">
+            <button class="connect-btn" :disabled="isConnecting" @click="connectWallet">
                 {{ isConnecting ? "Connecting..." : "Connect to Broker" }}
             </button>
             <div v-if="walletError" class="error-message">{{ walletError }}</div>

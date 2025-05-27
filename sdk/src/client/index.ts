@@ -17,6 +17,8 @@ import { ContractAddresses } from "../abis";
 import { _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from "./state";
 import { NitroliteTransactionPreparer, PreparerDependencies } from "./prepare";
 
+const CUSTODY_MIN_CHALLENGE_DURATION = 3600n;
+
 /**
  * The main client class for interacting with the Nitrolite SDK.
  * Provides high-level methods for managing state channels and funds.
@@ -39,7 +41,7 @@ export class NitroliteClient {
         if (!config.walletClient) throw new Errors.MissingParameterError("walletClient");
         if (!config.walletClient.account) throw new Errors.MissingParameterError("walletClient.account");
         if (!config.challengeDuration) throw new Errors.MissingParameterError("challengeDuration");
-        if (config.challengeDuration < 3600n) throw new Errors.InvalidParameterError("The minimum challenge duration is 3600 seconds");
+        if (config.challengeDuration < CUSTODY_MIN_CHALLENGE_DURATION) throw new Errors.InvalidParameterError(`The minimum challenge duration is ${CUSTODY_MIN_CHALLENGE_DURATION} seconds`);
         if (!config.addresses?.custody) throw new Errors.MissingParameterError("addresses.custody");
         if (!config.addresses?.adjudicator) throw new Errors.MissingParameterError("addresses.adjudicator");
         if (!config.addresses?.guestAddress) throw new Errors.MissingParameterError("addresses.guestAddress");

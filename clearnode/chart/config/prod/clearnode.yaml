@@ -1,0 +1,56 @@
+config:
+  args: ["clearnode"]
+  logLevel: info
+  database:
+    driver: postgres
+    host: postgresql.core
+    port: 5432
+    name: clearnet_prod
+    user: clearnet_prod_admin
+  envSecret: ""
+  extraEnvs:
+    POLYGON_CUSTODY_CONTRACT_ADDRESS: "0xc2F8Fca0A2dFa200728D3dae130dF6065b7da986"
+    # WORLD_CHAIN_CUSTODY_CONTRACT_ADDRESS: "0xcFdC977a4b75B77E47a80C0D2b2aB7ade72ABD2b"
+
+image:
+  repository: ghcr.io/erc7824/nitrolite/clearnode
+  tag: 0.0.1
+
+service:
+  http:
+    enabled: true
+    port: 8000
+    path: /
+
+metrics:
+  enabled: false
+  podmonitoring:
+    enabled: true
+  port: 4242
+  endpoint: "/metrics"
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 256Mi
+    ephemeral-storage: 100Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+    ephemeral-storage: 100Mi
+
+autoscaling:
+  enabled: false
+
+networking:
+  externalHostname: clearnet.yellow.com
+  tlsClusterIssuer: zerossl-prod
+  gateway:
+    enabled: false
+  ingress:
+    enabled: true
+    className: nginx
+    tls:
+      enabled: true
+
+imagePullSecret: ghcr-pull

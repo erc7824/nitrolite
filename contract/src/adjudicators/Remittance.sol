@@ -58,16 +58,14 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
             if (!earliestProof.validateInitialState(chan)) {
                 return false;
             }
-        }
-        else if (earliestProof.intent == StateIntent.RESIZE) {
+        } else if (earliestProof.intent == StateIntent.RESIZE) {
             if (!earliestProof.validateUnanimousSignatures(chan)) {
                 return false;
             }
             // NOTE: "extract" resize amounts, keep only the RESIZE state data
             // Remittance is encoded in "bytes"
             (, earliestProof.data) = abi.decode(earliestProof.data, (int256[], bytes));
-        }
-        else if (earliestProof.intent == StateIntent.OPERATE) {
+        } else if (earliestProof.intent == StateIntent.OPERATE) {
             // Otherwise, it must be signed by the other party (not the sender in candidate)
             // The last proof must have exactly one signature
             if (earliestProof.sigs.length != 1) {
@@ -128,8 +126,10 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
         Remittance memory currentRemittance = abi.decode(state.data, (Remittance));
 
         // NOTE: token must be the same
-        if (currentRemittance.amount.token != state.allocations[0].token ||
-            currentRemittance.amount.token != state.allocations[1].token) {
+        if (
+            currentRemittance.amount.token != state.allocations[0].token
+                || currentRemittance.amount.token != state.allocations[1].token
+        ) {
             return false;
         }
 
@@ -138,7 +138,11 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
         return Utils.verifySignature(stateHash, state.sigs[0], chan.participants[currentRemittance.sender]);
     }
 
-    function _validateRemittanceTransition(State memory previousState, State memory currentState) internal pure returns (bool) {
+    function _validateRemittanceTransition(State memory previousState, State memory currentState)
+        internal
+        pure
+        returns (bool)
+    {
         // basic validations: version, allocations sum
         if (!previousState.validateTransitionTo(currentState)) {
             return false;
@@ -160,7 +164,11 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
         return _validateRemittanceIsApplied(currentRemittance, previousState.allocations, currentState.allocations);
     }
 
-    function _validateRemittanceIsApplied(Remittance memory remittance, Allocation[] memory prevAllocations, Allocation[] memory currAllocations) internal pure returns (bool) {
+    function _validateRemittanceIsApplied(
+        Remittance memory remittance,
+        Allocation[] memory prevAllocations,
+        Allocation[] memory currAllocations
+    ) internal pure returns (bool) {
         // Verify sender's balance is decreasing
         if (prevAllocations[remittance.sender].amount <= currAllocations[remittance.sender].amount) {
             return false;
@@ -168,10 +176,8 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
 
         // Verify receiver's balance is increasing by the same amount
         uint8 receiver = remittance.sender == CREATOR ? BROKER : CREATOR;
-        uint256 senderDecrease = prevAllocations[remittance.sender].amount -
-                                currAllocations[remittance.sender].amount;
-        uint256 receiverIncrease = currAllocations[receiver].amount -
-                                    prevAllocations[receiver].amount;
+        uint256 senderDecrease = prevAllocations[remittance.sender].amount - currAllocations[remittance.sender].amount;
+        uint256 receiverIncrease = currAllocations[receiver].amount - prevAllocations[receiver].amount;
 
         if (senderDecrease != receiverIncrease) {
             return false;

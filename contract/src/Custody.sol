@@ -252,10 +252,10 @@ contract Custody is IChannel, IDeposit {
         // Verify channel exists and is not VOID
         if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
 
-        // Case 1: Mutual closing with CHANCLOSE magic number
+        // Case 1: Mutual closing with StateIntent.FINALIZE
         // Channel must not be in INITIAL stage (participants should close the channel with challenge then)
         if (meta.stage == ChannelStatus.ACTIVE) {
-            // Check that this is a closing state with CHANCLOSE magic number
+            // Check that this is a closing state with StateIntent.FINALIZE
             if (candidate.intent != StateIntent.FINALIZE) revert InvalidState();
 
             // For ACTIVE channels, version must be greater than 0
@@ -334,7 +334,7 @@ contract Custody is IChannel, IDeposit {
             candidate.data.length == 0
                 || (candidate.intent != StateIntent.INITIALIZE && candidate.intent != StateIntent.RESIZE)
         ) {
-            // if no state data or magic number is not CHANOPEN or CHANRESIZE, assume this is a normal state
+            // if no state data or intent is not INITIALIZE or RESIZE, assume this is a normal state
 
             // Verify the state is valid according to the adjudicator
             if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
@@ -441,7 +441,7 @@ contract Custody is IChannel, IDeposit {
         // Verify all participants have signed the resize state
         if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
 
-        // Decode the magic number and resize amounts
+        // Decode the resize amounts
         // TODO: extract `int256[]` into an alias type
         int256[] memory resizeAmounts = abi.decode(candidate.data, (int256[]));
 

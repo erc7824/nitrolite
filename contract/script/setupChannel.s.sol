@@ -17,10 +17,15 @@ contract SetupChannelScript is Script {
     uint256 constant USER_SESSION_KEY = 66797303920176115455777297298802822546720088673606171092140646898562007298987;
     address constant USER_SESSION_KEY_ADDRESS = 0xfAea0C9Dc921b8040DFa5Dd617014c957cf46455;
 
-
     function setUp() public {}
 
-    function run(string memory mnemonic, address custody, address adjudicator, address token, uint256 custodyDepositAmount) public {
+    function run(
+        string memory mnemonic,
+        address custody,
+        address adjudicator,
+        address token,
+        uint256 custodyDepositAmount
+    ) public {
         address[] memory addresses = new address[](3);
 
         for (uint32 i = 0; i < 3; i++) {
@@ -43,23 +48,28 @@ contract SetupChannelScript is Script {
         Custody(custody).create(channel, initialState);
     }
 
-    function createChannel(address userSessionKey, address broker, address adjudicator) internal pure returns (Channel memory) {
+    function createChannel(address userSessionKey, address broker, address adjudicator)
+        internal
+        pure
+        returns (Channel memory)
+    {
         address[] memory participants = new address[](2);
         participants[0] = userSessionKey;
         participants[1] = broker;
 
-        return Channel({
-            participants: participants,
-            adjudicator: adjudicator,
-            challenge: CHALLENGE_DURATION,
-            nonce: NONCE
-        });
+        return
+            Channel({participants: participants, adjudicator: adjudicator, challenge: CHALLENGE_DURATION, nonce: NONCE});
     }
 
-    function createInitialState(address token, address userSessionKey, address broker) internal pure returns (State memory) {
+    function createInitialState(address token, address userSessionKey, address broker)
+        internal
+        pure
+        returns (State memory)
+    {
         Allocation[] memory allocations = new Allocation[](2);
 
-        allocations[0] = Allocation({destination: userSessionKey, token: address(token), amount: CHANNEL_DEPOSIT_AMOUNT});
+        allocations[0] =
+            Allocation({destination: userSessionKey, token: address(token), amount: CHANNEL_DEPOSIT_AMOUNT});
 
         allocations[1] = Allocation({destination: broker, token: address(token), amount: 0});
 

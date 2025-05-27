@@ -96,10 +96,12 @@ Clearnode requires the following environment variables to be properly configured
 | `LOG_LEVEL` | Logging level (debug, info, warn, error) | No | info |
 | `HTTP_PORT` | Port for the HTTP/WebSocket server | No | 8000 |
 | `METRICS_PORT` | Port for Prometheus metrics | No | 4242 |
+| `MSG_EXPIRY_TIME` | Time in seconds for message timestamp validation | No | 60 |
 | `POLYGON_INFURA_URL` | Polygon RPC endpoint URL | At least one network required | - |
 | `POLYGON_CUSTODY_CONTRACT_ADDRESS` | Polygon custody contract address | Required if using Polygon | - |
+| `POLYGON_ADJUDICATOR_ADDRESS` | Polygon adjudicator contract address | Required if using Polygon | - |
 
-Multiple networks can be added.
+Multiple networks can be added. For each supported network (POLYGON, ETH_SEPOLIA, CELO, BASE, WORLD_CHAIN, LOCALNET), you can specify the corresponding INFURA_URL, CUSTODY_CONTRACT_ADDRESS, and ADJUDICATOR_ADDRESS environment variables.
 
 ## Running with Docker
 
@@ -113,6 +115,7 @@ DATABASE_DRIVER=postgres
 CLEARNODE_DATABASE_URL=file:./dev.db 
 POLYGON_INFURA_URL=https://polygon-mainnet.infura.io/v3/your_infura_key
 POLYGON_CUSTODY_CONTRACT_ADDRESS=0xYourContractAddress
+POLYGON_ADJUDICATOR_ADDRESS=0xYourAdjudicatorAddress
 ```
 
 ### Run locally

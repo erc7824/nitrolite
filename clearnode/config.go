@@ -25,10 +25,11 @@ var knownNetworks = map[string]uint32{
 
 // NetworkConfig represents configuration for a blockchain network
 type NetworkConfig struct {
-	Name           string
-	ChainID        uint32
-	InfuraURL      string
-	CustodyAddress string
+	Name               string
+	ChainID            uint32
+	InfuraURL          string
+	CustodyAddress     string
+	AdjudicatorAddress string
 }
 
 // Config represents the overall application configuration
@@ -95,6 +96,7 @@ func LoadConfig() (*Config, error) {
 	for network, chainID := range knownNetworks {
 		infuraURL := ""
 		custodyAddress := ""
+		adjudicatorAddress := ""
 
 		// Look for matching environment variables
 		for _, env := range envs {
@@ -110,6 +112,8 @@ func LoadConfig() (*Config, error) {
 				infuraURL = value
 			} else if strings.HasPrefix(key, network+"_CUSTODY_CONTRACT_ADDRESS") {
 				custodyAddress = value
+			} else if strings.HasPrefix(key, network+"_ADJUDICATOR_ADDRESS") {
+				custodyAddress = value
 			}
 		}
 
@@ -117,10 +121,11 @@ func LoadConfig() (*Config, error) {
 		if infuraURL != "" && custodyAddress != "" {
 			networkLower := strings.ToLower(network)
 			config.networks[networkLower] = &NetworkConfig{
-				Name:           networkLower,
-				ChainID:        chainID,
-				InfuraURL:      infuraURL,
-				CustodyAddress: custodyAddress,
+				Name:               networkLower,
+				ChainID:            chainID,
+				InfuraURL:          infuraURL,
+				CustodyAddress:     custodyAddress,
+				AdjudicatorAddress: adjudicatorAddress,
 			}
 		}
 	}

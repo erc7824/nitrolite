@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -149,7 +148,7 @@ func VerifyEip712Data(expectedAddrHex string, challengeToken string, signatureHe
 	fmt.Printf("EIP-712 Typed Data Hash: 0x%x\n", typedDataHash)
 
 	// 2. Example signature
-	sig, err := hex.DecodeString(signatureHex)
+	sig, err := hexutil.Decode(signatureHex)
 	if err != nil {
 		log.Printf("Failed to decode signature: %v", err)
 		return false, err

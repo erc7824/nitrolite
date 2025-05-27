@@ -92,7 +92,7 @@ Clearnode requires the following environment variables to be properly configured
 |----------|-------------|----------|---------|
 | `BROKER_PRIVATE_KEY` | Private key used for signing broker messages | Yes | - |
 | `DATABASE_DRIVER` | Database driver to use (postgres/sqlite) | No | sqlite |
-| `DATABASE_URL` | Database connection string | No | clearnode.db |
+| `CLEARNODE_DATABASE_URL` | Database connection string | No | clearnode.db |
 | `LOG_LEVEL` | Logging level (debug, info, warn, error) | No | info |
 | `HTTP_PORT` | Port for the HTTP/WebSocket server | No | 8000 |
 | `METRICS_PORT` | Port for Prometheus metrics | No | 4242 |
@@ -110,7 +110,7 @@ Multiple networks can be added.
 ```
 BROKER_PRIVATE_KEY=your_private_key
 DATABASE_DRIVER=postgres
-DATABASE_URL=postgresql://user:password@postgres:5432/clearnode
+CLEARNODE_DATABASE_URL=file:./dev.db 
 POLYGON_INFURA_URL=https://polygon-mainnet.infura.io/v3/your_infura_key
 POLYGON_CUSTODY_CONTRACT_ADDRESS=0xYourContractAddress
 ```
@@ -118,7 +118,7 @@ POLYGON_CUSTODY_CONTRACT_ADDRESS=0xYourContractAddress
 ### Run locally
 
 ```go
-go run ./...
+go run .
 ```
 
 ### Build and Run the Docker Image
@@ -129,5 +129,5 @@ go run ./...
 docker build -t clearnode .
 
 # Run the container
-docker run -p 8000:8000 -p 4242:4242 --env-file .env clearnode
+docker run -p 8000:8000 -p 4242:4242  -v ./.env:/.env clearnode
 ```

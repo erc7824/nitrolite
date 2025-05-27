@@ -12,20 +12,22 @@ import {
 const DERIVATION_PATH_PREFIX = 'nitrolite_state_wallet_v1_';
 
 /**
- * Generates a deterministic private key from a seed and optional salt
+ * Generates a deterministic private key for wallet clients based on the provided adjudicator and app addresses, and a nonce.
  */
 export const createDeterministicPrivateKey = async (
     walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>,
-    derivationIndex: number = 0,
-    salt: string = ''
+    adjudicatorAddress: string,
+    appAddress: string,
+    nonce: number = 0,
 ): Promise<Hex> => {
-    const nonceMessage = `Nitrolite derivation index: ${derivationIndex}`;
+    // NOTE: keep in mind that this key should be used only for the respective adjudicator and app address
+    const nonceMessage = `${walletClient.account.address}/${adjudicatorAddress}/${appAddress}/0/${nonce}`
 
     const seed = await walletClient.signMessage({
         message: nonceMessage,
     });
 
-    const input = DERIVATION_PATH_PREFIX + seed + salt;
+    const input = DERIVATION_PATH_PREFIX + seed;
 
     const privateKey = keccak256(toHex(input));
 

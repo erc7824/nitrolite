@@ -1,6 +1,6 @@
 {
     "name": "@erc7824/nitrolite",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "The Nitrolite SDK empowers developers to build high-performance, scalable web3 applications using state channels. It's designed to provide near-instant transactions and significantly improved user experiences by minimizing direct blockchain interactions.",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",

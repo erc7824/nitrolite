@@ -68,7 +68,7 @@ export async function createAuthVerifyMessageFromChallenge(
  *
  * @param signer - The function to sign the 'auth_verify' request payload.
  * @param rawChallengeResponse - The raw JSON string or object received from the broker containing the 'auth_challenge'.
- * @param clientAddress - The Ethereum address of the client authenticating (must match the address used in 'auth_request').
+ * @param params - The specific parameters required by 'auth_verify', including the session key and app name.
  * @param requestId - Optional request ID for the 'auth_verify' request. Defaults to a generated ID.
  * @param timestamp - Optional timestamp for the 'auth_verify' request. Defaults to the current time.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage for 'auth_verify'.
@@ -77,7 +77,7 @@ export async function createAuthVerifyMessageFromChallenge(
 export async function createAuthVerifyMessage(
     signer: MessageSigner,
     rawChallengeResponse: string | object,
-    clientAddress: Address,
+    params: AuthVerifyRequest,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
@@ -101,10 +101,10 @@ export async function createAuthVerifyMessage(
 
     const challenge: string = parsedResponse.data[0].challenge_message;
 
-    const verificationData = { address: clientAddress, challenge: challenge };
-    const params = [verificationData];
+    const verificationData = { address: params.address, challenge: challenge, session_key: params.session_key, app_name: params.app_name };
+    const paramsArray = [verificationData];
 
-    const request = NitroliteRPC.createRequest(requestId, "auth_verify", params, timestamp);
+    const request = NitroliteRPC.createRequest(requestId, "auth_verify", paramsArray, timestamp);
 
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 

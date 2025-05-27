@@ -145,8 +145,6 @@ func VerifyEip712Data(expectedAddrHex string, challengeToken string, signatureHe
 		return false, err
 	}
 
-	fmt.Printf("EIP-712 Typed Data Hash: 0x%x\n", typedDataHash)
-
 	// 2. Example signature
 	sig, err := hexutil.Decode(signatureHex)
 	if err != nil {
@@ -167,14 +165,11 @@ func VerifyEip712Data(expectedAddrHex string, challengeToken string, signatureHe
 	}
 
 	signerAddress := crypto.PubkeyToAddress(*pubKey)
-	fmt.Println("Recovered address:", signerAddress.Hex())
 
 	// 5. Optional: verify against expected signer
 	if signerAddress.Hex() == expectedAddrHex {
-		fmt.Println("✅ Signature verified successfully!")
 		return true, nil
 	} else {
-		fmt.Println("❌ Signature verification failed.")
 		return false, errors.New("signature verification failed")
 	}
 }

@@ -302,7 +302,8 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 				return fmt.Errorf("Asset not found in database for token: %s", channel.Token)
 			}
 
-			tokenAmount := decimal.NewFromBigInt(big.NewInt(int64(channel.Amount)), -int32(asset.Decimals))
+			finalAllocation := ev.FinalState.Allocations[0].Amount
+			tokenAmount := decimal.NewFromBigInt(finalAllocation, -int32(asset.Decimals))
 
 			ledger := GetWalletLedger(tx, channel.Wallet)
 			if err := ledger.Record(channel.Wallet, asset.Symbol, tokenAmount.Neg()); err != nil {

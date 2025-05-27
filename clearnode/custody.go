@@ -25,20 +25,20 @@ var (
 
 // Custody implements the BlockchainClient interface using the Custody contract
 type Custody struct {
-	client                *ethclient.Client
-	custody               *nitrolite.Custody
-	db                    *gorm.DB
-	custodyAddr           common.Address
-	transactOpts          *bind.TransactOpts
-	chainID               uint32
-	signer                *Signer
-	supportedAdjudicators []string
-	sendBalanceUpdate     func(string)
-	sendChannelUpdate     func(Channel)
+	client             *ethclient.Client
+	custody            *nitrolite.Custody
+	db                 *gorm.DB
+	custodyAddr        common.Address
+	transactOpts       *bind.TransactOpts
+	chainID            uint32
+	signer             *Signer
+	adjudicatorAddress common.Address
+	sendBalanceUpdate  func(string)
+	sendChannelUpdate  func(Channel)
 }
 
 // NewCustody initializes the Ethereum client and custody contract wrapper.
-func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr string, chain uint32) (*Custody, error) {
+func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr, adjudicatorAddr string, chain uint32) (*Custody, error) {
 	custodyAddress := common.HexToAddress(custodyAddressStr)
 	client, err := ethclient.Dial(infuraURL)
 	if err != nil {
@@ -64,16 +64,16 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 	}
 
 	return &Custody{
-		client:                client,
-		custody:               custody,
-		db:                    db,
-		custodyAddr:           custodyAddress,
-		transactOpts:          auth,
-		chainID:               uint32(chainID.Int64()),
-		signer:                signer,
-		supportedAdjudicators: []string{}, // TODO: add config
-		sendBalanceUpdate:     sendBalanceUpdate,
-		sendChannelUpdate:     sendChannelUpdate,
+		client:             client,
+		custody:            custody,
+		db:                 db,
+		custodyAddr:        custodyAddress,
+		transactOpts:       auth,
+		chainID:            uint32(chainID.Int64()),
+		signer:             signer,
+		adjudicatorAddress: common.HexToAddress(adjudicatorAddr),
+		sendBalanceUpdate:  sendBalanceUpdate,
+		sendChannelUpdate:  sendChannelUpdate,
 	}, nil
 }
 
@@ -137,7 +137,7 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 		broker := ev.Channel.Participants[1]
 		tokenAddress := ev.Initial.Allocations[0].Token.Hex()
 		tokenAmount := ev.Initial.Allocations[0].Amount.Int64()
-		adjudictor := ev.Channel.Adjudicator.Hex()
+		adjudicator := ev.Channel.Adjudicator
 		challenge := ev.Channel.Challenge
 
 		brokerAmount := ev.Initial.Allocations[1].Amount.Int64()
@@ -151,17 +151,9 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			return
 		}
 
-		found := false
-		for _, a := range c.supportedAdjudicators {
-			if a == adjudictor {
-				found = true
-				break
-			}
-		}
-		if !found {
-			log.Printf("[Created] Error: unsupported adjudicator %s\n", adjudictor)
-			// TODO: uncomment return after supported adjudicators are configured
-			// return
+		if adjudicator != c.adjudicatorAddress {
+			log.Printf("[Created] Error: unsupported adjudicator %s, expected %s\n", adjudicator.Hex(), c.adjudicatorAddress.Hex())
+			return
 		}
 
 		// Check if channel was created with the broker.
@@ -196,7 +188,7 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			participantSigner,
 			nonce,
 			challenge,
-			adjudictor,
+			adjudicator.Hex(),
 			c.chainID,
 			tokenAddress,
 			uint64(tokenAmount),

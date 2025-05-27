@@ -2,17 +2,14 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
-	"math/big"
 	"strings"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
@@ -119,27 +116,27 @@ func RecoverAddress(message []byte, signatureHex string) (string, error) {
 	return addr.Hex(), nil
 }
 
-func VerifyEip712Data(expectedAddrHex string, challengeToken string, signatureHex string) (bool, error) {
+func VerifyEip712Data(expectedAddrHex string, challengeToken string, sessionKey string, appName string, signatureHex string) (bool, error) {
 	// Define your EIP-712 typed data
 	typedData := apitypes.TypedData{
 		Types: apitypes.Types{
 			"EIP712Domain": {
 				{Name: "name", Type: "string"},
-				{Name: "version", Type: "string"},
 			},
 			"AuthVerify": {
 				{Name: "address", Type: "address"},
 				{Name: "challenge", Type: "string"},
+				{Name: "session_key", Type: "address"},
 			},
 		},
 		PrimaryType: "AuthVerify",
 		Domain: apitypes.TypedDataDomain{
-			Name:    "Nitrolite WebSocket Auth",
-			Version: "1",
+			Name: appName,
 		},
 		Message: map[string]interface{}{
-			"address":   expectedAddrHex,
-			"challenge": challengeToken,
+			"address":     expectedAddrHex,
+			"challenge":   challengeToken,
+			"session_key": sessionKey,
 		},
 	}
 
@@ -150,10 +147,8 @@ func VerifyEip712Data(expectedAddrHex string, challengeToken string, signatureHe
 		return false, err
 	}
 
-	fmt.Printf("EIP-712 Typed Data Hash: 0x%x\n", typedDataHash)
-
 	// 2. Example signature
-	sig, err := hex.DecodeString(signatureHex)
+	sig, err := hexutil.Decode(signatureHex)
 	if err != nil {
 		log.Printf("Failed to decode signature: %v", err)
 		return false, err
@@ -172,14 +167,11 @@ func VerifyEip712Data(expectedAddrHex string, challengeToken string, signatureHe
 	}
 
 	signerAddress := crypto.PubkeyToAddress(*pubKey)
-	fmt.Println("Recovered address:", signerAddress.Hex())
 
 	// 5. Optional: verify against expected signer
 	if signerAddress.Hex() == expectedAddrHex {
-		fmt.Println("✅ Signature verified successfully!")
 		return true, nil
 	} else {
-		fmt.Println("❌ Signature verification failed.")
 		return false, errors.New("signature verification failed")
 	}
 }

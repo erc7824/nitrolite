@@ -363,7 +363,7 @@ func HandleCreateApplication(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) 
 			return nil, errors.New("invalid signature")
 		}
 
-		walletAddress, err := GetWalletBySigner(db, addr)
+		walletAddress, err := GetWalletBySigner(addr)
 		if err != nil {
 			continue
 		}
@@ -508,7 +508,7 @@ func HandleCloseApplication(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 
 		for address := range recoveredAddresses {
 			addr := address
-			walletAddress, _ := GetWalletBySigner(db, address)
+			walletAddress, _ := GetWalletBySigner(address)
 			if walletAddress != "" {
 				addr = walletAddress
 			}
@@ -716,7 +716,7 @@ func HandleResizeChannel(rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMess
 		return nil, err
 	}
 
-	walletAddress, _ := GetWalletBySigner(db, recoveredAddress)
+	walletAddress, _ := GetWalletBySigner(recoveredAddress)
 	if walletAddress != "" {
 		recoveredAddress = walletAddress
 	}
@@ -857,7 +857,7 @@ func HandleCloseChannel(rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMessa
 		return nil, err
 	}
 
-	walletAddress, _ := GetWalletBySigner(db, recoveredAddress)
+	walletAddress, _ := GetWalletBySigner(recoveredAddress)
 	if walletAddress != "" {
 		recoveredAddress = walletAddress
 	}
@@ -950,7 +950,7 @@ func HandleCloseChannel(rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMessa
 // HandleGetChannels returns a list of channels for a given account
 // TODO: add filters, pagination, etc.
 func HandleGetChannels(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
-	var wallet string
+	var participant string
 	var status string
 
 	if len(rpc.Req.Params) > 0 {
@@ -958,17 +958,17 @@ func HandleGetChannels(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 		if err == nil {
 			var params map[string]string
 			if err := json.Unmarshal(paramsJSON, &params); err == nil {
-				wallet = params["wallet"]
+				participant = params["participant"]
 				status = params["status"]
 			}
 		}
 	}
 
-	if wallet == "" {
-		return nil, errors.New("missing participant parameter")
+	if participant == "" {
+		return nil, errors.New("missing participant participant")
 	}
 
-	channels, err := getChannelsByWallet(db, wallet, status)
+	channels, err := getChannelsByWallet(db, participant, status)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get channels: %w", err)
 	}

@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto';
-import { Player } from '../interfaces';
-import { getRoom } from './stateService';
-import { closeAppSession } from './brokerService';
+import { Player } from '../interfaces/index.ts';
+import { getRoom } from './stateService.ts';
+import { closeAppSession } from './brokerService.ts';
 import { Hex } from 'viem';
 
 // Import websocketService to broadcast game state - imported at bottom of file to avoid circular dependency

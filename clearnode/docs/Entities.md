@@ -89,6 +89,7 @@ A NetworkConfig represents configuration for a blockchain network.
 - `ChainID` (uint32): Blockchain network identifier
 - `RpcURL` (string): RPC endpoint URL
 - `CustodyAddress` (string): Address of the custody contract
+- `AdjudicatorAddress` (string): Address of the adjudicator contract
 
 NetworkConfig enables the protocol to interact with different blockchain networks.
 

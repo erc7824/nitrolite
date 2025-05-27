@@ -64,10 +64,11 @@ enum ChannelStatus {
  * @dev Used to indicate the action to be taken with the state
  */
 enum StateIntent {
-    OPERATE, // Operate the state application
+    OPERATE, // Operate is the app state
     INITIALIZE, // Initial funding state
     RESIZE, // Resize state
     FINALIZE // Final closing state
+
 }
 
 /**

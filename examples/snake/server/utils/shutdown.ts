@@ -1,7 +1,7 @@
 import { Server } from 'http';
 import { WebSocketServer } from 'ws';
-import { getAllRooms, getBrokerWebSocket } from '../services/stateService';
-import { closeAppSession } from '../services/brokerService';
+import { getAllRooms, getBrokerWebSocket } from '../services/stateService.ts';
+import { closeAppSession } from '../services/brokerService.ts';
 import { Hex } from 'viem';
 
 // Handle graceful shutdown of the server

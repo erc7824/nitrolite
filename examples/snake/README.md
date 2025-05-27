@@ -53,9 +53,9 @@ An online two-player snake game built with Vue and WebSocket, featuring state ch
 npm install
 
 # Set up environment variables (create .env file)
-echo "BROKER_WS_URL=wss://clearnode-multichain-production.up.railway.app/ws
-SERVER_PRIVATE_KEY=your_server_private_key
-WALLET_PRIVATE_KEY=your_wallet_private_key
+echo "BROKER_WS_URL=wss://broker.example.com/ws # see docs for the URL
+SERVER_PRIVATE_KEY=your_server_private_key      # used to sign the state updates in game server to broker comms
+WALLET_PRIVATE_KEY=your_wallet_private_key      # used to fund the state channel with the broker
 POLYGON_RPC_URL=your_polygon_rpc_url
 PORT=3001" > .env
 

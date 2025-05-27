@@ -548,7 +548,7 @@ func TestHandleGetChannels(t *testing.T) {
 	require.NoError(t, db.Create(&otherChannel).Error)
 
 	params := map[string]string{
-		"wallet": participantWallet,
+		"participant": participantWallet,
 	}
 	paramsJSON, err := json.Marshal(params)
 	require.NoError(t, err)
@@ -609,8 +609,8 @@ func TestHandleGetChannels(t *testing.T) {
 
 	// Test with status filter for "open" channels
 	openStatusParams := map[string]string{
-		"wallet": participantWallet,
-		"status": string(ChannelStatusOpen),
+		"participant": participantWallet,
+		"status":      string(ChannelStatusOpen),
 	}
 	openStatusParamsJSON, err := json.Marshal(openStatusParams)
 	require.NoError(t, err)
@@ -637,8 +637,8 @@ func TestHandleGetChannels(t *testing.T) {
 
 	// Test with status filter for "closed" channels
 	closedStatusParams := map[string]string{
-		"wallet": participantWallet,
-		"status": string(ChannelStatusClosed),
+		"participant": participantWallet,
+		"status":      string(ChannelStatusClosed),
 	}
 	closedStatusParamsJSON, err := json.Marshal(closedStatusParams)
 	require.NoError(t, err)
@@ -665,8 +665,8 @@ func TestHandleGetChannels(t *testing.T) {
 
 	// Test with status filter for "joining" channels
 	joiningStatusParams := map[string]string{
-		"wallet": participantWallet,
-		"status": string(ChannelStatusJoining),
+		"participant": participantWallet,
+		"status":      string(ChannelStatusJoining),
 	}
 	joiningStatusParamsJSON, err := json.Marshal(joiningStatusParams)
 	require.NoError(t, err)

@@ -49,7 +49,7 @@ export interface NitroliteRPCMessage {
     /** Contains the response or error payload if this is a response message. */
     res?: ResponsePayload;
     /** Optional cryptographic signature(s). */
-    sig?: Hex[];
+    sig?: Hex[] | [""];
 }
 
 /**
@@ -104,6 +104,32 @@ export interface AppDefinition {
     challenge: number;
     /** A unique number used once, often for preventing replay attacks or ensuring uniqueness of the application instance. */
     nonce?: number;
+}
+
+/**
+ * Defines the parameters required for the 'auth_request' RPC method.
+ */
+export interface AuthRequest {
+    /** The Address of the connected account. */
+    address: Address;
+    // Session key for the account, used for application authentication.
+    session_key: Address;
+    /** The name of the application associated with the account, used for application-specific operations. */
+    app_name: string;
+}
+
+/**
+ * Defines the parameters required for the 'auth_verify' RPC method.
+ */
+export interface AuthVerifyRequest {
+    /** The Address of the connected account. */
+    address: Address;
+    // The challenge string that needs to be signed by the user.
+    challenge: string;
+    // Session key for the account, used for application authentication.
+    session_key: Address;
+    /** The name of the application associated with the account, used for application-specific operations. */
+    app_name: string;
 }
 
 /**
@@ -174,7 +200,14 @@ export enum NitroliteErrorCode {
 
 /**
  * Defines the function signature for signing message payloads (req or res objects).
- * Implementations should sign the provided payload object (typically after serialization).
+ * Implementations can use either signMessage or signStateData depending on the use case.
+ * For general RPC messages, signMessage is typically used.
+ * For state channel operations, signStateData may be more appropriate.
+ *
+ * Example implementations:
+ * - Using signMessage: (payload) => walletClient.signMessage({ message: JSON.stringify(payload) })
+ * - Using signStateData: (payload) => walletClient.signStateData({ data: encodeAbiParameters([...], payload) })
+ *
  * @param payload - The RequestData or ResponsePayload object (array) to sign.
  * @returns A Promise that resolves to the cryptographic signature as a Hex string.
  */

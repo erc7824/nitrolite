@@ -9,12 +9,14 @@ config:
     user: clearnet_uat_admin
   envSecret: ""
   extraEnvs:
-    POLYGON_CUSTODY_CONTRACT_ADDRESS: "0xDB852c37e21Fb1bFDB911E3c3ecdb53fc9DEDB22"
+    POLYGON_CUSTODY_CONTRACT_ADDRESS: "0xc2F8Fca0A2dFa200728D3dae130dF6065b7da986"
+    POLYGON_ADJUDICATOR_ADDRESS: "0x5F4A4B1D293A973a1Bc0daD3BB3692Bd51058FCF"
     # ETH_SEPOLIA_CUSTODY_CONTRACT_ADDRESS: "0xa3f2f64455c9f8D68d9dCAeC2605D64680FaF898"
+    MSG_EXPIRY_TIME: "60"
 
 image:
   repository: ghcr.io/erc7824/nitrolite/clearnode
-  tag: 0.0.1-rc.12
+  tag: 63f1dd8
 
 service:
   http:

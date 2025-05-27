@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type SignerWallet struct {
@@ -28,25 +29,30 @@ func loadWalletCache(db *gorm.DB) error {
 	return nil
 }
 
-func GetWalletBySigner(db *gorm.DB, signerAddress string) (string, error) {
-	w, ok := walletCache.Load(signerAddress)
-	if ok {
+func GetWalletBySigner(signer string) (string, error) {
+	if w, ok := walletCache.Load(signer); ok {
 		return w.(string), nil
-	} else {
-		return "", nil
 	}
+	return "", nil
 }
 
-func AddSigner(db *gorm.DB, walletAddress, signerAddress string) error {
+func AddSigner(db *gorm.DB, wallet, signer string) error {
+	sw := &SignerWallet{Signer: signer, Wallet: wallet}
+
+	if err := db.
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(sw).Error; err != nil {
+		return err
+	}
+
+	walletCache.Store(signer, wallet)
+	return nil
+}
+
+func RemoveSigner(db *gorm.DB, walletAddress, signerAddress string) error {
 	sw := &SignerWallet{
 		Signer: signerAddress,
 		Wallet: walletAddress,
 	}
-
-	if err := db.Create(sw).Error; err != nil {
-		return err
-	}
-
-	walletCache.Store(signerAddress, walletAddress)
-	return nil
+	return db.Delete(&sw).Error
 }

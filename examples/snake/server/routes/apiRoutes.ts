@@ -1,20 +1,19 @@
 import { Express, RequestHandler } from 'express';
 import { ethers } from 'ethers';
 import { randomBytes } from 'crypto';
-import { SERVER_PRIVATE_KEY, CONTRACT_ADDRESSES } from '../config';
-import { getRoom, getAllRooms } from '../services/stateService';
-import { clearNetRPC } from '../services/gameService';
+import { SERVER_PRIVATE_KEY, CONTRACT_ADDRESSES } from '../config/index.ts';
+import { getRoom, getAllRooms } from '../services/stateService.ts';
+import { clearNetRPC } from '../services/gameService.ts';
 import {
   signStateData,
   verifySignature,
   isAuthenticatedWithBroker
-} from '../services/brokerService';
+} from '../services/brokerService.ts';
 import {
-  requireAuth,
   generateChallenge,
   verifyChallengeSignature
-} from '../middlewares/authMiddleware';
-import { Room } from '../interfaces';
+} from '../middlewares/authMiddleware.ts';
+import { Room } from '../interfaces/index.ts';
 import { Hex } from 'viem';
 
 // Setup API routes for the Express app
@@ -284,17 +283,4 @@ export function setupApiRoutes(app: Express): void {
       res.status(500).json({ error: 'Failed to verify authentication' });
     }
   }) as RequestHandler);
-
-  // Protected route example that requires authentication
-  app.get('/api/protected/user-info', requireAuth, (req, res) => {
-    // The middleware adds the authenticated address to the request
-    const address = (req as any).authenticatedAddress;
-
-    res.json({
-      success: true,
-      address,
-      authenticatedAt: Date.now(),
-      // In a real implementation, fetch and return user data from a database
-    });
-  });
 }

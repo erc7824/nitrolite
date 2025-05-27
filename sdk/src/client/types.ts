@@ -73,6 +73,8 @@ export interface NitroliteClientConfig {
      * 1. Sending on-chain transactions in direct execution methods (e.g., `client.deposit`).
      * 2. Providing the 'account' context for transaction preparation (`client.txPreparer`).
      * 3. Signing off-chain states *if* `stateWalletClient` is not provided.
+     * @dev Note that the client's `signMessage` function should NOT add an EIP-191 prefix to the message signed. See {@link SignMessageFn} for details.
+     * viem's `signMessage` can operate in `raw` mode, which suffice.
      */
     walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
 
@@ -81,6 +83,8 @@ export interface NitroliteClientConfig {
      * Provide this if you want to use a different key (e.g., a "hot" key from localStorage)
      * for state signing than the one used for on-chain transactions.
      * If omitted, `walletClient` will be used for state signing.
+     * @dev Note that the client's `signMessage` function should NOT add an EIP-191 prefix to the message signed. See {@link SignMessageFn} for details.
+     * viem's `signMessage` can operate in `raw` mode, which suffice.
      */
     stateWalletClient?: WalletClient<Transport, Chain, ParseAccount<Account>>;
 

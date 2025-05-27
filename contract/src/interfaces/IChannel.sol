@@ -59,16 +59,16 @@ interface IChannel {
 
     /**
      * @notice Creates a new channel and initializes funding
-     * @dev The creator must sign the funding state containing the CHANOPEN magic number
+     * @dev The creator must sign the funding state with StateIntent.INITIALIZE
      * @param ch Channel configuration with participants, adjudicator, challenge period, and nonce
-     * @param initial Initial state with CHANOPEN magic number and expected allocations
+     * @param initial Initial state with StateIntent.INITIALIZE and expected allocations
      * @return channelId Unique identifier for the created channel
      */
     function create(Channel calldata ch, State calldata initial) external returns (bytes32 channelId);
 
     /**
      * @notice Allows a participant to join a channel by signing the funding state
-     * @dev Participant must provide signature on the same funding state with CHANOPEN magic number
+     * @dev Participant must provide signature on the same funding state with StateIntent.INITIALIZE
      * @param channelId Unique identifier for the channel
      * @param index Index of the participant in the channel's participants array
      * @param sig Signature of the participant on the funding state
@@ -78,7 +78,7 @@ interface IChannel {
 
     /**
      * @notice Finalizes a channel with a mutually signed closing state
-     * @dev Requires all participants' signatures on a state with CHANCLOSE magic number,
+     * @dev Requires all participants' signatures on a state with StateIntent.FINALIZE,
      *      or can be called after challenge period expires with the last valid state
      * @param channelId Unique identifier for the channel
      * @param candidate The latest known valid state to be finalized

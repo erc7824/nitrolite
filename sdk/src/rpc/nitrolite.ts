@@ -157,6 +157,7 @@ export class NitroliteRPC {
      *
      * @param message - The request message to sign (must contain 'req').
      * @param signer - The signing function that takes the payload array and returns a signature.
+     *                 Can use either signMessage (for general RPC messages) or signStateData (for state channel operations).
      * @returns The original message object mutated with the signature attached.
      */
     static async signRequestMessage(message: NitroliteRPCMessage, signer: MessageSigner): Promise<NitroliteRPCMessage> {
@@ -193,7 +194,10 @@ export class NitroliteRPC {
 
         try {
             const payload = this.getMessagePayload(message);
-            return await verifier(payload, signature, expectedSigner);
+            if (typeof signature !== "string" || signature === "") {
+                return false;
+            }
+            return await verifier(payload, signature as Hex, expectedSigner);
         } catch (error) {
             console.error("Error during single signature verification:", error);
             return false;
@@ -220,6 +224,9 @@ export class NitroliteRPC {
 
         try {
             const payload = this.getMessagePayload(message);
+            if (typeof message.sig !== "string" || message.sig === "") {
+                return false;
+            }
             return await verifier(payload, message.sig, expectedSigners);
         } catch (error) {
             console.error("Error during multiple signature verification:", error);

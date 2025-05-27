@@ -11,6 +11,14 @@ State channel infrastructure has two main components:
 - **IChannel** escrow which stores funds and can support and run adjudication on multiple channels
 - **Adjudicators** are small contracts which validate state transitions to a candidate state against proofs
 
+It is expected that Nitrolite implementation are 2 participants channels, where the first participants
+is the channel creator and is called the client, the counterpart is clearnode a webservice which provide
+chain abstraction services to connected clients. Allowing them to transact off-chain in a logical layer-3
+with chain abstraction.
+
+Nitrolite is the EVM implementation which connects to clearnode, other blockchains have other implementations
+which must have equivalent escrow mechanisms.
+
 ## Interface Structure
 
 ### ChannelId
@@ -103,8 +111,9 @@ struct App {
 }
 
 struct State {
-    bytes data; // Application data encoded, decoded by the adjudicator for business logic
+    StateIntent intent; // Intent of the state
     uint256 version; // State version incremental number to compare most recent
+    bytes data; // Application data encoded, decoded by the adjudicator for business logic
     Allocation[] allocations; // Combined asset allocation and destination for each participant
     Signature[] sigs; // stateHash signatures from participants
 }
@@ -117,10 +126,12 @@ enum Status {
     FINAL     // Final state, channel can be closed
 }
 
-// Magic numbers for funding protocol
-uint32 constant CHANOPEN = 7877; // State.data value for funding stateHash
-uint32 constant CHANCLOSE = 7879; // State.data value for closing stateHash
-uint32 constant CHANRESIZE = 7883; // State.data value for resize stateHash
+enum StateIntent {
+    OPERATE,    // Operate is the app state 
+    INITIALIZE, // Initial funding state
+    RESIZE,     // Resize state
+    FINALIZE    // Final closing state
+}
 ```
 
 ### `IComparable.sol`
@@ -207,16 +218,16 @@ interface IChannel {
 
     /**
      * @notice Creates a new channel and initializes funding
-     * @dev The creator must sign the funding state containing the CHANOPEN magic number
+     * @dev The creator must sign the funding state with StateIntent.INITIALIZE
      * @param ch Channel configuration with participants, adjudicator, challenge period, and nonce
-     * @param initial Initial state with CHANOPEN magic number and expected allocations
+     * @param initial Initial state with StateIntent.INITIALIZE and expected allocations
      * @return channelId Unique identifier for the created channel
      */
     function create(Channel calldata ch, State calldata initial) external returns (bytes32 channelId);
 
     /**
      * @notice Allows a participant to join a channel by signing the funding state
-     * @dev Participant must provide signature on the same funding state with CHANOPEN magic number
+     * @dev Participant must provide signature on the same funding state with StateIntent.INITIALIZE
      * @param channelId Unique identifier for the channel
      * @param index Index of the participant in the channel's participants array
      * @param sig Signature of the participant on the funding state
@@ -226,7 +237,7 @@ interface IChannel {
 
     /**
      * @notice Finalizes a channel with a mutually signed closing state
-     * @dev Requires all participants' signatures on a state with CHANCLOSE magic number,
+     * @dev Requires all participants' signatures on a state with StateIntent.FINALIZE,
      *      or can be called after challenge period expires with the last valid state
      * @param channelId Unique identifier for the channel
      * @param candidate The latest known valid state to be finalized
@@ -274,7 +285,7 @@ interface IChannel {
 
 1. The Creator must:
    - Construct a channel configuration with participants, adjudicator, challenge period, and nonce
-   - Prepare an initial state where `state.data` is set to the magic number `CHANOPEN` (7877)
+   - Prepare an initial state where `state.intent` is set to `StateIntent.INITIALIZE`
    - Define expected token deposits for all participants in the `state.allocations` array
    - Compute the Funding stateHash of this initial deposit state
    - Include creator's stateHash signature in the `state.sigs` array at position 0
@@ -291,7 +302,7 @@ interface IChannel {
 
 1. Each non-Creator participant must:
    - Verify the channelId and expected allocations
-   - Sign the same funding stateHash (containing the magic number `CHANOPEN`)
+   - Sign the same funding stateHash (with `StateIntent.INITIALIZE`)
    - Call the `join` function with the channelId, their participant index, and signature
 
 2. The system must:
@@ -327,13 +338,13 @@ This approach ensures that the most recent valid state always prevails during di
 ### Cooperative Close
 
 1. To close cooperatively, any participant may:
-   - Prepare a final state where `state.data` is set to the magic number `CHANCLOSE` (7879)
+   - Prepare a final state where `state.intent` is set to `StateIntent.FINALIZE`
    - Collect signatures from all participants on this final state
    - Call the `close` function with the channelId, final state, and any required proofs
 
 2. The system must:
    - Verify all participant signatures on the closing stateHash
-   - Verify the state contains the `CHANCLOSE` magic number
+   - Verify the state contains `StateIntent.FINALIZE`
    - Distribute funds according to the final state's allocations
    - Set the channel status to `FINAL`
    - Delete the channel and emit a `Closed` event

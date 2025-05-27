@@ -11,6 +11,10 @@ import { _prepareAndSignInitialState, _prepareAndSignFinalState, _prepareAndSign
  */
 export type PreparedTransaction = SimulateContractReturnType["request"];
 
+/**
+ * @dev Note: `stateWalletClient.signMessage` function should NOT add an EIP-191 prefix to the message signed as
+ * the contract expects the raw message to be signed.
+ */
 export interface PreparerDependencies {
     nitroliteService: NitroliteService;
     erc20Service: Erc20Service;

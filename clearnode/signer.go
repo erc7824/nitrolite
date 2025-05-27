@@ -116,7 +116,7 @@ func RecoverAddress(message []byte, signatureHex string) (string, error) {
 	return addr.Hex(), nil
 }
 
-func VerifyEip712Data(expectedAddrHex string, challengeToken string, signatureHex string) (bool, error) {
+func VerifyEip712Data(expectedAddrHex string, challengeToken string, sessionKey string, appName string, signatureHex string) (bool, error) {
 	// Define your EIP-712 typed data
 	typedData := apitypes.TypedData{
 		Types: apitypes.Types{
@@ -126,15 +126,17 @@ func VerifyEip712Data(expectedAddrHex string, challengeToken string, signatureHe
 			"AuthVerify": {
 				{Name: "address", Type: "address"},
 				{Name: "challenge", Type: "string"},
+				{Name: "session_key", Type: "address"},
 			},
 		},
 		PrimaryType: "AuthVerify",
 		Domain: apitypes.TypedDataDomain{
-			Name: "Yellow App Store",
+			Name: appName,
 		},
 		Message: map[string]interface{}{
-			"address":   expectedAddrHex,
-			"challenge": challengeToken,
+			"address":     expectedAddrHex,
+			"challenge":   challengeToken,
+			"session_key": sessionKey,
 		},
 	}
 

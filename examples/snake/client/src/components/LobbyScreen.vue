@@ -65,7 +65,7 @@ const joinRoom = () => {
 };
 
 // Handle wallet connection events
-const onWalletConnected = (data: { address: string, balance: bigint }) => {
+const onWalletConnected = (data: { address: string }) => {
   isWalletConnected.value = true;
   walletAddress.value = data.address;
 };

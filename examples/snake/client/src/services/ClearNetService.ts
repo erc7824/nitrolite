@@ -27,13 +27,13 @@ class ClearNetService {
         {
             resolve: (value: any) => void;
             reject: (reason: Error) => void;
-            timeout: NodeJS.Timeout;
+            timeout: number;
         }
     >();
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
     private reconnectDelay = 1000;
-    private reconnectTimeout: NodeJS.Timeout | null = null;
+    private reconnectTimeout: number | null = null;
     private authenticationInProgress: Promise<void> | null = null;
 
     constructor() {
@@ -214,7 +214,7 @@ class ClearNetService {
             this.initializeWebSocket().catch(() => {
                 console.log("Reconnect attempt failed");
             });
-        }, delay);
+        }, delay) as unknown as number;
     }
 
     private async authenticateWithBroker(): Promise<void> {
@@ -253,7 +253,7 @@ class ClearNetService {
 
         // Create a new authentication promise and store it
         const authPromise = new Promise<void>((resolve, reject) => {
-            let authTimeout: NodeJS.Timeout;
+            let authTimeout: number;
 
             // Create a one-time message handler for authentication
             const authMessageHandler = async (event: MessageEvent) => {
@@ -360,7 +360,7 @@ class ClearNetService {
             authTimeout = setTimeout(() => {
                 cleanup();
                 reject(new Error("Authentication timeout"));
-            }, 15000); // 15 second timeout
+            }, 15000) as unknown as number; // 15 second timeout
 
             // Add temporary listener for authentication messages
             this.wsConnection?.addEventListener("message", authMessageHandler);
@@ -471,74 +471,6 @@ class ClearNetService {
         } catch (error) {
             console.error("Failed to get account channels:", error);
             return [];
-        }
-    }
-
-    async joinChannel(channelId: string, depositAmount: bigint, stateData: string): Promise<ChannelData | null> {
-        if (!this.client || !this.isConnected) {
-            console.error("ClearNet client not initialized");
-            return null;
-        }
-
-        try {
-            console.log("Joining channel:", channelId);
-            console.log("Depositing amount:", depositAmount.toString());
-            console.log("Join data:", stateData);
-
-            // First, deposit funds using the Nitrolite client
-            const depositTxHash = await this.client.deposit(depositAmount);
-
-            if (!depositTxHash) {
-                throw new Error("Failed to deposit funds");
-            }
-
-            console.log(`Deposit transaction hash: ${depositTxHash}`);
-
-            // Get channel information to validate it exists
-            const channelInfo = await this.client.getChannelInfo(channelId);
-
-            if (!channelInfo) {
-                throw new Error("Failed to get channel information");
-            }
-
-            console.log("Retrieved channel information:", channelInfo);
-
-            // Join the channel by signing the state
-            const initialState = channelInfo.state;
-
-            // Sign the state hash
-            const stateHash = await this.getStateHash(initialState);
-            const signingClient = this.config.stateWalletClient || this.config.walletClient;
-
-            // Sign the state hash
-            const signature = await signingClient.signMessage({
-                message: { raw: stateHash },
-            });
-
-            console.log(`Signed channel state with signature: ${signature}`);
-
-            // Store channel in localStorage for persistence
-            try {
-                localStorage.setItem("nitro_channel_id", channelId);
-                localStorage.setItem(
-                    "nitro_channel_state",
-                    JSON.stringify(initialState, (_, value) => (typeof value === "bigint" ? value.toString() + "n" : value))
-                );
-            } catch (error) {
-                console.error("Failed to save channel to localStorage:", error);
-            }
-
-            // Store the active channel
-            this.activeChannel = {
-                channelId,
-                state: initialState,
-            };
-
-            console.log(`Successfully joined channel ${channelId}`);
-            return this.activeChannel;
-        } catch (error) {
-            console.error("Failed to join channel:", error);
-            return null;
         }
     }
 

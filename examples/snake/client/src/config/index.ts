@@ -1,9 +1,6 @@
 import type { ContractAddresses } from "@erc7824/nitrolite";
 import type { Hex } from "viem";
 
-export const BROKER_WS_URL = "wss://clearnode-multichain-production.up.railway.app/ws";
-export const GAMESERVER_WS_URL = "ws://localhost:3001";
-
 const getEnvVar = (key: string, defaultValue: string): string => {
     try {
         const envValue = (import.meta.env?.[`VITE_${key}`] || window?.__ENV__?.[key] || null) as string | null;
@@ -13,6 +10,9 @@ const getEnvVar = (key: string, defaultValue: string): string => {
         return defaultValue;
     }
 };
+
+export const BROKER_WS_URL = getEnvVar("BROKER_WS_URL", "wss://clearnode-multichain-production.up.railway.app/ws");
+export const GAMESERVER_WS_URL = getEnvVar("GAMESERVER_WS_URL", "ws://localhost:3001");
 
 export const CONTRACT_ADDRESSES: ContractAddresses = {
     custody: getEnvVar("CUSTODY_ADDRESS", "0x1096644156Ed58BF596e67d35827Adc97A25D940") as Hex,

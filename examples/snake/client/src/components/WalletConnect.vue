@@ -15,7 +15,6 @@ const isConnected = ref(false);
 const isConnecting = ref(false);
 const isAuthenticated = ref(false);
 const walletAddress = ref("");
-const balance = ref(BigInt(0));
 const walletError = ref("");
 
 // Storage keys
@@ -23,12 +22,12 @@ const KEY_PAIR = "crypto_keypair";
 
 // Event emitters
 const emit = defineEmits<{
-    "wallet-connected": [{ address: string; balance: bigint }];
+    "wallet-connected": [{ address: string }];
     "wallet-disconnected": [];
     error: [string];
 }>();
 
-onMounted(() => { connectWallet(); });
+onMounted(connectWallet);
 
 // Wallet signer interface following server implementation
 interface WalletSigner {
@@ -78,9 +77,6 @@ async function connectWallet() {
 
         console.log("Using wallet with address:", signer.address);
 
-        // Set fake balance for display purposes
-        balance.value = BigInt(1000000000000000000); // 1 ETH
-
         // Update connection state
         isConnected.value = true;
 
@@ -109,7 +105,9 @@ async function connectWallet() {
 
             // Create a proper stateWalletClient for signing state updates
             const stateWalletClient = {
-                account: { address: stateWallet.address, },
+                account: {
+                    address: stateWallet.address,
+                },
                 signMessage: async ({ message: { raw } }: { message: { raw: string } }) => {
                     try {
                         const flatSignature = stateWallet._signingKey().signDigest(raw);
@@ -146,6 +144,7 @@ async function connectWallet() {
             const nitroConfig: NitroliteClientConfig = {
                 publicClient,
                 walletClient,
+                // @ts-ignore
                 stateWalletClient,
                 addresses: CONTRACT_ADDRESSES,
                 chainId: polygon.id,
@@ -170,7 +169,6 @@ async function connectWallet() {
         // Emit success event
         emit("wallet-connected", {
             address: signer.address,
-            balance: balance.value,
         });
     } catch (error) {
         console.error("Failed to connect:", error);
@@ -189,7 +187,6 @@ function disconnectWallet() {
     isConnected.value = false;
     isAuthenticated.value = false;
     walletAddress.value = "";
-    balance.value = BigInt(0);
 
     // Private key is preserved in localStorage
     // to maintain identity consistency across sessions
@@ -205,19 +202,12 @@ function formatAddress(address: string): string {
     if (!address) return "";
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 }
-
-/**
- * Formats a balance in wei to ETH with 4 decimal places
- */
-function formatBalance(balanceWei: bigint): string {
-    return (Number(balanceWei) / 1e18).toFixed(4);
-}
 </script>
 
 <template>
     <div class="wallet-connect">
         <div v-if="!isConnected" class="connect-container">
-            <button class="connect-btn" :disabled="isConnecting">
+            <button class="connect-btn" :disabled="isConnecting" @click="connectWallet">
                 {{ isConnecting ? "Connecting..." : "Connect to Broker" }}
             </button>
             <div v-if="walletError" class="error-message">{{ walletError }}</div>
@@ -234,11 +224,6 @@ function formatBalance(balanceWei: bigint): string {
                 <span class="status-value" :class="{ 'status-authenticated': isAuthenticated }">
                     {{ isAuthenticated ? "Authenticated" : "Connected" }}
                 </span>
-            </div>
-
-            <div class="balance">
-                <span class="balance-label">Balance:</span>
-                <span class="balance-value">{{ formatBalance(balance) }} ETH</span>
             </div>
 
             <button @click="disconnectWallet" class="disconnect-btn">Disconnect</button>
@@ -292,7 +277,6 @@ function formatBalance(balanceWei: bigint): string {
 }
 
 .address,
-.balance,
 .connection-status {
     display: flex;
     justify-content: space-between;
@@ -301,14 +285,12 @@ function formatBalance(balanceWei: bigint): string {
 }
 
 .address-label,
-.balance-label,
 .status-label {
     font-weight: 600;
     color: #666;
 }
 
 .address-value,
-.balance-value,
 .status-value {
     font-family: monospace;
     background-color: #e9ecef;

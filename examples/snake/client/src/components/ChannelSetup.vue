@@ -26,12 +26,11 @@ const metamaskInfo = ref<{
     chainId: number;
 } | null>(null);
 
-const emit = defineEmits(['channel-created', 'channel-joined', 'error']);
+const emit = defineEmits(['channel-created', 'error']);
 
 const depositAmount = ref<string>('0.00001');
 const errorMessage = ref('');
 const isCreating = ref(false);
-const isJoining = ref(false);
 const showAdvanced = ref(false);
 const channelData = ref<ChannelResponse | null>(null);
 const tokenDecimals = ref<number>(18); // will be updated with value from contract
@@ -285,100 +284,6 @@ async function createChannel() {
     }
 }
 
-// Join an existing channel
-async function joinChannel() {
-    if (!props.isWalletConnected) {
-        errorMessage.value = 'Please connect your wallet first';
-        emit('error', errorMessage.value);
-        return;
-    }
-
-    if (!isValidAmount.value) {
-        errorMessage.value = 'Please enter a valid deposit amount';
-        emit('error', errorMessage.value);
-        return;
-    }
-
-    isJoining.value = true;
-    errorMessage.value = '';
-
-    try {
-        // Check Metamask balance first
-        const info = await checkMetamaskBalance();
-        if (info) {
-            // Convert deposit amount to BigNumber for comparison
-            const depositAmountBN = ethers.utils.parseEther(depositAmount.value.toString());
-
-            // Check if user has enough balance
-            if (info.balance.lt(depositAmountBN)) {
-                errorMessage.value = `Insufficient balance in Metamask. You have ${ethers.utils.formatEther(info.balance)} ETH`;
-                emit('error', errorMessage.value);
-                return;
-            }
-
-            console.log(`Metamask address: ${info.address}`);
-            console.log(`Metamask balance: ${ethers.utils.formatEther(info.balance)} ETH`);
-        } else {
-            console.log('Could not check Metamask balance, proceeding anyway');
-        }
-
-        try {
-            // Get channel details from the server for this room
-            const response = await fetch(`/api/rooms/${props.roomId}/channel`);
-
-            if (!response.ok) {
-                throw new Error(`Failed to get channel information: ${response.status}`);
-            }
-
-            let channelInfo;
-            try {
-                channelInfo = await response.json();
-            } catch (error) {
-                console.error('Error parsing channel info response:', error);
-                throw new Error('Invalid response from server. Make sure the server is running.');
-            }
-
-            // Get the deposit amount specified by the user
-            const depositAmount = depositAmountWei.value;
-
-            // Join the channel with our deposit using the Nitrolite client
-            const joinedChannel = await clearNetService.joinChannel(
-                channelInfo.channelId,
-                depositAmount,
-                `game:${props.roomId}:joined`
-            );
-
-            if (!joinedChannel) {
-                throw new Error('Failed to join channel');
-            }
-
-            channelData.value = joinedChannel;
-            emit('channel-joined', joinedChannel);
-        } catch (error) {
-            console.error('Error joining channel:', error);
-
-            let errorMsg = 'Error joining channel';
-
-            if (String(error).includes('Invalid address')) {
-                errorMsg = 'Contract address configuration error. Please check network settings.';
-            } else if (String(error).includes('user rejected')) {
-                errorMsg = 'Transaction was rejected by user.';
-            } else if (String(error).includes('Failed to get channel information')) {
-                errorMsg = `Failed to get channel information. Make sure the room exists and the server is running.`;
-            }
-
-            errorMessage.value = errorMsg;
-            emit('error', errorMessage.value);
-        }
-    } catch (error) {
-        console.error('Error joining channel:', error);
-        errorMessage.value = 'Error joining channel: ' + (error instanceof Error ? error.message : String(error));
-        emit('error', errorMessage.value);
-    } finally {
-        isJoining.value = false;
-    }
-}
-
 // Toggle advanced options
 function toggleAdvanced() {
     showAdvanced.value = !showAdvanced.value;
@@ -462,7 +367,7 @@ onMounted(async () => {
 
 <template>
     <div class="channel-setup">
-        <h3>{{ roomCreator ? 'Create Game Channel' : 'Join Game Channel' }}</h3>
+        <h3>Create Channel</h3>
 
         <div class="metamask-status" v-if="hasMetamask">
             <div class="metamask-info">
@@ -477,8 +382,7 @@ onMounted(async () => {
                 </div>
                 <div v-else>
                     <div class="metamask-balance">Not connected</div>
-                    <button @click="checkMetamaskBalance" class="connect-metamask-btn"
-                        :disabled="isCreating || isJoining">
+                    <button @click="checkMetamaskBalance" class="connect-metamask-btn" :disabled="isCreating">
                         Connect Metamask
                     </button>
                 </div>
@@ -488,23 +392,15 @@ onMounted(async () => {
         <div class="form-group">
             <label for="depositAmount">Deposit Amount (ETH):</label>
             <input id="depositAmount" v-model="depositAmount" type="number" step="0.00001" min="0.00001"
-                :disabled="isCreating || isJoining" />
+                :disabled="isCreating" />
             <small>This amount will be used to fund your game channel.</small>
         </div>
 
         <div class="actions">
-            <template v-if="roomCreator">
-                <button @click="createChannel" class="create-btn"
-                    :disabled="!isWalletConnected || isCreating || !isValidAmount">
-                    {{ isCreating ? 'Creating...' : 'Create & Fund Channel' }}
-                </button>
-            </template>
-            <template v-else>
-                <button @click="joinChannel" class="join-btn"
-                    :disabled="!isWalletConnected || isJoining || !isValidAmount">
-                    {{ isJoining ? 'Joining...' : 'Join & Fund Channel' }}
-                </button>
-            </template>
+            <button @click="createChannel" class="create-btn"
+                :disabled="!isWalletConnected || isCreating || !isValidAmount">
+                {{ isCreating ? 'Creating...' : 'Create & Fund Channel' }}
+            </button>
         </div>
 
         <div class="advanced-toggle" @click="toggleAdvanced">
@@ -519,7 +415,7 @@ onMounted(async () => {
 
             <div class="form-group">
                 <label for="role">Your Role:</label>
-                <input id="role" type="text" :value="roomCreator ? 'Room Creator' : 'Room Joiner'" disabled />
+                <input id="role" type="text" value="Room Creator" disabled />
             </div>
         </div>
 
@@ -592,8 +488,7 @@ small {
     margin-top: 20px;
 }
 
-.create-btn,
-.join-btn {
+.create-btn {
     width: 100%;
     padding: 12px;
     border: none;
@@ -602,9 +497,6 @@ small {
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s;
-}
-
-.create-btn {
     background-color: #4CAF50;
     color: white;
 }
@@ -613,17 +505,7 @@ small {
     background-color: #388E3C;
 }
 
-.join-btn {
-    background-color: #2196F3;
-    color: white;
-}
-
-.join-btn:hover:not(:disabled) {
-    background-color: #1976D2;
-}
-
-.create-btn:disabled,
-.join-btn:disabled {
+.create-btn:disabled {
     background-color: #9e9e9e;
     cursor: not-allowed;
 }

@@ -1,1 +1,1 @@
-export * from './authMiddleware';
+export * from './authMiddleware.ts';

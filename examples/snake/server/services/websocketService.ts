@@ -1,7 +1,8 @@
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocketServer } from 'ws';
+import WebSocket from 'ws';
 import { randomBytes } from 'crypto';
-import { Room, SnakeWebSocket } from '../interfaces';
-import { getRoom, addRoom, removeRoom } from './stateService';
+import { Room, SnakeWebSocket } from '../interfaces/index.ts';
+import { getRoom, addRoom, removeRoom } from './stateService.ts';
 import {
   generateRoomId,
   generateFood,
@@ -9,8 +10,8 @@ import {
   gameTick,
   clearNetRPC,
   initializeBroadcastFunction
-} from './gameService';
-import { createAppSession, closeAppSession } from './brokerService';
+} from './gameService.ts';
+import { createAppSession, closeAppSession } from './brokerService.ts';
 import { Hex } from 'viem';
 
 // Global reference to the WebSocket server
@@ -29,7 +30,7 @@ export function setupWebSocketHandlers(wss: WebSocketServer): void {
     const snakeWs = ws as SnakeWebSocket;
     snakeWs.playerId = randomBytes(8).toString('hex');
 
-    snakeWs.on('message', async (message: WebSocket.Data) => {
+    snakeWs.on('message', async (message: WebSocket.RawData) => {
       try {
         const data = JSON.parse(message.toString());
         await handleWebSocketMessage(snakeWs, data);

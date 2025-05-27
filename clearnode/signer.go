@@ -123,7 +123,6 @@ func VerifyEip712Data(expectedAddrHex string, challengeToken string, signatureHe
 		Types: apitypes.Types{
 			"EIP712Domain": {
 				{Name: "name", Type: "string"},
-				{Name: "version", Type: "string"},
 			},
 			"AuthVerify": {
 				{Name: "address", Type: "address"},
@@ -132,8 +131,7 @@ func VerifyEip712Data(expectedAddrHex string, challengeToken string, signatureHe
 		},
 		PrimaryType: "AuthVerify",
 		Domain: apitypes.TypedDataDomain{
-			Name:    "Nitrolite WebSocket Auth",
-			Version: "1",
+			Name: "Yellow App Store",
 		},
 		Message: map[string]interface{}{
 			"address":   expectedAddrHex,

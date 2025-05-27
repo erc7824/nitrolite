@@ -140,7 +140,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 	log.Printf("Authentication successful for: %s", signerAddress)
 
-	walletAddress, err := GetWalletBySigner(h.db, signerAddress)
+	walletAddress, err := GetWalletBySigner(signerAddress)
 	if err != nil {
 		log.Printf("Error retrieving wallet address for participant %s: %v", signerAddress, err)
 		h.sendErrorResponse("", nil, conn, "Failed to retrieve wallet address")

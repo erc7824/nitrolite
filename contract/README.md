@@ -11,6 +11,14 @@ State channel infrastructure has two main components:
 - **IChannel** escrow which stores funds and can support and run adjudication on multiple channels
 - **Adjudicators** are small contracts which validate state transitions to a candidate state against proofs
 
+It is expected that Nitrolite implementation are 2 participants channels, where the first participants
+is the channel creator and is called the client, the counterpart is clearnode a webservice which provide
+chain abstraction services to connected clients. Allowing them to transact off-chain in a logical layer-3
+with chain abstraction.
+
+Nitrolite is the EVM implementation which connects to clearnode, other blockchains have other implementations
+which must have equivalent escrow mechanisms.
+
 ## Interface Structure
 
 ### ChannelId

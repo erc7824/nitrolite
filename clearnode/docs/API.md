@@ -264,7 +264,8 @@ Retrieves all channels for a participant (both open, closed, and joining), order
 ```json
 {
   "req": [1, "get_channels", [{
-    "participant": "0x1234567890abcdef..."
+    "participant": "0x1234567890abcdef...",
+    "status":"opem" // OPTIONAL FILTER
   }], 1619123456789],
   "sig": []
 }

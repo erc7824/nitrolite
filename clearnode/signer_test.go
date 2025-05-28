@@ -6,7 +6,19 @@ import (
 )
 
 func TestEIPSignature(t *testing.T) {
-	ok, err := VerifyEip712Data("0x21F7D1F35979B125f6F7918fC16Cb9101e5882d7", "69a3bbcc-c806-48e5-aa16-2f61a3dd741f", "0xAc18738D607D82E6b09B08a5C41Bc8ad89cf91F7", "Yellow App Store", "0x3d09ee2f03e51577e5530fb9ac30400852409583de8a91571ca59945c77d7e9c7a7f1cb8723549e561d1c3ca14ee564f1f2a0e959fa08265d0490f6da52908701b")
-	assert.True(t, ok)
+	allowances := []Allowance{
+		{
+			Asset:  "usdc",
+			Amount: "100000000000",
+		},
+	}
+	recoveredSigner, err := RecoverAddressFromEip712Signature(
+		"0x21f7d1f35979b125f6f7918fc16cb9101e5882d7",
+		"30322c9f-32f4-4e68-aa9d-42233ff20627",
+		"0x6966978ce78df3228993aa46984eab6d68bbe195",
+		"Yellow App Store",
+		allowances,
+		"0x746ec6b9d2de454ef0b0d579c79dc466a75573fb056d9a9505ecaafe7abe7ee92cb0502b6f0be435305b0b7f4eaf4e4d000a2b6c0b7299bfe2e9d8ec8861eaa81c")
+	assert.Equal(t, recoveredSigner, "0x21F7D1F35979B125f6F7918fC16Cb9101e5882d7")
 	assert.NoError(t, err)
 }

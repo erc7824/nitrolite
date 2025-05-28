@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/big"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -73,7 +72,6 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 	defer h.metrics.ConnectedClients.Dec()
 
 	var signerAddress string
-	var signerSessionKey string
 	var authenticated bool
 
 	// Read messages until authentication completes
@@ -117,7 +115,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 		case "auth_verify":
 			// Client is responding to a challenge
-			authAddr, authSessionKey, err := HandleAuthVerify(conn, &rpcMsg, h.authManager, h.signer, h.db)
+			authAddr, _, err := HandleAuthVerify(conn, &rpcMsg, h.authManager, h.signer, h.db)
 			if err != nil {
 				log.Printf("Authentication verification failed: %v", err)
 				h.sendErrorResponse("", nil, conn, err.Error())
@@ -127,7 +125,6 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 			// Authentication successful
 			signerAddress = authAddr
-			signerSessionKey = authSessionKey
 			authenticated = true
 			h.metrics.AuthSuccess.Inc()
 
@@ -161,8 +158,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		delete(h.connections, walletAddress)
 		h.connectionsMu.Unlock()
 		log.Printf("Connection closed for wallet: %s", walletAddress)
-		// Remove signer from DB
-		RemoveSigner(h.db, walletAddress, signerSessionKey)
+		// TODO: Remove signer from DB and cache
 	}()
 
 	log.Printf("Participant authenticated: %s", walletAddress)
@@ -629,16 +625,19 @@ type AuthResponse struct {
 
 // AuthVerifyParams represents parameters for completing authentication
 type AuthVerifyParams struct {
-	Challenge  uuid.UUID `json:"challenge"`   // The challenge token
-	Address    string    `json:"address"`     // The client's address
-	SessionKey string    `json:"session_key"` // Connection session key
-	AppName    string    `json:"app_name"`    // Application name
+	Challenge uuid.UUID `json:"challenge"` // The challenge token
+}
+
+// Allowance represents allowances for connection
+type Allowance struct {
+	Asset  string `json:"asset"`
+	Amount string `json:"amount"`
 }
 
 // HandleAuthRequest initializes the authentication process by generating a challenge
 func HandleAuthRequest(signer *Signer, conn *websocket.Conn, rpc *RPCMessage, authManager *AuthManager) error {
 	// Parse the parameters
-	if len(rpc.Req.Params) < 3 {
+	if len(rpc.Req.Params) < 4 {
 		return errors.New("missing parameters")
 	}
 
@@ -657,8 +656,13 @@ func HandleAuthRequest(signer *Signer, conn *websocket.Conn, rpc *RPCMessage, au
 		return errors.New("invalid app name")
 	}
 
+	rawAllowances := rpc.Req.Params[3]
+	allowances, err := parseAllowances(rawAllowances)
+	if err != nil {
+		return err
+	}
 	// Generate a challenge for this address
-	token, err := authManager.GenerateChallenge(addr, sessionKey, appName)
+	token, err := authManager.GenerateChallenge(addr, sessionKey, appName, allowances)
 	if err != nil {
 		return fmt.Errorf("failed to generate challenge: %w", err)
 	}
@@ -698,41 +702,36 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 		return "", "", fmt.Errorf("invalid parameters format: %w", err)
 	}
 
-	// Ensure address has 0x prefix
-	addr := authParams.Address
-	if !strings.HasPrefix(addr, "0x") {
-		addr = "0x" + addr
-	}
-
-	sessionKey := authParams.SessionKey
-	appName := authParams.AppName
-
 	// Validate the request signature
 	if len(rpc.Sig) == 0 {
 		return "", "", errors.New("missing signature in request")
 	}
 
-	isValid, err := VerifyEip712Data(addr, authParams.Challenge.String(), sessionKey, appName, rpc.Sig[0])
-	if err != nil || !isValid {
+	challenge, err := authManager.GetChallenge(authParams.Challenge)
+	if err != nil {
+		return "", "", err
+	}
+	recoveredAddress, err := RecoverAddressFromEip712Signature(challenge.Address, challenge.Token.String(), challenge.SessionKey, challenge.AppName, challenge.Allowances, rpc.Sig[0])
+	if err != nil {
 		return "", "", errors.New("invalid signature")
 	}
 
-	err = authManager.ValidateChallenge(authParams.Challenge, addr, sessionKey, appName)
+	err = authManager.ValidateChallenge(authParams.Challenge, recoveredAddress)
 	if err != nil {
 		log.Printf("Challenge verification failed: %v", err)
 		return "", "", err
 	}
 
 	// Store signer
-	err = AddSigner(db, authParams.Address, sessionKey)
+	err = AddSigner(db, challenge.Address, challenge.SessionKey)
 	if err != nil {
 		log.Printf("Failed to create signer in db: %v", err)
 		return "", "", err
 	}
 
 	response := CreateResponse(rpc.Req.RequestID, "auth_verify", []any{map[string]any{
-		"address":     addr,
-		"session_key": sessionKey,
+		"address":     challenge.Address,
+		"session_key": challenge.SessionKey,
 		"success":     true,
 	}}, time.Now())
 
@@ -747,7 +746,7 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 		return "", "", err
 	}
 
-	return addr, sessionKey, nil
+	return challenge.Address, challenge.SessionKey, nil
 }
 
 func ValidateTimestamp(ts uint64, expirySeconds int) error {
@@ -759,4 +758,36 @@ func ValidateTimestamp(ts uint64, expirySeconds int) error {
 		return fmt.Errorf("timestamp expired: %s older than %d s", t.Format(time.RFC3339Nano), expirySeconds)
 	}
 	return nil
+}
+
+func parseAllowances(rawAllowances any) ([]Allowance, error) {
+	outerSlice, ok := rawAllowances.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("input is not a list of allowances")
+	}
+
+	result := make([]Allowance, len(outerSlice))
+
+	for i, item := range outerSlice {
+		innerSlice, ok := item.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("allowance at index %d is not a list", i)
+		}
+		if len(innerSlice) != 2 {
+			return nil, fmt.Errorf("allowance at index %d must have exactly 2 elements (asset, amount)", i)
+		}
+
+		asset, ok1 := innerSlice[0].(string)
+		amount, ok2 := innerSlice[1].(string)
+		if !ok1 || !ok2 {
+			return nil, fmt.Errorf("allowance at index %d has non-string asset or amount", i)
+		}
+
+		result[i] = Allowance{
+			Asset:  asset,
+			Amount: amount,
+		}
+	}
+
+	return result, nil
 }

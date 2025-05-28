@@ -25,7 +25,7 @@ service:
     path: /
 
 metrics:
-  enabled: false
+  enabled: true
   podmonitoring:
     enabled: true
   port: 4242

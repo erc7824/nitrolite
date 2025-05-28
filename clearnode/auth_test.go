@@ -10,7 +10,10 @@ import (
 )
 
 func TestAuthManager(t *testing.T) {
-	authManager := NewAuthManager()
+	authManager, err := NewAuthManager(AuthManagerConfig{
+		SessionKey: "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+	})
+	require.NoError(t, err)
 	require.NotNil(t, authManager)
 
 	// Generate a challenge
@@ -57,4 +60,20 @@ func TestAuthManagerSessionManagement(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	valid = am.ValidateSession(testAddr)
 	assert.False(t, valid)
+}
+
+func TestAuthManagerJwtManagement(t *testing.T) {
+	authManager, err := NewAuthManager(AuthManagerConfig{
+		SessionKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, authManager)
+
+	token, err := authManager.generateJWT("0x1234567890123456789012345678901234567890")
+	require.NoError(t, err)
+
+	claims, err := authManager.verifyJWT(token)
+	require.NoError(t, err)
+
+	assert.Equal(t, "0x1234567890123456789012345678901234567890", claims.Address)
 }

@@ -38,7 +38,15 @@ func NewUnifiedWSHandler(
 	metrics *Metrics,
 	rpcStore *RPCStore,
 	config *Config,
-) *UnifiedWSHandler {
+) (*UnifiedWSHandler, error) {
+	authManager, err := NewAuthManager(AuthManagerConfig{
+		SessionKey: config.privateKeyHex,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &UnifiedWSHandler{
 		signer: signer,
 		db:     db,
@@ -50,11 +58,11 @@ func NewUnifiedWSHandler(
 			},
 		},
 		connections: make(map[string]*websocket.Conn),
-		authManager: NewAuthManager(),
+		authManager: authManager,
 		metrics:     metrics,
 		rpcStore:    rpcStore,
 		config:      config,
-	}
+	}, nil
 }
 
 // HandleConnection handles the WebSocket connection lifecycle.
@@ -729,9 +737,16 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 		return "", "", err
 	}
 
+	jwtToken, err := authManager.generateJWT(challenge.Address)
+	if err != nil {
+		log.Printf("Failed to generate JWT token: %v", err)
+		return "", "", err
+	}
+
 	response := CreateResponse(rpc.Req.RequestID, "auth_verify", []any{map[string]any{
 		"address":     challenge.Address,
 		"session_key": challenge.SessionKey,
+		"jwt_token":   jwtToken,
 		"success":     true,
 	}}, time.Now())
 

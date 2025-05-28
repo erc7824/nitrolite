@@ -43,7 +43,10 @@ func main() {
 	// Map to store custody clients for later reference
 	custodyClients := make(map[string]*Custody)
 
-	unifiedWSHandler := NewUnifiedWSHandler(signer, db, metrics, rpcStore, config)
+	unifiedWSHandler, err := NewUnifiedWSHandler(signer, db, metrics, rpcStore, config)
+	if err != nil {
+		log.Fatalf("Failed to initialize WebSocket handler: %v", err)
+	}
 	http.HandleFunc("/ws", unifiedWSHandler.HandleConnection)
 
 	for name, network := range config.networks {

@@ -1,11 +1,15 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -21,6 +25,10 @@ type Challenge struct {
 	Completed  bool        // Whether the challenge has been used
 }
 
+type AuthManagerConfig struct {
+	SessionKey string
+}
+
 // AuthManager handles authentication challenges
 type AuthManager struct {
 	challenges     map[uuid.UUID]*Challenge // Challenge token -> Challenge
@@ -31,10 +39,17 @@ type AuthManager struct {
 	authSessions   map[string]time.Time // Address -> last active time
 	authSessionsMu sync.RWMutex
 	sessionTTL     time.Duration
+	cfg            AuthManagerConfig // Key used for signing JWT tokens
+	authSessionKey *ecdsa.PrivateKey
+}
+
+type JWTClaims struct {
+	Address string `json:"address"`
+	jwt.RegisteredClaims
 }
 
 // NewAuthManager creates a new authentication manager
-func NewAuthManager() *AuthManager {
+func NewAuthManager(cfg AuthManagerConfig) (*AuthManager, error) {
 	am := &AuthManager{
 		challenges:    make(map[uuid.UUID]*Challenge),
 		challengeTTL:  5 * time.Minute,
@@ -42,11 +57,19 @@ func NewAuthManager() *AuthManager {
 		cleanupTicker: time.NewTicker(10 * time.Minute),
 		authSessions:  make(map[string]time.Time),
 		sessionTTL:    24 * time.Hour,
+		cfg:           cfg,
 	}
+
+	trimmedKey := strings.TrimLeft(cfg.SessionKey, "0x")
+	privateKey, err := crypto.HexToECDSA(trimmedKey)
+	if err != nil {
+		return nil, err
+	}
+	am.authSessionKey = privateKey
 
 	// Start background cleanup
 	go am.cleanupExpiredChallenges()
-	return am
+	return am, nil
 }
 
 // GenerateChallenge creates a new challenge for a specific address
@@ -178,6 +201,71 @@ func (am *AuthManager) UpdateSession(address string) bool {
 
 	am.authSessions[address] = time.Now()
 	return true
+}
+
+func (am *AuthManager) generateJWT(address string) (string, error) {
+	claims := JWTClaims{
+		Address: address,
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(am.sessionTTL)),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "clearnode", // TODO: make configurable
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	tokenString, err := token.SignedString(am.authSessionKey)
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
+func (am *AuthManager) verifyJWT(tokenString string) (*JWTClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
+			return nil, nil
+		}
+
+		return &am.authSessionKey.PublicKey, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(*JWTClaims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("invalid JWT token claims")
+	}
+
+	if err := am.validateClaims(claims); err != nil {
+		return nil, err
+	}
+
+	return claims, nil
+}
+
+func (am *AuthManager) validateClaims(claims *JWTClaims) error {
+	issuer, err := claims.GetIssuer()
+	if err != nil {
+		return errors.New("failed to get issuer from JWT token claims")
+	}
+	expiration, err := claims.GetExpirationTime()
+	if err != nil {
+		return errors.New("failed to get expiration from JWT token claims")
+	}
+
+	if issuer != "clearnode" {
+		return errors.New("invalid JWT token claims")
+	}
+	if expiration.Before(time.Now()) {
+		return errors.New("expired JWT token")
+	}
+
+	return nil
 }
 
 // CleanupExpiredChallenges periodically removes expired challenges

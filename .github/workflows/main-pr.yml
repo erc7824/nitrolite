@@ -62,7 +62,7 @@ jobs:
         uses: rtCamp/action-slack-notify@v2
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_CHANNEL: clearnet
+          SLACK_CHANNEL: deployments
           SLACK_USERNAME: CI/CD Bot
           SLACK_COLOR: ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || 'success' }}
           SLACK_TITLE: 'Nitrolite PR Build'

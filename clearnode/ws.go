@@ -716,6 +716,18 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 			return "", "", err
 		}
 
+		response := CreateResponse(rpc.Req.RequestID, "auth_verify", []any{map[string]any{
+			"address":     claims.Address,
+			"session_key": claims.SessionKey,
+			// "jwt_token":   jwtToken, TODO: regenerate JWT token here?
+			"success": true,
+		}}, time.Now())
+
+		if err = sendMessage(conn, signer, response); err != nil {
+			log.Printf("Error sending auth success: %v", err)
+			return "", "", err
+		}
+
 		return claims.Address, claims.SessionKey, nil
 	}
 
@@ -759,13 +771,7 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 		"success":     true,
 	}}, time.Now())
 
-	// Sign the response with the server's key
-	resBytes, _ := json.Marshal(response.Req)
-	signature, _ := signer.Sign(resBytes)
-	response.Sig = []string{hexutil.Encode(signature)}
-
-	responseData, _ := json.Marshal(response)
-	if err = conn.WriteMessage(websocket.TextMessage, responseData); err != nil {
+	if err = sendMessage(conn, signer, response); err != nil {
 		log.Printf("Error sending auth success: %v", err)
 		return "", "", err
 	}
@@ -814,4 +820,18 @@ func parseAllowances(rawAllowances any) ([]Allowance, error) {
 	}
 
 	return result, nil
+}
+
+func sendMessage(conn *websocket.Conn, signer *Signer, msg *RPCMessage) error {
+	// Sign the response with the server's key
+	resBytes, _ := json.Marshal(msg.Req)
+	signature, _ := signer.Sign(resBytes)
+	msg.Sig = []string{hexutil.Encode(signature)}
+
+	responseData, _ := json.Marshal(msg)
+	if err := conn.WriteMessage(websocket.TextMessage, responseData); err != nil {
+		return err
+	}
+
+	return nil
 }

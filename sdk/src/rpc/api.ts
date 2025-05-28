@@ -53,7 +53,7 @@ export async function createAuthVerifyMessageFromChallenge(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const params = [challenge];
+    const params = [{ challenge: challenge }];
 
     const request = NitroliteRPC.createRequest(requestId, "auth_verify", [params], timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
@@ -97,7 +97,7 @@ export async function createAuthVerifyMessage(
     }
 
     const challenge: string = parsedResponse.data[0].challenge_message;
-    const params = [challenge];
+    const params = [{ challenge: challenge }];
 
     const request = NitroliteRPC.createRequest(requestId, "auth_verify", params, timestamp);
 

@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -240,7 +239,7 @@ func (am *AuthManager) VerifyJWT(tokenString string) (*JWTClaims, error) {
 
 	claims, ok := token.Claims.(*JWTClaims)
 	if !ok || !token.Valid {
-		return nil, fmt.Errorf("invalid JWT token claims")
+		return nil, errors.New("invalid JWT token claims")
 	}
 
 	if err := am.validateClaims(claims); err != nil {

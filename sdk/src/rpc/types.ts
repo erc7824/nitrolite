@@ -23,7 +23,7 @@ export type Allowance = {
     symbol: string;
     /** The amount of the asset that is allowed to be spent. */
     amount: string;
-}
+};
 
 /** Represents the allocation of assets within an application session.
  * This structure is used to define the initial allocation of assets among participants.
@@ -122,22 +122,6 @@ export interface AppDefinition {
 export interface AuthRequest {
     /** The Address of the connected account. */
     address: Address;
-    // Session key for the account, used for application authentication.
-    session_key: Address;
-    /** The name of the application associated with the account, used for application-specific operations. */
-    app_name: string;
-    /** Allowances for tokens to spend. */
-    allowances: Allowance[];
-}
-
-/**
- * Defines the parameters required for the 'auth_verify' RPC method.
- */
-export interface AuthVerifyRequest {
-    /** The Address of the connected account. */
-    address: Address;
-    // The challenge string that needs to be signed by the user.
-    challenge: string;
     // Session key for the account, used for application authentication.
     session_key: Address;
     /** The name of the application associated with the account, used for application-specific operations. */

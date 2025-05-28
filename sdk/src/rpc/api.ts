@@ -9,7 +9,6 @@ import {
     CreateAppSessionRequest,
     ResizeChannel,
     AuthRequest,
-    AuthVerifyRequest,
 } from "./types"; // Added ParsedResponse
 import { NitroliteRPC } from "./nitrolite";
 import { generateRequestId, getCurrentTimestamp } from "./utils";
@@ -28,7 +27,7 @@ export async function createAuthRequestMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const allowances = Object.values(params.allowances || {}).map((v)=> [v.symbol, v.amount]); // converting it to an array of [key, value] pairs
+    const allowances = Object.values(params.allowances || {}).map((v) => [v.symbol, v.amount]); // converting it to an array of [key, value] pairs
     const paramsArray = [params.address, params.session_key, params.app_name, allowances];
     const request = NitroliteRPC.createRequest(requestId, "auth_request", paramsArray, timestamp);
 
@@ -43,21 +42,20 @@ export async function createAuthRequestMessage(
  * Use this if you have already parsed the 'auth_challenge' response yourself.
  *
  * @param signer - The function to sign the 'auth_verify' request payload.
- * @param params - The specific parameters required by 'auth_verify', including the challenge.
+ * @param challenge - The challenge string received from the broker in the 'auth_challenge' response.
  * @param requestId - Optional request ID for the 'auth_verify' request. Defaults to a generated ID.
  * @param timestamp - Optional timestamp for the 'auth_verify' request. Defaults to the current time.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage for 'auth_verify'.
  */
 export async function createAuthVerifyMessageFromChallenge(
     signer: MessageSigner,
-    params: AuthVerifyRequest,
+    challenge: string,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const verificationData = { address: params.address, challenge: params.challenge, session_key: params.session_key, app_name: params.app_name, allowances: params.allowances };
-    const paramsArray = [verificationData];
+    const params = [challenge];
 
-    const request = NitroliteRPC.createRequest(requestId, "auth_verify", paramsArray, timestamp);
+    const request = NitroliteRPC.createRequest(requestId, "auth_verify", [params], timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);
@@ -69,7 +67,6 @@ export async function createAuthVerifyMessageFromChallenge(
  *
  * @param signer - The function to sign the 'auth_verify' request payload.
  * @param rawChallengeResponse - The raw JSON string or object received from the broker containing the 'auth_challenge'.
- * @param params - The specific parameters required by 'auth_verify', including the session key and app name.
  * @param requestId - Optional request ID for the 'auth_verify' request. Defaults to a generated ID.
  * @param timestamp - Optional timestamp for the 'auth_verify' request. Defaults to the current time.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage for 'auth_verify'.
@@ -78,7 +75,6 @@ export async function createAuthVerifyMessageFromChallenge(
 export async function createAuthVerifyMessage(
     signer: MessageSigner,
     rawChallengeResponse: string | object,
-    params: AuthVerifyRequest,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
@@ -101,11 +97,9 @@ export async function createAuthVerifyMessage(
     }
 
     const challenge: string = parsedResponse.data[0].challenge_message;
+    const params = [challenge];
 
-    const verificationData = { address: params.address, challenge: challenge, session_key: params.session_key, app_name: params.app_name, allowance: params.allowances };
-    const paramsArray = [verificationData];
-
-    const request = NitroliteRPC.createRequest(requestId, "auth_verify", paramsArray, timestamp);
+    const request = NitroliteRPC.createRequest(requestId, "auth_verify", params, timestamp);
 
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 

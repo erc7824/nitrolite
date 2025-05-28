@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"strings"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -116,8 +118,7 @@ func RecoverAddress(message []byte, signatureHex string) (string, error) {
 	return addr.Hex(), nil
 }
 
-func VerifyEip712Data(expectedAddrHex string, challengeToken string, sessionKey string, appName string, signatureHex string) (bool, error) {
-	// Define your EIP-712 typed data
+func RecoverAddressFromEip712Signature(addrHex string, challengeToken string, sessionKey string, appName string, allowances []Allowance, signatureHex string) (string, error) {
 	typedData := apitypes.TypedData{
 		Types: apitypes.Types{
 			"EIP712Domain": {
@@ -127,16 +128,21 @@ func VerifyEip712Data(expectedAddrHex string, challengeToken string, sessionKey 
 				{Name: "address", Type: "address"},
 				{Name: "challenge", Type: "string"},
 				{Name: "session_key", Type: "address"},
+				{Name: "allowances", Type: "Allowance[]"},
 			},
-		},
+			"Allowance": {
+				{Name: "asset", Type: "string"},
+				{Name: "amount", Type: "uint256"},
+			}},
 		PrimaryType: "AuthVerify",
 		Domain: apitypes.TypedDataDomain{
 			Name: appName,
 		},
 		Message: map[string]interface{}{
-			"address":     expectedAddrHex,
+			"address":     addrHex,
 			"challenge":   challengeToken,
 			"session_key": sessionKey,
+			"allowances":  convertAllowances(allowances),
 		},
 	}
 
@@ -144,14 +150,14 @@ func VerifyEip712Data(expectedAddrHex string, challengeToken string, sessionKey 
 	typedDataHash, _, err := apitypes.TypedDataAndHash(typedData)
 	if err != nil {
 		log.Printf("Failed to hash typed data: %v", err)
-		return false, err
+		return "", err
 	}
 
 	// 2. Example signature
 	sig, err := hexutil.Decode(signatureHex)
 	if err != nil {
 		log.Printf("Failed to decode signature: %v", err)
-		return false, err
+		return "", err
 	}
 
 	// 3. Fix V if needed (Ethereum uses 27/28, go-ethereum expects 0/1)
@@ -163,15 +169,21 @@ func VerifyEip712Data(expectedAddrHex string, challengeToken string, sessionKey 
 	pubKey, err := crypto.SigToPub(typedDataHash, sig)
 	if err != nil {
 		log.Printf("Failed to recover public key: %v", err)
-		return false, err
+		return "", err
 	}
 
 	signerAddress := crypto.PubkeyToAddress(*pubKey)
 
-	// 5. Optional: verify against expected signer
-	if signerAddress.Hex() == expectedAddrHex {
-		return true, nil
-	} else {
-		return false, errors.New("signature verification failed")
+	return signerAddress.Hex(), nil
+}
+
+func convertAllowances(input []Allowance) []map[string]interface{} {
+	out := make([]map[string]interface{}, len(input))
+	for i, a := range input {
+		out[i] = map[string]interface{}{
+			"asset":  a.Asset,
+			"amount": a.Amount,
+		}
 	}
+	return out
 }

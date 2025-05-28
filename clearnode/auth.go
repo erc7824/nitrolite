@@ -11,13 +11,14 @@ import (
 
 // Challenge represents an authentication challenge
 type Challenge struct {
-	Token      uuid.UUID // Random challenge token
-	Address    string    // Address this challenge was created for
-	SessionKey string    // SessionKey that is going to be used for this session
-	AppName    string    // Name of the application which opened the connection
-	CreatedAt  time.Time // When the challenge was created
-	ExpiresAt  time.Time // When the challenge expires
-	Completed  bool      // Whether the challenge has been used
+	Token      uuid.UUID   // Random challenge token
+	Address    string      // Address this challenge was created for
+	SessionKey string      // SessionKey that is going to be used for this session
+	AppName    string      // Name of the application which opened the connection
+	Allowances []Allowance // Allowances for this connection
+	CreatedAt  time.Time   // When the challenge was created
+	ExpiresAt  time.Time   // When the challenge expires
+	Completed  bool        // Whether the challenge has been used
 }
 
 // AuthManager handles authentication challenges
@@ -49,7 +50,7 @@ func NewAuthManager() *AuthManager {
 }
 
 // GenerateChallenge creates a new challenge for a specific address
-func (am *AuthManager) GenerateChallenge(address string, sessionKey string, appName string) (uuid.UUID, error) {
+func (am *AuthManager) GenerateChallenge(address string, sessionKey string, appName string, allowances []Allowance) (uuid.UUID, error) {
 	// Normalize address
 	if !strings.HasPrefix(address, "0x") {
 		address = "0x" + address
@@ -62,6 +63,7 @@ func (am *AuthManager) GenerateChallenge(address string, sessionKey string, appN
 		Address:    address,
 		SessionKey: sessionKey,
 		AppName:    appName,
+		Allowances: allowances,
 		CreatedAt:  now,
 		ExpiresAt:  now.Add(am.challengeTTL),
 		Completed:  false,
@@ -81,11 +83,24 @@ func (am *AuthManager) GenerateChallenge(address string, sessionKey string, appN
 	return challenge.Token, nil
 }
 
+func (am *AuthManager) GetChallenge(challengeToken uuid.UUID) (*Challenge, error) {
+	// Get the challenge
+	am.challengesMu.Lock()
+	defer am.challengesMu.Unlock()
+
+	challenge, exists := am.challenges[challengeToken]
+	if !exists {
+		return nil, errors.New("challenge not found")
+	}
+
+	return challenge, nil
+}
+
 // ValidateChallenge validates a challenge response
-func (am *AuthManager) ValidateChallenge(challengeToken uuid.UUID, address string, sessionKey string, appName string) error {
+func (am *AuthManager) ValidateChallenge(challengeToken uuid.UUID, recoveredSigner string) error {
 	// Normalize address
-	if !strings.HasPrefix(address, "0x") {
-		address = "0x" + address
+	if !strings.HasPrefix(recoveredSigner, "0x") {
+		recoveredSigner = "0x" + recoveredSigner
 	}
 
 	// Get the challenge
@@ -98,18 +113,8 @@ func (am *AuthManager) ValidateChallenge(challengeToken uuid.UUID, address strin
 	}
 
 	// Verify the challenge was created for this address
-	if challenge.Address != address {
+	if challenge.Address != recoveredSigner {
 		return errors.New("challenge was not created for this address")
-	}
-
-	// Verify that session key has not changed
-	if challenge.SessionKey != sessionKey {
-		return errors.New("session key mismatch")
-	}
-
-	// Verify application name
-	if challenge.AppName != appName {
-		return errors.New("app name mismatch")
 	}
 
 	// Check if challenge is expired
@@ -131,7 +136,7 @@ func (am *AuthManager) ValidateChallenge(challengeToken uuid.UUID, address strin
 	challenge.ExpiresAt = time.Now().Add(30 * time.Second) // Keep briefly for reference
 
 	// Register authenticated session
-	am.registerAuthSession(address)
+	am.registerAuthSession(recoveredSigner)
 
 	return nil
 }

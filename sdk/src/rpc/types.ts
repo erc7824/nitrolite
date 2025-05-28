@@ -15,6 +15,16 @@ export type RequestData = [RequestID, string, any[], Timestamp?];
 /** Represents the data payload within a successful response message: [requestId, method, result, timestamp?]. */
 export type ResponseData = [RequestID, string, any[], Timestamp?];
 
+/** Represents a single allowance for an asset, used in application sessions.
+ * This structure defines the symbol of the asset and the amount that is allowed to be spent.
+ */
+export type Allowance = {
+    /** The symbol of the asset (e.g., "USDC", "USDT"). */
+    symbol: string;
+    /** The amount of the asset that is allowed to be spent. */
+    amount: string;
+}
+
 /** Represents the allocation of assets within an application session.
  * This structure is used to define the initial allocation of assets among participants.
  * It includes the participant's address, the asset (usdc, usdt, etc) being allocated, and the amount.
@@ -116,6 +126,8 @@ export interface AuthRequest {
     session_key: Address;
     /** The name of the application associated with the account, used for application-specific operations. */
     app_name: string;
+    /** Allowances for tokens to spend. */
+    allowances: Allowance[];
 }
 
 /**
@@ -130,6 +142,8 @@ export interface AuthVerifyRequest {
     session_key: Address;
     /** The name of the application associated with the account, used for application-specific operations. */
     app_name: string;
+    /** Allowances for tokens to spend. */
+    allowances: Allowance[];
 }
 
 /**

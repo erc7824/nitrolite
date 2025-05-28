@@ -28,7 +28,8 @@ export async function createAuthRequestMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const paramsArray = [params.address, params.session_key, params.app_name];
+    const allowances = Object.values(params.allowances || {}).map((v)=> [v.symbol, v.amount]); // converting it to an array of [key, value] pairs
+    const paramsArray = [params.address, params.session_key, params.app_name, allowances];
     const request = NitroliteRPC.createRequest(requestId, "auth_request", paramsArray, timestamp);
 
     request.sig = [""];
@@ -53,7 +54,7 @@ export async function createAuthVerifyMessageFromChallenge(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const verificationData = { address: params.address, challenge: params.challenge, session_key: params.session_key, app_name: params.app_name };
+    const verificationData = { address: params.address, challenge: params.challenge, session_key: params.session_key, app_name: params.app_name, allowances: params.allowances };
     const paramsArray = [verificationData];
 
     const request = NitroliteRPC.createRequest(requestId, "auth_verify", paramsArray, timestamp);
@@ -101,7 +102,7 @@ export async function createAuthVerifyMessage(
 
     const challenge: string = parsedResponse.data[0].challenge_message;
 
-    const verificationData = { address: params.address, challenge: challenge, session_key: params.session_key, app_name: params.app_name };
+    const verificationData = { address: params.address, challenge: challenge, session_key: params.session_key, app_name: params.app_name, allowance: params.allowances };
     const paramsArray = [verificationData];
 
     const request = NitroliteRPC.createRequest(requestId, "auth_verify", paramsArray, timestamp);

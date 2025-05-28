@@ -382,6 +382,7 @@ Creates a virtual application between participants.
 {
   "req": [1, "create_app_session", [{
     "definition": {
+      "address": "0x4300",
       "protocol": "NitroRPC/0.2",
       "participants": [
         "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
@@ -394,12 +395,12 @@ Creates a virtual application between participants.
     },
     "allocations": [
       {
-        "participant": "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
+        "wallet": "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
         "asset": "usdc",
         "amount": "100.0"
       },
       {
-        "participant": "0x00112233445566778899AaBbCcDdEeFf00112233",
+        "wallet": "0x00112233445566778899AaBbCcDdEeFf00112233",
         "asset": "usdc",
         "amount": "100.0"
       }

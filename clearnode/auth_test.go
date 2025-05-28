@@ -74,6 +74,6 @@ func TestAuthManagerJwtManagement(t *testing.T) {
 	claims, err := authManager.VerifyJWT(token)
 	require.NoError(t, err)
 
-	assert.Equal(t, "0x1234567890123456789012345678901234567890", claims.Address)
-	assert.Equal(t, "session_key", claims.SessionKey)
+	assert.Equal(t, "0x1234567890123456789012345678901234567890", claims.Wallet)
+	assert.Equal(t, "session_key", claims.Participant)
 }

@@ -28,7 +28,8 @@ export async function createAuthRequestMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const paramsArray = [params.address, params.session_key, params.app_name];
+    const allowances = Object.entries(params.allowances || {}); // converting it to an array of [key, value] pairs
+    const paramsArray = [params.address, params.session_key, params.app_name, allowances];
     const request = NitroliteRPC.createRequest(requestId, "auth_request", paramsArray, timestamp);
 
     request.sig = [""];

@@ -116,6 +116,8 @@ export interface AuthRequest {
     session_key: Address;
     /** The name of the application associated with the account, used for application-specific operations. */
     app_name: string;
+    /** Allowances for token to spend: symbol->amount */
+    allowances?: Record<string, string>;
 }
 
 /**

@@ -44,7 +44,8 @@ type AuthManager struct {
 }
 
 type JWTClaims struct {
-	Address string `json:"address"`
+	Address    string `json:"address"`
+	SessionKey string `json:"session_key"`
 	jwt.RegisteredClaims
 }
 
@@ -203,9 +204,10 @@ func (am *AuthManager) UpdateSession(address string) bool {
 	return true
 }
 
-func (am *AuthManager) generateJWT(address string) (string, error) {
+func (am *AuthManager) GenerateJWT(address string, sessionKey string) (string, error) {
 	claims := JWTClaims{
-		Address: address,
+		Address:    address,
+		SessionKey: sessionKey,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(am.sessionTTL)),
@@ -223,7 +225,7 @@ func (am *AuthManager) generateJWT(address string) (string, error) {
 	return tokenString, nil
 }
 
-func (am *AuthManager) verifyJWT(tokenString string) (*JWTClaims, error) {
+func (am *AuthManager) VerifyJWT(tokenString string) (*JWTClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
 			return nil, nil

@@ -69,11 +69,12 @@ func TestAuthManagerJwtManagement(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, authManager)
 
-	token, err := authManager.generateJWT("0x1234567890123456789012345678901234567890")
+	token, err := authManager.GenerateJWT("0x1234567890123456789012345678901234567890", "session_key")
 	require.NoError(t, err)
 
-	claims, err := authManager.verifyJWT(token)
+	claims, err := authManager.VerifyJWT(token)
 	require.NoError(t, err)
 
 	assert.Equal(t, "0x1234567890123456789012345678901234567890", claims.Address)
+	assert.Equal(t, "session_key", claims.SessionKey)
 }

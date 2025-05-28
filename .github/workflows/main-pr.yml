@@ -21,9 +21,6 @@ jobs:
         run: go test -v ./...
         working-directory: clearnode
 
-      - name: Deliberate Failure (Test)
-        run: exit 1
-
   build-and-publish-clearnode:
     name: Build and Publish (Clearnode)
     needs: test-clearnode

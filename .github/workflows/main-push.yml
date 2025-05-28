@@ -149,8 +149,8 @@ jobs:
           SLACK_CHANNEL: deployments
           SLACK_USERNAME: CI/CD Bot
           SLACK_COLOR: ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || 'success' }}
-          SLACK_TITLE: 'Nitrolite Clearnode Deployment'
-          SLACK_MESSAGE_ON_SUCCESS: '✅ Build and deployment completed successfully!'
-          SLACK_MESSAGE_ON_FAILURE: '❌ Build or deployment failed!'
-          SLACK_MESSAGE_ON_CANCEL: '⚠️ Build or deployment was cancelled!'
+          SLACK_TITLE: 'Nitrolite Clearnode Release Candidate'
+          SLACK_MESSAGE_ON_SUCCESS: '✅ RC build and deployment completed successfully!'
+          SLACK_MESSAGE_ON_FAILURE: '❌ RC build or deployment failed!'
+          SLACK_MESSAGE_ON_CANCEL: '⚠️ RC build or deployment was cancelled!'
           SLACK_FOOTER: 'Nitrolite CI/CD Pipeline'

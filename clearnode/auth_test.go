@@ -14,7 +14,7 @@ func TestAuthManager(t *testing.T) {
 	require.NotNil(t, authManager)
 
 	// Generate a challenge
-	challenge, err := authManager.GenerateChallenge("addr", "session_key", "app_name")
+	challenge, err := authManager.GenerateChallenge("addr", "session_key", "app_name", []Allowance{})
 	require.NoError(t, err)
 	require.NotEmpty(t, challenge)
 

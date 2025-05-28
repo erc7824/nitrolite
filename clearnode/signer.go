@@ -2,14 +2,12 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"strings"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -119,6 +117,8 @@ func RecoverAddress(message []byte, signatureHex string) (string, error) {
 }
 
 func RecoverAddressFromEip712Signature(addrHex string, challengeToken string, sessionKey string, appName string, allowances []Allowance, signatureHex string) (string, error) {
+	convertedAllowances := convertAllowances(allowances)
+
 	typedData := apitypes.TypedData{
 		Types: apitypes.Types{
 			"EIP712Domain": {
@@ -142,7 +142,7 @@ func RecoverAddressFromEip712Signature(addrHex string, challengeToken string, se
 			"address":     addrHex,
 			"challenge":   challengeToken,
 			"session_key": sessionKey,
-			"allowances":  convertAllowances(allowances),
+			"allowances":  convertedAllowances,
 		},
 	}
 
@@ -180,9 +180,14 @@ func RecoverAddressFromEip712Signature(addrHex string, challengeToken string, se
 func convertAllowances(input []Allowance) []map[string]interface{} {
 	out := make([]map[string]interface{}, len(input))
 	for i, a := range input {
+		amountInt, ok := new(big.Int).SetString(a.Amount, 10)
+		if !ok {
+			log.Printf("Invalid amount in allowance: %s", a.Amount)
+			continue
+		}
 		out[i] = map[string]interface{}{
 			"asset":  a.Asset,
-			"amount": a.Amount,
+			"amount": amountInt,
 		}
 	}
 	return out

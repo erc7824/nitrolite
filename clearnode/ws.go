@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/big"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -73,7 +72,6 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 	defer h.metrics.ConnectedClients.Dec()
 
 	var signerAddress string
-	var signerSessionKey string
 	var authenticated bool
 
 	// Read messages until authentication completes
@@ -117,7 +115,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 		case "auth_verify":
 			// Client is responding to a challenge
-			authAddr, authSessionKey, err := HandleAuthVerify(conn, &rpcMsg, h.authManager, h.signer, h.db)
+			authAddr, _, err := HandleAuthVerify(conn, &rpcMsg, h.authManager, h.signer, h.db)
 			if err != nil {
 				log.Printf("Authentication verification failed: %v", err)
 				h.sendErrorResponse("", nil, conn, err.Error())
@@ -127,7 +125,6 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 			// Authentication successful
 			signerAddress = authAddr
-			signerSessionKey = authSessionKey
 			authenticated = true
 			h.metrics.AuthSuccess.Inc()
 

@@ -4,15 +4,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAuthManager(t *testing.T) {
-	authManager, err := NewAuthManager(AuthManagerConfig{
-		SessionKey: "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-	})
+	signingKey, _ := crypto.GenerateKey()
+	authManager, err := NewAuthManager(signingKey)
 	require.NoError(t, err)
 	require.NotNil(t, authManager)
 
@@ -63,9 +63,8 @@ func TestAuthManagerSessionManagement(t *testing.T) {
 }
 
 func TestAuthManagerJwtManagement(t *testing.T) {
-	authManager, err := NewAuthManager(AuthManagerConfig{
-		SessionKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-	})
+	signingKey, _ := crypto.GenerateKey()
+	authManager, err := NewAuthManager(signingKey)
 	require.NoError(t, err)
 	require.NotNil(t, authManager)
 

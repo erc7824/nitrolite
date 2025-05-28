@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
@@ -24,10 +23,6 @@ type Challenge struct {
 	Completed  bool        // Whether the challenge has been used
 }
 
-type AuthManagerConfig struct {
-	SessionKey string
-}
-
 // AuthManager handles authentication challenges
 type AuthManager struct {
 	challenges     map[uuid.UUID]*Challenge // Challenge token -> Challenge
@@ -38,8 +33,7 @@ type AuthManager struct {
 	authSessions   map[string]time.Time // Address -> last active time
 	authSessionsMu sync.RWMutex
 	sessionTTL     time.Duration
-	cfg            AuthManagerConfig // Key used for signing JWT tokens
-	authSessionKey *ecdsa.PrivateKey
+	authSigningKey *ecdsa.PrivateKey // Private key used to sign the jwts
 }
 
 type JWTClaims struct {
@@ -49,23 +43,16 @@ type JWTClaims struct {
 }
 
 // NewAuthManager creates a new authentication manager
-func NewAuthManager(cfg AuthManagerConfig) (*AuthManager, error) {
+func NewAuthManager(signingKey *ecdsa.PrivateKey) (*AuthManager, error) {
 	am := &AuthManager{
-		challenges:    make(map[uuid.UUID]*Challenge),
-		challengeTTL:  5 * time.Minute,
-		maxChallenges: 1000, // Prevent DoS
-		cleanupTicker: time.NewTicker(10 * time.Minute),
-		authSessions:  make(map[string]time.Time),
-		sessionTTL:    24 * time.Hour,
-		cfg:           cfg,
+		challenges:     make(map[uuid.UUID]*Challenge),
+		challengeTTL:   5 * time.Minute,
+		maxChallenges:  1000, // Prevent DoS
+		cleanupTicker:  time.NewTicker(10 * time.Minute),
+		authSessions:   make(map[string]time.Time),
+		sessionTTL:     24 * time.Hour,
+		authSigningKey: signingKey,
 	}
-
-	trimmedKey := strings.TrimLeft(cfg.SessionKey, "0x")
-	privateKey, err := crypto.HexToECDSA(trimmedKey)
-	if err != nil {
-		return nil, err
-	}
-	am.authSessionKey = privateKey
 
 	// Start background cleanup
 	go am.cleanupExpiredChallenges()
@@ -216,7 +203,7 @@ func (am *AuthManager) GenerateJWT(address string, sessionKey string) (string, e
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
-	tokenString, err := token.SignedString(am.authSessionKey)
+	tokenString, err := token.SignedString(am.authSigningKey)
 	if err != nil {
 		return "", err
 	}
@@ -230,7 +217,7 @@ func (am *AuthManager) VerifyJWT(tokenString string) (*JWTClaims, error) {
 			return nil, nil
 		}
 
-		return &am.authSessionKey.PublicKey, nil
+		return &am.authSigningKey.PublicKey, nil
 	})
 
 	if err != nil {

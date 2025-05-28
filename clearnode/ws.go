@@ -39,9 +39,7 @@ func NewUnifiedWSHandler(
 	rpcStore *RPCStore,
 	config *Config,
 ) (*UnifiedWSHandler, error) {
-	authManager, err := NewAuthManager(AuthManagerConfig{
-		SessionKey: config.privateKeyHex,
-	})
+	authManager, err := NewAuthManager(signer.GetPrivateKey())
 
 	if err != nil {
 		return nil, err
@@ -634,6 +632,7 @@ type AuthResponse struct {
 // AuthVerifyParams represents parameters for completing authentication
 type AuthVerifyParams struct {
 	Challenge uuid.UUID `json:"challenge"` // The challenge token
+	JWT       string    `json:"jwt"`       // Optional JWT to use for logging in
 }
 
 // Allowance represents allowances for connection
@@ -708,6 +707,16 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 
 	if err := json.Unmarshal(paramsJSON, &authParams); err != nil {
 		return "", "", fmt.Errorf("invalid parameters format: %w", err)
+	}
+
+	// If JWT was provided - validate and skip all other checks
+	if authParams.JWT != "" {
+		claims, err := authManager.VerifyJWT(authParams.JWT)
+		if err != nil {
+			return "", "", err
+		}
+
+		return claims.Address, claims.SessionKey, nil
 	}
 
 	// Validate the request signature

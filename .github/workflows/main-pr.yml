@@ -4,26 +4,58 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  FOUNDRY_PROFILE: ci
+
 jobs:
   test-clearnode:
     name: Test (Clearnode)
-
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24'
+          go-version-file: 'clearnode/go.mod'
 
       - name: Test
         run: go test -v ./...
         working-directory: clearnode
 
+  test-forge:
+    name: Test (Foundry)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Show Forge version
+        run: |
+          forge --version
+
+      - name: Run Forge fmt
+        run: |
+          forge fmt --check
+        id: fmt
+
+      - name: Run Forge build
+        run: |
+          forge build --sizes
+        id: build
+
+      - name: Run Forge tests
+        run: |
+          forge test -vvv
+        id: test
+
   build-and-publish-clearnode:
     name: Build and Publish (Clearnode)
-    needs: test-clearnode
+    needs: [test-clearnode, test-forge]
     runs-on: ubuntu-latest
     permissions:
       contents: read

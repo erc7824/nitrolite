@@ -10,12 +10,6 @@ export {
   WSStatus 
 } from './nitroliteRPC.js';
 
-// Nitrolite on-chain operations
-export { 
-  initializeNitroliteOnChain, 
-  getNitroliteOnChainClient,
-  createChannel
-} from './nitroliteOnChain.js';
 
 // App sessions for game rooms
 export {

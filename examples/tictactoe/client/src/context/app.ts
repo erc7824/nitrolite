@@ -9,7 +9,7 @@ import { type Address } from "viem";
 export const APP_CONFIG = {
     // WebSocket configuration for real-time communication
     WEBSOCKET: {
-        URL: "wss://clearnode-multichain-production.up.railway.app/ws",
+        URL: "wss://canarynet.yellow.com/ws",
     },
 
     CHANNEL: {
@@ -22,13 +22,13 @@ export const APP_CONFIG = {
     },
 
     CUSTODIES: {
-        137: "0x1096644156Ed58BF596e67d35827Adc97A25D940" as Address,
+        137: "0x2627644ae08aa21Da0Fb458D8879729743D1bB51" as Address,
     },
 
     DEFAULT_ADJUDICATOR: "dummy",
 
     ADJUDICATORS: {
-        137: "0xa3f2f64455c9f8D68d9dCAeC2605D64680FaF898" as Address,
+        137: "0x5F4A4B1D293A973a1Bc0daD3BB3692Bd51058FCF" as Address,
     },
 };
 

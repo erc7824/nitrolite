@@ -3,6 +3,7 @@ import { WebSocketClient, createWebSocketClient, type WSStatus, type WalletSigne
 import type { Channel } from "@erc7824/nitrolite";
 import APP_CONFIG from "./app";
 import { generateKeyPair, createEthersSigner } from "./createSigner";
+import { WalletStore } from "../store";
 
 // Interface for key pairs
 export interface CryptoKeypair {
@@ -184,8 +185,8 @@ export const WebSocketProvider: React.FC<{ children: ReactNode }> = ({ children 
                 console.log(`Received message (type: ${messageType})`);
             });
 
-            // Automatically attempt to connect once client is initialized
-            connect();
+            // Don't automatically connect - wait for MetaMask to be connected first
+            console.log("WebSocket client initialized, waiting for MetaMask connection...");
         }
 
         return () => {
@@ -208,8 +209,16 @@ export const WebSocketProvider: React.FC<{ children: ReactNode }> = ({ children 
             console.log("Already connected");
             return true;
         }
+
+        // Check if MetaMask wallet is connected first
+        const walletClient = WalletStore.getWalletClient();
+        if (!walletClient?.account?.address) {
+            console.log("Cannot connect to WebSocket: MetaMask wallet not connected. Please connect MetaMask first.");
+            return false;
+        }
+
         try {
-            console.log("Connecting to WebSocket server...");
+            console.log("MetaMask connected, connecting to WebSocket server...");
             await clientRef.current.connect();
             console.log("WebSocket connection established");
             return true;
@@ -219,6 +228,25 @@ export const WebSocketProvider: React.FC<{ children: ReactNode }> = ({ children 
             return false;
         }
     }, []);
+
+    // Effect to automatically connect WebSocket when MetaMask becomes available
+    useEffect(() => {
+        const checkAndConnect = async () => {
+            const walletClient = WalletStore.getWalletClient();
+            if (walletClient?.account?.address && clientRef.current && !clientRef.current.isConnected && status === "disconnected") {
+                console.log("MetaMask connected, attempting WebSocket connection...");
+                await connect();
+            }
+        };
+
+        // Check immediately
+        checkAndConnect();
+
+        // Set up an interval to check periodically (in case we miss the wallet connection)
+        const interval = setInterval(checkAndConnect, 1000);
+
+        return () => clearInterval(interval);
+    }, [connect, status]);
 
     const disconnect = useCallback(() => {
         if (clientRef.current) {

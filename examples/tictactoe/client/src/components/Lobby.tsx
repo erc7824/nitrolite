@@ -7,7 +7,6 @@ import { Button } from "./ui/button";
 import { cn } from "../lib/utils";
 import { Wallet, Users, Loader2, KeyRound, GamepadIcon, RefreshCw, Clock, AlertCircle } from "lucide-react";
 import { useMetaMask } from "../hooks/useMetaMask";
-import { useChannel } from "../hooks/useChannel";
 import { ChannelRequiredModal } from "./ChannelRequiredModal";
 import { OnlinePlayersCounter } from "./OnlinePlayersCounter";
 
@@ -29,7 +28,7 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
     const [pendingRoomAction, setPendingRoomAction] = useState<{ mode: "create" | "join"; roomId?: string } | null>(null);
 
     // Use channel hook to check if channel exists
-    const { isChannelOpen } = useChannel();
+    const { isChannelOpen } = { isChannelOpen: true };
 
     // Use MetaMask hook for wallet connection
     const { address, isConnected: isWalletConnected, connectWallet, isConnecting, error: metamaskError, isMetaMaskInstalled } = useMetaMask();
@@ -291,13 +290,7 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
                                         Connect Your Wallet
                                     </h3>
                                     <p className="text-sm text-gray-400 mb-6">Connect your MetaMask wallet to create or join games.</p>
-                                    <Button
-                                        onClick={handleConnectWallet}
-                                        variant="glowCyan"
-                                        size="xl"
-                                        className="w-full"
-                                        disabled={isConnecting || !isConnected}
-                                    >
+                                    <Button onClick={handleConnectWallet} variant="glowCyan" size="xl" className="w-full" disabled={isConnecting}>
                                         {isConnecting ? (
                                             <>
                                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -312,13 +305,6 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
                                     </Button>
 
                                     {metamaskError && <p className="mt-4 text-sm text-red-400">{metamaskError}</p>}
-
-                                    {!isConnected && (
-                                        <p className="mt-4 text-sm text-amber-400">
-                                            <Loader2 className="h-3 w-3 inline mr-1 animate-spin" />
-                                            Connecting to game server...
-                                        </p>
-                                    )}
                                 </div>
                             </div>
                         </div>

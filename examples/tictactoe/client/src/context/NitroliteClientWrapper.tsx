@@ -2,7 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { createPublicClient, createWalletClient, custom, http, type Hex } from "viem";
-import { NitroliteStore } from "../store";
+import { NitroliteStore, WalletStore } from "../store";
 import { NitroliteClient, type ContractAddresses } from "@erc7824/nitrolite";
 
 import { ethers } from "ethers";
@@ -139,6 +139,9 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
                     chain: polygon,
                     account: address as Hex,
                 });
+
+                WalletStore.setWalletClient(walletClient);
+
                 console.log("Wallet client created successfully:", walletClient.account);
 
                 const addresses: ContractAddresses = {

@@ -4,6 +4,7 @@ import { Lobby } from "./Lobby";
 import { useChannel } from "../hooks/useChannel";
 import { useWebSocketContext } from "../context/WebSocketContext";
 import { useNitroliteIntegration } from "../hooks/useNitroliteIntegration";
+import { useMetaMask } from "../hooks/useMetaMask";
 import type { JoinRoomPayload, AvailableRoom } from "../types";
 import { Card, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -22,6 +23,7 @@ export function GameLobbyIntegrated({ onJoinRoom, availableRooms = [], onGetAvai
     const [isLoading, setIsLoading] = useState(true);
     const { isConnected, status } = useWebSocketContext();
     const { clearStoredChannel } = useChannel();
+    const { isConnected: isMetaMaskConnected } = useMetaMask();
     useNitroliteIntegration(); // Ensure proper integration
     
     // Handle channel initialization on component mount
@@ -57,7 +59,23 @@ export function GameLobbyIntegrated({ onJoinRoom, availableRooms = [], onGetAvai
         );
     }
 
-    // Show connection status if not connected
+    // Show Lobby component which has built-in MetaMask connection UI
+    if (!isMetaMaskConnected) {
+        return (
+            <>
+                <Lobby
+                    onJoinRoom={onJoinRoom}
+                    isConnected={isConnected}
+                    error={null}
+                    availableRooms={availableRooms}
+                    onGetAvailableRooms={onGetAvailableRooms}
+                    onlineUsers={onlineUsers}
+                />
+            </>
+        );
+    }
+
+    // Show WebSocket connection status if MetaMask is connected but WebSocket is not
     if (!isConnected) {
         return (
             <>

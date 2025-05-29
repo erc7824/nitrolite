@@ -2,6 +2,6 @@
 
 package nitrolite
 
-import (
-	_ "github.com/ethereum/go-ethereum/cmd/abigen"
-)
+// import (
+// 	_ "github.com/ethereum/go-ethereum/cmd/abigen"
+// )

@@ -32,7 +32,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Extract tag name without 'v' prefix
-        id: tag
+        id: tagger
         run: echo "tag=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
       
       - name: Build and push Docker image
@@ -41,7 +41,7 @@ jobs:
           context: clearnode
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/clearnode:${{ steps.tag.outputs.tag }}
+            ghcr.io/${{ github.repository }}/clearnode:${{ steps.tagger.outputs.tag }}
             ghcr.io/${{ github.repository }}/clearnode:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -103,4 +103,24 @@ jobs:
           -n ${HELM_NAMESPACE} \
           --reuse-values \
           -f clearnode/chart/config/${HELM_CONFIG_ENV}/clearnode.yaml \
-          --set image.tag="${{ needs.build-and-publish.outputs.image-tag }}"
+          --set image.tag="${{ needs.build-and-publish-clearnode.outputs.image-tag }}"
+
+  notify-slack:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: [build-and-publish-clearnode, deploy-clearnode]
+    if: always()
+    
+    steps:
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: deployments
+          SLACK_USERNAME: CI/CD Bot
+          SLACK_COLOR: ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || 'success' }}
+          SLACK_TITLE: 'Nitrolite Clearnode Production Release'
+          SLACK_MESSAGE_ON_SUCCESS: '✅ Stable build and deployment completed successfully!'
+          SLACK_MESSAGE_ON_FAILURE: '❌ Stable build or deployment failed!'
+          SLACK_MESSAGE_ON_CANCEL: '⚠️ Stable build or deployment was cancelled!'
+          SLACK_FOOTER: 'Nitrolite CI/CD Pipeline'

@@ -50,3 +50,4 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}/clearnode:${{ steps.sha.outputs.short_sha }}
+

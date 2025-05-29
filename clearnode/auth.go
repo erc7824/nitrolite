@@ -193,10 +193,13 @@ func (am *AuthManager) UpdateSession(address string) bool {
 	return true
 }
 
-func (am *AuthManager) GenerateJWT(address string, sessionKey string) (string, error) {
+func (am *AuthManager) GenerateJWT(address string, sessionKey string, scope string, application string, allowances []Allowance) (string, error) {
 	claims := JWTClaims{
 		Wallet:      address,
 		Participant: sessionKey,
+		Scope:       scope,
+		Application: application,
+		Allowances:  allowances,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(am.sessionTTL)),

@@ -758,7 +758,7 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 		return "", "", err
 	}
 
-	jwtToken, err := authManager.GenerateJWT(challenge.Address, challenge.SessionKey)
+	jwtToken, err := authManager.GenerateJWT(challenge.Address, challenge.SessionKey, "", "", challenge.Allowances)
 	if err != nil {
 		log.Printf("Failed to generate JWT token: %v", err)
 		return "", "", err

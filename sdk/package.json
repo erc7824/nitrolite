@@ -38,6 +38,9 @@
         "type": "git",
         "url": "https://github.com/erc7824/nitrolite.git"
     },
+    "engines": {
+        "node": ">=20.0.0"
+    },
     "dependencies": {
         "abitype": "^0.10.3",
         "viem": "^2.5.0"

@@ -4,9 +4,6 @@ on:
   push:
     branches: [ main ]
 
-env:
-  FOUNDRY_PROFILE: ci
-
 jobs:
   test-clearnode:
     name: Test (Clearnode)
@@ -32,6 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      FOUNDRY_PROFILE: ci
     steps:
       - uses: actions/checkout@v4
         with:

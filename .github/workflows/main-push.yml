@@ -77,7 +77,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
-    name: Deploy (Clearnode)
+    name: Deploy Clearnode
     needs: build-and-publish-clearnode
     runs-on: ubuntu-latest
     env:

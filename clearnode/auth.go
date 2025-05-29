@@ -13,14 +13,17 @@ import (
 
 // Challenge represents an authentication challenge
 type Challenge struct {
-	Token      uuid.UUID   // Random challenge token
-	Address    string      // Address this challenge was created for
-	SessionKey string      // SessionKey that is going to be used for this session
-	AppName    string      // Name of the application which opened the connection
-	Allowances []Allowance // Allowances for this connection
-	CreatedAt  time.Time   // When the challenge was created
-	ExpiresAt  time.Time   // When the challenge expires
-	Completed  bool        // Whether the challenge has been used
+	Token              uuid.UUID   // Random challenge token
+	Address            string      // Address this challenge was created for
+	SessionKey         string      // SessionKey that is going to be used for this session
+	AppName            string      // Name of the application which opened the connection
+	Allowances         []Allowance // Allowances for this connection
+	Scope              string      // Policy scope
+	Expire             string      // Policy expiration
+	ApplicationAddress string      // Policy application address
+	CreatedAt          time.Time   // When the challenge was created
+	ExpiresAt          time.Time   // When the challenge expires
+	Completed          bool        // Whether the challenge has been used
 }
 
 // AuthManager handles authentication challenges
@@ -68,7 +71,15 @@ func NewAuthManager(signingKey *ecdsa.PrivateKey) (*AuthManager, error) {
 }
 
 // GenerateChallenge creates a new challenge for a specific address
-func (am *AuthManager) GenerateChallenge(address string, sessionKey string, appName string, allowances []Allowance) (uuid.UUID, error) {
+func (am *AuthManager) GenerateChallenge(
+	address string,
+	sessionKey string,
+	appName string,
+	allowances []Allowance,
+	scope string,
+	expire string,
+	applicationAddress string,
+) (uuid.UUID, error) {
 	// Normalize address
 	if !strings.HasPrefix(address, "0x") {
 		address = "0x" + address
@@ -77,14 +88,17 @@ func (am *AuthManager) GenerateChallenge(address string, sessionKey string, appN
 	// Create challenge with expiration
 	now := time.Now()
 	challenge := &Challenge{
-		Token:      uuid.New(),
-		Address:    address,
-		SessionKey: sessionKey,
-		AppName:    appName,
-		Allowances: allowances,
-		CreatedAt:  now,
-		ExpiresAt:  now.Add(am.challengeTTL),
-		Completed:  false,
+		Token:              uuid.New(),
+		Address:            address,
+		SessionKey:         sessionKey,
+		AppName:            appName,
+		Allowances:         allowances,
+		Scope:              scope,
+		Expire:             expire,
+		ApplicationAddress: applicationAddress,
+		CreatedAt:          now,
+		ExpiresAt:          now.Add(am.challengeTTL),
+		Completed:          false,
 	}
 
 	// Store challenge

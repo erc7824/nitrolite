@@ -119,6 +119,7 @@ jobs:
           --tunnel-through-iap \
           --project ${PROJECT_ID} \
           --zone ${GKE_BASTION_ZONE} \
+          --ssh-key-expiration=600s \
           -- -NL8888:127.0.0.1:8888 &
         sleep 5
 

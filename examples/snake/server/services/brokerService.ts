@@ -2,7 +2,6 @@ import WebSocket from "ws";
 import { ethers } from "ethers";
 import {
     createAuthRequestMessage,
-    createAuthVerifyMessage,
     RequestData,
     ResponsePayload,
     MessageSigner,
@@ -13,6 +12,8 @@ import {
     createGetLedgerBalancesMessage,
     CreateAppSessionRequest,
     CloseAppSessionRequest,
+    AuthRequest,
+    getCurrentTimestamp,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, CONTRACT_ADDRESSES, POLYGON_RPC_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
@@ -181,22 +182,35 @@ async function authenticateWithBroker(): Promise<void> {
                     console.log("Received auth_challenge, preparing auth_verify...");
 
                     try {
-                        // Use nitrolite's createAuthVerifyMessage, passing the raw challenge response and our signer
-                        const authVerify = await createAuthVerifyMessage(
-                            signer.sign,
-                            data.toString(), // Pass the raw challenge response
-                            serverAddress
+                        // Parse the challenge from the response
+                        const parsedResponse = NitroliteRPC.parseResponse(data.toString());
+                        if (!parsedResponse.isValid || parsedResponse.method !== "auth_challenge") {
+                            throw new Error("Invalid auth_challenge response");
+                        }
+                        
+                        const challengeData = parsedResponse.data as any[];
+                        const challenge = challengeData[0]?.challenge_message;
+                        if (!challenge) {
+                            throw new Error("No challenge in auth_challenge response");
+                        }
+
+                        // Create auth_verify request with EIP-712 signature
+                        const authVerifyRequest = await createAuthVerifyWithEIP712(
+                            serverAddress,
+                            challenge,
+                            serverAddress, // session_key
+                            "snake-game-server", // app_name
+                            [] // allowances
                         );
+
+                        console.log("Sending auth_verify:", authVerifyRequest);
+                        brokerWs.send(authVerifyRequest);
+
+                        // Send additional requests
                         const getBalances = await createGetLedgerBalancesMessage(
                             signer.sign,
-                            "0x0ca18249bd1305abaf465686d94a0815f4a057086419e60185e5e0d7e6795f7a"
+                            serverAddress
                         );
-
-                        console.log("getBalances", getBalances);
-
-                        console.log("Sending auth_verify:", authVerify);
-
-                        brokerWs.send(authVerify);
                         brokerWs.send(getBalances);
                         await getChannels();
                     } catch (error: unknown) {
@@ -243,8 +257,16 @@ async function authenticateWithBroker(): Promise<void> {
         console.log("Server wallet address:", serverAddress);
         console.log("Private key used (first 4 chars):", WALLET_PRIVATE_KEY.substring(0, 6) + "...");
 
+        // Create the auth request parameters for the new API
+        const authRequest: AuthRequest = {
+            address: serverAddress,
+            session_key: serverAddress, // Using same address as session key for server
+            app_name: "snake-game-server",
+            allowances: [] // Empty allowances for server
+        };
+
         // Generate the auth request using nitrolite and our properly typed signer
-        createAuthRequestMessage(signer.sign, serverAddress)
+        createAuthRequestMessage(authRequest)
             .then((authRequest) => {
                 console.log("Sending auth_request:", authRequest);
                 brokerWs.send(authRequest);
@@ -388,7 +410,7 @@ export async function sendToBroker(request: any): Promise<any> {
             } else {
                 // Legacy format - convert to new format
                 requestId = request.id || `req-${Date.now()}`;
-                const reqData = [requestId, request.method, request.params ? [request.params] : [], Math.floor(Date.now() / 1000)];
+                const reqData = [requestId, request.method, request.params ? [request.params] : [], Date.now()];
 
                 // Sign the request
                 const signature = await signRpcRequest(reqData);
@@ -475,7 +497,7 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
             amount: "0",
         }))
     }]
-    const timestamp = Math.floor(Date.now() / 1000);
+    const timestamp = Date.now();
 
     // Create the request with properly formatted parameters
     const request: { req: [number, string, CreateAppSessionRequest[], number] } = {
@@ -514,7 +536,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
     // Verify the app session exists before trying to close it
     try {
         const requestId = Date.now();
-        const timestamp = Math.floor(Date.now() / 1000);
+        const timestamp = Date.now();
         const request: { req: [number, string, { app_session_id: string }[], number] } = {
             req: [requestId, "get_app_definition", [{ app_session_id: appId }], timestamp]
         };
@@ -540,7 +562,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
             amount: "0",
         })),
     }];
-    const timestamp = Math.floor(Date.now() / 1000);
+    const timestamp = Date.now();
 
     // Create the request with properly formatted parameters
     const request: { req: [number, string, CloseAppSessionRequest[], number] } = {
@@ -623,4 +645,56 @@ export function verifySignature(message: string, signature: string, expectedAddr
         console.error("Error verifying signature:", error);
         return false;
     }
+}
+
+// Create auth_verify message with EIP-712 signature
+async function createAuthVerifyWithEIP712(
+    address: string,
+    challenge: string,
+    sessionKey: string,
+    appName: string,
+    allowances: Array<{ asset: string; amount: string }>
+): Promise<string> {
+    const domain = {
+        name: appName,
+    };
+
+    const types = {
+        AuthVerify: [
+            { name: "address", type: "address" },
+            { name: "challenge", type: "string" },
+            { name: "session_key", type: "address" },
+            { name: "allowances", type: "Allowance[]" },
+        ],
+        Allowance: [
+            { name: "asset", type: "string" },
+            { name: "amount", type: "uint256" },
+        ],
+    };
+
+    const value = {
+        address: address,
+        challenge: challenge,
+        session_key: sessionKey,
+        allowances: allowances.map(a => ({
+            asset: a.asset,
+            amount: ethers.BigNumber.from(a.amount || "0"),
+        })),
+    };
+
+    // Create the wallet to sign
+    const wallet = new ethers.Wallet(WALLET_PRIVATE_KEY);
+    
+    // Sign the typed data
+    const signature = await wallet._signTypedData(domain, types, value);
+
+    // Create the auth_verify request
+    const requestId = Date.now();
+    const timestamp = getCurrentTimestamp();
+    const request = NitroliteRPC.createRequest(requestId, "auth_verify", [{ challenge }], timestamp);
+    
+    // Add the EIP-712 signature
+    request.sig = [signature as Hex];
+
+    return JSON.stringify(request);
 }

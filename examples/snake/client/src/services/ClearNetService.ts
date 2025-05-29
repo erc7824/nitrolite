@@ -1,17 +1,73 @@
 import {
     NitroliteClient,
     createAuthRequestMessage,
-    createAuthVerifyMessage,
     createGetLedgerBalancesMessage,
     type NitroliteClientConfig,
+    type AuthRequest,
+    NitroliteRPC,
+    getCurrentTimestamp,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL } from "../config";
 import { createEthersSigner, generateKeyPair } from "../crypto";
 import type { Hex } from "viem";
+import { ethers } from "ethers";
 
 export interface ChannelData {
     channelId: string;
     state: any;
+}
+
+// Helper function to create auth_verify message with EIP-712 signature
+async function createAuthVerifyWithEIP712(
+    privateKey: string,
+    address: string,
+    challenge: string,
+    sessionKey: string,
+    appName: string,
+    allowances: Array<{ asset: string; amount: string }>
+): Promise<string> {
+    const domain = {
+        name: appName,
+    };
+
+    const types = {
+        AuthVerify: [
+            { name: "address", type: "address" },
+            { name: "challenge", type: "string" },
+            { name: "session_key", type: "address" },
+            { name: "allowances", type: "Allowance[]" },
+        ],
+        Allowance: [
+            { name: "asset", type: "string" },
+            { name: "amount", type: "uint256" },
+        ],
+    };
+
+    const value = {
+        address: address,
+        challenge: challenge,
+        session_key: sessionKey,
+        allowances: allowances.map(a => ({
+            asset: a.asset,
+            amount: ethers.BigNumber.from(a.amount || "0"),
+        })),
+    };
+
+    // Create the wallet to sign
+    const wallet = new ethers.Wallet(privateKey);
+    
+    // Sign the typed data
+    const signature = await wallet._signTypedData(domain, types, value);
+
+    // Create the auth_verify request
+    const requestId = Date.now();
+    const timestamp = getCurrentTimestamp();
+    const request = NitroliteRPC.createRequest(requestId, "auth_verify", [{ challenge }], timestamp);
+    
+    // Add the EIP-712 signature
+    request.sig = [signature as Hex];
+
+    return JSON.stringify(request);
 }
 
 class ClearNetService {
@@ -250,6 +306,7 @@ class ClearNetService {
         }
 
         const signer = createEthersSigner(keyPair.privateKey);
+        const privateKey = keyPair.privateKey; // Store for EIP-712 signing
 
         // Create a new authentication promise and store it
         const authPromise = new Promise<void>((resolve, reject) => {
@@ -299,20 +356,18 @@ class ClearNetService {
 
                             console.log("Challenge received:", challenge);
 
-                            // Use raw challenge data directly for verification
-                            console.log("Using raw challenge response for verification");
-
-                            // Pass the raw challenge response to createAuthVerifyMessage
-                            // This should match what the server is doing
-                            const authVerify = await createAuthVerifyMessage(
-                                signer.sign,
-                                rawData, // Raw challenge response as a string
-                                signer.address
+                            // Create auth_verify request with EIP-712 signature
+                            const authVerifyRequest = await createAuthVerifyWithEIP712(
+                                privateKey,
+                                signer.address,
+                                challenge,
+                                signer.address, // session_key
+                                "snake-game-client", // app_name
+                                [] // allowances
                             );
 
-                            console.log("Auth verify created by nitrolite:", authVerify);
-                            console.log("Sending auth_verify:", authVerify);
-                            this.wsConnection?.send(authVerify);
+                            console.log("Sending auth_verify:", authVerifyRequest);
+                            this.wsConnection?.send(authVerifyRequest);
 
                             setTimeout(async () => {
                                 const nitroChannelId = localStorage.getItem("nitro_channel_id");
@@ -368,8 +423,16 @@ class ClearNetService {
             // Use nitrolite's createAuthRequestMessage directly
             console.log("Starting authentication with address:", signer.address);
 
+            // Create the auth request parameters for the new API
+            const authRequest: AuthRequest = {
+                address: signer.address as Hex,
+                session_key: signer.address as Hex, // Using same address as session key
+                app_name: "snake-game-client",
+                allowances: [] // Empty allowances for client
+            };
+
             // Use the same approach as the server
-            createAuthRequestMessage(signer.sign, signer.address)
+            createAuthRequestMessage(authRequest)
                 .then((authRequest) => {
                     console.log("Sending auth_request:", authRequest);
                     this.wsConnection?.send(authRequest);

@@ -207,7 +207,7 @@ func TestHandleCloseVirtualApp(t *testing.T) {
 	sig, _ := signer.Sign(signBytes)
 	req.Sig = []string{hexutil.Encode(sig)}
 
-	resp, err := HandleCloseApplication(req, db)
+	resp, err := HandleCloseApplication(nil, req, db)
 	require.NoError(t, err)
 	assert.Equal(t, "close_app_session", resp.Res.Method)
 	var updated AppSession
@@ -299,7 +299,7 @@ func TestHandleCreateVirtualApp(t *testing.T) {
 	sigB, _ := signerB.Sign(signBytes)
 	rpcReq.Sig = []string{hexutil.Encode(sigA), hexutil.Encode(sigB)}
 
-	resp, err := HandleCreateApplication(rpcReq, db)
+	resp, err := HandleCreateApplication(nil, rpcReq, db)
 	require.NoError(t, err)
 
 	// ► response sanity
@@ -354,7 +354,7 @@ func TestHandleGetLedgerBalances(t *testing.T) {
 	}
 
 	// Use the test-specific handler instead of the actual one
-	msg, err := HandleGetLedgerBalances(rpcRequest, "0xParticipant1", db)
+	msg, err := HandleGetLedgerBalances(nil, rpcRequest, "0xParticipant1", db)
 	require.NoError(t, err)
 	assert.NotNil(t, msg)
 
@@ -562,7 +562,7 @@ func TestHandleGetChannels(t *testing.T) {
 		},
 	}
 
-	response, err := HandleGetChannels(rpcRequest, db)
+	response, err := HandleGetChannels(nil, rpcRequest, db)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -624,7 +624,7 @@ func TestHandleGetChannels(t *testing.T) {
 		},
 	}
 
-	openStatusResponse, err := HandleGetChannels(openStatusRequest, db)
+	openStatusResponse, err := HandleGetChannels(nil, openStatusRequest, db)
 	require.NoError(t, err)
 	require.NotNil(t, openStatusResponse)
 
@@ -652,7 +652,7 @@ func TestHandleGetChannels(t *testing.T) {
 		},
 	}
 
-	closedStatusResponse, err := HandleGetChannels(closedStatusRequest, db)
+	closedStatusResponse, err := HandleGetChannels(nil, closedStatusRequest, db)
 	require.NoError(t, err)
 	require.NotNil(t, closedStatusResponse)
 
@@ -680,7 +680,7 @@ func TestHandleGetChannels(t *testing.T) {
 		},
 	}
 
-	joiningStatusResponse, err := HandleGetChannels(joiningStatusRequest, db)
+	joiningStatusResponse, err := HandleGetChannels(nil, joiningStatusRequest, db)
 	require.NoError(t, err)
 	require.NotNil(t, joiningStatusResponse)
 
@@ -702,7 +702,7 @@ func TestHandleGetChannels(t *testing.T) {
 		Sig: []string{},
 	}
 
-	_, err = HandleGetChannels(missingParamReq, db)
+	_, err = HandleGetChannels(nil, missingParamReq, db)
 	assert.Error(t, err, "Should return error with missing participant")
 	assert.Contains(t, err.Error(), "missing participant", "Error should mention missing participant")
 }
@@ -757,7 +757,7 @@ func TestHandleGetAssets(t *testing.T) {
 	}
 
 	// Call the handler
-	resp1, err := HandleGetAssets(rpcRequest1, db)
+	resp1, err := HandleGetAssets(nil, rpcRequest1, db)
 	require.NoError(t, err)
 	assert.NotNil(t, resp1)
 
@@ -815,7 +815,7 @@ func TestHandleGetAssets(t *testing.T) {
 	}
 
 	// Call the handler with chain_id filter
-	resp2, err := HandleGetAssets(rpcRequest2, db)
+	resp2, err := HandleGetAssets(nil, rpcRequest2, db)
 	require.NoError(t, err)
 	assert.NotNil(t, resp2)
 
@@ -861,7 +861,7 @@ func TestHandleGetAssets(t *testing.T) {
 	}
 
 	// Call the handler with chain_id filter
-	resp3, err := HandleGetAssets(rpcRequest3, db)
+	resp3, err := HandleGetAssets(nil, rpcRequest3, db)
 	require.NoError(t, err)
 	assert.NotNil(t, resp3)
 
@@ -891,7 +891,7 @@ func TestHandleGetAssets(t *testing.T) {
 	}
 
 	// Call the handler with non-existent chain_id filter
-	resp4, err := HandleGetAssets(rpcRequest4, db)
+	resp4, err := HandleGetAssets(nil, rpcRequest4, db)
 	require.NoError(t, err)
 	assert.NotNil(t, resp4)
 
@@ -970,7 +970,7 @@ func TestHandleGetAppSessions(t *testing.T) {
 	}
 
 	// Call the handler
-	resp1, err := HandleGetAppSessions(rpcRequest1, db)
+	resp1, err := HandleGetAppSessions(nil, rpcRequest1, db)
 	require.NoError(t, err)
 	assert.NotNil(t, resp1)
 
@@ -1024,7 +1024,7 @@ func TestHandleGetAppSessions(t *testing.T) {
 	}
 
 	// Call the handler
-	resp2, err := HandleGetAppSessions(rpcRequest2, db)
+	resp2, err := HandleGetAppSessions(nil, rpcRequest2, db)
 	require.NoError(t, err)
 	assert.NotNil(t, resp2)
 
@@ -1047,7 +1047,7 @@ func TestHandleGetAppSessions(t *testing.T) {
 	}
 
 	// Call with missing participant
-	resp3, err := HandleGetAppSessions(rpcRequest3, db)
+	resp3, err := HandleGetAppSessions(nil, rpcRequest3, db)
 	assert.Error(t, err, "Should return error with missing participant")
 	assert.Nil(t, resp3)
 	assert.Contains(t, err.Error(), "missing participant", "Error should mention missing participant")
@@ -1129,7 +1129,7 @@ func TestHandleGetRPCHistory(t *testing.T) {
 	require.NoError(t, err)
 	rpcRequest.Sig = []string{hexutil.Encode(signed)}
 
-	response, err := HandleGetRPCHistory(participantAddr, rpcRequest, rpcStore)
+	response, err := HandleGetRPCHistory(&Policy{Wallet: participantAddr}, rpcRequest, rpcStore)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -1156,7 +1156,7 @@ func TestHandleGetRPCHistory(t *testing.T) {
 		Sig: []string{hexutil.Encode(signed)},
 	}
 
-	_, err = HandleGetRPCHistory("", missingParamReq, rpcStore)
+	_, err = HandleGetRPCHistory(&Policy{}, missingParamReq, rpcStore)
 	assert.Error(t, err, "Should return error with missing participant")
 	assert.Contains(t, err.Error(), "missing participant", "Error should mention missing participant")
 }
@@ -1206,7 +1206,7 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	}
 
 	// Call the handler
-	resp1, err := HandleGetLedgerEntries(rpcRequest1, participant, db)
+	resp1, err := HandleGetLedgerEntries(nil, rpcRequest1, participant, db)
 	require.NoError(t, err)
 	assert.NotNil(t, resp1)
 
@@ -1250,7 +1250,7 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	}
 
 	// Call the handler
-	resp2, err := HandleGetLedgerEntries(rpcRequest2, participant, db)
+	resp2, err := HandleGetLedgerEntries(nil, rpcRequest2, participant, db)
 	require.NoError(t, err)
 	assert.NotNil(t, resp2)
 
@@ -1282,7 +1282,7 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	}
 
 	// Call with empty participant
-	resp3, err := HandleGetLedgerEntries(rpcRequest3, "", db)
+	resp3, err := HandleGetLedgerEntries(nil, rpcRequest3, "", db)
 	assert.Error(t, err, "Should return error with empty participant")
 	assert.Nil(t, resp3)
 }

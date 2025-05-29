@@ -1,11 +1,13 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -31,22 +33,38 @@ type AuthManager struct {
 	authSessions   map[string]time.Time // Address -> last active time
 	authSessionsMu sync.RWMutex
 	sessionTTL     time.Duration
+	authSigningKey *ecdsa.PrivateKey // Private key used to sign the jwts
+}
+
+type JWTClaims struct {
+	Policy Policy `json:"policy"` // Application policy details
+	jwt.RegisteredClaims
+}
+
+type Policy struct {
+	Wallet      string      `json:"wallet"`      // Main wallet address authorizing the session
+	Participant string      `json:"participant"` // Delegated session key address
+	Scope       string      `json:"scope"`       // Permission scope (e.g., "app.create", "ledger.readonly")
+	Application string      `json:"application"` // Application public address
+	Allowances  []Allowance `json:"allowance"`   // Array of asset allowances
+	ExpiresAt   time.Time   `json:"expiration"`  // Expiration timestamp
 }
 
 // NewAuthManager creates a new authentication manager
-func NewAuthManager() *AuthManager {
+func NewAuthManager(signingKey *ecdsa.PrivateKey) (*AuthManager, error) {
 	am := &AuthManager{
-		challenges:    make(map[uuid.UUID]*Challenge),
-		challengeTTL:  5 * time.Minute,
-		maxChallenges: 1000, // Prevent DoS
-		cleanupTicker: time.NewTicker(10 * time.Minute),
-		authSessions:  make(map[string]time.Time),
-		sessionTTL:    24 * time.Hour,
+		challenges:     make(map[uuid.UUID]*Challenge),
+		challengeTTL:   5 * time.Minute,
+		maxChallenges:  1000, // Prevent DoS
+		cleanupTicker:  time.NewTicker(10 * time.Minute),
+		authSessions:   make(map[string]time.Time),
+		sessionTTL:     24 * time.Hour,
+		authSigningKey: signingKey,
 	}
 
 	// Start background cleanup
 	go am.cleanupExpiredChallenges()
-	return am
+	return am, nil
 }
 
 // GenerateChallenge creates a new challenge for a specific address
@@ -178,6 +196,79 @@ func (am *AuthManager) UpdateSession(address string) bool {
 
 	am.authSessions[address] = time.Now()
 	return true
+}
+
+func (am *AuthManager) GenerateJWT(address string, sessionKey string, scope string, application string, allowances []Allowance) (*JWTClaims, string, error) {
+	policy := Policy{
+		Wallet:      address,
+		Participant: sessionKey,
+		Scope:       scope,
+		Application: application,
+		Allowances:  allowances,
+		ExpiresAt:   time.Now().Add(am.sessionTTL),
+	}
+	claims := JWTClaims{
+		Policy: policy,
+		RegisteredClaims: jwt.RegisteredClaims{
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(am.sessionTTL)),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "clearnode", // TODO: make configurable
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	tokenString, err := token.SignedString(am.authSigningKey)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return &claims, tokenString, nil
+}
+
+func (am *AuthManager) VerifyJWT(tokenString string) (*JWTClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
+			return nil, nil
+		}
+
+		return &am.authSigningKey.PublicKey, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(*JWTClaims)
+	if !ok || !token.Valid {
+		return nil, errors.New("invalid JWT token claims")
+	}
+
+	if err := am.validateClaims(claims); err != nil {
+		return nil, err
+	}
+
+	return claims, nil
+}
+
+func (am *AuthManager) validateClaims(claims *JWTClaims) error {
+	issuer, err := claims.GetIssuer()
+	if err != nil {
+		return errors.New("failed to get issuer from JWT token claims")
+	}
+	expiration, err := claims.GetExpirationTime()
+	if err != nil {
+		return errors.New("failed to get expiration from JWT token claims")
+	}
+
+	if issuer != "clearnode" {
+		return errors.New("invalid JWT token claims")
+	}
+	if expiration.Before(time.Now()) {
+		return errors.New("expired JWT token")
+	}
+
+	return nil
 }
 
 // CleanupExpiredChallenges periodically removes expired challenges

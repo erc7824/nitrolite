@@ -231,7 +231,7 @@ func HandlePing(rpc *RPCMessage) (*RPCMessage, error) {
 }
 
 // HandleGetLedgerBalances returns a list of participants and their balances for a ledger account
-func HandleGetLedgerBalances(rpc *RPCMessage, walletAddress string, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetLedgerBalances(policy *Policy, rpc *RPCMessage, walletAddress string, db *gorm.DB) (*RPCMessage, error) {
 	var account string
 
 	if len(rpc.Req.Params) > 0 {
@@ -262,7 +262,7 @@ func HandleGetLedgerBalances(rpc *RPCMessage, walletAddress string, db *gorm.DB)
 	return rpcResponse, nil
 }
 
-func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetLedgerEntries(policy *Policy, rpc *RPCMessage, walletAddress string, db *gorm.DB) (*RPCMessage, error) {
 	var accountID string
 	var asset string
 
@@ -307,7 +307,7 @@ func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) 
 }
 
 // HandleCreateApplication creates a virtual application between participants
-func HandleCreateApplication(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	if len(rpc.Req.Params) < 1 {
 		return nil, errors.New("missing parameters")
 	}
@@ -445,7 +445,7 @@ func HandleCreateApplication(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) 
 }
 
 // HandleCloseApplication closes a virtual app session and redistributes funds to participants
-func HandleCloseApplication(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	if len(rpc.Req.Params) == 0 {
 		return nil, errors.New("missing parameters")
 	}
@@ -593,7 +593,7 @@ func HandleCloseApplication(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 }
 
 // HandleGetAppDefinition returns the application definition for a ledger account
-func HandleGetAppDefinition(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetAppDefinition(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var sessionID string
 
 	if len(rpc.Req.Params) > 0 {
@@ -632,7 +632,7 @@ func HandleGetAppDefinition(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	return rpcResponse, nil
 }
 
-func HandleGetAppSessions(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetAppSessions(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var participant string
 	var status string
 
@@ -675,7 +675,7 @@ func HandleGetAppSessions(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 }
 
 // HandleResizeChannel processes a request to resize a payment channel
-func HandleResizeChannel(rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMessage, error) {
+func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMessage, error) {
 	if len(rpc.Req.Params) < 1 {
 		return nil, errors.New("missing parameters")
 	}
@@ -827,7 +827,7 @@ func HandleResizeChannel(rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMess
 }
 
 // HandleCloseChannel processes a request to close a payment channel
-func HandleCloseChannel(rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMessage, error) {
+func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMessage, error) {
 	if len(rpc.Req.Params) < 1 {
 		return nil, errors.New("missing parameters")
 	}
@@ -949,7 +949,7 @@ func HandleCloseChannel(rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMessa
 
 // HandleGetChannels returns a list of channels for a given account
 // TODO: add filters, pagination, etc.
-func HandleGetChannels(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetChannels(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var participant string
 	var status string
 
@@ -995,7 +995,8 @@ func HandleGetChannels(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	return rpcResponse, nil
 }
 
-func HandleGetRPCHistory(participant string, rpc *RPCMessage, store *RPCStore) (*RPCMessage, error) {
+func HandleGetRPCHistory(policy *Policy, rpc *RPCMessage, store *RPCStore) (*RPCMessage, error) {
+	participant := policy.Wallet
 	if participant == "" {
 		return nil, errors.New("missing participant parameter")
 	}
@@ -1033,7 +1034,7 @@ type AssetResponse struct {
 }
 
 // HandleGetAssets returns all supported assets
-func HandleGetAssets(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetAssets(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var chainID *uint32
 
 	if len(rpc.Req.Params) > 0 {

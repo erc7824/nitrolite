@@ -38,7 +38,13 @@ func NewUnifiedWSHandler(
 	metrics *Metrics,
 	rpcStore *RPCStore,
 	config *Config,
-) *UnifiedWSHandler {
+) (*UnifiedWSHandler, error) {
+	authManager, err := NewAuthManager(signer.GetPrivateKey())
+
+	if err != nil {
+		return nil, err
+	}
+
 	return &UnifiedWSHandler{
 		signer: signer,
 		db:     db,
@@ -50,11 +56,11 @@ func NewUnifiedWSHandler(
 			},
 		},
 		connections: make(map[string]*websocket.Conn),
-		authManager: NewAuthManager(),
+		authManager: authManager,
 		metrics:     metrics,
 		rpcStore:    rpcStore,
 		config:      config,
-	}
+	}, nil
 }
 
 // HandleConnection handles the WebSocket connection lifecycle.
@@ -72,6 +78,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 	defer h.metrics.ConnectedClients.Dec()
 
 	var signerAddress string
+	var policy *Policy
 	var authenticated bool
 
 	// Read messages until authentication completes
@@ -115,7 +122,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 		case "auth_verify":
 			// Client is responding to a challenge
-			authAddr, _, err := HandleAuthVerify(conn, &rpcMsg, h.authManager, h.signer, h.db)
+			authPolicy, err := HandleAuthVerify(conn, &rpcMsg, h.authManager, h.signer, h.db)
 			if err != nil {
 				log.Printf("Authentication verification failed: %v", err)
 				h.sendErrorResponse("", nil, conn, err.Error())
@@ -124,7 +131,8 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 			// Authentication successful
-			signerAddress = authAddr
+			policy = authPolicy
+			signerAddress = authPolicy.Wallet
 			authenticated = true
 			h.metrics.AuthSuccess.Inc()
 
@@ -234,6 +242,10 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 		// Track RPC request by method
 		h.metrics.RPCRequests.WithLabelValues(msg.Req.Method).Inc()
+		if policy == nil {
+			h.sendErrorResponse(walletAddress, &msg, conn, "Policy not found for the user")
+			continue
+		}
 
 		switch msg.Req.Method {
 		case "ping":
@@ -253,7 +265,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 		case "get_assets":
-			rpcResponse, handlerErr = HandleGetAssets(&msg, h.db)
+			rpcResponse, handlerErr = HandleGetAssets(policy, &msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_assets: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get assets: "+handlerErr.Error())
@@ -261,7 +273,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 		case "get_ledger_balances":
-			rpcResponse, handlerErr = HandleGetLedgerBalances(&msg, walletAddress, h.db)
+			rpcResponse, handlerErr = HandleGetLedgerBalances(policy, &msg, walletAddress, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_ledger_balances: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get ledger balances: "+handlerErr.Error())
@@ -269,7 +281,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 		case "get_ledger_entries":
-			rpcResponse, handlerErr = HandleGetLedgerEntries(&msg, walletAddress, h.db)
+			rpcResponse, handlerErr = HandleGetLedgerEntries(policy, &msg, walletAddress, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_ledger_entries: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get ledger entries: "+handlerErr.Error())
@@ -277,7 +289,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 		case "get_app_definition":
-			rpcResponse, handlerErr = HandleGetAppDefinition(&msg, h.db)
+			rpcResponse, handlerErr = HandleGetAppDefinition(policy, &msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_app_definition: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get app definition: "+handlerErr.Error())
@@ -285,7 +297,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 		case "create_app_session":
-			rpcResponse, handlerErr = HandleCreateApplication(&msg, h.db)
+			rpcResponse, handlerErr = HandleCreateApplication(policy, &msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling create_app_session: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to create application: "+handlerErr.Error())
@@ -294,7 +306,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			h.sendBalanceUpdate(walletAddress)
 			recordHistory = true
 		case "close_app_session":
-			rpcResponse, handlerErr = HandleCloseApplication(&msg, h.db)
+			rpcResponse, handlerErr = HandleCloseApplication(policy, &msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling close_app_session: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to close application: "+handlerErr.Error())
@@ -303,7 +315,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			h.sendBalanceUpdate(walletAddress)
 			recordHistory = true
 		case "get_app_sessions":
-			rpcResponse, handlerErr = HandleGetAppSessions(&msg, h.db)
+			rpcResponse, handlerErr = HandleGetAppSessions(policy, &msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_app_sessions: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get app sessions: "+handlerErr.Error())
@@ -311,7 +323,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 		case "resize_channel":
-			rpcResponse, handlerErr = HandleResizeChannel(&msg, h.db, h.signer)
+			rpcResponse, handlerErr = HandleResizeChannel(policy, &msg, h.db, h.signer)
 			if handlerErr != nil {
 				log.Printf("Error handling resize_channel: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to resize channel: "+handlerErr.Error())
@@ -319,7 +331,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 			recordHistory = true
 		case "close_channel":
-			rpcResponse, handlerErr = HandleCloseChannel(&msg, h.db, h.signer)
+			rpcResponse, handlerErr = HandleCloseChannel(policy, &msg, h.db, h.signer)
 			if handlerErr != nil {
 				log.Printf("Error handling close_channel: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to close channel: "+handlerErr.Error())
@@ -327,7 +339,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 			recordHistory = true
 		case "get_channels":
-			rpcResponse, handlerErr = HandleGetChannels(&msg, h.db)
+			rpcResponse, handlerErr = HandleGetChannels(policy, &msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_channels: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get channels: "+handlerErr.Error())
@@ -335,7 +347,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 		case "get_rpc_history":
-			rpcResponse, handlerErr = HandleGetRPCHistory(walletAddress, &msg, h.rpcStore)
+			rpcResponse, handlerErr = HandleGetRPCHistory(policy, &msg, h.rpcStore)
 			if handlerErr != nil {
 				log.Printf("Error handling get_rpc_history: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get RPC history: "+handlerErr.Error())
@@ -626,6 +638,7 @@ type AuthResponse struct {
 // AuthVerifyParams represents parameters for completing authentication
 type AuthVerifyParams struct {
 	Challenge uuid.UUID `json:"challenge"` // The challenge token
+	JWT       string    `json:"jwt"`       // Optional JWT to use for logging in
 }
 
 // Allowance represents allowances for connection
@@ -686,67 +699,90 @@ func HandleAuthRequest(signer *Signer, conn *websocket.Conn, rpc *RPCMessage, au
 }
 
 // HandleAuthVerify verifies an authentication response to a challenge
-func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthManager, signer *Signer, db *gorm.DB) (string, string, error) {
+func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthManager, signer *Signer, db *gorm.DB) (*Policy, error) {
 	if len(rpc.Req.Params) < 1 {
-		return "", "", errors.New("missing parameters")
+		return nil, errors.New("missing parameters")
 	}
 
 	var authParams AuthVerifyParams
 	paramsJSON, err := json.Marshal(rpc.Req.Params[0])
 	if err != nil {
-		return "", "", fmt.Errorf("failed to parse parameters: %w", err)
+		return nil, fmt.Errorf("failed to parse parameters: %w", err)
 
 	}
 
 	if err := json.Unmarshal(paramsJSON, &authParams); err != nil {
-		return "", "", fmt.Errorf("invalid parameters format: %w", err)
+		return nil, fmt.Errorf("invalid parameters format: %w", err)
+	}
+
+	// If JWT was provided - validate and skip all other checks
+	if authParams.JWT != "" {
+		claims, err := authManager.VerifyJWT(authParams.JWT)
+		if err != nil {
+			return nil, err
+		}
+
+		response := CreateResponse(rpc.Req.RequestID, "auth_verify", []any{map[string]any{
+			"address":     claims.Policy.Wallet,
+			"session_key": claims.Policy.Participant,
+			// "jwt_token":   newJwtToken, TODO: add refresh token
+			"success": true,
+		}}, time.Now())
+
+		if err = sendMessage(conn, signer, response); err != nil {
+			log.Printf("Error sending auth success: %v", err)
+			return nil, err
+		}
+
+		return &claims.Policy, nil
 	}
 
 	// Validate the request signature
 	if len(rpc.Sig) == 0 {
-		return "", "", errors.New("missing signature in request")
+		return nil, errors.New("missing signature in request")
 	}
 
 	challenge, err := authManager.GetChallenge(authParams.Challenge)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	recoveredAddress, err := RecoverAddressFromEip712Signature(challenge.Address, challenge.Token.String(), challenge.SessionKey, challenge.AppName, challenge.Allowances, rpc.Sig[0])
 	if err != nil {
-		return "", "", errors.New("invalid signature")
+		return nil, errors.New("invalid signature")
 	}
 
 	err = authManager.ValidateChallenge(authParams.Challenge, recoveredAddress)
 	if err != nil {
 		log.Printf("Challenge verification failed: %v", err)
-		return "", "", err
+		return nil, err
 	}
 
 	// Store signer
 	err = AddSigner(db, challenge.Address, challenge.SessionKey)
 	if err != nil {
 		log.Printf("Failed to create signer in db: %v", err)
-		return "", "", err
+		return nil, err
+	}
+
+	claims, jwtToken, err := authManager.GenerateJWT(challenge.Address, challenge.SessionKey, "", "", challenge.Allowances)
+	if err != nil {
+		log.Printf("Failed to generate JWT token: %v", err)
+		return nil, err
 	}
 
 	response := CreateResponse(rpc.Req.RequestID, "auth_verify", []any{map[string]any{
 		"address":     challenge.Address,
 		"session_key": challenge.SessionKey,
+		"jwt_token":   jwtToken,
 		"success":     true,
 	}}, time.Now())
 
-	// Sign the response with the server's key
-	resBytes, _ := json.Marshal(response.Req)
-	signature, _ := signer.Sign(resBytes)
-	response.Sig = []string{hexutil.Encode(signature)}
-
-	responseData, _ := json.Marshal(response)
-	if err = conn.WriteMessage(websocket.TextMessage, responseData); err != nil {
+	if err = sendMessage(conn, signer, response); err != nil {
 		log.Printf("Error sending auth success: %v", err)
-		return "", "", err
+		return nil, err
 	}
 
-	return challenge.Address, challenge.SessionKey, nil
+	return &claims.Policy, nil
 }
 
 func ValidateTimestamp(ts uint64, expirySeconds int) error {
@@ -790,4 +826,18 @@ func parseAllowances(rawAllowances any) ([]Allowance, error) {
 	}
 
 	return result, nil
+}
+
+func sendMessage(conn *websocket.Conn, signer *Signer, msg *RPCMessage) error {
+	// Sign the response with the server's key
+	resBytes, _ := json.Marshal(msg.Req)
+	signature, _ := signer.Sign(resBytes)
+	msg.Sig = []string{hexutil.Encode(signature)}
+
+	responseData, _ := json.Marshal(msg)
+	if err := conn.WriteMessage(websocket.TextMessage, responseData); err != nil {
+		return err
+	}
+
+	return nil
 }

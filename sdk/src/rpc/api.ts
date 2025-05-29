@@ -110,25 +110,21 @@ export async function createAuthVerifyMessage(
  * Creates the signed, stringified message body for an 'auth_verify' request
  * by providing JWT token received from the broker.
  *
- * @param signer - The function to sign the 'auth_verify' request payload.
  * @param jwtToken - The JWT token to use for the 'auth_verify' request.
  * @param requestId - Optional request ID for the 'auth_verify' request. Defaults to a generated ID.
  * @param timestamp - Optional timestamp for the 'auth_verify' request. Defaults to the current time.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage for 'auth_verify'.
  */
 export async function createAuthVerifyMessageWithJWT(
-    signer: MessageSigner,
     jwtToken: string,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [{ jwt_token: jwtToken }]
+    const params = [{ jwt: jwtToken }]
 
     const request = NitroliteRPC.createRequest(requestId, "auth_verify", params, timestamp);
 
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
-    return JSON.stringify(signedRequest);
+    return JSON.stringify(request);
 }
 
 /**

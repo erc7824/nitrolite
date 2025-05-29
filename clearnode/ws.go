@@ -650,7 +650,7 @@ type Allowance struct {
 // HandleAuthRequest initializes the authentication process by generating a challenge
 func HandleAuthRequest(signer *Signer, conn *websocket.Conn, rpc *RPCMessage, authManager *AuthManager) error {
 	// Parse the parameters
-	if len(rpc.Req.Params) < 4 {
+	if len(rpc.Req.Params) < 7 {
 		return errors.New("missing parameters")
 	}
 
@@ -674,8 +674,40 @@ func HandleAuthRequest(signer *Signer, conn *websocket.Conn, rpc *RPCMessage, au
 	if err != nil {
 		return err
 	}
+
+	expire, ok := rpc.Req.Params[4].(string)
+	if !ok {
+		return errors.New("invalid expire")
+	}
+
+	scope, ok := rpc.Req.Params[5].(string)
+	if !ok {
+		return errors.New("invalid scope")
+	}
+
+	applicationAddress, ok := rpc.Req.Params[6].(string)
+	if !ok {
+		return errors.New("invalid application address")
+	}
+
+	logger.Infow("incoming auth request:", "addr", addr,
+		"sessionKey", sessionKey,
+		"appName", appName,
+		"rawAllowances", rawAllowances,
+		"scope", scope,
+		"expire", expire,
+		"applicationAddress", applicationAddress)
+
 	// Generate a challenge for this address
-	token, err := authManager.GenerateChallenge(addr, sessionKey, appName, allowances)
+	token, err := authManager.GenerateChallenge(
+		addr,
+		sessionKey,
+		appName,
+		allowances,
+		scope,
+		expire,
+		applicationAddress,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to generate challenge: %w", err)
 	}
@@ -746,7 +778,16 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 	if err != nil {
 		return nil, err
 	}
-	recoveredAddress, err := RecoverAddressFromEip712Signature(challenge.Address, challenge.Token.String(), challenge.SessionKey, challenge.AppName, challenge.Allowances, rpc.Sig[0])
+	recoveredAddress, err := RecoverAddressFromEip712Signature(
+		challenge.Address,
+		challenge.Token.String(),
+		challenge.SessionKey,
+		challenge.AppName,
+		challenge.Allowances,
+		challenge.Scope,
+		challenge.ApplicationAddress,
+		challenge.Expire,
+		rpc.Sig[0])
 	if err != nil {
 		return nil, errors.New("invalid signature")
 	}

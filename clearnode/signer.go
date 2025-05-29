@@ -116,7 +116,16 @@ func RecoverAddress(message []byte, signatureHex string) (string, error) {
 	return addr.Hex(), nil
 }
 
-func RecoverAddressFromEip712Signature(addrHex string, challengeToken string, sessionKey string, appName string, allowances []Allowance, signatureHex string) (string, error) {
+func RecoverAddressFromEip712Signature(
+	addrHex string,
+	challengeToken string,
+	sessionKey string,
+	appName string,
+	allowances []Allowance,
+	scope string,
+	application string,
+	expire string,
+	signatureHex string) (string, error) {
 	convertedAllowances := convertAllowances(allowances)
 
 	typedData := apitypes.TypedData{
@@ -124,24 +133,30 @@ func RecoverAddressFromEip712Signature(addrHex string, challengeToken string, se
 			"EIP712Domain": {
 				{Name: "name", Type: "string"},
 			},
-			"AuthVerify": {
-				{Name: "address", Type: "address"},
+			"Policy": {
 				{Name: "challenge", Type: "string"},
-				{Name: "session_key", Type: "address"},
+				{Name: "scope", Type: "string"},
+				{Name: "wallet", Type: "address"},
+				{Name: "application", Type: "address"},
+				{Name: "participant", Type: "address"},
+				{Name: "expire", Type: "uint256"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {
 				{Name: "asset", Type: "string"},
 				{Name: "amount", Type: "uint256"},
 			}},
-		PrimaryType: "AuthVerify",
+		PrimaryType: "Policy",
 		Domain: apitypes.TypedDataDomain{
 			Name: appName,
 		},
 		Message: map[string]interface{}{
-			"address":     addrHex,
 			"challenge":   challengeToken,
-			"session_key": sessionKey,
+			"scope":       scope,
+			"wallet":      addrHex,
+			"application": application,
+			"participant": sessionKey,
+			"expire":      expire,
 			"allowances":  convertedAllowances,
 		},
 	}

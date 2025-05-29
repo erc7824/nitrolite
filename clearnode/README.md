@@ -89,6 +89,19 @@ struct Policy {
 }
 ```
 
+Once authenticated, a JWT is return for session persistence:
+
+```typescript
+type JWTClaims struct {
+ Scope       string      `json:"scope"`       // Permission scope (e.g., "app.create", "ledger.readonly")
+ Wallet      string      `json:"wallet"`      // Main wallet address authorizing the session
+ Participant string      `json:"participant"` // Delegated session key address
+ Application string      `json:"application"` // Application public address
+ Allowances  []Allowance `json:"allowance"`   // Array of asset allowances
+ jwt.RegisteredClaims
+}
+```
+
 ## Go Documentation
 
 ### Package Structure

@@ -17,7 +17,6 @@ export interface ChannelData {
     state: any;
 }
 
-// Helper function to create auth_verify message with EIP-712 signature
 async function createAuthVerifyWithEIP712(
     privateKey: string,
     address: string,
@@ -55,7 +54,7 @@ async function createAuthVerifyWithEIP712(
 
     // Create the wallet to sign
     const wallet = new ethers.Wallet(privateKey);
-    
+
     // Sign the typed data
     const signature = await wallet._signTypedData(domain, types, value);
 
@@ -63,7 +62,7 @@ async function createAuthVerifyWithEIP712(
     const requestId = Date.now();
     const timestamp = getCurrentTimestamp();
     const request = NitroliteRPC.createRequest(requestId, "auth_verify", [{ challenge }], timestamp);
-    
+
     // Add the EIP-712 signature
     request.sig = [signature as Hex];
 

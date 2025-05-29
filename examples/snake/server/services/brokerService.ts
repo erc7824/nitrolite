@@ -187,7 +187,7 @@ async function authenticateWithBroker(): Promise<void> {
                         if (!parsedResponse.isValid || parsedResponse.method !== "auth_challenge") {
                             throw new Error("Invalid auth_challenge response");
                         }
-                        
+
                         const challengeData = parsedResponse.data as any[];
                         const challenge = challengeData[0]?.challenge_message;
                         if (!challenge) {
@@ -684,7 +684,7 @@ async function createAuthVerifyWithEIP712(
 
     // Create the wallet to sign
     const wallet = new ethers.Wallet(WALLET_PRIVATE_KEY);
-    
+
     // Sign the typed data
     const signature = await wallet._signTypedData(domain, types, value);
 
@@ -692,7 +692,7 @@ async function createAuthVerifyWithEIP712(
     const requestId = Date.now();
     const timestamp = getCurrentTimestamp();
     const request = NitroliteRPC.createRequest(requestId, "auth_verify", [{ challenge }], timestamp);
-    
+
     // Add the EIP-712 signature
     request.sig = [signature as Hex];
 

@@ -27,8 +27,16 @@ export async function createAuthRequestMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const allowances = Object.values(params.allowances || {}).map((v) => [v.symbol, v.amount]); // converting it to an array of [key, value] pairs
-    const paramsArray = [params.address, params.session_key, params.app_name, allowances];
+    const allowances = Object.values(params.allowances || {}).map((v) => [v.symbol, v.amount]);
+    const paramsArray = [
+        params.wallet,
+        params.participant,
+        params.app_name,
+        allowances,
+        params.expire ?? "",
+        params.scope ?? "",
+        params.application ?? "",
+    ];
     const request = NitroliteRPC.createRequest(requestId, "auth_request", paramsArray, timestamp);
 
     request.sig = [""];
@@ -118,9 +126,9 @@ export async function createAuthVerifyMessage(
 export async function createAuthVerifyMessageWithJWT(
     jwtToken: string,
     requestId: RequestID = generateRequestId(),
-    timestamp: Timestamp = getCurrentTimestamp(),
+    timestamp: Timestamp = getCurrentTimestamp()
 ): Promise<string> {
-    const params = [{ jwt: jwtToken }]
+    const params = [{ jwt: jwtToken }];
 
     const request = NitroliteRPC.createRequest(requestId, "auth_verify", params, timestamp);
 

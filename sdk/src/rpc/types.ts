@@ -120,13 +120,19 @@ export interface AppDefinition {
  * Defines the parameters required for the 'auth_request' RPC method.
  */
 export interface AuthRequest {
-    /** The Address of the connected account. */
-    address: Address;
-    // Session key for the account, used for application authentication.
-    session_key: Address;
-    /** The name of the application associated with the account, used for application-specific operations. */
+    /** Unique challenge identifier, typically a UUID or similar unique string. */
+    wallet: Address;
+    /** The public address of the application that is being authorized. */
+    participant: Address;
+    /** The scope of the authorization, defining what permissions are granted (e.g., "app.create", "ledger.readonly"). */
+    scope?: string;
+    /** The public address of the application that is being authorized. */
     app_name: string;
-    /** Allowances for tokens to spend. */
+    /** Application public address. */
+    application?: Address;
+    /** The expiration timestamp for the authorization, typically in seconds since the Unix epoch. */
+    expire?: string;
+    /** An array of allowances, each defining an asset and the amount that can be spent. */
     allowances: Allowance[];
 }
 

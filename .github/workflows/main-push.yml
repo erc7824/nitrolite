@@ -79,7 +79,7 @@ jobs:
 
   auto-tag:
     name: Auto-Tag
-    needs: [test-clearnode, test-forge, test-sdk]
+    needs: test-clearnode
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -211,7 +211,7 @@ jobs:
   notify-slack:
     name: Notify Slack
     runs-on: ubuntu-latest
-    needs: [auto-tag, build-and-publish-clearnode, deploy]
+    needs: [deploy, test-forge, test-sdk]
     if: always()
 
     steps:

@@ -372,9 +372,9 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
 
 ## Virtual Application Management
 
-### Create Virtual Application
+### Create Virtual Application (create_app_session)
 
-Creates a virtual application between participants.
+Creates a virtual application between participants. If submitted with all signatures, creates an app session straight away, otherwise it expects all participants to call confirm_close.
 
 **Request:**
 
@@ -422,9 +422,37 @@ Creates a virtual application between participants.
 }
 ```
 
+### Join App Session
+
+Joins an existing app session by participant.
+
+**Request:**
+
+```json
+{
+  "req": [1, "join_app_session", [{
+    "app_session_id": "0x3456789012abcdef...",
+    "signature": "0x9876fedcba..."
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "join_app_session", [{
+    "app_session_id": "0x3456789012abcdef...",
+    "status": "joined"
+  }], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
 ### Close Virtual Application
 
-Closes a virtual application and redistributes funds.
+Closes a virtual application and redistributes funds. If submitted with all signatures, closes straight away, otherwise it expects all participants to call confirm_close.
 
 **Request:**
 
@@ -456,6 +484,34 @@ Closes a virtual application and redistributes funds.
   "res": [1, "close_app_session", [{
     "app_session_id": "0x3456789012abcdef...",
     "status": "closed"
+  }], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+### Confirm Close
+
+Confirms closing of an app session by participant.
+
+**Request:**
+
+```json
+{
+  "req": [1, "confirm_close", [{
+    "app_session_id": "0x3456789012abcdef...",
+    "signature": "0x9876fedcba..."
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "confirm_close", [{
+    "app_session_id": "0x3456789012abcdef...",
+    "status": "confirmed"
   }], 1619123456789],
   "sig": ["0xabcd1234..."]
 }

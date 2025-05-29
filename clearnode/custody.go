@@ -401,7 +401,8 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 
 		logger.Infow("Fetching account info", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "broker", brokerAddr.Hex())
 		// Call getAccountInfo on the custody contract
-		info, err := c.custody.GetAccountInfo(callOpts, brokerAddr, common.HexToAddress(asset.Token))
+		tokenAddr := common.HexToAddress(asset.Token)
+		info, err := c.custody.GetAccountInfo(callOpts, brokerAddr, tokenAddr)
 		if err != nil {
 			logger.Errorw("Failed to get account info", "network", c.chainID, "token", asset.Token, "error", err)
 			continue
@@ -422,5 +423,39 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 		}).Set(float64(info.ChannelCount.Int64()))
 
 		logger.Infow("Updated contract balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "available", availableBalance.String(), "channels", info.ChannelCount.String())
+
+		// Fetch broker wallet balances
+		walletBalance := decimal.Zero
+
+		if asset.Token == "0x0000000000000000000000000000000000000000" {
+			walletBalanceRaw, err := c.client.BalanceAt(context.TODO(), brokerAddr, nil)
+			if err != nil {
+				logger.Errorw("Failed to get base_asset balance", "network", c.chainID, "token", asset.Token, "error", err)
+				continue
+			}
+			walletBalance = decimal.NewFromBigInt(walletBalanceRaw, -int32(asset.Decimals))
+
+		} else {
+			caller, err := nitrolite.NewErc20(tokenAddr, c.client)
+			if err != nil {
+				logger.Errorw("Failed to initialize erc20 caller", "network", c.chainID, "token", asset.Token, "error", err)
+				continue
+			}
+
+			walletBalanceRaw, err := caller.BalanceOf(callOpts, brokerAddr)
+			if err != nil {
+				logger.Errorw("Failed to get erc20 balance", "network", c.chainID, "token", asset.Token, "error", err)
+				continue
+			}
+			walletBalance = decimal.NewFromBigInt(walletBalanceRaw, -int32(asset.Decimals))
+		}
+
+		metrics.BrokerWalletBalance.With(prometheus.Labels{
+			"network": fmt.Sprintf("%d", c.chainID),
+			"token":   asset.Token,
+			"asset":   asset.Symbol,
+		}).Set(walletBalance.InexactFloat64())
+
+		logger.Infow("Updated erc20 balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "balance", walletBalance.String())
 	}
 }

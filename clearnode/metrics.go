@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"gorm.io/gorm"
@@ -37,6 +36,9 @@ type Metrics struct {
 	// Smart contract metrics
 	BrokerBalanceAvailable *prometheus.GaugeVec
 	BrokerChannelCount     *prometheus.GaugeVec
+
+	// Broker wallet metrics
+	BrokerWalletBalance *prometheus.GaugeVec
 }
 
 // NewMetrics initializes and registers Prometheus metrics
@@ -107,6 +109,13 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"network", "token", "asset"},
 		),
+		BrokerWalletBalance: promauto.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "clearnet_broker_wallet_balance",
+				Help: "Broker wallet balance",
+			},
+			[]string{"network", "token", "asset"},
+		),
 	}
 
 	return metrics
@@ -129,7 +138,7 @@ func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[stri
 
 				assets, err := GetAllAssets(db, &client.chainID)
 				if err != nil {
-					log.Error(err.Error())
+					logger.Errorw("failed to retreive assets", "err", err)
 					continue
 				}
 

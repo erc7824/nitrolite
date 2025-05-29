@@ -4,13 +4,12 @@ on:
   pull_request:
     branches: [ main ]
 
-permissions:
-  contents: read # to read cached dependencies
-
 jobs:
   test-clearnode:
     name: Test (Clearnode)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -27,6 +26,8 @@ jobs:
   test-forge:
     name: Test (Foundry)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       FOUNDRY_PROFILE: ci
     steps:
@@ -58,6 +59,8 @@ jobs:
   test-sdk:
     name: Test (SDK)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 

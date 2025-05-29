@@ -7,13 +7,12 @@ on:
 env:
   FOUNDRY_PROFILE: ci
 
-permissions:
-  contents: read # to read cached dependencies
-
 jobs:
   test-clearnode:
     name: Test (Clearnode)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -30,6 +29,8 @@ jobs:
   test-forge:
     name: Test (Foundry)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,6 +60,8 @@ jobs:
   test-sdk:
     name: Test (SDK)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -153,6 +156,8 @@ jobs:
     name: Deploy Clearnode
     needs: build-and-publish-clearnode
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       PROJECT_ID: ${{ secrets.GKE_PROJECT }}
       GKE_CLUSTER_NAME: uat

@@ -37,12 +37,17 @@ type AuthManager struct {
 }
 
 type JWTClaims struct {
+	Policy Policy `json:"policy"` // Application policy details
+	jwt.RegisteredClaims
+}
+
+type Policy struct {
 	Wallet      string      `json:"wallet"`      // Main wallet address authorizing the session
 	Participant string      `json:"participant"` // Delegated session key address
 	Scope       string      `json:"scope"`       // Permission scope (e.g., "app.create", "ledger.readonly")
 	Application string      `json:"application"` // Application public address
 	Allowances  []Allowance `json:"allowance"`   // Array of asset allowances
-	jwt.RegisteredClaims
+	ExpiresAt   time.Time   `json:"expiration"`  // Expiration timestamp
 }
 
 // NewAuthManager creates a new authentication manager
@@ -194,12 +199,16 @@ func (am *AuthManager) UpdateSession(address string) bool {
 }
 
 func (am *AuthManager) GenerateJWT(address string, sessionKey string, scope string, application string, allowances []Allowance) (string, error) {
-	claims := JWTClaims{
+	policy := Policy{
 		Wallet:      address,
 		Participant: sessionKey,
 		Scope:       scope,
 		Application: application,
 		Allowances:  allowances,
+		ExpiresAt:   time.Now().Add(am.sessionTTL),
+	}
+	claims := JWTClaims{
+		Policy: policy,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(am.sessionTTL)),

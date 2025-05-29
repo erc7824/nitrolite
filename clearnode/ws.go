@@ -717,8 +717,8 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 		}
 
 		response := CreateResponse(rpc.Req.RequestID, "auth_verify", []any{map[string]any{
-			"address":     claims.Wallet,
-			"session_key": claims.Participant,
+			"address":     claims.Policy.Wallet,
+			"session_key": claims.Policy.Participant,
 			// "jwt_token":   newJwtToken, TODO: add refresh token
 			"success": true,
 		}}, time.Now())
@@ -728,7 +728,7 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 			return "", "", err
 		}
 
-		return claims.Wallet, claims.Participant, nil
+		return claims.Policy.Wallet, claims.Policy.Participant, nil
 	}
 
 	// Validate the request signature

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -80,6 +79,6 @@ func TestAuthManagerJwtManagement(t *testing.T) {
 	claims, err := authManager.VerifyJWT(token)
 	require.NoError(t, err)
 
-	assert.Equal(t, "0x1234567890123456789012345678901234567890", claims.Wallet)
-	assert.Equal(t, "0x6966978ce78df3228993aa46984eab6d68bbe195", claims.Participant)
+	assert.Equal(t, "0x1234567890123456789012345678901234567890", claims.Policy.Wallet)
+	assert.Equal(t, "0x6966978ce78df3228993aa46984eab6d68bbe195", claims.Policy.Participant)
 }

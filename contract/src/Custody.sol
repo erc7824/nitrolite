@@ -47,7 +47,7 @@ contract Custody is IChannel, IDeposit {
     struct Metadata {
         Channel chan; // Opener define channel configuration
         ChannelStatus stage;
-        address wallet;
+        address[2] wallets; // depositing and resizing wallets for CLIENT and SERVER
         // Fixed arrays for exactly 2 participants (CLIENT and SERVER)
         // TODO: store `uint256` instead of `Amount`, as tokens are the same
         Amount[2] expectedDeposits; // CLIENT defines Token per participant
@@ -165,7 +165,7 @@ contract Custody is IChannel, IDeposit {
         Metadata storage meta = _channels[channelId];
         meta.chan = ch;
         meta.stage = ChannelStatus.INITIAL;
-        meta.wallet = wallet;
+        meta.wallets[CLIENT_IDX] = wallet;
         meta.lastValidState = initial;
 
         // NOTE: allocations MUST come in the same order as participants in deposit
@@ -223,10 +223,12 @@ contract Custody is IChannel, IDeposit {
 
         // Lock SERVER's funds according to expected deposit
         Amount memory expectedDeposit = meta.expectedDeposits[SERVER_IDX];
-        _lockAccountFundsToChannel(msg.sender, channelId, expectedDeposit.token, expectedDeposit.amount);
+        address wallet = msg.sender;
+        _lockAccountFundsToChannel(wallet, channelId, expectedDeposit.token, expectedDeposit.amount);
 
         // Record actual deposit
         meta.actualDeposits[SERVER_IDX] = expectedDeposit;
+        meta.wallets[SERVER_IDX] = wallet;
 
         // Add channel to participant's ledger
         _ledgers[meta.chan.participants[SERVER_IDX]].channels.add(channelId);
@@ -591,14 +593,14 @@ contract Custody is IChannel, IDeposit {
         // First pass: Process all positive resizes
         for (uint256 i = 0; i < PART_NUM; i++) {
             if (resizeAmounts[i] > 0) {
-                _lockAccountFundsToChannel(chMeta.chan.participants[i], channelId, token, uint256(resizeAmounts[i]));
+                _lockAccountFundsToChannel(chMeta.wallets[i], channelId, token, uint256(resizeAmounts[i]));
             }
         }
 
         // Second pass: Process all negative resizes
         for (uint256 i = 0; i < PART_NUM; i++) {
             if (resizeAmounts[i] < 0) {
-                _unlockAllocation(channelId, Allocation(chMeta.chan.participants[i], token, uint256(-resizeAmounts[i])));
+                _unlockAllocation(channelId, Allocation(chMeta.wallets[i], token, uint256(-resizeAmounts[i])));
             }
         }
 

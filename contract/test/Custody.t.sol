@@ -32,20 +32,20 @@ contract CustodyTest is Test {
     MockERC20 public token;
 
     // Private keys for testing
-    uint256 constant hostPrivKey = 1;
-    uint256 constant guestPrivKey = 2;
+    uint256 constant hostSKPrivKey = 1;
+    uint256 constant guestSKPrivKey = 2;
     uint256 constant nonParticipantPrivKey = 3;
     uint256 constant depositorPrivKey = 4;
-    uint256 constant hostParticipantPrivKey = 5;
-    uint256 constant guestParticipantPrivKey = 6;
+    uint256 constant hostWalletPrivKey = 5;
+    uint256 constant guestWalletPrivKey = 6;
 
     // Test users
-    address public host;
-    address public guest;
+    address public hostSK;
+    address public guestSK;
     address public nonParticipant;
     address public depositor;
-    address public hostParticipant;
-    address public guestParticipant;
+    address public hostWallet;
+    address public guestWallet;
 
     // Common test values
     uint64 constant CHALLENGE_DURATION = 3600; // 1 hour
@@ -55,12 +55,12 @@ contract CustodyTest is Test {
 
     function setUp() public {
         // Set up user addresses from private keys
-        host = vm.addr(hostPrivKey);
-        guest = vm.addr(guestPrivKey);
+        hostSK = vm.addr(hostSKPrivKey);
+        guestSK = vm.addr(guestSKPrivKey);
         nonParticipant = vm.addr(nonParticipantPrivKey);
         depositor = vm.addr(depositorPrivKey);
-        hostParticipant = vm.addr(hostParticipantPrivKey);
-        guestParticipant = vm.addr(guestParticipantPrivKey);
+        hostWallet = vm.addr(hostWalletPrivKey);
+        guestWallet = vm.addr(guestWalletPrivKey);
 
         // Deploy contracts
         custody = new Custody();
@@ -68,17 +68,19 @@ contract CustodyTest is Test {
         token = new MockERC20("Test Token", "TST", 18);
 
         // Fund accounts
-        token.mint(host, INITIAL_BALANCE);
-        token.mint(guest, INITIAL_BALANCE);
+        token.mint(hostSK, INITIAL_BALANCE);
+        token.mint(guestSK, INITIAL_BALANCE);
         token.mint(nonParticipant, INITIAL_BALANCE);
         token.mint(depositor, INITIAL_BALANCE);
+        token.mint(hostWallet, INITIAL_BALANCE);
+        token.mint(guestWallet, INITIAL_BALANCE);
 
         // Approve token transfers
-        vm.startPrank(host);
+        vm.startPrank(hostSK);
         token.approve(address(custody), INITIAL_BALANCE);
         vm.stopPrank();
 
-        vm.startPrank(guest);
+        vm.startPrank(guestSK);
         token.approve(address(custody), INITIAL_BALANCE);
         vm.stopPrank();
 
@@ -89,13 +91,20 @@ contract CustodyTest is Test {
         vm.startPrank(depositor);
         token.approve(address(custody), INITIAL_BALANCE);
         vm.stopPrank();
+
+        vm.startPrank(hostWallet);
+        token.approve(address(custody), INITIAL_BALANCE);
+        vm.stopPrank();
+
+        vm.startPrank(guestWallet);
+        token.approve(address(custody), INITIAL_BALANCE);
+        vm.stopPrank();
     }
 
-    // Helper to create a standard test channel
-    function createTestChannel() internal view returns (Channel memory) {
+    function createTestChannelWithSK() internal view returns (Channel memory) {
         address[] memory participants = new address[](2);
-        participants[0] = host;
-        participants[1] = guest;
+        participants[0] = hostSK;
+        participants[1] = guestSK;
 
         return Channel({
             participants: participants,
@@ -105,11 +114,10 @@ contract CustodyTest is Test {
         });
     }
 
-    // Helper to create a test channel with separate participant addresses
-    function createTestChannelWithParticipants() internal view returns (Channel memory) {
+    function createTestChannelWithWallets() internal view returns (Channel memory) {
         address[] memory participants = new address[](2);
-        participants[0] = hostParticipant;
-        participants[1] = guestParticipant;
+        participants[0] = hostWallet;
+        participants[1] = guestWallet;
 
         return Channel({
             participants: participants,
@@ -119,16 +127,12 @@ contract CustodyTest is Test {
         });
     }
 
-    // Helper to create an initial state for testing
-    function createInitialState() internal view returns (State memory) {
-        // Create allocations for both participants
+    function createInitialStateWithSK() internal view returns (State memory) {
         Allocation[] memory allocations = new Allocation[](2);
 
-        allocations[0] = Allocation({destination: host, token: address(token), amount: DEPOSIT_AMOUNT});
+        allocations[0] = Allocation({destination: hostSK, token: address(token), amount: DEPOSIT_AMOUNT});
+        allocations[1] = Allocation({destination: guestSK, token: address(token), amount: DEPOSIT_AMOUNT});
 
-        allocations[1] = Allocation({destination: guest, token: address(token), amount: DEPOSIT_AMOUNT});
-
-        // Create unsigned state with INITIALIZE intent
         return State({
             intent: StateIntent.INITIALIZE,
             version: 0, // Initial state has version 0
@@ -138,16 +142,12 @@ contract CustodyTest is Test {
         });
     }
 
-    // Helper to create an initial state for testing with separate participants
-    function createInitialStateWithParticipants() internal view returns (State memory) {
-        // Create allocations for both participants
+    function createInitialStateWithWallets() internal view returns (State memory) {
         Allocation[] memory allocations = new Allocation[](2);
 
-        allocations[0] = Allocation({destination: hostParticipant, token: address(token), amount: DEPOSIT_AMOUNT});
+        allocations[0] = Allocation({destination: hostWallet, token: address(token), amount: DEPOSIT_AMOUNT});
+        allocations[1] = Allocation({destination: guestWallet, token: address(token), amount: DEPOSIT_AMOUNT});
 
-        allocations[1] = Allocation({destination: guestParticipant, token: address(token), amount: DEPOSIT_AMOUNT});
-
-        // Create unsigned state with INITIALIZE intent
         return State({
             intent: StateIntent.INITIALIZE,
             version: 0, // Initial state has version 0
@@ -157,14 +157,11 @@ contract CustodyTest is Test {
         });
     }
 
-    // Helper to create a closing state
-    function createClosingState() internal view returns (State memory) {
-        // Create allocations for both participants
+    function createClosingStateWithSK() internal view returns (State memory) {
         Allocation[] memory allocations = new Allocation[](2);
 
-        allocations[0] = Allocation({destination: host, token: address(token), amount: DEPOSIT_AMOUNT});
-
-        allocations[1] = Allocation({destination: guest, token: address(token), amount: DEPOSIT_AMOUNT});
+        allocations[0] = Allocation({destination: hostSK, token: address(token), amount: DEPOSIT_AMOUNT});
+        allocations[1] = Allocation({destination: guestSK, token: address(token), amount: DEPOSIT_AMOUNT});
 
         // Create unsigned state with FINALIZE intent
         return State({
@@ -176,16 +173,12 @@ contract CustodyTest is Test {
         });
     }
 
-    // Helper to create a closing state with separate participants
-    function createClosingStateWithParticipants() internal view returns (State memory) {
-        // Create allocations for both participants
+    function createClosingStateWithWallets() internal view returns (State memory) {
         Allocation[] memory allocations = new Allocation[](2);
 
-        allocations[0] = Allocation({destination: hostParticipant, token: address(token), amount: DEPOSIT_AMOUNT});
+        allocations[0] = Allocation({destination: hostWallet, token: address(token), amount: DEPOSIT_AMOUNT});
+        allocations[1] = Allocation({destination: guestWallet, token: address(token), amount: DEPOSIT_AMOUNT});
 
-        allocations[1] = Allocation({destination: guestParticipant, token: address(token), amount: DEPOSIT_AMOUNT});
-
-        // Create unsigned state with FINALIZE intent
         return State({
             intent: StateIntent.FINALIZE,
             version: 0, // Initial state has version 0
@@ -195,7 +188,6 @@ contract CustodyTest is Test {
         });
     }
 
-    // Helper to sign a state
     function signState(Channel memory chan, State memory state, uint256 privateKey)
         internal
         view
@@ -206,13 +198,11 @@ contract CustodyTest is Test {
         return Signature({v: v, r: r, s: s});
     }
 
-    // Helper to deposit tokens using prank instead of startPrank
     function depositTokens(address user, uint256 amount) internal {
         vm.prank(user);
         custody.deposit(address(token), amount);
     }
 
-    // Helper to skip time for challenge testing
     function skipChallengeTime() internal {
         skip(CHALLENGE_DURATION + 1);
     }
@@ -223,28 +213,28 @@ contract CustodyTest is Test {
 
     function test_ChannelCreation() public {
         // 1. Prepare channel and initial state
-        Channel memory chan = createTestChannel();
-        State memory initialState = createInitialState();
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
 
         // 2. Sign the state by the host
-        vm.deal(host, 1 ether); // Ensure host has ETH for gas
+        vm.deal(hostSK, 1 ether); // Ensure host has ETH for gas
 
         // Sign the state
-        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
         Signature[] memory sigs = new Signature[](1);
         sigs[0] = hostSig;
         initialState.sigs = sigs;
 
         // 3. Deposit tokens for the host
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.deposit(address(token), DEPOSIT_AMOUNT * 2);
 
         // 4. Create the channel as host
-        vm.prank(host);
+        vm.prank(hostSK);
         bytes32 channelId = custody.create(chan, initialState);
 
         // Verify the channel is created and in INITIAL state
-        (uint256 available, uint256 channelCount) = custody.getAccountInfo(host, address(token));
+        (uint256 available, uint256 channelCount) = custody.getAccountInfo(hostSK, address(token));
         assertEq(available, DEPOSIT_AMOUNT, "Host should have correct available balance");
         assertEq(channelCount, 1, "Host should have 1 channel");
 
@@ -255,37 +245,37 @@ contract CustodyTest is Test {
 
     function test_CompleteChannelFunding() public {
         // 1. Create channel with host
-        Channel memory chan = createTestChannel();
-        State memory initialState = createInitialState();
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
 
         // 2. Sign the state by the host
-        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
         Signature[] memory hostSigs = new Signature[](1);
         hostSigs[0] = hostSig;
         initialState.sigs = hostSigs;
 
         // 3. Host creates channel with initial funding
-        depositTokens(host, DEPOSIT_AMOUNT * 2);
-        vm.prank(host);
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(hostSK);
         bytes32 channelId = custody.create(chan, initialState);
 
         // 4. Guest joins the channel
-        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
-        depositTokens(guest, DEPOSIT_AMOUNT * 2);
+        Signature memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        depositTokens(guestSK, DEPOSIT_AMOUNT * 2);
 
-        vm.prank(guest);
+        vm.prank(guestSK);
         custody.join(channelId, 1, guestSig);
 
         // Verify channel is now ACTIVE
-        bytes32[] memory hostChannels = custody.getAccountChannels(host);
+        bytes32[] memory hostChannels = custody.getAccountChannels(hostSK);
         assertEq(hostChannels.length, 1, "Host should have 1 channel");
 
-        bytes32[] memory guestChannels = custody.getAccountChannels(guest);
+        bytes32[] memory guestChannels = custody.getAccountChannels(guestSK);
         assertEq(guestChannels.length, 1, "Guest should have 1 channel");
 
         // Check available amounts
-        (uint256 hostAvailable,) = custody.getAccountInfo(host, address(token));
-        (uint256 guestAvailable,) = custody.getAccountInfo(guest, address(token));
+        (uint256 hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
+        (uint256 guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
 
         assertEq(hostAvailable, DEPOSIT_AMOUNT, "Host should have correct available balance");
         assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest should have correct available balance");
@@ -294,7 +284,7 @@ contract CustodyTest is Test {
     function test_InvalidChannelCreation() public {
         // Create channel with invalid participant (empty array)
         address[] memory invalidParticipants = new address[](1);
-        invalidParticipants[0] = host;
+        invalidParticipants[0] = hostSK;
         Channel memory chanWithInvalidParticipants = Channel({
             participants: invalidParticipants,
             adjudicator: address(adjudicator),
@@ -302,23 +292,23 @@ contract CustodyTest is Test {
             nonce: NONCE
         });
 
-        State memory initialState = createInitialState();
-        Signature memory hostSig = signState(chanWithInvalidParticipants, initialState, hostPrivKey);
+        State memory initialState = createInitialStateWithSK();
+        Signature memory hostSig = signState(chanWithInvalidParticipants, initialState, hostSKPrivKey);
         Signature[] memory sigs = new Signature[](1);
         sigs[0] = hostSig;
         initialState.sigs = sigs;
 
-        depositTokens(host, DEPOSIT_AMOUNT * 2);
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
 
-        vm.startPrank(host);
+        vm.startPrank(hostSK);
         vm.expectRevert(Custody.InvalidParticipant.selector);
         custody.create(chanWithInvalidParticipants, initialState);
         vm.stopPrank();
 
         // Test with zero address as adjudicator
         address[] memory validParticipants = new address[](2);
-        validParticipants[0] = host;
-        validParticipants[1] = guest;
+        validParticipants[0] = hostSK;
+        validParticipants[1] = guestSK;
 
         Channel memory chanWithZeroAdjudicator = Channel({
             participants: validParticipants,
@@ -327,7 +317,7 @@ contract CustodyTest is Test {
             nonce: NONCE
         });
 
-        vm.startPrank(host);
+        vm.startPrank(hostSK);
         vm.expectRevert(Custody.InvalidAdjudicator.selector);
         custody.create(chanWithZeroAdjudicator, initialState);
         vm.stopPrank();
@@ -336,7 +326,7 @@ contract CustodyTest is Test {
         Channel memory chanWithZeroChallenge =
             Channel({participants: validParticipants, adjudicator: address(adjudicator), challenge: 0, nonce: NONCE});
 
-        vm.startPrank(host);
+        vm.startPrank(hostSK);
         vm.expectRevert(Custody.InvalidChallengePeriod.selector);
         custody.create(chanWithZeroChallenge, initialState);
         vm.stopPrank();
@@ -346,33 +336,33 @@ contract CustodyTest is Test {
 
     function test_ChannelCooperativeClose() public {
         // 1. First create and fund a channel
-        Channel memory chan = createTestChannel();
-        State memory initialState = createInitialState();
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
 
         // Host signs initial state
-        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
         Signature[] memory hostSigs = new Signature[](1);
         hostSigs[0] = hostSig;
         initialState.sigs = hostSigs;
 
         // Create channel with host
-        depositTokens(host, DEPOSIT_AMOUNT);
-        vm.prank(host);
+        depositTokens(hostSK, DEPOSIT_AMOUNT);
+        vm.prank(hostSK);
         bytes32 channelId = custody.create(chan, initialState);
 
         // Guest joins the channel
-        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
-        depositTokens(guest, DEPOSIT_AMOUNT);
-        vm.prank(guest);
+        Signature memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        depositTokens(guestSK, DEPOSIT_AMOUNT);
+        vm.prank(guestSK);
         custody.join(channelId, 1, guestSig);
 
         // 2. Create a final state that both participants sign
-        State memory finalState = createClosingState();
+        State memory finalState = createClosingStateWithSK();
         finalState.version = 100; // Version 100 indicates a closing state
 
         // Both sign the final state
-        hostSig = signState(chan, finalState, hostPrivKey);
-        guestSig = signState(chan, finalState, guestPrivKey);
+        hostSig = signState(chan, finalState, hostSKPrivKey);
+        guestSig = signState(chan, finalState, guestSKPrivKey);
 
         Signature[] memory bothSigs = new Signature[](2);
         bothSigs[0] = hostSig;
@@ -380,15 +370,15 @@ contract CustodyTest is Test {
         finalState.sigs = bothSigs;
 
         // 3. Close the channel cooperatively
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.close(channelId, finalState, new State[](0));
 
         // 4. Verify channel is closed and funds returned
-        bytes32[] memory hostChannels = custody.getAccountChannels(host);
+        bytes32[] memory hostChannels = custody.getAccountChannels(hostSK);
         assertEq(hostChannels.length, 0, "Host should have no channels after close");
 
-        (uint256 hostAvailable,) = custody.getAccountInfo(host, address(token));
-        (uint256 guestAvailable,) = custody.getAccountInfo(guest, address(token));
+        (uint256 hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
+        (uint256 guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
 
         assertEq(hostAvailable, DEPOSIT_AMOUNT, "Host's available balance incorrect");
         assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest's available balance incorrect");
@@ -396,24 +386,24 @@ contract CustodyTest is Test {
 
     function test_InvalidChannelClose() public {
         // 1. Create and fund a channel
-        Channel memory chan = createTestChannel();
-        State memory initialState = createInitialState();
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
 
         // Set up signatures
-        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
         Signature[] memory hostSigs = new Signature[](1);
         hostSigs[0] = hostSig;
         initialState.sigs = hostSigs;
 
         // Create channel with host
-        depositTokens(host, DEPOSIT_AMOUNT * 2);
-        vm.prank(host);
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(hostSK);
         bytes32 channelId = custody.create(chan, initialState);
 
         // Guest joins the channel
-        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
-        depositTokens(guest, DEPOSIT_AMOUNT * 2);
-        vm.prank(guest);
+        Signature memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        depositTokens(guestSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(guestSK);
         custody.join(channelId, 1, guestSig);
 
         // 2. Try to close with invalid close state (missing CHANCLOSE magic number)
@@ -424,17 +414,17 @@ contract CustodyTest is Test {
         bothSigs[1] = guestSig;
         invalidState.sigs = bothSigs;
 
-        vm.startPrank(host);
+        vm.startPrank(hostSK);
         vm.expectRevert(Custody.InvalidState.selector);
         custody.close(channelId, invalidState, new State[](0));
         vm.stopPrank();
 
         // 3. Try to close non-existent channel
         bytes32 nonExistentChannelId = bytes32(uint256(1234));
-        State memory closingState = createClosingState();
+        State memory closingState = createClosingStateWithSK();
         closingState.sigs = bothSigs;
 
-        vm.startPrank(host);
+        vm.startPrank(hostSK);
         vm.expectRevert(abi.encodeWithSelector(Custody.ChannelNotFound.selector, nonExistentChannelId));
         custody.close(nonExistentChannelId, closingState, new State[](0));
         vm.stopPrank();
@@ -444,24 +434,24 @@ contract CustodyTest is Test {
 
     function test_RejectEqualVersionChallenge() public {
         // 1. Create and fund a channel
-        Channel memory chan = createTestChannel();
-        State memory initialState = createInitialState();
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
 
         // Set up signatures
-        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
         Signature[] memory hostSigs = new Signature[](1);
         hostSigs[0] = hostSig;
         initialState.sigs = hostSigs;
 
         // Create channel with host
-        depositTokens(host, DEPOSIT_AMOUNT * 2);
-        vm.prank(host);
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(hostSK);
         bytes32 channelId = custody.create(chan, initialState);
 
         // Guest joins the channel
-        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
-        depositTokens(guest, DEPOSIT_AMOUNT * 2);
-        vm.prank(guest);
+        Signature memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        depositTokens(guestSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(guestSK);
         custody.join(channelId, 1, guestSig);
 
         // 2. Create and submit first challenge state
@@ -471,13 +461,13 @@ contract CustodyTest is Test {
         challengeState.version = 97; // Version 97 indicates a challenge state
 
         // Host signs the challenge state
-        Signature memory hostChallengeSig = signState(chan, challengeState, hostPrivKey);
+        Signature memory hostChallengeSig = signState(chan, challengeState, hostSKPrivKey);
         Signature[] memory challengeSigs = new Signature[](1);
         challengeSigs[0] = hostChallengeSig;
         challengeState.sigs = challengeSigs;
 
         // Submit first challenge
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.challenge(channelId, challengeState, new State[](0));
 
         // 3. Create a new challenge state with the same version number
@@ -487,37 +477,37 @@ contract CustodyTest is Test {
         sameVersionChallenge.version = 97; // Same version as previous challenge (97)
 
         // Host signs the same version challenge
-        Signature memory hostSameVersionSig = signState(chan, sameVersionChallenge, hostPrivKey);
+        Signature memory hostSameVersionSig = signState(chan, sameVersionChallenge, hostSKPrivKey);
         Signature[] memory sameVersionSigs = new Signature[](1);
         sameVersionSigs[0] = hostSameVersionSig;
         sameVersionChallenge.sigs = sameVersionSigs;
 
         // 4. Try to challenge with the same version - should revert
-        vm.prank(host);
+        vm.prank(hostSK);
         vm.expectRevert(Custody.InvalidState.selector);
         custody.challenge(channelId, sameVersionChallenge, new State[](0));
     }
 
     function test_ChannelChallenge() public {
         // 1. Create and fund a channel
-        Channel memory chan = createTestChannel();
-        State memory initialState = createInitialState();
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
 
         // Set up signatures
-        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
         Signature[] memory hostSigs = new Signature[](1);
         hostSigs[0] = hostSig;
         initialState.sigs = hostSigs;
 
         // Create channel with host
-        depositTokens(host, DEPOSIT_AMOUNT * 2);
-        vm.prank(host);
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(hostSK);
         bytes32 channelId = custody.create(chan, initialState);
 
         // Guest joins the channel
-        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
-        depositTokens(guest, DEPOSIT_AMOUNT * 2);
-        vm.prank(guest);
+        Signature memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        depositTokens(guestSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(guestSK);
         custody.join(channelId, 1, guestSig);
 
         // 2. Create a challenge state
@@ -527,13 +517,13 @@ contract CustodyTest is Test {
         challengeState.version = 97; // Version 97 indicates a challenge state
 
         // Host signs the challenge state
-        Signature memory hostChallengeSig = signState(chan, challengeState, hostPrivKey);
+        Signature memory hostChallengeSig = signState(chan, challengeState, hostSKPrivKey);
         Signature[] memory challengeSigs = new Signature[](1);
         challengeSigs[0] = hostChallengeSig;
         challengeState.sigs = challengeSigs;
 
         // 3. Host challenges with this state
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.challenge(channelId, challengeState, new State[](0));
 
         // 4. Create a counter-challenge state
@@ -543,8 +533,8 @@ contract CustodyTest is Test {
         counterChallengeState.version = 98; // Higher version than the challenge state (97)
 
         // Both sign the counter-challenge
-        Signature memory hostCounterSig = signState(chan, counterChallengeState, hostPrivKey);
-        Signature memory guestCounterSig = signState(chan, counterChallengeState, guestPrivKey);
+        Signature memory hostCounterSig = signState(chan, counterChallengeState, hostSKPrivKey);
+        Signature memory guestCounterSig = signState(chan, counterChallengeState, guestSKPrivKey);
 
         Signature[] memory counterChallengeSigs = new Signature[](2);
         counterChallengeSigs[0] = hostCounterSig;
@@ -552,21 +542,21 @@ contract CustodyTest is Test {
         counterChallengeState.sigs = counterChallengeSigs;
 
         // 5. Guest counter-challenges
-        vm.prank(guest);
+        vm.prank(guestSK);
         custody.challenge(channelId, counterChallengeState, new State[](0));
 
         // 6. Skip time and close the channel
         skipChallengeTime();
 
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.close(channelId, counterChallengeState, new State[](0));
 
         // 7. Verify channel is closed and funds returned
-        bytes32[] memory hostChannels = custody.getAccountChannels(host);
+        bytes32[] memory hostChannels = custody.getAccountChannels(hostSK);
         assertEq(hostChannels.length, 0, "Host should have no channels after challenge resolution");
 
-        (uint256 hostAvailable,) = custody.getAccountInfo(host, address(token));
-        (uint256 guestAvailable,) = custody.getAccountInfo(guest, address(token));
+        (uint256 hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
+        (uint256 guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
 
         assertEq(hostAvailable, DEPOSIT_AMOUNT * 2, "Host's available balance incorrect");
         assertEq(guestAvailable, DEPOSIT_AMOUNT * 2, "Guest's available balance incorrect");
@@ -574,24 +564,24 @@ contract CustodyTest is Test {
 
     function test_InvalidChallenge() public {
         // 1. Create and fund a channel
-        Channel memory chan = createTestChannel();
-        State memory initialState = createInitialState();
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
 
         // Set up signatures
-        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
         Signature[] memory hostSigs = new Signature[](1);
         hostSigs[0] = hostSig;
         initialState.sigs = hostSigs;
 
         // Create channel with host
-        depositTokens(host, DEPOSIT_AMOUNT * 2);
-        vm.prank(host);
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(hostSK);
         bytes32 channelId = custody.create(chan, initialState);
 
         // Guest joins the channel
-        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
-        depositTokens(guest, DEPOSIT_AMOUNT * 2);
-        vm.prank(guest);
+        Signature memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        depositTokens(guestSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(guestSK);
         custody.join(channelId, 1, guestSig);
 
         // 2. Try to challenge with invalid state (adjudicator rejects)
@@ -602,13 +592,13 @@ contract CustodyTest is Test {
         adjudicator.setFlag(false); // Set flag to false for invalid state
 
         // Host signs the invalid state
-        Signature memory hostInvalidSig = signState(chan, invalidState, hostPrivKey);
+        Signature memory hostInvalidSig = signState(chan, invalidState, hostSKPrivKey);
         Signature[] memory invalidSigs = new Signature[](1);
         invalidSigs[0] = hostInvalidSig;
         invalidState.sigs = invalidSigs;
 
         // Attempt to challenge with invalid state
-        vm.prank(host);
+        vm.prank(hostSK);
         vm.expectRevert(Custody.InvalidState.selector);
         custody.challenge(channelId, invalidState, new State[](0));
 
@@ -616,7 +606,7 @@ contract CustodyTest is Test {
         bytes32 nonExistentChannelId = bytes32(uint256(1234));
         adjudicator.setFlag(true); // Set flag back to true
 
-        vm.prank(host);
+        vm.prank(hostSK);
         vm.expectRevert(abi.encodeWithSelector(Custody.ChannelNotFound.selector, nonExistentChannelId));
         custody.challenge(nonExistentChannelId, invalidState, new State[](0));
     }
@@ -625,24 +615,24 @@ contract CustodyTest is Test {
 
     function test_RejectEqualVersion() public {
         // 1. Create and fund a channel
-        Channel memory chan = createTestChannel();
-        State memory initialState = createInitialState();
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
 
         // Set up signatures
-        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
         Signature[] memory hostSigs = new Signature[](1);
         hostSigs[0] = hostSig;
         initialState.sigs = hostSigs;
 
         // Create channel with host
-        depositTokens(host, DEPOSIT_AMOUNT * 2);
-        vm.prank(host);
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(hostSK);
         bytes32 channelId = custody.create(chan, initialState);
 
         // Guest joins the channel
-        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
-        depositTokens(guest, DEPOSIT_AMOUNT * 2);
-        vm.prank(guest);
+        Signature memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        depositTokens(guestSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(guestSK);
         custody.join(channelId, 1, guestSig);
 
         // 2. Create a checkpoint state
@@ -652,8 +642,8 @@ contract CustodyTest is Test {
         checkpointState.version = 55; // Version 55 indicates a checkpoint state
 
         // Both sign the checkpoint state
-        Signature memory hostCheckpointSig = signState(chan, checkpointState, hostPrivKey);
-        Signature memory guestCheckpointSig = signState(chan, checkpointState, guestPrivKey);
+        Signature memory hostCheckpointSig = signState(chan, checkpointState, hostSKPrivKey);
+        Signature memory guestCheckpointSig = signState(chan, checkpointState, guestSKPrivKey);
 
         Signature[] memory checkpointSigs = new Signature[](2);
         checkpointSigs[0] = hostCheckpointSig;
@@ -661,7 +651,7 @@ contract CustodyTest is Test {
         checkpointState.sigs = checkpointSigs;
 
         // 3. Checkpoint the state
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.checkpoint(channelId, checkpointState, new State[](0));
 
         // 4. Create a new state with the same version number
@@ -671,8 +661,8 @@ contract CustodyTest is Test {
         sameVersionState.version = 55; // Same version as previous checkpoint (55)
 
         // Both sign the new state
-        Signature memory hostSameVersionSig = signState(chan, sameVersionState, hostPrivKey);
-        Signature memory guestSameVersionSig = signState(chan, sameVersionState, guestPrivKey);
+        Signature memory hostSameVersionSig = signState(chan, sameVersionState, hostSKPrivKey);
+        Signature memory guestSameVersionSig = signState(chan, sameVersionState, guestSKPrivKey);
 
         Signature[] memory sameVersionSigs = new Signature[](2);
         sameVersionSigs[0] = hostSameVersionSig;
@@ -680,31 +670,31 @@ contract CustodyTest is Test {
         sameVersionState.sigs = sameVersionSigs;
 
         // 5. Try to checkpoint with the same version - should revert
-        vm.prank(host);
+        vm.prank(hostSK);
         vm.expectRevert(Custody.InvalidState.selector);
         custody.checkpoint(channelId, sameVersionState, new State[](0));
     }
 
     function test_Checkpoint() public {
         // 1. Create and fund a channel
-        Channel memory chan = createTestChannel();
-        State memory initialState = createInitialState();
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
 
         // Set up signatures
-        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
         Signature[] memory hostSigs = new Signature[](1);
         hostSigs[0] = hostSig;
         initialState.sigs = hostSigs;
 
         // Create channel with host
-        depositTokens(host, DEPOSIT_AMOUNT * 2);
-        vm.prank(host);
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(hostSK);
         bytes32 channelId = custody.create(chan, initialState);
 
         // Guest joins the channel
-        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
-        depositTokens(guest, DEPOSIT_AMOUNT * 2);
-        vm.prank(guest);
+        Signature memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        depositTokens(guestSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(guestSK);
         custody.join(channelId, 1, guestSig);
 
         // 2. Create a new state to checkpoint
@@ -714,8 +704,8 @@ contract CustodyTest is Test {
         checkpointState.version = 55; // Version 55 indicates a checkpoint state
 
         // Both sign the checkpoint state
-        Signature memory hostCheckpointSig = signState(chan, checkpointState, hostPrivKey);
-        Signature memory guestCheckpointSig = signState(chan, checkpointState, guestPrivKey);
+        Signature memory hostCheckpointSig = signState(chan, checkpointState, hostSKPrivKey);
+        Signature memory guestCheckpointSig = signState(chan, checkpointState, guestSKPrivKey);
 
         Signature[] memory checkpointSigs = new Signature[](2);
         checkpointSigs[0] = hostCheckpointSig;
@@ -723,7 +713,7 @@ contract CustodyTest is Test {
         checkpointState.sigs = checkpointSigs;
 
         // 3. Checkpoint the state
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.checkpoint(channelId, checkpointState, new State[](0));
 
         // 4. Start a challenge with single-signed state
@@ -731,12 +721,12 @@ contract CustodyTest is Test {
         challengeState.intent = StateIntent.OPERATE;
         challengeState.data = abi.encode(21);
         challengeState.version = 97; // Version 97 indicates a challenge state (higher than checkpoint's 55)
-        Signature memory hostChallengeSig = signState(chan, challengeState, hostPrivKey);
+        Signature memory hostChallengeSig = signState(chan, challengeState, hostSKPrivKey);
         Signature[] memory challengeSigs = new Signature[](1);
         challengeSigs[0] = hostChallengeSig;
         challengeState.sigs = challengeSigs;
 
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.challenge(channelId, challengeState, new State[](0));
 
         // 5. Checkpoint should resolve the challenge with a higher version state
@@ -746,32 +736,32 @@ contract CustodyTest is Test {
         resolveState.version = 98; // Even higher version to resolve the challenge
 
         // Both sign the resolve state
-        Signature memory hostResolveSignature = signState(chan, resolveState, hostPrivKey);
-        Signature memory guestResolveSignature = signState(chan, resolveState, guestPrivKey);
+        Signature memory hostResolveSignature = signState(chan, resolveState, hostSKPrivKey);
+        Signature memory guestResolveSignature = signState(chan, resolveState, guestSKPrivKey);
 
         Signature[] memory resolveSignatures = new Signature[](2);
         resolveSignatures[0] = hostResolveSignature;
         resolveSignatures[1] = guestResolveSignature;
         resolveState.sigs = resolveSignatures;
 
-        vm.prank(guest);
+        vm.prank(guestSK);
         custody.checkpoint(channelId, resolveState, new State[](0));
 
         // Close with checkpointed state
         skipChallengeTime();
 
         // Try to close normally - should succeed because challenge timer expired
-        State memory closeState = createClosingState();
+        State memory closeState = createClosingStateWithSK();
         closeState.version = 100; // Version 100 indicates a closing state
         // Add signatures
-        Signature memory hostCloseSig = signState(chan, closeState, hostPrivKey);
-        Signature memory guestCloseSig = signState(chan, closeState, guestPrivKey);
+        Signature memory hostCloseSig = signState(chan, closeState, hostSKPrivKey);
+        Signature memory guestCloseSig = signState(chan, closeState, guestSKPrivKey);
         Signature[] memory closeSigs = new Signature[](2);
         closeSigs[0] = hostCloseSig;
         closeSigs[1] = guestCloseSig;
         closeState.sigs = closeSigs;
 
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.close(channelId, closeState, new State[](0));
     }
 
@@ -779,16 +769,16 @@ contract CustodyTest is Test {
 
     function test_DepositAndWithdraw() public {
         // 1. Test deposit
-        vm.startPrank(host);
+        vm.startPrank(hostSK);
         custody.deposit(address(token), DEPOSIT_AMOUNT);
 
-        (uint256 available,) = custody.getAccountInfo(host, address(token));
+        (uint256 available,) = custody.getAccountInfo(hostSK, address(token));
         assertEq(available, DEPOSIT_AMOUNT, "Deposit not recorded correctly");
 
         // 2. Test withdrawal
         custody.withdraw(address(token), DEPOSIT_AMOUNT / 2);
 
-        (available,) = custody.getAccountInfo(host, address(token));
+        (available,) = custody.getAccountInfo(hostSK, address(token));
         assertEq(available, DEPOSIT_AMOUNT / 2, "Withdrawal not processed correctly");
 
         // 3. Test insufficient balance for withdrawal
@@ -804,29 +794,29 @@ contract CustodyTest is Test {
 
     function test_Resize() public {
         // 1. Create and fund a channel
-        Channel memory chan = createTestChannel();
-        State memory initialState = createInitialState();
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
 
         // Set up signatures
-        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
         Signature[] memory hostSigs = new Signature[](1);
         hostSigs[0] = hostSig;
         initialState.sigs = hostSigs;
 
         // Create channel with host
-        depositTokens(host, DEPOSIT_AMOUNT * 2);
-        vm.prank(host);
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(hostSK);
         bytes32 channelId = custody.create(chan, initialState);
 
         // Guest joins the channel
-        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
-        depositTokens(guest, DEPOSIT_AMOUNT * 2);
-        vm.prank(guest);
+        Signature memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        depositTokens(guestSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(guestSK);
         custody.join(channelId, 1, guestSig);
 
         // 1.1 Check available and locked are correct
-        (uint256 hostAvailable,) = custody.getAccountInfo(host, address(token));
-        (uint256 guestAvailable,) = custody.getAccountInfo(guest, address(token));
+        (uint256 hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
+        (uint256 guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
 
         assertEq(hostAvailable, DEPOSIT_AMOUNT, "Host's initial available tokens should be DEPOSIT_AMOUNT");
         assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest's initial available tokens should be DEPOSIT_AMOUNT");
@@ -841,7 +831,7 @@ contract CustodyTest is Test {
         });
 
         // If adjudicator allows, then only one can sign the preceding state
-        Signature memory hostPrecedingSig = signState(chan, precedingState, hostPrivKey);
+        Signature memory hostPrecedingSig = signState(chan, precedingState, hostSKPrivKey);
 
         Signature[] memory precedingSigs = new Signature[](1);
         precedingSigs[0] = hostPrecedingSig;
@@ -871,8 +861,8 @@ contract CustodyTest is Test {
         resizedState.allocations[1].amount = resizedGuestLockedBalance; // Guest now has updated amount
 
         // Both sign the resized state
-        Signature memory hostResizeSig = signState(chan, resizedState, hostPrivKey);
-        Signature memory guestResizeSig = signState(chan, resizedState, guestPrivKey);
+        Signature memory hostResizeSig = signState(chan, resizedState, hostSKPrivKey);
+        Signature memory guestResizeSig = signState(chan, resizedState, guestSKPrivKey);
 
         Signature[] memory resizeSigs = new Signature[](2);
         resizeSigs[0] = hostResizeSig;
@@ -884,16 +874,16 @@ contract CustodyTest is Test {
         proof[0] = precedingState;
 
         // 3. Resize the channel with the new interface
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.resize(channelId, resizedState, proof);
 
         // 4. Verify channel has been resized correctly
-        bytes32[] memory hostChannels = custody.getAccountChannels(host);
+        bytes32[] memory hostChannels = custody.getAccountChannels(hostSK);
         assertEq(hostChannels.length, 1, "Host should still have 1 channel after resize");
 
         // Check locked amounts have been updated correctly
-        (hostAvailable,) = custody.getAccountInfo(host, address(token));
-        (guestAvailable,) = custody.getAccountInfo(guest, address(token));
+        (hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
+        (guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
 
         assertEq(
             hostAvailable, DEPOSIT_AMOUNT * 2 - resizedHostLockedBalance, "Host's available tokens should decrease"
@@ -913,8 +903,8 @@ contract CustodyTest is Test {
         afterResizeState.allocations[1].amount = resizedGuestLockedBalance;
 
         // Both sign the state after resize
-        Signature memory hostAfterSig = signState(chan, afterResizeState, hostPrivKey);
-        Signature memory guestAfterSig = signState(chan, afterResizeState, guestPrivKey);
+        Signature memory hostAfterSig = signState(chan, afterResizeState, hostSKPrivKey);
+        Signature memory guestAfterSig = signState(chan, afterResizeState, guestSKPrivKey);
 
         Signature[] memory afterSigs = new Signature[](2);
         afterSigs[0] = hostAfterSig;
@@ -922,12 +912,12 @@ contract CustodyTest is Test {
         afterResizeState.sigs = afterSigs;
 
         // Checkpoint the state after resize
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.checkpoint(channelId, afterResizeState, new State[](0));
 
         // 5. Check available and locked balances after resize
-        (hostAvailable,) = custody.getAccountInfo(host, address(token));
-        (guestAvailable,) = custody.getAccountInfo(guest, address(token));
+        (hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
+        (guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
 
         assertEq(
             hostAvailable,
@@ -944,11 +934,11 @@ contract CustodyTest is Test {
         uint256 absResizeGuestDelta = uint256(resizeGuestDelta > 0 ? resizeGuestDelta : -resizeGuestDelta);
 
         // Verify guest can withdraw some of the unlocked tokens
-        vm.prank(guest);
+        vm.prank(guestSK);
         custody.withdraw(address(token), absResizeGuestDelta);
 
         // Check balances after withdrawal
-        (guestAvailable,) = custody.getAccountInfo(guest, address(token));
+        (guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
         assertEq(
             guestAvailable,
             DEPOSIT_AMOUNT * 2 - resizedGuestLockedBalance - absResizeGuestDelta,
@@ -956,7 +946,7 @@ contract CustodyTest is Test {
         );
 
         // Check actual token balance
-        uint256 guestBalance = token.balanceOf(guest);
+        uint256 guestBalance = token.balanceOf(guestSK);
         assertEq(
             guestBalance,
             INITIAL_BALANCE - DEPOSIT_AMOUNT * 2 + absResizeGuestDelta,
@@ -972,24 +962,24 @@ contract CustodyTest is Test {
      */
     function test_ImplicitTransfer() public {
         // 1. Create and fund a channel
-        Channel memory chan = createTestChannel();
-        State memory initialState = createInitialState();
+        Channel memory chan = createTestChannelWithSK(); // session keys are participants
+        State memory initialState = createInitialStateWithWallets(); // wallets are depositors and destinations in allocations
 
         // Set up signatures
-        Signature memory hostSig = signState(chan, initialState, hostPrivKey);
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
         Signature[] memory hostSigs = new Signature[](1);
         hostSigs[0] = hostSig;
         initialState.sigs = hostSigs;
 
         // Create channel with host, giving extra deposit for future top-up
-        depositTokens(host, DEPOSIT_AMOUNT * 2);
-        vm.prank(host);
+        depositTokens(hostWallet, DEPOSIT_AMOUNT * 2);
+        vm.prank(hostWallet);
         bytes32 channelId = custody.create(chan, initialState);
 
         // Guest joins the channel
-        Signature memory guestSig = signState(chan, initialState, guestPrivKey);
-        depositTokens(guest, DEPOSIT_AMOUNT * 2);
-        vm.prank(guest);
+        Signature memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        depositTokens(guestWallet, DEPOSIT_AMOUNT * 2);
+        vm.prank(guestWallet);
         custody.join(channelId, 1, guestSig);
 
         // 2. Create a state before resize (preceding state)
@@ -1002,7 +992,7 @@ contract CustodyTest is Test {
         });
 
         // Host signs the preceding state
-        Signature memory hostPrecedingSig = signState(chan, precedingState, hostPrivKey);
+        Signature memory hostPrecedingSig = signState(chan, precedingState, hostSKPrivKey);
         Signature[] memory precedingSigs = new Signature[](1);
         precedingSigs[0] = hostPrecedingSig;
         precedingState.sigs = precedingSigs;
@@ -1032,17 +1022,17 @@ contract CustodyTest is Test {
         uint256 newGuestAmount = 0; // Zero after withdrawal
 
         // Set allocations to match the resize - both must have the SAME token
-        resizedState.allocations[0] = Allocation({destination: host, token: address(token), amount: newHostAmount});
+        resizedState.allocations[0] = Allocation({destination: hostWallet, token: address(token), amount: newHostAmount});
 
         resizedState.allocations[1] = Allocation({
-            destination: guest,
+            destination: guestWallet,
             token: address(token), // Must be the same token as in allocation[0]
             amount: newGuestAmount
         });
 
         // Both sign the resized state
-        Signature memory hostResizeSig = signState(chan, resizedState, hostPrivKey);
-        Signature memory guestResizeSig = signState(chan, resizedState, guestPrivKey);
+        Signature memory hostResizeSig = signState(chan, resizedState, hostSKPrivKey);
+        Signature memory guestResizeSig = signState(chan, resizedState, guestSKPrivKey);
 
         Signature[] memory resizeSigs = new Signature[](2);
         resizeSigs[0] = hostResizeSig;
@@ -1053,13 +1043,13 @@ contract CustodyTest is Test {
         State[] memory proof = new State[](1);
         proof[0] = precedingState;
 
-        vm.prank(host);
+        vm.prank(hostSK);
         custody.resize(channelId, resizedState, proof);
 
         // 5. Verify channel has been resized correctly with implicit transfer
         // Check locked amounts have been updated correctly
-        (uint256 hostAvailableAfterResize,) = custody.getAccountInfo(host, address(token));
-        (uint256 guestAvailableAfterResize,) = custody.getAccountInfo(guest, address(token));
+        (uint256 hostAvailableAfterResize,) = custody.getAccountInfo(hostWallet, address(token));
+        (uint256 guestAvailableAfterResize,) = custody.getAccountInfo(guestWallet, address(token));
 
         assertEq(hostAvailableAfterResize, 0, "Host's available tokens should be updated to new amount");
         // Guest should have received the withdrawn amount
@@ -1070,13 +1060,13 @@ contract CustodyTest is Test {
 
     function test_SeparateDepositorAndParticipant() public {
         // 1. Prepare channel with different participant addresses
-        Channel memory chan = createTestChannelWithParticipants();
-        State memory initialState = createInitialStateWithParticipants();
+        Channel memory chan = createTestChannelWithWallets();
+        State memory initialState = createInitialStateWithWallets();
         // NOTE: depositor is specified instead of host in allocations
         initialState.allocations[0].destination = depositor;
 
         // 2. Sign the state by the host participant (not the depositor/creator)
-        Signature memory hostPartSig = signState(chan, initialState, hostParticipantPrivKey);
+        Signature memory hostPartSig = signState(chan, initialState, hostWalletPrivKey);
         Signature[] memory sigs = new Signature[](1);
         sigs[0] = hostPartSig;
         initialState.sigs = sigs;
@@ -1095,31 +1085,31 @@ contract CustodyTest is Test {
         assertEq(available, 0, "Depositor should have no available balance after locking");
         assertEq(channelCount, 0, "Depositor should have 0 channels");
 
-        bytes32[] memory hostChannels = custody.getAccountChannels(hostParticipant);
+        bytes32[] memory hostChannels = custody.getAccountChannels(hostWallet);
         assertEq(hostChannels.length, 1, "Host should have 1 channel");
 
         // 6. Guest participant joins the channel
-        vm.startPrank(guestParticipant);
-        token.mint(guestParticipant, INITIAL_BALANCE);
+        vm.startPrank(guestWallet);
+        token.mint(guestWallet, INITIAL_BALANCE);
         token.approve(address(custody), INITIAL_BALANCE);
         custody.deposit(address(token), DEPOSIT_AMOUNT);
         vm.stopPrank();
 
         // Sign the state by guest participant
-        Signature memory guestPartSig = signState(chan, initialState, guestParticipantPrivKey);
+        Signature memory guestPartSig = signState(chan, initialState, guestWalletPrivKey);
 
         // Guest participant joins with their own signature
-        vm.prank(guestParticipant);
+        vm.prank(guestWallet);
         custody.join(channelId, 1, guestPartSig);
 
         // 7. Verify channel is ACTIVE
         bytes32[] memory depositorChannels = custody.getAccountChannels(depositor);
         assertEq(depositorChannels.length, 0, "Depositor should have 0 channels");
 
-        hostChannels = custody.getAccountChannels(hostParticipant);
+        hostChannels = custody.getAccountChannels(hostWallet);
         assertEq(hostChannels.length, 1, "Host should have 1 channel");
 
-        bytes32[] memory guestChannels = custody.getAccountChannels(guestParticipant);
+        bytes32[] memory guestChannels = custody.getAccountChannels(guestWallet);
         assertEq(guestChannels.length, 1, "Guest participant should have 1 channel");
 
         // 8. Create a checkpoint state
@@ -1129,8 +1119,8 @@ contract CustodyTest is Test {
         checkpointState.version = 55; // Version 55 indicates a checkpoint state
 
         // Both participants sign the checkpoint state
-        Signature memory hostPartCheckpointSig = signState(chan, checkpointState, hostParticipantPrivKey);
-        Signature memory guestPartCheckpointSig = signState(chan, checkpointState, guestParticipantPrivKey);
+        Signature memory hostPartCheckpointSig = signState(chan, checkpointState, hostWalletPrivKey);
+        Signature memory guestPartCheckpointSig = signState(chan, checkpointState, guestWalletPrivKey);
 
         Signature[] memory checkpointSigs = new Signature[](2);
         checkpointSigs[0] = hostPartCheckpointSig;
@@ -1142,13 +1132,13 @@ contract CustodyTest is Test {
         custody.checkpoint(channelId, checkpointState, new State[](0));
 
         // 10. Create a closing state
-        State memory finalState = createClosingStateWithParticipants();
+        State memory finalState = createClosingStateWithWallets();
         finalState.version = 100; // Version 100 indicates a closing state
         finalState.allocations[0].destination = depositor;
 
         // Both participants sign the final state
-        Signature memory hostPartFinalSig = signState(chan, finalState, hostParticipantPrivKey);
-        Signature memory guestPartFinalSig = signState(chan, finalState, guestParticipantPrivKey);
+        Signature memory hostPartFinalSig = signState(chan, finalState, hostWalletPrivKey);
+        Signature memory guestPartFinalSig = signState(chan, finalState, guestWalletPrivKey);
 
         Signature[] memory finalSigs = new Signature[](2);
         finalSigs[0] = hostPartFinalSig;
@@ -1163,11 +1153,11 @@ contract CustodyTest is Test {
         bytes32[] memory depositorChannelsAfter = custody.getAccountChannels(depositor);
         assertEq(depositorChannelsAfter.length, 0, "Depositor should have no channels after close");
 
-        bytes32[] memory guestChannelsAfter = custody.getAccountChannels(guestParticipant);
+        bytes32[] memory guestChannelsAfter = custody.getAccountChannels(guestWallet);
         assertEq(guestChannelsAfter.length, 0, "Guest participant should have no channels after close");
 
         (uint256 depositorAvailable,) = custody.getAccountInfo(depositor, address(token));
-        (uint256 guestAvailable,) = custody.getAccountInfo(guestParticipant, address(token));
+        (uint256 guestAvailable,) = custody.getAccountInfo(guestWallet, address(token));
 
         // In this flow, the funds go back to participants (who are also depositors)
         assertEq(depositorAvailable, DEPOSIT_AMOUNT, "Depositor available balance incorrect");

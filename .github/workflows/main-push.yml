@@ -5,26 +5,102 @@ on:
     branches: [ main ]
 
 jobs:
+  test-clearnode:
+    name: Test (Clearnode)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'clearnode/go.mod'
+          cache: true
+          cache-dependency-path: 'clearnode/go.sum'
+
+      - name: Test
+        run: go test -v ./...
+        working-directory: clearnode
+
+  test-forge:
+    name: Test (Foundry)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      FOUNDRY_PROFILE: ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Show Forge version
+        run: forge --version
+
+      - name: Run Forge fmt
+        run: forge fmt --check
+        working-directory: contract
+        id: fmt
+
+      - name: Run Forge build
+        run: forge build --sizes
+        working-directory: contract
+        id: build
+
+      - name: Run Forge tests
+        run: forge test -vvv
+        working-directory: contract
+        id: test
+
+  test-sdk:
+    name: Test (SDK)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'sdk/package.json'
+          cache: 'npm'
+          cache-dependency-path: 'sdk/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: sdk
+
+      - name: Run tests
+        run: npm test
+        working-directory: sdk
+
   auto-tag:
     name: Auto-Tag
+    needs: test-clearnode
     runs-on: ubuntu-latest
     permissions:
       contents: write
     outputs:
       image-tag: ${{ steps.tagger.outputs.new_tag }}
-      
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Run auto tag script
         run: |
           git config user.name "GitHub Actions"
           git config user.email "github-actions@github.com"
-          
+
           ./clearnode/scripts/auto_tag.sh
 
       - name: Get the new tag without 'v' prefix
@@ -49,17 +125,17 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Save image tag
         id: tagger
         run: |
@@ -80,6 +156,8 @@ jobs:
     name: Deploy Clearnode
     needs: build-and-publish-clearnode
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       PROJECT_ID: ${{ secrets.GKE_PROJECT }}
       GKE_CLUSTER_NAME: uat
@@ -138,9 +216,9 @@ jobs:
   notify-slack:
     name: Notify Slack
     runs-on: ubuntu-latest
-    needs: [auto-tag, build-and-publish-clearnode, deploy]
+    needs: [deploy, test-forge, test-sdk]
     if: always()
-    
+
     steps:
       - name: Slack Notification
         uses: rtCamp/action-slack-notify@v2

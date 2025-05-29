@@ -14,7 +14,7 @@ import {
     createCloseChannelMessage,
     createGetChannelsMessage,
 } from "../../src/rpc/api";
-import { CreateAppSessionRequest, MessageSigner } from "../../src/rpc/types";
+import { CreateAppSessionRequest, MessageSigner, AuthRequest } from "../../src/rpc/types";
 
 describe("API message creators", () => {
     const signer: MessageSigner = jest.fn(async () => "0xsig" as Hex);
@@ -31,22 +31,28 @@ describe("API message creators", () => {
     });
 
     test("createAuthRequestMessage", async () => {
-        const msgStr = await createAuthRequestMessage(signer, clientAddress, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, "auth_request", [clientAddress], timestamp]);
+        const authRequest: AuthRequest = {
+            address: clientAddress,
+            session_key: clientAddress,
+            app_name: "test-app",
+            allowances: []
+        };
+        const msgStr = await createAuthRequestMessage(authRequest, requestId, timestamp);
+        expect(signer).not.toHaveBeenCalled();
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, "auth_request", [clientAddress], timestamp],
-            sig: ["0xsig"],
+            req: [requestId, "auth_request", [clientAddress, clientAddress, "test-app", []], timestamp],
+            sig: [""],
         });
     });
 
     test("createAuthVerifyMessageFromChallenge", async () => {
         const challenge = "challenge123";
-        const msgStr = await createAuthVerifyMessageFromChallenge(signer, clientAddress, challenge, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, "auth_verify", [{ address: clientAddress, challenge }], timestamp]);
+        const msgStr = await createAuthVerifyMessageFromChallenge(signer, challenge, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, "auth_verify", [[{ challenge }]], timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, "auth_verify", [{ address: clientAddress, challenge }], timestamp],
+            req: [requestId, "auth_verify", [[{ challenge }]], timestamp],
             sig: ["0xsig"],
         });
     });
@@ -57,11 +63,11 @@ describe("API message creators", () => {
         });
 
         test("successful challenge flow", async () => {
-            const msgStr = await createAuthVerifyMessage(signer, rawResponse, clientAddress, requestId, timestamp);
-            expect(signer).toHaveBeenCalledWith([requestId, "auth_verify", [{ address: clientAddress, challenge: "msg" }], timestamp]);
+            const msgStr = await createAuthVerifyMessage(signer, rawResponse, requestId, timestamp);
+            expect(signer).toHaveBeenCalledWith([requestId, "auth_verify", [{ challenge: "msg" }], timestamp]);
             const parsed = JSON.parse(msgStr);
             expect(parsed).toEqual({
-                req: [requestId, "auth_verify", [{ address: clientAddress, challenge: "msg" }], timestamp],
+                req: [requestId, "auth_verify", [{ challenge: "msg" }], timestamp],
                 sig: ["0xsig"],
             });
         });

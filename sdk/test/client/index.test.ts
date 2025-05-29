@@ -18,7 +18,7 @@ describe("NitroliteClient", () => {
         guestAddress: "0xGUEST" as Address,
         tokenAddress: "0xTOKEN" as Address,
     };
-    const challengeDuration = 123n;
+    const challengeDuration = 3600n;
     const chainId = 1;
 
     let mockNitroService: any;

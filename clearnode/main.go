@@ -43,8 +43,6 @@ func main() {
 	// Map to store custody clients for later reference
 	custodyClients := make(map[string]*Custody)
 
-	go metrics.RecordMetricsPeriodically(db, custodyClients)
-
 	unifiedWSHandler := NewUnifiedWSHandler(signer, db, metrics, rpcStore, config)
 	http.HandleFunc("/ws", unifiedWSHandler.HandleConnection)
 
@@ -67,6 +65,10 @@ func main() {
 		Addr:    ":4242",
 		Handler: metricsMux,
 	}
+
+	// Start metrcis monitoring
+	go metrics.RecordMetricsPeriodically(db, custodyClients)
+
 	go func() {
 		log.Printf("Prometheus metrics available at http://localhost:4242/metrics")
 		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {

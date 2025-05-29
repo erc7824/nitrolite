@@ -386,37 +386,76 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 }
 
 // UpdateBalanceMetrics fetches the broker's account information from the smart contract and updates metrics
-func (c *Custody) UpdateBalanceMetrics(ctx context.Context, tokens []common.Address, metrics *Metrics) {
+func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metrics *Metrics) {
 	if metrics == nil {
 		logger.Errorw("Metrics not initialized for custody client", "network", c.chainID)
 		return
 	}
 
 	brokerAddr := c.signer.GetAddress()
-	for _, token := range tokens {
+	for _, asset := range assets {
 		// Create a call opts with the provided context
 		callOpts := &bind.CallOpts{
 			Context: ctx,
 		}
 
-		logger.Infow("Fetching account info", "network", c.chainID, "token", token.Hex(), "broker", brokerAddr.Hex())
+		logger.Infow("Fetching account info", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "broker", brokerAddr.Hex())
 		// Call getAccountInfo on the custody contract
-		info, err := c.custody.GetAccountInfo(callOpts, brokerAddr, token)
+		tokenAddr := common.HexToAddress(asset.Token)
+		info, err := c.custody.GetAccountInfo(callOpts, brokerAddr, tokenAddr)
 		if err != nil {
-			logger.Errorw("Failed to get account info", "network", c.chainID, "token", token.Hex(), "error", err)
+			logger.Errorw("Failed to get account info", "network", c.chainID, "token", asset.Token, "error", err)
 			continue
 		}
 
+		availableBalance := decimal.NewFromBigInt(info.Available, -int32(asset.Decimals))
+
 		metrics.BrokerBalanceAvailable.With(prometheus.Labels{
 			"network": fmt.Sprintf("%d", c.chainID),
-			"token":   token.Hex(),
-		}).Set(float64(info.Available.Int64()))
+			"token":   asset.Token,
+			"asset":   asset.Symbol,
+		}).Set(availableBalance.InexactFloat64())
 
 		metrics.BrokerChannelCount.With(prometheus.Labels{
 			"network": fmt.Sprintf("%d", c.chainID),
-			"token":   token.Hex(),
+			"token":   asset.Token,
+			"asset":   asset.Symbol,
 		}).Set(float64(info.ChannelCount.Int64()))
 
-		logger.Infow("Updated contract balance metrics", "network", c.chainID, "token", token.Hex(), "available", info.Available.String(), "channels", info.ChannelCount.String())
+		logger.Infow("Updated contract balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "available", availableBalance.String(), "channels", info.ChannelCount.String())
+
+		// Fetch broker wallet balances
+		walletBalance := decimal.Zero
+
+		if asset.Token == "0x0000000000000000000000000000000000000000" {
+			walletBalanceRaw, err := c.client.BalanceAt(context.TODO(), brokerAddr, nil)
+			if err != nil {
+				logger.Errorw("Failed to get base_asset balance", "network", c.chainID, "token", asset.Token, "error", err)
+				continue
+			}
+			walletBalance = decimal.NewFromBigInt(walletBalanceRaw, -int32(asset.Decimals))
+
+		} else {
+			caller, err := nitrolite.NewErc20(tokenAddr, c.client)
+			if err != nil {
+				logger.Errorw("Failed to initialize erc20 caller", "network", c.chainID, "token", asset.Token, "error", err)
+				continue
+			}
+
+			walletBalanceRaw, err := caller.BalanceOf(callOpts, brokerAddr)
+			if err != nil {
+				logger.Errorw("Failed to get erc20 balance", "network", c.chainID, "token", asset.Token, "error", err)
+				continue
+			}
+			walletBalance = decimal.NewFromBigInt(walletBalanceRaw, -int32(asset.Decimals))
+		}
+
+		metrics.BrokerWalletBalance.With(prometheus.Labels{
+			"network": fmt.Sprintf("%d", c.chainID),
+			"token":   asset.Token,
+			"asset":   asset.Symbol,
+		}).Set(walletBalance.InexactFloat64())
+
+		logger.Infow("Updated erc20 balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "balance", walletBalance.String())
 	}
 }

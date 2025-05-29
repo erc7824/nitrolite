@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"gorm.io/gorm"
@@ -98,14 +98,14 @@ func NewMetrics() *Metrics {
 				Name: "clearnet_broker_balance_available",
 				Help: "Available balance of the broker on the custody contract",
 			},
-			[]string{"network", "token"},
+			[]string{"network", "token", "asset"},
 		),
 		BrokerChannelCount: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "clearnet_broker_channel_count",
 				Help: "Number of channels for the broker on the custody contract",
 			},
-			[]string{"network", "token"},
+			[]string{"network", "token", "asset"},
 		),
 	}
 
@@ -124,12 +124,16 @@ func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[stri
 			m.UpdateChannelMetrics(db)
 			m.UpdateAppSessionMetrics(db)
 		case <-balanceTicker.C:
-			// Refresh the list of tokens to monitor
-			monitoredTokens := GetUniqueTokenAddresses(db)
-
 			// Update metrics for each custody client
 			for _, client := range custodyClients {
-				client.UpdateBalanceMetrics(context.Background(), monitoredTokens, m)
+
+				assets, err := GetAllAssets(db, &client.chainID)
+				if err != nil {
+					log.Error(err.Error())
+					continue
+				}
+
+				client.UpdateBalanceMetrics(context.Background(), assets, m)
 			}
 		}
 	}
@@ -153,22 +157,4 @@ func (m *Metrics) UpdateAppSessionMetrics(db *gorm.DB) {
 	var count int64
 	db.Model(&AppSession{}).Count(&count)
 	m.AppSessionsTotal.Set(float64(count))
-}
-
-// GetUniqueTokenAddresses returns a list of unique token addresses from the database
-func GetUniqueTokenAddresses(db *gorm.DB) []common.Address {
-	var tokens []string
-
-	// Query unique token addresses from the channels table
-	db.Model(&Channel{}).Distinct().Pluck("token", &tokens)
-
-	// Convert to common.Address and remove empty strings
-	addresses := make([]common.Address, 0, len(tokens))
-	for _, tokenStr := range tokens {
-		if tokenStr != "" {
-			addresses = append(addresses, common.HexToAddress(tokenStr))
-		}
-	}
-
-	return addresses
 }

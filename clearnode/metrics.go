@@ -142,6 +142,18 @@ func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[stri
 					continue
 				}
 
+				// Append base asset
+				baseAsset := Asset{
+					Token:    "0x0000000000000000000000000000000000000000",
+					ChainID:  client.chainID,
+					Symbol:   "eth",
+					Decimals: 18,
+				}
+				if client.chainID == 137 {
+					baseAsset.Symbol = "pol"
+				}
+				assets = append(assets, baseAsset)
+
 				client.UpdateBalanceMetrics(context.Background(), assets, m)
 			}
 		}

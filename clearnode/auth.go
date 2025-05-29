@@ -198,7 +198,7 @@ func (am *AuthManager) UpdateSession(address string) bool {
 	return true
 }
 
-func (am *AuthManager) GenerateJWT(address string, sessionKey string, scope string, application string, allowances []Allowance) (string, error) {
+func (am *AuthManager) GenerateJWT(address string, sessionKey string, scope string, application string, allowances []Allowance) (*JWTClaims, string, error) {
 	policy := Policy{
 		Wallet:      address,
 		Participant: sessionKey,
@@ -220,10 +220,10 @@ func (am *AuthManager) GenerateJWT(address string, sessionKey string, scope stri
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
 	tokenString, err := token.SignedString(am.authSigningKey)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
-	return tokenString, nil
+	return &claims, tokenString, nil
 }
 
 func (am *AuthManager) VerifyJWT(tokenString string) (*JWTClaims, error) {

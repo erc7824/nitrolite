@@ -68,7 +68,7 @@ func TestAuthManagerJwtManagement(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, authManager)
 
-	token, err := authManager.GenerateJWT("0x1234567890123456789012345678901234567890", "0x6966978ce78df3228993aa46984eab6d68bbe195", "", "", []Allowance{
+	_, token, err := authManager.GenerateJWT("0x1234567890123456789012345678901234567890", "0x6966978ce78df3228993aa46984eab6d68bbe195", "", "", []Allowance{
 		{
 			Asset:  "usdc",
 			Amount: "100000",

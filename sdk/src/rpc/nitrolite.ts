@@ -224,10 +224,7 @@ export class NitroliteRPC {
 
         try {
             const payload = this.getMessagePayload(message);
-            if (typeof message.sig !== "string" || message.sig === "") {
-                return false;
-            }
-            return await verifier(payload, message.sig, expectedSigners);
+            return await verifier(payload, message.sig as Hex[], expectedSigners);
         } catch (error) {
             console.error("Error during multiple signature verification:", error);
             return false;

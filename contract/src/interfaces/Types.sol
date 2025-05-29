@@ -95,3 +95,26 @@ struct App {
     uint64 challenge; // Duration in seconds for dispute resolution period
     uint64 nonce; // Unique per channel with same participants and adjudicator
 }
+
+/**
+ * @notice Allowance structure for policy asset permissions
+ * @dev Defines allowed asset amounts for session key operations
+ */
+struct Allowance {
+    string asset; // Asset identifier (e.g., "usdc")
+    uint256 amount; // Maximum allowed amount
+}
+
+/**
+ * @notice Policy structure for EIP-712 session key authorization and registration
+ * @dev Defines permissions and constraints for delegated operations
+ */
+struct Policy {
+    string challenge; // Unique challenge identifier (UUID format)
+    string scope; // Permission scope (e.g., "app.create", "ledger.readonly")
+    address wallet; // Main wallet address authorizing the session
+    address application; // Application public address
+    address participant; // Delegated session key address
+    uint256 expire; // Expiration timestamp
+    Allowance[] allowances; // Array of asset allowances
+}

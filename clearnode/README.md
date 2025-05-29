@@ -61,6 +61,47 @@ sequenceDiagram
 
 ```
 
+## Authentication and security Policy
+
+Each websocket connection must be authenticated by signing the Policy struct defined in nitrolite.
+Main console scope is `console` and allows superuser access to clearnode administration.
+Application must also connect to clearnode with limited scope permissions (`app.create`) to only `create_app_session`
+for a specific application address, a maximum allocation limit and register and assign the participant session key
+with an expiration date.
+
+`create_app_session` must verify:
+
+- Policy scope allow to create app
+- Wallet in allocation match with policy wallet address
+- The application address match with the policy value
+- Allocation is within the permitted policy Allowance
+- Participant address from policy is in the first value of app participant array
+
+```solidity
+struct Policy {
+    string challenge; // Unique challenge identifier (UUID format)
+    string scope; // Permission scope (e.g., "app.create", "ledger.readonly")
+    address wallet; // Main wallet address authorizing the session
+    address application; // Application public address
+    address participant; // Delegated session key address
+    uint256 expire; // Expiration timestamp
+    Allowance[] allowances; // Array of asset allowances
+}
+```
+
+Once authenticated, a JWT is return for session persistence:
+
+```typescript
+type JWTClaims struct {
+ Scope       string      `json:"scope"`       // Permission scope (e.g., "app.create", "ledger.readonly")
+ Wallet      string      `json:"wallet"`      // Main wallet address authorizing the session
+ Participant string      `json:"participant"` // Delegated session key address
+ Application string      `json:"application"` // Application public address
+ Allowances  []Allowance `json:"allowance"`   // Array of asset allowances
+ jwt.RegisteredClaims
+}
+```
+
 ## Go Documentation
 
 ### Package Structure
@@ -125,7 +166,6 @@ go run .
 ```
 
 ### Build and Run the Docker Image
-
 
 ```bash
 # Build the Docker image

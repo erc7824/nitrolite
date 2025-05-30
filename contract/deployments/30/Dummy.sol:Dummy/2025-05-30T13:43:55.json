@@ -1,0 +1,11 @@
+{
+  "deployer": "0xcFdC977a4b75B77E47a80C0D2b2aB7ade72ABD2b",
+  "deployedTo": "0x6258dCa1DF894980a8778197c60893a9fa2b5eF8",
+  "transactionHash": "0x3a9e1ad443dcd3ef8f907cf176c868c4864a25360ea6ec0f9c4f117bd137dbc9",
+  "commit": "41948aeb67de990738d93364e437ffec49f2652b",
+  "timestamp": 1748612635,
+  "chainId": 30,
+  "contractPath": "./src/adjudicators/Dummy.sol:Dummy",
+  "constructorArgs": [],
+  "comment": "PROD v0.2.6"
+}

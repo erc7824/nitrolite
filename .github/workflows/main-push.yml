@@ -184,20 +184,43 @@ jobs:
   notify-slack:
     name: Notify Slack
     runs-on: ubuntu-latest
-    # needs: [deploy, test-forge, test-sdk]
+    needs: [deploy, test-forge, test-sdk]
     if: always()
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
 
       - name: Get commit info
         id: commit_info
-        run: echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+        run: |
+          echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+          echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
 
       - name: Slack Notification
-        run: |
-          echo ${{ steps.commit_info.outputs.message }}
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: deployments
+          SLACK_USERNAME: CI/CD Bot
+          SLACK_COLOR: ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || 'success' }}
+          SLACK_ICON_EMOJI: ${{ contains(needs.*.result, 'failure') && ':x:' || contains(needs.*.result, 'cancelled') && ':warning:' || ':white_check_mark:' }}
+          SLACK_TITLE: 'Nitrolite Clearnode Release Candidate'
+          SLACK_MESSAGE_ON_SUCCESS: |
+            ✅ RC build and deployment completed successfully!
+            
+            📝 Commit: ${{ steps.commit_info.outputs.message }}
+            👤 Author: ${{ steps.commit_info.outputs.author }}
+          SLACK_MESSAGE_ON_FAILURE: |
+            ❌ RC build or deployment failed!
+            
+            📝 Commit: ${{ steps.commit_info.outputs.message }}
+            👤 Author: ${{ steps.commit_info.outputs.author }}
+          SLACK_MESSAGE_ON_CANCEL: |
+            ⚠️ RC build or deployment was cancelled!
+            
+            📝 Commit: ${{ steps.commit_info.outputs.message }}
+            👤 Author: ${{ steps.commit_info.outputs.author }}
+          SLACK_FOOTER: 'Nitrolite CI/CD Pipeline'

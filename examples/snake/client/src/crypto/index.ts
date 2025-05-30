@@ -6,9 +6,9 @@ import type { Hex } from 'viem';
  */
 export interface CryptoKeypair {
     /** Public key in hexadecimal format */
-    publicKey: string;
+    publicKey: Hex;
     /** Private key in hexadecimal format */
-    privateKey: string;
+    privateKey: Hex;
     /** Optional Ethereum address derived from the public key */
     address?: Hex;
 }

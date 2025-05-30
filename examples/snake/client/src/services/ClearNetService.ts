@@ -8,17 +8,12 @@ import { createEthersSigner, generateKeyPair } from "../crypto";
 import type { Hex } from "viem";
 import { authenticate } from "./authentication";
 
-export interface ChannelData {
-    channelId: string;
-    state: any;
-}
-
 class ClearNetService {
     public client!: NitroliteClient;
     public config!: NitroliteClientConfig;
     private isConnected = false;
     private currentAddress: string | null = null;
-    private activeChannel: ChannelData | null = null;
+    private activeChannel: Hex | null = null;
     private wsConnection: WebSocket | null = null;
     private readonly wsUrl = BROKER_WS_URL;
     private pendingRequests = new Map<
@@ -34,46 +29,6 @@ class ClearNetService {
     private reconnectDelay = 1000;
     private reconnectTimeout: number | null = null;
     private authenticationInProgress: Promise<void> | null = null;
-
-    constructor() {
-        // Try to restore channel from localStorage on initialization
-        this.restoreChannelFromStorage();
-        console.log('ws url', this.wsUrl);
-    }
-
-    public restoreChannelFromStorage(): void {
-        try {
-            const channelId = localStorage.getItem("nitro_channel_id");
-            const channelState = localStorage.getItem("nitro_channel_state");
-
-            if (channelId && channelState) {
-                this.activeChannel = {
-                    channelId,
-                    state: JSON.parse(channelState, (_, value) => {
-                        // Handle bigint values stored as strings
-                        if (typeof value === 'string' && value.endsWith('n')) {
-                            return BigInt(value.slice(0, -1));
-                        }
-                        return value;
-                    })
-                };
-                console.log("Restored channel from storage:", this.activeChannel);
-            }
-        } catch (error) {
-            console.error("Failed to restore channel from storage:", error);
-            // Clear potentially corrupted storage
-            this.clearChannelStorage();
-        }
-    }
-
-    private clearChannelStorage() {
-        try {
-            localStorage.removeItem("nitro_channel_id");
-            localStorage.removeItem("nitro_channel_state");
-        } catch (error) {
-            console.error("Failed to clear channel storage:", error);
-        }
-    }
 
     async initialize(config: NitroliteClientConfig): Promise<boolean> {
         try {
@@ -229,7 +184,7 @@ class ClearNetService {
         }
 
         // Verify we have wallet client for authentication
-        const walletClient = this.config?.walletClient;
+        const walletClient = this.config?.stateWalletClient;
         if (!walletClient) {
             throw new Error('No wallet client available for authentication');
         }
@@ -259,12 +214,12 @@ class ClearNetService {
         this.authenticationInProgress = authenticate(this.wsConnection, walletClient, signer, 15000)
             .then(async () => {
                 console.log("Authentication successful, sending get_balances");
-                
+
                 // Send get_balances message after successful authentication
                 const nitroChannelId = localStorage.getItem("nitro_channel_id");
                 if (nitroChannelId && this.wsConnection) {
                     const getBalancesMsg = await createGetLedgerBalancesMessage(
-                        signer.sign, 
+                        signer.sign,
                         nitroChannelId as Hex
                     );
                     this.wsConnection.send(getBalancesMsg);
@@ -293,23 +248,6 @@ class ClearNetService {
             }
             return;
         }
-
-        // Handle other message types
-        if (message.method) {
-            switch (message.method) {
-                case "channel_update":
-                    // Handle channel state update
-                    if (this.activeChannel && message.params?.channel_id === this.activeChannel.channelId) {
-                        this.activeChannel.state = message.params.state;
-                    }
-                    break;
-
-                case "app_update":
-                    // Handle application update
-                    console.log("Received app update:", message.params);
-                    break;
-            }
-        }
     }
 
     async signState(stateData: any, stateId: string, channelId: string) {
@@ -325,7 +263,6 @@ class ClearNetService {
                 channelId,
                 stateData: JSON.stringify(stateData),
                 version: BigInt(Math.floor(Date.now() / 1000)),
-                allocations: this.activeChannel?.state?.allocations || [],
                 stateId,
             };
 
@@ -399,11 +336,17 @@ class ClearNetService {
         }
     }
 
-    getActiveChannel(): ChannelData | null {
-        // If we don't have an active channel but have one in storage, try to restore it
-        if (!this.activeChannel) {
-            this.restoreChannelFromStorage();
+    async getActiveChannel(): Promise<Hex | null> {
+        if (this.activeChannel) {
+            return this.activeChannel;
         }
+
+        const channels = await this.client.getAccountChannels();
+        if (channels.length <= 0) {
+            throw new Error('No active channel found. Please open a channel at apps.yellow.com');
+        }
+        this.activeChannel = channels[0];
+
         return this.activeChannel;
     }
 }

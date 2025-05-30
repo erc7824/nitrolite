@@ -155,6 +155,7 @@ type ChannelResponse struct {
 	Participant string        `json:"participant"`
 	Status      ChannelStatus `json:"status"`
 	Token       string        `json:"token"`
+	Wallet      string        `json:"wallet"`
 	// Total amount in the channel (user + broker)
 	Amount      *big.Int `json:"amount"`
 	ChainID     uint32   `json:"chain_id"`
@@ -978,6 +979,7 @@ func HandleGetChannels(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessag
 		channelResponses = append(channelResponses, ChannelResponse{
 			ChannelID:   channel.ChannelID,
 			Participant: channel.Participant,
+			Wallet:      channel.Wallet,
 			Status:      channel.Status,
 			Token:       channel.Token,
 			Amount:      big.NewInt(int64(channel.Amount)),

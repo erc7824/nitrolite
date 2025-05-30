@@ -393,15 +393,23 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 				}
 			}
 
-			participantWalletLedger := GetWalletLedger(tx, allocation.ParticipantWallet)
-			balance, err := participantWalletLedger.Balance(allocation.ParticipantWallet, allocation.AssetSymbol)
+			walletAddress, err := GetWalletBySigner(allocation.ParticipantWallet)
+			if err != nil {
+				continue
+			}
+			if walletAddress == "" {
+				walletAddress = allocation.ParticipantWallet
+			}
+
+			participantWalletLedger := GetWalletLedger(tx, walletAddress)
+			balance, err := participantWalletLedger.Balance(walletAddress, allocation.AssetSymbol)
 			if err != nil {
 				return fmt.Errorf("failed to check participant balance: %w", err)
 			}
 			if allocation.Amount.GreaterThan(balance) {
 				return errors.New("insufficient funds")
 			}
-			if err := participantWalletLedger.Record(allocation.ParticipantWallet, allocation.AssetSymbol, allocation.Amount.Neg()); err != nil {
+			if err := participantWalletLedger.Record(walletAddress, allocation.AssetSymbol, allocation.Amount.Neg()); err != nil {
 				return fmt.Errorf("failed to transfer funds from participant: %w", err)
 			}
 			if err := participantWalletLedger.Record(appSessionID.Hex(), allocation.AssetSymbol, allocation.Amount); err != nil {

@@ -4,6 +4,7 @@ import {
     createAuthRequestMessage,
     createAuthVerifyMessageFromChallenge,
     createAuthVerifyMessage,
+    createAuthVerifyMessageWithJWT,
     createPingMessage,
     createGetConfigMessage,
     createGetLedgerBalancesMessage,
@@ -12,9 +13,10 @@ import {
     createCloseAppSessionMessage,
     createApplicationMessage,
     createCloseChannelMessage,
+    createResizeChannelMessage,
     createGetChannelsMessage,
 } from "../../src/rpc/api";
-import { CreateAppSessionRequest, MessageSigner, AuthRequest } from "../../src/rpc/types";
+import { CreateAppSessionRequest, CloseAppSessionRequest, ResizeChannel, MessageSigner, AuthRequest } from "../../src/rpc/types";
 
 describe("API message creators", () => {
     const signer: MessageSigner = jest.fn(async () => "0xsig" as Hex);
@@ -32,16 +34,16 @@ describe("API message creators", () => {
 
     test("createAuthRequestMessage", async () => {
         const authRequest: AuthRequest = {
-            address: clientAddress,
-            session_key: clientAddress,
+            wallet: clientAddress,
+            participant: clientAddress,
             app_name: "test-app",
-            allowances: []
+            allowances: {}
         };
         const msgStr = await createAuthRequestMessage(authRequest, requestId, timestamp);
         expect(signer).not.toHaveBeenCalled();
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, "auth_request", [clientAddress, clientAddress, "test-app", []], timestamp],
+            req: [requestId, "auth_request", [clientAddress, clientAddress, "test-app", [], "", "", ""], timestamp],
             sig: [""],
         });
     });
@@ -73,7 +75,7 @@ describe("API message creators", () => {
         });
 
         test("throws on invalid response", async () => {
-            await expect(createAuthVerifyMessage(signer, "{}", clientAddress, requestId, timestamp)).rejects.toThrow(
+            await expect(createAuthVerifyMessage(signer, "{}", requestId, timestamp)).rejects.toThrow(
                 "Invalid auth_challenge response"
             );
         });
@@ -82,7 +84,7 @@ describe("API message creators", () => {
             const wrong = JSON.stringify({
                 res: [100, "other", [{ challenge_message: "msg" }], 200],
             });
-            await expect(createAuthVerifyMessage(signer, wrong, clientAddress, requestId, timestamp)).rejects.toThrow(
+            await expect(createAuthVerifyMessage(signer, wrong, requestId, timestamp)).rejects.toThrow(
                 "Expected 'auth_challenge' method"
             );
         });
@@ -196,6 +198,35 @@ describe("API message creators", () => {
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, "close_channel", [{ channel_id: channelId, funds_destination: fundDestination }], timestamp],
+            sig: ["0xsig"],
+        });
+    });
+
+    test("createAuthVerifyMessageWithJWT", async () => {
+        const jwtToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...";
+        const msgStr = await createAuthVerifyMessageWithJWT(jwtToken, requestId, timestamp);
+        expect(signer).not.toHaveBeenCalled();
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, "auth_verify", [{ jwt: jwtToken }], timestamp],
+            sig: undefined,
+        });
+    });
+
+    test("createResizeChannelMessage", async () => {
+        const resizeParams: ResizeChannel[] = [{
+            channel_id: channelId,
+            allocations: [{
+                participant: clientAddress,
+                asset: "usdc",
+                amount: "100.0"
+            }]
+        }];
+        const msgStr = await createResizeChannelMessage(signer, resizeParams, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, "resize_channel", resizeParams, timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, "resize_channel", resizeParams, timestamp],
             sig: ["0xsig"],
         });
     });

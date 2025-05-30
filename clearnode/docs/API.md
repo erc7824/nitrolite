@@ -749,17 +749,20 @@ Retrieves broker configuration information including supported networks.
       {
         "name": "polygon",
         "chain_id": 137,
-        "custody_address": "0xCustodyContractAddress1..."
+        "custody_address": "0xCustodyContractAddress1...",
+        "adjudicator_address":"0xCustodyContractAddress1..."
       },
       {
         "name": "celo",
         "chain_id": 42220,
-        "custody_address": "0xCustodyContractAddress2..."
+        "custody_address": "0xCustodyContractAddress2...",
+        "adjudicator_address":"0xCustodyContractAddress1..."
       },
       {
         "name": "base",
         "chain_id": 8453,
-        "custody_address": "0xCustodyContractAddress3..."
+        "custody_address": "0xCustodyContractAddress3...",
+        "adjudicator_address":"0xCustodyContractAddress1..."
       }
     ]
   }], 1619123456789],

@@ -180,9 +180,10 @@ type Balance struct {
 
 // NetworkInfo represents information about a supported network
 type NetworkInfo struct {
-	Name           string `json:"name"`
-	ChainID        uint32 `json:"chain_id"`
-	CustodyAddress string `json:"custody_address"`
+	Name               string `json:"name"`
+	ChainID            uint32 `json:"chain_id"`
+	CustodyAddress     string `json:"custody_address"`
+	AdjudicatorAddress string `json:"adjudicator_address"`
 }
 
 // BrokerConfig represents the broker configuration information
@@ -211,9 +212,10 @@ func HandleGetConfig(rpc *RPCMessage, config *Config, signer *Signer) (*RPCMessa
 	// Populate the supported networks from the config
 	for name, networkConfig := range config.networks {
 		supportedNetworks = append(supportedNetworks, NetworkInfo{
-			Name:           name,
-			ChainID:        networkConfig.ChainID,
-			CustodyAddress: networkConfig.CustodyAddress,
+			Name:               name,
+			ChainID:            networkConfig.ChainID,
+			CustodyAddress:     networkConfig.CustodyAddress,
+			AdjudicatorAddress: networkConfig.AdjudicatorAddress,
 		})
 	}
 

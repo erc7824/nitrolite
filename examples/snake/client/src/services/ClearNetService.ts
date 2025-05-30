@@ -1,6 +1,8 @@
 import {
     NitroliteClient,
     createAuthRequestMessage,
+    createAuthVerifyMessage,
+    createAuthVerifyMessageWithJWT,
     createGetLedgerBalancesMessage,
     type NitroliteClientConfig,
     type AuthRequest,
@@ -17,56 +19,155 @@ export interface ChannelData {
     state: any;
 }
 
-async function createAuthVerifyWithEIP712(
-    privateKey: string,
-    address: string,
-    challenge: string,
-    sessionKey: string,
-    appName: string,
-    allowances: Array<{ asset: string; amount: string }>
-): Promise<string> {
-    const domain = {
-        name: appName,
+/**
+ * EIP-712 domain and types for auth_verify challenge
+ */
+const getAuthDomain = () => {
+    return {
+        name: 'Snake Game',
     };
+};
 
-    const types = {
-        AuthVerify: [
-            { name: "address", type: "address" },
-            { name: "challenge", type: "string" },
-            { name: "session_key", type: "address" },
-            { name: "allowances", type: "Allowance[]" },
-        ],
-        Allowance: [
-            { name: "asset", type: "string" },
-            { name: "amount", type: "uint256" },
-        ],
+const AUTH_TYPES = {
+    Policy: [
+        { name: 'challenge', type: 'string' },
+        { name: 'scope', type: 'string' },
+        { name: 'wallet', type: 'address' },
+        { name: 'application', type: 'address' },
+        { name: 'participant', type: 'address' },
+        { name: 'expire', type: 'uint256' },
+        { name: 'allowances', type: 'Allowance[]' },
+    ],
+    Allowance: [
+        { name: 'asset', type: 'string' },
+        { name: 'amount', type: 'uint256' },
+    ],
+};
+
+/**
+ * Creates EIP-712 signing function for challenge verification with proper challenge extraction
+ */
+function createEIP712SigningFunction(walletClient: any, stateSigner: any, expire: string) {
+    if (!walletClient) {
+        throw new Error('No wallet client available for EIP-712 signing');
+    }
+
+    return async (data: any): Promise<`0x${string}`> => {
+        console.log('Signing auth_verify challenge with EIP-712:', data);
+
+        let challengeUUID = '';
+        const address = walletClient.account?.address;
+
+        // The data coming in is the array from createAuthVerifyMessage
+        // Format: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
+        if (Array.isArray(data)) {
+            console.log('Data is array, extracting challenge from position [2][0].challenge');
+
+            // Direct array access - data[2] should be the array with the challenge object
+            if (data.length >= 3 && Array.isArray(data[2]) && data[2].length > 0) {
+                const challengeObject = data[2][0];
+
+                if (challengeObject && challengeObject.challenge) {
+                    challengeUUID = challengeObject.challenge;
+                    console.log('Extracted challenge UUID from array:', challengeUUID);
+                }
+            }
+        } else if (typeof data === 'string') {
+            try {
+                const parsed = JSON.parse(data);
+
+                console.log('Parsed challenge data:', parsed);
+
+                // Handle different message structures
+                if (parsed.res && Array.isArray(parsed.res)) {
+                    // auth_challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
+                    if (parsed.res[1] === 'auth_challenge' && parsed.res[2]) {
+                        challengeUUID = parsed.res[2].challenge_message || parsed.res[2].challenge;
+                        console.log('Extracted challenge UUID from auth_challenge:', challengeUUID);
+                    }
+                    // auth_verify message: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
+                    else if (parsed.res[1] === 'auth_verify' && Array.isArray(parsed.res[2]) && parsed.res[2][0]) {
+                        challengeUUID = parsed.res[2][0].challenge;
+                        console.log('Extracted challenge UUID from auth_verify:', challengeUUID);
+                    }
+                }
+                // Direct array format
+                else if (Array.isArray(parsed) && parsed.length >= 3 && Array.isArray(parsed[2])) {
+                    challengeUUID = parsed[2][0]?.challenge;
+                    console.log('Extracted challenge UUID from direct array:', challengeUUID);
+                }
+            } catch (e) {
+                console.error('Could not parse challenge data:', e);
+                console.log('Using raw string as challenge');
+                challengeUUID = data;
+            }
+        } else if (data && typeof data === 'object') {
+            // If data is already an object, try to extract challenge
+            challengeUUID = data.challenge || data.challenge_message;
+            console.log('Extracted challenge from object:', challengeUUID);
+        }
+
+        if (!challengeUUID || challengeUUID.includes('[') || challengeUUID.includes('{')) {
+            console.error('Challenge extraction failed or contains invalid characters:', challengeUUID);
+            throw new Error('Could not extract valid challenge UUID for EIP-712 signing');
+        }
+
+        console.log('Final challenge UUID for EIP-712:', challengeUUID);
+        console.log('Signing for address (original):', address);
+        console.log('Signing for address (type):', typeof address);
+        console.log('Auth domain:', getAuthDomain());
+
+        // Create EIP-712 message with ONLY the challenge UUID
+        const message = {
+            challenge: challengeUUID,
+            scope: 'snake-game',
+            wallet: address as `0x${string}`,
+            application: address as `0x${string}`,
+            participant: stateSigner.address as `0x${string}`,
+            expire: expire,
+            allowances: [
+                {
+                    asset: 'usdc',
+                    amount: '0',
+                },
+            ],
+        };
+
+        try {
+            // Sign with EIP-712
+            const signature = await walletClient.signTypedData({
+                account: walletClient.account!,
+                domain: getAuthDomain(),
+                types: AUTH_TYPES,
+                primaryType: 'Policy',
+                message: message,
+            });
+
+            console.log('EIP-712 signature generated for challenge:', signature);
+            return signature;
+        } catch (eip712Error) {
+            console.error('EIP-712 signing failed:', eip712Error);
+            console.log('Attempting fallback to regular message signing...');
+
+            try {
+                // Fallback to regular message signing if EIP-712 fails
+                const fallbackMessage = `Authentication challenge for ${address}: ${challengeUUID}`;
+
+                console.log('Fallback message:', fallbackMessage);
+
+                const fallbackSignature = await walletClient.signMessage({
+                    message: fallbackMessage,
+                    account: walletClient.account!,
+                });
+
+                console.log('Fallback signature generated:', fallbackSignature);
+                return fallbackSignature as `0x${string}`;
+            } catch (fallbackError) {
+                console.error('Fallback signing also failed:', fallbackError);
+                throw new Error(`Both EIP-712 and fallback signing failed: ${eip712Error.message}`);
+            }
+        }
     };
-
-    const value = {
-        address: address,
-        challenge: challenge,
-        session_key: sessionKey,
-        allowances: allowances.map(a => ({
-            asset: a.asset,
-            amount: ethers.BigNumber.from(a.amount || "0"),
-        })),
-    };
-
-    // Create the wallet to sign
-    const wallet = new ethers.Wallet(privateKey);
-
-    // Sign the typed data
-    const signature = await wallet._signTypedData(domain, types, value);
-
-    // Create the auth_verify request
-    const requestId = Date.now();
-    const timestamp = getCurrentTimestamp();
-    const request = NitroliteRPC.createRequest(requestId, "auth_verify", [{ challenge }], timestamp);
-
-    // Add the EIP-712 signature
-    request.sig = [signature as Hex];
-
-    return JSON.stringify(request);
 }
 
 class ClearNetService {
@@ -283,6 +384,19 @@ class ClearNetService {
             throw new Error("WebSocket not connected");
         }
 
+        // Verify we have wallet client for both address and EIP-712 signing
+        const walletClient = this.config?.walletClient;
+
+        if (!walletClient) {
+            throw new Error('No wallet client available for authentication');
+        }
+
+        const privyWalletAddress = walletClient.account?.address;
+
+        if (!privyWalletAddress) {
+            throw new Error('No Privy wallet address available for authentication');
+        }
+
         /**
          * Gets or creates a wallet signer with a private key stored in localStorage
          */
@@ -305,10 +419,10 @@ class ClearNetService {
         }
 
         const signer = createEthersSigner(keyPair.privateKey);
-        const privateKey = keyPair.privateKey; // Store for EIP-712 signing
+        const expire = String(Math.floor(Date.now() / 1000) + 24 * 60 * 60);
 
         // Create a new authentication promise and store it
-        const authPromise = new Promise<void>((resolve, reject) => {
+        const authPromise = new Promise<void>(async (resolve, reject) => {
             let authTimeout: number;
 
             // Create a one-time message handler for authentication
@@ -319,54 +433,23 @@ class ClearNetService {
 
                     // Check for auth_challenge response
                     if (message.res && message.res[1] === "auth_challenge") {
-                        console.log("Received auth_challenge, preparing auth_verify...");
-                        // Log the exact structure of the response to help us debug
-                        console.log("Challenge full response:", message);
-                        console.log("Challenge res array:", message.res);
-                        console.log("Challenge data:", message.res[2]);
+                        console.log("Received auth_challenge, preparing EIP-712 auth_verify...");
 
                         try {
-                            // Let's try to extract the challenge directly from the raw response
-                            const rawData = event.data;
-                            console.log("Raw challenge response:", rawData);
+                            // Step 2: Create EIP-712 signing function for challenge verification
+                            console.log('Creating EIP-712 signing function...');
+                            const eip712SigningFunction = createEIP712SigningFunction(walletClient, signer, expire);
 
-                            // Extract the challenge from the response - more safely
-                            let challenge = null;
-                            const responseData = message.res[2];
-
-                            if (Array.isArray(responseData) && responseData.length > 0) {
-                                if (typeof responseData[0] === "object") {
-                                    // Try both challenge and challenge_message fields
-                                    challenge = responseData[0]?.challenge || responseData[0]?.challenge_message;
-                                } else if (typeof responseData[0] === "string") {
-                                    challenge = responseData[0];
-                                }
-                            } else if (typeof responseData === "object") {
-                                challenge = responseData.challenge || responseData.challenge_message;
-                            } else if (typeof responseData === "string") {
-                                challenge = responseData;
-                            }
-
-                            console.log("Extracted challenge:", challenge);
-
-                            if (!challenge) {
-                                throw new Error("No challenge received in auth_challenge response");
-                            }
-
-                            console.log("Challenge received:", challenge);
-
-                            // Create auth_verify request with EIP-712 signature
-                            const authVerifyRequest = await createAuthVerifyWithEIP712(
-                                privateKey,
-                                signer.address,
-                                challenge,
-                                signer.address, // session_key
-                                "snake-game-client", // app_name
-                                [] // allowances
+                            console.log('Calling createAuthVerifyMessage...');
+                            // Create and send verification message with EIP-712 signature
+                            const authVerify = await createAuthVerifyMessage(
+                                eip712SigningFunction,
+                                event.data, // Pass the raw challenge response string/object
                             );
 
-                            console.log("Sending auth_verify:", authVerifyRequest);
-                            this.wsConnection?.send(authVerifyRequest);
+                            console.log('Sending auth_verify with EIP-712 signature');
+                            this.wsConnection?.send(authVerify);
+                            console.log('auth_verify sent successfully');
 
                             setTimeout(async () => {
                                 const nitroChannelId = localStorage.getItem("nitro_channel_id");
@@ -378,28 +461,45 @@ class ClearNetService {
                                     this.wsConnection?.send(getBalancesMsg);
                                 }
                             }, 2000);
-                        } catch (error) {
-                            console.error("Error creating auth verify message:", error);
+                        } catch (eip712Error) {
+                            console.error('Error creating EIP-712 auth_verify:', eip712Error);
+                            console.error('Error stack:', (eip712Error as Error).stack);
+
                             cleanup();
-                            reject(new Error("Failed to create auth verify message"));
+                            reject(new Error(`EIP-712 auth_verify failed: ${(eip712Error as Error).message}`));
+                            return;
                         }
                     }
                     // Check for auth_verify success response
-                    else if (message.res && message.res[1] === "auth_verify") {
+                    else if (message.res && (message.res[1] === "auth_verify" || message.res[1] === 'auth_success')) {
                         console.log("Authentication successful");
+
+                        // If response contains a JWT token, store it
+                        if (message.res[2]?.[0]?.['jwt_token']) {
+                            console.log('JWT token received:', message.res[2][0]['jwt_token']);
+                            window.localStorage.setItem('jwt_token', message.res[2][0]['jwt_token']);
+                        }
+
                         cleanup();
                         resolve();
                     }
                     // Check for error responses
-                    else if (message.res && message.res[1] === "error") {
-                        const errorMessage = message.res[2] && message.res[2][0]?.error ? message.res[2][0].error : "Unknown authentication error";
-                        console.error("Authentication error:", errorMessage);
+                    else if (message.err || (message.res && message.res[1] === "error")) {
+                        const errorMsg = message.err?.[1] || message.error || message.res?.[2]?.[0]?.error || 'Authentication failed';
+
+                        console.error('Authentication failed:', errorMsg);
+                        window.localStorage.removeItem('jwt_token');
                         cleanup();
-                        reject(new Error(errorMessage));
+                        reject(new Error(String(errorMsg)));
+                    } else {
+                        console.log('Received non-auth message during auth, continuing to listen:', message);
+                        // Keep listening if it wasn't a final success/error
                     }
                 } catch (error) {
-                    console.error("Error processing authentication message:", error);
-                    // Don't reject yet, it might be an unrelated message
+                    console.error("Error handling auth response:", error);
+                    console.error("Error stack:", (error as Error).stack);
+                    cleanup();
+                    reject(new Error(`Authentication error: ${error instanceof Error ? error.message : String(error)}`));
                 }
             };
 
@@ -419,28 +519,44 @@ class ClearNetService {
             // Add temporary listener for authentication messages
             this.wsConnection?.addEventListener("message", authMessageHandler);
 
-            // Use nitrolite's createAuthRequestMessage directly
-            console.log("Starting authentication with address:", signer.address);
+            // Step 1: Send auth_request with empty signature and Privy address
+            console.log('Starting authentication with:');
+            console.log('- Privy wallet address:', privyWalletAddress);
+            console.log('- Empty signature for auth_request');
+            console.log('- EIP-712 signature for auth_verify challenge (UUID only)');
 
-            // Create the auth request parameters for the new API
-            const authRequest: AuthRequest = {
-                address: signer.address as Hex,
-                session_key: signer.address as Hex, // Using same address as session key
-                app_name: "snake-game-client",
-                allowances: [] // Empty allowances for client
-            };
+            try {
+                let authRequest: string;
+                const jwtToken = window.localStorage.getItem('jwt_token');
 
-            // Use the same approach as the server
-            createAuthRequestMessage(authRequest)
-                .then((authRequest) => {
-                    console.log("Sending auth_request:", authRequest);
-                    this.wsConnection?.send(authRequest);
-                })
-                .catch((error) => {
-                    console.error("Error creating auth request:", error);
-                    cleanup();
-                    reject(new Error(`Failed to create auth request: ${error.message}`));
-                });
+                if (jwtToken) {
+                    console.log('JWT token found, sending auth request with token:', jwtToken);
+                    authRequest = await createAuthVerifyMessageWithJWT(jwtToken);
+                } else {
+                    console.log('No JWT token found, proceeding with challenge-response authentication');
+                    authRequest = await createAuthRequestMessage({
+                        wallet: privyWalletAddress as Hex,
+                        participant: signer.address as Hex,
+                        app_name: 'Snake Game',
+                        expire: expire,
+                        scope: 'snake-game',
+                        application: privyWalletAddress as Hex,
+                        allowances: [
+                            {
+                                symbol: 'usdc',
+                                amount: '0',
+                            },
+                        ],
+                    });
+                }
+
+                console.log('Sending auth_request with empty signature and Privy address:', privyWalletAddress);
+                this.wsConnection?.send(authRequest);
+            } catch (requestError) {
+                console.error('Error creating auth_request:', requestError);
+                cleanup();
+                reject(new Error(`Failed to create auth_request: ${(requestError as Error).message}`));
+            }
         });
 
         // Store the promise and return it

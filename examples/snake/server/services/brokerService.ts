@@ -2,6 +2,8 @@ import WebSocket from "ws";
 import { ethers } from "ethers";
 import {
     createAuthRequestMessage,
+    createAuthVerifyMessage,
+    createAuthVerifyMessageWithJWT,
     RequestData,
     ResponsePayload,
     MessageSigner,
@@ -31,6 +33,9 @@ const DEFAULT_QUORUM: number = 100; // server alone decides the outcome
 // Flag to indicate if we've authenticated with the broker
 let isAuthenticated = false;
 let client: NitroliteClient = createClient();
+
+// Store JWT token at file level for reuse
+let jwtToken: string | null = null;
 
 function createClient(): NitroliteClient {
     // Create the wallet client using the ethereum provider
@@ -137,6 +142,7 @@ export function connectToBroker(): void {
             isAuthenticated
         });
         isAuthenticated = false;
+        jwtToken = null; // Clear JWT token on disconnect
         setTimeout(connectToBroker, 5000);
     });
 
@@ -162,7 +168,9 @@ async function authenticateWithBroker(): Promise<void> {
         throw new Error("Server address not found");
     }
 
-    return new Promise((resolve, reject) => {
+    const expire = String(Math.floor(Date.now() / 1000) + 24 * 60 * 60);
+
+    return new Promise(async (resolve, reject) => {
         let authTimeout: NodeJS.Timeout;
 
         // Clean up function to remove listeners and clear timeout
@@ -179,32 +187,23 @@ async function authenticateWithBroker(): Promise<void> {
 
                 // Check for auth_challenge response (response to our auth_request)
                 if (message.res && message.res[1] === "auth_challenge") {
-                    console.log("Received auth_challenge, preparing auth_verify...");
+                    console.log("Received auth_challenge, preparing EIP-712 auth_verify...");
 
                     try {
-                        // Parse the challenge from the response
-                        const parsedResponse = NitroliteRPC.parseResponse(data.toString());
-                        if (!parsedResponse.isValid || parsedResponse.method !== "auth_challenge") {
-                            throw new Error("Invalid auth_challenge response");
-                        }
+                        // Step 2: Create EIP-712 signing function for challenge verification
+                        console.log('Creating EIP-712 signing function...');
+                        const eip712SigningFunction = createEIP712SigningFunction(serverAddress, expire);
 
-                        const challengeData = parsedResponse.data as any[];
-                        const challenge = challengeData[0]?.challenge_message;
-                        if (!challenge) {
-                            throw new Error("No challenge in auth_challenge response");
-                        }
-
-                        // Create auth_verify request with EIP-712 signature
-                        const authVerifyRequest = await createAuthVerifyWithEIP712(
-                            serverAddress,
-                            challenge,
-                            serverAddress, // session_key
-                            "snake-game-server", // app_name
-                            [] // allowances
+                        console.log('Calling createAuthVerifyMessage...');
+                        // Create and send verification message with EIP-712 signature
+                        const authVerify = await createAuthVerifyMessage(
+                            eip712SigningFunction,
+                            data.toString(), // Pass the raw challenge response string
                         );
 
-                        console.log("Sending auth_verify:", authVerifyRequest);
-                        brokerWs.send(authVerifyRequest);
+                        console.log('Sending auth_verify with EIP-712 signature');
+                        brokerWs.send(authVerify);
+                        console.log('auth_verify sent successfully');
 
                         // Send additional requests
                         const getBalances = await createGetLedgerBalancesMessage(
@@ -213,33 +212,46 @@ async function authenticateWithBroker(): Promise<void> {
                         );
                         brokerWs.send(getBalances);
                         await getChannels();
-                    } catch (error: unknown) {
-                        console.error("Error creating auth verify message:", error);
+                    } catch (eip712Error) {
+                        console.error('Error creating EIP-712 auth_verify:', eip712Error);
+                        console.error('Error stack:', (eip712Error as Error).stack);
+
                         cleanup();
-                        reject(new Error(`Failed to create auth verify message: ${error}`));
+                        reject(new Error(`EIP-712 auth_verify failed: ${(eip712Error as Error).message}`));
+                        return;
                     }
                 }
                 // Check for auth_verify success response
-                else if (message.res && message.res[1] === "auth_verify") {
+                else if (message.res && (message.res[1] === "auth_verify" || message.res[1] === 'auth_success')) {
+                    console.log("Authentication successful");
+
+                    // If response contains a JWT token, store it
+                    if (message.res[2]?.[0]?.['jwt_token']) {
+                        console.log('JWT token received:', message.res[2][0]['jwt_token']);
+                        jwtToken = message.res[2][0]['jwt_token'];
+                    }
+
                     isAuthenticated = true;
                     cleanup();
                     resolve();
                 }
                 // Check for error responses
-                else if (message.res && message.res[1] === "error") {
-                    const errorMessage = message.res[2] && message.res[2][0]?.error ? message.res[2][0].error : "Unknown authentication error";
-                    console.error("Authentication error:", errorMessage);
+                else if (message.err || (message.res && message.res[1] === "error")) {
+                    const errorMsg = message.err?.[1] || message.error || message.res?.[2]?.[0]?.error || 'Authentication failed';
+
+                    console.error('Authentication failed:', errorMsg);
+                    jwtToken = null; // Clear JWT token on auth failure
                     cleanup();
-                    reject(new Error(errorMessage));
-                }
-            } catch (error: unknown) {
-                console.error("Error processing authentication message:", error);
-                cleanup();
-                if (error instanceof Error) {
-                    reject(new Error(`Authentication processing error: ${error.message}`));
+                    reject(new Error(String(errorMsg)));
                 } else {
-                    reject(new Error('Authentication processing error: Unknown error'));
+                    console.log('Received non-auth message during auth, continuing to listen:', message);
+                    // Keep listening if it wasn't a final success/error
                 }
+            } catch (error) {
+                console.error("Error handling auth response:", error);
+                console.error("Error stack:", (error as Error).stack);
+                cleanup();
+                reject(new Error(`Authentication error: ${error instanceof Error ? error.message : String(error)}`));
             }
         };
 
@@ -252,30 +264,42 @@ async function authenticateWithBroker(): Promise<void> {
         // Add temporary listener for authentication messages
         brokerWs.on("message", authMessageHandler);
 
-        // Create and send the auth request using nitrolite
-        console.log("Starting authentication with address:", serverAddress);
-        console.log("Server wallet address:", serverAddress);
-        console.log("Private key used (first 4 chars):", WALLET_PRIVATE_KEY.substring(0, 6) + "...");
+        // Step 1: Send auth_request with JWT token if available
+        console.log('Starting authentication with:');
+        console.log('- Server wallet address:', serverAddress);
+        console.log('- JWT token if available, otherwise EIP-712 signature for auth_verify challenge');
 
-        // Create the auth request parameters for the new API
-        const authRequest: AuthRequest = {
-            address: serverAddress,
-            session_key: serverAddress, // Using same address as session key for server
-            app_name: "snake-game-server",
-            allowances: [] // Empty allowances for server
-        };
+        try {
+            let authRequest: string;
 
-        // Generate the auth request using nitrolite and our properly typed signer
-        createAuthRequestMessage(authRequest)
-            .then((authRequest) => {
-                console.log("Sending auth_request:", authRequest);
-                brokerWs.send(authRequest);
-            })
-            .catch((error) => {
-                console.error("Error creating auth request:", error);
-                cleanup();
-                reject(new Error(`Failed to create auth request: ${error.message}`));
-            });
+            if (jwtToken) {
+                console.log('JWT token found, sending auth request with token:', jwtToken);
+                authRequest = await createAuthVerifyMessageWithJWT(jwtToken);
+            } else {
+                console.log('No JWT token found, proceeding with challenge-response authentication');
+                authRequest = await createAuthRequestMessage({
+                    wallet: serverAddress,
+                    participant: serverAddress,
+                    app_name: 'Snake Game Server',
+                    expire: expire,
+                    scope: 'snake-game-server',
+                    application: serverAddress,
+                    allowances: [
+                        {
+                            symbol: 'usdc',
+                            amount: '0',
+                        },
+                    ],
+                });
+            }
+
+            console.log('Sending auth_request:', authRequest);
+            brokerWs.send(authRequest);
+        } catch (requestError) {
+            console.error('Error creating auth_request:', requestError);
+            cleanup();
+            reject(new Error(`Failed to create auth_request: ${(requestError as Error).message}`));
+        }
     });
 }
 
@@ -647,54 +671,126 @@ export function verifySignature(message: string, signature: string, expectedAddr
     }
 }
 
-// Create auth_verify message with EIP-712 signature
-async function createAuthVerifyWithEIP712(
-    address: string,
-    challenge: string,
-    sessionKey: string,
-    appName: string,
-    allowances: Array<{ asset: string; amount: string }>
-): Promise<string> {
-    const domain = {
-        name: appName,
+/**
+ * EIP-712 domain and types for auth_verify challenge
+ */
+const getAuthDomain = () => {
+    return {
+        name: 'Snake Game Server',
     };
+};
 
-    const types = {
-        AuthVerify: [
-            { name: "address", type: "address" },
-            { name: "challenge", type: "string" },
-            { name: "session_key", type: "address" },
-            { name: "allowances", type: "Allowance[]" },
-        ],
-        Allowance: [
-            { name: "asset", type: "string" },
-            { name: "amount", type: "uint256" },
-        ],
-    };
+const AUTH_TYPES = {
+    Policy: [
+        { name: 'challenge', type: 'string' },
+        { name: 'scope', type: 'string' },
+        { name: 'wallet', type: 'address' },
+        { name: 'application', type: 'address' },
+        { name: 'participant', type: 'address' },
+        { name: 'expire', type: 'uint256' },
+        { name: 'allowances', type: 'Allowance[]' },
+    ],
+    Allowance: [
+        { name: 'asset', type: 'string' },
+        { name: 'amount', type: 'uint256' },
+    ],
+};
 
-    const value = {
-        address: address,
-        challenge: challenge,
-        session_key: sessionKey,
-        allowances: allowances.map(a => ({
-            asset: a.asset,
-            amount: ethers.BigNumber.from(a.amount || "0"),
-        })),
-    };
-
-    // Create the wallet to sign
+/**
+ * Creates EIP-712 signing function for challenge verification with proper challenge extraction
+ */
+function createEIP712SigningFunction(serverAddress: string, expire: string) {
     const wallet = new ethers.Wallet(WALLET_PRIVATE_KEY);
 
-    // Sign the typed data
-    const signature = await wallet._signTypedData(domain, types, value);
+    return async (data: any): Promise<`0x${string}`> => {
+        console.log('Signing auth_verify challenge with EIP-712:', data);
 
-    // Create the auth_verify request
-    const requestId = Date.now();
-    const timestamp = getCurrentTimestamp();
-    const request = NitroliteRPC.createRequest(requestId, "auth_verify", [{ challenge }], timestamp);
+        let challengeUUID = '';
 
-    // Add the EIP-712 signature
-    request.sig = [signature as Hex];
+        // The data coming in is the array from createAuthVerifyMessage
+        // Format: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
+        if (Array.isArray(data)) {
+            console.log('Data is array, extracting challenge from position [2][0].challenge');
 
-    return JSON.stringify(request);
+            // Direct array access - data[2] should be the array with the challenge object
+            if (data.length >= 3 && Array.isArray(data[2]) && data[2].length > 0) {
+                const challengeObject = data[2][0];
+
+                if (challengeObject && challengeObject.challenge) {
+                    challengeUUID = challengeObject.challenge;
+                    console.log('Extracted challenge UUID from array:', challengeUUID);
+                }
+            }
+        } else if (typeof data === 'string') {
+            try {
+                const parsed = JSON.parse(data);
+
+                console.log('Parsed challenge data:', parsed);
+
+                // Handle different message structures
+                if (parsed.res && Array.isArray(parsed.res)) {
+                    // auth_challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
+                    if (parsed.res[1] === 'auth_challenge' && parsed.res[2]) {
+                        challengeUUID = parsed.res[2].challenge_message || parsed.res[2].challenge;
+                        console.log('Extracted challenge UUID from auth_challenge:', challengeUUID);
+                    }
+                    // auth_verify message: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
+                    else if (parsed.res[1] === 'auth_verify' && Array.isArray(parsed.res[2]) && parsed.res[2][0]) {
+                        challengeUUID = parsed.res[2][0].challenge;
+                        console.log('Extracted challenge UUID from auth_verify:', challengeUUID);
+                    }
+                }
+                // Direct array format
+                else if (Array.isArray(parsed) && parsed.length >= 3 && Array.isArray(parsed[2])) {
+                    challengeUUID = parsed[2][0]?.challenge;
+                    console.log('Extracted challenge UUID from direct array:', challengeUUID);
+                }
+            } catch (e) {
+                console.error('Could not parse challenge data:', e);
+                console.log('Using raw string as challenge');
+                challengeUUID = data;
+            }
+        } else if (data && typeof data === 'object') {
+            // If data is already an object, try to extract challenge
+            challengeUUID = data.challenge || data.challenge_message;
+            console.log('Extracted challenge from object:', challengeUUID);
+        }
+
+        if (!challengeUUID || challengeUUID.includes('[') || challengeUUID.includes('{')) {
+            console.error('Challenge extraction failed or contains invalid characters:', challengeUUID);
+            throw new Error('Could not extract valid challenge UUID for EIP-712 signing');
+        }
+
+        console.log('Final challenge UUID for EIP-712:', challengeUUID);
+        console.log('Signing for address (original):', serverAddress);
+        console.log('Signing for address (type):', typeof serverAddress);
+        console.log('Auth domain:', getAuthDomain());
+
+        // Create EIP-712 message with ONLY the challenge UUID
+        const message = {
+            challenge: challengeUUID,
+            scope: 'snake-game-server',
+            wallet: serverAddress as `0x${string}`,
+            application: serverAddress as `0x${string}`,
+            participant: serverAddress as `0x${string}`,
+            expire: expire,
+            allowances: [
+                {
+                    asset: 'usdc',
+                    amount: '0',
+                },
+            ],
+        };
+
+        try {
+            // Sign with EIP-712
+            const signature = await wallet._signTypedData(getAuthDomain(), AUTH_TYPES, message);
+
+            console.log('EIP-712 signature generated for challenge:', signature);
+            return signature as `0x${string}`;
+        } catch (eip712Error) {
+            console.error('EIP-712 signing failed:', eip712Error);
+            throw new Error(`EIP-712 signing failed: ${(eip712Error as Error).message}`);
+        }
+    };
 }

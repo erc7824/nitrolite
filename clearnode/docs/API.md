@@ -265,7 +265,7 @@ Retrieves all channels for a participant (both open, closed, and joining), order
 {
   "req": [1, "get_channels", [{
     "participant": "0x1234567890abcdef...",
-    "status":"opem" // OPTIONAL FILTER
+    "status":"open" // OPTIONAL FILTER
   }], 1619123456789],
   "sig": []
 }
@@ -279,6 +279,7 @@ Retrieves all channels for a participant (both open, closed, and joining), order
     {
       "channel_id": "0xfedcba9876543210...",
       "participant": "0x1234567890abcdef...",
+      "wallet": "0x1234567890abcdef...",
       "status": "open",
       "token": "0xeeee567890abcdef...",
       "amount": "100000",
@@ -293,6 +294,7 @@ Retrieves all channels for a participant (both open, closed, and joining), order
     {
       "channel_id": "0xabcdef1234567890...",
       "participant": "0x1234567890abcdef...",
+      "wallet": "0x1234567890abcdef...",
       "status": "closed",
       "token": "0xeeee567890abcdef...",
       "amount": "50000",

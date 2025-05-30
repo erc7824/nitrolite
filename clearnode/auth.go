@@ -262,6 +262,9 @@ func (am *AuthManager) VerifyJWT(tokenString string) (*JWTClaims, error) {
 		return nil, err
 	}
 
+	// Register authenticated session
+	am.registerAuthSession(claims.Policy.Wallet)
+
 	return claims, nil
 }
 

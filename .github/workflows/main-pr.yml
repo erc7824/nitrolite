@@ -77,3 +77,35 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}/clearnode:${{ steps.sha.outputs.short_sha }}
 
+  notify-slack:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: [test-clearnode, test-forge, test-sdk, build-and-publish-clearnode]
+    if: always()
+
+    steps:
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_CHANNEL: deployments
+          SLACK_USERNAME: CI/CD Bot
+          SLACK_COLOR: ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || 'success' }}
+          SLACK_ICON_EMOJI: ${{ contains(needs.*.result, 'failure') && ':x:' || contains(needs.*.result, 'cancelled') && ':warning:' || ':white_check_mark:' }}
+          SLACK_TITLE: 'Nitrolite PR Tests'
+          SLACK_MESSAGE_ON_SUCCESS: |
+            ✅ All PR tests passed successfully!
+            
+            📝 Commit: ${{ github.event.head_commit.message }}
+            👤 Author: ${{ github.event.head_commit.author.name }}
+          SLACK_MESSAGE_ON_FAILURE: |
+            ❌ PR tests failed!
+            
+            📝 Commit: ${{ github.event.head_commit.message }}
+            👤 Author: ${{ github.event.head_commit.author.name }}
+          SLACK_MESSAGE_ON_CANCEL: |
+            ⚠️ PR tests were cancelled!
+            
+            📝 Commit: ${{ github.event.head_commit.message }}
+            👤 Author: ${{ github.event.head_commit.author.name }}
+          SLACK_FOOTER: 'Nitrolite CI/CD Pipeline'

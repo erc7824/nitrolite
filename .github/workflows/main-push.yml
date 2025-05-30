@@ -195,8 +195,21 @@ jobs:
           SLACK_CHANNEL: deployments
           SLACK_USERNAME: CI/CD Bot
           SLACK_COLOR: ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || 'success' }}
+          SLACK_ICON_EMOJI: ${{ contains(needs.*.result, 'failure') && ':x:' || contains(needs.*.result, 'cancelled') && ':warning:' || ':white_check_mark:' }}
           SLACK_TITLE: 'Nitrolite Clearnode Release Candidate'
-          SLACK_MESSAGE_ON_SUCCESS: '✅ RC build and deployment completed successfully!'
-          SLACK_MESSAGE_ON_FAILURE: '❌ RC build or deployment failed!'
-          SLACK_MESSAGE_ON_CANCEL: '⚠️ RC build or deployment was cancelled!'
+          SLACK_MESSAGE_ON_SUCCESS: |
+            ✅ RC build and deployment completed successfully!
+            
+            📝 Commit: ${{ github.event.head_commit.message }}
+            👤 Author: ${{ github.event.head_commit.author.name }}
+          SLACK_MESSAGE_ON_FAILURE: |
+            ❌ RC build or deployment failed!
+            
+            📝 Commit: ${{ github.event.head_commit.message }}
+            👤 Author: ${{ github.event.head_commit.author.name }}
+          SLACK_MESSAGE_ON_CANCEL: |
+            ⚠️ RC build or deployment was cancelled!
+            
+            📝 Commit: ${{ github.event.head_commit.message }}
+            👤 Author: ${{ github.event.head_commit.author.name }}
           SLACK_FOOTER: 'Nitrolite CI/CD Pipeline'

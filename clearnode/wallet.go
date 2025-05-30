@@ -29,11 +29,11 @@ func loadWalletCache(db *gorm.DB) error {
 	return nil
 }
 
-func GetWalletBySigner(signer string) (string, error) {
+func GetWalletBySigner(signer string) string {
 	if w, ok := walletCache.Load(signer); ok {
-		return w.(string), nil
+		return w.(string)
 	}
-	return "", nil
+	return ""
 }
 
 func AddSigner(db *gorm.DB, wallet, signer string) error {

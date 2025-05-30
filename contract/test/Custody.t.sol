@@ -1022,7 +1022,8 @@ contract CustodyTest is Test {
         uint256 newGuestAmount = 0; // Zero after withdrawal
 
         // Set allocations to match the resize - both must have the SAME token
-        resizedState.allocations[0] = Allocation({destination: hostWallet, token: address(token), amount: newHostAmount});
+        resizedState.allocations[0] =
+            Allocation({destination: hostWallet, token: address(token), amount: newHostAmount});
 
         resizedState.allocations[1] = Allocation({
             destination: guestWallet,

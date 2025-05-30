@@ -116,13 +116,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           fetch-depth: 1
 
       - name: Get commit info
         id: commit_info
         run: |
           echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
-          echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
 
       - name: Slack Notification
         uses: rtCamp/action-slack-notify@v2
@@ -136,19 +136,16 @@ jobs:
           SLACK_MESSAGE_ON_SUCCESS: |
             ✅ Stable build and deployment completed successfully!
             
-            🏷️ Tag: ${{ github.ref_name }}
-            📝 Commit: ${{ steps.commit_info.outputs.message }}
-            👤 Author: ${{ steps.commit_info.outputs.author }}
+            🏷️ ${{ github.ref_name }}
+            📝 ${{ steps.commit_info.outputs.message }}
           SLACK_MESSAGE_ON_FAILURE: |
             ❌ Stable build or deployment failed!
             
-            🏷️ Tag: ${{ github.ref_name }}
-            📝 Commit: ${{ steps.commit_info.outputs.message }}
-            👤 Author: ${{ steps.commit_info.outputs.author }}
+            🏷️ ${{ github.ref_name }}
+            📝 ${{ steps.commit_info.outputs.message }}
           SLACK_MESSAGE_ON_CANCEL: |
             ⚠️ Stable build or deployment was cancelled!
             
-            🏷️ Tag: ${{ github.ref_name }}
-            📝 Commit: ${{ steps.commit_info.outputs.message }}
-            👤 Author: ${{ steps.commit_info.outputs.author }}
+            🏷️ ${{ github.ref_name }}
+            📝 ${{ steps.commit_info.outputs.message }}
           SLACK_FOOTER: 'Nitrolite CI/CD Pipeline'

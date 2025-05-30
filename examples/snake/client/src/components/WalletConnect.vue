@@ -17,6 +17,9 @@ const isAuthenticated = ref(false);
 const walletAddress = ref("");
 const walletError = ref("");
 
+// Global connection promise to prevent concurrent connections
+let connectionPromise: Promise<void> | null = null;
+
 // Storage keys
 const KEY_PAIR = "crypto_keypair";
 
@@ -27,7 +30,8 @@ const emit = defineEmits<{
     error: [string];
 }>();
 
-onMounted(connectWallet);
+// Remove automatic connection on mount to prevent race conditions
+// onMounted(connectWallet);
 
 // Wallet signer interface following server implementation
 interface WalletSigner {
@@ -65,20 +69,42 @@ async function getOrCreateWalletSigner(): Promise<WalletSigner> {
  * Main connect function that establishes connection and authenticates
  */
 async function connectWallet() {
-    if (isConnecting.value) return;
+    // If already connected, just return
+    if (isConnected.value) {
+        console.log("Already connected");
+        return;
+    }
+
+    // If there's an ongoing connection, wait for it
+    if (connectionPromise) {
+        console.log("Connection already in progress, waiting...");
+        return connectionPromise;
+    }
+
+    // Create a new connection promise
+    connectionPromise = doConnect();
+    
+    try {
+        await connectionPromise;
+    } finally {
+        connectionPromise = null;
+    }
+}
+
+async function doConnect() {
+    if (isConnecting.value) {
+        console.log("Already connecting, skipping duplicate request");
+        return;
+    }
 
     isConnecting.value = true;
     walletError.value = "";
 
     try {
-        // Get or create wallet signer
+        // Get or create wallet signer (this will be used as session key)
         const signer = await getOrCreateWalletSigner();
-        walletAddress.value = signer.address;
-
-        console.log("Using wallet with address:", signer.address);
-
-        // Update connection state
-        isConnected.value = true;
+        
+        console.log("Using session signer with address:", signer.address);
 
         // Initialize ClearNetService with proper wallet configuration
         try {
@@ -122,10 +148,34 @@ async function connectWallet() {
 
             const ethereum = (window as any).ethereum;
 
-            const accounts = await ethereum.request({
-                method: "eth_requestAccounts",
-            });
+            let accounts;
+            try {
+                accounts = await ethereum.request({
+                    method: "eth_requestAccounts",
+                });
+            } catch (error: any) {
+                if (error.code !== -32002) {
+                    throw error;
+                }
+                console.log("Metamask is already processing eth_requestAccounts, waiting...");
+                // Wait a bit and try again
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                try {
+                    accounts = await ethereum.request({
+                        method: "eth_accounts",
+                    });
+                    if (!accounts || accounts.length === 0) {
+                        throw new Error("No accounts available after waiting");
+                    }
+                } catch (retryError) {
+                    throw retryError;
+                }
+            }
             const address = accounts[0];
+            
+            // Set the wallet address to the MetaMask address
+            walletAddress.value = address;
+            console.log("Connected to MetaMask wallet:", address);
 
             // Create the wallet client using the ethereum provider
             const walletClient = createWalletClient({
@@ -139,6 +189,8 @@ async function connectWallet() {
                 chain: polygon,
             });
 
+            // Update connection state
+            isConnected.value = true;
 
             // Create the actual Nitrolite configuration
             const nitroConfig: NitroliteClientConfig = {
@@ -166,9 +218,9 @@ async function connectWallet() {
             emit("error", walletError.value);
         }
 
-        // Emit success event
+        // Emit success event with MetaMask wallet address
         emit("wallet-connected", {
-            address: signer.address,
+            address: walletAddress.value,
         });
     } catch (error) {
         console.error("Failed to connect:", error);
@@ -187,6 +239,9 @@ function disconnectWallet() {
     isConnected.value = false;
     isAuthenticated.value = false;
     walletAddress.value = "";
+    
+    // Clear any ongoing connection promise
+    connectionPromise = null;
 
     // Private key is preserved in localStorage
     // to maintain identity consistency across sessions

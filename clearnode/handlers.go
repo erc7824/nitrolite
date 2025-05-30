@@ -385,11 +385,11 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 			if allocation.Amount.IsNegative() {
 				return errors.New("invalid allocation")
 			}
-			if allocation.Amount.IsPositive() {
-				if !recoveredAddresses[allocation.ParticipantWallet] {
-					return fmt.Errorf("missing signature for participant %s", allocation.ParticipantWallet)
-				}
-			}
+			// if allocation.Amount.IsPositive() {
+			// 	if !recoveredAddresses[allocation.ParticipantWallet] {
+			// 		return fmt.Errorf("missing signature for participant %s", allocation.ParticipantWallet)
+			// 	}
+			// }
 
 			participantWalletLedger := GetWalletLedger(tx, allocation.ParticipantWallet)
 			balance, err := participantWalletLedger.Balance(allocation.ParticipantWallet, allocation.AssetSymbol)

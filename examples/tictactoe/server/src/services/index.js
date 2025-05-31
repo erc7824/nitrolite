@@ -17,7 +17,11 @@ export {
   closeAppSession,
   getAppSession,
   hasAppSession,
-  getAllAppSessions
+  getAllAppSessions,
+  generateAppSessionMessage,
+  getPendingAppSessionMessage,
+  addAppSessionSignature,
+  createAppSessionWithSignatures
 } from './appSessions.js';
 
 // Room management

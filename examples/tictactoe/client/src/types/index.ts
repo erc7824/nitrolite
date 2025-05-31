@@ -2,6 +2,8 @@
  * Game and WebSocket types for Nitro Aura
  */
 
+import type { CreateAppSessionRequest } from '@erc7824/nitrolite';
+
 // Player piece: X or O
 export type PlayerSymbol = 'X' | 'O';
 
@@ -54,7 +56,12 @@ export type WebSocketMessageType =
   | 'game:over'
   | 'onlineUsers'
   | 'players:count'
-  | 'error';
+  | 'error'
+  | 'appSession:signatureRequest'
+  | 'appSession:startGameRequest'
+  | 'appSession:signatureConfirmed'
+  | 'appSession:signature'
+  | 'appSession:startGame';
 
 // Base WebSocket message
 export interface WebSocketMessage {
@@ -136,6 +143,47 @@ export interface OnlineUsersMessage extends WebSocketMessage {
   count: number;
 }
 
+// App Session related messages
+
+export interface AppSessionSignatureRequestMessage extends WebSocketMessage {
+  type: 'appSession:signatureRequest';
+  roomId: string;
+  appSessionData: CreateAppSessionRequest[];
+  appDefinition: unknown;
+  participants: string[];
+  requestToSign: unknown[];
+}
+
+export interface AppSessionStartGameRequestMessage extends WebSocketMessage {
+  type: 'appSession:startGameRequest';
+  roomId: string;
+  appSessionData: CreateAppSessionRequest[];
+  appDefinition: unknown;
+  participants: string[];
+  requestToSign: unknown[];
+}
+
+export interface AppSessionSignatureConfirmedMessage extends WebSocketMessage {
+  type: 'appSession:signatureConfirmed';
+  roomId: string;
+}
+
+export interface AppSessionSignatureMessage extends WebSocketMessage {
+  type: 'appSession:signature';
+  payload: {
+    roomId: string;
+    signature: string;
+  };
+}
+
+export interface AppSessionStartGameMessage extends WebSocketMessage {
+  type: 'appSession:startGame';
+  payload: {
+    roomId: string;
+    signature: string;
+  };
+}
+
 // Union type for all WebSocket messages
 export type WebSocketMessages =
   | JoinRoomMessage
@@ -149,7 +197,12 @@ export type WebSocketMessages =
   | AvailableRoomsMessage
   | GetAvailableRoomsMessage
   | OnlineUsersMessage
-  | ErrorMessage;
+  | ErrorMessage
+  | AppSessionSignatureRequestMessage
+  | AppSessionStartGameRequestMessage
+  | AppSessionSignatureConfirmedMessage
+  | AppSessionSignatureMessage
+  | AppSessionStartGameMessage;
 
 // MetaMask Ethereum Provider
 export interface MetaMaskEthereumProvider {

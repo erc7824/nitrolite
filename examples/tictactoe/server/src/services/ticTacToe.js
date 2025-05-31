@@ -1,6 +1,7 @@
 /**
  * Tic Tac Toe game engine
  */
+import { ethers } from 'ethers';
 
 /**
  * @typedef {Object} GameState
@@ -20,14 +21,18 @@
  * @returns {GameState} Initial game state
  */
 export function createGame(hostEoa, guestEoa) {
+  // Format addresses to proper checksum format
+  const formattedHostEoa = ethers.getAddress(hostEoa);
+  const formattedGuestEoa = ethers.getAddress(guestEoa);
+  
   return {
     board: Array(9).fill(null),
     nextTurn: 'X', // X goes first
     winner: null,
     isGameOver: false,
     players: {
-      X: hostEoa,
-      O: guestEoa
+      X: formattedHostEoa,
+      O: formattedGuestEoa
     }
   };
 }
@@ -40,13 +45,16 @@ export function createGame(hostEoa, guestEoa) {
  * @returns {Object} Result with updated game state or error
  */
 export function makeMove(gameState, position, playerEoa) {
+  // Format player address to proper checksum format
+  const formattedPlayerEoa = ethers.getAddress(playerEoa);
+  
   // Check if the game is already over
   if (gameState.isGameOver) {
     return { success: false, error: 'Game is already over' };
   }
 
   // Check if it's the player's turn
-  const playerSymbol = gameState.players.X === playerEoa ? 'X' : 'O';
+  const playerSymbol = gameState.players.X === formattedPlayerEoa ? 'X' : 'O';
   if (playerSymbol !== gameState.nextTurn) {
     return { success: false, error: 'Not your turn' };
   }

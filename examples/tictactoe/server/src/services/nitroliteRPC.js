@@ -2,11 +2,13 @@
  * Nitrolite RPC (WebSocket) client
  * This file handles all WebSocket communication with Nitrolite server
  */
-import WebSocket from "ws";
-import { ethers } from "ethers";
-import { NitroliteRPC, createAuthRequestMessage, createAuthVerifyMessage, createPingMessage } from "@erc7824/nitrolite";
+import { createAuthRequestMessage, createAuthVerifyMessage, createPingMessage, NitroliteRPC } from "@erc7824/nitrolite";
 import dotenv from "dotenv";
+import { ethers } from "ethers";
+import WebSocket from "ws";
+
 import logger from "../utils/logger.js";
+
 import { getWalletClient } from "./nitroliteOnChain.js";
 
 /**
@@ -185,18 +187,14 @@ export class NitroliteRPCClient {
 
     // Sign message function that can be reused across the client
     async signMessage(data) {
-        logger.auth(`Signing message: ${typeof data === "string" ? data.slice(0, 50) : JSON.stringify(data).slice(0, 50)}...`);
-
         const challengeUUID = this.extractChallenge(data);
         const address = this.address;
 
         if (!challengeUUID || challengeUUID.includes("[") || challengeUUID.includes("{")) {
-            logger.error("Challenge extraction failed or contains invalid characters:", challengeUUID);
-
             // Fallback to regular signing for non-auth messages
             if (!challengeUUID) {
-                logger.auth("No challenge found, using regular message signing");
                 const messageStr = typeof data === "string" ? data : JSON.stringify(data);
+
                 const digestHex = ethers.id(messageStr);
                 const messageBytes = ethers.getBytes(digestHex);
 
@@ -206,10 +204,6 @@ export class NitroliteRPCClient {
 
             throw new Error("Could not extract valid challenge UUID for EIP-712 signing");
         }
-
-        logger.auth("Final challenge UUID for EIP-712:", challengeUUID);
-        logger.auth("Signing for address:", address);
-        logger.auth("Auth domain:", getAuthDomain());
 
         // Create EIP-712 message
         const message = {
@@ -305,9 +299,9 @@ export class NitroliteRPCClient {
                         this.setStatus(WSStatus.CONNECTED);
 
                         try {
-                            // Request channel information for our address and check if we need to create one
+                            // Request channel information for our address and check if we
+                            // need to create one
                             const channels = await this.getChannelInfo();
-
                             // Check if we have valid channels
                             const hasValidChannel = channels && Array.isArray(channels) && channels.length > 0 && channels[0] !== null;
 

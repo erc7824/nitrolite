@@ -99,6 +99,28 @@ export function useWebSocket() {
         });
     }, [sendMessage]);
 
+    // Send app session signature
+    const sendAppSessionSignature = useCallback(
+        (roomId: string, signature: string) => {
+            sendMessage({
+                type: "appSession:signature",
+                payload: { roomId, signature },
+            });
+        },
+        [sendMessage]
+    );
+
+    // Send app session start game with signature
+    const sendAppSessionStartGame = useCallback(
+        (roomId: string, signature: string) => {
+            sendMessage({
+                type: "appSession:startGame",
+                payload: { roomId, signature },
+            });
+        },
+        [sendMessage]
+    );
+
     return {
         isConnected,
         error,
@@ -107,5 +129,7 @@ export function useWebSocket() {
         makeMove,
         startGame,
         getAvailableRooms,
+        sendAppSessionSignature,
+        sendAppSessionStartGame,
     };
 }

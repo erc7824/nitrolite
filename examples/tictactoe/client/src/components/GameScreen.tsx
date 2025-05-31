@@ -22,6 +22,8 @@ interface GameScreenProps {
     onCellClick: (position: number) => void;
     onPlayAgain: () => void;
     onStartGame: () => void;
+    awaitingHostStart?: boolean;
+    isSigningInProgress?: boolean;
 }
 
 export function GameScreen({
@@ -39,6 +41,8 @@ export function GameScreen({
     onCellClick,
     onPlayAgain,
     onStartGame,
+    awaitingHostStart = false,
+    isSigningInProgress = false,
 }: GameScreenProps) {
     const [hasChannelId, setHasChannelId] = useState<boolean>(false);
 
@@ -114,8 +118,18 @@ export function GameScreen({
                                             variant="cyan"
                                             size="xl"
                                             className="w-full mt-2 shadow-lg shadow-cyan-900/20 animate-pulse"
+                                            disabled={isSigningInProgress}
                                         >
-                                            Start Game
+                                            {isSigningInProgress ? (
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-4 h-4 border-t-2 border-r-2 border-white border-solid rounded-full animate-spin"></div>
+                                                    Signing...
+                                                </div>
+                                            ) : awaitingHostStart ? (
+                                                "Sign & Start Game"
+                                            ) : (
+                                                "Start Game"
+                                            )}
                                         </Button>
                                     </CardContent>
                                 </Card>

@@ -3,6 +3,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import { ethers } from 'ethers';
 import { makeMove } from './index.js';
 
 /**
@@ -59,8 +60,11 @@ export function createRoomManager() {
    * @returns {Object} Result with success flag and additional info
    */
   function joinRoom(roomId, eoa, ws) {
+    // Format address to proper checksum format
+    const formattedEoa = ethers.getAddress(eoa);
+    
     // Check if player is already in another room
-    if (addressToRoom.has(eoa)) {
+    if (addressToRoom.has(formattedEoa)) {
       return { 
         success: false, 
         error: 'Player already in another room' 
@@ -88,16 +92,16 @@ export function createRoomManager() {
     // Assign player to available role
     let role;
     if (!room.players.host) {
-      room.players.host = eoa;
+      room.players.host = formattedEoa;
       role = 'host';
     } else if (!room.players.guest) {
-      room.players.guest = eoa;
+      room.players.guest = formattedEoa;
       role = 'guest';
     }
 
     // Store connection and map address to room
-    room.connections.set(eoa, { ws, role });
-    addressToRoom.set(eoa, roomId);
+    room.connections.set(formattedEoa, { ws, role });
+    addressToRoom.set(formattedEoa, roomId);
 
     // Check if room has both players (ready to potentially start)
     const isRoomFull = room.players.host && room.players.guest;
@@ -125,6 +129,9 @@ export function createRoomManager() {
    * @returns {Object} Result with success flag and additional info
    */
   function processMove(roomId, position, eoa) {
+    // Format address to proper checksum format
+    const formattedEoa = ethers.getAddress(eoa);
+    
     if (!rooms.has(roomId)) {
       return { 
         success: false, 
@@ -135,7 +142,7 @@ export function createRoomManager() {
     const room = rooms.get(roomId);
     
     // Check if player is in this room
-    if (!room.connections.has(eoa)) {
+    if (!room.connections.has(formattedEoa)) {
       return { 
         success: false, 
         error: 'Player not in this room' 
@@ -151,7 +158,7 @@ export function createRoomManager() {
     }
 
     // Make the move
-    const result = makeMove(room.gameState, position, eoa);
+    const result = makeMove(room.gameState, position, formattedEoa);
     if (!result.success) {
       return result;
     }
@@ -172,24 +179,27 @@ export function createRoomManager() {
    * @returns {Object} Result with success flag and removed room info
    */
   function leaveRoom(eoa) {
-    if (!addressToRoom.has(eoa)) {
+    // Format address to proper checksum format
+    const formattedEoa = ethers.getAddress(eoa);
+    
+    if (!addressToRoom.has(formattedEoa)) {
       return { 
         success: false, 
         error: 'Player not in any room' 
       };
     }
 
-    const roomId = addressToRoom.get(eoa);
+    const roomId = addressToRoom.get(formattedEoa);
     const room = rooms.get(roomId);
     
     // Clean up player connections
     if (room) {
-      room.connections.delete(eoa);
+      room.connections.delete(formattedEoa);
       
       // Update player list
-      if (room.players.host === eoa) {
+      if (room.players.host === formattedEoa) {
         room.players.host = null;
-      } else if (room.players.guest === eoa) {
+      } else if (room.players.guest === formattedEoa) {
         room.players.guest = null;
       }
       
@@ -199,7 +209,7 @@ export function createRoomManager() {
       }
     }
     
-    addressToRoom.delete(eoa);
+    addressToRoom.delete(formattedEoa);
     
     return { 
       success: true, 

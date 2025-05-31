@@ -9,12 +9,12 @@ import { type Address } from "viem";
 export const APP_CONFIG = {
     // WebSocket configuration for real-time communication
     WEBSOCKET: {
-        URL: "wss://canarynet.yellow.com/ws",
+        URL: "wss://clearnet.yellow.com/ws",
     },
 
     CHANNEL: {
         DEFAULT_GUEST: "0x3c93C321634a80FB3657CFAC707718A11cA57cBf",
-        CHALLENGE_PERIOD: BigInt(1),
+        CHALLENGE_PERIOD: BigInt(3600),
     },
 
     TOKENS: {
@@ -22,7 +22,7 @@ export const APP_CONFIG = {
     },
 
     CUSTODIES: {
-        137: "0x2627644ae08aa21Da0Fb458D8879729743D1bB51" as Address,
+        137: "0x4C8Bd8877C3b403BA9f9ECfaAD910AF0d8CA2c4D" as Address,
     },
 
     DEFAULT_ADJUDICATOR: "dummy",

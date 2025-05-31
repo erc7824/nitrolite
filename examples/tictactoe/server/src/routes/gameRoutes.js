@@ -9,7 +9,10 @@ import {
   createGame, 
   createAppSession,
   closeAppSession,
-  hasAppSession
+  hasAppSession,
+  generateAppSessionMessage,
+  addAppSessionSignature,
+  createAppSessionWithSignatures
 } from '../services/index.js';
 import logger from '../utils/logger.js';
 
@@ -152,10 +155,27 @@ export async function handleMove(ws, payload, { roomManager, connections, sendEr
       if (room && room.appId) {
         logger.nitro(`Closing app session with ID ${room.appId} for room ${roomId}`);
         
-        // Create the final allocations based on the game result
-        // Currently using all zeroes, but you might implement actual token allocations
-        // based on the game outcome in the future
-        const finalAllocations = [0, 0, 0];
+        // Determine winner based on game result
+        let winnerId = null;
+        if (result.gameState.winner === 'X') {
+          winnerId = 'A'; // X is player A (host)
+        } else if (result.gameState.winner === 'O') {
+          winnerId = 'B'; // O is player B (guest)
+        }
+        // null winner means tie
+        
+        // Calculate allocations based on winner
+        let finalAllocations;
+        if (winnerId === 'A') {
+          // Player A wins - gets all the funds
+          finalAllocations = ['0.02', '0', '0']; // A gets both initial allocations
+        } else if (winnerId === 'B') {
+          // Player B wins - gets all the funds
+          finalAllocations = ['0', '0.02', '0']; // B gets both initial allocations
+        } else {
+          // Tie or no winner - split evenly
+          finalAllocations = ['0.01', '0.01', '0'];
+        }
         
         await closeAppSession(roomId, finalAllocations);
         logger.nitro(`App session closed for room ${roomId}`);
@@ -163,7 +183,29 @@ export async function handleMove(ws, payload, { roomManager, connections, sendEr
       // Otherwise check the app sessions storage
       else if (hasAppSession(roomId)) {
         logger.nitro(`Closing app session from storage for room ${roomId}`);
-        const finalAllocations = [0, 0, 0];
+        
+        // Determine winner based on game result
+        let winnerId = null;
+        if (result.gameState.winner === 'X') {
+          winnerId = 'A'; // X is player A (host)
+        } else if (result.gameState.winner === 'O') {
+          winnerId = 'B'; // O is player B (guest)
+        }
+        // null winner means tie
+        
+        // Calculate allocations based on winner
+        let finalAllocations;
+        if (winnerId === 'A') {
+          // Player A wins - gets all the funds
+          finalAllocations = ['0.02', '0', '0']; // A gets both initial allocations
+        } else if (winnerId === 'B') {
+          // Player B wins - gets all the funds
+          finalAllocations = ['0', '0.02', '0']; // B gets both initial allocations
+        } else {
+          // Tie or no winner - split evenly
+          finalAllocations = ['0.01', '0.01', '0'];
+        }
+        
         await closeAppSession(roomId, finalAllocations);
         logger.nitro(`App session closed for room ${roomId}`);
       }

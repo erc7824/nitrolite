@@ -35,11 +35,13 @@ export const createEthersSigner = (privateKey: string): WalletSigner => {
         const wallet = new ethers.Wallet(privateKey);
 
         return {
-            address: wallet.address as Hex,
+            address: ethers.getAddress(wallet.address) as Hex,
             sign: async (payload: RequestData | ResponsePayload): Promise<Hex> => {
                 try {
                     const message = JSON.stringify(payload);
+                    console.log("Signing message in Sign function:", message);
                     const digestHex = ethers.id(message);
+                    console.log("Digest Hex:", digestHex);
                     const messageBytes = ethers.getBytes(digestHex);
 
                     const { serialized: signature } = wallet.signingKey.sign(messageBytes);
@@ -75,7 +77,7 @@ export const generateKeyPair = async (): Promise<CryptoKeypair> => {
 
         return {
             privateKey: privateKeyHash,
-            address: walletFromHashedKey.address,
+            address: ethers.getAddress(walletFromHashedKey.address),
         };
     } catch (error) {
         console.error("Error generating keypair, using fallback:", error);
@@ -86,7 +88,7 @@ export const generateKeyPair = async (): Promise<CryptoKeypair> => {
 
         return {
             privateKey: privateKey,
-            address: wallet.address,
+            address: ethers.getAddress(wallet.address),
         };
     }
 };

@@ -19,7 +19,16 @@ function App() {
     const [gameView, setGameView] = useState<"lobby" | "game">("lobby");
 
     // WebSocket connection
-    const { error: wsError, lastMessage, joinRoom, makeMove, startGame, getAvailableRooms } = useWebSocket();
+    const { 
+        error: wsError, 
+        lastMessage, 
+        joinRoom, 
+        makeMove, 
+        startGame, 
+        getAvailableRooms,
+        sendAppSessionSignature,
+        sendAppSessionStartGame
+    } = useWebSocket();
     useWebSocketNitrolite();
     const { client, loading: nitroliteLoading, error: nitroliteError } = useNitrolite();
 
@@ -56,7 +65,11 @@ function App() {
         formatShortAddress,
         getOpponentAddress,
         resetGame,
-    } = useGameState(lastMessage, eoaAddress);
+        awaitingHostStart,
+        signAndStartGame,
+        isSigningInProgress,
+        signatureError
+    } = useGameState(lastMessage, eoaAddress, sendAppSessionSignature, sendAppSessionStartGame);
 
     // Handle errors
     const [showError, setShowError] = useState<boolean>(false);
@@ -64,7 +77,7 @@ function App() {
 
     useEffect(() => {
         // Combine all possible error sources
-        const combinedError = wsError || errorMessage || nitroliteError;
+        const combinedError = wsError || errorMessage || nitroliteError || signatureError;
 
         if (combinedError) {
             console.log("Error detected:", combinedError);
@@ -81,7 +94,7 @@ function App() {
             setShowError(false);
             setErrorDisplay(null);
         }
-    }, [wsError, errorMessage, nitroliteError]);
+    }, [wsError, errorMessage, nitroliteError, signatureError]);
 
     // Process available rooms from websocket messages
     useEffect(() => {
@@ -143,8 +156,14 @@ function App() {
             return;
         }
 
-        console.log("Starting game as host for room:", roomId);
-        startGame(roomId);
+        // If we're awaiting host signature for app session, sign and start
+        if (awaitingHostStart) {
+            console.log("Signing app session and starting game for room:", roomId);
+            signAndStartGame();
+        } else {
+            console.log("Starting game as host for room:", roomId);
+            startGame(roomId);
+        }
     };
 
     // Handle play again
@@ -212,6 +231,8 @@ function App() {
                         onCellClick={handleCellClick}
                         onPlayAgain={handlePlayAgain}
                         onStartGame={handleStartGame}
+                        awaitingHostStart={awaitingHostStart}
+                        isSigningInProgress={isSigningInProgress}
                     />
                 )}
 

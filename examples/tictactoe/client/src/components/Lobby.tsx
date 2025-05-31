@@ -101,37 +101,6 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
         return `${hoursAgo} hour${hoursAgo !== 1 ? "s" : ""} ago`;
     };
 
-    // Helper function to get the Nitrolite address from localStorage
-    const getNitroliteAddress = (): string => {
-        if (!address) return "";
-
-        // Try to get the address from localStorage
-        const savedKeys = localStorage.getItem("crypto_keypair");
-        let gameAddress = address; // Fallback to MetaMask address
-
-        if (savedKeys) {
-            try {
-                const parsed = JSON.parse(savedKeys);
-                if (parsed && parsed.address) {
-                    gameAddress = parsed.address;
-                    console.log("Using Nitrolite address from localStorage:", gameAddress);
-                }
-            } catch (e) {
-                console.error("Failed to parse saved keys, using MetaMask address instead:", e);
-            }
-        }
-
-        // Make sure the nitrolite_channel_id exists in localStorage
-        const channelId = localStorage.getItem("nitrolite_channel_id");
-        if (!channelId) {
-            console.log("No nitrolite_channel_id found in localStorage, will need to create a channel");
-        } else {
-            console.log("Found nitrolite_channel_id in localStorage:", channelId);
-        }
-
-        return gameAddress;
-    };
-
     // Handle joining a specific available room
     const handleJoinAvailableRoom = (selectedRoomId: string) => {
         if (!isWalletConnected || !address) {
@@ -145,11 +114,9 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
             return;
         }
 
-        // Get the Nitrolite address from localStorage
-        const gameAddress = getNitroliteAddress();
-
-        console.log("Joining available room with address:", gameAddress, "and roomId:", selectedRoomId);
-        onJoinRoom({ eoa: gameAddress, roomId: selectedRoomId });
+        // Use MetaMask wallet address for app session participants
+        console.log("Joining available room with MetaMask address:", address, "and roomId:", selectedRoomId);
+        onJoinRoom({ eoa: address, roomId: selectedRoomId });
     };
 
     // Handle manual refresh of available rooms
@@ -185,17 +152,15 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
             return;
         }
 
-        // Get the Nitrolite address from localStorage
-        const gameAddress = getNitroliteAddress();
-
+        // Use MetaMask wallet address for app session participants
         if (mode === "create") {
             // When creating a room, always pass undefined for roomId
-            console.log("Creating a room with address:", gameAddress);
-            onJoinRoom({ eoa: gameAddress, roomId: undefined });
+            console.log("Creating a room with MetaMask address:", address);
+            onJoinRoom({ eoa: address, roomId: undefined });
         } else {
             // When joining, use the entered roomId
-            console.log("Joining a room with address:", gameAddress, "and roomId:", roomId.trim());
-            onJoinRoom({ eoa: gameAddress, roomId: roomId.trim() });
+            console.log("Joining a room with MetaMask address:", address, "and roomId:", roomId.trim());
+            onJoinRoom({ eoa: address, roomId: roomId.trim() });
         }
     };
 
@@ -203,8 +168,7 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
     const handleChannelSuccess = (action: "join" | "create", roomIdParam?: string) => {
         if (!address) return;
 
-        // Get the Nitrolite address from localStorage
-        const gameAddress = getNitroliteAddress();
+        // Use MetaMask wallet address for app session participants
 
         // Add a debounce mechanism to prevent duplicate calls
         const now = Date.now();
@@ -220,11 +184,11 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
         window.localStorage.setItem("last_join_call_time", now.toString());
 
         if (action === "create") {
-            console.log("Creating a room with address after channel creation:", gameAddress);
-            onJoinRoom({ eoa: gameAddress, roomId: undefined });
+            console.log("Creating a room with MetaMask address after channel creation:", address);
+            onJoinRoom({ eoa: address, roomId: undefined });
         } else {
-            console.log("Joining a room with address after channel creation:", gameAddress, "and roomId:", roomIdParam);
-            onJoinRoom({ eoa: gameAddress, roomId: roomIdParam });
+            console.log("Joining a room with MetaMask address after channel creation:", address, "and roomId:", roomIdParam);
+            onJoinRoom({ eoa: address, roomId: roomIdParam });
         }
     };
 
@@ -349,6 +313,14 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
 
                                 {/* Join tab content */}
                                 <TabsContent value="join" className="space-y-5 mt-4 mb-0">
+                                    {/* Betting amount notice */}
+                                    <div className="rounded-md bg-amber-950/20 p-4 text-sm border border-amber-900/30 shadow-inner">
+                                        <p className="mb-2 text-amber-400 font-medium flex items-center">Game Stakes</p>
+                                        <p className="text-amber-200 text-sm opacity-90">
+                                            Each player bets <span className="font-bold text-amber-300">$0.01</span>. Winner takes all!
+                                        </p>
+                                    </div>
+
                                     {/* Available games list */}
                                     <div className="rounded-md bg-fuchsia-950/10 p-4 border border-fuchsia-900/20 shadow-inner space-y-3">
                                         <div className="flex items-center justify-between mb-2">
@@ -447,6 +419,14 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
 
                                 {/* Create tab content */}
                                 <TabsContent value="create" className="space-y-4 mt-4 mb-0">
+                                    {/* Betting amount notice */}
+                                    <div className="rounded-md bg-amber-950/20 p-4 text-sm border border-amber-900/30 shadow-inner">
+                                        <p className="mb-2 text-amber-400 font-medium flex items-center">Game Stakes</p>
+                                        <p className="text-amber-200 text-sm opacity-90">
+                                            Each player bets <span className="font-bold text-amber-300">$0.01</span>. Winner takes all!
+                                        </p>
+                                    </div>
+
                                     <div className="rounded-md bg-cyan-950/20 p-4 text-sm text-gray-300 border border-cyan-900/30 shadow-inner">
                                         <p className="mb-2 text-cyan-400 font-medium flex items-center">
                                             <GamepadIcon className="h-4 w-4 mr-1.5" />

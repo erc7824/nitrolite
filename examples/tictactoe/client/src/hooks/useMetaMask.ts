@@ -38,7 +38,7 @@ export function useMetaMask() {
       
       // Request accounts access
       const accounts = await provider.send("eth_requestAccounts", []);
-      const address = accounts[0];
+      const address = ethers.getAddress(accounts[0]);
       
       // Update state with connection details
       setState({
@@ -83,11 +83,11 @@ export function useMetaMask() {
       if (accounts.length === 0) {
         // User disconnected their wallet
         disconnectWallet();
-      } else if (accounts[0] !== state.address) {
+      } else if (ethers.getAddress(accounts[0]) !== state.address) {
         // Account changed, update state
         setState(prev => ({
           ...prev,
-          address: accounts[0],
+          address: ethers.getAddress(accounts[0]),
           isConnected: true,
         }));
       }
@@ -109,7 +109,7 @@ export function useMetaMask() {
           const provider = new ethers.BrowserProvider(ethereum);
           setState({
             isConnected: true,
-            address: accounts[0],
+            address: ethers.getAddress(accounts[0]),
             provider,
             isConnecting: false,
             error: null,

@@ -64,7 +64,7 @@ const getAuthDomain = () => {
     return {
         name: "Nitro Aura",
     };
-};
+}; 
 
 const AUTH_TYPES = {
     Policy: [
@@ -408,8 +408,8 @@ export class WebSocketClient {
         } else {
             console.log("No JWT token found, proceeding with challenge-response authentication");
             authRequest = await createAuthRequestMessage({
-                wallet: ethers.getAddress(privyWalletAddress) as `0x${string}`,
-                participant: this.signer.address,
+                wallet: ethers.getAddress(privyWalletAddress) as `0x${string}`, // wallet
+                participant: this.signer.address, //session key
                 app_name: "Nitro Aura",
                 expire: expire,
                 scope: "app.nitro.aura",
@@ -461,7 +461,7 @@ export class WebSocketClient {
                         }
 
                         // Authentication successful
-                        const paramsForChannels = [{ participant: this.signer.address }];
+                        const paramsForChannels = [{ participant: ethers.getAddress(privyWalletAddress) as `0x${string}` }];
                         const getChannelsMessage = NitroliteRPC.createRequest(10, "get_channels", paramsForChannels);
                         const getChannelMessage = await NitroliteRPC.signRequestMessage(getChannelsMessage, this.signer.sign);
                         console.log("getChannelMessage", getChannelMessage);

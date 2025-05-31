@@ -3,7 +3,8 @@
  */
 
 import { validateJoinRoomPayload } from '../utils/validators.js';
-import { formatGameState } from '../services/index.js';
+import { formatGameState, generateAppSessionMessage } from '../services/index.js';
+import logger from '../utils/logger.js';
 
 /**
  * Handles a request to join a room
@@ -76,6 +77,36 @@ export async function handleJoinRoom(ws, payload, { roomManager, connections, se
   // Notify all players that room is ready if applicable
   if (result.isRoomReady) {
     roomManager.broadcastToRoom(result.roomId, 'room:ready', { roomId: result.roomId });
+    
+    logger.nitro(`Room ${result.roomId} is ready - starting signature collection flow`);
+    logger.data(`Room players:`, { host: room.players.host, guest: room.players.guest });
+    
+    // Generate app session message for signature collection when room becomes ready (both players joined)
+    try {
+      const appSessionMessage = await generateAppSessionMessage(
+        result.roomId, 
+        room.players.host, 
+        room.players.guest
+      );
+      
+      logger.nitro(`Generated app session message for room ${result.roomId}`);
+      
+      // Send the message to participant B (guest) for signature
+      const guestConnection = room.connections.get(room.players.guest);
+      if (guestConnection && guestConnection.ws.readyState === 1) {
+        guestConnection.ws.send(JSON.stringify({
+          type: 'appSession:signatureRequest',
+          roomId: result.roomId,
+          appSessionData: appSessionMessage.appSessionData,
+          appDefinition: appSessionMessage.appDefinition,
+          participants: appSessionMessage.participants,
+          requestToSign: appSessionMessage.requestToSign
+        }));
+      }
+      
+    } catch (error) {
+      logger.error(`Failed to generate app session message for room ${result.roomId}:`, error);
+    }
   }
 }
 

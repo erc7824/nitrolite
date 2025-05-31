@@ -2,8 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import type { 
   GameState, 
   GameOver, 
-  WebSocketMessages
+  WebSocketMessages,
+  AppSessionSignatureRequestMessage,
+  AppSessionStartGameRequestMessage
 } from '../types';
+import { useAppSessionSignature } from './useAppSessionSignature';
 
 // Initial empty game state
 const EMPTY_BOARD = Array(9).fill(null);
@@ -17,7 +20,9 @@ const INITIAL_GAME_STATE: GameState = {
 // Game state hook that processes WebSocket messages
 export function useGameState(
   lastMessage: WebSocketMessages | null,
-  eoaAddress: string
+  eoaAddress: string,
+  sendAppSessionSignature?: (roomId: string, signature: string) => void,
+  sendAppSessionStartGame?: (roomId: string, signature: string) => void
 ) {
   // Game state
   const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE);
@@ -27,6 +32,16 @@ export function useGameState(
   const [isRoomReady, setIsRoomReady] = useState(false);
   const [isGameStarted, setIsGameStarted] = useState(false);
   const [isHost, setIsHost] = useState(false);
+  const [pendingSignatureRequest, setPendingSignatureRequest] = useState<AppSessionSignatureRequestMessage | AppSessionStartGameRequestMessage | null>(null);
+  const [awaitingHostStart, setAwaitingHostStart] = useState(false);
+
+  // App session signature handling
+  const { 
+    isSigningInProgress, 
+    signatureError, 
+    handleParticipantBSignature, 
+    handleParticipantASignature 
+  } = useAppSessionSignature(sendAppSessionSignature, sendAppSessionStartGame);
 
   // Determine player's role (X or O)
   const playerSymbol = gameState.players.X === eoaAddress ? 'X' : 
@@ -107,6 +122,33 @@ export function useGameState(
         setErrorMessage(null);
         break;
 
+      case 'appSession:signatureRequest':
+        console.log("Received signature request for participant B:", lastMessage);
+        setPendingSignatureRequest(lastMessage as AppSessionSignatureRequestMessage);
+        
+        // Automatically sign for participant B (guest)
+        if (!isHost) {
+          try {
+            handleParticipantBSignature(lastMessage as AppSessionSignatureRequestMessage);
+          } catch (error) {
+            console.error('Failed to handle participant B signature:', error);
+            setErrorMessage('Failed to sign app session message');
+          }
+        }
+        break;
+
+      case 'appSession:startGameRequest':
+        console.log("Received start game request for participant A (host):", lastMessage);
+        setPendingSignatureRequest(lastMessage as AppSessionStartGameRequestMessage);
+        setAwaitingHostStart(true);
+        break;
+
+      case 'appSession:signatureConfirmed':
+        console.log("App session signature confirmed:", lastMessage);
+        setPendingSignatureRequest(null);
+        setErrorMessage(null);
+        break;
+
       case 'error':
         setErrorMessage(lastMessage.msg);
         break;
@@ -115,7 +157,7 @@ export function useGameState(
         // Ignore unknown message types
         break;
     }
-  }, [lastMessage, eoaAddress]);
+  }, [lastMessage, eoaAddress, handleParticipantBSignature, isHost]);
 
   // Helper to format short address display
   const formatShortAddress = (address: string): string => {
@@ -129,6 +171,23 @@ export function useGameState(
     return playerSymbol === 'X' ? gameState.players.O : gameState.players.X;
   };
 
+  // Handle host signing and starting game
+  const signAndStartGame = useCallback(async () => {
+    if (!pendingSignatureRequest || pendingSignatureRequest.type !== 'appSession:startGameRequest') {
+      console.error('No pending start game request');
+      return;
+    }
+
+    try {
+      await handleParticipantASignature(pendingSignatureRequest as AppSessionStartGameRequestMessage);
+      setPendingSignatureRequest(null);
+      setAwaitingHostStart(false);
+    } catch (error) {
+      console.error('Failed to sign and start game:', error);
+      setErrorMessage('Failed to sign and start game');
+    }
+  }, [pendingSignatureRequest, handleParticipantASignature]);
+
   // Reset game state
   const resetGame = useCallback(() => {
     setGameState(INITIAL_GAME_STATE);
@@ -138,6 +197,8 @@ export function useGameState(
     setIsHost(false);
     setRoomId('');
     setErrorMessage(null);
+    setPendingSignatureRequest(null);
+    setAwaitingHostStart(false);
   }, []);
 
   // TODO: Add integration with @erc7824/nitrolite for persisting game state
@@ -154,6 +215,11 @@ export function useGameState(
     isPlayerTurn,
     formatShortAddress,
     getOpponentAddress,
-    resetGame
+    resetGame,
+    pendingSignatureRequest,
+    awaitingHostStart,
+    signAndStartGame,
+    isSigningInProgress,
+    signatureError
   };
 }

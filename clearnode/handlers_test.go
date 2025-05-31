@@ -1286,3 +1286,357 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	assert.Error(t, err, "Should return error with empty participant")
 	assert.Nil(t, resp3)
 }
+
+// TestHandleResizeChannel tests the resize channel handler functionality
+func TestHandleResizeChannel(t *testing.T) {
+	// Set up test database with cleanup
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Generate keys and signers
+	rawKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	userSigner := Signer{privateKey: rawKey}
+	userAddress := userSigner.GetAddress().Hex()
+
+	brokerKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	brokerSigner := Signer{privateKey: brokerKey}
+
+	tokenAddress := "0xa0B86a33E6441C8B9ed9f3c971e0B803b87D9eF2"
+	chainID := uint32(137)
+	assetSymbol := "usdc"
+	assetDecimals := uint8(6)
+
+	// Create asset
+	asset := Asset{
+		Token:    tokenAddress,
+		ChainID:  chainID,
+		Symbol:   assetSymbol,
+		Decimals: assetDecimals,
+	}
+	require.NoError(t, db.Create(&asset).Error)
+
+	// Create channel
+	channel := Channel{
+		ChannelID:   "0xChannel123",
+		Wallet:      userAddress,
+		Participant: userAddress,
+		Status:      ChannelStatusOpen,
+		Token:       tokenAddress,
+		ChainID:     chainID,
+		Amount:      1000000, // 1 USDC (6 decimals)
+		Nonce:       1,
+		Version:     10,
+		Challenge:   86400,
+		Adjudicator: "0xAdjudicator123",
+	}
+	require.NoError(t, db.Create(&channel).Error)
+
+	// Add wallet balance (10 USDC)
+	ledger := GetWalletLedger(db, userAddress)
+	err = ledger.Record(userAddress, assetSymbol, decimal.NewFromInt(10))
+	require.NoError(t, err)
+
+	// Test Case 1: Successful resize with both allocate and resize amounts
+	allocateAmount := big.NewInt(2000000) // 2 USDC
+	resizeAmount := big.NewInt(1000000)   // 1 USDC
+	fundsDestination := userAddress
+
+	params1 := ResizeChannelParams{
+		ChannelID:        channel.ChannelID,
+		AllocateAmount:   allocateAmount,
+		ResizeAmount:     resizeAmount,
+		FundsDestination: fundsDestination,
+	}
+
+	// Create and sign RPC request
+	rpcReq1 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 1,
+			Method:    "resize_channel",
+			Params:    []any{params1},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+	}
+
+	signData1 := ResizeChannelSignData{
+		RequestID: rpcReq1.Req.RequestID,
+		Method:    rpcReq1.Req.Method,
+		Params:    []ResizeChannelParams{params1},
+		Timestamp: rpcReq1.Req.Timestamp,
+	}
+	signBytes1, err := json.Marshal(signData1)
+	require.NoError(t, err)
+	sig1, err := userSigner.Sign(signBytes1)
+	require.NoError(t, err)
+	rpcReq1.Sig = []string{hexutil.Encode(sig1)}
+
+	// Call handler
+	resp1, err := HandleResizeChannel(rpcReq1, db, &brokerSigner)
+	require.NoError(t, err)
+	assert.NotNil(t, resp1)
+
+	// Verify response structure
+	assert.Equal(t, "resize_channel", resp1.Res.Method)
+	assert.Equal(t, uint64(1), resp1.Res.RequestID)
+	require.Len(t, resp1.Res.Params, 1)
+
+	resizeResp1, ok := resp1.Res.Params[0].(ResizeChannelResponse)
+	require.True(t, ok, "Response should be ResizeChannelResponse")
+
+	// Verify response fields
+	assert.Equal(t, channel.ChannelID, resizeResp1.ChannelID)
+	assert.Equal(t, uint8(2), resizeResp1.Intent) // IntentRESIZE = 2
+	assert.Equal(t, channel.Version+1, resizeResp1.Version)
+	assert.NotEmpty(t, resizeResp1.StateData)
+	assert.NotEmpty(t, resizeResp1.StateHash)
+	assert.NotEmpty(t, resizeResp1.Signature.R)
+	assert.NotEmpty(t, resizeResp1.Signature.S)
+
+	// Verify allocations
+	require.Len(t, resizeResp1.Allocations, 2)
+	assert.Equal(t, userAddress, resizeResp1.Allocations[0].Participant)
+	assert.Equal(t, tokenAddress, resizeResp1.Allocations[0].TokenAddress)
+	expectedNewAmount := new(big.Int).Add(new(big.Int).SetUint64(channel.Amount), allocateAmount)
+	expectedNewAmount.Add(expectedNewAmount, resizeAmount)
+	assert.Equal(t, expectedNewAmount, resizeResp1.Allocations[0].Amount)
+
+	assert.Equal(t, brokerSigner.GetAddress().Hex(), resizeResp1.Allocations[1].Participant)
+	assert.Equal(t, tokenAddress, resizeResp1.Allocations[1].TokenAddress)
+	assert.Equal(t, big.NewInt(0), resizeResp1.Allocations[1].Amount)
+
+	// Test Case 2: Error - missing parameters
+	rpcReq2 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 2,
+			Method:    "resize_channel",
+			Params:    []any{},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+		Sig: []string{"dummy-sig"},
+	}
+
+	resp2, err := HandleResizeChannel(rpcReq2, db, &brokerSigner)
+	assert.Error(t, err)
+	assert.Nil(t, resp2)
+	assert.Contains(t, err.Error(), "missing parameters")
+
+	// Test Case 3: Error - invalid channel ID
+	params3 := ResizeChannelParams{
+		ChannelID:        "0xInvalidChannel",
+		AllocateAmount:   allocateAmount,
+		ResizeAmount:     resizeAmount,
+		FundsDestination: fundsDestination,
+	}
+
+	rpcReq3 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 3,
+			Method:    "resize_channel",
+			Params:    []any{params3},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+	}
+
+	signData3 := ResizeChannelSignData{
+		RequestID: rpcReq3.Req.RequestID,
+		Method:    rpcReq3.Req.Method,
+		Params:    []ResizeChannelParams{params3},
+		Timestamp: rpcReq3.Req.Timestamp,
+	}
+	signBytes3, err := json.Marshal(signData3)
+	require.NoError(t, err)
+	sig3, err := userSigner.Sign(signBytes3)
+	require.NoError(t, err)
+	rpcReq3.Sig = []string{hexutil.Encode(sig3)}
+
+	resp3, err := HandleResizeChannel(rpcReq3, db, &brokerSigner)
+	assert.Error(t, err)
+	assert.Nil(t, resp3)
+	assert.Contains(t, err.Error(), "channel not found")
+
+	// Test Case 4: Error - insufficient unified balance
+	params4 := ResizeChannelParams{
+		ChannelID:        channel.ChannelID,
+		AllocateAmount:   big.NewInt(15000000), // 15 USDC (more than available balance of 10 USDC)
+		ResizeAmount:     big.NewInt(0),
+		FundsDestination: fundsDestination,
+	}
+
+	rpcReq4 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 4,
+			Method:    "resize_channel",
+			Params:    []any{params4},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+	}
+
+	signData4 := ResizeChannelSignData{
+		RequestID: rpcReq4.Req.RequestID,
+		Method:    rpcReq4.Req.Method,
+		Params:    []ResizeChannelParams{params4},
+		Timestamp: rpcReq4.Req.Timestamp,
+	}
+	signBytes4, err := json.Marshal(signData4)
+	require.NoError(t, err)
+	sig4, err := userSigner.Sign(signBytes4)
+	require.NoError(t, err)
+	rpcReq4.Sig = []string{hexutil.Encode(sig4)}
+
+	resp4, err := HandleResizeChannel(rpcReq4, db, &brokerSigner)
+	assert.Error(t, err)
+	assert.Nil(t, resp4)
+	assert.Contains(t, err.Error(), "insufficient unified balance")
+
+	// Test Case 5: Error - invalid signature (wrong signer)
+	wrongKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	wrongSigner := Signer{privateKey: wrongKey}
+
+	params5 := ResizeChannelParams{
+		ChannelID:        channel.ChannelID,
+		AllocateAmount:   allocateAmount,
+		ResizeAmount:     resizeAmount,
+		FundsDestination: fundsDestination,
+	}
+
+	rpcReq5 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 5,
+			Method:    "resize_channel",
+			Params:    []any{params5},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+	}
+
+	signData5 := ResizeChannelSignData{
+		RequestID: rpcReq5.Req.RequestID,
+		Method:    rpcReq5.Req.Method,
+		Params:    []ResizeChannelParams{params5},
+		Timestamp: rpcReq5.Req.Timestamp,
+	}
+	signBytes5, err := json.Marshal(signData5)
+	require.NoError(t, err)
+	sig5, err := wrongSigner.Sign(signBytes5)
+	require.NoError(t, err)
+	rpcReq5.Sig = []string{hexutil.Encode(sig5)}
+
+	resp5, err := HandleResizeChannel(rpcReq5, db, &brokerSigner)
+	assert.Error(t, err)
+	assert.Nil(t, resp5)
+	assert.Contains(t, err.Error(), "invalid signature")
+
+	// Test Case 6: Error - negative new channel amount
+	params6 := ResizeChannelParams{
+		ChannelID:        channel.ChannelID,
+		AllocateAmount:   big.NewInt(0),
+		ResizeAmount:     big.NewInt(-2000000), // -2 USDC (makes new amount negative)
+		FundsDestination: fundsDestination,
+	}
+
+	rpcReq6 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 6,
+			Method:    "resize_channel",
+			Params:    []any{params6},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+	}
+
+	signData6 := ResizeChannelSignData{
+		RequestID: rpcReq6.Req.RequestID,
+		Method:    rpcReq6.Req.Method,
+		Params:    []ResizeChannelParams{params6},
+		Timestamp: rpcReq6.Req.Timestamp,
+	}
+	signBytes6, err := json.Marshal(signData6)
+	require.NoError(t, err)
+	sig6, err := userSigner.Sign(signBytes6)
+	require.NoError(t, err)
+	rpcReq6.Sig = []string{hexutil.Encode(sig6)}
+
+	resp6, err := HandleResizeChannel(rpcReq6, db, &brokerSigner)
+	assert.Error(t, err)
+	assert.Nil(t, resp6)
+	assert.Contains(t, err.Error(), "new channel amount must be positive")
+
+	// Test Case 7: Resize with only allocate amount (no resize amount)
+	params7 := ResizeChannelParams{
+		ChannelID:        channel.ChannelID,
+		AllocateAmount:   big.NewInt(1000000), // 1 USDC
+		FundsDestination: fundsDestination,
+	}
+
+	rpcReq7 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 7,
+			Method:    "resize_channel",
+			Params:    []any{params7},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+	}
+
+	signData7 := ResizeChannelSignData{
+		RequestID: rpcReq7.Req.RequestID,
+		Method:    rpcReq7.Req.Method,
+		Params:    []ResizeChannelParams{params7},
+		Timestamp: rpcReq7.Req.Timestamp,
+	}
+	signBytes7, err := json.Marshal(signData7)
+	require.NoError(t, err)
+	sig7, err := userSigner.Sign(signBytes7)
+	require.NoError(t, err)
+	rpcReq7.Sig = []string{hexutil.Encode(sig7)}
+
+	resp7, err := HandleResizeChannel(rpcReq7, db, &brokerSigner)
+	require.NoError(t, err)
+	assert.NotNil(t, resp7)
+
+	resizeResp7, ok := resp7.Res.Params[0].(ResizeChannelResponse)
+	require.True(t, ok)
+
+	// Verify that only allocate amount was added (resize amount defaults to 0)
+	expectedAmount7 := new(big.Int).Add(new(big.Int).SetUint64(channel.Amount), big.NewInt(1000000))
+	assert.Equal(t, expectedAmount7, resizeResp7.Allocations[0].Amount)
+
+	// Test Case 8: Resize with only resize amount (no allocate amount)
+	params8 := ResizeChannelParams{
+		ChannelID:        channel.ChannelID,
+		ResizeAmount:     big.NewInt(500000), // 0.5 USDC
+		FundsDestination: fundsDestination,
+	}
+
+	rpcReq8 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 8,
+			Method:    "resize_channel",
+			Params:    []any{params8},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+	}
+
+	signData8 := ResizeChannelSignData{
+		RequestID: rpcReq8.Req.RequestID,
+		Method:    rpcReq8.Req.Method,
+		Params:    []ResizeChannelParams{params8},
+		Timestamp: rpcReq8.Req.Timestamp,
+	}
+	signBytes8, err := json.Marshal(signData8)
+	require.NoError(t, err)
+	sig8, err := userSigner.Sign(signBytes8)
+	require.NoError(t, err)
+	rpcReq8.Sig = []string{hexutil.Encode(sig8)}
+
+	resp8, err := HandleResizeChannel(rpcReq8, db, &brokerSigner)
+	require.NoError(t, err)
+	assert.NotNil(t, resp8)
+
+	resizeResp8, ok := resp8.Res.Params[0].(ResizeChannelResponse)
+	require.True(t, ok)
+
+	// Verify that only resize amount was added (allocate amount defaults to 0)
+	expectedAmount8 := new(big.Int).Add(new(big.Int).SetUint64(channel.Amount), big.NewInt(500000))
+	assert.Equal(t, expectedAmount8, resizeResp8.Allocations[0].Amount)
+}

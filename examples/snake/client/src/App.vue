@@ -170,8 +170,8 @@ const autoConnect = async () => {
 
     // Initialize ClearNetService with Nitrolite configuration
     const config: NitroliteClientConfig = {
-      walletClient,
       // @ts-ignore
+      walletClient,
       publicClient,
       stateWalletClient,
       chainId: polygon.id,
@@ -190,7 +190,7 @@ const autoConnect = async () => {
     console.log('[App] ClearNetService initialized successfully');
 
     // Check for existing channel
-    const activeChannel = clearNetService.getActiveChannel();
+    const activeChannel = await clearNetService.getActiveChannel();
     if (!activeChannel) {
       throw new Error('No active channel found. Please open a channel at apps.yellow.com');
     }

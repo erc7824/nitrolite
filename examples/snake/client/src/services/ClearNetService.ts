@@ -184,9 +184,9 @@ class ClearNetService {
         }
 
         // Verify we have wallet client for authentication
-        const walletClient = this.config?.stateWalletClient;
-        if (!walletClient) {
-            throw new Error('No wallet client available for authentication');
+        const eip712SignerWalletClient = this.config?.walletClient;
+        if (!eip712SignerWalletClient) {
+            throw new Error('No main wallet client (e.g., MetaMask) available for EIP-712 authentication');
         }
 
         // Get or create session key signer
@@ -211,7 +211,7 @@ class ClearNetService {
         const signer = createEthersSigner(keyPair.privateKey);
 
         // Create and store the authentication promise
-        this.authenticationInProgress = authenticate(this.wsConnection, walletClient, signer, 15000)
+        this.authenticationInProgress = authenticate(this.wsConnection, eip712SignerWalletClient, signer, 15000)
             .then(async () => {
                 console.log("Authentication successful, sending get_balances");
 

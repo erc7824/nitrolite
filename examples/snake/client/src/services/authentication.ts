@@ -37,7 +37,7 @@ function createEIP712SigningFunction(walletClient: any, stateSigner: WalletSigne
         throw new Error('No wallet client available for EIP-712 signing');
     }
 
-    return async (data: any): Promise<`0x${string}`> => {
+    return async (data: any): Promise<Hex> => {
         console.log('Signing auth_verify challenge with EIP-712:', data);
 
         let challengeUUID = '';
@@ -222,7 +222,7 @@ export async function authenticate(
         console.log('Sending auth_request:', authRequest);
         ws.send(authRequest);
     } catch (requestError) {
-        console.error('Error creating auth_request:', requestError);    
+        console.error('Error creating auth_request:', requestError);
         throw new Error(`Failed to create auth_request: ${(requestError as Error).message}`);
     }
 

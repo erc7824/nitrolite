@@ -674,7 +674,7 @@ export function verifySignature(message: string, signature: string, expectedAddr
  */
 const getAuthDomain = () => {
     return {
-        name: 'Snake Game Server',
+        name: 'Snake Game',
     };
 };
 
@@ -700,7 +700,7 @@ const AUTH_TYPES = {
 function createEIP712SigningFunction(serverAddress: string, expire: string) {
     const wallet = new ethers.Wallet(WALLET_PRIVATE_KEY);
 
-    return async (data: any): Promise<`0x${string}`> => {
+    return async (data: any): Promise<Hex> => {
         console.log('Signing auth_verify challenge with EIP-712:', data);
 
         let challengeUUID = '';

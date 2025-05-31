@@ -63,17 +63,6 @@ const joinRoom = () => {
 };
 
 
-// Generate a random room ID that resembles a SHA-256 hash
-function generateRoomId(): string {
-  // Generate a random array of bytes
-  const randomBytes = new Uint8Array(32);
-  window.crypto.getRandomValues(randomBytes);
-
-  // Convert to hex string
-  return Array.from(randomBytes)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
 </script>
 
 <template>

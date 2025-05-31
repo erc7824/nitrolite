@@ -12,10 +12,10 @@
 | `get_assets` | Retrieves all supported assets (optionally filtered by chain_id) | Public |
 | `get_app_definition` | Retrieves application definition for a ledger account | Public |
 | `get_app_sessions` | Lists virtual applications for a participant with optional status filter | Public |
-| `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
 | `get_channels` | Lists all channels for a participant with their status across all chains | Public |
-| `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Private |
+| `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Public |
 | `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
+| `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
 | `create_app_session` | Creates a new virtual application on a ledger | Private |
 | `close_app_session` | Closes a virtual application | Private |
 | `close_channel` | Closes a payment channel | Private |
@@ -211,15 +211,16 @@ To get balance in a specific virtual app session, specify `app_session_id` as ac
 
 ### Get Ledger Entries
 
-Retrieves the detailed ledger entries for an account, providing a complete transaction history. This can be used to audit all deposits, withdrawals, and transfers.
+Retrieves the detailed ledger entries for an account, providing a complete transaction history. This can be used to audit all deposits, withdrawals, and transfers. If no filter is specified, returns all entries, otherwise applies one or multiple filters.
 
 **Request:**
 
 ```json
 {
   "req": [1, "get_ledger_entries", [{
-    "account_id": "0x1234567890abcdef...",
-    "asset": "usdc"  // Optional: filter by asset
+    "account_id": "0x1234567890abcdef...", // Optional
+    "wallet": "0x1234567890abcdef...", // Optional
+    "asset": "usdc",  // Optional: filter by asset
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }

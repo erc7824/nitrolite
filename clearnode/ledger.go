@@ -97,7 +97,16 @@ func (l *WalletLedger) GetBalances(accountID string) ([]Balance, error) {
 
 func (l *WalletLedger) GetEntries(accountID, assetSymbol string) ([]Entry, error) {
 	var entries []Entry
-	q := l.db.Where("account_id = ? AND wallet = ?", accountID, l.wallet)
+	q := l.db.Model(&Entry{})
+
+	if accountID != "" {
+		q = q.Where("account_id = ?", accountID)
+	}
+
+	if l.wallet != "" {
+		q = q.Where("wallet = ?", l.wallet)
+	}
+
 	if assetSymbol != "" {
 		q = q.Where("asset_symbol = ?", assetSymbol)
 	}

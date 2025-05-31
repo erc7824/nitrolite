@@ -82,6 +82,9 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 	var policy *Policy
 	var authenticated bool
 
+	// Send assets immediately upon connection (before authentication)
+	h.sendAssets(conn)
+
 	// Read messages until authentication completes
 	for !authenticated {
 		_, message, err := conn.ReadMessage()
@@ -613,6 +616,32 @@ func (h *UnifiedWSHandler) sendChannelUpdate(channel Channel) {
 		UpdatedAt:   channel.UpdatedAt.Format(time.RFC3339),
 	}
 	h.sendResponse(channel.Wallet, "cu", []any{channelResponse}, "channel")
+}
+
+// sendAssetsUpdate sends all assets to the client immediately upon connection
+func (h *UnifiedWSHandler) sendAssets(conn *websocket.Conn) {
+	assets, err := GetAllAssets(h.db, nil) // Get all assets without chain filter
+	if err != nil {
+		log.Printf("Error getting assets for connection: %v", err)
+		return
+	}
+
+	// Convert to AssetResponse format
+	response := make([]AssetResponse, 0, len(assets))
+	for _, asset := range assets {
+		response = append(response, AssetResponse{
+			Token:    asset.Token,
+			ChainID:  asset.ChainID,
+			Symbol:   asset.Symbol,
+			Decimals: asset.Decimals,
+		})
+	}
+
+	// Create RPC response
+	rpcResponse := CreateResponse(uint64(time.Now().UnixMilli()), "assets", []any{response}, time.Now())
+
+	sendMessage(conn, h.signer, rpcResponse)
+	log.Printf("Successfully sent welcome message with assets")
 }
 
 // CloseAllConnections closes all open WebSocket connections during shutdown

@@ -136,31 +136,9 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			case "get_ledger_entries":
 				rpcResponse, handlerErr = HandleGetLedgerEntries(&rpcMsg, "", h.db)
 			case "subscribe_ledger":
-				// For unauthenticated connections, we use a temporary identifier based on request ID
+				// For unauthenticated connections, use a temporary identifier based on request ID
 				subscriberID := fmt.Sprintf("anonymous-%d", rpcMsg.Req.RequestID)
-
-				// Setup ping handler to keep connection alive
-				conn.SetPingHandler(func(message string) error {
-					err := conn.WriteControl(
-						websocket.PongMessage,
-						[]byte(message),
-						time.Now().Add(5*time.Second),
-					)
-					if err != nil {
-						log.Printf("Error sending pong to %s: %v", subscriberID, err)
-					}
-					return nil
-				})
-
-				// Add to subscribers
-				h.ledgerPublisher.Subscribe(subscriberID, conn)
-
-				// Return success response
-				response := map[string]interface{}{
-					"subscribed": true,
-					"timestamp":  time.Now().UnixMilli(),
-				}
-				rpcResponse = CreateResponse(rpcMsg.Req.RequestID, rpcMsg.Req.Method, []any{response}, time.Now())
+				rpcResponse, handlerErr = h.HandleLedgerSubscription(conn, &rpcMsg, subscriberID)
 			}
 
 			if handlerErr != nil {
@@ -371,29 +349,12 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 		case "subscribe_ledger":
 			// For authenticated users, we use their wallet address as the subscriber ID
-
-			// Setup ping handler to keep connection alive
-			conn.SetPingHandler(func(message string) error {
-				err := conn.WriteControl(
-					websocket.PongMessage,
-					[]byte(message),
-					time.Now().Add(5*time.Second),
-				)
-				if err != nil {
-					log.Printf("Error sending pong to %s: %v", walletAddress, err)
-				}
-				return nil
-			})
-
-			// Add to subscribers
-			h.ledgerPublisher.Subscribe(walletAddress, conn)
-
-			// Return success response
-			response := map[string]interface{}{
-				"subscribed": true,
-				"timestamp":  time.Now().UnixMilli(),
+			rpcResponse, handlerErr = h.HandleLedgerSubscription(conn, &msg, walletAddress)
+			if handlerErr != nil {
+				log.Printf("Error handling subscribe_ledger: %v", handlerErr)
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to subscribe to ledger: "+handlerErr.Error())
+				continue
 			}
-			rpcResponse = CreateResponse(msg.Req.RequestID, msg.Req.Method, []any{response}, time.Now())
 
 		case "get_app_definition":
 			rpcResponse, handlerErr = HandleGetAppDefinition(&msg, h.db)

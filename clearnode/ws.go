@@ -477,9 +477,17 @@ func (h *UnifiedWSHandler) sendErrorResponse(sender string, rpc *RPCMessage, con
 	reqID := uint64(time.Now().UnixMilli())
 	if rpc != nil && rpc.Req != nil {
 		reqID = rpc.Req.RequestID
+		var messageBody string
+		if rpc != nil {
+			messageBodyBytes, err := json.Marshal(rpc)
+			if err != nil {
+				messageBody = "could not marshal rpc message"
+			} else {
+				messageBody = string(messageBodyBytes)
+			}
+		}
+		log.Printf("error: %s, wallet: %s, method: %s, request: %s", errMsg, sender, rpc.Req.Method, messageBody)
 	}
-
-	log.Printf("error: %s, wallet: %s, method: %s, request: %s", errMsg, sender, rpc.Req.Method)
 
 	response := CreateResponse(reqID, "error", []any{map[string]any{
 		"error": errMsg,

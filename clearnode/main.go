@@ -38,8 +38,7 @@ func main() {
 	}
 	
 	// Initialize the LedgerPublisher and set it as the global publisher
-	ledgerPublisher := NewLedgerPublisher(signer)
-	SetPublisher(ledgerPublisher)
+	Publisher = NewLedgerPublisher(signer)
 	
 	rpcStore := NewRPCStore(db)
 

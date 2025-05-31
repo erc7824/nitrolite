@@ -174,14 +174,14 @@ func TestLedgerPublisherIntegration(t *testing.T) {
 	defer publisher.Stop()
 	
 	// Set as global publisher
-	SetPublisher(publisher)
+	Publisher = publisher
 	
 	// Get a wallet ledger instance
 	walletLedger := GetWalletLedger(db, "test-wallet")
 	
-	// Verify the publisher was set
-	if walletLedger.publisher == nil {
-		t.Errorf("Expected wallet ledger to have a publisher")
+	// Verify the global publisher was set
+	if Publisher == nil {
+		t.Errorf("Expected global publisher to be set")
 	}
 	
 	// Test making an entry (we can't easily verify the publish happened without mocks)
@@ -203,24 +203,26 @@ func TestLedgerPublisherIntegration(t *testing.T) {
 	}
 	
 	// Test the global publisher functions
-	globalPub := GetPublisher()
-	if globalPub == nil {
-		t.Errorf("Expected to get global publisher")
+	// Publisher should still be set at this point
+	if Publisher == nil {
+		t.Errorf("Expected global publisher to be set")
 	}
 	
 	// Test stopping and unsetting the publisher
-	SetPublisher(nil)
+	Publisher = nil
 	
 	// Verify it was unset
-	globalPub = GetPublisher()
-	if globalPub != nil {
+	// Publisher should now be nil
+	if Publisher != nil {
 		t.Errorf("Expected global publisher to be nil after unsetting")
 	}
 	
-	// Get a new wallet ledger and verify no publisher
+	// Get a new wallet ledger (publisher is now nil)
 	newLedger := GetWalletLedger(db, "test-wallet")
-	if newLedger.publisher != nil {
-		t.Errorf("Expected new wallet ledger to have no publisher")
+	
+	// Verify global publisher is now nil
+	if Publisher != nil {
+		t.Errorf("Expected global publisher to be nil")
 	}
 	
 	// Test recording without publisher (should still work)

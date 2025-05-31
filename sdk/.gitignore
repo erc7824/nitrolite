@@ -9,9 +9,6 @@ lib/
 build/
 *.tsbuildinfo
 
-# Auto-generated files
-src/generated.ts
-
 # Testing
 coverage/
 .nyc_output/

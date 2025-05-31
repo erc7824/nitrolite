@@ -211,14 +211,14 @@ To get balance in a specific virtual app session, specify `app_session_id` as ac
 
 ### Get Ledger Entries
 
-Retrieves the detailed ledger entries for an account, providing a complete transaction history. This can be used to audit all deposits, withdrawals, and transfers.
+Retrieves the detailed ledger entries for an account, providing a complete transaction history. This can be used to audit all deposits, withdrawals, and transfers. If no filter is specified, returns all entries, otherwise applies one or multiple filters.
 
 **Request:**
 
 ```json
 {
   "req": [1, "get_ledger_entries", [{
-    "account_id": "0x1234567890abcdef...",
+    "account_id": "0x1234567890abcdef...", // Optional
     "wallet": "0x1234567890abcdef...", // Optional
     "asset": "usdc",  // Optional: filter by asset
   }], 1619123456789],

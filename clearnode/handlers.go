@@ -267,6 +267,7 @@ func HandleGetLedgerBalances(rpc *RPCMessage, walletAddress string, db *gorm.DB)
 
 func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) (*RPCMessage, error) {
 	var accountID, asset string
+	var wallet string
 
 	if len(rpc.Req.Params) > 0 {
 		paramsJSON, err := json.Marshal(rpc.Req.Params[0])
@@ -275,22 +276,22 @@ func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) 
 			if err := json.Unmarshal(paramsJSON, &params); err == nil {
 				accountID = params["account_id"]
 				asset = params["asset"]
-				if w, ok := params["wallet"]; ok && w != "" {
-					walletAddress = w
+				if w, ok := params["wallet"]; ok {
+					wallet = w
 				}
 			}
 		}
 	}
 
-	if accountID == "" {
-		return nil, errors.New("missing account_id")
+	if wallet != "" {
+		walletAddress = wallet
 	}
 
 	ledger := GetWalletLedger(db, walletAddress)
 
 	entries, err := ledger.GetEntries(accountID, asset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find account: %w", err)
+		return nil, fmt.Errorf("failed to find ledger entries: %w", err)
 	}
 
 	response := make([]LedgerEntryResponse, len(entries))

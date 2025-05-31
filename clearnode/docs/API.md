@@ -219,7 +219,8 @@ Retrieves the detailed ledger entries for an account, providing a complete trans
 {
   "req": [1, "get_ledger_entries", [{
     "account_id": "0x1234567890abcdef...",
-    "asset": "usdc"  // Optional: filter by asset
+    "wallet": "0x1234567890abcdef...", // Optional
+    "asset": "usdc",  // Optional: filter by asset
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }

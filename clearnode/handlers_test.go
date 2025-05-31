@@ -705,30 +705,30 @@ func TestHandleGetChannels(t *testing.T) {
 	allChannelsResp, err := HandleGetChannels(noParamReq, db)
 	require.NoError(t, err, "Should not return error when participant is not specified")
 	require.NotNil(t, allChannelsResp)
-	
+
 	// Extract and verify all channels
 	allChannels, ok := allChannelsResp.Res.Params[0].([]ChannelResponse)
 	require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
 	assert.Len(t, allChannels, 4, "Should return all 4 channels in the database")
-	
+
 	// Check that the response includes both the participant's channels and the other channel
 	foundChannelIDs := make(map[string]bool)
 	for _, channel := range allChannels {
 		foundChannelIDs[channel.ChannelID] = true
 	}
-	
+
 	assert.True(t, foundChannelIDs["0xChannel1"], "Should include Channel1")
 	assert.True(t, foundChannelIDs["0xChannel2"], "Should include Channel2")
 	assert.True(t, foundChannelIDs["0xChannel3"], "Should include Channel3")
 	assert.True(t, foundChannelIDs["0xOtherChannel"], "Should include OtherChannel")
-	
+
 	// Test with no participant but with status filter (should return all open channels)
 	openStatusOnlyParams := map[string]string{
 		"status": string(ChannelStatusOpen),
 	}
 	openStatusOnlyParamsJSON, err := json.Marshal(openStatusOnlyParams)
 	require.NoError(t, err)
-	
+
 	openStatusOnlyReq := &RPCMessage{
 		Req: &RPCData{
 			RequestID: 790,
@@ -738,23 +738,23 @@ func TestHandleGetChannels(t *testing.T) {
 		},
 		Sig: []string{},
 	}
-	
+
 	openChannelsResp, err := HandleGetChannels(openStatusOnlyReq, db)
 	require.NoError(t, err)
 	require.NotNil(t, openChannelsResp)
-	
+
 	// Extract and verify open channels
 	openChannelsOnly, ok := openChannelsResp.Res.Params[0].([]ChannelResponse)
 	require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
 	assert.Len(t, openChannelsOnly, 2, "Should return 2 open channels (one from participant and one from other)")
-	
+
 	// Check that the response includes only open channels
 	openChannelIDs := make(map[string]bool)
 	for _, channel := range openChannelsOnly {
 		openChannelIDs[channel.ChannelID] = true
 		assert.Equal(t, ChannelStatusOpen, channel.Status, "All channels should have open status")
 	}
-	
+
 	assert.True(t, openChannelIDs["0xChannel1"], "Should include open Channel1")
 	assert.True(t, openChannelIDs["0xOtherChannel"], "Should include open OtherChannel")
 	assert.False(t, openChannelIDs["0xChannel2"], "Should not include closed Channel2")
@@ -1104,29 +1104,29 @@ func TestHandleGetAppSessions(t *testing.T) {
 	resp3, err := HandleGetAppSessions(rpcRequest3, db)
 	require.NoError(t, err, "Should not return error when participant is not specified")
 	require.NotNil(t, resp3)
-	
+
 	// Extract and verify all app sessions
 	allSessions, ok := resp3.Res.Params[0].([]AppSessionResponse)
 	require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
 	assert.Len(t, allSessions, 3, "Should return all 3 app sessions in the database")
-	
+
 	// Check that the response includes all sessions
 	foundSessionIDs := make(map[string]bool)
 	for _, session := range allSessions {
 		foundSessionIDs[session.AppSessionID] = true
 	}
-	
+
 	assert.True(t, foundSessionIDs["0xSession1"], "Should include Session1")
 	assert.True(t, foundSessionIDs["0xSession2"], "Should include Session2")
 	assert.True(t, foundSessionIDs["0xSession3"], "Should include Session3")
-	
+
 	// Test Case 4: No participant but with status filter - should return all open app sessions
 	openStatusParams := map[string]string{
 		"status": string(ChannelStatusOpen),
 	}
 	openStatusParamsJSON, err := json.Marshal(openStatusParams)
 	require.NoError(t, err)
-	
+
 	openStatusRequest := &RPCMessage{
 		Req: &RPCData{
 			RequestID: 4,
@@ -1136,23 +1136,23 @@ func TestHandleGetAppSessions(t *testing.T) {
 		},
 		Sig: []string{"dummy-signature"},
 	}
-	
+
 	openStatusResponse, err := HandleGetAppSessions(openStatusRequest, db)
 	require.NoError(t, err)
 	require.NotNil(t, openStatusResponse)
-	
+
 	// Extract and verify filtered sessions
 	openSessions, ok := openStatusResponse.Res.Params[0].([]AppSessionResponse)
 	require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
 	assert.Len(t, openSessions, 2, "Should return 2 open sessions")
-	
+
 	// Check that the response includes only open sessions
 	openSessionIDs := make(map[string]bool)
 	for _, session := range openSessions {
 		openSessionIDs[session.AppSessionID] = true
 		assert.Equal(t, string(ChannelStatusOpen), session.Status, "All sessions should have open status")
 	}
-	
+
 	assert.True(t, openSessionIDs["0xSession1"], "Should include open Session1")
 	assert.True(t, openSessionIDs["0xSession3"], "Should include open Session3")
 	assert.False(t, openSessionIDs["0xSession2"], "Should not include closed Session2")
@@ -1272,11 +1272,13 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	participant := "0xParticipant1"
-	ledger := GetWalletLedger(db, participant)
-
+	participant1 := "0xParticipant1"
+	participant2 := "0xParticipant2"
+	
+	// Create entries for first participant
+	ledger1 := GetWalletLedger(db, participant1)
 	// Create test entries with different assets
-	testData := []struct {
+	testData1 := []struct {
 		asset  string
 		amount decimal.Decimal
 	}{
@@ -1288,14 +1290,29 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	}
 
 	// Insert test entries
-	for _, data := range testData {
-		err := ledger.Record(participant, data.asset, data.amount)
+	for _, data := range testData1 {
+		err := ledger1.Record(participant1, data.asset, data.amount)
+		require.NoError(t, err)
+	}
+	
+	// Create entries for second participant
+	ledger2 := GetWalletLedger(db, participant2)
+	testData2 := []struct {
+		asset  string
+		amount decimal.Decimal
+	}{
+		{"usdc", decimal.NewFromInt(300)},
+		{"btc", decimal.NewFromFloat(0.05)},
+	}
+	
+	for _, data := range testData2 {
+		err := ledger2.Record(participant2, data.asset, data.amount)
 		require.NoError(t, err)
 	}
 
-	// Test Case 1: Get all entries for the participant
+	// Test Case 1: Filter by account_id only
 	params1 := map[string]string{
-		"account_id": participant,
+		"account_id": participant1,
 	}
 	paramsJSON1, err := json.Marshal(params1)
 	require.NoError(t, err)
@@ -1310,8 +1327,8 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 		Sig: []string{"dummy-signature"},
 	}
 
-	// Call the handler
-	resp1, err := HandleGetLedgerEntries(rpcRequest1, participant, db)
+	// Call the handler with account_id only
+	resp1, err := HandleGetLedgerEntries(rpcRequest1, "", db) // No default wallet
 	require.NoError(t, err)
 	assert.NotNil(t, resp1)
 
@@ -1323,22 +1340,21 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	// Extract and verify entries
 	entries1, ok := resp1.Res.Params[0].([]LedgerEntryResponse)
 	require.True(t, ok, "Response parameter should be a slice of Entry")
-
-	assert.Len(t, entries1, 5, "Should return all 5 entries")
+	assert.Len(t, entries1, 5, "Should return all 5 entries for participant1")
 
 	// Count entries by asset
 	assetCounts := map[string]int{}
 	for _, entry := range entries1 {
 		assetCounts[entry.Asset]++
-		assert.Equal(t, participant, entry.AccountID)
-		assert.Equal(t, participant, entry.Participant)
+		assert.Equal(t, participant1, entry.AccountID)
+		assert.Equal(t, participant1, entry.Participant)
 	}
 	assert.Equal(t, 3, assetCounts["usdc"], "Should have 3 USDC entries")
 	assert.Equal(t, 2, assetCounts["eth"], "Should have 2 ETH entries")
 
-	// Test Case 2: Get entries for a specific asset
+	// Test Case 2: Filter by account_id and asset
 	params2 := map[string]string{
-		"account_id": participant,
+		"account_id": participant1,
 		"asset":      "usdc",
 	}
 	paramsJSON2, err := json.Marshal(params2)
@@ -1354,40 +1370,160 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 		Sig: []string{"dummy-signature"},
 	}
 
-	// Call the handler
-	resp2, err := HandleGetLedgerEntries(rpcRequest2, participant, db)
+	// Call the handler with account_id and asset
+	resp2, err := HandleGetLedgerEntries(rpcRequest2, "", db) // No default wallet
 	require.NoError(t, err)
 	assert.NotNil(t, resp2)
-
-	// Verify response format for specific asset
-	assert.Equal(t, "get_ledger_entries", resp2.Res.Method)
-	assert.Equal(t, uint64(2), resp2.Res.RequestID)
 
 	// Extract and verify entries for specific asset
 	entries2, ok := resp2.Res.Params[0].([]LedgerEntryResponse)
 	require.True(t, ok, "Response parameter should be a slice of Entry")
-	assert.Len(t, entries2, 3, "Should return 3 USDC entries")
+	assert.Len(t, entries2, 3, "Should return 3 USDC entries for participant1")
 
 	// Ensure all entries are for USDC
 	for _, entry := range entries2 {
 		assert.Equal(t, "usdc", entry.Asset)
-		assert.Equal(t, participant, entry.AccountID)
-		assert.Equal(t, participant, entry.Participant)
+		assert.Equal(t, participant1, entry.AccountID)
+		assert.Equal(t, participant1, entry.Participant)
 	}
 
-	// Test Case 3: Error case - invalid participant
+	// Test Case 3: Filter by wallet only
+	params3 := map[string]string{
+		"wallet": participant2,
+	}
+	paramsJSON3, err := json.Marshal(params3)
+	require.NoError(t, err)
+	
 	rpcRequest3 := &RPCMessage{
 		Req: &RPCData{
 			RequestID: 3,
 			Method:    "get_ledger_entries",
-			Params:    []any{json.RawMessage(`{"participant": ""}`)},
+			Params:    []any{json.RawMessage(paramsJSON3)},
 			Timestamp: uint64(time.Now().Unix()),
 		},
 		Sig: []string{"dummy-signature"},
 	}
 
-	// Call with empty participant
-	resp3, err := HandleGetLedgerEntries(rpcRequest3, "", db)
-	assert.Error(t, err, "Should return error with empty participant")
-	assert.Nil(t, resp3)
+	// Call with just the wallet parameter
+	resp3, err := HandleGetLedgerEntries(rpcRequest3, "", db) // No default wallet
+	require.NoError(t, err)
+	assert.NotNil(t, resp3)
+	
+	entries3, ok := resp3.Res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries3, 2, "Should return all 2 entries for wallet participant2")
+	
+	// Verify all entries are for participant2
+	for _, entry := range entries3 {
+		assert.Equal(t, participant2, entry.Participant)
+	}
+
+	// Test Case 4: Filter by wallet and asset
+	params4 := map[string]string{
+		"wallet": participant2,
+		"asset": "usdc",
+	}
+	paramsJSON4, err := json.Marshal(params4)
+	require.NoError(t, err)
+	
+	rpcRequest4 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 4,
+			Method:    "get_ledger_entries",
+			Params:    []any{json.RawMessage(paramsJSON4)},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+		Sig: []string{"dummy-signature"},
+	}
+
+	// Call with wallet and asset parameters
+	resp4, err := HandleGetLedgerEntries(rpcRequest4, "", db)
+	require.NoError(t, err)
+	assert.NotNil(t, resp4)
+	
+	entries4, ok := resp4.Res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries4, 1, "Should return 1 entry for participant2 with usdc asset")
+	assert.Equal(t, "usdc", entries4[0].Asset)
+	assert.Equal(t, participant2, entries4[0].Participant)
+	
+	// Test Case 5: Filter by account_id and wallet (different accounts)
+	params5 := map[string]string{
+		"account_id": participant1,
+		"wallet": participant2,
+	}
+	paramsJSON5, err := json.Marshal(params5)
+	require.NoError(t, err)
+	
+	rpcRequest5 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 5,
+			Method:    "get_ledger_entries",
+			Params:    []any{json.RawMessage(paramsJSON5)},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+		Sig: []string{"dummy-signature"},
+	}
+
+	// Call with different account_id and wallet parameters
+	resp5, err := HandleGetLedgerEntries(rpcRequest5, "", db)
+	require.NoError(t, err)
+	assert.NotNil(t, resp5)
+	
+	entries5, ok := resp5.Res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries5, 0, "Should return 0 entries when account_id and wallet don't match")
+	
+	// Test Case 6: No filters (all entries)
+	rpcRequest6 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 6,
+			Method:    "get_ledger_entries",
+			Params:    []any{map[string]string{}}, // Empty parameters
+			Timestamp: uint64(time.Now().Unix()),
+		},
+		Sig: []string{"dummy-signature"},
+	}
+
+	// Call with no filters
+	resp6, err := HandleGetLedgerEntries(rpcRequest6, "", db) // No default wallet
+	require.NoError(t, err)
+	assert.NotNil(t, resp6)
+	
+	entries6, ok := resp6.Res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries6, 7, "Should return all 7 entries (5 for participant1 + 2 for participant2)")
+	
+	// Verify entries contain both participants
+	foundParticipants := map[string]bool{}
+	for _, entry := range entries6 {
+		foundParticipants[entry.Participant] = true
+	}
+	assert.True(t, foundParticipants[participant1], "Should include entries for participant1")
+	assert.True(t, foundParticipants[participant2], "Should include entries for participant2")
+	
+	// Test Case 7: Use default wallet when no wallet specified in params
+	rpcRequest7 := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 7,
+			Method:    "get_ledger_entries",
+			Params:    []any{map[string]string{}}, // Empty parameters
+			Timestamp: uint64(time.Now().Unix()),
+		},
+		Sig: []string{"dummy-signature"},
+	}
+
+	// Call with default wallet but no parameters
+	resp7, err := HandleGetLedgerEntries(rpcRequest7, participant1, db) // With default wallet
+	require.NoError(t, err)
+	assert.NotNil(t, resp7)
+	
+	entries7, ok := resp7.Res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries7, 5, "Should return 5 entries for default wallet participant1")
+	
+	// Verify all entries are for participant1
+	for _, entry := range entries7 {
+		assert.Equal(t, participant1, entry.Participant)
+	}
 }

@@ -418,11 +418,9 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 
 		metrics.BrokerChannelCount.With(prometheus.Labels{
 			"network": fmt.Sprintf("%d", c.chainID),
-			"token":   asset.Token,
-			"asset":   asset.Symbol,
 		}).Set(float64(info.ChannelCount.Int64()))
 
-		logger.Infow("Updated contract balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "available", availableBalance.String(), "channels", info.ChannelCount.String())
+		logger.Infow("Updated contract balance metrics", "network", c.chainID, "available", availableBalance.String(), "channels", info.ChannelCount.String())
 
 		// Fetch broker wallet balances
 		walletBalance := decimal.Zero

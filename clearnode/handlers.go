@@ -234,7 +234,7 @@ func HandlePing(rpc *RPCMessage) (*RPCMessage, error) {
 }
 
 // HandleGetLedgerBalances returns a list of participants and their balances for a ledger account
-func HandleGetLedgerBalances(policy *Policy, rpc *RPCMessage, walletAddress string, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetLedgerBalances(rpc *RPCMessage, walletAddress string, db *gorm.DB) (*RPCMessage, error) {
 	var account string
 
 	if len(rpc.Req.Params) > 0 {
@@ -265,7 +265,7 @@ func HandleGetLedgerBalances(policy *Policy, rpc *RPCMessage, walletAddress stri
 	return rpcResponse, nil
 }
 
-func HandleGetLedgerEntries(policy *Policy, rpc *RPCMessage, walletAddress string, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) (*RPCMessage, error) {
 	var accountID string
 	var asset string
 
@@ -596,7 +596,7 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 }
 
 // HandleGetAppDefinition returns the application definition for a ledger account
-func HandleGetAppDefinition(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetAppDefinition(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var sessionID string
 
 	if len(rpc.Req.Params) > 0 {
@@ -635,7 +635,7 @@ func HandleGetAppDefinition(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 	return rpcResponse, nil
 }
 
-func HandleGetAppSessions(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetAppSessions(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var participant string
 	var status string
 
@@ -952,7 +952,7 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 
 // HandleGetChannels returns a list of channels for a given account
 // TODO: add filters, pagination, etc.
-func HandleGetChannels(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetChannels(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var participant string
 	var status string
 
@@ -1038,7 +1038,7 @@ type AssetResponse struct {
 }
 
 // HandleGetAssets returns all supported assets
-func HandleGetAssets(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func HandleGetAssets(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var chainID *uint32
 
 	if len(rpc.Req.Params) > 0 {

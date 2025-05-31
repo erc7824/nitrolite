@@ -92,6 +92,7 @@ go run . --method <method_name> [options]
 | `--signers` | Comma-separated list of signer numbers to use (e.g., "1,2,3") | All available |
 | `--auth` | Specify which signer to authenticate with (e.g., "1") | First signer |
 | `--nosign` | Make a request without signatures | false |
+| `--noauth` | Skip authentication (for public endpoints) | false |
 
 ### Environment Variables
 
@@ -107,73 +108,57 @@ go run . --method <method_name> [options]
 # Authenticate with a specific signer
 go run . --method ping --send --auth 2
 
-# Send a request with no signatures (useful for public endpoints or testing)
+# Send a request with no signatures (useful for testing)
 go run . --method ping --send --nosign
+
+# Skip authentication completely (for public endpoints)
+go run . --method ping --send --noauth
 
 # Authenticate with signer #2 but sign the message with signers #1 and #3
 go run . --method ping --send --auth 2 --signers 1,3
 ```
 
-### Server Health & Configuration
+### Public Endpoints (No Authentication Required)
+
+These endpoints can be accessed without authentication by using the `--noauth` flag:
 
 ```bash
-# Ping the server
-go run . --method ping --send --server ws://localhost:8000/ws
+# Simple connectivity check
+go run . --method ping --send --noauth --server wss://canarynet.yellow.com/ws
 
-# Using environment variable for server URL
-SERVER=ws://testnet.example.com/ws go run . --method ping --send
+# Get server configuration and supported networks
+go run . --method get_config --send --noauth --server wss://canarynet.yellow.com/ws
 
-# Get server configuration
-go run . --method get_config --send --server ws://localhost:8000/ws
-```
-
-### Account & Ledger Operations
-
-```bash
-# Get balances for the participant
-go run . --method get_ledger_balances --params '[{"account_id":"0x70997970C51812dc3A010C7d01b50e0d17dc79C8"}]' --auth 10 --send --server ws://localhost:8000/ws
-
-# Get detailed ledger entries for a specific account and asset
-go run . --method get_ledger_entries --params '[{"account_id":"0xYourAccountID","asset":"usdc"}]' --send --server ws://localhost:8000/ws
-
-# Get RPC message history
-go run . --method get_rpc_history --send --server ws://localhost:8000/ws
-```
-
-### Asset Information
-
-```bash
 # List all supported assets
-go run . --method get_assets --send --server ws://localhost:8000/ws
+go run . --method get_assets --send --noauth --server wss://canarynet.yellow.com/ws
 
 # Get assets for a specific blockchain
-go run . --method get_assets --params '[{"chain_id":137}]' --send --server ws://localhost:8000/ws
+go run . --method get_assets --params '[{"chain_id":137}]' --send --noauth --server wss://canarynet.yellow.com/ws
+
+# Get application definition for a specific app session
+go run . --method get_app_definition --params '[{"app_session_id":"0xAppSessionID"}]' --send --noauth --server wss://canarynet.yellow.com/ws
+
+# List virtual applications for a participant
+go run . --method get_app_sessions --params '[{"participant":"0xParticipantAddress"}]' --send --noauth --server wss://canarynet.yellow.com/ws
+
+# Get balances for a specific account
+go run . --method get_ledger_balances --params '[{"account_id":"0x70997970C51812dc3A010C7d01b50e0d17dc79C8"}]' --send --noauth --server wss://canarynet.yellow.com/ws
+
+# Get detailed ledger entries
+go run . --method get_ledger_entries --params '[{"account_id":"0xAccountID","asset":"usdc"}]' --send --noauth --server wss://canarynet.yellow.com/ws
+
+# Get channels for a participant
+go run . --method get_channels --params '[{"participant":"0xParticipantAddress"}]' --send --noauth --server wss://canarynet.yellow.com/ws
 ```
 
-### Channel Management
+### Authenticated Endpoints
+
+These endpoints require authentication:
 
 ```bash
-# Get all channels
-go run . --method get_channels --params '[{"participant":"0xParticipantAddress"}]' --send --server ws://localhost:8000/ws
+# Get RPC message history
+go run . --method get_rpc_history --send --server ws://localhost:8000/ws
 
-# Resize a channel (increase or decrease allocation)
-go run . --method resize_channel --params '[{
-  "channel_id": "0xYourChannelID",
-  "resize_amount": "10.0",
-  "allocate_amount": "0.0",
-  "funds_destination": "0xYourAddress"
-}]' --send --server ws://localhost:8000/ws
-
-# Close a channel
-go run . --method close_channel --params '[{
-  "channel_id": "0xYourChannelID",
-  "funds_destination": "0xYourAddress"
-}]' --send --server ws://localhost:8000/ws
-```
-
-### App Session Operations
-
-```bash
 # Create a virtual app session between two participants
 go run . --method create_app_session --params '[{
   "definition": {
@@ -190,6 +175,7 @@ go run . --method create_app_session --params '[{
   ]
 }]' --auth 10 --signers 10 --send --server ws://localhost:8000/ws
 
+# Close an app session
 go run . --method close_app_session --params '[{
   "app_session_id": "0x2b1843390eef1ed7406826b01fa95135e71ea2266222761ffa2efeaad6b81f84",
   "allocations": [
@@ -198,18 +184,18 @@ go run . --method close_app_session --params '[{
   ]
 }]' --auth 10 --signers 10 --send --server ws://localhost:8000/ws
 
-# Get app session details
-go run . --method get_app_definition --params '[{
-  "app_session_id": "0xAppSessionID"
+# Resize a channel (increase or decrease allocation)
+go run . --method resize_channel --params '[{
+  "channel_id": "0xYourChannelID",
+  "resize_amount": "10.0",
+  "allocate_amount": "0.0",
+  "funds_destination": "0xYourAddress"
 }]' --send --server ws://localhost:8000/ws
 
-# Close an app session
-go run . --method close_app_session --params '[{
-  "app_session_id": "0xAppSessionID",
-  "allocations": [
-    {"participant": "0xYourAddress", "asset": "usdc", "amount": "7.5"},
-    {"participant": "0xOtherParticipantAddress", "asset": "usdc", "amount": "2.5"}
-  ]
+# Close a channel
+go run . --method close_channel --params '[{
+  "channel_id": "0xYourChannelID",
+  "funds_destination": "0xYourAddress"
 }]' --send --server ws://localhost:8000/ws
 ```
 
@@ -239,5 +225,6 @@ The `test_api.sh` script provides a menu-driven interface for common operations:
 - The testing tools automatically handle the entire authentication flow
 - Multi-signature support allows testing scenarios where messages must be signed by multiple parties
 - The `sig` field in RPC messages contains an array of signatures from all signers
-- The `--nosign` flag allows sending requests without signatures, useful for testing public endpoints or middleware
+- The `--nosign` flag allows sending requests without signatures, useful for testing
+- The `--noauth` flag lets you skip authentication completely for public endpoints
 - The `--auth` flag lets you specify which signer to use for authentication when using multiple signers

@@ -229,10 +229,11 @@ type Client struct {
 	addresses    []string
 	authSigner   *Signer // Signer used for authentication
 	noSignatures bool    // Flag to indicate if signatures should be added
+	noAuth       bool    // Flag to indicate if authentication should be skipped
 }
 
 // NewClient creates a new websocket client
-func NewClient(serverURL string, authSigner *Signer, noSignatures bool, signers ...*Signer) (*Client, error) {
+func NewClient(serverURL string, authSigner *Signer, noSignatures bool, noAuth bool, signers ...*Signer) (*Client, error) {
 	if len(signers) == 0 && !noSignatures {
 		return nil, fmt.Errorf("at least one signer is required unless noSignatures is enabled")
 	}
@@ -251,13 +252,15 @@ func NewClient(serverURL string, authSigner *Signer, noSignatures bool, signers 
 	var addresses []string
 
 	if len(signers) > 0 {
-		// Set auth signer if not specified
-		if authSigner == nil {
+		// Set auth signer if not specified and auth is required
+		if authSigner == nil && !noAuth {
 			authSigner = signers[0]
 		}
 
 		// We'll use the auth signer's address as the primary address for auth
-		primaryAddress = authSigner.GetAddress()
+		if authSigner != nil {
+			primaryAddress = authSigner.GetAddress()
+		}
 
 		// Collect all addresses
 		addresses = make([]string, len(signers))
@@ -277,6 +280,7 @@ func NewClient(serverURL string, authSigner *Signer, noSignatures bool, signers 
 		addresses:    addresses,
 		authSigner:   authSigner,
 		noSignatures: noSignatures,
+		noAuth:       noAuth,
 	}, nil
 }
 
@@ -318,6 +322,12 @@ func (c *Client) collectSignatures(data []byte) ([]string, error) {
 
 // Authenticate performs the authentication flow with the server
 func (c *Client) Authenticate() error {
+	// Skip authentication if noAuth flag is set
+	if c.noAuth {
+		fmt.Println("Authentication skipped (noAuth mode)")
+		return nil
+	}
+
 	fmt.Println("Starting authentication...")
 
 	// If no auth signer is provided, we can't authenticate
@@ -475,6 +485,7 @@ func main() {
 		signersFlag = flag.String("signers", "", "Comma-separated list of signer numbers to use (e.g., '1,2,3'). If not specified, all available signers will be used.")
 		authFlag    = flag.String("auth", "", "Specify which signer to authenticate with (e.g., '1'). If not specified, first signer is used.")
 		noSignFlag  = flag.Bool("nosign", false, "Send request without signatures")
+		noAuthFlag  = flag.Bool("noauth", false, "Skip authentication (for public endpoints)")
 	)
 
 	flag.Parse()
@@ -831,7 +842,9 @@ func main() {
 		}
 
 		// Auth signer info
-		if authSigner != nil {
+		if *noAuthFlag {
+			fmt.Println("\nAuthentication: None (--noauth flag)")
+		} else if authSigner != nil {
 			fmt.Printf("\nAuthentication: Using %s for authentication\n", authSigner.GetAddress())
 		} else if *noSignFlag {
 			fmt.Println("\nAuthentication: None (--nosign flag)")
@@ -847,20 +860,15 @@ func main() {
 	if *sendFlag {
 
 		// Create the client with the specified settings
-		client, err := NewClient(*serverFlag, authSigner, *noSignFlag, signers...)
+		client, err := NewClient(*serverFlag, authSigner, *noSignFlag, *noAuthFlag, signers...)
 		if err != nil {
 			log.Fatalf("Error creating client: %v", err)
 		}
 		defer client.Close()
 
-		// Skip authentication if noSign flag is set and no auth signer is provided
-		if authSigner == nil && *noSignFlag {
-			fmt.Println("Skipping authentication as no auth signer is provided and nosign flag is set")
-		} else {
-			// Authenticate with the server
-			if err := client.Authenticate(); err != nil {
-				log.Fatalf("Authentication failed: %v", err)
-			}
+		// Authenticate with the server (handled by client.Authenticate based on noAuth flag)
+		if err := client.Authenticate(); err != nil {
+			log.Fatalf("Authentication failed: %v", err)
 		}
 
 		// Send the message

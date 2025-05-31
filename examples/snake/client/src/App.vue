@@ -4,11 +4,19 @@ import GameRoom from './components/GameRoom.vue';
 import LobbyScreen from './components/LobbyScreen.vue';
 import clearNetService from './services/ClearNetService';
 import gameService from './services/GameService';
+import { createWalletClient, createPublicClient, custom, http } from 'viem';
+import { polygon } from 'viem/chains';
+import { CryptoKeypair, generateKeyPair } from './crypto';
+import { BROKER_WS_URL, CONTRACT_ADDRESSES } from './config';
+import { NitroliteClientConfig } from '@erc7824/nitrolite';
+import { privateKeyToAccount } from 'viem/accounts';
 
 const nickname = ref('');
 const roomId = ref('');
 const currentScreen = ref('lobby'); // 'lobby' or 'game'
 const errorMessage = ref('');
+const isConnecting = ref(true);
+const walletAddress = ref('');
 
 // Create a new game room
 const createRoom = async () => {
@@ -18,22 +26,17 @@ const createRoom = async () => {
   }
 
   // Check if we have an active channel
-  let activeChannel = clearNetService.getActiveChannel();
-  if (!activeChannel) {
-    // Try to restore channel from storage first
-    clearNetService.restoreChannelFromStorage();
-    activeChannel = clearNetService.getActiveChannel();
-    if (!activeChannel) {
-      errorMessage.value = 'Please create a channel first';
-      return;
-    }
+  let activeChannelId = await clearNetService.getActiveChannel();
+  if (!activeChannelId) {
+    errorMessage.value = 'Please create a channel first';
+    return;
   }
 
   try {
     const walletAddress = clearNetService.client.walletClient.account.address;
     await gameService.createRoom(
       nickname.value.trim(),
-      activeChannel.channelId,
+      activeChannelId,
       walletAddress
     );
   } catch (error) {
@@ -55,8 +58,8 @@ const joinRoom = async () => {
   }
 
   // Check if we have an active channel
-  const activeChannel = clearNetService.getActiveChannel();
-  if (!activeChannel) {
+  const activeChannelId = await clearNetService.getActiveChannel();
+  if (!activeChannelId) {
     errorMessage.value = 'Please join a channel first';
     return;
   }
@@ -66,7 +69,7 @@ const joinRoom = async () => {
     await gameService.joinRoom(
       roomId.value.trim(),
       nickname.value.trim(),
-      activeChannel.channelId,
+      activeChannelId,
       walletAddress
     );
   } catch (error) {
@@ -107,22 +110,111 @@ watch(() => currentScreen.value, (newScreen, oldScreen) => {
   }
 });
 
-// Watch for channel state changes
-watch(() => clearNetService.getActiveChannel(), (newChannel) => {
-  if (!newChannel) {
-    // If channel is lost, show error
-    errorMessage.value = 'Channel connection lost. Please create a new channel.';
-  } else {
-    // Clear any channel-related errors
-    if (errorMessage.value.includes('channel')) {
-      errorMessage.value = '';
+// Auto-connect wallet and broker on page load
+const autoConnect = async () => {
+  isConnecting.value = true;
+
+  try {
+    // Check for MetaMask
+    const { ethereum } = window as any;
+    if (!ethereum) {
+      throw new Error('MetaMask is required. Please install MetaMask extension.');
+    }
+
+    // Request accounts
+    console.log('[App] Requesting MetaMask accounts...');
+    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+    if (!accounts || accounts.length === 0) {
+      throw new Error('No accounts found. Please connect your MetaMask wallet.');
+    }
+
+    walletAddress.value = accounts[0];
+    console.log('[App] Wallet connected:', walletAddress.value);
+
+    // Create wallet client
+    const walletClient = createWalletClient({
+      account: accounts[0],
+      chain: polygon,
+      transport: custom(ethereum)
+    });
+
+    // Create public client for reading blockchain data
+    const publicClient = createPublicClient({
+      chain: polygon,
+      transport: http()
+    });
+
+    // Get or create session key
+    let keyPair: CryptoKeypair | null = null;
+    const savedKeys = localStorage.getItem('crypto_keypair');
+
+    if (savedKeys) {
+      try {
+        keyPair = JSON.parse(savedKeys);
+      } catch (error) {
+        console.error('[App] Failed to parse saved keypair, generating new one');
+        keyPair = null;
+      }
+    }
+
+    if (!keyPair) {
+      keyPair = await generateKeyPair();
+      localStorage.setItem('crypto_keypair', JSON.stringify(keyPair));
+    }
+
+    const stateWalletClient = createWalletClient({
+      account: privateKeyToAccount(keyPair.privateKey),
+      chain: polygon,
+      transport: custom(ethereum)
+    });
+
+    // Initialize ClearNetService with Nitrolite configuration
+    const config: NitroliteClientConfig = {
+      // @ts-ignore
+      walletClient,
+      publicClient,
+      stateWalletClient,
+      chainId: polygon.id,
+      addresses: {
+        custody: CONTRACT_ADDRESSES.custody,
+        adjudicator: CONTRACT_ADDRESSES.adjudicator,
+        tokenAddress: CONTRACT_ADDRESSES.tokenAddress,
+        guestAddress: CONTRACT_ADDRESSES.guestAddress
+      },
+      brokerUrl: BROKER_WS_URL,
+      challengeDuration: 3600n // 1 hour in seconds
+    };
+
+    console.log('[App] Initializing ClearNetService...');
+    await clearNetService.initialize(config);
+    console.log('[App] ClearNetService initialized successfully');
+
+    // Check for existing channel
+    const activeChannel = await clearNetService.getActiveChannel();
+    if (!activeChannel) {
+      throw new Error('No active channel found. Please open a channel at apps.yellow.com');
+    }
+
+    console.log('[App] Active channel found:', activeChannel);
+    isConnecting.value = false;
+    errorMessage.value = '';
+
+  } catch (error) {
+    console.error('[App] Auto-connect failed:', error);
+    errorMessage.value = error instanceof Error ? error.message : 'Failed to connect wallet and broker';
+    isConnecting.value = false;
+    // Crash the app if no channel is available
+    if (error instanceof Error && error.message.includes('No active channel')) {
+      throw error;
     }
   }
-});
+};
 
-onMounted(() => {
+onMounted(async () => {
   console.log('[App] Component mounted');
-  // Initialize WebSocket connection - this will be handled by GameService
+  // Auto-connect wallet and broker first
+  await autoConnect();
+  // Then initialize WebSocket connection
   gameService.connect();
 });
 
@@ -138,25 +230,26 @@ onUnmounted(() => {
     </header>
 
     <main>
-      <div v-if="!gameService.getIsConnected().value && currentScreen === 'lobby'" class="connection-error">
-        {{ errorMessage }}
+      <div v-if="isConnecting" class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Connecting to wallet and broker...</p>
       </div>
+
+      <div v-else-if="errorMessage" class="error-container">
+        <div class="error-icon">⚠️</div>
+        <h2>Connection Failed</h2>
+        <p>{{ errorMessage }}</p>
+        <button @click="autoConnect" class="retry-btn">Retry Connection</button>
+      </div>
+
       <div v-else>
-        <LobbyScreen
-          v-if="currentScreen === 'lobby'"
-          v-model:nickname="nickname"
-          v-model:roomId="roomId"
-          :socket="gameService.getWebSocket()"
+        <LobbyScreen v-if="currentScreen === 'lobby'" v-model:nickname="nickname" v-model:roomId="roomId"
+          :socket="gameService.getWebSocket()" :walletAddress="walletAddress"
           :errorMessage="gameService.getErrorMessage().value" @create-room="createRoom" @join-room="joinRoom" />
 
-        <GameRoom
-          v-else-if="currentScreen === 'game'"
-          :roomId="gameService.getRoomId().value"
-          :playerId="gameService.getPlayerId().value"
-          :nickname="nickname"
-          :socket="gameService.getWebSocket()"
-          @exit-game="currentScreen = 'lobby'"
-        />
+        <GameRoom v-else-if="currentScreen === 'game'" :roomId="gameService.getRoomId().value"
+          :playerId="gameService.getPlayerId().value" :nickname="nickname" :socket="gameService.getWebSocket()"
+          @exit-game="currentScreen = 'lobby'" />
       </div>
     </main>
   </div>
@@ -180,11 +273,68 @@ h1 {
   font-size: 2.5rem;
 }
 
-.connection-error {
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 20px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
   text-align: center;
   padding: 20px;
-  background-color: #f8f8f8;
-  border-radius: 8px;
+}
+
+.error-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+}
+
+.error-container h2 {
+  color: #d32f2f;
+  margin-bottom: 10px;
+}
+
+.error-container p {
   color: #666;
+  margin-bottom: 30px;
+  max-width: 500px;
+}
+
+.retry-btn {
+  padding: 12px 24px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.retry-btn:hover {
+  background-color: #388E3C;
 }
 </style>

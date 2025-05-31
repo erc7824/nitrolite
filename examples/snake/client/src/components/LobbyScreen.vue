@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { defineEmits, defineProps, ref, watch } from 'vue';
-import WalletConnect from './WalletConnect.vue';
-import ChannelSetup from './ChannelSetup.vue';
 import gameService from '../services/GameService';
+import clearNetService from '../services/ClearNetService';
+import { Hex } from 'viem';
 
 const props = defineProps<{
   nickname: string;
   roomId: string;
   errorMessage: string;
+  walletAddress: string;
 }>();
 
 const emit = defineEmits([
@@ -18,12 +19,9 @@ const emit = defineEmits([
   'join-room'
 ]);
 
-const isWalletConnected = ref(false);
-const isChannelCreated = ref(false);
 const isCreatingRoom = ref(false);
 const isJoiningRoom = ref(false);
-const walletAddress = ref('');
-const channelInfo = ref<any>(null);
+const channelInfo = ref<Hex | null>(await clearNetService.getActiveChannel());
 
 // Subscribe to GameService state
 const gameError = gameService.getErrorMessage();
@@ -44,67 +42,36 @@ const updateRoomId = (e: Event) => {
 };
 
 const createRoom = () => {
-  if (isChannelCreated.value) {
+  if (channelInfo.value) {
     isCreatingRoom.value = true;
-    gameService.createRoom(props.nickname, channelInfo.value.channelId, walletAddress.value);
+    gameService.createRoom(props.nickname, channelInfo.value, props.walletAddress);
     emit('create-room');
   } else {
-    console.log("createRoom", isChannelCreated.value);
-    emit('update:errorMessage', 'Please create a channel first');
+    console.error("No active channel found");
+    emit('update:errorMessage', 'No active channel found');
   }
 };
 
 const joinRoom = () => {
-  if (isChannelCreated.value) {
+  if (channelInfo.value) {
     isJoiningRoom.value = true;
-    gameService.joinRoom(props.roomId, props.nickname, channelInfo.value.channelId, walletAddress.value);
+    gameService.joinRoom(props.roomId, props.nickname, channelInfo.value, props.walletAddress);
     emit('join-room');
   } else {
-    emit('update:errorMessage', 'Please join a channel first');
+    emit('update:errorMessage', 'No active channel found');
   }
 };
 
-// Handle wallet connection events
-const onWalletConnected = (data: { address: string }) => {
-  isWalletConnected.value = true;
-  walletAddress.value = data.address;
-};
 
-const onWalletDisconnected = () => {
-  isWalletConnected.value = false;
-  walletAddress.value = '';
-  isChannelCreated.value = false;
-  channelInfo.value = null;
-};
-
-// Handle channel creation events
-const onChannelCreated = async (data: any) => {
-  console.log("onChannelCreated", data);
-  isChannelCreated.value = true;
-  channelInfo.value = data;
-};
-
-const onError = (error: string) => {
-  emit('update:errorMessage', error);
-};
-
-// Generate a random room ID that resembles a SHA-256 hash
-function generateRoomId(): string {
-  // Generate a random array of bytes
-  const randomBytes = new Uint8Array(32);
-  window.crypto.getRandomValues(randomBytes);
-
-  // Convert to hex string
-  return Array.from(randomBytes)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
 </script>
 
 <template>
   <div class="lobby">
-    <!-- Wallet Connection Card -->
-    <WalletConnect @wallet-connected="onWalletConnected" @wallet-disconnected="onWalletDisconnected" @error="onError" />
+    <!-- Wallet Info Card -->
+    <div class="wallet-info">
+      <div class="wallet-address">Wallet: {{ props.walletAddress.slice(0, 6) }}...{{ props.walletAddress.slice(-4) }}</div>
+      <div v-if="channelInfo" class="channel-info">Channel: {{ channelInfo }}...</div>
+    </div>
 
     <!-- Username Card -->
     <div class="form-container">
@@ -117,11 +84,6 @@ function generateRoomId(): string {
       </div>
     </div>
 
-    <!-- Channel Setup -->
-    <ChannelSetup v-if="isWalletConnected && nickname" :isWalletConnected="isWalletConnected"
-      :roomId="roomId || generateRoomId()" :roomCreator="!roomId" @channel-created="onChannelCreated"
-      @error="onError" />
-
     <!-- Game Actions Card -->
     <div class="form-container">
       <h2>Game Options</h2>
@@ -129,15 +91,12 @@ function generateRoomId(): string {
       <div class="actions">
         <div class="action-group">
           <button @click="createRoom" class="btn primary"
-            :disabled="!nickname || !isWalletConnected || !isChannelCreated || isCreatingRoom">
+            :disabled="!nickname || isCreatingRoom">
             {{ isCreatingRoom ? 'Creating Room...' : 'Create New Room' }}
           </button>
 
-          <div class="requirements" v-if="!isWalletConnected || !nickname || !isChannelCreated">
-            <div v-if="!isWalletConnected" class="requirement">⚠️ Connect wallet first</div>
-            <div v-if="!nickname" class="requirement">⚠️ Set a nickname first</div>
-            <div v-if="isWalletConnected && nickname && !isChannelCreated" class="requirement">⚠️ Create a channel first
-            </div>
+          <div class="requirements" v-if="!nickname">
+            <div class="requirement">⚠️ Set a nickname first</div>
           </div>
         </div>
 
@@ -150,16 +109,13 @@ function generateRoomId(): string {
               :disabled="isJoiningRoom" />
           </div>
           <button @click="joinRoom" class="btn secondary"
-            :disabled="!nickname || !roomId || !isWalletConnected || !isChannelCreated || isJoiningRoom">
+            :disabled="!nickname || !roomId || isJoiningRoom">
             {{ isJoiningRoom ? 'Joining Room...' : 'Join Existing Room' }}
           </button>
 
-          <div class="requirements" v-if="!isWalletConnected || !nickname || !roomId || !isChannelCreated">
-            <div v-if="!isWalletConnected" class="requirement">⚠️ Connect wallet first</div>
+          <div class="requirements" v-if="!nickname || !roomId">
             <div v-if="!nickname" class="requirement">⚠️ Set a nickname first</div>
             <div v-if="!roomId" class="requirement">⚠️ Enter a room ID</div>
-            <div v-if="isWalletConnected && nickname && roomId && !isChannelCreated" class="requirement">⚠️ Join a
-              channel first</div>
           </div>
         </div>
       </div>
@@ -300,5 +256,27 @@ input:focus {
 .requirement {
   color: #f44336;
   margin-bottom: 4px;
+}
+
+.wallet-info {
+  background-color: #e8f5e9;
+  border-radius: 8px;
+  padding: 15px 20px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+}
+
+.wallet-address {
+  color: #2e7d32;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.channel-info {
+  color: #388e3c;
+  font-size: 0.85rem;
 }
 </style>

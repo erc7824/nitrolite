@@ -7,3 +7,6 @@ export * from "./client/types";
 export * from "./client/state";
 export * from "./rpc";
 export * from "./abis";
+
+// Export auto-generated contract ABIs and types
+export * from "./generated";

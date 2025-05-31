@@ -107,6 +107,45 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 		// Handle message based on the method
 		switch rpcMsg.Req.Method {
+		// Public endpoints
+		case "ping", "get_config", "get_assets", "get_ledger_balances", "get_ledger_entries", "get_app_definition", "get_app_sessions", "get_channels":
+			var rpcResponse *RPCMessage
+			var handlerErr error
+
+			switch rpcMsg.Req.Method {
+			case "ping":
+				rpcResponse, handlerErr = HandlePing(&rpcMsg)
+			case "get_config":
+				rpcResponse, handlerErr = HandleGetConfig(&rpcMsg, h.config, h.signer)
+			case "get_assets":
+				rpcResponse, handlerErr = HandleGetAssets(&rpcMsg, h.db)
+			case "get_ledger_balances":
+				rpcResponse, handlerErr = HandleGetLedgerBalances(&rpcMsg, "", h.db)
+			case "get_ledger_entries":
+				rpcResponse, handlerErr = HandleGetLedgerEntries(&rpcMsg, "", h.db)
+			case "get_app_definition":
+				rpcResponse, handlerErr = HandleGetAppDefinition(&rpcMsg, h.db)
+			case "get_app_sessions":
+				rpcResponse, handlerErr = HandleGetAppSessions(&rpcMsg, h.db)
+			case "get_channels":
+				rpcResponse, handlerErr = HandleGetChannels(&rpcMsg, h.db)
+			}
+
+			if handlerErr != nil {
+				log.Printf("Error handling %s: %v", rpcMsg.Req.Method, handlerErr)
+				h.sendErrorResponse("", nil, conn, fmt.Sprintf("Failed to process %s: %v", rpcMsg.Req.Method, handlerErr))
+			} else {
+				byteData, _ := json.Marshal(rpcResponse.Res)
+				signature, _ := h.signer.Sign(byteData)
+				rpcResponse.Sig = []string{hexutil.Encode(signature)}
+				wsResponseData, _ := json.Marshal(rpcResponse)
+
+				if err := h.writeWSResponse(conn, wsResponseData); err != nil {
+					continue
+				}
+			}
+			continue
+
 		case "auth_request":
 			// Track auth request metrics
 			h.metrics.AuthRequests.Inc()
@@ -265,7 +304,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 		case "get_assets":
-			rpcResponse, handlerErr = HandleGetAssets(policy, &msg, h.db)
+			rpcResponse, handlerErr = HandleGetAssets(&msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_assets: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get assets: "+handlerErr.Error())
@@ -273,7 +312,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 		case "get_ledger_balances":
-			rpcResponse, handlerErr = HandleGetLedgerBalances(policy, &msg, walletAddress, h.db)
+			rpcResponse, handlerErr = HandleGetLedgerBalances(&msg, walletAddress, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_ledger_balances: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get ledger balances: "+handlerErr.Error())
@@ -281,7 +320,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 		case "get_ledger_entries":
-			rpcResponse, handlerErr = HandleGetLedgerEntries(policy, &msg, walletAddress, h.db)
+			rpcResponse, handlerErr = HandleGetLedgerEntries(&msg, walletAddress, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_ledger_entries: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get ledger entries: "+handlerErr.Error())
@@ -289,13 +328,26 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 
 		case "get_app_definition":
-			rpcResponse, handlerErr = HandleGetAppDefinition(policy, &msg, h.db)
+			rpcResponse, handlerErr = HandleGetAppDefinition(&msg, h.db)
 			if handlerErr != nil {
 				log.Printf("Error handling get_app_definition: %v", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get app definition: "+handlerErr.Error())
 				continue
 			}
-
+		case "get_app_sessions":
+			rpcResponse, handlerErr = HandleGetAppSessions(&msg, h.db)
+			if handlerErr != nil {
+				log.Printf("Error handling get_app_sessions: %v", handlerErr)
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get app sessions: "+handlerErr.Error())
+				continue
+			}
+		case "get_channels":
+			rpcResponse, handlerErr = HandleGetChannels(&msg, h.db)
+			if handlerErr != nil {
+				log.Printf("Error handling get_channels: %v", handlerErr)
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get channels: "+handlerErr.Error())
+				continue
+			}
 		case "create_app_session":
 			rpcResponse, handlerErr = HandleCreateApplication(policy, &msg, h.db)
 			if handlerErr != nil {
@@ -314,13 +366,6 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 			h.sendBalanceUpdate(walletAddress)
 			recordHistory = true
-		case "get_app_sessions":
-			rpcResponse, handlerErr = HandleGetAppSessions(policy, &msg, h.db)
-			if handlerErr != nil {
-				log.Printf("Error handling get_app_sessions: %v", handlerErr)
-				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get app sessions: "+handlerErr.Error())
-				continue
-			}
 
 		case "resize_channel":
 			rpcResponse, handlerErr = HandleResizeChannel(policy, &msg, h.db, h.signer)
@@ -338,13 +383,6 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 				continue
 			}
 			recordHistory = true
-		case "get_channels":
-			rpcResponse, handlerErr = HandleGetChannels(policy, &msg, h.db)
-			if handlerErr != nil {
-				log.Printf("Error handling get_channels: %v", handlerErr)
-				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get channels: "+handlerErr.Error())
-				continue
-			}
 
 		case "get_rpc_history":
 			rpcResponse, handlerErr = HandleGetRPCHistory(policy, &msg, h.rpcStore)
@@ -372,26 +410,9 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 		}
 
-		// Use NextWriter for safer message delivery
-		w, err := conn.NextWriter(websocket.TextMessage)
-		if err != nil {
-			log.Printf("Error getting writer for response: %v", err)
+		if err := h.writeWSResponse(conn, wsResponseData); err != nil {
 			continue
 		}
-
-		if _, err := w.Write(wsResponseData); err != nil {
-			log.Printf("Error writing response: %v", err)
-			w.Close()
-			continue
-		}
-
-		if err := w.Close(); err != nil {
-			log.Printf("Error closing writer for response: %v", err)
-			continue
-		}
-
-		// Increment sent message counter
-		h.metrics.MessageSent.Inc()
 	}
 }
 
@@ -437,26 +458,11 @@ func forwardMessage(rpc *RPCMessage, msg []byte, fromAddress string, h *UnifiedW
 		recipientConn, exists := h.connections[recipient]
 		h.connectionsMu.RUnlock()
 		if exists {
-			// Use NextWriter for safer message delivery
-			w, err := recipientConn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				log.Printf("Error getting writer for forwarded message to %s: %v", recipient, err)
+			// Send the message
+			if err := h.writeWSResponse(recipientConn, msg); err != nil {
+				log.Printf("Error forwarding message to %s: %v", recipient, err)
 				continue
 			}
-
-			if _, err := w.Write(msg); err != nil {
-				log.Printf("Error writing forwarded message to %s: %v", recipient, err)
-				w.Close()
-				continue
-			}
-
-			if err := w.Close(); err != nil {
-				log.Printf("Error closing writer for forwarded message to %s: %v", recipient, err)
-				continue
-			}
-
-			// Increment sent message counter for each forwarded message
-			h.metrics.MessageSent.Inc()
 
 			log.Printf("Successfully forwarded message to %s", recipient)
 		} else {
@@ -498,25 +504,10 @@ func (h *UnifiedWSHandler) sendErrorResponse(sender string, rpc *RPCMessage, con
 	// Set a short write deadline to prevent blocking on unresponsive clients
 	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 
-	// Use NextWriter for safer message delivery
-	w, err := conn.NextWriter(websocket.TextMessage)
-	if err != nil {
-		log.Printf("Error getting writer for error response: %v", err)
+	// Write the response
+	if err := h.writeWSResponse(conn, responseData); err != nil {
 		return
 	}
-
-	if _, err := w.Write(responseData); err != nil {
-		log.Printf("Error writing error response: %v", err)
-		w.Close()
-		return
-	}
-
-	if err := w.Close(); err != nil {
-		log.Printf("Error closing writer for error response: %v", err)
-	}
-
-	// Increment sent message counter
-	h.metrics.MessageSent.Inc()
 
 	// Reset the write deadline
 	conn.SetWriteDeadline(time.Time{})
@@ -540,26 +531,11 @@ func (h *UnifiedWSHandler) sendResponse(recipient string, method string, payload
 	recipientConn, exists := h.connections[recipient]
 	h.connectionsMu.RUnlock()
 	if exists {
-		// Use NextWriter for safer message delivery
-		w, err := recipientConn.NextWriter(websocket.TextMessage)
-		if err != nil {
-			log.Printf("Error getting writer for %s update to %s: %v", updateType, recipient, err)
-			return
-		}
-
-		if _, err := w.Write(responseData); err != nil {
+		// Write the response
+		if err := h.writeWSResponse(recipientConn, responseData); err != nil {
 			log.Printf("Error writing %s update to %s: %v", updateType, recipient, err)
-			w.Close()
 			return
 		}
-
-		if err := w.Close(); err != nil {
-			log.Printf("Error closing writer for %s update to %s: %v", updateType, recipient, err)
-			return
-		}
-
-		// Increment sent message counter
-		h.metrics.MessageSent.Inc()
 
 		log.Printf("Successfully sent %s update to %s", updateType, recipient)
 	} else {
@@ -867,6 +843,29 @@ func parseAllowances(rawAllowances any) ([]Allowance, error) {
 	}
 
 	return result, nil
+}
+
+// writeWSResponse writes a response to the WebSocket connection and increments metrics
+func (h *UnifiedWSHandler) writeWSResponse(conn *websocket.Conn, responseData []byte) error {
+	w, err := conn.NextWriter(websocket.TextMessage)
+	if err != nil {
+		log.Printf("Error getting writer for response: %v", err)
+		return err
+	}
+
+	if _, err := w.Write(responseData); err != nil {
+		log.Printf("Error writing response: %v", err)
+		w.Close()
+		return err
+	}
+
+	if err := w.Close(); err != nil {
+		log.Printf("Error closing writer for response: %v", err)
+		return err
+	}
+
+	h.metrics.MessageSent.Inc()
+	return nil
 }
 
 func sendMessage(conn *websocket.Conn, signer *Signer, msg *RPCMessage) error {

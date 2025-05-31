@@ -2,24 +2,24 @@
 
 ## API Endpoints
 
-| Method | Description |
-|--------|-------------|
-| `auth_request` | Initiates authentication with the server |
-| `auth_challenge` | Server response with authentication challenge |
-| `auth_verify` | Completes authentication with a challenge response |
-| `ping` | Simple connectivity check |
-| `get_config` | Retrieves broker configuration and supported networks |
-| `get_assets` | Retrieves all supported assets (optionally filtered by chain_id) |
-| `get_app_definition` | Retrieves application definition for a ledger account |
-| `get_app_sessions` | Lists virtual applications for a participant with optional status filter |
-| `get_ledger_balances` | Lists participants and their balances for a ledger account |
-| `get_ledger_entries` | Retrieves detailed ledger entries for a participant |
-| `get_channels` | Lists all channels for a participant with their status across all chains |
-| `get_rpc_history` | Retrieves all RPC message history for a participant |
-| `create_app_session` | Creates a new virtual application on a ledger |
-| `close_app_session` | Closes a virtual application |
-| `close_channel` | Closes a payment channel |
-| `resize_channel` | Adjusts channel capacity |
+| Method | Description | Access |
+|--------|-------------|------------|
+| `auth_request` | Initiates authentication with the server | Public |
+| `auth_challenge` | Server response with authentication challenge | Public |
+| `auth_verify` | Completes authentication with a challenge response | Public |
+| `ping` | Simple connectivity check | Public |
+| `get_config` | Retrieves broker configuration and supported networks | Public |
+| `get_assets` | Retrieves all supported assets (optionally filtered by chain_id) | Public |
+| `get_app_definition` | Retrieves application definition for a ledger account | Public |
+| `get_app_sessions` | Lists virtual applications for a participant with optional status filter | Public |
+| `get_ledger_balances` | Lists participants and their balances for a ledger account | Public |
+| `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Public |
+| `get_channels` | Lists all channels for a participant with their status across all chains | Public |
+| `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
+| `create_app_session` | Creates a new virtual application on a ledger | Private |
+| `close_app_session` | Closes a virtual application | Private |
+| `close_channel` | Closes a payment channel | Private |
+| `resize_channel` | Adjusts channel capacity | Private |
 
 ## Authentication
 

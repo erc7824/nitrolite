@@ -266,8 +266,7 @@ func HandleGetLedgerBalances(rpc *RPCMessage, walletAddress string, db *gorm.DB)
 }
 
 func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) (*RPCMessage, error) {
-	var accountID string
-	var asset string
+	var accountID, asset string
 
 	if len(rpc.Req.Params) > 0 {
 		paramsJSON, err := json.Marshal(rpc.Req.Params[0])
@@ -276,6 +275,9 @@ func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) 
 			if err := json.Unmarshal(paramsJSON, &params); err == nil {
 				accountID = params["account_id"]
 				asset = params["asset"]
+				if w, ok := params["wallet"]; ok && w != "" {
+					walletAddress = w
+				}
 			}
 		}
 	}

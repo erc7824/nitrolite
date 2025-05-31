@@ -14,8 +14,6 @@ import {
     createGetLedgerBalancesMessage,
     CreateAppSessionRequest,
     CloseAppSessionRequest,
-    AuthRequest,
-    getCurrentTimestamp,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, CONTRACT_ADDRESSES, POLYGON_RPC_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";

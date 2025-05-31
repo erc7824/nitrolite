@@ -171,6 +171,7 @@ const autoConnect = async () => {
     // Initialize ClearNetService with Nitrolite configuration
     const config: NitroliteClientConfig = {
       walletClient,
+      // @ts-ignore
       publicClient,
       stateWalletClient,
       chainId: polygon.id,

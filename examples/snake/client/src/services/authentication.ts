@@ -170,9 +170,9 @@ function createEIP712SigningFunction(walletClient: any, stateSigner: WalletSigne
  * @returns A Promise that resolves when authenticated
  */
 export async function authenticate(
-    ws: WebSocket, 
-    walletClient: any, 
-    signer: WalletSigner, 
+    ws: WebSocket,
+    walletClient: any,
+    signer: WalletSigner,
     timeout: number = 15000
 ): Promise<void> {
     if (!ws) throw new Error('WebSocket not connected');
@@ -222,14 +222,14 @@ export async function authenticate(
         console.log('Sending auth_request:', authRequest);
         ws.send(authRequest);
     } catch (requestError) {
-        console.error('Error creating auth_request:', requestError);
+        console.error('Error creating auth_request:', requestError);    
         throw new Error(`Failed to create auth_request: ${(requestError as Error).message}`);
     }
 
     return new Promise((resolve, reject) => {
         if (!ws) return reject(new Error('WebSocket not connected'));
 
-        let authTimeoutId: NodeJS.Timeout | null = null;
+        let authTimeoutId: number | null = null;
 
         const cleanup = () => {
             if (authTimeoutId) {

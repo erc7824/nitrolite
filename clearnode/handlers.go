@@ -396,15 +396,23 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 				}
 			}
 
-			participantWalletLedger := GetWalletLedger(tx, allocation.ParticipantWallet)
-			balance, err := participantWalletLedger.Balance(allocation.ParticipantWallet, allocation.AssetSymbol)
+			walletAddress, err := GetWalletBySigner(allocation.ParticipantWallet)
+			if err != nil {
+				continue
+			}
+			if walletAddress == "" {
+				walletAddress = allocation.ParticipantWallet
+			}
+
+			participantWalletLedger := GetWalletLedger(tx, walletAddress)
+			balance, err := participantWalletLedger.Balance(walletAddress, allocation.AssetSymbol)
 			if err != nil {
 				return fmt.Errorf("failed to check participant balance: %w", err)
 			}
 			if allocation.Amount.GreaterThan(balance) {
 				return errors.New("insufficient funds")
 			}
-			if err := participantWalletLedger.Record(allocation.ParticipantWallet, allocation.AssetSymbol, allocation.Amount.Neg()); err != nil {
+			if err := participantWalletLedger.Record(walletAddress, allocation.AssetSymbol, allocation.Amount.Neg()); err != nil {
 				return fmt.Errorf("failed to transfer funds from participant: %w", err)
 			}
 			if err := participantWalletLedger.Record(appSessionID.Hex(), allocation.AssetSymbol, allocation.Amount); err != nil {
@@ -535,7 +543,15 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 
 		appSessionBalance := map[string]decimal.Decimal{}
 		for _, p := range appSession.ParticipantWallets {
-			ledger := GetWalletLedger(tx, p)
+			walletAddress, err := GetWalletBySigner(p)
+			if err != nil {
+				continue
+			}
+			if walletAddress == "" {
+				walletAddress = p
+			}
+
+			ledger := GetWalletLedger(tx, walletAddress)
 			for asset := range assets {
 				bal, err := ledger.Balance(appSession.SessionID, asset)
 				if err != nil {
@@ -548,11 +564,19 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 		allocationSum := map[string]decimal.Decimal{}
 
 		for _, alloc := range params.Allocations {
-			if _, ok := participantWeights[alloc.ParticipantWallet]; !ok {
-				return fmt.Errorf("allocation to non-participant %s", alloc.ParticipantWallet)
+			walletAddress, err := GetWalletBySigner(alloc.ParticipantWallet)
+			if err != nil {
+				continue
+			}
+			if walletAddress == "" {
+				walletAddress = alloc.ParticipantWallet
 			}
 
-			ledger := GetWalletLedger(tx, alloc.ParticipantWallet)
+			if _, ok := participantWeights[walletAddress]; !ok {
+				return fmt.Errorf("allocation to non-participant %s", walletAddress)
+			}
+
+			ledger := GetWalletLedger(tx, walletAddress)
 			balance, err := ledger.Balance(appSession.SessionID, alloc.AssetSymbol)
 			if err != nil {
 				return fmt.Errorf("failed to get participant balance: %w", err)
@@ -562,7 +586,7 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, balance.Neg()); err != nil {
 				return fmt.Errorf("failed to debit session: %w", err)
 			}
-			if err := ledger.Record(alloc.ParticipantWallet, alloc.AssetSymbol, alloc.Amount); err != nil {
+			if err := ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit participant: %w", err)
 			}
 

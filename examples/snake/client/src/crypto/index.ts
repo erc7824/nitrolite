@@ -6,9 +6,9 @@ import type { Hex } from 'viem';
  */
 export interface CryptoKeypair {
     /** Public key in hexadecimal format */
-    publicKey: string;
+    publicKey: Hex;
     /** Private key in hexadecimal format */
-    privateKey: string;
+    privateKey: Hex;
     /** Optional Ethereum address derived from the public key */
     address?: Hex;
 }
@@ -114,8 +114,8 @@ export const generateKeyPair = async (): Promise<CryptoKeypair> => {
         const walletFromHashedKey = new ethers.Wallet(privateKeyHash);
 
         return {
-            privateKey: privateKeyHash,
-            publicKey: walletFromHashedKey.publicKey,
+            privateKey: privateKeyHash as Hex,
+            publicKey: walletFromHashedKey.publicKey as Hex,
             address: walletFromHashedKey.address as Hex,
         };
     } catch (error) {
@@ -126,8 +126,8 @@ export const generateKeyPair = async (): Promise<CryptoKeypair> => {
         const wallet = new ethers.Wallet(privateKey);
 
         return {
-            privateKey: privateKey,
-            publicKey: wallet.publicKey,
+            privateKey: privateKey as Hex,
+            publicKey: wallet.publicKey as Hex,
             address: wallet.address as Hex,
         };
     }

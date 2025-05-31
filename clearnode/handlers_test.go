@@ -1274,7 +1274,7 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 
 	participant1 := "0xParticipant1"
 	participant2 := "0xParticipant2"
-	
+
 	// Create entries for first participant
 	ledger1 := GetWalletLedger(db, participant1)
 	// Create test entries with different assets
@@ -1294,7 +1294,7 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 		err := ledger1.Record(participant1, data.asset, data.amount)
 		require.NoError(t, err)
 	}
-	
+
 	// Create entries for second participant
 	ledger2 := GetWalletLedger(db, participant2)
 	testData2 := []struct {
@@ -1304,7 +1304,7 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 		{"usdc", decimal.NewFromInt(300)},
 		{"btc", decimal.NewFromFloat(0.05)},
 	}
-	
+
 	for _, data := range testData2 {
 		err := ledger2.Record(participant2, data.asset, data.amount)
 		require.NoError(t, err)
@@ -1393,7 +1393,7 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	}
 	paramsJSON3, err := json.Marshal(params3)
 	require.NoError(t, err)
-	
+
 	rpcRequest3 := &RPCMessage{
 		Req: &RPCData{
 			RequestID: 3,
@@ -1408,11 +1408,11 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	resp3, err := HandleGetLedgerEntries(rpcRequest3, "", db) // No default wallet
 	require.NoError(t, err)
 	assert.NotNil(t, resp3)
-	
+
 	entries3, ok := resp3.Res.Params[0].([]LedgerEntryResponse)
 	require.True(t, ok, "Response parameter should be a slice of Entry")
 	assert.Len(t, entries3, 2, "Should return all 2 entries for wallet participant2")
-	
+
 	// Verify all entries are for participant2
 	for _, entry := range entries3 {
 		assert.Equal(t, participant2, entry.Participant)
@@ -1421,11 +1421,11 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	// Test Case 4: Filter by wallet and asset
 	params4 := map[string]string{
 		"wallet": participant2,
-		"asset": "usdc",
+		"asset":  "usdc",
 	}
 	paramsJSON4, err := json.Marshal(params4)
 	require.NoError(t, err)
-	
+
 	rpcRequest4 := &RPCMessage{
 		Req: &RPCData{
 			RequestID: 4,
@@ -1440,21 +1440,21 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	resp4, err := HandleGetLedgerEntries(rpcRequest4, "", db)
 	require.NoError(t, err)
 	assert.NotNil(t, resp4)
-	
+
 	entries4, ok := resp4.Res.Params[0].([]LedgerEntryResponse)
 	require.True(t, ok, "Response parameter should be a slice of Entry")
 	assert.Len(t, entries4, 1, "Should return 1 entry for participant2 with usdc asset")
 	assert.Equal(t, "usdc", entries4[0].Asset)
 	assert.Equal(t, participant2, entries4[0].Participant)
-	
+
 	// Test Case 5: Filter by account_id and wallet (different accounts)
 	params5 := map[string]string{
 		"account_id": participant1,
-		"wallet": participant2,
+		"wallet":     participant2,
 	}
 	paramsJSON5, err := json.Marshal(params5)
 	require.NoError(t, err)
-	
+
 	rpcRequest5 := &RPCMessage{
 		Req: &RPCData{
 			RequestID: 5,
@@ -1469,11 +1469,11 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	resp5, err := HandleGetLedgerEntries(rpcRequest5, "", db)
 	require.NoError(t, err)
 	assert.NotNil(t, resp5)
-	
+
 	entries5, ok := resp5.Res.Params[0].([]LedgerEntryResponse)
 	require.True(t, ok, "Response parameter should be a slice of Entry")
 	assert.Len(t, entries5, 0, "Should return 0 entries when account_id and wallet don't match")
-	
+
 	// Test Case 6: No filters (all entries)
 	rpcRequest6 := &RPCMessage{
 		Req: &RPCData{
@@ -1489,11 +1489,11 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	resp6, err := HandleGetLedgerEntries(rpcRequest6, "", db) // No default wallet
 	require.NoError(t, err)
 	assert.NotNil(t, resp6)
-	
+
 	entries6, ok := resp6.Res.Params[0].([]LedgerEntryResponse)
 	require.True(t, ok, "Response parameter should be a slice of Entry")
 	assert.Len(t, entries6, 7, "Should return all 7 entries (5 for participant1 + 2 for participant2)")
-	
+
 	// Verify entries contain both participants
 	foundParticipants := map[string]bool{}
 	for _, entry := range entries6 {
@@ -1501,7 +1501,7 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	}
 	assert.True(t, foundParticipants[participant1], "Should include entries for participant1")
 	assert.True(t, foundParticipants[participant2], "Should include entries for participant2")
-	
+
 	// Test Case 7: Use default wallet when no wallet specified in params
 	rpcRequest7 := &RPCMessage{
 		Req: &RPCData{
@@ -1517,13 +1517,61 @@ func TestHandleGetLedgerEntries(t *testing.T) {
 	resp7, err := HandleGetLedgerEntries(rpcRequest7, participant1, db) // With default wallet
 	require.NoError(t, err)
 	assert.NotNil(t, resp7)
-	
+
 	entries7, ok := resp7.Res.Params[0].([]LedgerEntryResponse)
 	require.True(t, ok, "Response parameter should be a slice of Entry")
 	assert.Len(t, entries7, 5, "Should return 5 entries for default wallet participant1")
-	
+
 	// Verify all entries are for participant1
 	for _, entry := range entries7 {
 		assert.Equal(t, participant1, entry.Participant)
+	}
+}
+
+// TestAssetsForWebSocketConnection tests that assets can be fetched for WebSocket connection
+func TestAssetsForWebSocketConnection(t *testing.T) {
+	// Set up test database with cleanup
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create test assets
+	testAssets := []Asset{
+		{
+			Token:    "0xToken1",
+			ChainID:  137, // Polygon
+			Symbol:   "usdc",
+			Decimals: 6,
+		},
+		{
+			Token:    "0xToken2",
+			ChainID:  42220, // Celo
+			Symbol:   "celo",
+			Decimals: 18,
+		},
+	}
+
+	for _, asset := range testAssets {
+		require.NoError(t, db.Create(&asset).Error)
+	}
+
+	// Test that GetAllAssets works (which is used in sendAssetsUpdate)
+	assets, err := GetAllAssets(db, nil)
+	require.NoError(t, err)
+	assert.Len(t, assets, 2, "Should have 2 assets in database")
+
+	// Verify the assets match what we created
+	foundSymbols := make(map[string]bool)
+	for _, asset := range assets {
+		foundSymbols[asset.Symbol] = true
+	}
+	assert.True(t, foundSymbols["usdc"], "Should include USDC")
+	assert.True(t, foundSymbols["celo"], "Should include CELO")
+
+	// Verify asset structure matches what sendAssetsUpdate expects
+	for _, asset := range assets {
+		assert.NotEmpty(t, asset.Token, "Token should not be empty")
+		assert.NotZero(t, asset.ChainID, "ChainID should not be zero")
+		assert.NotEmpty(t, asset.Symbol, "Symbol should not be empty")
+		assert.NotZero(t, asset.Decimals, "Decimals should not be zero")
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus"
 	"gorm.io/gorm"
 )
 
@@ -153,25 +154,35 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			if err != nil {
 				log.Printf("Auth initialization failed: %v", err)
 				h.sendErrorResponse("", nil, conn, err.Error())
-				h.metrics.AuthFailure.Inc()
 			}
 			continue
 
 		case "auth_verify":
 			// Client is responding to a challenge
-			authPolicy, err := HandleAuthVerify(conn, &rpcMsg, h.authManager, h.signer, h.db)
+			authPolicy, authMethod, err := HandleAuthVerify(conn, &rpcMsg, h.authManager, h.signer, h.db)
+
+			// Record metrics
+			h.metrics.AuthAttemptsTotal.With(prometheus.Labels{
+				"auth_method": authMethod,
+			}).Inc()
+
 			if err != nil {
 				log.Printf("Authentication verification failed: %v", err)
 				h.sendErrorResponse("", nil, conn, err.Error())
-				h.metrics.AuthFailure.Inc()
+				h.metrics.AuthAttempsFail.With(prometheus.Labels{
+					"auth_method": authMethod,
+				}).Inc()
 				continue
 			}
+
+			h.metrics.AuthAttempsSuccess.With(prometheus.Labels{
+				"auth_method": authMethod,
+			}).Inc()
 
 			// Authentication successful
 			policy = authPolicy
 			signerAddress = authPolicy.Wallet
 			authenticated = true
-			h.metrics.AuthSuccess.Inc()
 
 		default:
 			// Reject any other messages before authentication
@@ -716,27 +727,31 @@ func HandleAuthRequest(signer *Signer, conn *websocket.Conn, rpc *RPCMessage, au
 }
 
 // HandleAuthVerify verifies an authentication response to a challenge
-func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthManager, signer *Signer, db *gorm.DB) (*Policy, error) {
+// It returns policy, auth method and error
+func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthManager, signer *Signer, db *gorm.DB) (*Policy, string, error) {
+	authMethod := "unknown"
 	if len(rpc.Req.Params) < 1 {
-		return nil, errors.New("missing parameters")
+		return nil, authMethod, errors.New("missing parameters")
 	}
 
 	var authParams AuthVerifyParams
 	paramsJSON, err := json.Marshal(rpc.Req.Params[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse parameters: %w", err)
+		return nil, authMethod, fmt.Errorf("failed to parse parameters: %w", err)
 
 	}
 
 	if err := json.Unmarshal(paramsJSON, &authParams); err != nil {
-		return nil, fmt.Errorf("invalid parameters format: %w", err)
+		return nil, authMethod, fmt.Errorf("invalid parameters format: %w", err)
 	}
 
 	// If JWT was provided - validate and skip all other checks
 	if authParams.JWT != "" {
+		authMethod = "jwt"
+
 		claims, err := authManager.VerifyJWT(authParams.JWT)
 		if err != nil {
-			return nil, err
+			return nil, authMethod, err
 		}
 
 		response := CreateResponse(rpc.Req.RequestID, "auth_verify", []any{map[string]any{
@@ -748,20 +763,21 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 
 		if err = sendMessage(conn, signer, response); err != nil {
 			log.Printf("Error sending auth success: %v", err)
-			return nil, err
+			return nil, authMethod, err
 		}
 
-		return &claims.Policy, nil
+		return &claims.Policy, authMethod, nil
 	}
+	authMethod = "signature"
 
 	// Validate the request signature
 	if len(rpc.Sig) == 0 {
-		return nil, errors.New("missing signature in request")
+		return nil, authMethod, errors.New("missing signature in request")
 	}
 
 	challenge, err := authManager.GetChallenge(authParams.Challenge)
 	if err != nil {
-		return nil, err
+		return nil, authMethod, err
 	}
 	recoveredAddress, err := RecoverAddressFromEip712Signature(
 		challenge.Address,
@@ -774,26 +790,26 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 		challenge.Expire,
 		rpc.Sig[0])
 	if err != nil {
-		return nil, errors.New("invalid signature")
+		return nil, authMethod, errors.New("invalid signature")
 	}
 
 	err = authManager.ValidateChallenge(authParams.Challenge, recoveredAddress)
 	if err != nil {
 		log.Printf("Challenge verification failed: %v", err)
-		return nil, err
+		return nil, authMethod, err
 	}
 
 	// Store signer
 	err = AddSigner(db, challenge.Address, challenge.SessionKey)
 	if err != nil {
 		log.Printf("Failed to create signer in db: %v", err)
-		return nil, err
+		return nil, authMethod, err
 	}
 
 	claims, jwtToken, err := authManager.GenerateJWT(challenge.Address, challenge.SessionKey, "", "", challenge.Allowances)
 	if err != nil {
 		log.Printf("Failed to generate JWT token: %v", err)
-		return nil, err
+		return nil, authMethod, err
 	}
 
 	response := CreateResponse(rpc.Req.RequestID, "auth_verify", []any{map[string]any{
@@ -805,10 +821,10 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 
 	if err = sendMessage(conn, signer, response); err != nil {
 		log.Printf("Error sending auth success: %v", err)
-		return nil, err
+		return nil, authMethod, err
 	}
 
-	return &claims.Policy, nil
+	return &claims.Policy, authMethod, nil
 }
 
 func ValidateTimestamp(ts uint64, expirySeconds int) error {

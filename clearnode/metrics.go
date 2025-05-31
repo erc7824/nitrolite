@@ -18,9 +18,10 @@ type Metrics struct {
 	MessageSent      prometheus.Counter
 
 	// Authentication metrics
-	AuthRequests prometheus.Counter
-	AuthSuccess  prometheus.Counter
-	AuthFailure  prometheus.Counter
+	AuthRequests       prometheus.Counter
+	AuthAttemptsTotal  *prometheus.CounterVec
+	AuthAttempsSuccess *prometheus.CounterVec
+	AuthAttempsFail    *prometheus.CounterVec
 
 	// Channel metrics
 	ChannelsTotal  prometheus.Gauge
@@ -62,16 +63,29 @@ func NewMetrics() *Metrics {
 		}),
 		AuthRequests: promauto.NewCounter(prometheus.CounterOpts{
 			Name: "clearnet_auth_requests_total",
-			Help: "The total number of authentication requests",
+			Help: "The total number of auth_requests (get challenge code)",
 		}),
-		AuthSuccess: promauto.NewCounter(prometheus.CounterOpts{
-			Name: "clearnet_auth_success_total",
-			Help: "The total number of successful authentications",
-		}),
-		AuthFailure: promauto.NewCounter(prometheus.CounterOpts{
-			Name: "clearnet_auth_failure_total",
-			Help: "The total number of failed authentications",
-		}),
+		AuthAttemptsTotal: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "clearnet_auth_attempts_total",
+				Help: "The total number of authentication attempts",
+			},
+			[]string{"auth_method"},
+		),
+		AuthAttempsSuccess: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "clearnet_auth_attempts_success",
+				Help: "The total number of successfull authentication attempts",
+			},
+			[]string{"auth_method"},
+		),
+		AuthAttempsFail: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "clearnet_auth_attempts_fail",
+				Help: "The total number of failed authentication attempts",
+			},
+			[]string{"auth_method"},
+		),
 		ChannelsTotal: promauto.NewGauge(prometheus.GaugeOpts{
 			Name: "clearnet_channels_total",
 			Help: "The total number of channels",
@@ -107,7 +121,7 @@ func NewMetrics() *Metrics {
 				Name: "clearnet_broker_channel_count",
 				Help: "Number of channels for the broker on the custody contract",
 			},
-			[]string{"network", "asset"},
+			[]string{"network"},
 		),
 		BrokerWalletBalance: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{

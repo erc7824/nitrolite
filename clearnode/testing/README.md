@@ -16,6 +16,9 @@ go run . --method ping
 # Send the message to the server and get a response
 go run . --method ping --send --server ws://localhost:8000/ws
 
+# TESTNET: wss://canarynet.yellow.com/ws
+# PROD: wss://clearnet.yellow.com/ws
+
 # Or set the server URL via environment variable
 export SERVER=wss://canarynet.yellow.com/ws
 go run . --method ping --send

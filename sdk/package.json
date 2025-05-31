@@ -11,13 +11,18 @@
   "scripts": {
     "build": "npm run codegen && tsc",
     "build:prod": "npm run codegen && tsc -p tsconfig.prod.json",
+    "build:full": "npm run validate && npm run build && npm run docs",
     "codegen": "wagmi generate",
+    "docs": "ts-node scripts/generate-docs.ts",
+    "validate": "ts-node scripts/validate-types.ts",
     "watch": "tsc --watch",
-    "clean": "rimraf dist",
+    "clean": "rimraf dist docs/generated",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "prepublishOnly": "npm run clean && npm run build:prod"
+    "test:types": "npm run validate",
+    "dev": "npm run codegen && npm run watch",
+    "prepublishOnly": "npm run clean && npm run build:full"
   },
   "keywords": [
     "erc7824",
@@ -53,9 +58,11 @@
     "@typescript-eslint/parser": "^7.0.0",
     "@wagmi/cli": "^2.3.1",
     "eslint": "^8.57.0",
+    "glob": "^11.0.2",
     "jest": "^29.7.0",
     "rimraf": "^5.0.5",
     "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.0"
   }
 }

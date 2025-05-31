@@ -698,6 +698,9 @@ func HandleResizeChannel(rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMess
 	if err != nil {
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
+	if channel == nil {
+		return nil, errors.New("channel not found")
+	}
 
 	req := ResizeChannelSignData{
 		RequestID: rpc.Req.RequestID,
@@ -845,6 +848,9 @@ func HandleCloseChannel(rpc *RPCMessage, db *gorm.DB, signer *Signer) (*RPCMessa
 	channel, err := GetChannelByID(db, params.ChannelID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find channel: %w", err)
+	}
+	if channel == nil {
+		return nil, errors.New("channel not found")
 	}
 
 	reqBytes, err := json.Marshal(rpc.Req)

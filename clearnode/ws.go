@@ -22,15 +22,16 @@ var validate = validator.New()
 
 // UnifiedWSHandler manages WebSocket connections with authentication
 type UnifiedWSHandler struct {
-	signer        *Signer
-	db            *gorm.DB
-	upgrader      websocket.Upgrader
-	connections   map[string]*websocket.Conn
-	connectionsMu sync.RWMutex
-	authManager   *AuthManager
-	metrics       *Metrics
-	rpcStore      *RPCStore
-	config        *Config
+	signer          *Signer
+	db              *gorm.DB
+	upgrader        websocket.Upgrader
+	connections     map[string]*websocket.Conn
+	connectionsMu   sync.RWMutex
+	authManager     *AuthManager
+	metrics         *Metrics
+	rpcStore        *RPCStore
+	config          *Config
+	ledgerPublisher *LedgerPublisher
 }
 
 func NewUnifiedWSHandler(
@@ -46,6 +47,8 @@ func NewUnifiedWSHandler(
 		return nil, err
 	}
 
+	ledgerPublisher := NewLedgerPublisher(signer)
+
 	return &UnifiedWSHandler{
 		signer: signer,
 		db:     db,
@@ -56,11 +59,12 @@ func NewUnifiedWSHandler(
 				return true // Allow all origins for testing; should be restricted in production
 			},
 		},
-		connections: make(map[string]*websocket.Conn),
-		authManager: authManager,
-		metrics:     metrics,
-		rpcStore:    rpcStore,
-		config:      config,
+		connections:     make(map[string]*websocket.Conn),
+		authManager:     authManager,
+		metrics:         metrics,
+		rpcStore:        rpcStore,
+		config:          config,
+		ledgerPublisher: ledgerPublisher,
 	}, nil
 }
 
@@ -112,7 +116,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		// Handle message based on the method
 		switch rpcMsg.Req.Method {
 		// Public endpoints
-		case "ping", "get_config", "get_assets", "get_app_definition", "get_app_sessions", "get_channels", "get_ledger_entries":
+		case "ping", "get_config", "get_assets", "get_app_definition", "get_app_sessions", "get_channels", "get_ledger_entries", "subscribe_ledger":
 			var rpcResponse *RPCMessage
 			var handlerErr error
 
@@ -131,6 +135,32 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 				rpcResponse, handlerErr = HandleGetChannels(&rpcMsg, h.db)
 			case "get_ledger_entries":
 				rpcResponse, handlerErr = HandleGetLedgerEntries(&rpcMsg, "", h.db)
+			case "subscribe_ledger":
+				// For unauthenticated connections, we use a temporary identifier based on request ID
+				subscriberID := fmt.Sprintf("anonymous-%d", rpcMsg.Req.RequestID)
+
+				// Setup ping handler to keep connection alive
+				conn.SetPingHandler(func(message string) error {
+					err := conn.WriteControl(
+						websocket.PongMessage,
+						[]byte(message),
+						time.Now().Add(5*time.Second),
+					)
+					if err != nil {
+						log.Printf("Error sending pong to %s: %v", subscriberID, err)
+					}
+					return nil
+				})
+
+				// Add to subscribers
+				h.ledgerPublisher.Subscribe(subscriberID, conn)
+
+				// Return success response
+				response := map[string]interface{}{
+					"subscribed": true,
+					"timestamp":  time.Now().UnixMilli(),
+				}
+				rpcResponse = CreateResponse(rpcMsg.Req.RequestID, rpcMsg.Req.Method, []any{response}, time.Now())
 			}
 
 			if handlerErr != nil {
@@ -338,6 +368,32 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get ledger entries: "+handlerErr.Error())
 				continue
 			}
+
+		case "subscribe_ledger":
+			// For authenticated users, we use their wallet address as the subscriber ID
+
+			// Setup ping handler to keep connection alive
+			conn.SetPingHandler(func(message string) error {
+				err := conn.WriteControl(
+					websocket.PongMessage,
+					[]byte(message),
+					time.Now().Add(5*time.Second),
+				)
+				if err != nil {
+					log.Printf("Error sending pong to %s: %v", walletAddress, err)
+				}
+				return nil
+			})
+
+			// Add to subscribers
+			h.ledgerPublisher.Subscribe(walletAddress, conn)
+
+			// Return success response
+			response := map[string]interface{}{
+				"subscribed": true,
+				"timestamp":  time.Now().UnixMilli(),
+			}
+			rpcResponse = CreateResponse(msg.Req.RequestID, msg.Req.Method, []any{response}, time.Now())
 
 		case "get_app_definition":
 			rpcResponse, handlerErr = HandleGetAppDefinition(&msg, h.db)
@@ -646,6 +702,12 @@ func (h *UnifiedWSHandler) sendAssets(conn *websocket.Conn) {
 
 // CloseAllConnections closes all open WebSocket connections during shutdown
 func (h *UnifiedWSHandler) CloseAllConnections() {
+	// Stop the ledger publisher if it exists
+	if h.ledgerPublisher != nil {
+		h.ledgerPublisher.Stop()
+	}
+
+	// Close all connections
 	h.connectionsMu.RLock()
 	defer h.connectionsMu.RUnlock()
 

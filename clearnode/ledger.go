@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -25,12 +26,36 @@ func (Entry) TableName() string {
 }
 
 type WalletLedger struct {
-	wallet string
-	db     *gorm.DB
+	wallet    string
+	db        *gorm.DB
+	publisher *LedgerPublisher
 }
 
+// Global publisher variables
+var (
+	Publisher     *LedgerPublisher
+	publisherLock sync.RWMutex
+)
+
+// GetWalletLedger returns a new WalletLedger instance
 func GetWalletLedger(db *gorm.DB, wallet string) *WalletLedger {
-	return &WalletLedger{wallet: wallet, db: db}
+	publisherLock.RLock()
+	defer publisherLock.RUnlock()
+	return &WalletLedger{wallet: wallet, db: db, publisher: Publisher}
+}
+
+// SetPublisher sets the global Publisher instance
+func SetPublisher(publisher *LedgerPublisher) {
+	publisherLock.Lock()
+	defer publisherLock.Unlock()
+	Publisher = publisher
+}
+
+// GetPublisher safely retrieves the global Publisher instance
+func GetPublisher() *LedgerPublisher {
+	publisherLock.RLock()
+	defer publisherLock.RUnlock()
+	return Publisher
 }
 
 func (l *WalletLedger) Record(accountID string, assetSymbol string, amount decimal.Decimal) error {
@@ -52,7 +77,12 @@ func (l *WalletLedger) Record(accountID string, assetSymbol string, amount decim
 	}
 
 	fmt.Println("recording entry for: ", l.wallet, " in account ", accountID, " ", assetSymbol, " ", amount)
-	return l.db.Create(entry).Error
+	err := l.db.Create(entry).Error
+	if err == nil && l.publisher != nil {
+		// Publish the ledger entry to all subscribers
+		l.publisher.PublishEntry(entry)
+	}
+	return err
 }
 
 func (l *WalletLedger) Balance(accountID string, assetSymbol string) (decimal.Decimal, error) {

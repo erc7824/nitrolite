@@ -36,6 +36,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialise signer: %v", err)
 	}
+	
+	// Initialize the LedgerPublisher and set it as the global publisher
+	ledgerPublisher := NewLedgerPublisher(signer)
+	SetPublisher(ledgerPublisher)
+	
 	rpcStore := NewRPCStore(db)
 
 	// Initialize Prometheus metrics

@@ -1089,7 +1089,7 @@ func TestHandleGetAppSessions(t *testing.T) {
 	assert.Equal(t, "0xSession1", sessionResponses2[0].AppSessionID, "Should be Session1")
 	assert.Equal(t, string(ChannelStatusOpen), sessionResponses2[0].Status, "Status should be open")
 
-	// Test Case 3: Error case - missing participant
+	// Test Case 3: No participant specified - should return all app sessions
 	rpcRequest3 := &RPCMessage{
 		Req: &RPCData{
 			RequestID: 3,
@@ -1100,11 +1100,62 @@ func TestHandleGetAppSessions(t *testing.T) {
 		Sig: []string{"dummy-signature"},
 	}
 
-	// Call with missing participant
+	// Call with no participant
 	resp3, err := HandleGetAppSessions(rpcRequest3, db)
-	assert.Error(t, err, "Should return error with missing participant")
-	assert.Nil(t, resp3)
-	assert.Contains(t, err.Error(), "missing participant", "Error should mention missing participant")
+	require.NoError(t, err, "Should not return error when participant is not specified")
+	require.NotNil(t, resp3)
+	
+	// Extract and verify all app sessions
+	allSessions, ok := resp3.Res.Params[0].([]AppSessionResponse)
+	require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
+	assert.Len(t, allSessions, 3, "Should return all 3 app sessions in the database")
+	
+	// Check that the response includes all sessions
+	foundSessionIDs := make(map[string]bool)
+	for _, session := range allSessions {
+		foundSessionIDs[session.AppSessionID] = true
+	}
+	
+	assert.True(t, foundSessionIDs["0xSession1"], "Should include Session1")
+	assert.True(t, foundSessionIDs["0xSession2"], "Should include Session2")
+	assert.True(t, foundSessionIDs["0xSession3"], "Should include Session3")
+	
+	// Test Case 4: No participant but with status filter - should return all open app sessions
+	openStatusParams := map[string]string{
+		"status": string(ChannelStatusOpen),
+	}
+	openStatusParamsJSON, err := json.Marshal(openStatusParams)
+	require.NoError(t, err)
+	
+	openStatusRequest := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 4,
+			Method:    "get_app_sessions",
+			Params:    []any{json.RawMessage(openStatusParamsJSON)},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+		Sig: []string{"dummy-signature"},
+	}
+	
+	openStatusResponse, err := HandleGetAppSessions(openStatusRequest, db)
+	require.NoError(t, err)
+	require.NotNil(t, openStatusResponse)
+	
+	// Extract and verify filtered sessions
+	openSessions, ok := openStatusResponse.Res.Params[0].([]AppSessionResponse)
+	require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
+	assert.Len(t, openSessions, 2, "Should return 2 open sessions")
+	
+	// Check that the response includes only open sessions
+	openSessionIDs := make(map[string]bool)
+	for _, session := range openSessions {
+		openSessionIDs[session.AppSessionID] = true
+		assert.Equal(t, string(ChannelStatusOpen), session.Status, "All sessions should have open status")
+	}
+	
+	assert.True(t, openSessionIDs["0xSession1"], "Should include open Session1")
+	assert.True(t, openSessionIDs["0xSession3"], "Should include open Session3")
+	assert.False(t, openSessionIDs["0xSession2"], "Should not include closed Session2")
 }
 
 func TestHandleGetRPCHistory(t *testing.T) {

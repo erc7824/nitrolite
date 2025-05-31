@@ -139,10 +139,10 @@ go run . --method get_assets --params '[{"chain_id":137}]' --send --noauth --ser
 go run . --method get_app_definition --params '[{"app_session_id":"0xAppSessionID"}]' --send --noauth --server wss://canarynet.yellow.com/ws
 
 # List virtual applications for a participant
-go run . --method get_app_sessions --params '[{"participant":"0xParticipantAddress"}]' --send --noauth --server wss://canarynet.yellow.com/ws
+go run . --method get_app_sessions  --send --noauth --server wss://canarynet.yellow.com/ws
 
 # Get channels for a participant
-go run . --method get_channels --params '[{"participant":"0xParticipantAddress"}]' --send --noauth --server wss://canarynet.yellow.com/ws
+go run . --method get_channels --send --noauth --server wss://canarynet.yellow.com/ws
 ```
 
 ### Authenticated Endpoints

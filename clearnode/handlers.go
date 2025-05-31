@@ -650,14 +650,11 @@ func HandleGetAppSessions(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 		}
 	}
 
-	if participant == "" {
-		return nil, errors.New("missing participant")
-	}
-
 	sessions, err := getAppSessions(db, participant, status)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find application sessions: %w", err)
 	}
+
 	response := make([]AppSessionResponse, len(sessions))
 	for i, session := range sessions {
 		response[i] = AppSessionResponse{

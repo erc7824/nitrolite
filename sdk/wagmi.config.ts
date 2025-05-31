@@ -23,6 +23,11 @@ export default defineConfig({
         "forge-std/**",
         "openzeppelin-contracts/**",
       ],
+      // Add more verbose output
+      forge: {
+        build: true,
+        rebuild: true,
+      },
     }),
   ],
 });

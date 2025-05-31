@@ -20,6 +20,8 @@ var knownNetworks = map[string]uint32{
 	"CELO":        42220,
 	"BASE":        8453,
 	"WORLD_CHAIN": 480,
+	"ROOTSTOCK":   30,
+	"FLOW":        747,
 	"LOCALNET":    1337,
 }
 

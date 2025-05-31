@@ -7,3 +7,4 @@ export * from './client/types';
 export * from './client/state';
 export * from './rpc';
 export * from './abis';
+export * from './generated';

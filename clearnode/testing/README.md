@@ -16,6 +16,9 @@ go run . --method ping
 # Send the message to the server and get a response
 go run . --method ping --send --server ws://localhost:8000/ws
 
+# TESTNET: wss://canarynet.yellow.com/ws
+# PROD: wss://clearnet.yellow.com/ws
+
 # Or set the server URL via environment variable
 export SERVER=wss://canarynet.yellow.com/ws
 go run . --method ping --send
@@ -139,16 +142,10 @@ go run . --method get_assets --params '[{"chain_id":137}]' --send --noauth --ser
 go run . --method get_app_definition --params '[{"app_session_id":"0xAppSessionID"}]' --send --noauth --server wss://canarynet.yellow.com/ws
 
 # List virtual applications for a participant
-go run . --method get_app_sessions --params '[{"participant":"0xParticipantAddress"}]' --send --noauth --server wss://canarynet.yellow.com/ws
-
-# Get balances for a specific account
-go run . --method get_ledger_balances --params '[{"account_id":"0x70997970C51812dc3A010C7d01b50e0d17dc79C8"}]' --send --noauth --server wss://canarynet.yellow.com/ws
-
-# Get detailed ledger entries
-go run . --method get_ledger_entries --params '[{"account_id":"0xAccountID","asset":"usdc"}]' --send --noauth --server wss://canarynet.yellow.com/ws
+go run . --method get_app_sessions  --send --noauth --server wss://canarynet.yellow.com/ws
 
 # Get channels for a participant
-go run . --method get_channels --params '[{"participant":"0xParticipantAddress"}]' --send --noauth --server wss://canarynet.yellow.com/ws
+go run . --method get_channels --send --noauth --server wss://canarynet.yellow.com/ws
 ```
 
 ### Authenticated Endpoints

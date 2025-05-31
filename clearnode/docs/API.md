@@ -12,9 +12,9 @@
 | `get_assets` | Retrieves all supported assets (optionally filtered by chain_id) | Public |
 | `get_app_definition` | Retrieves application definition for a ledger account | Public |
 | `get_app_sessions` | Lists virtual applications for a participant with optional status filter | Public |
-| `get_ledger_balances` | Lists participants and their balances for a ledger account | Public |
-| `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Public |
+| `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
 | `get_channels` | Lists all channels for a participant with their status across all chains | Public |
+| `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Private |
 | `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
 | `create_app_session` | Creates a new virtual application on a ledger | Private |
 | `close_app_session` | Closes a virtual application | Private |
@@ -257,7 +257,7 @@ Retrieves the detailed ledger entries for an account, providing a complete trans
 
 ### Get Channels
 
-Retrieves all channels for a participant (both open, closed, and joining), ordered by creation date (newest first). This method returns channels across all supported chains.
+Retrieves all channels for a participant (both open, closed, and joining), ordered by creation date (newest first). This method returns channels across all supported chains. If no participant is specified, it returns all channels.
 
 **Request:**
 

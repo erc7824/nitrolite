@@ -25,22 +25,29 @@ func (AppSession) TableName() string {
 	return "app_sessions"
 }
 
-// getAppSessions finds all channels for a participant
+// getAppSessions finds all app sessions
+// If participantWallet is specified, it returns only sessions for that participant
+// If participantWallet is empty, it returns all sessions
 func getAppSessions(tx *gorm.DB, participantWallet string, status string) ([]AppSession, error) {
 	var sessions []AppSession
-	switch tx.Dialector.Name() {
-	case "postgres":
-		tx = tx.Where("? = ANY(participants)", participantWallet)
-	case "sqlite":
-		tx = tx.Where("instr(participants, ?) > 0", participantWallet)
-	default:
-		return nil, fmt.Errorf("unsupported database driver: %s", tx.Dialector.Name())
-	}
-	if status != "" {
-		tx = tx.Where("status = ?", status)
+	query := tx
+
+	if participantWallet != "" {
+		switch tx.Dialector.Name() {
+		case "postgres":
+			query = query.Where("? = ANY(participants)", participantWallet)
+		case "sqlite":
+			query = query.Where("instr(participants, ?) > 0", participantWallet)
+		default:
+			return nil, fmt.Errorf("unsupported database driver: %s", tx.Dialector.Name())
+		}
 	}
 
-	if err := tx.Find(&sessions).Error; err != nil {
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	if err := query.Find(&sessions).Error; err != nil {
 		return nil, err
 	}
 

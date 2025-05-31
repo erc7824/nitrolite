@@ -107,7 +107,7 @@ func NewMetrics() *Metrics {
 				Name: "clearnet_broker_channel_count",
 				Help: "Number of channels for the broker on the custody contract",
 			},
-			[]string{"network", "token", "asset"},
+			[]string{"network", "asset"},
 		),
 		BrokerWalletBalance: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{

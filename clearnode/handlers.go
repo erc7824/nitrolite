@@ -360,13 +360,15 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 	}
 
 	recoveredAddresses := map[string]bool{}
-	for _, sig := range rpc.Sig {
+	for i, sig := range rpc.Sig {
 		addr, err := RecoverAddress(reqBytes, sig)
+		fmt.Println("Recovered address for ", i, ": ", addr)
 		if err != nil {
 			return nil, errors.New("invalid signature")
 		}
 
 		walletAddress, err := GetWalletBySigner(addr)
+		fmt.Println("Get wallet address for ", i, ": ", walletAddress)
 		if err != nil {
 			continue
 		}
@@ -387,7 +389,9 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 			if allocation.Amount.IsNegative() {
 				return errors.New("invalid allocation")
 			}
+			fmt.Println(recoveredAddresses)
 			if allocation.Amount.IsPositive() {
+				fmt.Println("Checking allocation for participant:", allocation.ParticipantWallet)
 				if !recoveredAddresses[allocation.ParticipantWallet] {
 					return fmt.Errorf("missing signature for participant %s", allocation.ParticipantWallet)
 				}

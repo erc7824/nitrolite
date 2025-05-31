@@ -40,14 +40,13 @@ func NewUnifiedWSHandler(
 	metrics *Metrics,
 	rpcStore *RPCStore,
 	config *Config,
+	ledgerPublisher *LedgerPublisher,
 ) (*UnifiedWSHandler, error) {
 	authManager, err := NewAuthManager(signer.GetPrivateKey())
 
 	if err != nil {
 		return nil, err
 	}
-
-	ledgerPublisher := NewLedgerPublisher(signer)
 
 	return &UnifiedWSHandler{
 		signer: signer,
@@ -349,12 +348,29 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 		case "subscribe_ledger":
 			// For authenticated users, we use their wallet address as the subscriber ID
-			rpcResponse, handlerErr = h.HandleLedgerSubscription(conn, &msg, walletAddress)
-			if handlerErr != nil {
-				log.Printf("Error handling subscribe_ledger: %v", handlerErr)
-				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to subscribe to ledger: "+handlerErr.Error())
-				continue
+
+			// Setup ping handler to keep connection alive
+			conn.SetPingHandler(func(message string) error {
+				err := conn.WriteControl(
+					websocket.PongMessage,
+					[]byte(message),
+					time.Now().Add(5*time.Second),
+				)
+				if err != nil {
+					log.Printf("Error sending pong to %s: %v", walletAddress, err)
+				}
+				return nil
+			})
+
+			// Add to subscribers
+			h.ledgerPublisher.Subscribe(walletAddress, conn)
+
+			// Return success response
+			response := map[string]interface{}{
+				"subscribed": true,
+				"timestamp":  time.Now().UnixMilli(),
 			}
+			rpcResponse = CreateResponse(msg.Req.RequestID, msg.Req.Method, []any{response}, time.Now())
 
 		case "get_app_definition":
 			rpcResponse, handlerErr = HandleGetAppDefinition(&msg, h.db)

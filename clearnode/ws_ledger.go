@@ -1,12 +1,5 @@
 package main
 
-// ws_ledger.go contains WebSocket handler methods for ledger subscription functionality.
-// It manages the connection setup for ledger update subscriptions and provides utility
-// methods for publishing ledger entries to subscribed clients.
-//
-// This file complements ledger_publisher.go by integrating the subscription functionality
-// with the WebSocket handler infrastructure.
-
 import (
 	"log"
 	"time"
@@ -19,19 +12,19 @@ func (h *UnifiedWSHandler) HandleLedgerSubscription(conn *websocket.Conn, rpc *R
 	// Setup ping handler to keep connection alive
 	conn.SetPingHandler(func(message string) error {
 		err := conn.WriteControl(
-			websocket.PongMessage, 
+			websocket.PongMessage,
 			[]byte(message),
-			time.Now().Add(5 * time.Second),
+			time.Now().Add(5*time.Second),
 		)
 		if err != nil {
 			log.Printf("Error sending pong to %s: %v", subscriberID, err)
 		}
 		return nil
 	})
-	
+
 	// Register the subscriber
 	h.ledgerPublisher.Subscribe(subscriberID, conn)
-	
+
 	// We don't need a separate goroutine here since LedgerPublisher now has
 	// its own connection health checks
 

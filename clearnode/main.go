@@ -36,10 +36,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialise signer: %v", err)
 	}
-	
+
 	// Initialize the LedgerPublisher and set it as the global publisher
 	Publisher = NewLedgerPublisher(signer)
-	
+
 	rpcStore := NewRPCStore(db)
 
 	// Initialize Prometheus metrics
@@ -47,7 +47,7 @@ func main() {
 	// Map to store custody clients for later reference
 	custodyClients := make(map[string]*Custody)
 
-	unifiedWSHandler, err := NewUnifiedWSHandler(signer, db, metrics, rpcStore, config)
+	unifiedWSHandler, err := NewUnifiedWSHandler(signer, db, metrics, rpcStore, config, Publisher)
 	if err != nil {
 		log.Fatalf("Failed to initialize WebSocket handler: %v", err)
 	}

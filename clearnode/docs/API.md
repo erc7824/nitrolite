@@ -14,6 +14,7 @@
 | `get_app_sessions` | Lists virtual applications for a participant with optional status filter | Public |
 | `get_channels` | Lists all channels for a participant with their status across all chains | Public |
 | `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Public |
+| `subscribe_ledger` | Subscribes to real-time ledger updates | Public |
 | `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
 | `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
 | `create_app_session` | Creates a new virtual application on a ledger | Private |
@@ -605,6 +606,60 @@ Responses can also be forwarded to all participants in a virtual application by 
 }
 ```
 
+## Real-time Updates
+
+### Subscribe to Ledger Updates
+
+Establishes a subscription to receive real-time notifications when ledger entries are recorded.
+
+**Request:**
+
+```json
+{
+  "req": [1, "subscribe_ledger", [], 1619123456789],
+  "sig": []
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "subscribe_ledger", [{
+    "subscribed": true,
+    "timestamp": 1619123456789
+  }], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+**Ledger Update Notification:**
+
+After subscribing, the client will receive ledger entry updates in real-time:
+
+```json
+{
+  "res": [1234567890123, "ledger_update", [{
+    "id": 125,
+    "account_id": "0x1234567890abcdef...",
+    "account_type": 0,
+    "asset": "usdc",
+    "participant": "0x1234567890abcdef...",
+    "credit": "50.0",
+    "debit": "0.0",
+    "created_at": "2023-05-01T15:45:00Z"
+  }], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+The subscription remains active until:
+- The client closes the WebSocket connection
+- The server detects the connection is no longer responsive (via ping/pong health checks)
+- The server is shut down (which will close all active connections with a proper close message)
+
+Both authenticated and unauthenticated clients can subscribe to ledger updates. Authenticated clients will use their wallet address as subscriber ID, while unauthenticated clients will be assigned a temporary identifier.
+
 ## Utility Methods
 
 ### Ping
@@ -635,6 +690,7 @@ The server automatically sends balance updates to clients in these scenarios:
 1. After successful authentication (as a welcome message)
 2. After channel operations (open, close, resize)
 3. After application operations (create, close)
+4. When using ledger subscription, after any new ledger entry is recorded
 
 Balance updates are sent as unsolicited server messages with the "bu" method:
 

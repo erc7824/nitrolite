@@ -11,17 +11,19 @@
   "scripts": {
     "build": "npm run codegen && tsc",
     "build:prod": "npm run codegen && tsc -p tsconfig.prod.json",
-    "build:full": "npm run validate && npm run build && npm run docs",
+    "build:full": "npm run validate && npm run build && npm run docs && npm run docs:tutorials",
     "codegen": "wagmi generate",
     "docs": "ts-node scripts/generate-docs.ts",
+    "docs:tutorials": "ts-node scripts/generate-example-tutorials.ts",
     "validate": "ts-node scripts/validate-types.ts",
     "watch": "tsc --watch",
-    "clean": "rimraf dist docs/generated",
+    "clean": "rimraf dist docs/generated docs/tutorials",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:types": "npm run validate",
     "dev": "npm run codegen && npm run watch",
+    "dev:docs": "npm run docs:tutorials && npm run watch",
     "prepublishOnly": "npm run clean && npm run build:full"
   },
   "keywords": [

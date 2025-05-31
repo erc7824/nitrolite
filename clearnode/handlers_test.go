@@ -691,8 +691,8 @@ func TestHandleGetChannels(t *testing.T) {
 	assert.Equal(t, "0xChannel3", joiningChannels[0].ChannelID, "Should return the joining channel")
 	assert.Equal(t, ChannelStatusJoining, joiningChannels[0].Status, "Status should be joining")
 
-	// Test with missing participant parameter
-	missingParamReq := &RPCMessage{
+	// Test with no participant parameter (should return all channels)
+	noParamReq := &RPCMessage{
 		Req: &RPCData{
 			RequestID: 789,
 			Method:    "get_channels",
@@ -702,9 +702,63 @@ func TestHandleGetChannels(t *testing.T) {
 		Sig: []string{},
 	}
 
-	_, err = HandleGetChannels(missingParamReq, db)
-	assert.Error(t, err, "Should return error with missing participant")
-	assert.Contains(t, err.Error(), "missing participant", "Error should mention missing participant")
+	allChannelsResp, err := HandleGetChannels(noParamReq, db)
+	require.NoError(t, err, "Should not return error when participant is not specified")
+	require.NotNil(t, allChannelsResp)
+	
+	// Extract and verify all channels
+	allChannels, ok := allChannelsResp.Res.Params[0].([]ChannelResponse)
+	require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
+	assert.Len(t, allChannels, 4, "Should return all 4 channels in the database")
+	
+	// Check that the response includes both the participant's channels and the other channel
+	foundChannelIDs := make(map[string]bool)
+	for _, channel := range allChannels {
+		foundChannelIDs[channel.ChannelID] = true
+	}
+	
+	assert.True(t, foundChannelIDs["0xChannel1"], "Should include Channel1")
+	assert.True(t, foundChannelIDs["0xChannel2"], "Should include Channel2")
+	assert.True(t, foundChannelIDs["0xChannel3"], "Should include Channel3")
+	assert.True(t, foundChannelIDs["0xOtherChannel"], "Should include OtherChannel")
+	
+	// Test with no participant but with status filter (should return all open channels)
+	openStatusOnlyParams := map[string]string{
+		"status": string(ChannelStatusOpen),
+	}
+	openStatusOnlyParamsJSON, err := json.Marshal(openStatusOnlyParams)
+	require.NoError(t, err)
+	
+	openStatusOnlyReq := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 790,
+			Method:    "get_channels",
+			Params:    []any{json.RawMessage(openStatusOnlyParamsJSON)},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+		Sig: []string{},
+	}
+	
+	openChannelsResp, err := HandleGetChannels(openStatusOnlyReq, db)
+	require.NoError(t, err)
+	require.NotNil(t, openChannelsResp)
+	
+	// Extract and verify open channels
+	openChannelsOnly, ok := openChannelsResp.Res.Params[0].([]ChannelResponse)
+	require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
+	assert.Len(t, openChannelsOnly, 2, "Should return 2 open channels (one from participant and one from other)")
+	
+	// Check that the response includes only open channels
+	openChannelIDs := make(map[string]bool)
+	for _, channel := range openChannelsOnly {
+		openChannelIDs[channel.ChannelID] = true
+		assert.Equal(t, ChannelStatusOpen, channel.Status, "All channels should have open status")
+	}
+	
+	assert.True(t, openChannelIDs["0xChannel1"], "Should include open Channel1")
+	assert.True(t, openChannelIDs["0xOtherChannel"], "Should include open OtherChannel")
+	assert.False(t, openChannelIDs["0xChannel2"], "Should not include closed Channel2")
+	assert.False(t, openChannelIDs["0xChannel3"], "Should not include joining Channel3")
 }
 
 // TestHandleGetAssets tests the get assets handler functionality

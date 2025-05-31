@@ -108,7 +108,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		// Handle message based on the method
 		switch rpcMsg.Req.Method {
 		// Public endpoints
-		case "ping", "get_config", "get_assets", "get_ledger_balances", "get_ledger_entries", "get_app_definition", "get_app_sessions", "get_channels":
+		case "ping", "get_config", "get_assets", "get_app_definition", "get_app_sessions", "get_channels":
 			var rpcResponse *RPCMessage
 			var handlerErr error
 
@@ -119,10 +119,6 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 				rpcResponse, handlerErr = HandleGetConfig(&rpcMsg, h.config, h.signer)
 			case "get_assets":
 				rpcResponse, handlerErr = HandleGetAssets(&rpcMsg, h.db)
-			case "get_ledger_balances":
-				rpcResponse, handlerErr = HandleGetLedgerBalances(&rpcMsg, "", h.db)
-			case "get_ledger_entries":
-				rpcResponse, handlerErr = HandleGetLedgerEntries(&rpcMsg, "", h.db)
 			case "get_app_definition":
 				rpcResponse, handlerErr = HandleGetAppDefinition(&rpcMsg, h.db)
 			case "get_app_sessions":

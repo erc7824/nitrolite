@@ -967,13 +967,25 @@ func HandleGetChannels(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 		}
 	}
 
-	if participant == "" {
-		return nil, errors.New("missing participant participant")
-	}
+	var channels []Channel
+	var err error
 
-	channels, err := getChannelsByWallet(db, participant, status)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get channels: %w", err)
+	if participant == "" {
+		// Return all channels if participant is not specified
+		query := db
+		if status != "" {
+			query = query.Where("status = ?", status)
+		}
+		err = query.Order("created_at DESC").Find(&channels).Error
+		if err != nil {
+			return nil, fmt.Errorf("failed to get all channels: %w", err)
+		}
+	} else {
+		// Return channels for specific participant
+		channels, err = getChannelsByWallet(db, participant, status)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get channels: %w", err)
+		}
 	}
 
 	var channelResponses []ChannelResponse

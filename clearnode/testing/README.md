@@ -141,12 +141,6 @@ go run . --method get_app_definition --params '[{"app_session_id":"0xAppSessionI
 # List virtual applications for a participant
 go run . --method get_app_sessions --params '[{"participant":"0xParticipantAddress"}]' --send --noauth --server wss://canarynet.yellow.com/ws
 
-# Get balances for a specific account
-go run . --method get_ledger_balances --params '[{"account_id":"0x70997970C51812dc3A010C7d01b50e0d17dc79C8"}]' --send --noauth --server wss://canarynet.yellow.com/ws
-
-# Get detailed ledger entries
-go run . --method get_ledger_entries --params '[{"account_id":"0xAccountID","asset":"usdc"}]' --send --noauth --server wss://canarynet.yellow.com/ws
-
 # Get channels for a participant
 go run . --method get_channels --params '[{"participant":"0xParticipantAddress"}]' --send --noauth --server wss://canarynet.yellow.com/ws
 ```

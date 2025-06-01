@@ -1,6 +1,7 @@
 import { createAuthRequestMessage, createAuthVerifyMessage, createAuthVerifyMessageWithJWT } from '@erc7824/nitrolite';
 import type { WalletSigner } from '../crypto';
 import type { Hex } from 'viem';
+import { getAddress } from 'viem';
 
 /**
  * EIP-712 domain and types for auth_verify challenge
@@ -41,7 +42,11 @@ function createEIP712SigningFunction(walletClient: any, stateSigner: WalletSigne
         console.log('Signing auth_verify challenge with EIP-712:', data);
 
         let challengeUUID = '';
-        const address = walletClient.account?.address;
+        const address = walletClient.account?.address ? getAddress(walletClient.account.address) : null;
+        
+        if (!address) {
+            throw new Error('No wallet address available for signing');
+        }
 
         // For Snake game, we don't have complex channel state, so we'll use 0 for amount
         const totalAmount = 0;
@@ -181,11 +186,14 @@ export async function authenticate(
         throw new Error('No wallet client available for authentication');
     }
 
-    const walletAddress = walletClient.account?.address;
-
-    if (!walletAddress) {
+    const rawWalletAddress = walletClient.account?.address;
+    
+    if (!rawWalletAddress) {
         throw new Error('No wallet address available for authentication');
     }
+    
+    // Ensure the address is properly checksummed for EIP-55 compliance
+    const walletAddress = getAddress(rawWalletAddress);
 
     console.log('Starting authentication with:');
     console.log('- Wallet address:', walletAddress);

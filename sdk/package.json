@@ -16,9 +16,14 @@
         "lint": "eslint src --ext .ts",
         "typecheck": "tsc --noEmit",
         "test": "jest",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
         "test:integration": "jest --config jest.integration.config.js",
-        "test:ci": "npm run test && npm run test:integration",
-        "prepublishOnly": "npm run clean && npm run build:prod"
+        "test:integration:watch": "jest --config jest.integration.config.js --watch",
+        "test:integration:coverage": "jest --config jest.integration.config.js --coverage",
+        "test:nonregression": "npm run test:integration",
+        "test:all": "npm run test && npm run test:integration",
+        "prepare": "npm run build"
     },
     "keywords": [
         "erc7824",

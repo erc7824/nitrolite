@@ -38,10 +38,10 @@ export const TEST_CONSTANTS = {
 
 // Test accounts with known private keys
 const TEST_PRIVATE_KEYS = {
-  alice: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
-  bob: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
-  charlie: '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a',
-  deployer: '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6',
+  alice: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as `0x${string}`,
+  bob: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as `0x${string}`,
+  charlie: '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a' as `0x${string}`,
+  deployer: '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6' as `0x${string}`,
 };
 
 let testEnvironment: TestEnvironment | null = null;
@@ -137,6 +137,7 @@ export async function deployContract(
     bytecode,
     args,
     account: testEnv.accounts.deployer,
+    chain: anvil,
   });
 
   const receipt = await testEnv.publicClient.waitForTransactionReceipt({ hash });
@@ -175,12 +176,12 @@ export function getContractArtifacts() {
 export function createWalletClientForAccount(
   testEnv: TestEnvironment,
   account: Account
-): WalletClient {
+): WalletClient<any, any, Account> {
   return createWalletClient({
     chain: anvil,
     transport: http('http://127.0.0.1:8545'),
     account,
-  });
+  }) as WalletClient<any, any, Account>;
 }
 
 // Jest setup
@@ -190,58 +191,4 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await resetTestEnvironment();
-});
-
-// Helper functions for tests
-export const deployContract = async (
-  env: TestEnvironment,
-  bytecode: string,
-  constructorArgs: any[] = []
-): Promise<Address> => {
-  // This would deploy contract to the simulated EVM
-  // For now, we'll simulate deployment
-  const contractAddress = createAddress(env.accounts.deployer.address, 0n);
-  return contractAddress;
-};
-
-export const fundAccount = async (
-  env: TestEnvironment,
-  address: Address,
-  amount: bigint
-): Promise<void> => {
-  // Fund account in the test environment
-  const account = await env.stateManager.getAccount(createAddress(address, 0n));
-  if (account) {
-    account.balance = amount;
-    await env.stateManager.putAccount(createAddress(address, 0n), account);
-  }
-};
-
-export const getAccountBalance = async (
-  env: TestEnvironment,
-  address: Address
-): Promise<bigint> => {
-  const account = await env.stateManager.getAccount(createAddress(address, 0n));
-  return account?.balance || 0n;
-};
-
-export const mineBlock = async (env: TestEnvironment): Promise<void> => {
-  // Simulate mining a block in the test environment
-  await env.testClient.mine({ blocks: 1 });
-};
-
-// Contract compilation utilities
-export const getContractArtifacts = () => {
-  // This would read compiled contract artifacts
-  // For now, return placeholder bytecode
-  return {
-    custody: {
-      bytecode: '0x608060405234801561001057600080fd5b50600080fd5b50',
-      abi: [],
-    },
-    adjudicator: {
-      bytecode: '0x608060405234801561001057600080fd5b50600080fd5b50',
-      abi: [],
-    },
-  };
-}; 
+}); 

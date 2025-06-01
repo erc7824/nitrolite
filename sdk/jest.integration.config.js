@@ -1,20 +1,47 @@
-/** @type {import('ts-jest').JestConfigWithTsJest} */
+/** @type {import('jest').Config} */
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  testMatch: ['**/test/integration/**/*.test.ts'],
-  collectCoverageFrom: [
-    'src/**/*.ts',
-    '!src/**/index.ts',
-    '!src/**/*.d.ts'
+  roots: ['<rootDir>/test/integration'],
+  testMatch: [
+    '**/test/integration/**/*.test.ts',
+    '**/test/integration/**/*.test.js'
   ],
-  collectCoverage: true,
-  coverageReporters: ['text', 'lcov'],
   transform: {
-    '^.+\\.ts$': 'ts-jest'
+    '^.+\\.ts$': 'ts-jest',
   },
-  setupFilesAfterEnv: ['<rootDir>/test/integration/setup.ts'],
+  collectCoverageFrom: [
+    'src/**/*.{ts,js}',
+    '!src/**/*.d.ts',
+    '!src/**/*.test.{ts,js}',
+    '!src/**/__tests__/**',
+  ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'html'],
   testTimeout: 30000, // 30 seconds for integration tests
-  maxWorkers: 1, // Run integration tests sequentially to avoid conflicts
-  verbose: true
+  maxWorkers: 1, // Run tests sequentially for integration testing
+  verbose: true,
+  setupFilesAfterEnv: ['<rootDir>/test/integration/setup.ts'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
+  moduleNameMapping: {
+    '^@/(.*)$': '<rootDir>/src/$1'
+  },
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',
+    '/build/'
+  ],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/test/',
+    '/dist/',
+    '/build/'
+  ],
+  // Global test setup
+  globalSetup: undefined,
+  globalTeardown: undefined,
+  // Environment variables for tests
+  testEnvironmentOptions: {
+    NODE_ENV: 'test'
+  }
 }; 

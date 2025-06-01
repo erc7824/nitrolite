@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -146,7 +147,7 @@ func (am *AuthManager) ValidateChallenge(challengeToken uuid.UUID, recoveredSign
 
 	// Verify the challenge was created for this address
 	if challenge.Address != recoveredSigner {
-		return errors.New("challenge was not created for this address")
+		return fmt.Errorf("challenge address mismatch, expected %s, got %s", challenge.Address, recoveredSigner)
 	}
 
 	// Check if challenge is expired

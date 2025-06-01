@@ -165,6 +165,7 @@ async function authenticateWithBroker(): Promise<void> {
     if (!serverAddress) {
         throw new Error("Server address not found");
     }
+    
 
     const expire = String(Math.floor(Date.now() / 1000) + 24 * 60 * 60);
 
@@ -278,9 +279,9 @@ async function authenticateWithBroker(): Promise<void> {
                 authRequest = await createAuthRequestMessage({
                     wallet: serverAddress,
                     participant: serverAddress,
-                    app_name: 'Snake Game Server',
+                    app_name: 'Snake Game',
                     expire: expire,
-                    scope: 'snake-game-server',
+                    scope: 'snake-game',
                     application: serverAddress,
                     allowances: [
                         {
@@ -628,6 +629,7 @@ export function createEthersSigner(privateKey: string): WalletSigner {
     try {
         // Create ethers wallet from private key
         const wallet = new ethers.Wallet(privateKey);
+        
         return {
             publicKey: wallet.publicKey,
             address: wallet.address as Hex,
@@ -767,7 +769,7 @@ function createEIP712SigningFunction(serverAddress: string, expire: string) {
         // Create EIP-712 message with ONLY the challenge UUID
         const message = {
             challenge: challengeUUID,
-            scope: 'snake-game-server',
+            scope: 'snake-game',
             wallet: serverAddress as `0x${string}`,
             application: serverAddress as `0x${string}`,
             participant: serverAddress as `0x${string}`,
@@ -779,12 +781,15 @@ function createEIP712SigningFunction(serverAddress: string, expire: string) {
                 },
             ],
         };
+        
 
         try {
             // Sign with EIP-712
             const signature = await wallet._signTypedData(getAuthDomain(), AUTH_TYPES, message);
 
             console.log('EIP-712 signature generated for challenge:', signature);
+            
+            
             return signature as `0x${string}`;
         } catch (eip712Error) {
             console.error('EIP-712 signing failed:', eip712Error);

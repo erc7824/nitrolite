@@ -25,8 +25,14 @@
         "dev": "npm run codegen && npm run watch",
         "dev:docs": "npm run docs:tutorials && npm run watch",
         "prettier": "prettier --write .",
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
         "test:integration": "jest --config jest.integration.config.js",
-        "test:ci": "npm run test && npm run test:integration",
+        "test:integration:watch": "jest --config jest.integration.config.js --watch",
+        "test:integration:coverage": "jest --config jest.integration.config.js --coverage",
+        "test:nonregression": "npm run test:integration",
+        "test:all": "npm run test && npm run test:integration",
+        "prepare": "npm run build",
         "prepublishOnly": "npm run clean && npm run validate && npm run build:prod"
     },
     "keywords": [

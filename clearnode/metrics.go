@@ -23,16 +23,12 @@ type Metrics struct {
 	AuthAttempsSuccess *prometheus.CounterVec
 	AuthAttempsFail    *prometheus.CounterVec
 
-	// Channel metrics
-	ChannelsTotal  prometheus.Gauge
-	ChannelsOpen   prometheus.Gauge
-	ChannelsClosed prometheus.Gauge
+	// Channel & app sessions metrics
+	Channels    *prometheus.GaugeVec
+	AppSessions *prometheus.GaugeVec
 
 	// RPC method metrics
 	RPCRequests *prometheus.CounterVec
-
-	// Application metrics
-	AppSessionsTotal prometheus.Gauge
 
 	// Smart contract metrics
 	BrokerBalanceAvailable *prometheus.GaugeVec
@@ -86,18 +82,18 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"auth_method"},
 		),
-		ChannelsTotal: promauto.NewGauge(prometheus.GaugeOpts{
-			Name: "clearnet_channels_total",
-			Help: "The total number of channels",
-		}),
-		ChannelsOpen: promauto.NewGauge(prometheus.GaugeOpts{
-			Name: "clearnet_channels_open",
-			Help: "The number of open channels",
-		}),
-		ChannelsClosed: promauto.NewGauge(prometheus.GaugeOpts{
-			Name: "clearnet_channels_closed",
-			Help: "The number of closed channels",
-		}),
+		Channels: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "clearnet_channels",
+			Help: "The number of channels",
+		},
+			[]string{"status"},
+		),
+		AppSessions: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "clearnet_app_sessions",
+			Help: "The number of application sessions",
+		},
+			[]string{"status"},
+		),
 		RPCRequests: promauto.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "clearnet_rpc_requests_total",
@@ -105,10 +101,6 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"method"},
 		),
-		AppSessionsTotal: promauto.NewGauge(prometheus.GaugeOpts{
-			Name: "clearnet_app_sessions_total",
-			Help: "The total number of application sessions",
-		}),
 		BrokerBalanceAvailable: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "clearnet_broker_balance_available",
@@ -173,23 +165,58 @@ func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[stri
 		}
 	}
 }
-
-// UpdateChannelMetrics updates the channel metrics from the database
 func (m *Metrics) UpdateChannelMetrics(db *gorm.DB) {
-	var total, open, closed int64
+	type StatusCount struct {
+		Status string
+		Count  int64
+	}
 
-	db.Model(&Channel{}).Count(&total)
-	db.Model(&Channel{}).Where("status = ?", ChannelStatusOpen).Count(&open)
-	db.Model(&Channel{}).Where("status = ?", ChannelStatusClosed).Count(&closed)
+	var results []StatusCount
 
-	m.ChannelsTotal.Set(float64(total))
-	m.ChannelsOpen.Set(float64(open))
-	m.ChannelsClosed.Set(float64(closed))
+	err := db.Model(&Channel{}).
+		Select("status, COUNT(*) as count").
+		Group("status").
+		Scan(&results).Error
+	if err != nil {
+		// handle error (e.g., log it)
+		return
+	}
+
+	// Reset the gauge vector before setting new values
+	m.Channels.Reset()
+
+	for _, row := range results {
+		m.Channels.WithLabelValues(row.Status).Set(float64(row.Count))
+	}
 }
 
 // UpdateAppSessionMetrics updates the application session metrics from the database
 func (m *Metrics) UpdateAppSessionMetrics(db *gorm.DB) {
-	var count int64
-	db.Model(&AppSession{}).Count(&count)
-	m.AppSessionsTotal.Set(float64(count))
+	type StatusCount struct {
+		Status string
+		Count  int64
+	}
+
+	var results []StatusCount
+
+	err := db.Model(&AppSession{}).
+		Select("status, COUNT(*) as count").
+		Group("status").
+		Scan(&results).Error
+	if err != nil {
+		// Log or handle error
+		return
+	}
+
+	// Stage values to avoid partial update issues
+	tmp := make(map[string]float64)
+	for _, row := range results {
+		tmp[row.Status] = float64(row.Count)
+	}
+
+	// Now safely update the GaugeVec
+	m.AppSessions.Reset()
+	for status, count := range tmp {
+		m.AppSessions.WithLabelValues(status).Set(count)
+	}
 }

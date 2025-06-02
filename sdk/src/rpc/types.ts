@@ -251,6 +251,11 @@ export type MultiMessageVerifier = (
     expectedSigners: Address[]
 ) => Promise<boolean>;
 
+/**
+ * Represents a partial EIP-712 message for authorization.
+ * This is used to define the structure of the authorization message
+ * that will be signed by the user.
+ */
 export interface PartialEIP712AuthMessage {
     scope: string;
     application: Address;
@@ -263,15 +268,25 @@ export interface PartialEIP712AuthMessage {
     }[];
 }
 
+/**
+ * Represents a complete EIP-712 message for authorization.
+ */
 export interface EIP712AuthMessage extends PartialEIP712AuthMessage {
     wallet: Address;
     challenge: string;
 }
 
+/**
+ * Represents the EIP-712 domain for authorization messages.
+ * This is used to define the domain separator for EIP-712 signatures.
+ */
 export interface EIP712AuthDomain {
     name: string;
 }
 
+/**
+ * Represents the EIP-712 types for authorization messages.
+ */
 export const EIP712AuthTypes = {
     Policy: [
         { name: 'challenge', type: 'string' },

@@ -1,4 +1,4 @@
-import { Address, Hex } from "viem";
+import { Address, Hex, WalletClient } from "viem";
 import {
     MessageSigner,
     AccountID,
@@ -9,6 +9,9 @@ import {
     CreateAppSessionRequest,
     ResizeChannel,
     AuthRequest,
+    PartialEIP712AuthMessage,
+    EIP712AuthTypes,
+    EIP712AuthDomain,
 } from "./types"; // Added ParsedResponse
 import { NitroliteRPC } from "./nitrolite";
 import { generateRequestId, getCurrentTimestamp } from "./utils";
@@ -348,4 +351,90 @@ export async function createGetChannelsMessage(
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);
+}
+
+/**
+ * Creates EIP-712 signing function for challenge verification with proper challenge extraction
+ * 
+ * @param walletClient - The WalletClient instance to use for signing.
+ * @param partialMessage - The partial EIP-712 message structure to complete with the challenge.
+ * @param authDomain - The domain name for the EIP-712 signing context.
+ * @returns A MessageSigner function that takes the challenge data and returns the EIP-712 signature.
+ * @throws Error if the wallet client is not available or if challenge extraction fails.
+*/
+export function createEIP712AuthMessageSigner(
+    walletClient: WalletClient,
+    partialMessage: PartialEIP712AuthMessage,
+    domain: EIP712AuthDomain,
+): MessageSigner {
+    return async (data: any): Promise<`0x${string}`> => {
+        let challengeUUID = '';
+        const address = walletClient.account?.address;
+
+        // The data coming in is the array from createAuthVerifyMessage
+        // Format: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
+        if (Array.isArray(data)) {
+            // Direct array access - data[2] should be the array with the challenge object
+            if (data.length >= 3 && Array.isArray(data[2]) && data[2].length > 0) {
+                const challengeObject = data[2][0];
+
+                if (challengeObject && challengeObject.challenge) {
+                    challengeUUID = challengeObject.challenge;
+                }
+            }
+        } else if (typeof data === 'string') {
+            try {
+                const parsed = JSON.parse(data);
+
+                // Handle different message structures
+                if (parsed.res && Array.isArray(parsed.res)) {
+                    // auth_challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
+                    if (parsed.res[1] === 'auth_challenge' && parsed.res[2]) {
+                        challengeUUID = parsed.res[2].challenge_message || parsed.res[2].challenge;
+                    }
+                    // auth_verify message: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
+                    else if (parsed.res[1] === 'auth_verify' && Array.isArray(parsed.res[2]) && parsed.res[2][0]) {
+                        challengeUUID = parsed.res[2][0].challenge;
+                    }
+                }
+                // Direct array format
+                else if (Array.isArray(parsed) && parsed.length >= 3 && Array.isArray(parsed[2])) {
+                    challengeUUID = parsed[2][0]?.challenge;
+                }
+            } catch (e) {
+                console.error('Could not parse challenge data:', e);
+                challengeUUID = data;
+            }
+        } else if (data && typeof data === 'object') {
+            // If data is already an object, try to extract challenge
+            challengeUUID = data.challenge || data.challenge_message;
+        }
+
+        if (!challengeUUID || challengeUUID.includes('[') || challengeUUID.includes('{')) {
+            console.error('Challenge extraction failed or contains invalid characters:', challengeUUID);
+            throw new Error('Could not extract valid challenge UUID for EIP-712 signing');
+        }
+
+        const message: Record<string, unknown> = {
+            ...partialMessage,
+            challenge: challengeUUID,
+            wallet: address as Address,
+        }
+
+        try {
+            // Sign with EIP-712
+            const signature = await walletClient.signTypedData({
+                account: walletClient.account!,
+                domain,
+                types: EIP712AuthTypes,
+                primaryType: 'Policy',
+                message,
+            });
+
+            return signature;
+        } catch (eip712Error) {
+            console.error('EIP-712 signing failed:', eip712Error);
+            throw new Error(`EIP-712  signing failed: ${eip712Error}`);
+        }
+    };
 }

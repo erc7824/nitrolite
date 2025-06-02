@@ -1,5 +1,5 @@
 import { Hex, stringToHex } from "viem";
-import { NitroliteRPCMessage } from "./types";
+import { NitroliteRPCMessage, RPCResponse } from "./types";
 
 /**
  * Get the current time in milliseconds
@@ -140,3 +140,60 @@ export function isValidResponseRequestId(request: NitroliteRPCMessage, response:
 
     return responseId === requestId;
 }
+
+
+/**
+ * Parses a raw RPC response string into a structured RPCResponse object
+ * @param response The raw RPC response string to parse
+ * @returns An RPCResponse object containing the parsed data
+ */
+export function parseRPCResponse(response: string): RPCResponse {
+    // TODO: Add support for other rpc protocols besides websocket
+    try {
+        const parsed = JSON.parse(response);
+
+        if (!Array.isArray(parsed.res) || parsed.res.length !== 4) {
+            throw new Error('Invalid RPC response format');
+        }
+
+        switch (parsed.res[1]) {
+            case 'auth_challenge':
+                return {
+                    method: 'auth_challenge',
+                    requestId: parsed.res[0],
+                    timestamp: parsed.res[3],
+                    params: {
+                        challengeMessage: parsed.res[2][0]['challenge_message'],
+                    },
+                    signatures: parsed.sig,
+                };
+            case 'auth_verify':
+                return {
+                    method: 'auth_verify',
+                    requestId: parsed.res[0],
+                    timestamp: parsed.res[3],
+                    params: {
+                        address: parsed.res[2][0]['address'],
+                        jwtToken: parsed.res[2][0]['jwt_token'],
+                        sessionKey: parsed.res[2][0]['session_key'],
+                        success: parsed.res[2][0]['success'],
+                    },
+                    signatures: parsed.sig,
+                };
+            case 'error':
+                return {
+                    method: 'error',
+                    requestId: parsed.res[0],
+                    timestamp: parsed.res[3],
+                    params: {
+                        error: parsed.res[2][0]['error'],
+                    },
+                };
+            default:
+                throw new Error(`Unknown method: ${parsed.res[1]}`);
+        }
+    } catch (e) {
+        throw new Error(`Failed to parse RPC response: ${e}`);
+    }
+}
+

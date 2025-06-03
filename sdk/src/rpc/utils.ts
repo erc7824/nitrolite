@@ -1,4 +1,4 @@
-import { Hex, stringToHex } from "viem";
+import { Address, Hex, stringToHex } from "viem";
 import { NitroliteRPCMessage, RPCResponse } from "./types";
 
 /**
@@ -163,7 +163,7 @@ export function parseRPCResponse(response: string): RPCResponse {
                     requestId: parsed.res[0],
                     timestamp: parsed.res[3],
                     params: {
-                        challengeMessage: parsed.res[2][0]['challenge_message'],
+                        challengeMessage: extractRPCParameter(parsed.res, 'challenge_message'),
                     },
                     signatures: parsed.sig,
                 };
@@ -173,10 +173,10 @@ export function parseRPCResponse(response: string): RPCResponse {
                     requestId: parsed.res[0],
                     timestamp: parsed.res[3],
                     params: {
-                        address: parsed.res[2][0]['address'],
-                        jwtToken: parsed.res[2][0]['jwt_token'],
-                        sessionKey: parsed.res[2][0]['session_key'],
-                        success: parsed.res[2][0]['success'],
+                        address: extractRPCParameter(parsed.res, 'address'),
+                        jwtToken: extractRPCParameter(parsed.res, 'jwt_token'),
+                        sessionKey: extractRPCParameter(parsed.res, 'session_key'),
+                        success: extractRPCParameter(parsed.res, 'success'),
                     },
                     signatures: parsed.sig,
                 };
@@ -186,8 +186,9 @@ export function parseRPCResponse(response: string): RPCResponse {
                     requestId: parsed.res[0],
                     timestamp: parsed.res[3],
                     params: {
-                        error: parsed.res[2][0]['error'],
+                        error: extractRPCParameter(parsed.res, 'error'),
                     },
+                    signatures: parsed.sig,
                 };
             default:
                 throw new Error(`Unknown method: ${parsed.res[1]}`);
@@ -197,3 +198,10 @@ export function parseRPCResponse(response: string): RPCResponse {
     }
 }
 
+function extractRPCParameter<T>(res: Array<any>, key: string): T {
+    if (Array.isArray(res[2])) {
+        return res[2]?.[0]?.[key];
+    }
+
+    return res[2]?.[key]
+}

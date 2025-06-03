@@ -19,6 +19,18 @@ export interface GameState {
   timestamp: number;
 }
 
+export interface Room {
+  id: string;
+  name: string;
+  players: Array<{
+    id: string;
+    nickname: string;
+  }>;
+  maxPlayers: number;
+  isGameActive: boolean;
+  createdAt: number;
+}
+
 class GameService {
   private ws: WebSocket | null = null;
   private isConnected: Ref<boolean> = ref(false);
@@ -26,6 +38,7 @@ class GameService {
   private roomId: Ref<string> = ref('');
   private errorMessage: Ref<string> = ref('');
   private gameState: Ref<GameState | null> = ref(null);
+  private availableRooms: Ref<Room[]> = ref([]);
   private messageHandlers: Map<string, (data: any) => void> = new Map();
   private connectionPromise: Promise<void> | null = null;
   private reconnectAttempts = 0;
@@ -67,6 +80,28 @@ class GameService {
 
     this.messageHandlers.set('channelFinalized', (data) => {
       console.log(`[GameService] Channel ${data.channelId} has been finalized`);
+    });
+
+    this.messageHandlers.set('roomsList', (data) => {
+      console.log('[GameService] Rooms list received:', data);
+      this.availableRooms.value = data.rooms || [];
+    });
+
+    this.messageHandlers.set('roomUpdated', (data) => {
+      console.log('[GameService] Room updated:', data);
+      // Update the specific room in the list
+      const roomIndex = this.availableRooms.value.findIndex(room => room.id === data.room.id);
+      if (roomIndex !== -1) {
+        this.availableRooms.value[roomIndex] = data.room;
+      } else {
+        // If room doesn't exist, add it
+        this.availableRooms.value.push(data.room);
+      }
+    });
+
+    this.messageHandlers.set('roomRemoved', (data) => {
+      console.log('[GameService] Room removed:', data);
+      this.availableRooms.value = this.availableRooms.value.filter(room => room.id !== data.roomId);
     });
   }
 
@@ -289,6 +324,71 @@ class GameService {
       type: 'finalizeGame',
       roomId: this.roomId.value
     }));
+    
+    // Clear local room state since game is being finalized
+    this.clearRoomState();
+  }
+
+  clearRoomState() {
+    console.log('[GameService] Clearing room state');
+    this.roomId.value = '';
+    this.playerId.value = '';
+    this.gameState.value = null;
+    this.errorMessage.value = '';
+  }
+
+  async subscribeToRooms() {
+    try {
+      await this.ensureConnected();
+
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        throw new Error('Not connected to server');
+      }
+
+      console.log('[GameService] Subscribing to rooms updates');
+      this.ws.send(JSON.stringify({
+        type: 'subscribeRooms'
+      }));
+    } catch (error) {
+      console.error('Error subscribing to rooms:', error);
+    }
+  }
+
+  async unsubscribeFromRooms() {
+    try {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        return; // Connection is already closed
+      }
+
+      console.log('[GameService] Unsubscribing from rooms updates');
+      this.ws.send(JSON.stringify({
+        type: 'unsubscribeRooms'
+      }));
+    } catch (error) {
+      console.error('Error unsubscribing from rooms:', error);
+    }
+  }
+
+  async joinRoomById(roomId: string, nickname: string, channelId: string, walletAddress: string) {
+    try {
+      await this.ensureConnected();
+
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        throw new Error('Not connected to server');
+      }
+
+      this.ws.send(JSON.stringify({
+        type: 'joinRoom',
+        roomId,
+        nickname,
+        channelId,
+        walletAddress,
+      }));
+    } catch (error) {
+      console.error('Error joining room:', error);
+      this.errorMessage.value = 'Failed to join room. Please try again.';
+      throw error;
+    }
   }
 
   private async handleStateSignRequest(channelId: string, state: any, stateId: string) {
@@ -328,6 +428,10 @@ class GameService {
 
   getGameState(): Ref<GameState | null> {
     return this.gameState;
+  }
+
+  getAvailableRooms(): Ref<Room[]> {
+    return this.availableRooms;
   }
 
   // Get the WebSocket instance

@@ -3,7 +3,7 @@ import { WebSocket } from 'ws';
 
 export interface SnakeWebSocket extends WebSocket {
   playerId: string;
-  roomId: string;
+  roomId?: string;
   channelId?: string;
 }
 

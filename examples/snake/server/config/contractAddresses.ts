@@ -38,7 +38,6 @@ function getContractAddressFromBroadcast(contractName: string, chainId: number =
     return transaction.contractAddress as Hex;
   } catch (error) {
     console.error(`Failed to read contract address for ${contractName} from broadcast file:`, error);
-    console.error(`Tried to read from: ${broadcastPath}`);
     throw new Error(`Contract address for ${contractName} must be read from broadcast file`);
   }
 }

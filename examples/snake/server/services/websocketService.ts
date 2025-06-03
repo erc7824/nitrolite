@@ -73,6 +73,46 @@ export function broadcastGameState(roomId: string, gameState: any): void {
   console.log(`[websocketService] Broadcast complete. Sent to ${clientCount} clients at ${Date.now()}`);
 }
 
+// Broadcast vote update to all clients in a room
+function broadcastVoteUpdate(roomId: string): void {
+  const room = getRoom(roomId);
+  if (!room) return;
+
+  const voteUpdate = {
+    type: 'playAgainVoteUpdate',
+    playAgainVotes: room.playAgainVotes ? Array.from(room.playAgainVotes) : [],
+    totalPlayers: room.players.size,
+    votesNeeded: room.players.size - (room.playAgainVotes?.size || 0)
+  };
+
+  console.log(`[broadcastVoteUpdate] Broadcasting vote update to room ${roomId}:`, voteUpdate);
+
+  webSocketServer.clients.forEach(client => {
+    const snakeClient = client as SnakeWebSocket;
+    if (snakeClient.roomId === roomId && snakeClient.readyState === WebSocket.OPEN) {
+      snakeClient.send(JSON.stringify(voteUpdate));
+    }
+  });
+}
+
+// Broadcast player disconnect notification to all clients in a room
+function broadcastPlayerDisconnect(roomId: string, playerNickname: string): void {
+  const disconnectNotification = {
+    type: 'playerDisconnected',
+    playerNickname,
+    message: `${playerNickname} left the room`
+  };
+
+  console.log(`[broadcastPlayerDisconnect] Broadcasting disconnect notification to room ${roomId}:`, disconnectNotification);
+
+  webSocketServer.clients.forEach(client => {
+    const snakeClient = client as SnakeWebSocket;
+    if (snakeClient.roomId === roomId && snakeClient.readyState === WebSocket.OPEN) {
+      snakeClient.send(JSON.stringify(disconnectNotification));
+    }
+  });
+}
+
 // Handle WebSocket message
 async function handleWebSocketMessage(ws: SnakeWebSocket, data: any): Promise<void> {
   switch (data.type) {
@@ -340,63 +380,86 @@ async function handleChangeDirection(ws: SnakeWebSocket, data: any): Promise<voi
 
 // Handle play again message
 async function handlePlayAgain(data: any): Promise<void> {
-  const { roomId } = data;
-  if (!roomId) return;
+  const { roomId, playerId } = data;
+  if (!roomId || !playerId) return;
 
   const room = getRoom(roomId);
   if (!room) return;
 
-  // Reset game state
-  room.isGameOver = false;
-
-  // Reset players
-  for (const player of room.players.values()) {
-    const { width, height } = room.gridSize;
-    const x = Math.floor(Math.random() * (width - 10)) + 5;
-    const y = Math.floor(Math.random() * (height - 10)) + 5;
-
-    player.position = { x, y };
-    player.direction = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)] as 'up' | 'down' | 'left' | 'right';
-    player.segments = [{ x, y }];
-    player.score = 0;
-    player.isDead = false;
+  // Initialize votes set if it doesn't exist
+  if (!room.playAgainVotes) {
+    room.playAgainVotes = new Set<string>();
   }
 
-  // Create new food
-  room.food = generateFood(room.gridSize, room.players);
+  // Add this player's vote
+  room.playAgainVotes.add(playerId);
 
-  // Reset state version
-  room.stateVersion = 0;
+  console.log(`[handlePlayAgain] Player ${playerId} voted to play again. Current votes: ${room.playAgainVotes.size}/${room.players.size}`);
+  console.log(`[handlePlayAgain] Current players in room:`, Array.from(room.players.keys()));
+  console.log(`[handlePlayAgain] Current voters:`, Array.from(room.playAgainVotes));
 
-  // Restart game interval if needed
-  if (!room.gameInterval) {
-    room.gameInterval = setInterval(async () => {
-      await gameTick(roomId);
-    }, 150);
+  // Broadcast vote update to all players in the room
+  broadcastVoteUpdate(roomId);
+
+  // Check if all players have voted to play again (and we have at least 2 players)
+  if (room.playAgainVotes.size === room.players.size && room.players.size >= 2) {
+    console.log(`[handlePlayAgain] All players voted to play again. Restarting game.`);
+    
+    // Clear votes for next time
+    room.playAgainVotes.clear();
+    
+    // Reset game state
+    room.isGameOver = false;
+
+    // Reset players
+    for (const player of room.players.values()) {
+      const { width, height } = room.gridSize;
+      const x = Math.floor(Math.random() * (width - 10)) + 5;
+      const y = Math.floor(Math.random() * (height - 10)) + 5;
+
+      player.position = { x, y };
+      player.direction = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)] as 'up' | 'down' | 'left' | 'right';
+      player.segments = [{ x, y }];
+      player.score = 0;
+      player.isDead = false;
+    }
+
+    // Create new food
+    room.food = generateFood(room.gridSize, room.players);
+
+    // Reset state version
+    room.stateVersion = 0;
+
+    // Restart game interval if needed
+    if (!room.gameInterval) {
+      room.gameInterval = setInterval(async () => {
+        await gameTick(roomId);
+      }, 150);
+    }
+
+    // Create and broadcast initial game state
+    const gameState = {
+      type: 'gameState',
+      players: Array.from(room.players.values()).map(p => ({
+        id: p.id,
+        nickname: p.nickname,
+        segments: p.segments,
+        score: p.score,
+        isDead: p.isDead || false
+      })),
+      food: room.food,
+      gridSize: room.gridSize,
+      isGameOver: room.isGameOver || false,
+      stateVersion: ++room.stateVersion,
+      timestamp: Date.now()
+    };
+
+    // Store the current state in the room
+    room.currentState = gameState;
+
+    // Broadcast to all players in the room
+    broadcastGameState(roomId, gameState);
   }
-
-  // Create and broadcast initial game state
-  const gameState = {
-    type: 'gameState',
-    players: Array.from(room.players.values()).map(p => ({
-      id: p.id,
-      nickname: p.nickname,
-      segments: p.segments,
-      score: p.score,
-      isDead: p.isDead || false
-    })),
-    food: room.food,
-    gridSize: room.gridSize,
-    isGameOver: room.isGameOver || false,
-    stateVersion: ++room.stateVersion,
-    timestamp: Date.now()
-  };
-
-  // Store the current state in the room
-  room.currentState = gameState;
-
-  // Broadcast to all players in the room
-  broadcastGameState(roomId, gameState);
 }
 
 // Handle finalize game message
@@ -419,6 +482,11 @@ async function handleFinalizeGame(data: any): Promise<void> {
   }
 
   room.isGameOver = true;
+
+  // Clear any pending votes
+  if (room.playAgainVotes) {
+    room.playAgainVotes.clear();
+  }
 
   // Create final state with game results
   const finalState = {
@@ -528,12 +596,22 @@ async function handleDisconnect(ws: SnakeWebSocket): Promise<void> {
     return;
   }
 
+  // Get player info before removing them
+  const disconnectedPlayer = room.players.get(ws.playerId);
+  const playerNickname = disconnectedPlayer?.nickname || 'Unknown player';
+
   // Remove the player from the room
   room.players.delete(ws.playerId);
   console.log(`[websocketService] Removed player ${ws.playerId} from room ${roomId}`);
   
-  // If room still has players, notify subscribers about room update
+  // Remove player's vote if they had one
+  if (room.playAgainVotes) {
+    room.playAgainVotes.delete(ws.playerId);
+  }
+  
+  // Notify remaining players about the disconnect
   if (room.players.size > 0) {
+    broadcastPlayerDisconnect(roomId, playerNickname);
     broadcastRoomUpdate(roomId);
   }
 

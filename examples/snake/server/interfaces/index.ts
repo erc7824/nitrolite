@@ -31,6 +31,7 @@ export interface Room {
   stateVersion: number;
   createdAt: number; // Timestamp when the room was created
   isClosingAppSession?: boolean;
+  playAgainVotes?: Set<string>; // Set of player IDs who voted to play again
 }
 
 export interface PendingRequest {

@@ -271,121 +271,26 @@ const formatAddress = (address: string): string => {
   align-items: center;
   min-height: 60vh;
   gap: 20px;
-  background: 
-    radial-gradient(circle at 20% 80%, rgba(255, 0, 255, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(0, 255, 255, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(255, 255, 0, 0.05) 0%, transparent 50%),
-    linear-gradient(135deg, #000011 0%, #001122 25%, #000033 50%, #001122 75%, #000011 100%);
   padding: 20px;
-  position: relative;
-  overflow: hidden;
-}
-
-.lobby::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 50px,
-      rgba(0, 255, 255, 0.02) 50px,
-      rgba(0, 255, 255, 0.02) 52px
-    ),
-    repeating-linear-gradient(
-      -45deg,
-      transparent,
-      transparent 50px,
-      rgba(255, 0, 255, 0.02) 50px,
-      rgba(255, 0, 255, 0.02) 52px
-    );
-  pointer-events: none;
 }
 
 .form-container {
-  background: linear-gradient(45deg, #ff00ff 0%, #00ffff 25%, #ffff00 50%, #ff00ff 75%, #00ffff 100%);
-  background-size: 400% 400%;
-  animation: retroGradient 4s ease infinite;
-  border: 4px solid #00ffff;
-  border-radius: 0;
+  background: white;
+  border: 2px solid #ddd;
+  border-radius: 8px;
   padding: 30px;
   width: 100%;
   max-width: 500px;
-  box-shadow: 
-    0 0 20px #ff00ff,
-    inset 0 0 20px rgba(0, 255, 255, 0.1),
-    0 8px 0 #ff00ff,
-    0 12px 0 #00ffff;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  font-family: 'Courier New', monospace;
-}
-
-.form-container:hover {
-  box-shadow: 
-    0 0 30px #ff00ff,
-    inset 0 0 30px rgba(0, 255, 255, 0.2),
-    0 12px 0 #ff00ff,
-    0 16px 0 #00ffff;
-  transform: translateY(-2px);
-}
-
-@keyframes retroGradient {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.form-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 255, 255, 0.03) 2px,
-      rgba(0, 255, 255, 0.03) 4px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(255, 0, 255, 0.03) 2px,
-      rgba(255, 0, 255, 0.03) 4px
-    );
-  pointer-events: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 h2 {
   text-align: center;
   margin-top: 0;
   margin-bottom: 25px;
-  color: #00ffff;
-  font-family: 'Courier New', monospace;
-  font-weight: bold;
-  font-size: 1.8rem;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  text-shadow: 
-    0 0 10px #00ffff,
-    0 0 20px #00ffff,
-    2px 2px 0 #ff00ff;
-  animation: textGlow 2s ease-in-out infinite alternate;
-}
-
-@keyframes textGlow {
-  from { text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 2px 2px 0 #ff00ff; }
-  to { text-shadow: 0 0 15px #00ffff, 0 0 30px #00ffff, 2px 2px 0 #ff00ff; }
+  color: #333;
+  font-weight: 600;
+  font-size: 1.5rem;
 }
 
 .form-group {
@@ -395,89 +300,66 @@ h2 {
 label {
   display: block;
   margin-bottom: 6px;
-  font-weight: bold;
-  color: #ffff00;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  text-shadow: 0 0 5px #ffff00;
+  font-weight: 600;
+  color: #333;
 }
 
 input {
   width: 100%;
   padding: 12px 15px;
-  border: 2px solid #00ffff;
-  border-radius: 0;
+  border: 2px solid #ddd;
+  border-radius: 4px;
   font-size: 16px;
-  background: #000;
-  color: #00ff00;
-  font-family: 'Courier New', monospace;
-  box-shadow: 
-    inset 0 0 10px rgba(0, 255, 255, 0.2),
-    0 0 5px #00ffff;
-  transition: all 0.3s ease;
+  background: white;
+  color: #333;
+  transition: border-color 0.2s;
 }
 
 input:focus {
-  border-color: #ff00ff;
+  border-color: #4CAF50;
   outline: none;
-  box-shadow: 
-    inset 0 0 15px rgba(255, 0, 255, 0.3),
-    0 0 10px #ff00ff;
-  color: #ffff00;
 }
 
 input::placeholder {
-  color: #666;
+  color: #999;
 }
 
 /* Tab Navigation */
 .tab-nav {
   display: flex;
-  border-bottom: 3px solid #00ffff;
+  border-bottom: 2px solid #ddd;
   margin-bottom: 25px;
-  background: linear-gradient(90deg, #ff00ff 0%, #00ffff 100%);
-  padding: 0;
+  background: #f5f5f5;
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
 }
 
 .tab-button {
   flex: 1;
   padding: 15px 20px;
-  border: 2px solid #ffff00;
-  border-bottom: none;
-  background: #000;
+  border: none;
+  background: #f5f5f5;
   font-size: 14px;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
-  color: #00ffff;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  transition: all 0.3s ease;
-  position: relative;
-  text-shadow: 0 0 5px #00ffff;
+  color: #666;
+  transition: all 0.2s;
 }
 
 .tab-button:hover {
-  background: #1a0033;
-  color: #ff00ff;
-  text-shadow: 0 0 8px #ff00ff;
-  box-shadow: inset 0 0 10px rgba(255, 0, 255, 0.3);
+  background: #e0e0e0;
+  color: #333;
 }
 
 .tab-button.active {
-  background: linear-gradient(45deg, #ff00ff, #00ffff);
-  color: #000;
-  text-shadow: none;
-  font-weight: bold;
-  border-color: #ffff00;
-  box-shadow: 
-    0 0 10px #ffff00,
-    inset 0 0 20px rgba(255, 255, 0, 0.2);
+  background: white;
+  color: #333;
+  font-weight: 600;
+  border-bottom: 2px solid #4CAF50;
 }
 
 .tab-button:not(:last-child) {
-  border-right: none;
+  border-right: 1px solid #ddd;
 }
 
 /* Tab Content */
@@ -493,147 +375,66 @@ input::placeholder {
 .btn {
   width: 100%;
   padding: 15px 20px;
-  border: 3px solid #ff00ff;
-  border-radius: 0;
+  border: none;
+  border-radius: 4px;
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-  text-shadow: 0 0 5px currentColor;
+  transition: background-color 0.2s;
 }
 
 .btn:disabled {
-  opacity: 0.4;
+  opacity: 0.6;
   cursor: not-allowed;
-  box-shadow: none;
-  animation: none;
-}
-
-.btn:not(:disabled):hover {
-  transform: translateY(-2px);
-  animation: buttonPulse 0.6s ease-in-out infinite;
-}
-
-@keyframes buttonPulse {
-  0%, 100% { box-shadow: 0 0 5px currentColor; }
-  50% { box-shadow: 0 0 20px currentColor, 0 0 30px currentColor; }
 }
 
 .primary {
-  background: linear-gradient(45deg, #ff00ff, #ff0080);
-  color: #ffff00;
-  border-color: #ffff00;
-  box-shadow: 
-    0 0 10px #ff00ff,
-    inset 0 0 10px rgba(255, 255, 0, 0.1);
+  background: #4CAF50;
+  color: white;
 }
 
 .primary:hover:not(:disabled) {
-  background: linear-gradient(45deg, #ff0080, #ff00ff);
-  box-shadow: 
-    0 0 20px #ff00ff,
-    0 0 30px #ff00ff,
-    inset 0 0 20px rgba(255, 255, 0, 0.2);
+  background: #388e3c;
 }
 
 .secondary {
-  background: linear-gradient(45deg, #00ffff, #0080ff);
-  color: #000;
-  border-color: #ffff00;
-  box-shadow: 
-    0 0 10px #00ffff,
-    inset 0 0 10px rgba(255, 255, 0, 0.1);
+  background: #2196F3;
+  color: white;
 }
 
 .secondary:hover:not(:disabled) {
-  background: linear-gradient(45deg, #0080ff, #00ffff);
-  box-shadow: 
-    0 0 20px #00ffff,
-    0 0 30px #00ffff,
-    inset 0 0 20px rgba(255, 255, 0, 0.2);
+  background: #1976d2;
 }
 
 .error-message {
-  background: #ff0000;
-  color: #ffff00;
+  background: #f44336;
+  color: white;
   padding: 15px;
-  border: 2px solid #ffff00;
-  border-radius: 0;
+  border-radius: 4px;
   margin-top: 20px;
   text-align: center;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  font-weight: bold;
-  letter-spacing: 1px;
-  text-shadow: 0 0 5px #ffff00;
-  animation: errorBlink 1s ease-in-out infinite;
-}
-
-@keyframes errorBlink {
-  0%, 50% { opacity: 1; }
-  25%, 75% { opacity: 0.7; }
 }
 
 .requirements {
   margin-top: 15px;
-  font-size: 0.85em;
-  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #666;
 }
 
 .requirement {
-  color: #ffff00;
   margin-bottom: 6px;
-  text-shadow: 0 0 3px #ffff00;
-  text-transform: uppercase;
-  font-weight: bold;
 }
 
-/* Enhanced Wallet Card Styles */
+/* Wallet Card Styles */
 .wallet-card {
-  background: linear-gradient(135deg, #000033 0%, #001133 100%);
-  border: 2px solid #333;
-  border-radius: 0;
+  background: white;
+  border: 2px solid #ddd;
+  border-radius: 8px;
   padding: 0;
   width: 100%;
   max-width: 500px;
-  box-shadow: 
-    0 0 10px rgba(0, 255, 255, 0.1),
-    inset 0 0 10px rgba(0, 0, 0, 0.5);
   margin-bottom: 20px;
   overflow: hidden;
-  position: relative;
-  transition: all 0.3s ease;
-  font-family: 'Courier New', monospace;
-}
-
-.wallet-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 
-    0 0 15px rgba(0, 255, 255, 0.2),
-    inset 0 0 15px rgba(0, 0, 0, 0.5);
-}
-
-.wallet-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: 
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 1px,
-      rgba(0, 255, 255, 0.05) 1px,
-      rgba(0, 255, 255, 0.05) 2px
-    );
-  pointer-events: none;
 }
 
 .wallet-header {
@@ -641,8 +442,8 @@ input::placeholder {
   align-items: center;
   gap: 16px;
   padding: 20px 24px 16px;
-  border-bottom: 1px solid #333;
-  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid #eee;
+  background: #f9f9f9;
 }
 
 .wallet-icon {
@@ -651,19 +452,16 @@ input::placeholder {
   justify-content: center;
   width: 40px;
   height: 40px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 10px;
+  background: #f0f0f0;
+  border-radius: 8px;
 }
 
 .wallet-title h3 {
-  color: #00ffff;
+  color: #333;
   margin: 0;
   font-size: 1rem;
   font-weight: bold;
   margin-bottom: 4px;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  letter-spacing: 1px;
 }
 
 .connection-status {
@@ -672,20 +470,17 @@ input::placeholder {
   gap: 6px;
   color: #666;
   font-size: 0.8rem;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
 }
 
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #4ade80;
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+  background-color: #4CAF50;
 }
 
 .status-dot.connected {
-  background-color: #10b981;
+  background-color: #4CAF50;
 }
 
 .status-dot.pulse {
@@ -707,7 +502,6 @@ input::placeholder {
   }
 }
 
-
 .wallet-details {
   padding: 16px 24px 20px;
 }
@@ -727,26 +521,23 @@ input::placeholder {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #888;
-  font-size: 0.85rem;
-  font-weight: bold;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
+  color: #666;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .detail-value {
-  color: #00ffff;
-  font-weight: bold;
-  font-size: 0.85rem;
-  font-family: 'Courier New', monospace;
+  color: #333;
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .wallet-address {
-  font-family: 'Courier New', monospace;
-  background: rgba(0, 0, 0, 0.5);
+  font-family: monospace;
+  background: #f0f0f0;
   padding: 4px 8px;
-  border: 1px solid #333;
-  border-radius: 0;
+  border-radius: 4px;
+  border: 1px solid #ddd;
 }
 
 .channel-connected {
@@ -756,11 +547,11 @@ input::placeholder {
 }
 
 .channel-connected span {
-  font-family: 'Courier New', monospace;
-  background: rgba(0, 0, 0, 0.5);
+  font-family: monospace;
+  background: #f0f0f0;
   padding: 4px 8px;
-  border: 1px solid #333;
-  border-radius: 0;
+  border-radius: 4px;
+  border: 1px solid #ddd;
 }
 
 .status-indicator {
@@ -771,25 +562,22 @@ input::placeholder {
 
 .status-text {
   font-size: 0.8rem;
-  color: #00ff00;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
+  color: #4CAF50;
+  font-weight: 500;
 }
 
 .channel-loading {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #888;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
+  color: #666;
 }
 
 .loading-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid #333;
-  border-top: 2px solid #00ffff;
+  border: 2px solid #ddd;
+  border-top: 2px solid #4CAF50;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -826,13 +614,10 @@ input::placeholder {
 }
 
 .rooms-container h3 {
-  color: #ffff00;
+  color: #333;
   margin-bottom: 16px;
   font-size: 1.1rem;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  text-shadow: 0 0 5px #ffff00;
+  font-weight: 600;
 }
 
 .room-item {
@@ -841,21 +626,19 @@ input::placeholder {
   align-items: center;
   padding: 16px;
   margin-bottom: 12px;
-  border: 2px solid #333;
-  border-radius: 0;
-  background: linear-gradient(90deg, #001122 0%, #002244 100%);
-  transition: all 0.3s ease;
-  font-family: 'Courier New', monospace;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  transition: border-color 0.2s;
 }
 
 .room-item:hover:not(.disabled) {
-  border-color: #00ffff;
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+  border-color: #4CAF50;
 }
 
 .room-item.disabled {
-  opacity: 0.4;
-  background: #000011;
+  opacity: 0.5;
+  background: #f9f9f9;
 }
 
 .room-info {
@@ -865,18 +648,14 @@ input::placeholder {
 .room-name {
   font-weight: bold;
   font-size: 1rem;
-  color: #00ffff;
+  color: #333;
   margin-bottom: 4px;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
 }
 
 .room-players {
   font-size: 0.9rem;
-  color: #888;
+  color: #666;
   margin-bottom: 6px;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
 }
 
 .room-status {
@@ -885,35 +664,29 @@ input::placeholder {
 
 .status-badge {
   display: inline-block;
-  padding: 4px 10px;
-  border: 1px solid;
-  border-radius: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
   font-size: 0.7rem;
   font-weight: bold;
   text-transform: uppercase;
-  font-family: 'Courier New', monospace;
-  letter-spacing: 1px;
 }
 
 .status-badge.waiting {
-  background-color: #003300;
-  color: #00ff00;
-  border-color: #00ff00;
-  text-shadow: 0 0 3px #00ff00;
+  background-color: #fff8e1;
+  color: #ff8f00;
+  border: 1px solid #ff8f00;
 }
 
 .status-badge.active {
-  background-color: #330033;
-  color: #ff00ff;
-  border-color: #ff00ff;
-  text-shadow: 0 0 3px #ff00ff;
+  background-color: #e8f5e8;
+  color: #4CAF50;
+  border: 1px solid #4CAF50;
 }
 
 .status-badge.full {
-  background-color: #330000;
-  color: #ff0000;
-  border-color: #ff0000;
-  text-shadow: 0 0 3px #ff0000;
+  background-color: #ffebee;
+  color: #f44336;
+  border: 1px solid #f44336;
 }
 
 .room-join-btn {

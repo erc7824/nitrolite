@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import GameRoom from './components/GameRoom.vue';
-import LobbyScreen from './components/LobbyScreen.vue';
+import Lobby from './components/Lobby.vue';
 import clearNetService from './services/ClearNetService';
 import gameService from './services/GameService';
 import { createWalletClient, createPublicClient, custom, http } from 'viem';
@@ -243,7 +243,7 @@ onUnmounted(() => {
       </div>
 
       <div v-else>
-        <LobbyScreen v-if="currentScreen === 'lobby'" v-model:nickname="nickname" v-model:roomId="roomId"
+        <Lobby v-if="currentScreen === 'lobby'" v-model:nickname="nickname" v-model:roomId="roomId"
           :socket="gameService.getWebSocket()" :walletAddress="walletAddress"
           :errorMessage="gameService.getErrorMessage().value" @create-room="createRoom" @join-room="joinRoom" />
 

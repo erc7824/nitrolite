@@ -3,7 +3,7 @@ import {
     createGetLedgerBalancesMessage,
     type NitroliteClientConfig,
 } from "@erc7824/nitrolite";
-import { BROKER_WS_URL } from "../config";
+import { BROKER_WS_URL, CHAIN_ID } from "../config";
 import { createEthersSigner, generateKeyPair } from "../crypto";
 import type { Hex } from "viem";
 import { authenticate } from "./authentication";
@@ -248,6 +248,16 @@ class ClearNetService {
             }
             return;
         }
+        if (message.res[1] === "channels") {
+            const channel = message.res[2][0].find((ch: any) => {
+                return ch.chain_id === CHAIN_ID && ch.status === "open";
+            });
+            console.log('[ClearNetService] Received new active channel:', channel);
+            if (channel) {
+                this.activeChannel = channel.channel_id;
+                console.log('[ClearNetService] Active channel updated:', this.activeChannel);
+            }
+        }
     }
 
     async signState(stateData: any, stateId: string, channelId: string) {
@@ -337,16 +347,18 @@ class ClearNetService {
     }
 
     async getActiveChannel(): Promise<Hex | null> {
-        if (this.activeChannel) {
-            return this.activeChannel;
+        // Wait until broker pushes the active channel to the client
+        let attempts = 0;
+        const timeout = 100;
+        const maxAttempts = 2000 / timeout;
+        while (!this.activeChannel) {
+            await new Promise(resolve => setTimeout(resolve, timeout));
+            attempts++;
+            if (this.isConnected && attempts > maxAttempts) {
+                throw new Error('No active channel found. Please open a channel at apps.yellow.com');
+            }
         }
-
-        const channels = await this.client.getAccountChannels();
-        if (channels.length <= 0) {
-            throw new Error('No active channel found. Please open a channel at apps.yellow.com');
-        }
-        this.activeChannel = channels[0];
-
+        console.log('[ClearNetService] Active channel:', this.activeChannel);
         return this.activeChannel;
     }
 }

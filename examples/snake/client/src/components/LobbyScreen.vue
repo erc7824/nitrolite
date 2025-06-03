@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineEmits, defineProps, ref, watch } from 'vue';
+import { defineEmits, defineProps, ref, watch, onMounted } from 'vue';
 import gameService from '../services/GameService';
 import clearNetService from '../services/ClearNetService';
 import { Hex } from 'viem';
@@ -21,12 +21,19 @@ const emit = defineEmits([
 
 const isCreatingRoom = ref(false);
 const isJoiningRoom = ref(false);
-const channelInfo = ref<Hex | null>(await clearNetService.getActiveChannel());
+const channelInfo = ref<Hex | null>(null);
 
-// Subscribe to GameService state
+onMounted(async () => {
+  try {
+    channelInfo.value = await clearNetService.getActiveChannel();
+  } catch (error) {
+    console.error('Failed to load active channel:', error);
+    emit('update:errorMessage', 'Failed to load active channel');
+  }
+});
+
 const gameError = gameService.getErrorMessage();
 
-// Watch for error messages from GameService
 watch(gameError, (newError) => {
   if (newError) {
     emit('update:errorMessage', newError);
@@ -62,17 +69,10 @@ const joinRoom = () => {
   }
 };
 
-
 </script>
 
 <template>
   <div class="lobby">
-    <!-- Wallet Info Card -->
-    <div class="wallet-info">
-      <div class="wallet-address">Wallet: {{ props.walletAddress.slice(0, 6) }}...{{ props.walletAddress.slice(-4) }}</div>
-      <div v-if="channelInfo" class="channel-info">Channel: {{ channelInfo }}...</div>
-    </div>
-
     <!-- Username Card -->
     <div class="form-container">
       <h2>Set Username</h2>
@@ -256,27 +256,5 @@ input:focus {
 .requirement {
   color: #f44336;
   margin-bottom: 4px;
-}
-
-.wallet-info {
-  background-color: #e8f5e9;
-  border-radius: 8px;
-  padding: 15px 20px;
-  width: 100%;
-  max-width: 500px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  font-size: 0.9rem;
-  margin-bottom: 10px;
-}
-
-.wallet-address {
-  color: #2e7d32;
-  font-weight: 600;
-  margin-bottom: 5px;
-}
-
-.channel-info {
-  color: #388e3c;
-  font-size: 0.85rem;
 }
 </style>

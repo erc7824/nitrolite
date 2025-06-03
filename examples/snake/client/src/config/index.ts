@@ -1,5 +1,6 @@
 import type { ContractAddresses } from "@erc7824/nitrolite";
 import type { Hex } from "viem";
+import { getCustodyAddress, getAdjudicatorAddress } from "./contractAddresses.js";
 
 const getEnvVar = (key: string, defaultValue: string): string => {
     try {
@@ -14,9 +15,12 @@ const getEnvVar = (key: string, defaultValue: string): string => {
 export const BROKER_WS_URL = getEnvVar("BROKER_WS_URL", "wss://clearnode-multichain-production.up.railway.app/ws");
 export const GAMESERVER_WS_URL = getEnvVar("GAMESERVER_WS_URL", "ws://localhost:3001");
 
+// Contract addresses - read from latest broadcast files
 export const CONTRACT_ADDRESSES: ContractAddresses = {
-    custody: getEnvVar("CUSTODY_ADDRESS", "0x1096644156Ed58BF596e67d35827Adc97A25D940") as Hex,
-    adjudicator: getEnvVar("ADJUDICATOR_ADDRESS", "0xa3f2f64455c9f8D68d9dCAeC2605D64680FaF898") as Hex,
+    custody: (getEnvVar("CUSTODY_ADDRESS", "") as Hex) || getCustodyAddress(),
+    adjudicator: (getEnvVar("ADJUDICATOR_ADDRESS", "") as Hex) || getAdjudicatorAddress(),
     tokenAddress: getEnvVar("TOKEN_ADDRESS", "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359") as Hex,
     guestAddress: getEnvVar("GUEST_ADDRESS", "0x3c93C321634a80FB3657CFAC707718A11cA57cBf") as Hex,
 };
+
+export const CHAIN_ID = parseInt(getEnvVar("CHAIN_ID", "137"), 10);

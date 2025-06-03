@@ -204,11 +204,34 @@ export async function authenticate(
     // Step 1: Send auth_request with empty signature and wallet address
     try {
         let authRequest: string;
+        let usingJWT = false;
         const jwtToken = window.localStorage.getItem('jwt_token');
 
         if (jwtToken) {
-            console.log('JWT token found, sending auth request with token:', jwtToken);
-            authRequest = await createAuthVerifyMessageWithJWT(jwtToken);
+            console.log('JWT token found, attempting JWT authentication:', jwtToken);
+            try {
+                authRequest = await createAuthVerifyMessageWithJWT(jwtToken);
+                usingJWT = true;
+            } catch (jwtError) {
+                console.warn('JWT auth failed, falling back to signer authentication:', jwtError);
+                // Remove invalid JWT token
+                window.localStorage.removeItem('jwt_token');
+                authRequest = await createAuthRequestMessage({
+                    wallet: walletAddress as Hex,
+                    participant: signer.address as Hex,
+                    app_name: 'Snake Game',
+                    expire: expire, // 24 hours in seconds
+                    scope: 'snake-game',
+                    application: walletAddress as Hex,
+                    allowances: [
+                        {
+                            symbol: 'usdc',
+                            amount: '0',
+                        },
+                    ],
+                });
+                usingJWT = false;
+            }
         } else {
             console.log('No JWT token found, proceeding with challenge-response authentication');
             authRequest = await createAuthRequestMessage({
@@ -225,9 +248,10 @@ export async function authenticate(
                     },
                 ],
             });
+            usingJWT = false;
         }
 
-        console.log('Sending auth_request:', authRequest);
+        console.log(`Sending auth_request (${usingJWT ? 'JWT' : 'challenge-response'}):`, authRequest);
         ws.send(authRequest);
     } catch (requestError) {
         console.error('Error creating auth_request:', requestError);
@@ -318,6 +342,42 @@ export async function authenticate(
                         response.err?.[1] || response.error || response.res?.[2]?.[0]?.error || 'Authentication failed';
 
                     console.error('Authentication failed:', errorMsg);
+                    
+                    // Check if this is a JWT authentication failure and fallback to signer auth
+                    const errorString = String(errorMsg).toLowerCase();
+                    if (errorString.includes('jwt') || errorString.includes('token') || errorString.includes('invalid') || errorString.includes('expired')) {
+                        console.warn('JWT authentication failed on server, attempting fallback to signer authentication');
+                        window.localStorage.removeItem('jwt_token');
+                        
+                        try {
+                            // Restart authentication with signer
+                            const fallbackAuthRequest = await createAuthRequestMessage({
+                                wallet: walletAddress as Hex,
+                                participant: signer.address as Hex,
+                                app_name: 'Snake Game',
+                                expire: expire, // 24 hours in seconds
+                                scope: 'snake-game',
+                                application: walletAddress as Hex,
+                                allowances: [
+                                    {
+                                        symbol: 'usdc',
+                                        amount: '0',
+                                    },
+                                ],
+                            });
+                            
+                            console.log('Sending fallback auth_request with signer:', fallbackAuthRequest);
+                            ws.send(fallbackAuthRequest);
+                            resetTimeout(); // Reset timeout for the fallback attempt
+                            return; // Continue listening for the fallback response
+                        } catch (fallbackError) {
+                            console.error('Fallback to signer authentication failed:', fallbackError);
+                            cleanup();
+                            reject(new Error(`Both JWT and signer authentication failed: ${fallbackError}`));
+                            return;
+                        }
+                    }
+                    
                     window.localStorage.removeItem('jwt_token');
                     cleanup();
                     reject(new Error(String(errorMsg)));

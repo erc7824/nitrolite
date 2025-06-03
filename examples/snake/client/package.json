@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "dev": "node scripts/generateContractAddresses.js && vite",
+    "build": "node scripts/generateContractAddresses.js && vue-tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@erc7824/nitrolite": "^0.2.5",
+    "@erc7824/nitrolite": "0.2.6",
     "axios": "^1.9.0",
     "ethers": "5.7.2",
     "viem": "2.29.3",

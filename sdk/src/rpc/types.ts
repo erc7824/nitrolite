@@ -302,3 +302,52 @@ export const EIP712AuthTypes = {
         { name: 'amount', type: 'uint256' },
     ],
 };
+
+/**
+ * Represents a generic RPC response structure that includes common fields.
+ * This interface is extended by specific RPC response types.
+ */
+interface GenericRPCResponse {
+    requestId: RequestID;
+    timestamp?: Timestamp;
+    signatures?: Hex[];
+}
+
+/**
+ * Represents the response structure for the 'auth_challenge'
+ */
+export interface AuthChallengeRPCResponse extends GenericRPCResponse {
+    method: "auth_challenge";
+    params: {
+        challengeMessage: string;
+    };
+}
+
+/**
+ * Represents the response structure for the 'auth_verify'
+ */
+export interface AuthVerifyRPCResponse extends GenericRPCResponse {
+    method: "auth_verify";
+    params: {
+        address: Address;
+        jwtToken: string;
+        sessionKey: Address;
+        success: boolean;
+    };
+}
+
+/**
+ * Represents the response structure for an error response.
+ */
+export interface ErrorRPCResponse extends GenericRPCResponse {
+    method: "error";
+    params: {
+        error: string;
+    };
+}
+
+/**
+ * Union type for all possible RPC response types.
+ * This allows for type-safe handling of different response structures.
+ */
+export type RPCResponse = AuthChallengeRPCResponse | AuthVerifyRPCResponse | ErrorRPCResponse;

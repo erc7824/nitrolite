@@ -1,5 +1,5 @@
-import { Hex, stringToHex } from "viem";
-import { NitroliteRPCMessage } from "./types";
+import { Address, Hex, stringToHex } from "viem";
+import { NitroliteRPCMessage, RPCResponse } from "./types";
 
 /**
  * Get the current time in milliseconds
@@ -139,4 +139,69 @@ export function isValidResponseRequestId(request: NitroliteRPCMessage, response:
     }
 
     return responseId === requestId;
+}
+
+
+/**
+ * Parses a raw RPC response string into a structured RPCResponse object
+ * @param response The raw RPC response string to parse
+ * @returns An RPCResponse object containing the parsed data
+ */
+export function parseRPCResponse(response: string): RPCResponse {
+    // TODO: Add support for other rpc protocols besides websocket
+    try {
+        const parsed = JSON.parse(response);
+
+        if (!Array.isArray(parsed.res) || parsed.res.length !== 4) {
+            throw new Error('Invalid RPC response format');
+        }
+
+        switch (parsed.res[1]) {
+            case 'auth_challenge':
+                return {
+                    method: 'auth_challenge',
+                    requestId: parsed.res[0],
+                    timestamp: parsed.res[3],
+                    params: {
+                        challengeMessage: extractRPCParameter(parsed.res, 'challenge_message'),
+                    },
+                    signatures: parsed.sig,
+                };
+            case 'auth_verify':
+                return {
+                    method: 'auth_verify',
+                    requestId: parsed.res[0],
+                    timestamp: parsed.res[3],
+                    params: {
+                        address: extractRPCParameter(parsed.res, 'address'),
+                        jwtToken: extractRPCParameter(parsed.res, 'jwt_token'),
+                        sessionKey: extractRPCParameter(parsed.res, 'session_key'),
+                        success: extractRPCParameter(parsed.res, 'success'),
+                    },
+                    signatures: parsed.sig,
+                };
+            case 'error':
+                return {
+                    method: 'error',
+                    requestId: parsed.res[0],
+                    timestamp: parsed.res[3],
+                    params: {
+                        error: extractRPCParameter(parsed.res, 'error'),
+                    },
+                    signatures: parsed.sig,
+                };
+            default:
+                throw new Error(`Unknown method: ${parsed.res[1]}`);
+        }
+    } catch (e) {
+        throw new Error(`Failed to parse RPC response: ${e}`);
+    }
+}
+
+function extractRPCParameter<T>(res: Array<any>, key: string): T {
+    if (Array.isArray(res[2])) {
+        return res[2]?.[0]?.[key];
+    }
+
+    return res[2]?.[key]
 }

@@ -2,8 +2,9 @@ version: '3.8'
 
 services:
   # TODO: add frontend
+  
   anvil:
-    image: ghcr.io/foundry-rs/foundry:latest
+    image: ghcr.io/foundry-rs/foundry:v1.2.2
     container_name: anvil
     ports:
       - "8545:8545"
@@ -15,7 +16,7 @@ services:
       timeout: 5s
       retries: 5
   contract-deployer:
-    image: ghcr.io/foundry-rs/foundry:latest
+    image: ghcr.io/foundry-rs/foundry:v1.2.2
     container_name: contract-deployer
     depends_on:
       anvil:
@@ -31,6 +32,35 @@ services:
         forge script script/setupChannel.s.sol:SetupChannelScript --rpc-url http://anvil:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast --sig 'run(string,address,address,address,uint256)' 'test test test test test test test test test test test junk' 0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE 0x5fbdb2315678afecb367f032d93f642f64180aa3 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512 100
       "
 
+  db-init:
+    image: alpine:3.19.1
+    volumes:
+      - ./clearnode:/app
+    working_dir: /app
+    command: >
+      sh -c "
+        apk add --no-cache sqlite &&
+        echo 'Checking database...' &&
+        
+        # Check if token already exists
+        TOKEN_EXISTS=$(sqlite3 ./dev.db \"SELECT COUNT(*) FROM assets WHERE token = '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512' AND chain_id = 1337;\") &&
+        
+        if [ \"$TOKEN_EXISTS\" -eq \"0\" ]; then
+          echo 'Seeding database with tokens...' &&
+          sqlite3 ./dev.db \"
+            -- Add USDC on local development network (ChainID 1337) - using the ERC20 test token deployed address
+            INSERT INTO assets (token, chain_id, symbol, decimals) 
+            VALUES ('0xe7f1725e7734ce288f8367e1bb143e90bb3f0512', 1337, 'USDC', 6);
+          \" &&
+          echo 'Database seeded with tokens successfully'
+        else
+          echo 'Database already seeded, skipping'
+        fi
+      "
+    depends_on:
+      contract-deployer:
+        condition: service_completed_successfully
+
   clearnode:
     platform: linux/amd64
     image: ghcr.io/erc7824/nitrolite/clearnode:0.0.1-rc.28
@@ -38,7 +68,7 @@ services:
       - "8000:8000"
       - "4242:4242"
     depends_on:
-      contract-deployer:
+      db-init:
         condition: service_completed_successfully
     environment:
       - BROKER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80

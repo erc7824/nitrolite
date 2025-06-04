@@ -9,7 +9,7 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@erc7824/nitrolite": "0.2.6",
+    "@erc7824/nitrolite": "0.2.7",
     "axios": "^1.9.0",
     "ethers": "5.7.2",
     "viem": "2.29.3",

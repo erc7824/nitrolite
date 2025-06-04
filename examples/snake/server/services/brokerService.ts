@@ -20,7 +20,7 @@ import { Hex } from "viem";
 import util from 'util';
 util.inspect.defaultOptions.depth = null;
 
-const DEFAULT_PROTOCOL = "app_aura_nitrolite_v0";
+const DEFAULT_PROTOCOL = "app_snake_nitrolite";
 const DEFAULT_WEIGHTS: number[] = [0, 0, 100]; // Alice: 0, Bob: 0, Server: 100
 const DEFAULT_QUORUM: number = 100; // server alone decides the outcome
 

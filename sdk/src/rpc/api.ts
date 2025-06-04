@@ -12,6 +12,7 @@ import {
     PartialEIP712AuthMessage,
     EIP712AuthTypes,
     EIP712AuthDomain,
+    EIP712AuthMessage,
 } from './types'; // Added ParsedResponse
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp, parseRPCResponse } from './utils';
@@ -370,7 +371,14 @@ export function createEIP712AuthMessageSigner(
     domain: EIP712AuthDomain,
 ): MessageSigner {
     return async (data: any): Promise<`0x${string}`> => {
+        // TODO: perhaps it would be better to pass full EIP712AuthMessage instead of parsing part of it
+        // out of untyped data 
         const address = walletClient.account?.address;
+
+        if (!address) {
+            throw new Error('Wallet client is not connected or does not have an account.');
+        }
+
         const response = parseRPCResponse(data)
 
         if (response.method !== 'auth_challenge') {
@@ -378,11 +386,15 @@ export function createEIP712AuthMessageSigner(
         }
 
         const challengeUUID = response.params.challengeMessage;
-        const message: Record<string, unknown> = {
+        const message: EIP712AuthMessage = {
             ...partialMessage,
             challenge: challengeUUID,
             wallet: address as Address,
         };
+
+        const untypedMessage: Record<string, unknown> =  Object.fromEntries(
+            Object.entries(message)
+        );
 
         try {
             // Sign with EIP-712
@@ -391,7 +403,7 @@ export function createEIP712AuthMessageSigner(
                 domain,
                 types: EIP712AuthTypes,
                 primaryType: 'Policy',
-                message,
+                message: untypedMessage,
             });
 
             return signature;

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"strings"
 	"time"
@@ -314,6 +315,7 @@ func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) 
 
 // HandleCreateApplication creates a virtual application between participants
 func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+	fmt.Println("HandleCreateApplication called")
 	if len(rpc.Req.Params) < 1 {
 		return nil, errors.New("missing parameters")
 	}
@@ -365,11 +367,13 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 	recoveredAddresses := map[string]bool{}
 	for _, sig := range rpc.Sig {
 		addr, err := RecoverAddress(reqBytes, sig)
+		fmt.Println(recoveredAddresses)
 		if err != nil {
 			return nil, errors.New("invalid signature")
 		}
 
 		walletAddress, err := GetWalletBySigner(addr)
+		fmt.Println("Recovered address:", addr, "Got Wallet address:", walletAddress)
 		if err != nil {
 			continue
 		}
@@ -391,6 +395,7 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 				return errors.New("invalid allocation")
 			}
 			if allocation.Amount.IsPositive() {
+				fmt.Println("Checking allocation for participant:", allocation.ParticipantWallet)
 				if !recoveredAddresses[allocation.ParticipantWallet] {
 					return fmt.Errorf("missing signature for participant %s", allocation.ParticipantWallet)
 				}
@@ -447,11 +452,14 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 	}
 
 	rpcResponse := CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{response}, time.Now())
+	log.Printf("Virtual app session created session_id %s participants %s", appSessionID.Hex(), createApp.Definition.ParticipantWallets)
+	log.Printf("Allocations for created virtual app session session_id %s allocations %v", appSessionID.Hex(), createApp.Allocations)
 	return rpcResponse, nil
 }
 
 // HandleCloseApplication closes a virtual app session and redistributes funds to participants
 func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+	fmt.Println("HandleCloseApplication called")
 	if len(rpc.Req.Params) == 0 {
 		return nil, errors.New("missing parameters")
 	}
@@ -595,6 +603,8 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 	}
 
 	rpcResponse := CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{response}, time.Now())
+	log.Printf("Virtual app session closed session_id %s participants %v", params.AppSessionID, params.Allocations)
+	log.Printf("Allocations for closed virtual app session session_id %s allocations %v", params.AppSessionID, params.Allocations)
 	return rpcResponse, nil
 }
 

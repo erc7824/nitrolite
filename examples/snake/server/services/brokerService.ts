@@ -530,7 +530,7 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
         definition: appDefinition,
         allocations: participants.map((participant) => ({
             participant,
-            asset: "USDC",
+            asset: "usdc",
             amount: "0",
         }))
     }]
@@ -595,7 +595,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
         app_session_id: appId,
         allocations: [participantA, participantB, signer.address].map((participant) => ({
             participant,
-            asset: "USDC",
+            asset: "usdc",
             amount: "0",
         })),
     }];

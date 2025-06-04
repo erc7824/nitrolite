@@ -2,7 +2,7 @@ import { WebSocketServer } from 'ws';
 import WebSocket from 'ws';
 import { randomBytes } from 'crypto';
 import { Room, SnakeWebSocket } from '../interfaces/index.ts';
-import { getRoom, addRoom, removeRoom } from './stateService.ts';
+import { getRoom, addRoom, removeRoom, getAllRooms } from './stateService.ts';
 import {
   generateRoomId,
   generateFood,
@@ -16,6 +16,9 @@ import { Hex } from 'viem';
 
 // Global reference to the WebSocket server
 let webSocketServer: WebSocketServer;
+
+// Store clients subscribed to room updates
+const roomSubscribers = new Set<SnakeWebSocket>();
 
 // Setup WebSocket handlers
 export function setupWebSocketHandlers(wss: WebSocketServer): void {
@@ -40,6 +43,8 @@ export function setupWebSocketHandlers(wss: WebSocketServer): void {
     });
 
     snakeWs.on('close', async () => {
+      // Remove from room subscribers if they were subscribed
+      roomSubscribers.delete(snakeWs);
       await handleDisconnect(snakeWs);
     });
   });
@@ -66,6 +71,46 @@ export function broadcastGameState(roomId: string, gameState: any): void {
     }
   });
   console.log(`[websocketService] Broadcast complete. Sent to ${clientCount} clients at ${Date.now()}`);
+}
+
+// Broadcast vote update to all clients in a room
+function broadcastVoteUpdate(roomId: string): void {
+  const room = getRoom(roomId);
+  if (!room) return;
+
+  const voteUpdate = {
+    type: 'playAgainVoteUpdate',
+    playAgainVotes: room.playAgainVotes ? Array.from(room.playAgainVotes) : [],
+    totalPlayers: room.players.size,
+    votesNeeded: room.players.size - (room.playAgainVotes?.size || 0)
+  };
+
+  console.log(`[broadcastVoteUpdate] Broadcasting vote update to room ${roomId}:`, voteUpdate);
+
+  webSocketServer.clients.forEach(client => {
+    const snakeClient = client as SnakeWebSocket;
+    if (snakeClient.roomId === roomId && snakeClient.readyState === WebSocket.OPEN) {
+      snakeClient.send(JSON.stringify(voteUpdate));
+    }
+  });
+}
+
+// Broadcast player disconnect notification to all clients in a room
+function broadcastPlayerDisconnect(roomId: string, playerNickname: string): void {
+  const disconnectNotification = {
+    type: 'playerDisconnected',
+    playerNickname,
+    message: `${playerNickname} left the room`
+  };
+
+  console.log(`[broadcastPlayerDisconnect] Broadcasting disconnect notification to room ${roomId}:`, disconnectNotification);
+
+  webSocketServer.clients.forEach(client => {
+    const snakeClient = client as SnakeWebSocket;
+    if (snakeClient.roomId === roomId && snakeClient.readyState === WebSocket.OPEN) {
+      snakeClient.send(JSON.stringify(disconnectNotification));
+    }
+  });
 }
 
 // Handle WebSocket message
@@ -95,12 +140,33 @@ async function handleWebSocketMessage(ws: SnakeWebSocket, data: any): Promise<vo
       await handleFinalizeGame(data);
       break;
     }
+
+    case 'subscribeRooms': {
+      handleSubscribeRooms(ws);
+      break;
+    }
+
+    case 'unsubscribeRooms': {
+      handleUnsubscribeRooms(ws);
+      break;
+    }
   }
 }
 
 // Handle create room message
 async function handleCreateRoom(ws: SnakeWebSocket, data: any): Promise<void> {
   console.log('[websocketService] Creating room with data:', data);
+  
+  // Check if player is already in a room
+  if (ws.roomId) {
+    console.log(`[websocketService] Player ${ws.playerId} already in room ${ws.roomId}, ignoring create room request`);
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'You are already in a room'
+    }));
+    return;
+  }
+  
   const roomId = generateRoomId();
   const { nickname, channelId, walletAddress } = data;
   const gridSize = { width: 40, height: 30 };
@@ -141,11 +207,25 @@ async function handleCreateRoom(ws: SnakeWebSocket, data: any): Promise<void> {
   }));
 
   console.log(`[websocketService] Room created: ${roomId}, Player: ${player.id}, Address: ${walletAddress}`);
+  
+  // Notify subscribers about new room
+  broadcastRoomUpdate(roomId);
 }
 
 // Handle join room message
 async function handleJoinRoom(ws: SnakeWebSocket, data: any): Promise<void> {
   console.log('[websocketService] Joining room with data:', data);
+  
+  // Check if player is already in a room
+  if (ws.roomId) {
+    console.log(`[websocketService] Player ${ws.playerId} already in room ${ws.roomId}, ignoring join room request`);
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'You are already in a room'
+    }));
+    return;
+  }
+  
   const { roomId, nickname, channelId, walletAddress } = data;
   const room = getRoom(roomId);
   console.log('[websocketService] Room lookup result:', room ? 'found' : 'not found');
@@ -190,6 +270,9 @@ async function handleJoinRoom(ws: SnakeWebSocket, data: any): Promise<void> {
 
   console.log(`Player joined room: ${roomId}, Player: ${player.id}, Address: ${walletAddress}`);
   console.log('Room data:', room);
+  
+  // Notify subscribers about room update
+  broadcastRoomUpdate(roomId);
 
   // If we have 2 players and a channel, create the app session
   if (room.players.size === 2 && room.channelIds.size > 0) {
@@ -297,63 +380,86 @@ async function handleChangeDirection(ws: SnakeWebSocket, data: any): Promise<voi
 
 // Handle play again message
 async function handlePlayAgain(data: any): Promise<void> {
-  const { roomId } = data;
-  if (!roomId) return;
+  const { roomId, playerId } = data;
+  if (!roomId || !playerId) return;
 
   const room = getRoom(roomId);
   if (!room) return;
 
-  // Reset game state
-  room.isGameOver = false;
-
-  // Reset players
-  for (const player of room.players.values()) {
-    const { width, height } = room.gridSize;
-    const x = Math.floor(Math.random() * (width - 10)) + 5;
-    const y = Math.floor(Math.random() * (height - 10)) + 5;
-
-    player.position = { x, y };
-    player.direction = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)] as 'up' | 'down' | 'left' | 'right';
-    player.segments = [{ x, y }];
-    player.score = 0;
-    player.isDead = false;
+  // Initialize votes set if it doesn't exist
+  if (!room.playAgainVotes) {
+    room.playAgainVotes = new Set<string>();
   }
 
-  // Create new food
-  room.food = generateFood(room.gridSize, room.players);
+  // Add this player's vote
+  room.playAgainVotes.add(playerId);
 
-  // Reset state version
-  room.stateVersion = 0;
+  console.log(`[handlePlayAgain] Player ${playerId} voted to play again. Current votes: ${room.playAgainVotes.size}/${room.players.size}`);
+  console.log(`[handlePlayAgain] Current players in room:`, Array.from(room.players.keys()));
+  console.log(`[handlePlayAgain] Current voters:`, Array.from(room.playAgainVotes));
 
-  // Restart game interval if needed
-  if (!room.gameInterval) {
-    room.gameInterval = setInterval(async () => {
-      await gameTick(roomId);
-    }, 150);
+  // Broadcast vote update to all players in the room
+  broadcastVoteUpdate(roomId);
+
+  // Check if all players have voted to play again (and we have at least 2 players)
+  if (room.playAgainVotes.size === room.players.size && room.players.size >= 2) {
+    console.log(`[handlePlayAgain] All players voted to play again. Restarting game.`);
+    
+    // Clear votes for next time
+    room.playAgainVotes.clear();
+    
+    // Reset game state
+    room.isGameOver = false;
+
+    // Reset players
+    for (const player of room.players.values()) {
+      const { width, height } = room.gridSize;
+      const x = Math.floor(Math.random() * (width - 10)) + 5;
+      const y = Math.floor(Math.random() * (height - 10)) + 5;
+
+      player.position = { x, y };
+      player.direction = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)] as 'up' | 'down' | 'left' | 'right';
+      player.segments = [{ x, y }];
+      player.score = 0;
+      player.isDead = false;
+    }
+
+    // Create new food
+    room.food = generateFood(room.gridSize, room.players);
+
+    // Reset state version
+    room.stateVersion = 0;
+
+    // Restart game interval if needed
+    if (!room.gameInterval) {
+      room.gameInterval = setInterval(async () => {
+        await gameTick(roomId);
+      }, 150);
+    }
+
+    // Create and broadcast initial game state
+    const gameState = {
+      type: 'gameState',
+      players: Array.from(room.players.values()).map(p => ({
+        id: p.id,
+        nickname: p.nickname,
+        segments: p.segments,
+        score: p.score,
+        isDead: p.isDead || false
+      })),
+      food: room.food,
+      gridSize: room.gridSize,
+      isGameOver: room.isGameOver || false,
+      stateVersion: ++room.stateVersion,
+      timestamp: Date.now()
+    };
+
+    // Store the current state in the room
+    room.currentState = gameState;
+
+    // Broadcast to all players in the room
+    broadcastGameState(roomId, gameState);
   }
-
-  // Create and broadcast initial game state
-  const gameState = {
-    type: 'gameState',
-    players: Array.from(room.players.values()).map(p => ({
-      id: p.id,
-      nickname: p.nickname,
-      segments: p.segments,
-      score: p.score,
-      isDead: p.isDead || false
-    })),
-    food: room.food,
-    gridSize: room.gridSize,
-    isGameOver: room.isGameOver || false,
-    stateVersion: ++room.stateVersion,
-    timestamp: Date.now()
-  };
-
-  // Store the current state in the room
-  room.currentState = gameState;
-
-  // Broadcast to all players in the room
-  broadcastGameState(roomId, gameState);
 }
 
 // Handle finalize game message
@@ -376,6 +482,11 @@ async function handleFinalizeGame(data: any): Promise<void> {
   }
 
   room.isGameOver = true;
+
+  // Clear any pending votes
+  if (room.playAgainVotes) {
+    room.playAgainVotes.clear();
+  }
 
   // Create final state with game results
   const finalState = {
@@ -451,8 +562,20 @@ async function handleFinalizeGame(data: any): Promise<void> {
 
   // Clean up the room after a short delay to allow clients to receive the final state
   setTimeout(() => {
+    // Clear roomId from all connected clients in this room before deleting
+    webSocketServer.clients.forEach(client => {
+      const snakeClient = client as SnakeWebSocket;
+      if (snakeClient.roomId === roomId) {
+        console.log(`[websocketService] Clearing roomId for player ${snakeClient.playerId}`);
+        snakeClient.roomId = undefined;
+      }
+    });
+    
     removeRoom(roomId);
     console.log(`[websocketService] Room deleted: ${roomId}`);
+    
+    // Notify subscribers about room removal
+    broadcastRoomRemoved(roomId);
   }, 2000);
 }
 
@@ -473,9 +596,24 @@ async function handleDisconnect(ws: SnakeWebSocket): Promise<void> {
     return;
   }
 
+  // Get player info before removing them
+  const disconnectedPlayer = room.players.get(ws.playerId);
+  const playerNickname = disconnectedPlayer?.nickname || 'Unknown player';
+
   // Remove the player from the room
   room.players.delete(ws.playerId);
   console.log(`[websocketService] Removed player ${ws.playerId} from room ${roomId}`);
+  
+  // Remove player's vote if they had one
+  if (room.playAgainVotes) {
+    room.playAgainVotes.delete(ws.playerId);
+  }
+  
+  // Notify remaining players about the disconnect
+  if (room.players.size > 0) {
+    broadcastPlayerDisconnect(roomId, playerNickname);
+    broadcastRoomUpdate(roomId);
+  }
 
   // If room is empty and this wasn't an intentional disconnect, clean up
   if (room.players.size === 0 && ws.readyState === WebSocket.CLOSED) {
@@ -540,5 +678,97 @@ async function handleDisconnect(ws: SnakeWebSocket): Promise<void> {
     // Remove the room
     removeRoom(roomId);
     console.log(`[websocketService] Room ${roomId} removed`);
+    
+    // Notify subscribers about room removal
+    broadcastRoomRemoved(roomId);
   }
+}
+
+// Handle room subscription
+function handleSubscribeRooms(ws: SnakeWebSocket): void {
+  console.log(`[websocketService] Client ${ws.playerId} subscribing to room updates`);
+  roomSubscribers.add(ws);
+  
+  // Send current rooms list
+  const availableRooms = getAvailableRoomsList();
+  ws.send(JSON.stringify({
+    type: 'roomsList',
+    rooms: availableRooms
+  }));
+}
+
+// Handle room unsubscription
+function handleUnsubscribeRooms(ws: SnakeWebSocket): void {
+  console.log(`[websocketService] Client ${ws.playerId} unsubscribing from room updates`);
+  roomSubscribers.delete(ws);
+}
+
+// Get list of available rooms (not full and not in active game)
+function getAvailableRoomsList(): Array<any> {
+  const allRooms = getAllRooms();
+  const availableRooms: Array<any> = [];
+  
+  allRooms.forEach((room, roomId) => {
+    // Include rooms that are not full (less than 2 players) and not in active game
+    if (room.players.size < 2 && !room.isGameOver) {
+      availableRooms.push({
+        id: roomId,
+        name: `Room ${roomId.slice(0, 8)}`,
+        players: Array.from(room.players.values()).map(p => ({
+          id: p.id,
+          nickname: p.nickname
+        })),
+        maxPlayers: 2,
+        isGameActive: !!room.gameInterval && !room.isGameOver,
+        createdAt: room.createdAt
+      });
+    }
+  });
+  
+  return availableRooms;
+}
+
+// Broadcast room updates to all subscribers
+export function broadcastRoomUpdate(roomId: string): void {
+  const room = getRoom(roomId);
+  if (!room) return;
+  
+  const roomData = {
+    id: roomId,
+    name: `Room ${roomId.slice(0, 8)}`,
+    players: Array.from(room.players.values()).map(p => ({
+      id: p.id,
+      nickname: p.nickname
+    })),
+    maxPlayers: 2,
+    isGameActive: !!room.gameInterval && !room.isGameOver,
+    createdAt: room.createdAt
+  };
+  
+  const updateMessage = JSON.stringify({
+    type: 'roomUpdated',
+    room: roomData
+  });
+  
+  // Send to all subscribers
+  roomSubscribers.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(updateMessage);
+    }
+  });
+}
+
+// Broadcast room removal to all subscribers
+export function broadcastRoomRemoved(roomId: string): void {
+  const removeMessage = JSON.stringify({
+    type: 'roomRemoved',
+    roomId
+  });
+  
+  // Send to all subscribers
+  roomSubscribers.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(removeMessage);
+    }
+  });
 }

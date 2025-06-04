@@ -1,16 +1,15 @@
 import {
-    NitroliteClient,
     createGetLedgerBalancesMessage,
-    type NitroliteClientConfig,
 } from "@erc7824/nitrolite";
-import { BROKER_WS_URL } from "../config";
+import { BROKER_WS_URL, CHAIN_ID } from "../config";
 import { createEthersSigner, generateKeyPair } from "../crypto";
-import type { Hex } from "viem";
+import type { Account, Transport, Chain, Hex, ParseAccount, WalletClient } from "viem";
 import { authenticate } from "./authentication";
 
 class ClearNetService {
-    public client!: NitroliteClient;
-    public config!: NitroliteClientConfig;
+    walletClient: WalletClient<Transport, Chain, ParseAccount<Account>> | null = null;
+    stateWalletClient: WalletClient<Transport, Chain, ParseAccount<Account>> | null = null;
+
     private isConnected = false;
     private currentAddress: string | null = null;
     private activeChannel: Hex | null = null;
@@ -30,31 +29,26 @@ class ClearNetService {
     private reconnectTimeout: number | null = null;
     private authenticationInProgress: Promise<void> | null = null;
 
-    async initialize(config: NitroliteClientConfig): Promise<boolean> {
+    async initialize(
+        walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>,
+        stateWalletClient: WalletClient<Transport, Chain, ParseAccount<Account>>
+    ): Promise<boolean> {
         try {
-            // Validate the config
-            if (!config) {
-                throw new Error("Config object is required");
-            }
-
             // Check for required config properties
-            if (!config.walletClient) {
+            if (!walletClient) {
                 throw new Error("walletClient is required in config");
             }
 
-            if (!config.walletClient.account || !config.walletClient.account.address) {
+            if (!walletClient.account || !walletClient.account.address) {
                 throw new Error("walletClient.account.address is required");
             }
 
-            console.log("Initializing with wallet address:", config.walletClient.account.address);
-
-            // Store the config for later use with wallet client
-            this.config = config;
+            console.log("Initializing with wallet address:", walletClient.account.address);
 
             // Initialize the Nitrolite client
-            this.client = new NitroliteClient(config);
-            console.log("Nitrolite client initialized", this.client);
-            this.currentAddress = config.walletClient.account.address;
+            this.currentAddress = walletClient.account.address;
+            this.walletClient = walletClient;
+            this.stateWalletClient = stateWalletClient;
             console.log("Current wallet client address:", this.currentAddress);
 
             // Initialize WebSocket connection to ClearNet
@@ -109,7 +103,7 @@ class ClearNetService {
 
                     try {
                         // Log wallet client details for debugging
-                        console.log("Wallet client account:", this.config?.walletClient?.account);
+                        console.log("Wallet client account:", this.walletClient?.account);
                         console.log("Current address:", this.currentAddress);
 
                         // Authenticate with the broker
@@ -184,7 +178,7 @@ class ClearNetService {
         }
 
         // Verify we have wallet client for authentication
-        const eip712SignerWalletClient = this.config?.walletClient;
+        const eip712SignerWalletClient = this.walletClient;
         if (!eip712SignerWalletClient) {
             throw new Error('No main wallet client (e.g., MetaMask) available for EIP-712 authentication');
         }
@@ -248,10 +242,20 @@ class ClearNetService {
             }
             return;
         }
+        if (message.res[1] === "channels") {
+            const channel = message.res[2][0].find((ch: any) => {
+                return ch.chain_id === CHAIN_ID && ch.status === "open";
+            });
+            console.log('[ClearNetService] Received new active channel:', channel);
+            if (channel) {
+                this.activeChannel = channel.channel_id;
+                console.log('[ClearNetService] Active channel updated:', this.activeChannel);
+            }
+        }
     }
 
     async signState(stateData: any, stateId: string, channelId: string) {
-        if (!this.client || !this.isConnected) {
+        if (!this.isConnected) {
             console.error("ClearNet client not initialized");
             return null;
         }
@@ -271,7 +275,10 @@ class ClearNetService {
             const stateHash = await this.getStateHash(state);
 
             // Choose which wallet client to use for signing
-            const signingClient = this.config.stateWalletClient || this.config.walletClient;
+            const signingClient = this.stateWalletClient || this.walletClient;
+            if (!signingClient) {
+                throw new Error("No signing client available");
+            }
             const signature = await signingClient.signMessage({
                 message: { raw: stateHash },
             });
@@ -288,26 +295,8 @@ class ClearNetService {
         }
     }
 
-    async getAccountChannels() {
-        if (!this.client || !this.isConnected) {
-            console.error("ClearNet client not initialized");
-            return [];
-        }
-
-        try {
-            return await this.client.getAccountChannels();
-        } catch (error) {
-            console.error("Failed to get account channels:", error);
-            return [];
-        }
-    }
-
     // Helper method to hash a state with the Nitrolite protocol standard
     private async getStateHash(state: any): Promise<Hex> {
-        if (!this.client) {
-            throw new Error("ClearNet client not initialized");
-        }
-
         // Format the state as required by the ERC-7824 specification
         const stateString = JSON.stringify(state);
 
@@ -337,16 +326,18 @@ class ClearNetService {
     }
 
     async getActiveChannel(): Promise<Hex | null> {
-        if (this.activeChannel) {
-            return this.activeChannel;
+        // Wait until broker pushes the active channel to the client
+        let attempts = 0;
+        const timeout = 100;
+        const maxAttempts = 2000 / timeout;
+        while (!this.activeChannel) {
+            await new Promise(resolve => setTimeout(resolve, timeout));
+            attempts++;
+            if (this.isConnected && attempts > maxAttempts) {
+                throw new Error('No active channel found. Please open a channel at apps.yellow.com');
+            }
         }
-
-        const channels = await this.client.getAccountChannels();
-        if (channels.length <= 0) {
-            throw new Error('No active channel found. Please open a channel at apps.yellow.com');
-        }
-        this.activeChannel = channels[0];
-
+        console.log('[ClearNetService] Active channel:', this.activeChannel);
         return this.activeChannel;
     }
 }

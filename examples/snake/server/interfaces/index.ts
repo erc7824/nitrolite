@@ -3,7 +3,7 @@ import { WebSocket } from 'ws';
 
 export interface SnakeWebSocket extends WebSocket {
   playerId: string;
-  roomId: string;
+  roomId?: string;
   channelId?: string;
 }
 
@@ -31,6 +31,7 @@ export interface Room {
   stateVersion: number;
   createdAt: number; // Timestamp when the room was created
   isClosingAppSession?: boolean;
+  playAgainVotes?: Set<string>; // Set of player IDs who voted to play again
 }
 
 export interface PendingRequest {

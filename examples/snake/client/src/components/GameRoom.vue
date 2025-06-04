@@ -33,6 +33,11 @@ const isGameStarted = ref(false);
 const waitingForPlayer = ref(false);
 const gameOver = ref(false);
 const copySuccess = ref(false);
+const playAgainVotes = ref<string[]>([]);
+const totalPlayers = ref(0);
+const hasVoted = ref(false);
+const playerDisconnectMessage = ref('');
+const showDisconnectNotification = ref(false);
 
 // Handle incoming WebSocket messages
 const handleMessage = (event: MessageEvent) => {
@@ -43,11 +48,30 @@ const handleMessage = (event: MessageEvent) => {
       gameState.value = data;
       isGameStarted.value = true;
       waitingForPlayer.value = false;
+      totalPlayers.value = data.players.length;
 
       // Update game over state from server
       if (data.isGameOver) {
         gameOver.value = true;
+        // Reset vote state when game ends
+        hasVoted.value = false;
+        playAgainVotes.value = [];
+      } else if (gameOver.value) {
+        // Game restarted (was over, now not over), reset UI state
+        gameOver.value = false;
+        hasVoted.value = false;
+        playAgainVotes.value = [];
       }
+    } else if (data.type === 'playAgainVoteUpdate') {
+      playAgainVotes.value = data.playAgainVotes;
+      totalPlayers.value = data.totalPlayers;
+      hasVoted.value = data.playAgainVotes.includes(props.playerId);
+    } else if (data.type === 'playerDisconnected') {
+      playerDisconnectMessage.value = data.message;
+      showDisconnectNotification.value = true;
+      // Clear vote state since we can't restart with missing players
+      playAgainVotes.value = [];
+      hasVoted.value = false;
     }
   } catch (error) {
     console.error('Error parsing message:', error);
@@ -311,8 +335,8 @@ const closeChannel = async () => {
 
 // Play another game with the same channel
 const playAgain = () => {
-  // Reset game state
-  gameOver.value = false;
+  // Don't send vote if already voted
+  if (hasVoted.value) return;
 
   // Notify server that we want to play again
   const ws = gameService.getWebSocket();
@@ -331,7 +355,7 @@ const playAgain = () => {
     <div class="room-info">
       <h2>
         Room:
-        <span class="room-id" @click="copyRoomId" title="Click to copy">{{ roomId }}</span>
+        <span class="room-id" @click="copyRoomId" title="Click to copy">{{ roomId.slice(0, 8) }}</span>
         <button class="copy-btn" @click="copyRoomId" title="Copy room ID">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -341,11 +365,6 @@ const playAgain = () => {
       </h2>
       <p>Share this room ID with your friend to play together!</p>
       <div v-if="copySuccess" class="copy-success">Room ID copied to clipboard!</div>
-    </div>
-
-    <div class="channel-status">
-      <span class="status-label">Channel Status:</span>
-      <span class="status-value active">Active</span>
     </div>
 
     <div v-if="waitingForPlayer" class="waiting-message">
@@ -365,9 +384,34 @@ const playAgain = () => {
         </div>
       </div>
 
+      <div v-if="showDisconnectNotification" class="disconnect-notification">
+        <p>{{ playerDisconnectMessage }}</p>
+        <p>Cannot continue playing. Please close the channel to withdraw funds.</p>
+      </div>
+
+      <div v-else class="vote-status" v-if="totalPlayers > 1">
+        <p v-if="playAgainVotes.length === 0">
+          Want to play again? Both players need to agree.
+        </p>
+        <p v-else-if="playAgainVotes.length < totalPlayers">
+          {{ playAgainVotes.length }}/{{ totalPlayers }} players voted to play again
+        </p>
+        <p v-else>
+          All players agreed! Starting new game...
+        </p>
+      </div>
+
       <div class="game-over-actions">
         <button @click="closeChannel" class="close-channel-btn">Close Channel & Withdraw</button>
-        <button @click="playAgain" class="play-again-btn">Play Again</button>
+        <button
+          v-if="!showDisconnectNotification"
+          @click="playAgain"
+          class="play-again-btn"
+          :class="{ 'voted': hasVoted }"
+          :disabled="hasVoted"
+        >
+          {{ hasVoted ? 'Voted to Play Again' : 'Vote to Play Again' }}
+        </button>
       </div>
     </div>
 
@@ -569,33 +613,6 @@ canvas {
   animation: fadeIn 0.3s ease-in-out;
 }
 
-.channel-status {
-  background-color: #f8f9fa;
-  border-radius: 4px;
-  padding: 8px 12px;
-  margin-bottom: 15px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.status-label {
-  font-weight: 600;
-  color: #666;
-}
-
-.status-value {
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 0.85em;
-  font-weight: bold;
-}
-
-.status-value.active {
-  background-color: #e8f5e9;
-  color: #388e3c;
-}
-
 .game-over-actions {
   margin-top: 20px;
   display: flex;
@@ -626,8 +643,51 @@ canvas {
   color: white;
 }
 
-.play-again-btn:hover {
+.play-again-btn:hover:not(:disabled) {
   background-color: #388e3c;
+}
+
+.play-again-btn:disabled {
+  background-color: #81c784;
+  cursor: not-allowed;
+}
+
+.play-again-btn.voted {
+  background-color: #66bb6a;
+}
+
+.vote-status {
+  margin: 15px 0;
+  padding: 10px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.vote-status p {
+  margin: 0;
+  font-size: 14px;
+  color: #fff;
+}
+
+.disconnect-notification {
+  margin: 15px 0;
+  padding: 15px;
+  background-color: rgba(244, 67, 54, 0.2);
+  border: 1px solid #f44336;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.disconnect-notification p {
+  margin: 5px 0;
+  font-size: 14px;
+  color: #fff;
+}
+
+.disconnect-notification p:first-child {
+  font-weight: bold;
+  color: #ffcdd2;
 }
 
 @keyframes fadeIn {

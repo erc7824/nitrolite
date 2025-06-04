@@ -7,19 +7,15 @@ import {
     RequestData,
     ResponsePayload,
     MessageSigner,
-    NitroliteClient,
-    NitroliteClientConfig,
     AppDefinition,
     NitroliteRPC,
     createGetLedgerBalancesMessage,
     CreateAppSessionRequest,
     CloseAppSessionRequest,
 } from "@erc7824/nitrolite";
-import { BROKER_WS_URL, CONTRACT_ADDRESSES, POLYGON_RPC_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
+import { BROKER_WS_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
-import { Hex, createWalletClient, createPublicClient, http } from "viem";
-import { polygon } from "viem/chains";
-import { privateKeyToAccount } from "viem/accounts";
+import { Hex } from "viem";
 
 import util from 'util';
 util.inspect.defaultOptions.depth = null;
@@ -30,56 +26,9 @@ const DEFAULT_QUORUM: number = 100; // server alone decides the outcome
 
 // Flag to indicate if we've authenticated with the broker
 let isAuthenticated = false;
-let client: NitroliteClient = createClient();
 
 // Store JWT token at file level for reuse
 let jwtToken: string | null = null;
-
-function createClient(): NitroliteClient {
-    // Create the wallet client using the ethereum provider
-
-    const wallet = privateKeyToAccount(WALLET_PRIVATE_KEY);
-    const walletClient = createWalletClient({
-        transport: http(process.env.POLYGON_RPC_URL),
-        chain: polygon,
-        account: wallet,
-    });
-
-    const publicClient = createPublicClient({
-        transport: http(POLYGON_RPC_URL),
-        chain: polygon,
-    });
-
-    // Create a dedicated client for signing state updates
-    const stateWalletClient = createWalletClient({
-        transport: http(process.env.POLYGON_RPC_URL),
-        chain: polygon,
-        account: wallet,
-    });
-    const config: NitroliteClientConfig = {
-        publicClient,
-        walletClient,
-        stateWalletClient,
-        addresses: CONTRACT_ADDRESSES,
-        chainId: polygon.id,
-        challengeDuration: BigInt(86400), // 1 day in seconds
-    };
-    const client = new NitroliteClient(config);
-
-    return client;
-}
-
-async function createBrokerChannel(client: NitroliteClient): Promise<void> {
-    // Create a channel with the broker
-    const createChannelResponse = await client.createChannel({
-        initialAllocationAmounts: [0n, 0n],
-        stateData: "0x",
-    });
-    console.log("Created channel", createChannelResponse);
-
-    // Check if broker joined the channel
-    getChannels();
-}
 
 async function getChannels(): Promise<void> {
     const brokerWs = getBrokerWebSocket();
@@ -166,6 +115,7 @@ async function authenticateWithBroker(): Promise<void> {
         throw new Error("Server address not found");
     }
 
+
     const expire = String(Math.floor(Date.now() / 1000) + 24 * 60 * 60);
 
     return new Promise(async (resolve, reject) => {
@@ -238,6 +188,47 @@ async function authenticateWithBroker(): Promise<void> {
                     const errorMsg = message.err?.[1] || message.error || message.res?.[2]?.[0]?.error || 'Authentication failed';
 
                     console.error('Authentication failed:', errorMsg);
+
+                    // Check if this is a JWT authentication failure and fallback to signer auth
+                    const errorString = String(errorMsg).toLowerCase();
+                    if (errorString.includes('jwt') || errorString.includes('token') || errorString.includes('invalid') || errorString.includes('expired')) {
+                        console.warn('JWT authentication failed on server, attempting fallback to signer authentication');
+                        jwtToken = null; // Clear invalid JWT token
+
+                        try {
+                            // Restart authentication with signer
+                            const fallbackAuthRequest = await createAuthRequestMessage({
+                                wallet: serverAddress,
+                                participant: serverAddress,
+                                app_name: 'Snake Game',
+                                expire: expire,
+                                scope: 'snake-game',
+                                application: serverAddress,
+                                allowances: [
+                                    {
+                                        symbol: 'usdc',
+                                        amount: '0',
+                                    },
+                                ],
+                            });
+
+                            console.log('Sending fallback auth_request with signer:', fallbackAuthRequest);
+                            brokerWs.send(fallbackAuthRequest);
+                            // Reset timeout for the fallback attempt
+                            clearTimeout(authTimeout);
+                            authTimeout = setTimeout(() => {
+                                cleanup();
+                                reject(new Error("Authentication timeout"));
+                            }, 15000);
+                            return; // Continue listening for the fallback response
+                        } catch (fallbackError) {
+                            console.error('Fallback to signer authentication failed:', fallbackError);
+                            cleanup();
+                            reject(new Error(`Both JWT and signer authentication failed: ${fallbackError}`));
+                            return;
+                        }
+                    }
+
                     jwtToken = null; // Clear JWT token on auth failure
                     cleanup();
                     reject(new Error(String(errorMsg)));
@@ -269,18 +260,41 @@ async function authenticateWithBroker(): Promise<void> {
 
         try {
             let authRequest: string;
+            let usingJWT = false;
 
             if (jwtToken) {
-                console.log('JWT token found, sending auth request with token:', jwtToken);
-                authRequest = await createAuthVerifyMessageWithJWT(jwtToken);
+                console.log('JWT token found, attempting JWT authentication:', jwtToken);
+                try {
+                    authRequest = await createAuthVerifyMessageWithJWT(jwtToken);
+                    usingJWT = true;
+                } catch (jwtError) {
+                    console.warn('JWT auth failed, falling back to signer authentication:', jwtError);
+                    // Clear invalid JWT token
+                    jwtToken = null;
+                    authRequest = await createAuthRequestMessage({
+                        wallet: serverAddress,
+                        participant: serverAddress,
+                        app_name: 'Snake Game',
+                        expire: expire,
+                        scope: 'snake-game',
+                        application: serverAddress,
+                        allowances: [
+                            {
+                                symbol: 'usdc',
+                                amount: '0',
+                            },
+                        ],
+                    });
+                    usingJWT = false;
+                }
             } else {
                 console.log('No JWT token found, proceeding with challenge-response authentication');
                 authRequest = await createAuthRequestMessage({
                     wallet: serverAddress,
                     participant: serverAddress,
-                    app_name: 'Snake Game Server',
+                    app_name: 'Snake Game',
                     expire: expire,
-                    scope: 'snake-game-server',
+                    scope: 'snake-game',
                     application: serverAddress,
                     allowances: [
                         {
@@ -289,9 +303,10 @@ async function authenticateWithBroker(): Promise<void> {
                         },
                     ],
                 });
+                usingJWT = false;
             }
 
-            console.log('Sending auth_request:', authRequest);
+            console.log(`Sending auth_request (${usingJWT ? 'JWT' : 'challenge-response'}):`, authRequest);
             brokerWs.send(authRequest);
         } catch (requestError) {
             console.error('Error creating auth_request:', requestError);
@@ -331,7 +346,7 @@ export function handleBrokerMessage(message: any): void {
                 return;
             }
             else if (method === "get_channels" && payload.length === 0) {
-                createBrokerChannel(client);
+                throw new Error("No channels found. Please open a channel at apps.yellow.com");
             }
 
             // Handle successful response to a pending request
@@ -515,7 +530,7 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
         definition: appDefinition,
         allocations: participants.map((participant) => ({
             participant,
-            asset: CONTRACT_ADDRESSES.tokenAddress as Hex,
+            asset: "usdc",
             amount: "0",
         }))
     }]
@@ -580,7 +595,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
         app_session_id: appId,
         allocations: [participantA, participantB, signer.address].map((participant) => ({
             participant,
-            asset: CONTRACT_ADDRESSES.tokenAddress as Hex,
+            asset: "usdc",
             amount: "0",
         })),
     }];
@@ -628,6 +643,7 @@ export function createEthersSigner(privateKey: string): WalletSigner {
     try {
         // Create ethers wallet from private key
         const wallet = new ethers.Wallet(privateKey);
+
         return {
             publicKey: wallet.publicKey,
             address: wallet.address as Hex,
@@ -767,7 +783,7 @@ function createEIP712SigningFunction(serverAddress: string, expire: string) {
         // Create EIP-712 message with ONLY the challenge UUID
         const message = {
             challenge: challengeUUID,
-            scope: 'snake-game-server',
+            scope: 'snake-game',
             wallet: serverAddress as `0x${string}`,
             application: serverAddress as `0x${string}`,
             participant: serverAddress as `0x${string}`,
@@ -780,11 +796,14 @@ function createEIP712SigningFunction(serverAddress: string, expire: string) {
             ],
         };
 
+
         try {
             // Sign with EIP-712
             const signature = await wallet._signTypedData(getAuthDomain(), AUTH_TYPES, message);
 
             console.log('EIP-712 signature generated for challenge:', signature);
+
+
             return signature as `0x${string}`;
         } catch (eip712Error) {
             console.error('EIP-712 signing failed:', eip712Error);

@@ -1,4 +1,4 @@
-import { createAuthRequestMessage, createAuthVerifyMessage, createAuthVerifyMessageWithJWT } from '@erc7824/nitrolite';
+import { createAuthRequestMessage, createAuthVerifyMessage, createAuthVerifyMessageWithJWT, createEIP712AuthMessageSigner } from '@erc7824/nitrolite';
 import type { WalletSigner } from '../crypto';
 import type { Hex } from 'viem';
 import { getAddress } from 'viem';
@@ -12,156 +12,9 @@ const getAuthDomain = () => {
     };
 };
 
-const AUTH_TYPES = {
-    Policy: [
-        { name: 'challenge', type: 'string' },
-        { name: 'scope', type: 'string' },
-        { name: 'wallet', type: 'address' },
-        { name: 'application', type: 'address' },
-        { name: 'participant', type: 'address' },
-        { name: 'expire', type: 'uint256' },
-        { name: 'allowances', type: 'Allowance[]' },
-    ],
-    Allowance: [
-        { name: 'asset', type: 'string' },
-        { name: 'amount', type: 'uint256' },
-    ],
-};
 
 const expire = String(Math.floor(Date.now() / 1000) + 24 * 60 * 60);
 
-/**
- * Creates EIP-712 signing function for challenge verification with proper challenge extraction
- */
-function createEIP712SigningFunction(walletClient: any, stateSigner: WalletSigner) {
-    if (!walletClient) {
-        throw new Error('No wallet client available for EIP-712 signing');
-    }
-
-    return async (data: any): Promise<Hex> => {
-        console.log('Signing auth_verify challenge with EIP-712:', data);
-
-        let challengeUUID = '';
-        const address = walletClient.account?.address ? getAddress(walletClient.account.address) : null;
-        
-        if (!address) {
-            throw new Error('No wallet address available for signing');
-        }
-
-        // For Snake game, we don't have complex channel state, so we'll use 0 for amount
-        const totalAmount = 0;
-
-        // The data coming in is the array from createAuthVerifyMessage
-        // Format: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
-        if (Array.isArray(data)) {
-            console.log('Data is array, extracting challenge from position [2][0].challenge');
-
-            // Direct array access - data[2] should be the array with the challenge object
-            if (data.length >= 3 && Array.isArray(data[2]) && data[2].length > 0) {
-                const challengeObject = data[2][0];
-
-                if (challengeObject && challengeObject.challenge) {
-                    challengeUUID = challengeObject.challenge;
-                    console.log('Extracted challenge UUID from array:', challengeUUID);
-                }
-            }
-        } else if (typeof data === 'string') {
-            try {
-                const parsed = JSON.parse(data);
-
-                console.log('Parsed challenge data:', parsed);
-
-                // Handle different message structures
-                if (parsed.res && Array.isArray(parsed.res)) {
-                    // auth_challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
-                    if (parsed.res[1] === 'auth_challenge' && parsed.res[2]) {
-                        challengeUUID = parsed.res[2].challenge_message || parsed.res[2].challenge;
-                        console.log('Extracted challenge UUID from auth_challenge:', challengeUUID);
-                    }
-                    // auth_verify message: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
-                    else if (parsed.res[1] === 'auth_verify' && Array.isArray(parsed.res[2]) && parsed.res[2][0]) {
-                        challengeUUID = parsed.res[2][0].challenge;
-                        console.log('Extracted challenge UUID from auth_verify:', challengeUUID);
-                    }
-                }
-                // Direct array format
-                else if (Array.isArray(parsed) && parsed.length >= 3 && Array.isArray(parsed[2])) {
-                    challengeUUID = parsed[2][0]?.challenge;
-                    console.log('Extracted challenge UUID from direct array:', challengeUUID);
-                }
-            } catch (e) {
-                console.error('Could not parse challenge data:', e);
-                console.log('Using raw string as challenge');
-                challengeUUID = data;
-            }
-        } else if (data && typeof data === 'object') {
-            // If data is already an object, try to extract challenge
-            challengeUUID = data.challenge || data.challenge_message;
-            console.log('Extracted challenge from object:', challengeUUID);
-        }
-
-        if (!challengeUUID || challengeUUID.includes('[') || challengeUUID.includes('{')) {
-            console.error('Challenge extraction failed or contains invalid characters:', challengeUUID);
-            throw new Error('Could not extract valid challenge UUID for EIP-712 signing');
-        }
-
-        console.log('Final challenge UUID for EIP-712:', challengeUUID);
-        console.log('Signing for address (original):', address);
-        console.log('Signing for address (type):', typeof address);
-        console.log('Auth domain:', getAuthDomain());
-
-        // Create EIP-712 message with ONLY the challenge UUID
-        const message = {
-            challenge: challengeUUID,
-            scope: 'snake-game',
-            wallet: address as `0x${string}`,
-            application: address as `0x${string}`,
-            participant: stateSigner.address as `0x${string}`,
-            expire: expire, // 24 hours in seconds
-            allowances: [
-                {
-                    asset: 'usdc',
-                    amount: totalAmount.toString(),
-                },
-            ],
-        };
-
-        try {
-            // Sign with EIP-712
-            const signature = await walletClient.signTypedData({
-                account: walletClient.account!,
-                domain: getAuthDomain(),
-                types: AUTH_TYPES,
-                primaryType: 'Policy',
-                message: message,
-            });
-
-            console.log('EIP-712 signature generated for challenge:', signature);
-            return signature;
-        } catch (eip712Error) {
-            console.error('EIP-712 signing failed:', eip712Error);
-            console.log('Attempting fallback to regular message signing...');
-
-            try {
-                // Fallback to regular message signing if EIP-712 fails
-                const fallbackMessage = `Authentication challenge for ${address}: ${challengeUUID}`;
-
-                console.log('Fallback message:', fallbackMessage);
-
-                const fallbackSignature = await walletClient.signMessage({
-                    message: fallbackMessage,
-                    account: walletClient.account!,
-                });
-
-                console.log('Fallback signature generated:', fallbackSignature);
-                return fallbackSignature as `0x${string}`;
-            } catch (fallbackError) {
-                console.error('Fallback signing also failed:', fallbackError);
-                throw new Error(`Both EIP-712 and fallback signing failed: ${(eip712Error as Error).message}`);
-            }
-        }
-    };
-}
 
 /**
  * Authenticates with the WebSocket server using:
@@ -201,6 +54,21 @@ export async function authenticate(
     console.log('- Empty signature for auth_request');
     console.log('- EIP-712 signature for auth_verify challenge (UUID only)');
 
+    const authMessage = {
+        wallet: walletAddress as Hex,
+        participant: signer.address as Hex,
+        app_name: 'Snake Game',
+        expire: expire, // 24 hours in seconds
+        scope: 'snake-game',
+        application: walletAddress as Hex,
+        allowances: [
+            {
+                symbol: 'usdc',
+                amount: '0',
+            },
+        ],
+    };
+
     // Step 1: Send auth_request with empty signature and wallet address
     try {
         let authRequest: string;
@@ -216,38 +84,12 @@ export async function authenticate(
                 console.warn('JWT auth failed, falling back to signer authentication:', jwtError);
                 // Remove invalid JWT token
                 window.localStorage.removeItem('jwt_token');
-                authRequest = await createAuthRequestMessage({
-                    wallet: walletAddress as Hex,
-                    participant: signer.address as Hex,
-                    app_name: 'Snake Game',
-                    expire: expire, // 24 hours in seconds
-                    scope: 'snake-game',
-                    application: walletAddress as Hex,
-                    allowances: [
-                        {
-                            symbol: 'usdc',
-                            amount: '0',
-                        },
-                    ],
-                });
+                authRequest = await createAuthRequestMessage(authMessage);
                 usingJWT = false;
             }
         } else {
             console.log('No JWT token found, proceeding with challenge-response authentication');
-            authRequest = await createAuthRequestMessage({
-                wallet: walletAddress as Hex,
-                participant: signer.address as Hex,
-                app_name: 'Snake Game',
-                expire: expire, // 24 hours in seconds
-                scope: 'snake-game',
-                application: walletAddress as Hex,
-                allowances: [
-                    {
-                        symbol: 'usdc',
-                        amount: '0',
-                    },
-                ],
-            });
+            authRequest = await createAuthRequestMessage(authMessage);
             usingJWT = false;
         }
 
@@ -301,8 +143,21 @@ export async function authenticate(
 
                     try {
                         // Step 2: Create EIP-712 signing function for challenge verification
+                        if (!walletClient) {
+                            throw new Error('No wallet client available for EIP-712 signing');
+                        }
+
                         console.log('Creating EIP-712 signing function...');
-                        const eip712SigningFunction = createEIP712SigningFunction(walletClient, signer);
+                        const eip712SigningFunction = createEIP712AuthMessageSigner(walletClient, {
+                            scope: authMessage.scope,
+                            application: authMessage.application,
+                            participant: authMessage.participant,
+                            expire: authMessage.expire,
+                            allowances: authMessage.allowances.map((allowance) => ({
+                                asset: allowance.symbol,
+                                amount: allowance.amount.toString(),
+                            })),
+                        }, getAuthDomain());
 
                         console.log('Calling createAuthVerifyMessage...');
                         // Create and send verification message with EIP-712 signature
@@ -351,20 +206,7 @@ export async function authenticate(
                         
                         try {
                             // Restart authentication with signer
-                            const fallbackAuthRequest = await createAuthRequestMessage({
-                                wallet: walletAddress as Hex,
-                                participant: signer.address as Hex,
-                                app_name: 'Snake Game',
-                                expire: expire, // 24 hours in seconds
-                                scope: 'snake-game',
-                                application: walletAddress as Hex,
-                                allowances: [
-                                    {
-                                        symbol: 'usdc',
-                                        amount: '0',
-                                    },
-                                ],
-                            });
+                            const fallbackAuthRequest = await createAuthRequestMessage(authMessage);
                             
                             console.log('Sending fallback auth_request with signer:', fallbackAuthRequest);
                             ws.send(fallbackAuthRequest);

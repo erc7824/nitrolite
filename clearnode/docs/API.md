@@ -31,7 +31,20 @@ Initiates authentication with the server.
 
 ```json
 {
-  "req": [1, "auth_request", ["0x1234567890abcdef..."], 1619123456789],
+  "req": [1, "auth_request", [{
+    "address": "0x1234567890abcdef...",
+    "session_key": "0x9876543210fedcba...", // Optional: If specified, enables delegation to this key
+    "app_name": "Example App", // Optional: Application name for analytics
+    "allowances": [ // Optional: Asset allowances for the session
+      {
+        "asset": "usdc", 
+        "amount": "100.0"
+      }
+    ],
+    "scope": "app.create", // Optional: Permission scope (e.g., "app.create", "ledger.readonly")
+    "expire": "24h", // Optional: Session expiration (e.g., "1h", "24h", "7d")
+    "application": "0xApplication1234..." // Optional: Application public address
+  }], 1619123456789],
   "sig": ["0x5432abcdef..."] // Client's signature of the entire 'req' object
 }
 ```
@@ -73,11 +86,23 @@ Completes authentication with a challenge response.
 {
   "res": [2, "auth_verify", [{
     "address": "0x1234567890abcdef...",
-    "success": true
+    "success": true,
+    "jwt_token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..." // JWT token for subsequent requests
   }], 1619123456789],
   "sig": ["0xabcd1234..."] // Server's signature of the entire 'res' object
 }
 ```
+
+#### JWT Authentication
+
+After successful authentication, the server provides a JWT token that can be used for subsequent authenticated requests. The JWT contains:
+
+- Policy information with wallet address, participant, scope, and expiration
+- Permission scopes (e.g., "app.create", "ledger.readonly")
+- Asset allowances (if specified during auth_request)
+- Standard JWT claims (issued at, expiration, etc.)
+
+The JWT token has a default validity period of 24 hours and must be refreshed by making a new authentication request before expiration.
 
 ## Ledger Management
 
@@ -317,6 +342,7 @@ The signature in the request must be from the participant's private key, verifyi
 Each channel response includes:
 - `channel_id`: Unique identifier for the channel
 - `participant`: The participant's address
+- `wallet`: The wallet address associated with this channel (may differ from participant if using delegation)
 - `status`: Current status ("open", "closed", or "joining")
 - `token`: The token address for the channel
 - `amount`: Total channel capacity
@@ -385,7 +411,6 @@ Creates a virtual application between participants.
 {
   "req": [1, "create_app_session", [{
     "definition": {
-      "address": "0x4300",
       "protocol": "NitroRPC/0.2",
       "participants": [
         "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
@@ -398,12 +423,12 @@ Creates a virtual application between participants.
     },
     "allocations": [
       {
-        "wallet": "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
+        "participant": "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
         "asset": "usdc",
         "amount": "100.0"
       },
       {
-        "wallet": "0x00112233445566778899AaBbCcDdEeFf00112233",
+        "participant": "0x00112233445566778899AaBbCcDdEeFf00112233",
         "asset": "usdc",
         "amount": "100.0"
       }
@@ -486,7 +511,7 @@ Closes a channel between a participant and the broker.
 {
   "res": [1, "close_channel", [{
     "channel_id": "0x4567890123abcdef...",
-    "intent": 1,
+    "intent": 3, // IntentFINALIZE
     "version": 123,
     "state_data": "0x0000000000000000000000000000000000000000000000000000000000001ec7",
     "allocations": [
@@ -546,7 +571,7 @@ Example:
   "res": [1, "resize_channel", [{
     "channel_id": "0x4567890123abcdef...",
     "state_data": "0x0000000000000000000000000000000000000000000000000000000000002ec7",
-    "intent": 2,
+    "intent": 2, // IntentRESIZE
     "version": 5,
     "allocations": [
       {

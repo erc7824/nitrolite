@@ -988,9 +988,9 @@ func HandleGetChannels(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 		}
 	}
 
-	var channelResponses []ChannelResponse
+	response := make([]ChannelResponse, 0, len(channels))
 	for _, channel := range channels {
-		channelResponses = append(channelResponses, ChannelResponse{
+		response = append(response, ChannelResponse{
 			ChannelID:   channel.ChannelID,
 			Participant: channel.Participant,
 			Wallet:      channel.Wallet,
@@ -1007,7 +1007,7 @@ func HandleGetChannels(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 		})
 	}
 
-	rpcResponse := CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{channelResponses}, time.Now())
+	rpcResponse := CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{response}, time.Now())
 	return rpcResponse, nil
 }
 

@@ -30,29 +30,29 @@ import { mainnet } from 'viem/chains';
 
 // Setup clients
 const publicClient = createPublicClient({
-  chain: mainnet,
-  transport: http('https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY')
+    chain: mainnet,
+    transport: http('https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY'),
 });
 
 const account = privateKeyToAccount('0x...');
 const walletClient = createWalletClient({
-  account,
-  chain: mainnet,
-  transport: http('https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY')
+    account,
+    chain: mainnet,
+    transport: http('https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY'),
 });
 
 // Initialize Nitrolite client
 const client = new NitroliteClient({
-  publicClient,
-  walletClient,
-  addresses: {
-    custody: '0xCustodyAddress',
-    adjudicator: '0xAdjudicatorAddress',
-    guestAddress: '0xGuestAddress',
-    tokenAddress: '0xTokenAddress'
-  },
-  challengeDuration: 100n,
-  chainId: 1
+    publicClient,
+    walletClient,
+    addresses: {
+        custody: '0xCustodyAddress',
+        adjudicator: '0xAdjudicatorAddress',
+        guestAddress: '0xGuestAddress',
+        tokenAddress: '0xTokenAddress',
+    },
+    challengeDuration: 100n,
+    chainId: 1,
 });
 
 // 1. Deposit funds
@@ -60,19 +60,19 @@ const depositTxHash = await client.deposit(1000000n);
 
 // 2. Create a channel
 const { channelId, initialState, txHash } = await client.createChannel({
-  initialAllocationAmounts: [700000n, 300000n],
-  stateData: '0x1234'
+    initialAllocationAmounts: [700000n, 300000n],
+    stateData: '0x1234',
 });
 
 // 3. Resize the channel when needed
 const resizeTxHash = await client.resizeChannel({
-  channelId,
-  candidateState: updatedState
+    channelId,
+    candidateState: updatedState,
 });
 
 // 4. Close the channel
 const closeTxHash = await client.closeChannel({
-  finalState: finalState
+    finalState: finalState,
 });
 ```
 
@@ -80,20 +80,20 @@ const closeTxHash = await client.closeChannel({
 
 The `NitroliteClient` class provides the following key methods:
 
-| Method | Description |
-|--------|-------------|
-| `deposit` | Deposits tokens or ETH into the custody contract |
-| `createChannel` | Creates a new state channel |
-| `depositAndCreateChannel` | Combines deposit and channel creation in one operation |
-| `challengeChannel` | Challenges a channel when the counterparty is non-responsive |
-| `resizeChannel` | Updates a channel's allocation |
-| `closeChannel` | Closes a channel with a mutually agreed final state |
-| `withdrawal` | Withdraws tokens from the custody contract |
-| `getAccountChannels` | Gets a list of channels for the account |
-| `getAccountInfo` | Gets account balance information |
-| `approveTokens` | Approves tokens for the custody contract |
-| `getTokenAllowance` | Gets current token allowance |
-| `getTokenBalance` | Gets token balance for an account |
+| Method                    | Description                                                  |
+| ------------------------- | ------------------------------------------------------------ |
+| `deposit`                 | Deposits tokens or ETH into the custody contract             |
+| `createChannel`           | Creates a new state channel                                  |
+| `depositAndCreateChannel` | Combines deposit and channel creation in one operation       |
+| `challengeChannel`        | Challenges a channel when the counterparty is non-responsive |
+| `resizeChannel`           | Updates a channel's allocation                               |
+| `closeChannel`            | Closes a channel with a mutually agreed final state          |
+| `withdrawal`              | Withdraws tokens from the custody contract                   |
+| `getAccountChannels`      | Gets a list of channels for the account                      |
+| `getAccountInfo`          | Gets account balance information                             |
+| `approveTokens`           | Approves tokens for the custody contract                     |
+| `getTokenAllowance`       | Gets current token allowance                                 |
+| `getTokenBalance`         | Gets token balance for an account                            |
 
 ## RPC Communication
 
@@ -106,20 +106,13 @@ import { NitroliteRPC } from '@erc7824/nitrolite';
 const socket = new WebSocket('wss://rpc.nitrolite.io');
 
 // Create a message for authentication
-const authMsg = await NitroliteRPC.createAuthRequestMessage(
-  signer, 
-  account.address
-);
+const authMsg = await NitroliteRPC.createAuthRequestMessage(signer, account.address);
 
 // Send the authentication message
 socket.send(authMsg);
 
 // Create application-specific messages
-const appMsg = await NitroliteRPC.createAppMessage(
-  signer,
-  channelId,
-  ["param1", "param2"]
-);
+const appMsg = await NitroliteRPC.createAppMessage(signer, channelId, ['param1', 'param2']);
 
 // Send the application message
 socket.send(appMsg);
@@ -135,15 +128,15 @@ socket.send(appMsg);
 
 ### Core RPC Methods
 
-| Method | Description |
-|--------|-------------|
-| `createAuthRequestMessage` | Creates a message for authentication |
-| `createAuthVerifyMessage` | Verifies an authentication challenge |
-| `createPingMessage` | Creates a heartbeat message |
-| `createGetConfigMessage` | Retrieves channel configuration |
-| `createApplicationMessage` | Creates an application-specific message |
-| `createCloseApplicationMessage` | Initiates application closure |
-| `parseResponse` | Parses and validates incoming messages |
+| Method                          | Description                             |
+| ------------------------------- | --------------------------------------- |
+| `createAuthRequestMessage`      | Creates a message for authentication    |
+| `createAuthVerifyMessage`       | Verifies an authentication challenge    |
+| `createPingMessage`             | Creates a heartbeat message             |
+| `createGetConfigMessage`        | Retrieves channel configuration         |
+| `createApplicationMessage`      | Creates an application-specific message |
+| `createCloseApplicationMessage` | Initiates application closure           |
+| `parseResponse`                 | Parses and validates incoming messages  |
 
 ## Framework Compatibility
 
@@ -165,9 +158,9 @@ const depositRequest = await client.txPreparer.prepareDeposit(100000n);
 
 // Execute with your AA provider
 const userOp = await aaProvider.prepareUserOperation({
-  target: depositRequest.to,
-  data: depositRequest.data,
-  value: depositRequest.value
+    target: depositRequest.to,
+    data: depositRequest.data,
+    value: depositRequest.value,
 });
 ```
 

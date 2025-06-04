@@ -1,5 +1,5 @@
-import { Address, Hex, stringToHex } from "viem";
-import { NitroliteRPCMessage, RPCResponse } from "./types";
+import { Address, Hex, stringToHex } from 'viem';
+import { NitroliteRPCMessage, RPCResponse } from './types';
 
 /**
  * Get the current time in milliseconds
@@ -102,7 +102,7 @@ export function getError(message: any): { code: number; message: string } | unde
  * @returns Array of hex strings
  */
 export function toBytes(values: any[]): Hex[] {
-    return values.map((v) => (typeof v === "string" ? stringToHex(v) : stringToHex(JSON.stringify(v))));
+    return values.map((v) => (typeof v === 'string' ? stringToHex(v) : stringToHex(JSON.stringify(v))));
 }
 
 /**
@@ -140,7 +140,6 @@ export function isValidResponseRequestId(request: NitroliteRPCMessage, response:
 
     return responseId === requestId;
 }
-
 
 /**
  * Parses a raw RPC response string into a structured RPCResponse object
@@ -203,5 +202,5 @@ function extractRPCParameter<T>(res: Array<any>, key: string): T {
         return res[2]?.[0]?.[key];
     }
 
-    return res[2]?.[key]
+    return res[2]?.[key];
 }

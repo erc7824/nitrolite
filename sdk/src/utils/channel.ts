@@ -1,5 +1,5 @@
-import { keccak256, encodeAbiParameters, Address, Hex } from "viem";
-import { Channel, ChannelId } from "../client/types"; // Updated import path
+import { keccak256, encodeAbiParameters, Address, Hex } from 'viem';
+import { Channel, ChannelId } from '../client/types'; // Updated import path
 
 /**
  * Compute the unique identifier for a channel based on its configuration.
@@ -10,14 +10,14 @@ import { Channel, ChannelId } from "../client/types"; // Updated import path
 export function getChannelId(channel: Channel): ChannelId {
     const encoded = encodeAbiParameters(
         [
-            { name: "participants", type: "address[]" },
-            { name: "adjudicator", type: "address" },
-            { name: "challenge", type: "uint64" },
-            { name: "nonce", type: "uint64" },
-            { name: "chainId", type: "uint256" },
+            { name: 'participants', type: 'address[]' },
+            { name: 'adjudicator', type: 'address' },
+            { name: 'challenge', type: 'uint64' },
+            { name: 'nonce', type: 'uint64' },
+            { name: 'chainId', type: 'uint256' },
         ],
         // @ts-ignore
-        [channel.participants, channel.adjudicator, channel.challenge, channel.nonce, channel.chainId]
+        [channel.participants, channel.adjudicator, channel.challenge, channel.nonce, channel.chainId],
     );
 
     return keccak256(encoded);

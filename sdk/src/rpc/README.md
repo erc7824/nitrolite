@@ -4,30 +4,30 @@ This module provides RPC communication capabilities for the Nitrolite SDK, allow
 
 ## API Functions
 
-| Function | Description | Parameters |
-|----------|-------------|------------|
-| `createAuthRequestMessage` | Creates a signed auth request message for initial authentication | `signer`, `clientAddress`, `requestId?`, `timestamp?` |
-| `createAuthVerifyMessageFromChallenge` | Creates a signed auth verify message using an explicit challenge | `signer`, `clientAddress`, `challenge`, `requestId?`, `timestamp?` |
-| `createAuthVerifyMessage` | Creates a signed auth verify message from a raw challenge response | `signer`, `rawChallengeResponse`, `clientAddress`, `requestId?`, `timestamp?` |
-| `createPingMessage` | Creates a signed ping message to check connection | `signer`, `requestId?`, `timestamp?` |
-| `createGetConfigMessage` | Creates a signed get_config message | `signer`, `channelId`, `requestId?`, `timestamp?` |
-| `createGetLedgerBalancesMessage` | Creates a signed get_ledger_balances message | `signer`, `channelId`, `requestId?`, `timestamp?` |
-| `createGetAppDefinitionMessage` | Creates a signed get_app_definition message | `signer`, `appId`, `requestId?`, `timestamp?` |
-| `createAppSessionMessage` | Creates a signed create_app_session message | `signer`, `params`, `intent`, `requestId?`, `timestamp?` |
-| `createCloseAppSessionMessage` | Creates a signed close_app_session message | `signer`, `params`, `intent`, `requestId?`, `timestamp?` |
-| `createApplicationMessage` | Creates a signed application message | `signer`, `appId`, `messageParams`, `requestId?`, `timestamp?` |
-| `createCloseChannelMessage` | Creates a signed close_channel message | `signer`, `channelId`, `requestId?`, `timestamp?` |
+| Function                               | Description                                                        | Parameters                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| `createAuthRequestMessage`             | Creates a signed auth request message for initial authentication   | `signer`, `clientAddress`, `requestId?`, `timestamp?`                         |
+| `createAuthVerifyMessageFromChallenge` | Creates a signed auth verify message using an explicit challenge   | `signer`, `clientAddress`, `challenge`, `requestId?`, `timestamp?`            |
+| `createAuthVerifyMessage`              | Creates a signed auth verify message from a raw challenge response | `signer`, `rawChallengeResponse`, `clientAddress`, `requestId?`, `timestamp?` |
+| `createPingMessage`                    | Creates a signed ping message to check connection                  | `signer`, `requestId?`, `timestamp?`                                          |
+| `createGetConfigMessage`               | Creates a signed get_config message                                | `signer`, `channelId`, `requestId?`, `timestamp?`                             |
+| `createGetLedgerBalancesMessage`       | Creates a signed get_ledger_balances message                       | `signer`, `channelId`, `requestId?`, `timestamp?`                             |
+| `createGetAppDefinitionMessage`        | Creates a signed get_app_definition message                        | `signer`, `appId`, `requestId?`, `timestamp?`                                 |
+| `createAppSessionMessage`              | Creates a signed create_app_session message                        | `signer`, `params`, `intent`, `requestId?`, `timestamp?`                      |
+| `createCloseAppSessionMessage`         | Creates a signed close_app_session message                         | `signer`, `params`, `intent`, `requestId?`, `timestamp?`                      |
+| `createApplicationMessage`             | Creates a signed application message                               | `signer`, `appId`, `messageParams`, `requestId?`, `timestamp?`                |
+| `createCloseChannelMessage`            | Creates a signed close_channel message                             | `signer`, `channelId`, `requestId?`, `timestamp?`                             |
 
 ## NitroliteRPC Class Methods
 
-| Method | Description | Parameters |
-|--------|-------------|------------|
-| `createRequest` | Creates a NitroliteRPC request message | `requestId?`, `method`, `params?`, `timestamp?`, `int?` |
-| `createAppRequest` | Creates an application-specific RPC message | `requestId?`, `method`, `params?`, `timestamp?`, `acc`, `int?` |
-| `parseResponse` | Parses and validates a raw response | `rawMessage` |
-| `signRequestMessage` | Signs a request message with the provided signer | `message`, `signer` |
-| `verifySingleSignature` | Verifies a single signature on a message | `message`, `expectedSigner`, `verifier` |
-| `verifyMultipleSignatures` | Verifies multiple signatures on a message | `message`, `expectedSigners`, `verifier` |
+| Method                     | Description                                      | Parameters                                                     |
+| -------------------------- | ------------------------------------------------ | -------------------------------------------------------------- |
+| `createRequest`            | Creates a NitroliteRPC request message           | `requestId?`, `method`, `params?`, `timestamp?`, `int?`        |
+| `createAppRequest`         | Creates an application-specific RPC message      | `requestId?`, `method`, `params?`, `timestamp?`, `acc`, `int?` |
+| `parseResponse`            | Parses and validates a raw response              | `rawMessage`                                                   |
+| `signRequestMessage`       | Signs a request message with the provided signer | `message`, `signer`                                            |
+| `verifySingleSignature`    | Verifies a single signature on a message         | `message`, `expectedSigner`, `verifier`                        |
+| `verifyMultipleSignatures` | Verifies multiple signatures on a message        | `message`, `expectedSigners`, `verifier`                       |
 
 # NitroliteRPC - Simple RPC for State Channels
 
@@ -47,8 +47,8 @@ NitroliteRPC is a lightweight RPC protocol designed for state channels. Messages
 
 ```json
 {
-  "req": [1001, "subtract", [42, 23], 1741344819012],
-  "sig": "0xa0ad67f51cc73aee5b874ace9bc2e2053488bde06de257541e05fc58fd8c4f149cca44f1c702fcbdbde0aa09bcd24456f465e5c3002c011a3bc0f317df7777d2"
+    "req": [1001, "subtract", [42, 23], 1741344819012],
+    "sig": "0xa0ad67f51cc73aee5b874ace9bc2e2053488bde06de257541e05fc58fd8c4f149cca44f1c702fcbdbde0aa09bcd24456f465e5c3002c011a3bc0f317df7777d2"
 }
 ```
 
@@ -59,8 +59,8 @@ NitroliteRPC is a lightweight RPC protocol designed for state channels. Messages
 
 ```json
 {
-  "res": [1001, "subtract", [19], 1741344819814],
-  "sig": "0xd73268362b04516451ec52170f5c8ca189d35d9ac5e9041c156c9f0faf9aebd2891309e3b2b5d8788578ab3449c96f7aa81aefb25482b53f02bac42c65f806e5"
+    "res": [1001, "subtract", [19], 1741344819814],
+    "sig": "0xd73268362b04516451ec52170f5c8ca189d35d9ac5e9041c156c9f0faf9aebd2891309e3b2b5d8788578ab3449c96f7aa81aefb25482b53f02bac42c65f806e5"
 }
 ```
 
@@ -85,15 +85,12 @@ import { MessageSigner } from '@nitrolite/sdk/rpc/types';
 
 // Assuming you have a signing function that returns a Promise<Hex>
 const signer: MessageSigner = async (payload) => {
-  // Your signing implementation
-  return "0x..."; // Signed message
+    // Your signing implementation
+    return '0x...'; // Signed message
 };
 
 // Create an auth request message
-const authRequestMessage = await createAuthRequestMessage(
-  signer,
-  "0xYourAddress"
-);
+const authRequestMessage = await createAuthRequestMessage(signer, '0xYourAddress');
 
 // Create a ping message
 const pingMessage = await createPingMessage(signer);

@@ -1,15 +1,21 @@
-import { Account, SimulateContractReturnType, WalletClient, Chain, Transport, ParseAccount, zeroAddress } from "viem";
-import { NitroliteService, Erc20Service } from "./services";
-import { CreateChannelParams, CheckpointChannelParams, ChallengeChannelParams, CloseChannelParams, ResizeChannelParams } from "./types";
-import { ContractAddresses } from "../abis";
-import * as Errors from "../errors";
-import { _prepareAndSignInitialState, _prepareAndSignFinalState, _prepareAndSignResizeState } from "./state";
+import { Account, SimulateContractReturnType, WalletClient, Chain, Transport, ParseAccount, zeroAddress } from 'viem';
+import { NitroliteService, Erc20Service } from './services';
+import {
+    CreateChannelParams,
+    CheckpointChannelParams,
+    ChallengeChannelParams,
+    CloseChannelParams,
+    ResizeChannelParams,
+} from './types';
+import { ContractAddresses } from '../abis';
+import * as Errors from '../errors';
+import { _prepareAndSignInitialState, _prepareAndSignFinalState, _prepareAndSignResizeState } from './state';
 
 /**
  * Represents the data needed to construct a transaction or UserOperation call.
  * Derived from viem's SimulateContractReturnType['request'].
  */
-export type PreparedTransaction = SimulateContractReturnType["request"];
+export type PreparedTransaction = SimulateContractReturnType['request'];
 
 /**
  * @dev Note: `stateWalletClient.signMessage` function should NOT add an EIP-191 prefix to the message signed as
@@ -61,7 +67,11 @@ export class NitroliteTransactionPreparer {
                     const approveTx = await this.deps.erc20Service.prepareApprove(tokenAddress, spender, amount);
                     transactions.push(approveTx);
                 } catch (err) {
-                    throw new Errors.ContractCallError("prepareApprove (for deposit)", err as Error, { tokenAddress, spender, amount });
+                    throw new Errors.ContractCallError('prepareApprove (for deposit)', err as Error, {
+                        tokenAddress,
+                        spender,
+                        amount,
+                    });
                 }
             }
         }
@@ -70,7 +80,7 @@ export class NitroliteTransactionPreparer {
             const depositTx = await this.deps.nitroliteService.prepareDeposit(tokenAddress, amount);
             transactions.push(depositTx);
         } catch (err) {
-            throw new Errors.ContractCallError("prepareDeposit", err as Error, { tokenAddress, amount });
+            throw new Errors.ContractCallError('prepareDeposit', err as Error, { tokenAddress, amount });
         }
 
         return transactions;
@@ -89,7 +99,7 @@ export class NitroliteTransactionPreparer {
             return await this.deps.nitroliteService.prepareCreateChannel(channel, initialState);
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
-            throw new Errors.ContractCallError("prepareCreateChannelTransaction", err as Error, { params });
+            throw new Errors.ContractCallError('prepareCreateChannelTransaction', err as Error, { params });
         }
     }
 
@@ -100,19 +110,30 @@ export class NitroliteTransactionPreparer {
      * @param params Parameters for channel creation. See {@link CreateChannelParams}.
      * @returns An array of PreparedTransaction objects (approve?, deposit, createChannel).
      */
-    async prepareDepositAndCreateChannelTransactions(depositAmount: bigint, params: CreateChannelParams): Promise<PreparedTransaction[]> {
+    async prepareDepositAndCreateChannelTransactions(
+        depositAmount: bigint,
+        params: CreateChannelParams,
+    ): Promise<PreparedTransaction[]> {
         let allTransactions: PreparedTransaction[] = [];
         try {
             const depositTxs = await this.prepareDepositTransactions(depositAmount);
             allTransactions = allTransactions.concat(depositTxs);
         } catch (err) {
-            throw new Errors.ContractCallError("Failed to prepare deposit part of depositAndCreateChannel", err as Error, { depositAmount });
+            throw new Errors.ContractCallError(
+                'Failed to prepare deposit part of depositAndCreateChannel',
+                err as Error,
+                { depositAmount },
+            );
         }
         try {
             const createChannelTx = await this.prepareCreateChannelTransaction(params);
             allTransactions.push(createChannelTx);
         } catch (err) {
-            throw new Errors.ContractCallError("Failed to prepare createChannel part of depositAndCreateChannel", err as Error, { depositAmount });
+            throw new Errors.ContractCallError(
+                'Failed to prepare createChannel part of depositAndCreateChannel',
+                err as Error,
+                { depositAmount },
+            );
         }
         return allTransactions;
     }
@@ -127,14 +148,16 @@ export class NitroliteTransactionPreparer {
         const { channelId, candidateState, proofStates = [] } = params;
 
         if (!candidateState.sigs || candidateState.sigs.length < 2) {
-            throw new Errors.InvalidParameterError("Candidate state for checkpoint must be signed by both participants.");
+            throw new Errors.InvalidParameterError(
+                'Candidate state for checkpoint must be signed by both participants.',
+            );
         }
 
         try {
             return await this.deps.nitroliteService.prepareCheckpoint(channelId, candidateState, proofStates);
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
-            throw new Errors.ContractCallError("prepareCheckpointChannelTransaction", err as Error, { params });
+            throw new Errors.ContractCallError('prepareCheckpointChannelTransaction', err as Error, { params });
         }
     }
 
@@ -150,7 +173,7 @@ export class NitroliteTransactionPreparer {
             return await this.deps.nitroliteService.prepareChallenge(channelId, candidateState, proofStates);
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
-            throw new Errors.ContractCallError("prepareChallengeChannelTransaction", err as Error, { params });
+            throw new Errors.ContractCallError('prepareChallengeChannelTransaction', err as Error, { params });
         }
     }
 
@@ -166,7 +189,7 @@ export class NitroliteTransactionPreparer {
             return await this.deps.nitroliteService.prepareResize(channelId, resizeStateWithSigs);
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
-            throw new Errors.ContractCallError("prepareResizeChannelTransaction", err as Error, { params });
+            throw new Errors.ContractCallError('prepareResizeChannelTransaction', err as Error, { params });
         }
     }
 
@@ -183,7 +206,7 @@ export class NitroliteTransactionPreparer {
             return await this.deps.nitroliteService.prepareClose(channelId, finalStateWithSigs);
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
-            throw new Errors.ContractCallError("prepareCloseChannelTransaction", err as Error, { params });
+            throw new Errors.ContractCallError('prepareCloseChannelTransaction', err as Error, { params });
         }
     }
 
@@ -200,7 +223,7 @@ export class NitroliteTransactionPreparer {
             return await this.deps.nitroliteService.prepareWithdraw(tokenAddress, amount);
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
-            throw new Errors.ContractCallError("prepareWithdrawalTransaction", err as Error, { amount, tokenAddress });
+            throw new Errors.ContractCallError('prepareWithdrawalTransaction', err as Error, { amount, tokenAddress });
         }
     }
 
@@ -214,13 +237,17 @@ export class NitroliteTransactionPreparer {
         const spender = this.deps.addresses.custody;
 
         if (tokenAddress === zeroAddress) {
-            throw new Errors.InvalidParameterError("Cannot prepare approval for ETH (zero address)");
+            throw new Errors.InvalidParameterError('Cannot prepare approval for ETH (zero address)');
         }
         try {
             return await this.deps.erc20Service.prepareApprove(tokenAddress, spender, amount);
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
-            throw new Errors.ContractCallError("prepareApproveTokensTransaction", err as Error, { amount, tokenAddress, spender });
+            throw new Errors.ContractCallError('prepareApproveTokensTransaction', err as Error, {
+                amount,
+                tokenAddress,
+                spender,
+            });
         }
     }
 }

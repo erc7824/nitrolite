@@ -1,7 +1,7 @@
-import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress, SimulateContractReturnType } from "viem";
-import { CustodyAbi, ContractAddresses } from "../../abis"; // Adjust path
-import { Errors } from "../../errors"; // Use the namespace import
-import { Channel, ChannelId, Signature, State } from "../types";
+import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress, SimulateContractReturnType } from 'viem';
+import { CustodyAbi, ContractAddresses } from '../../abis'; // Adjust path
+import { Errors } from '../../errors'; // Use the namespace import
+import { Channel, ChannelId, Signature, State } from '../types';
 
 /**
  * Service for interacting directly with the Nitrolite Custody smart contract.
@@ -13,13 +13,18 @@ export class NitroliteService {
     private readonly account?: Account | Address;
     private readonly addresses: ContractAddresses;
 
-    constructor(publicClient: PublicClient, addresses: ContractAddresses, walletClient?: WalletClient, account?: Account | Address) {
+    constructor(
+        publicClient: PublicClient,
+        addresses: ContractAddresses,
+        walletClient?: WalletClient,
+        account?: Account | Address,
+    ) {
         if (!publicClient) {
-            throw new Errors.MissingParameterError("publicClient");
+            throw new Errors.MissingParameterError('publicClient');
         }
 
         if (!addresses || !addresses.custody) {
-            throw new Errors.MissingParameterError("addresses.custody");
+            throw new Errors.MissingParameterError('addresses.custody');
         }
 
         this.publicClient = publicClient;
@@ -56,15 +61,15 @@ export class NitroliteService {
      * @param amount Amount to deposit.
      * @returns The prepared transaction request object.
      */
-    async prepareDeposit(tokenAddress: Address, amount: bigint): Promise<SimulateContractReturnType["request"]> {
+    async prepareDeposit(tokenAddress: Address, amount: bigint): Promise<SimulateContractReturnType['request']> {
         const account = this.ensureAccount();
-        const operationName = "prepareDeposit";
+        const operationName = 'prepareDeposit';
 
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: CustodyAbi,
-                functionName: "deposit",
+                functionName: 'deposit',
                 args: [tokenAddress, amount],
                 account: account,
                 value: tokenAddress === zeroAddress ? amount : 0n,
@@ -89,7 +94,7 @@ export class NitroliteService {
     async deposit(tokenAddress: Address, amount: bigint): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
-        const operationName = "deposit";
+        const operationName = 'deposit';
 
         try {
             const request = await this.prepareDeposit(tokenAddress, amount);
@@ -108,15 +113,15 @@ export class NitroliteService {
      * @param initial Initial state. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
-    async prepareCreateChannel(channel: Channel, initial: State): Promise<SimulateContractReturnType["request"]> {
+    async prepareCreateChannel(channel: Channel, initial: State): Promise<SimulateContractReturnType['request']> {
         const account = this.ensureAccount();
-        const operationName = "prepareCreateChannel";
+        const operationName = 'prepareCreateChannel';
 
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: CustodyAbi,
-                functionName: "create",
+                functionName: 'create',
                 args: [channel, initial],
                 account: account,
             });
@@ -140,7 +145,7 @@ export class NitroliteService {
     async createChannel(channel: Channel, initial: State): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
-        const operationName = "createChannel";
+        const operationName = 'createChannel';
 
         try {
             const request = await this.prepareCreateChannel(channel, initial);
@@ -160,15 +165,19 @@ export class NitroliteService {
      * @param sig Participant signature.
      * @returns The prepared transaction request object.
      */
-    async prepareJoinChannel(channelId: ChannelId, index: bigint, sig: Signature): Promise<SimulateContractReturnType["request"]> {
+    async prepareJoinChannel(
+        channelId: ChannelId,
+        index: bigint,
+        sig: Signature,
+    ): Promise<SimulateContractReturnType['request']> {
         const account = this.ensureAccount();
-        const operationName = "prepareJoinChannel";
+        const operationName = 'prepareJoinChannel';
 
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: CustodyAbi,
-                functionName: "join",
+                functionName: 'join',
                 args: [channelId, index, sig],
                 account: account,
             });
@@ -193,7 +202,7 @@ export class NitroliteService {
     async joinChannel(channelId: ChannelId, index: bigint, sig: Signature): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
-        const operationName = "joinChannel";
+        const operationName = 'joinChannel';
 
         try {
             const request = await this.prepareJoinChannel(channelId, index, sig);
@@ -213,15 +222,19 @@ export class NitroliteService {
      * @param proofs Supporting proofs. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
-    async prepareCheckpoint(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<SimulateContractReturnType["request"]> {
+    async prepareCheckpoint(
+        channelId: ChannelId,
+        candidate: State,
+        proofs: State[] = [],
+    ): Promise<SimulateContractReturnType['request']> {
         const account = this.ensureAccount();
-        const operationName = "prepareCheckpoint";
+        const operationName = 'prepareCheckpoint';
 
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: CustodyAbi,
-                functionName: "checkpoint",
+                functionName: 'checkpoint',
                 args: [channelId, candidate, proofs],
                 account: account,
             });
@@ -246,7 +259,7 @@ export class NitroliteService {
     async checkpoint(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
-        const operationName = "checkpoint";
+        const operationName = 'checkpoint';
 
         try {
             const request = await this.prepareCheckpoint(channelId, candidate, proofs);
@@ -265,15 +278,19 @@ export class NitroliteService {
      * @param proofs Supporting proofs. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
-    async prepareChallenge(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<SimulateContractReturnType["request"]> {
+    async prepareChallenge(
+        channelId: ChannelId,
+        candidate: State,
+        proofs: State[] = [],
+    ): Promise<SimulateContractReturnType['request']> {
         const account = this.ensureAccount();
-        const operationName = "prepareChallenge";
+        const operationName = 'prepareChallenge';
 
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: CustodyAbi,
-                functionName: "challenge",
+                functionName: 'challenge',
                 args: [channelId, candidate, proofs],
                 account: account,
             });
@@ -298,7 +315,7 @@ export class NitroliteService {
     async challenge(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
-        const operationName = "challenge";
+        const operationName = 'challenge';
 
         try {
             const request = await this.prepareChallenge(channelId, candidate, proofs);
@@ -318,15 +335,19 @@ export class NitroliteService {
      * @param proofs Supporting proofs. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
-    async prepareResize(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<SimulateContractReturnType["request"]> {
+    async prepareResize(
+        channelId: ChannelId,
+        candidate: State,
+        proofs: State[] = [],
+    ): Promise<SimulateContractReturnType['request']> {
         const account = this.ensureAccount();
-        const operationName = "prepareResize";
+        const operationName = 'prepareResize';
 
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: CustodyAbi,
-                functionName: "resize",
+                functionName: 'resize',
                 args: [channelId, candidate, proofs],
                 account: account,
             });
@@ -351,7 +372,7 @@ export class NitroliteService {
     async resize(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
-        const operationName = "resize";
+        const operationName = 'resize';
 
         try {
             const request = await this.prepareResize(channelId, candidate, proofs);
@@ -371,15 +392,19 @@ export class NitroliteService {
      * @param proofs Supporting proofs. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
-    async prepareClose(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<SimulateContractReturnType["request"]> {
+    async prepareClose(
+        channelId: ChannelId,
+        candidate: State,
+        proofs: State[] = [],
+    ): Promise<SimulateContractReturnType['request']> {
         const account = this.ensureAccount();
-        const operationName = "prepareClose";
+        const operationName = 'prepareClose';
 
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: CustodyAbi,
-                functionName: "close",
+                functionName: 'close',
                 args: [channelId, candidate, proofs],
                 account: account,
             });
@@ -404,7 +429,7 @@ export class NitroliteService {
     async close(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
-        const operationName = "close";
+        const operationName = 'close';
 
         try {
             const request = await this.prepareClose(channelId, candidate, proofs);
@@ -423,15 +448,15 @@ export class NitroliteService {
      * @param amount Amount to withdraw.
      * @returns The prepared transaction request object.
      */
-    async prepareWithdraw(tokenAddress: Address, amount: bigint): Promise<SimulateContractReturnType["request"]> {
+    async prepareWithdraw(tokenAddress: Address, amount: bigint): Promise<SimulateContractReturnType['request']> {
         const account = this.ensureAccount();
-        const operationName = "prepareWithdraw";
+        const operationName = 'prepareWithdraw';
 
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: CustodyAbi,
-                functionName: "withdraw",
+                functionName: 'withdraw',
                 args: [tokenAddress, amount],
                 account: account,
             });
@@ -455,7 +480,7 @@ export class NitroliteService {
     async withdraw(tokenAddress: Address, amount: bigint): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
-        const operationName = "withdraw";
+        const operationName = 'withdraw';
 
         try {
             const request = await this.prepareWithdraw(tokenAddress, amount);
@@ -474,7 +499,7 @@ export class NitroliteService {
      * @error Throws ContractReadError if the read operation fails
      */
     async getAccountChannels(account: Address): Promise<ChannelId[]> {
-        const functionName = "getAccountChannels";
+        const functionName = 'getAccountChannels';
 
         try {
             const result = await this.publicClient.readContract({
@@ -499,7 +524,7 @@ export class NitroliteService {
      * @error Throws ContractReadError if the read operation fails.
      */
     async getAccountInfo(user: Address, token: Address): Promise<{ available: bigint; channelCount: bigint }> {
-        const functionName = "getAccountInfo";
+        const functionName = 'getAccountInfo';
 
         try {
             const result = await this.publicClient.readContract({

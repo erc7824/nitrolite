@@ -1,4 +1,4 @@
-import { Address } from "viem";
+import { Address } from 'viem';
 
 /**
  * Contract addresses for Nitrolite infrastructure

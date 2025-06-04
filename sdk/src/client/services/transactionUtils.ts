@@ -1,5 +1,5 @@
-import { PublicClient, Hash, TransactionReceipt } from "viem";
-import { Errors } from "../../errors";
+import { PublicClient, Hash, TransactionReceipt } from 'viem';
+import { Errors } from '../../errors';
 
 /**
  * Waits for a transaction to be mined and returns the receipt.
@@ -9,12 +9,12 @@ import { Errors } from "../../errors";
  * @throws {TransactionError} If the transaction fails, reverts, or waiting times out.
  */
 export async function waitForTransaction(publicClient: PublicClient, hash: Hash): Promise<TransactionReceipt> {
-    const operationName = "waitForTransaction";
+    const operationName = 'waitForTransaction';
 
     try {
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
-        if (receipt.status === "reverted") {
+        if (receipt.status === 'reverted') {
             throw new Error(`Transaction reverted`);
         }
 

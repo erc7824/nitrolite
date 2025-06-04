@@ -1,8 +1,16 @@
-import { Hex } from "viem";
-import { CreateChannelParams, State, Channel, ChannelId, CloseChannelParams, StateIntent, ResizeChannelParams } from "./types";
-import { generateChannelNonce, getChannelId, getStateHash, signState, removeQuotesFromRS } from "../utils";
-import * as Errors from "../errors";
-import { PreparerDependencies } from "./prepare";
+import { Hex } from 'viem';
+import {
+    CreateChannelParams,
+    State,
+    Channel,
+    ChannelId,
+    CloseChannelParams,
+    StateIntent,
+    ResizeChannelParams,
+} from './types';
+import { generateChannelNonce, getChannelId, getStateHash, signState, removeQuotesFromRS } from '../utils';
+import * as Errors from '../errors';
+import { PreparerDependencies } from './prepare';
 
 /**
  * Shared logic for preparing the channel object, initial state, and signing it.
@@ -15,12 +23,12 @@ import { PreparerDependencies } from "./prepare";
  */
 export async function _prepareAndSignInitialState(
     deps: PreparerDependencies,
-    params: CreateChannelParams
+    params: CreateChannelParams,
 ): Promise<{ channel: Channel; initialState: State; channelId: ChannelId }> {
     const { initialAllocationAmounts, stateData } = params;
 
     if (!stateData) {
-        throw new Errors.MissingParameterError("State data is required for creating the channel.");
+        throw new Errors.MissingParameterError('State data is required for creating the channel.');
     }
 
     const channelNonce = generateChannelNonce(deps.account.address);
@@ -30,17 +38,19 @@ export async function _prepareAndSignInitialState(
     const tokenAddress = deps.addresses.tokenAddress;
     const adjudicatorAddress = deps.addresses.adjudicator;
     if (!adjudicatorAddress) {
-        throw new Errors.MissingParameterError("Default adjudicator address is not configured in addresses.adjudicator");
+        throw new Errors.MissingParameterError(
+            'Default adjudicator address is not configured in addresses.adjudicator',
+        );
     }
 
     const challengeDuration = deps.challengeDuration;
 
     if (!participants || participants.length !== 2) {
-        throw new Errors.InvalidParameterError("Channel must have two participants.");
+        throw new Errors.InvalidParameterError('Channel must have two participants.');
     }
 
     if (!initialAllocationAmounts || initialAllocationAmounts.length !== 2) {
-        throw new Errors.InvalidParameterError("Initial allocation amounts must be provided for both participants.");
+        throw new Errors.InvalidParameterError('Initial allocation amounts must be provided for both participants.');
     }
 
     const channel: Channel = {
@@ -85,12 +95,12 @@ export async function _prepareAndSignInitialState(
  */
 export async function _prepareAndSignResizeState(
     deps: PreparerDependencies,
-    params: ResizeChannelParams
+    params: ResizeChannelParams,
 ): Promise<{ resizeStateWithSigs: State; proofs: State[]; channelId: ChannelId }> {
     const { resizeState, proofStates } = params;
 
     if (!resizeState.stateData) {
-        throw new Errors.MissingParameterError("State data is required for closing the channel.");
+        throw new Errors.MissingParameterError('State data is required for closing the channel.');
     }
 
     const channelId = resizeState.channelId;
@@ -129,12 +139,12 @@ export async function _prepareAndSignResizeState(
  */
 export async function _prepareAndSignFinalState(
     deps: PreparerDependencies,
-    params: CloseChannelParams
+    params: CloseChannelParams,
 ): Promise<{ finalStateWithSigs: State; channelId: ChannelId }> {
     const { stateData, finalState } = params;
 
     if (!stateData) {
-        throw new Errors.MissingParameterError("State data is required for closing the channel.");
+        throw new Errors.MissingParameterError('State data is required for closing the channel.');
     }
 
     const channelId = finalState.channelId;

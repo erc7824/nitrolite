@@ -1,4 +1,4 @@
-import { Address, Hex } from "viem";
+import { Address, Hex } from 'viem';
 import {
     NitroliteRPCMessage,
     RequestData,
@@ -10,8 +10,8 @@ import {
     ParsedResponse, // Assuming ParsedResponse type is defined (without originalMessage)
     ResponsePayload,
     ApplicationRPCMessage,
-} from "./types";
-import { getCurrentTimestamp, generateRequestId } from "./utils";
+} from './types';
+import { getCurrentTimestamp, generateRequestId } from './utils';
 
 /**
  * NitroliteRPC utility class for creating, signing, and parsing RPC messages
@@ -31,7 +31,7 @@ export class NitroliteRPC {
         requestId: number = generateRequestId(),
         method: string,
         params: any[] = [],
-        timestamp: number = getCurrentTimestamp()
+        timestamp: number = getCurrentTimestamp(),
     ): NitroliteRPCMessage {
         const requestData: RequestData = [requestId, method, params, timestamp];
         const message: NitroliteRPCMessage = { req: requestData };
@@ -54,7 +54,7 @@ export class NitroliteRPC {
         method: string,
         params: any[] = [],
         timestamp: number = getCurrentTimestamp(),
-        sid: Hex
+        sid: Hex,
     ): ApplicationRPCMessage {
         const requestData: RequestData = [requestId, method, params, timestamp];
         const message: ApplicationRPCMessage = { req: requestData, sid };
@@ -75,16 +75,22 @@ export class NitroliteRPC {
         let message: any;
 
         try {
-            message = typeof rawMessage === "string" ? JSON.parse(rawMessage) : rawMessage;
+            message = typeof rawMessage === 'string' ? JSON.parse(rawMessage) : rawMessage;
         } catch (e) {
-            console.error("Failed to parse incoming message:", e);
+            console.error('Failed to parse incoming message:', e);
             return {
                 isValid: false,
-                error: "Message parsing failed",
+                error: 'Message parsing failed',
             };
         }
 
-        if (!message || typeof message !== "object" || !message.res || !Array.isArray(message.res) || message.res.length !== 4) {
+        if (
+            !message ||
+            typeof message !== 'object' ||
+            !message.res ||
+            !Array.isArray(message.res) ||
+            message.res.length !== 4
+        ) {
             return {
                 isValid: false,
                 error: "Invalid message structure: Missing or invalid 'res' array.",
@@ -92,9 +98,14 @@ export class NitroliteRPC {
         }
 
         const [requestId, method, dataPayload, timestamp] = message.res;
-        const sid = typeof message.sid === "string" ? message.sid : undefined;
+        const sid = typeof message.sid === 'string' ? message.sid : undefined;
 
-        if (typeof requestId !== "number" || typeof method !== "string" || !Array.isArray(dataPayload) || typeof timestamp !== "number") {
+        if (
+            typeof requestId !== 'number' ||
+            typeof method !== 'string' ||
+            !Array.isArray(dataPayload) ||
+            typeof timestamp !== 'number'
+        ) {
             return {
                 isValid: false,
                 requestId,
@@ -107,9 +118,14 @@ export class NitroliteRPC {
 
         let data: any[] | NitroliteRPCErrorDetail;
         let isError = false;
-        if (method === "error") {
+        if (method === 'error') {
             isError = true;
-            if (dataPayload.length > 0 && typeof dataPayload[0] === "object" && dataPayload[0] !== null && "error" in dataPayload[0]) {
+            if (
+                dataPayload.length > 0 &&
+                typeof dataPayload[0] === 'object' &&
+                dataPayload[0] !== null &&
+                'error' in dataPayload[0]
+            ) {
                 data = dataPayload[0] as NitroliteRPCErrorDetail;
             } else {
                 return {
@@ -118,7 +134,7 @@ export class NitroliteRPC {
                     method,
                     sid,
                     timestamp,
-                    error: "Malformed error response payload.",
+                    error: 'Malformed error response payload.',
                 };
             }
         } else {
@@ -181,7 +197,11 @@ export class NitroliteRPC {
      * @param verifier - The verification function for single signatures.
      * @returns A Promise resolving to true if the signature exists and is valid, false otherwise.
      */
-    static async verifySingleSignature(message: NitroliteRPCMessage, expectedSigner: Address, verifier: SingleMessageVerifier): Promise<boolean> {
+    static async verifySingleSignature(
+        message: NitroliteRPCMessage,
+        expectedSigner: Address,
+        verifier: SingleMessageVerifier,
+    ): Promise<boolean> {
         if (!message.sig || !Array.isArray(message.sig) || message.sig.length === 0) {
             return false;
         }
@@ -189,17 +209,19 @@ export class NitroliteRPC {
         const signature = message.sig[0];
 
         if (message.sig.length > 1) {
-            console.error("verifySingleSignature called on message with multiple signatures. Verifying only the first one.");
+            console.error(
+                'verifySingleSignature called on message with multiple signatures. Verifying only the first one.',
+            );
         }
 
         try {
             const payload = this.getMessagePayload(message);
-            if (typeof signature !== "string" || signature === "") {
+            if (typeof signature !== 'string' || signature === '') {
                 return false;
             }
             return await verifier(payload, signature as Hex, expectedSigner);
         } catch (error) {
-            console.error("Error during single signature verification:", error);
+            console.error('Error during single signature verification:', error);
             return false;
         }
     }
@@ -216,7 +238,7 @@ export class NitroliteRPC {
     static async verifyMultipleSignatures(
         message: NitroliteRPCMessage,
         expectedSigners: Address[],
-        verifier: MultiMessageVerifier
+        verifier: MultiMessageVerifier,
     ): Promise<boolean> {
         if (!message.sig || !Array.isArray(message.sig)) {
             return false;
@@ -226,7 +248,7 @@ export class NitroliteRPC {
             const payload = this.getMessagePayload(message);
             return await verifier(payload, message.sig as Hex[], expectedSigners);
         } catch (error) {
-            console.error("Error during multiple signature verification:", error);
+            console.error('Error during multiple signature verification:', error);
             return false;
         }
     }

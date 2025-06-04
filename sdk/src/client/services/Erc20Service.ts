@@ -1,6 +1,6 @@
-import { Account, Address, PublicClient, WalletClient, Hash, SimulateContractReturnType } from "viem"; // Added SimulateContractReturnType
-import { Erc20Abi } from "../../abis/token"; // Adjust path as needed
-import { Errors } from "../../errors"; // Use the namespace import
+import { Account, Address, PublicClient, WalletClient, Hash, SimulateContractReturnType } from 'viem'; // Added SimulateContractReturnType
+import { Erc20Abi } from '../../abis/token'; // Adjust path as needed
+import { Errors } from '../../errors'; // Use the namespace import
 
 /**
  * Service for interacting with ERC20 token contracts.
@@ -13,7 +13,7 @@ export class Erc20Service {
 
     constructor(publicClient: PublicClient, walletClient?: WalletClient, account?: Account | Address) {
         if (!publicClient) {
-            throw new Errors.MissingParameterError("publicClient");
+            throw new Errors.MissingParameterError('publicClient');
         }
 
         this.publicClient = publicClient;
@@ -46,7 +46,7 @@ export class Erc20Service {
      * @error Throws ContractReadError if the read operation fails.
      */
     async getTokenBalance(tokenAddress: Address, account: Address): Promise<bigint> {
-        const functionName = "balanceOf";
+        const functionName = 'balanceOf';
 
         try {
             const balance = await this.publicClient.readContract({
@@ -72,7 +72,7 @@ export class Erc20Service {
      * @error Throws ContractReadError if the read operation fails.
      */
     async getTokenAllowance(tokenAddress: Address, owner: Address, spender: Address): Promise<bigint> {
-        const functionName = "allowance";
+        const functionName = 'allowance';
 
         try {
             const allowance = await this.publicClient.readContract({
@@ -99,15 +99,19 @@ export class Erc20Service {
      * @throws {ContractCallError} If simulation fails.
      * @throws {AccountRequiredError} If no account is available for simulation.
      */
-    async prepareApprove(tokenAddress: Address, spender: Address, amount: bigint): Promise<SimulateContractReturnType["request"]> {
+    async prepareApprove(
+        tokenAddress: Address,
+        spender: Address,
+        amount: bigint,
+    ): Promise<SimulateContractReturnType['request']> {
         const account = this.ensureAccount();
-        const operationName = "prepareApprove";
+        const operationName = 'prepareApprove';
 
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: tokenAddress,
                 abi: Erc20Abi,
-                functionName: "approve",
+                functionName: 'approve',
                 args: [spender, amount],
                 account: account,
             });
@@ -134,7 +138,7 @@ export class Erc20Service {
     async approve(tokenAddress: Address, spender: Address, amount: bigint): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
-        const operationName = "approve";
+        const operationName = 'approve';
         try {
             const request = await this.prepareApprove(tokenAddress, spender, amount);
             const txHash = await walletClient.writeContract({ ...request, account });

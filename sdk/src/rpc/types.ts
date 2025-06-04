@@ -43,12 +43,7 @@ export interface NitroliteRPCErrorDetail {
 }
 
 /** Represents the data payload for an error response: [requestId, "error", [errorDetail], timestamp?]. */
-export type ErrorResponseData = [
-    RequestID,
-    'error',
-    [NitroliteRPCErrorDetail],
-    Timestamp?
-];
+export type ErrorResponseData = [RequestID, 'error', [NitroliteRPCErrorDetail], Timestamp?];
 
 /** Union type for the 'res' payload, covering both success and error responses. */
 export type ResponsePayload = ResponseData | ErrorResponseData;
@@ -220,9 +215,7 @@ export enum NitroliteErrorCode {
  * @param payload - The RequestData or ResponsePayload object (array) to sign.
  * @returns A Promise that resolves to the cryptographic signature as a Hex string.
  */
-export type MessageSigner = (
-    payload: RequestData | ResponsePayload
-) => Promise<Hex>;
+export type MessageSigner = (payload: RequestData | ResponsePayload) => Promise<Hex>;
 
 /**
  * Defines the function signature for verifying a single message signature against its payload.
@@ -234,7 +227,7 @@ export type MessageSigner = (
 export type SingleMessageVerifier = (
     payload: RequestData | ResponsePayload,
     signature: Hex,
-    address: Address
+    address: Address,
 ) => Promise<boolean>;
 
 /**
@@ -248,7 +241,7 @@ export type SingleMessageVerifier = (
 export type MultiMessageVerifier = (
     payload: RequestData | ResponsePayload,
     signatures: Hex[],
-    expectedSigners: Address[]
+    expectedSigners: Address[],
 ) => Promise<boolean>;
 
 /**
@@ -261,7 +254,7 @@ export interface PartialEIP712AuthMessage {
     application: Address;
     participant: Address;
     expire: string;
-    // TODO: use Allowance type after replacing symbol with asset 
+    // TODO: use Allowance type after replacing symbol with asset
     allowances: {
         asset: string;
         amount: string;
@@ -317,7 +310,7 @@ interface GenericRPCResponse {
  * Represents the response structure for the 'auth_challenge'
  */
 export interface AuthChallengeRPCResponse extends GenericRPCResponse {
-    method: "auth_challenge";
+    method: 'auth_challenge';
     params: {
         challengeMessage: string;
     };
@@ -327,7 +320,7 @@ export interface AuthChallengeRPCResponse extends GenericRPCResponse {
  * Represents the response structure for the 'auth_verify'
  */
 export interface AuthVerifyRPCResponse extends GenericRPCResponse {
-    method: "auth_verify";
+    method: 'auth_verify';
     params: {
         address: Address;
         jwtToken: string;
@@ -340,7 +333,7 @@ export interface AuthVerifyRPCResponse extends GenericRPCResponse {
  * Represents the response structure for an error response.
  */
 export interface ErrorRPCResponse extends GenericRPCResponse {
-    method: "error";
+    method: 'error';
     params: {
         error: string;
     };

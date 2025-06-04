@@ -16,7 +16,14 @@
         "lint": "eslint src --ext .ts",
         "typecheck": "tsc --noEmit",
         "test": "jest",
-        "prepublishOnly": "npm run clean && npm run build:prod"
+        "test:watch": "jest --watch",
+        "test:coverage": "jest --coverage",
+        "test:integration": "jest --config jest.integration.config.js",
+        "test:integration:watch": "jest --config jest.integration.config.js --watch",
+        "test:integration:coverage": "jest --config jest.integration.config.js --coverage",
+        "test:nonregression": "npm run test:integration",
+        "test:all": "npm run test && npm run test:integration",
+        "prepare": "npm run build"
     },
     "keywords": [
         "erc7824",
@@ -46,6 +53,12 @@
         "viem": "^2.5.0"
     },
     "devDependencies": {
+        "@ethereumjs/blockchain": "^10.0.0",
+        "@ethereumjs/common": "^10.0.0",
+        "@ethereumjs/evm": "^10.0.0",
+        "@ethereumjs/statemanager": "^10.0.0",
+        "@ethereumjs/util": "^10.0.0",
+        "@ethereumjs/vm": "^10.0.0",
         "@types/jest": "29.5.14",
         "@types/node": "^20.10.0",
         "@typescript-eslint/eslint-plugin": "^7.0.0",

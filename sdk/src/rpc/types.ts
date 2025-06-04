@@ -1,4 +1,4 @@
-import { Address, Hex } from "viem";
+import { Address, Hex } from 'viem';
 
 /** Type alias for Request ID (uint64) */
 export type RequestID = number;
@@ -43,7 +43,12 @@ export interface NitroliteRPCErrorDetail {
 }
 
 /** Represents the data payload for an error response: [requestId, "error", [errorDetail], timestamp?]. */
-export type ErrorResponseData = [RequestID, "error", [NitroliteRPCErrorDetail], Timestamp?];
+export type ErrorResponseData = [
+    RequestID,
+    'error',
+    [NitroliteRPCErrorDetail],
+    Timestamp?
+];
 
 /** Union type for the 'res' payload, covering both success and error responses. */
 export type ResponsePayload = ResponseData | ErrorResponseData;
@@ -59,7 +64,7 @@ export interface NitroliteRPCMessage {
     /** Contains the response or error payload if this is a response message. */
     res?: ResponsePayload;
     /** Optional cryptographic signature(s). */
-    sig?: Hex[] | [""];
+    sig?: Hex[] | [''];
 }
 
 /**
@@ -215,7 +220,9 @@ export enum NitroliteErrorCode {
  * @param payload - The RequestData or ResponsePayload object (array) to sign.
  * @returns A Promise that resolves to the cryptographic signature as a Hex string.
  */
-export type MessageSigner = (payload: RequestData | ResponsePayload) => Promise<Hex>;
+export type MessageSigner = (
+    payload: RequestData | ResponsePayload
+) => Promise<Hex>;
 
 /**
  * Defines the function signature for verifying a single message signature against its payload.
@@ -224,7 +231,11 @@ export type MessageSigner = (payload: RequestData | ResponsePayload) => Promise<
  * @param address - The Ethereum address of the expected signer.
  * @returns A Promise that resolves to true if the signature is valid for the given payload and address, false otherwise.
  */
-export type SingleMessageVerifier = (payload: RequestData | ResponsePayload, signature: Hex, address: Address) => Promise<boolean>;
+export type SingleMessageVerifier = (
+    payload: RequestData | ResponsePayload,
+    signature: Hex,
+    address: Address
+) => Promise<boolean>;
 
 /**
  * Defines the function signature for verifying multiple message signatures against a payload.
@@ -234,4 +245,60 @@ export type SingleMessageVerifier = (payload: RequestData | ResponsePayload, sig
  * @param expectedSigners - An array of Ethereum addresses of the required signers. The implementation determines if order matters.
  * @returns A Promise that resolves to true if all required signatures from the expected signers are present and valid, false otherwise.
  */
-export type MultiMessageVerifier = (payload: RequestData | ResponsePayload, signatures: Hex[], expectedSigners: Address[]) => Promise<boolean>;
+export type MultiMessageVerifier = (
+    payload: RequestData | ResponsePayload,
+    signatures: Hex[],
+    expectedSigners: Address[]
+) => Promise<boolean>;
+
+/**
+ * Represents a partial EIP-712 message for authorization.
+ * This is used to define the structure of the authorization message
+ * that will be signed by the user.
+ */
+export interface PartialEIP712AuthMessage {
+    scope: string;
+    application: Address;
+    participant: Address;
+    expire: string;
+    // TODO: use Allowance type after replacing symbol with asset 
+    allowances: {
+        asset: string;
+        amount: string;
+    }[];
+}
+
+/**
+ * Represents a complete EIP-712 message for authorization.
+ */
+export interface EIP712AuthMessage extends PartialEIP712AuthMessage {
+    wallet: Address;
+    challenge: string;
+}
+
+/**
+ * Represents the EIP-712 domain for authorization messages.
+ * This is used to define the domain separator for EIP-712 signatures.
+ */
+export interface EIP712AuthDomain {
+    name: string;
+}
+
+/**
+ * Represents the EIP-712 types for authorization messages.
+ */
+export const EIP712AuthTypes = {
+    Policy: [
+        { name: 'challenge', type: 'string' },
+        { name: 'scope', type: 'string' },
+        { name: 'wallet', type: 'address' },
+        { name: 'application', type: 'address' },
+        { name: 'participant', type: 'address' },
+        { name: 'expire', type: 'uint256' },
+        { name: 'allowances', type: 'Allowance[]' },
+    ],
+    Allowance: [
+        { name: 'asset', type: 'string' },
+        { name: 'amount', type: 'uint256' },
+    ],
+};

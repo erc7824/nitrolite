@@ -80,6 +80,33 @@ jobs:
         run: npm test
         working-directory: sdk
 
+  test-examples:
+    name: Test Examples Compilation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        example: [snake, tictactoe]
+        component: [client, server]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'examples/${{ matrix.example }}/${{ matrix.component }}/package.json'
+          cache: 'npm'
+          cache-dependency-path: 'examples/${{ matrix.example }}/${{ matrix.component }}/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: examples/${{ matrix.example }}/${{ matrix.component }}
+
+      - name: Build
+        run: npm run build
+        working-directory: examples/${{ matrix.example }}/${{ matrix.component }}
+
   build-and-publish-clearnode:
     name: Build and Publish (Clearnode)
     needs: test-clearnode

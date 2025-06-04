@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # TODO: add frontend
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: anvil
+    ports:
+      - "8545:8545"
+    entrypoint: ["anvil"] 
+    command: ["--host","0.0.0.0","--chain-id","1337","--accounts","15","--balance","300"]
+    healthcheck:
+      test: ["CMD", "cast", "block-number", "--rpc-url", "http://localhost:8545"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  contract-deployer:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: contract-deployer
+    depends_on:
+      anvil:
+        condition: service_healthy
+    volumes:
+      - ./contract:/app
+    working_dir: /app
+    command: >
+      bash -c "
+        forge script script/DeployCustody.s.sol:DeployCustodyScript --rpc-url http://anvil:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast &&
+        forge script ./script/DeployFundERC20.s.sol --broadcast --rpc-url http://anvil:8545 --sig 'run(string)' 'test test test test test test test test test test test junk' &&
+        forge create --broadcast --optimizer-runs 1000000 --via-ir ./test/mocks/FlagAdjudicator.sol:FlagAdjudicator --rpc-url http://anvil:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --constructor-args true &&
+        forge script script/setupChannel.s.sol:SetupChannelScript --rpc-url http://anvil:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast --sig 'run(string,address,address,address,uint256)' 'test test test test test test test test test test test junk' 0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE 0x5fbdb2315678afecb367f032d93f642f64180aa3 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512 100
+      "
+
+  clearnode:
+    platform: linux/amd64
+    image: ghcr.io/erc7824/nitrolite/clearnode:0.0.1-rc.28
+    ports:
+      - "8000:8000"
+      - "4242:4242"
+    depends_on:
+      contract-deployer:
+        condition: service_completed_successfully
+    environment:
+      - BROKER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+      - LOCALNET_CUSTODY_CONTRACT_ADDRESS=0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE
+      - LOCALNET_INFURA_URL=ws://anvil:8545
+      - CLEARNODE_DATABASE_URL=file:./dev.db
+    volumes:
+      - ./clearnode/dev.db:/dev.db
+    restart: unless-stopped

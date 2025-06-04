@@ -182,6 +182,36 @@ A state channel is a relationship between participants that allows them to excha
 - **Allocation**: Destination address, token, and amount for each participant
 - **Status**: Channel lifecycle stages (VOID, INITIAL, ACTIVE, DISPUTE, FINAL)
 
+## Quick Start with Docker Compose
+
+Get started quickly with the local development environment using Docker Compose:
+
+```bash
+# Start the environment
+docker-compose up -d
+
+# This will:
+# 1. Start a local Anvil blockchain on port 8545
+# 2. Deploy the Custody, ERC20, and FlagAdjudicator contracts
+# 3. Seed the database with test tokens information
+# 4. Start the Clearnode service on ports 8000 (HTTP) and 4242 (WebSocket)
+```
+
+To check the status:
+```bash
+docker-compose ps
+```
+
+To view logs:
+```bash
+docker-compose logs -f clearnode
+```
+
+To stop the environment:
+```bash
+docker-compose down
+```
+
 ## Development
 
 ```bash

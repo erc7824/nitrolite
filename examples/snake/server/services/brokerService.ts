@@ -530,7 +530,7 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
         definition: appDefinition,
         allocations: participants.map((participant) => ({
             participant,
-            asset: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" as Hex,
+            asset: "USDC",
             amount: "0",
         }))
     }]
@@ -595,7 +595,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
         app_session_id: appId,
         allocations: [participantA, participantB, signer.address].map((participant) => ({
             participant,
-            asset: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" as Hex,
+            asset: "USDC",
             amount: "0",
         })),
     }];

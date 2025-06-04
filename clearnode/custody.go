@@ -180,21 +180,41 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			return
 		}
 
+		var ch Channel
 		channelID := common.BytesToHash(ev.ChannelId[:]).Hex()
-		ch, err := CreateChannel(
-			c.db,
-			channelID,
-			wallet,
-			participantSigner,
-			nonce,
-			challenge,
-			adjudicator.Hex(),
-			c.chainID,
-			tokenAddress,
-			uint64(tokenAmount),
-		)
+		err = c.db.Transaction(func(tx *gorm.DB) error {
+			ch, err = CreateChannel(
+				tx,
+				channelID,
+				wallet,
+				participantSigner,
+				nonce,
+				challenge,
+				adjudicator.Hex(),
+				c.chainID,
+				tokenAddress,
+				uint64(tokenAmount),
+			)
+			if err != nil {
+				return err
+			}
+
+			asset, err := GetAssetByToken(tx, tokenAddress, c.chainID)
+			if err != nil {
+				return fmt.Errorf("DB error fetching asset: %w", err)
+			}
+
+			tokenAmount := decimal.NewFromBigInt(big.NewInt(tokenAmount), -int32(asset.Decimals))
+			ledger := GetWalletLedger(tx, wallet)
+			if err := ledger.Record(channelID, asset.Symbol, tokenAmount); err != nil {
+				log.Printf("[ChannelCreated] Error recording balance update for wallet: %v", err)
+				return err
+			}
+
+			return nil
+		})
 		if err != nil {
-			log.Printf("[ChannelCreated] Error creating/updating channel in database: %v", err)
+			log.Printf("[ChannelCreated] Error creating channel in database: %v", err)
 			return
 		}
 
@@ -246,8 +266,14 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			}
 
 			tokenAmount := decimal.NewFromBigInt(big.NewInt(int64(channel.Amount)), -int32(asset.Decimals))
-
+			// Transfer from channel account into user's unified account.
 			ledger := GetWalletLedger(tx, channel.Wallet)
+			if err := ledger.Record(channelID, asset.Symbol, tokenAmount.Neg()); err != nil {
+				log.Printf("[Joined] Error recording balance update for wallet: %v", err)
+				return err
+			}
+
+			ledger = GetWalletLedger(tx, channel.Wallet)
 			if err := ledger.Record(channel.Wallet, asset.Symbol, tokenAmount); err != nil {
 				log.Printf("[Joined] Error recording balance update for wallet: %v", err)
 				return err
@@ -289,9 +315,19 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			finalAllocation := ev.FinalState.Allocations[0].Amount
 			tokenAmount := decimal.NewFromBigInt(finalAllocation, -int32(asset.Decimals))
 
+			// Transfer fron unified account into channel account and then withdraw immidiately.
 			ledger := GetWalletLedger(tx, channel.Wallet)
 			if err := ledger.Record(channel.Wallet, asset.Symbol, tokenAmount.Neg()); err != nil {
 				log.Printf("[Closed] Error recording balance update for participant: %v", err)
+				return err
+			}
+			ledger = GetWalletLedger(tx, channel.Wallet)
+			if err := ledger.Record(channelID, asset.Symbol, tokenAmount); err != nil {
+				log.Printf("[Closed] Error recording balance update for wallet: %v", err)
+				return err
+			}
+			if err := ledger.Record(channelID, asset.Symbol, tokenAmount.Neg()); err != nil {
+				log.Printf("[Closed] Error recording balance update for wallet: %v", err)
 				return err
 			}
 
@@ -351,10 +387,41 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 				}
 
 				amount := decimal.NewFromBigInt(resizeAmount, -int32(asset.Decimals))
-				ledger := GetWalletLedger(tx, channel.Wallet)
-				if err := ledger.Record(channel.Wallet, asset.Symbol, amount); err != nil {
-					log.Printf("[Resized] Error recording balance update for participant: %v", err)
-					return err
+				// Keep correct order of operation for deposits and withdrawals into the channel.
+				if amount.IsPositive() || amount.IsZero() {
+					// 1. Deposit into a channel account.
+					ledger := GetWalletLedger(tx, channel.Wallet)
+					if err := ledger.Record(channelID, asset.Symbol, amount); err != nil {
+						log.Printf("[Resized] Error recording balance update for wallet: %v", err)
+						return err
+					}
+					// 2. Immediately transfer from the channel account into the unified account.
+					if err := ledger.Record(channelID, asset.Symbol, amount.Neg()); err != nil {
+						log.Printf("[Resized] Error recording balance update for wallet: %v", err)
+						return err
+					}
+					ledger = GetWalletLedger(tx, channel.Wallet)
+					if err := ledger.Record(channel.Wallet, asset.Symbol, amount); err != nil {
+						log.Printf("[Resized] Error recording balance update for participant: %v", err)
+						return err
+					}
+				} else {
+					// 1. Withdraw from the unified account and immediately transfer into the unified account.
+					ledger := GetWalletLedger(tx, channel.Wallet)
+					if err := ledger.Record(channel.Wallet, asset.Symbol, amount); err != nil {
+						log.Printf("[Resized] Error recording balance update for participant: %v", err)
+						return err
+					}
+					if err := ledger.Record(channelID, asset.Symbol, amount.Neg()); err != nil {
+						log.Printf("[Resized] Error recording balance update for wallet: %v", err)
+						return err
+					}
+					// 2. Withdraw from the channel account.
+					ledger = GetWalletLedger(tx, channel.Wallet)
+					if err := ledger.Record(channelID, asset.Symbol, amount); err != nil {
+						log.Printf("[Resized] Error recording balance update for wallet: %v", err)
+						return err
+					}
 				}
 			}
 

@@ -1,7 +1,7 @@
 import { Express, RequestHandler } from 'express';
 import { ethers } from 'ethers';
 import { randomBytes } from 'crypto';
-import { SERVER_PRIVATE_KEY, CONTRACT_ADDRESSES } from '../config/index.ts';
+import { SERVER_PRIVATE_KEY } from '../config/index.ts';
 import { getRoom, getAllRooms } from '../services/stateService.ts';
 import { clearNetRPC } from '../services/gameService.ts';
 import {
@@ -18,17 +18,6 @@ import { Hex } from 'viem';
 
 // Setup API routes for the Express app
 export function setupApiRoutes(app: Express): void {
-  // Contract addresses endpoint
-  app.get('/api/contract-addresses', ((_, res) => {
-    const wallet = new ethers.Wallet(SERVER_PRIVATE_KEY);
-    res.json({
-      custody: CONTRACT_ADDRESSES.custody,
-      adjudicator: CONTRACT_ADDRESSES.adjudicator,
-      tokenAddress: CONTRACT_ADDRESSES.tokenAddress,
-      serverAddress: wallet.address // Return the server's Ethereum address
-    });
-  }) as RequestHandler);
-
   // Get active rooms
   app.get('/api/rooms', ((_, res) => {
     const activeRooms = Array.from(getAllRooms().entries())

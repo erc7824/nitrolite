@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/generateContractAddresses.js && vite",
-    "build": "node scripts/generateContractAddresses.js && vue-tsc -b && vite build",
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {

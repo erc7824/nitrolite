@@ -7,19 +7,15 @@ import {
     RequestData,
     ResponsePayload,
     MessageSigner,
-    NitroliteClient,
-    NitroliteClientConfig,
     AppDefinition,
     NitroliteRPC,
     createGetLedgerBalancesMessage,
     CreateAppSessionRequest,
     CloseAppSessionRequest,
 } from "@erc7824/nitrolite";
-import { BROKER_WS_URL, CONTRACT_ADDRESSES, POLYGON_RPC_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
+import { BROKER_WS_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
-import { Hex, createWalletClient, createPublicClient, http } from "viem";
-import { polygon } from "viem/chains";
-import { privateKeyToAccount } from "viem/accounts";
+import { Hex } from "viem";
 
 import util from 'util';
 util.inspect.defaultOptions.depth = null;
@@ -30,56 +26,9 @@ const DEFAULT_QUORUM: number = 100; // server alone decides the outcome
 
 // Flag to indicate if we've authenticated with the broker
 let isAuthenticated = false;
-let client: NitroliteClient = createClient();
 
 // Store JWT token at file level for reuse
 let jwtToken: string | null = null;
-
-function createClient(): NitroliteClient {
-    // Create the wallet client using the ethereum provider
-
-    const wallet = privateKeyToAccount(WALLET_PRIVATE_KEY);
-    const walletClient = createWalletClient({
-        transport: http(process.env.POLYGON_RPC_URL),
-        chain: polygon,
-        account: wallet,
-    });
-
-    const publicClient = createPublicClient({
-        transport: http(POLYGON_RPC_URL),
-        chain: polygon,
-    });
-
-    // Create a dedicated client for signing state updates
-    const stateWalletClient = createWalletClient({
-        transport: http(process.env.POLYGON_RPC_URL),
-        chain: polygon,
-        account: wallet,
-    });
-    const config: NitroliteClientConfig = {
-        publicClient,
-        walletClient,
-        stateWalletClient,
-        addresses: CONTRACT_ADDRESSES,
-        chainId: polygon.id,
-        challengeDuration: BigInt(86400), // 1 day in seconds
-    };
-    const client = new NitroliteClient(config);
-
-    return client;
-}
-
-async function createBrokerChannel(client: NitroliteClient): Promise<void> {
-    // Create a channel with the broker
-    const createChannelResponse = await client.createChannel({
-        initialAllocationAmounts: [0n, 0n],
-        stateData: "0x",
-    });
-    console.log("Created channel", createChannelResponse);
-
-    // Check if broker joined the channel
-    getChannels();
-}
 
 async function getChannels(): Promise<void> {
     const brokerWs = getBrokerWebSocket();
@@ -165,7 +114,7 @@ async function authenticateWithBroker(): Promise<void> {
     if (!serverAddress) {
         throw new Error("Server address not found");
     }
-    
+
 
     const expire = String(Math.floor(Date.now() / 1000) + 24 * 60 * 60);
 
@@ -239,13 +188,13 @@ async function authenticateWithBroker(): Promise<void> {
                     const errorMsg = message.err?.[1] || message.error || message.res?.[2]?.[0]?.error || 'Authentication failed';
 
                     console.error('Authentication failed:', errorMsg);
-                    
+
                     // Check if this is a JWT authentication failure and fallback to signer auth
                     const errorString = String(errorMsg).toLowerCase();
                     if (errorString.includes('jwt') || errorString.includes('token') || errorString.includes('invalid') || errorString.includes('expired')) {
                         console.warn('JWT authentication failed on server, attempting fallback to signer authentication');
                         jwtToken = null; // Clear invalid JWT token
-                        
+
                         try {
                             // Restart authentication with signer
                             const fallbackAuthRequest = await createAuthRequestMessage({
@@ -262,7 +211,7 @@ async function authenticateWithBroker(): Promise<void> {
                                     },
                                 ],
                             });
-                            
+
                             console.log('Sending fallback auth_request with signer:', fallbackAuthRequest);
                             brokerWs.send(fallbackAuthRequest);
                             // Reset timeout for the fallback attempt
@@ -279,7 +228,7 @@ async function authenticateWithBroker(): Promise<void> {
                             return;
                         }
                     }
-                    
+
                     jwtToken = null; // Clear JWT token on auth failure
                     cleanup();
                     reject(new Error(String(errorMsg)));
@@ -397,7 +346,7 @@ export function handleBrokerMessage(message: any): void {
                 return;
             }
             else if (method === "get_channels" && payload.length === 0) {
-                createBrokerChannel(client);
+                throw new Error("No channels found. Please open a channel at apps.yellow.com");
             }
 
             // Handle successful response to a pending request
@@ -581,7 +530,7 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
         definition: appDefinition,
         allocations: participants.map((participant) => ({
             participant,
-            asset: CONTRACT_ADDRESSES.tokenAddress as Hex,
+            asset: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" as Hex,
             amount: "0",
         }))
     }]
@@ -646,7 +595,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
         app_session_id: appId,
         allocations: [participantA, participantB, signer.address].map((participant) => ({
             participant,
-            asset: CONTRACT_ADDRESSES.tokenAddress as Hex,
+            asset: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" as Hex,
             amount: "0",
         })),
     }];
@@ -694,7 +643,7 @@ export function createEthersSigner(privateKey: string): WalletSigner {
     try {
         // Create ethers wallet from private key
         const wallet = new ethers.Wallet(privateKey);
-        
+
         return {
             publicKey: wallet.publicKey,
             address: wallet.address as Hex,
@@ -846,15 +795,15 @@ function createEIP712SigningFunction(serverAddress: string, expire: string) {
                 },
             ],
         };
-        
+
 
         try {
             // Sign with EIP-712
             const signature = await wallet._signTypedData(getAuthDomain(), AUTH_TYPES, message);
 
             console.log('EIP-712 signature generated for challenge:', signature);
-            
-            
+
+
             return signature as `0x${string}`;
         } catch (eip712Error) {
             console.error('EIP-712 signing failed:', eip712Error);

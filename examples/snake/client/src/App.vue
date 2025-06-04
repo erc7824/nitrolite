@@ -4,11 +4,9 @@ import GameRoom from './components/GameRoom.vue';
 import Lobby from './components/Lobby.vue';
 import clearNetService from './services/ClearNetService';
 import gameService from './services/GameService';
-import { createWalletClient, createPublicClient, custom, http } from 'viem';
+import { createWalletClient, custom, Hex } from 'viem';
 import { polygon } from 'viem/chains';
 import { CryptoKeypair, generateKeyPair } from './crypto';
-import { BROKER_WS_URL, CONTRACT_ADDRESSES } from './config';
-import { NitroliteClientConfig } from '@erc7824/nitrolite';
 import { privateKeyToAccount } from 'viem/accounts';
 
 const nickname = ref('');
@@ -24,6 +22,10 @@ const createRoom = async () => {
     errorMessage.value = 'Please enter a nickname';
     return;
   }
+  if (!clearNetService) {
+    errorMessage.value = 'ClearNet service not initialized';
+    return;
+  }
 
   // Check if we have an active channel
   let activeChannelId = await clearNetService.getActiveChannel();
@@ -33,7 +35,7 @@ const createRoom = async () => {
   }
 
   try {
-    const walletAddress = clearNetService.client.walletClient.account.address;
+    const walletAddress = clearNetService.walletClient?.account.address as Hex;
     await gameService.createRoom(
       nickname.value.trim(),
       activeChannelId,
@@ -58,6 +60,10 @@ const joinRoom = async () => {
   }
 
   // Check if we have an active channel
+  if (!clearNetService) {
+    errorMessage.value = 'ClearNet service not initialized';
+    return;
+  }
   const activeChannelId = await clearNetService.getActiveChannel();
   if (!activeChannelId) {
     errorMessage.value = 'Please join a channel first';
@@ -65,7 +71,7 @@ const joinRoom = async () => {
   }
 
   try {
-    const walletAddress = clearNetService.client.walletClient.account.address;
+    const walletAddress = clearNetService.walletClient?.account.address as Hex;
     await gameService.joinRoom(
       roomId.value.trim(),
       nickname.value.trim(),
@@ -138,12 +144,6 @@ const autoConnect = async () => {
       transport: custom(ethereum)
     });
 
-    // Create public client for reading blockchain data
-    const publicClient = createPublicClient({
-      chain: polygon,
-      transport: http()
-    });
-
     // Get or create session key
     let keyPair: CryptoKeypair | null = null;
     const savedKeys = localStorage.getItem('crypto_keypair');
@@ -168,34 +168,11 @@ const autoConnect = async () => {
       transport: custom(ethereum)
     });
 
-    // Initialize ClearNetService with Nitrolite configuration
-    const config: NitroliteClientConfig = {
-      // @ts-ignore
-      walletClient,
-      publicClient,
-      stateWalletClient,
-      chainId: polygon.id,
-      addresses: {
-        custody: CONTRACT_ADDRESSES.custody,
-        adjudicator: CONTRACT_ADDRESSES.adjudicator,
-        tokenAddress: CONTRACT_ADDRESSES.tokenAddress,
-        guestAddress: CONTRACT_ADDRESSES.guestAddress
-      },
-      brokerUrl: BROKER_WS_URL,
-      challengeDuration: 3600n // 1 hour in seconds
-    };
-
     console.log('[App] Initializing ClearNetService...');
-    await clearNetService.initialize(config);
+    // @ts-ignore
+    await clearNetService.initialize(walletClient, stateWalletClient);
     console.log('[App] ClearNetService initialized successfully');
 
-    // Check for existing channel
-    const activeChannel = await clearNetService.getActiveChannel();
-    if (!activeChannel) {
-      throw new Error('No active channel found. Please open a channel at apps.yellow.com');
-    }
-
-    console.log('[App] Active channel found:', activeChannel);
     isConnecting.value = false;
     errorMessage.value = '';
 

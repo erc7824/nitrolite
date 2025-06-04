@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
 	"strings"
 	"time"
@@ -452,8 +451,8 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 	}
 
 	rpcResponse := CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{response}, time.Now())
-	log.Printf("Virtual app session created session_id %s participants %s", appSessionID.Hex(), createApp.Definition.ParticipantWallets)
-	log.Printf("Allocations for created virtual app session session_id %s allocations %v", appSessionID.Hex(), createApp.Allocations)
+	fmt.Printf("Virtual app session created session_id %s participants %s", appSessionID.Hex(), createApp.Definition.ParticipantWallets)
+	fmt.Printf("Allocations for created virtual app session session_id %s allocations %v", appSessionID.Hex(), createApp.Allocations)
 	return rpcResponse, nil
 }
 
@@ -603,8 +602,8 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 	}
 
 	rpcResponse := CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{response}, time.Now())
-	log.Printf("Virtual app session closed session_id %s participants %v", params.AppSessionID, params.Allocations)
-	log.Printf("Allocations for closed virtual app session session_id %s allocations %v", params.AppSessionID, params.Allocations)
+	fmt.Printf("Virtual app session closed session_id %s participants %v", params.AppSessionID, params.Allocations)
+	fmt.Printf("Allocations for closed virtual app session session_id %s allocations %v", params.AppSessionID, params.Allocations)
 	return rpcResponse, nil
 }
 

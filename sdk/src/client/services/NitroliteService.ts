@@ -6,7 +6,7 @@ import {
     Hash, 
     zeroAddress
 } from 'viem';
-import { custodyAbi } from '../../abis/generated'; // Use generated ABI
+import { custodyAbi } from '../../abis/generated';
 import { ContractAddresses } from '../../abis';
 import { Errors } from '../../errors';
 import { Channel, ChannelId, Signature, State } from '../types';

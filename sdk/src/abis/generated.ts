@@ -1,687 +1,1288 @@
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Custody
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+// Auto-generated file. Do not edit manually.
 export const custodyAbi = [
   {
-    type: 'function',
-    inputs: [
-      { name: 'channelId', internalType: 'bytes32', type: 'bytes32' },
+    "type": "function",
+    "name": "challenge",
+    "inputs": [
       {
-        name: 'candidate',
-        internalType: 'struct State',
-        type: 'tuple',
-        components: [
-          { name: 'intent', internalType: 'enum StateIntent', type: 'uint8' },
-          { name: 'version', internalType: 'uint256', type: 'uint256' },
-          { name: 'data', internalType: 'bytes', type: 'bytes' },
-          {
-            name: 'allocations',
-            internalType: 'struct Allocation[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'destination', internalType: 'address', type: 'address' },
-              { name: 'token', internalType: 'address', type: 'address' },
-              { name: 'amount', internalType: 'uint256', type: 'uint256' },
-            ],
-          },
-          {
-            name: 'sigs',
-            internalType: 'struct Signature[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', internalType: 'uint8', type: 'uint8' },
-              { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-              { name: 's', internalType: 'bytes32', type: 'bytes32' },
-            ],
-          },
-        ],
+        "name": "channelId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
-        name: 'proofs',
-        internalType: 'struct State[]',
-        type: 'tuple[]',
-        components: [
-          { name: 'intent', internalType: 'enum StateIntent', type: 'uint8' },
-          { name: 'version', internalType: 'uint256', type: 'uint256' },
-          { name: 'data', internalType: 'bytes', type: 'bytes' },
+        "name": "candidate",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
           {
-            name: 'allocations',
-            internalType: 'struct Allocation[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'destination', internalType: 'address', type: 'address' },
-              { name: 'token', internalType: 'address', type: 'address' },
-              { name: 'amount', internalType: 'uint256', type: 'uint256' },
-            ],
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
           },
           {
-            name: 'sigs',
-            internalType: 'struct Signature[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', internalType: 'uint8', type: 'uint8' },
-              { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-              { name: 's', internalType: 'bytes32', type: 'bytes32' },
-            ],
+            "name": "version",
+            "type": "uint256",
+            "internalType": "uint256"
           },
-        ],
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "allocations",
+            "type": "tuple[]",
+            "internalType": "struct Allocation[]",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "sigs",
+            "type": "tuple[]",
+            "internalType": "struct Signature[]",
+            "components": [
+              {
+                "name": "v",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          }
+        ]
       },
+      {
+        "name": "proofs",
+        "type": "tuple[]",
+        "internalType": "struct State[]",
+        "components": [
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "version",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "allocations",
+            "type": "tuple[]",
+            "internalType": "struct Allocation[]",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "sigs",
+            "type": "tuple[]",
+            "internalType": "struct Signature[]",
+            "components": [
+              {
+                "name": "v",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          }
+        ]
+      }
     ],
-    name: 'challenge',
-    outputs: [],
-    stateMutability: 'nonpayable',
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'function',
-    inputs: [
-      { name: 'channelId', internalType: 'bytes32', type: 'bytes32' },
+    "type": "function",
+    "name": "checkpoint",
+    "inputs": [
       {
-        name: 'candidate',
-        internalType: 'struct State',
-        type: 'tuple',
-        components: [
-          { name: 'intent', internalType: 'enum StateIntent', type: 'uint8' },
-          { name: 'version', internalType: 'uint256', type: 'uint256' },
-          { name: 'data', internalType: 'bytes', type: 'bytes' },
+        "name": "channelId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "candidate",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
           {
-            name: 'allocations',
-            internalType: 'struct Allocation[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'destination', internalType: 'address', type: 'address' },
-              { name: 'token', internalType: 'address', type: 'address' },
-              { name: 'amount', internalType: 'uint256', type: 'uint256' },
-            ],
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
           },
           {
-            name: 'sigs',
-            internalType: 'struct Signature[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', internalType: 'uint8', type: 'uint8' },
-              { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-              { name: 's', internalType: 'bytes32', type: 'bytes32' },
-            ],
-          },
-        ],
-      },
-      {
-        name: 'proofs',
-        internalType: 'struct State[]',
-        type: 'tuple[]',
-        components: [
-          { name: 'intent', internalType: 'enum StateIntent', type: 'uint8' },
-          { name: 'version', internalType: 'uint256', type: 'uint256' },
-          { name: 'data', internalType: 'bytes', type: 'bytes' },
-          {
-            name: 'allocations',
-            internalType: 'struct Allocation[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'destination', internalType: 'address', type: 'address' },
-              { name: 'token', internalType: 'address', type: 'address' },
-              { name: 'amount', internalType: 'uint256', type: 'uint256' },
-            ],
+            "name": "version",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
-            name: 'sigs',
-            internalType: 'struct Signature[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', internalType: 'uint8', type: 'uint8' },
-              { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-              { name: 's', internalType: 'bytes32', type: 'bytes32' },
-            ],
-          },
-        ],
-      },
-    ],
-    name: 'checkpoint',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'channelId', internalType: 'bytes32', type: 'bytes32' },
-      {
-        name: 'candidate',
-        internalType: 'struct State',
-        type: 'tuple',
-        components: [
-          { name: 'intent', internalType: 'enum StateIntent', type: 'uint8' },
-          { name: 'version', internalType: 'uint256', type: 'uint256' },
-          { name: 'data', internalType: 'bytes', type: 'bytes' },
-          {
-            name: 'allocations',
-            internalType: 'struct Allocation[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'destination', internalType: 'address', type: 'address' },
-              { name: 'token', internalType: 'address', type: 'address' },
-              { name: 'amount', internalType: 'uint256', type: 'uint256' },
-            ],
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
           },
           {
-            name: 'sigs',
-            internalType: 'struct Signature[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', internalType: 'uint8', type: 'uint8' },
-              { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-              { name: 's', internalType: 'bytes32', type: 'bytes32' },
-            ],
-          },
-        ],
-      },
-      {
-        name: '',
-        internalType: 'struct State[]',
-        type: 'tuple[]',
-        components: [
-          { name: 'intent', internalType: 'enum StateIntent', type: 'uint8' },
-          { name: 'version', internalType: 'uint256', type: 'uint256' },
-          { name: 'data', internalType: 'bytes', type: 'bytes' },
-          {
-            name: 'allocations',
-            internalType: 'struct Allocation[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'destination', internalType: 'address', type: 'address' },
-              { name: 'token', internalType: 'address', type: 'address' },
-              { name: 'amount', internalType: 'uint256', type: 'uint256' },
-            ],
+            "name": "allocations",
+            "type": "tuple[]",
+            "internalType": "struct Allocation[]",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
           },
           {
-            name: 'sigs',
-            internalType: 'struct Signature[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', internalType: 'uint8', type: 'uint8' },
-              { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-              { name: 's', internalType: 'bytes32', type: 'bytes32' },
-            ],
-          },
-        ],
-      },
-    ],
-    name: 'close',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      {
-        name: 'ch',
-        internalType: 'struct Channel',
-        type: 'tuple',
-        components: [
-          {
-            name: 'participants',
-            internalType: 'address[]',
-            type: 'address[]',
-          },
-          { name: 'adjudicator', internalType: 'address', type: 'address' },
-          { name: 'challenge', internalType: 'uint64', type: 'uint64' },
-          { name: 'nonce', internalType: 'uint64', type: 'uint64' },
-        ],
+            "name": "sigs",
+            "type": "tuple[]",
+            "internalType": "struct Signature[]",
+            "components": [
+              {
+                "name": "v",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          }
+        ]
       },
       {
-        name: 'initial',
-        internalType: 'struct State',
-        type: 'tuple',
-        components: [
-          { name: 'intent', internalType: 'enum StateIntent', type: 'uint8' },
-          { name: 'version', internalType: 'uint256', type: 'uint256' },
-          { name: 'data', internalType: 'bytes', type: 'bytes' },
+        "name": "proofs",
+        "type": "tuple[]",
+        "internalType": "struct State[]",
+        "components": [
           {
-            name: 'allocations',
-            internalType: 'struct Allocation[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'destination', internalType: 'address', type: 'address' },
-              { name: 'token', internalType: 'address', type: 'address' },
-              { name: 'amount', internalType: 'uint256', type: 'uint256' },
-            ],
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
           },
           {
-            name: 'sigs',
-            internalType: 'struct Signature[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', internalType: 'uint8', type: 'uint8' },
-              { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-              { name: 's', internalType: 'bytes32', type: 'bytes32' },
-            ],
-          },
-        ],
-      },
-    ],
-    name: 'create',
-    outputs: [{ name: 'channelId', internalType: 'bytes32', type: 'bytes32' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'token', internalType: 'address', type: 'address' },
-      { name: 'amount', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'deposit',
-    outputs: [],
-    stateMutability: 'payable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
-    name: 'getAccountChannels',
-    outputs: [{ name: '', internalType: 'bytes32[]', type: 'bytes32[]' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'user', internalType: 'address', type: 'address' },
-      { name: 'token', internalType: 'address', type: 'address' },
-    ],
-    name: 'getAccountInfo',
-    outputs: [
-      { name: 'available', internalType: 'uint256', type: 'uint256' },
-      { name: 'channelCount', internalType: 'uint256', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'channelId', internalType: 'bytes32', type: 'bytes32' },
-      { name: 'index', internalType: 'uint256', type: 'uint256' },
-      {
-        name: 'sig',
-        internalType: 'struct Signature',
-        type: 'tuple',
-        components: [
-          { name: 'v', internalType: 'uint8', type: 'uint8' },
-          { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-          { name: 's', internalType: 'bytes32', type: 'bytes32' },
-        ],
-      },
-    ],
-    name: 'join',
-    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'channelId', internalType: 'bytes32', type: 'bytes32' },
-      {
-        name: 'candidate',
-        internalType: 'struct State',
-        type: 'tuple',
-        components: [
-          { name: 'intent', internalType: 'enum StateIntent', type: 'uint8' },
-          { name: 'version', internalType: 'uint256', type: 'uint256' },
-          { name: 'data', internalType: 'bytes', type: 'bytes' },
-          {
-            name: 'allocations',
-            internalType: 'struct Allocation[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'destination', internalType: 'address', type: 'address' },
-              { name: 'token', internalType: 'address', type: 'address' },
-              { name: 'amount', internalType: 'uint256', type: 'uint256' },
-            ],
+            "name": "version",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
-            name: 'sigs',
-            internalType: 'struct Signature[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', internalType: 'uint8', type: 'uint8' },
-              { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-              { name: 's', internalType: 'bytes32', type: 'bytes32' },
-            ],
-          },
-        ],
-      },
-      {
-        name: 'proofs',
-        internalType: 'struct State[]',
-        type: 'tuple[]',
-        components: [
-          { name: 'intent', internalType: 'enum StateIntent', type: 'uint8' },
-          { name: 'version', internalType: 'uint256', type: 'uint256' },
-          { name: 'data', internalType: 'bytes', type: 'bytes' },
-          {
-            name: 'allocations',
-            internalType: 'struct Allocation[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'destination', internalType: 'address', type: 'address' },
-              { name: 'token', internalType: 'address', type: 'address' },
-              { name: 'amount', internalType: 'uint256', type: 'uint256' },
-            ],
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
           },
           {
-            name: 'sigs',
-            internalType: 'struct Signature[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', internalType: 'uint8', type: 'uint8' },
-              { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-              { name: 's', internalType: 'bytes32', type: 'bytes32' },
-            ],
-          },
-        ],
-      },
-    ],
-    name: 'resize',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'token', internalType: 'address', type: 'address' },
-      { name: 'amount', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'withdraw',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'channelId',
-        internalType: 'bytes32',
-        type: 'bytes32',
-        indexed: true,
-      },
-      {
-        name: 'expiration',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-    ],
-    name: 'Challenged',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'channelId',
-        internalType: 'bytes32',
-        type: 'bytes32',
-        indexed: true,
-      },
-    ],
-    name: 'Checkpointed',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'channelId',
-        internalType: 'bytes32',
-        type: 'bytes32',
-        indexed: true,
-      },
-      {
-        name: 'finalState',
-        internalType: 'struct State',
-        type: 'tuple',
-        components: [
-          { name: 'intent', internalType: 'enum StateIntent', type: 'uint8' },
-          { name: 'version', internalType: 'uint256', type: 'uint256' },
-          { name: 'data', internalType: 'bytes', type: 'bytes' },
-          {
-            name: 'allocations',
-            internalType: 'struct Allocation[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'destination', internalType: 'address', type: 'address' },
-              { name: 'token', internalType: 'address', type: 'address' },
-              { name: 'amount', internalType: 'uint256', type: 'uint256' },
-            ],
+            "name": "allocations",
+            "type": "tuple[]",
+            "internalType": "struct Allocation[]",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
           },
           {
-            name: 'sigs',
-            internalType: 'struct Signature[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', internalType: 'uint8', type: 'uint8' },
-              { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-              { name: 's', internalType: 'bytes32', type: 'bytes32' },
-            ],
-          },
-        ],
-        indexed: false,
-      },
+            "name": "sigs",
+            "type": "tuple[]",
+            "internalType": "struct Signature[]",
+            "components": [
+              {
+                "name": "v",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          }
+        ]
+      }
     ],
-    name: 'Closed',
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'event',
-    anonymous: false,
-    inputs: [
+    "type": "function",
+    "name": "close",
+    "inputs": [
       {
-        name: 'channelId',
-        internalType: 'bytes32',
-        type: 'bytes32',
-        indexed: true,
+        "name": "channelId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
-        name: 'wallet',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'channel',
-        internalType: 'struct Channel',
-        type: 'tuple',
-        components: [
+        "name": "candidate",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
           {
-            name: 'participants',
-            internalType: 'address[]',
-            type: 'address[]',
-          },
-          { name: 'adjudicator', internalType: 'address', type: 'address' },
-          { name: 'challenge', internalType: 'uint64', type: 'uint64' },
-          { name: 'nonce', internalType: 'uint64', type: 'uint64' },
-        ],
-        indexed: false,
-      },
-      {
-        name: 'initial',
-        internalType: 'struct State',
-        type: 'tuple',
-        components: [
-          { name: 'intent', internalType: 'enum StateIntent', type: 'uint8' },
-          { name: 'version', internalType: 'uint256', type: 'uint256' },
-          { name: 'data', internalType: 'bytes', type: 'bytes' },
-          {
-            name: 'allocations',
-            internalType: 'struct Allocation[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'destination', internalType: 'address', type: 'address' },
-              { name: 'token', internalType: 'address', type: 'address' },
-              { name: 'amount', internalType: 'uint256', type: 'uint256' },
-            ],
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
           },
           {
-            name: 'sigs',
-            internalType: 'struct Signature[]',
-            type: 'tuple[]',
-            components: [
-              { name: 'v', internalType: 'uint8', type: 'uint8' },
-              { name: 'r', internalType: 'bytes32', type: 'bytes32' },
-              { name: 's', internalType: 'bytes32', type: 'bytes32' },
-            ],
+            "name": "version",
+            "type": "uint256",
+            "internalType": "uint256"
           },
-        ],
-        indexed: false,
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "allocations",
+            "type": "tuple[]",
+            "internalType": "struct Allocation[]",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "sigs",
+            "type": "tuple[]",
+            "internalType": "struct Signature[]",
+            "components": [
+              {
+                "name": "v",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          }
+        ]
       },
+      {
+        "name": "",
+        "type": "tuple[]",
+        "internalType": "struct State[]",
+        "components": [
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "version",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "allocations",
+            "type": "tuple[]",
+            "internalType": "struct Allocation[]",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "sigs",
+            "type": "tuple[]",
+            "internalType": "struct Signature[]",
+            "components": [
+              {
+                "name": "v",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          }
+        ]
+      }
     ],
-    name: 'Created',
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'event',
-    anonymous: false,
-    inputs: [
+    "type": "function",
+    "name": "create",
+    "inputs": [
       {
-        name: 'wallet',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
+        "name": "ch",
+        "type": "tuple",
+        "internalType": "struct Channel",
+        "components": [
+          {
+            "name": "participants",
+            "type": "address[]",
+            "internalType": "address[]"
+          },
+          {
+            "name": "adjudicator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "challenge",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "nonce",
+            "type": "uint64",
+            "internalType": "uint64"
+          }
+        ]
       },
       {
-        name: 'token',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'amount',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
+        "name": "initial",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "version",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "allocations",
+            "type": "tuple[]",
+            "internalType": "struct Allocation[]",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "sigs",
+            "type": "tuple[]",
+            "internalType": "struct Signature[]",
+            "components": [
+              {
+                "name": "v",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          }
+        ]
+      }
     ],
-    name: 'Deposited',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
+    "outputs": [
       {
-        name: 'channelId',
-        internalType: 'bytes32',
-        type: 'bytes32',
-        indexed: true,
-      },
-      {
-        name: 'index',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
+        "name": "channelId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
     ],
-    name: 'Joined',
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'event',
-    anonymous: false,
-    inputs: [
+    "type": "function",
+    "name": "deposit",
+    "inputs": [
       {
-        name: 'channelId',
-        internalType: 'bytes32',
-        type: 'bytes32',
-        indexed: true,
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
       },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
     ],
-    name: 'Opened',
+    "outputs": [],
+    "stateMutability": "payable"
   },
   {
-    type: 'event',
-    anonymous: false,
-    inputs: [
+    "type": "function",
+    "name": "getAccountChannels",
+    "inputs": [
       {
-        name: 'channelId',
-        internalType: 'bytes32',
-        type: 'bytes32',
-        indexed: true,
-      },
-      {
-        name: 'deltaAllocations',
-        internalType: 'int256[]',
-        type: 'int256[]',
-        indexed: false,
-      },
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
     ],
-    name: 'Resized',
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
-    type: 'event',
-    anonymous: false,
-    inputs: [
+    "type": "function",
+    "name": "getAccountInfo",
+    "inputs": [
       {
-        name: 'wallet',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        name: 'token',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "available",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        name: 'amount',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
+        "name": "channelCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "join",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
+      {
+        "name": "index",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "sig",
+        "type": "tuple",
+        "internalType": "struct Signature",
+        "components": [
+          {
+            "name": "v",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "r",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
+      }
     ],
-    name: 'Withdrawn',
-  },
-  { type: 'error', inputs: [], name: 'ChallengeNotExpired' },
-  { type: 'error', inputs: [], name: 'ChannelNotFinal' },
-  {
-    type: 'error',
-    inputs: [{ name: 'channelId', internalType: 'bytes32', type: 'bytes32' }],
-    name: 'ChannelNotFound',
-  },
-  { type: 'error', inputs: [], name: 'ECDSAInvalidSignature' },
-  {
-    type: 'error',
-    inputs: [{ name: 'length', internalType: 'uint256', type: 'uint256' }],
-    name: 'ECDSAInvalidSignatureLength',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 's', internalType: 'bytes32', type: 'bytes32' }],
-    name: 'ECDSAInvalidSignatureS',
-  },
-  {
-    type: 'error',
-    inputs: [
-      { name: 'available', internalType: 'uint256', type: 'uint256' },
-      { name: 'required', internalType: 'uint256', type: 'uint256' },
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
     ],
-    name: 'InsufficientBalance',
-  },
-  { type: 'error', inputs: [], name: 'InvalidAdjudicator' },
-  { type: 'error', inputs: [], name: 'InvalidAllocations' },
-  { type: 'error', inputs: [], name: 'InvalidAmount' },
-  { type: 'error', inputs: [], name: 'InvalidChallengePeriod' },
-  { type: 'error', inputs: [], name: 'InvalidParticipant' },
-  { type: 'error', inputs: [], name: 'InvalidState' },
-  { type: 'error', inputs: [], name: 'InvalidStateSignatures' },
-  { type: 'error', inputs: [], name: 'InvalidStatus' },
-  { type: 'error', inputs: [], name: 'InvalidValue' },
-  {
-    type: 'error',
-    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
-    name: 'SafeERC20FailedOperation',
+    "stateMutability": "nonpayable"
   },
   {
-    type: 'error',
-    inputs: [
-      { name: 'token', internalType: 'address', type: 'address' },
-      { name: 'to', internalType: 'address', type: 'address' },
-      { name: 'amount', internalType: 'uint256', type: 'uint256' },
+    "type": "function",
+    "name": "resize",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "candidate",
+        "type": "tuple",
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "version",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "allocations",
+            "type": "tuple[]",
+            "internalType": "struct Allocation[]",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "sigs",
+            "type": "tuple[]",
+            "internalType": "struct Signature[]",
+            "components": [
+              {
+                "name": "v",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "proofs",
+        "type": "tuple[]",
+        "internalType": "struct State[]",
+        "components": [
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "version",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "allocations",
+            "type": "tuple[]",
+            "internalType": "struct Allocation[]",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "sigs",
+            "type": "tuple[]",
+            "internalType": "struct Signature[]",
+            "components": [
+              {
+                "name": "v",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          }
+        ]
+      }
     ],
-    name: 'TransferFailed',
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
-] as const
+  {
+    "type": "function",
+    "name": "withdraw",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "Challenged",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "expiration",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Checkpointed",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Closed",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "finalState",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "version",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "allocations",
+            "type": "tuple[]",
+            "internalType": "struct Allocation[]",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "sigs",
+            "type": "tuple[]",
+            "internalType": "struct Signature[]",
+            "components": [
+              {
+                "name": "v",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Created",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "wallet",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "channel",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct Channel",
+        "components": [
+          {
+            "name": "participants",
+            "type": "address[]",
+            "internalType": "address[]"
+          },
+          {
+            "name": "adjudicator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "challenge",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "nonce",
+            "type": "uint64",
+            "internalType": "uint64"
+          }
+        ]
+      },
+      {
+        "name": "initial",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct State",
+        "components": [
+          {
+            "name": "intent",
+            "type": "uint8",
+            "internalType": "enum StateIntent"
+          },
+          {
+            "name": "version",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "allocations",
+            "type": "tuple[]",
+            "internalType": "struct Allocation[]",
+            "components": [
+              {
+                "name": "destination",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "amount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "sigs",
+            "type": "tuple[]",
+            "internalType": "struct Signature[]",
+            "components": [
+              {
+                "name": "v",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "r",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "s",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Deposited",
+    "inputs": [
+      {
+        "name": "wallet",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Joined",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "index",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Opened",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Resized",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "deltaAllocations",
+        "type": "int256[]",
+        "indexed": false,
+        "internalType": "int256[]"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Withdrawn",
+    "inputs": [
+      {
+        "name": "wallet",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "ChallengeNotExpired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ChannelNotFinal",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ChannelNotFound",
+    "inputs": [
+      {
+        "name": "channelId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ECDSAInvalidSignature",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ECDSAInvalidSignatureLength",
+    "inputs": [
+      {
+        "name": "length",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ECDSAInvalidSignatureS",
+    "inputs": [
+      {
+        "name": "s",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InsufficientBalance",
+    "inputs": [
+      {
+        "name": "available",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "required",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidAdjudicator",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidAllocations",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidChallengePeriod",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidParticipant",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidState",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidStateSignatures",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidStatus",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidValue",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SafeERC20FailedOperation",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "TransferFailed",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "to",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  }
+] as const;

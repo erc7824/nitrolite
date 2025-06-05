@@ -1,5 +1,3 @@
-// rpc.go
-
 package main
 
 import (
@@ -11,9 +9,9 @@ import (
 
 // RPCMessage represents a complete message in the RPC protocol, including data and signatures
 type RPCMessage struct {
-	ReqRaw       json.RawMessage `json:"req,omitempty"`
+	ReqRaw       json.RawMessage `json:"req,omitempty" validate:"required_without=Res,excluded_with=Res"` // Keep raw req for signature validation
 	Req          *RPCData        `json:"-"`
-	Res          *RPCData        `json:"res,omitempty"`
+	Res          *RPCData        `json:"res,omitempty" validate:"required_without=ReqRaw,excluded_with=ReqRaw"`
 	AppSessionID string          `json:"sid,omitempty"`
 	Sig          []string        `json:"sig"`
 }
@@ -92,7 +90,6 @@ func (m *RPCData) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON for RPCData always emits the array‐form [RequestID, Method, Params, Timestamp].
-// (We keep this in case you ever need to send an RPCData back to a client.)
 func (m RPCData) MarshalJSON() ([]byte, error) {
 	return json.Marshal([]any{
 		m.RequestID,

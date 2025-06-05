@@ -23,7 +23,7 @@ import (
 type AppDefinition struct {
 	Protocol           string   `json:"protocol"`
 	ParticipantWallets []string `json:"participants"`
-	Weights            []int64  `json:"weights"`
+	Weights            []int64  `json:"weights"` // Signature weight for each participant.
 	Quorum             uint64   `json:"quorum"`
 	Challenge          uint64   `json:"challenge"`
 	Nonce              uint64   `json:"nonce"`
@@ -121,7 +121,7 @@ type ChannelResponse struct {
 	Status      ChannelStatus `json:"status"`
 	Token       string        `json:"token"`
 	Wallet      string        `json:"wallet"`
-	Amount      *big.Int      `json:"amount"`
+	Amount      *big.Int      `json:"amount"` // Total amount in the channel (user + broker)
 	ChainID     uint32        `json:"chain_id"`
 	Adjudicator string        `json:"adjudicator"`
 	Challenge   uint64        `json:"challenge"`
@@ -284,7 +284,9 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 	if err := parseParams(rpc.Req.Params, &params); err != nil {
 		return nil, err
 	}
-
+	if len(params.Definition.ParticipantWallets) < 2 {
+		return nil, errors.New("invalid number of participants")
+	}
 	if len(params.Definition.Weights) != len(params.Definition.ParticipantWallets) {
 		return nil, errors.New("number of weights must be equal to participants")
 	}
@@ -292,11 +294,9 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 		return nil, errors.New("nonce is zero or not provided")
 	}
 
-	reqBytes := rpc.ReqRaw
-
 	recoveredAddresses := map[string]bool{}
 	for _, sig := range rpc.Sig {
-		addr, err := RecoverAddress(reqBytes, sig)
+		addr, err := RecoverAddress(rpc.ReqRaw, sig)
 		if err != nil {
 			return nil, errors.New("invalid signature")
 		}
@@ -313,9 +313,13 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 	}
 
 	// Generate a unique ID for the virtual application
-	appSessionID := getAppSessionID(params.Definition).Hex()
+	b, err := json.Marshal(params.Definition)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate app session ID: %w", err)
+	}
+	appSessionID := crypto.Keccak256Hash(b).Hex()
 
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		for _, allocation := range params.Allocations {
 			if allocation.Amount.IsNegative() {
 				return fmt.Errorf("invalid allocation: negative amount")
@@ -383,11 +387,9 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 		assets[a.AssetSymbol] = struct{}{}
 	}
 
-	reqBytes := rpc.ReqRaw
-
 	var recoveredAddresses = map[string]bool{}
 	for _, sigHex := range rpc.Sig {
-		recovered, err := RecoverAddress(reqBytes, sigHex)
+		recovered, err := RecoverAddress(rpc.ReqRaw, sigHex)
 		if err != nil {
 			return nil, err
 		}
@@ -577,9 +579,7 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
 
-	reqBytes := rpc.ReqRaw
-
-	recoveredAddress, err := RecoverAddress(reqBytes, rpc.Sig[0])
+	recoveredAddress, err := RecoverAddress(rpc.ReqRaw, rpc.Sig[0])
 	if err != nil {
 		return nil, err
 	}
@@ -595,9 +595,6 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 	asset, err := GetAssetByToken(db, channel.Token, channel.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find asset: %w", err)
-	}
-	if asset == nil {
-		return nil, fmt.Errorf("asset not found: %s", channel.Token)
 	}
 
 	if params.ResizeAmount == nil {
@@ -702,9 +699,7 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
 
-	reqBytes := rpc.ReqRaw
-
-	recoveredAddress, err := RecoverAddress(reqBytes, rpc.Sig[0])
+	recoveredAddress, err := RecoverAddress(rpc.ReqRaw, rpc.Sig[0])
 	if err != nil {
 		return nil, err
 	}
@@ -720,9 +715,6 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 	asset, err := GetAssetByToken(db, channel.Token, channel.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find asset: %w", err)
-	}
-	if asset == nil {
-		return nil, fmt.Errorf("asset not found: %s", channel.Token)
 	}
 
 	ledger := GetWalletLedger(db, channel.Wallet)
@@ -759,8 +751,7 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 		return nil, fmt.Errorf("failed to decode state data: %w", err)
 	}
 
-	channelID := common.HexToHash(channel.ChannelID)
-	encodedState, err := nitrolite.EncodeState(channelID, nitrolite.IntentFINALIZE, big.NewInt(int64(channel.Version)+1), stateData, allocations)
+	encodedState, err := nitrolite.EncodeState(common.HexToHash(channel.ChannelID), nitrolite.IntentFINALIZE, big.NewInt(int64(channel.Version)+1), stateData, allocations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode state hash: %w", err)
 	}

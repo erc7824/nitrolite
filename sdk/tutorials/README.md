@@ -109,9 +109,9 @@ This step is crucial for data persistence.
 We use TypeORM for type-safe database operations.
 */
 const connection = await createConnection({
-  type: "postgres",
-  host: "localhost",
-  // ... configuration
+    type: 'postgres',
+    host: 'localhost',
+    // ... configuration
 });
 ```
 
@@ -166,11 +166,11 @@ This pattern ensures robust error handling in async operations.
 Always provide fallbacks and user-friendly error messages.
 */
 try {
-  const result = await riskyOperation();
-  return { success: true, data: result };
+    const result = await riskyOperation();
+    return { success: true, data: result };
 } catch (error) {
-  console.error("Operation failed:", error);
-  return { success: false, error: error.message };
+    console.error('Operation failed:', error);
+    return { success: false, error: error.message };
 }
 ```
 
@@ -339,12 +339,12 @@ Add to your CI pipeline:
 ```yaml
 - name: Generate Tutorial Documentation
   run: |
-    cd sdk
-    npm run docs:tutorials
+      cd sdk
+      npm run docs:tutorials
 
 - name: Deploy Documentation
   run: |
-    # Deploy docs/tutorials/ to your documentation site
+      # Deploy docs/tutorials/ to your documentation site
 ```
 
 ## 🎯 Goals

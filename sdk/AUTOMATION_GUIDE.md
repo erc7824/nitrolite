@@ -54,29 +54,18 @@ This guide explains the comprehensive automation system that ensures the Nitroli
 
 ```typescript
 export default defineConfig({
-  out: "src/generated.ts",
-  plugins: [
-    foundry({
-      project: "../contract",
-      include: [
-        "Custody.sol/**",
-        "Dummy.sol/**",
-        "Consensus.sol/**",
-        "Counter.sol/**",
-        "Remittance.sol/**",
-      ],
-      exclude: [
-        "*.t.sol/**",
-        "*.s.sol/**",
-        "forge-std/**",
-        "openzeppelin-contracts/**",
-      ],
-      forge: {
-        build: true,
-        rebuild: true,
-      },
-    }),
-  ],
+    out: 'src/generated.ts',
+    plugins: [
+        foundry({
+            project: '../contract',
+            include: ['Custody.sol/**', 'Dummy.sol/**', 'Consensus.sol/**', 'Counter.sol/**', 'Remittance.sol/**'],
+            exclude: ['*.t.sol/**', '*.s.sol/**', 'forge-std/**', 'openzeppelin-contracts/**'],
+            forge: {
+                build: true,
+                rebuild: true,
+            },
+        }),
+    ],
 });
 ```
 
@@ -192,14 +181,14 @@ git pull origin main
 ### Type Safety Example
 
 ```typescript
-import { custodyAbi } from "@erc7824/nitrolite";
+import { custodyAbi } from '@erc7824/nitrolite';
 
 // ✅ Full type safety and autocomplete
 const result = await publicClient.readContract({
-  address: CUSTODY_ADDRESS,
-  abi: custodyAbi,
-  functionName: "getAccountInfo", // ✅ Auto-complete available
-  args: [userAddress, tokenAddress], // ✅ Args type-checked
+    address: CUSTODY_ADDRESS,
+    abi: custodyAbi,
+    functionName: 'getAccountInfo', // ✅ Auto-complete available
+    args: [userAddress, tokenAddress], // ✅ Args type-checked
 });
 
 // ✅ Return types are fully typed
@@ -214,32 +203,32 @@ The validation system performs comprehensive checks:
 
 1. **Generated Types Validation**
 
-   - Verifies `src/generated.ts` exists and contains valid ABIs
-   - Counts and validates contract exports
-   - Ensures proper TypeScript format
+    - Verifies `src/generated.ts` exists and contains valid ABIs
+    - Counts and validates contract exports
+    - Ensures proper TypeScript format
 
 2. **TypeScript Compilation**
 
-   - Runs `tsc --noEmit` to check for compilation errors
-   - Validates all type definitions
-   - Ensures SDK compiles cleanly
+    - Runs `tsc --noEmit` to check for compilation errors
+    - Validates all type definitions
+    - Ensures SDK compiles cleanly
 
 3. **Contract Synchronization**
 
-   - Compares contract build timestamps with generated types
-   - Ensures types are up-to-date with latest contracts
-   - Prevents stale type usage
+    - Compares contract build timestamps with generated types
+    - Ensures types are up-to-date with latest contracts
+    - Prevents stale type usage
 
 4. **SDK Structure Integrity**
 
-   - Validates essential exports in `src/index.ts`
-   - Ensures proper module structure
-   - Checks for missing dependencies
+    - Validates essential exports in `src/index.ts`
+    - Ensures proper module structure
+    - Checks for missing dependencies
 
 5. **Package Configuration**
-   - Validates required npm scripts exist
-   - Checks for essential dependencies
-   - Ensures proper package.json setup
+    - Validates required npm scripts exist
+    - Checks for essential dependencies
+    - Ensures proper package.json setup
 
 ### Validation Output Example
 
@@ -263,17 +252,17 @@ The documentation system creates:
 
 1. **SDK Overview** (`docs/README.md`)
 
-   - Quick start guide
-   - Available contracts summary
-   - Type safety features
-   - Development workflow
+    - Quick start guide
+    - Available contracts summary
+    - Type safety features
+    - Development workflow
 
 2. **Contract Documentation** (`docs/contracts/[ContractName].md`)
-   - Complete function reference
-   - Parameter documentation
-   - Return value documentation
-   - Type-safe usage examples
-   - Event and error documentation
+    - Complete function reference
+    - Parameter documentation
+    - Return value documentation
+    - Type-safe usage examples
+    - Event and error documentation
 
 ### Documentation Example
 
@@ -295,13 +284,13 @@ The documentation system creates:
 **Usage Example:**
 
 ```typescript
-import { getAccountInfo } from "@erc7824/nitrolite";
+import { getAccountInfo } from '@erc7824/nitrolite';
 
 const result = await publicClient.readContract({
-  address: contractAddress,
-  abi: contractAbi,
-  functionName: "getAccountInfo",
-  args: [userAddress, tokenAddress],
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: 'getAccountInfo',
+    args: [userAddress, tokenAddress],
 });
 ```
 ````
@@ -315,29 +304,29 @@ name: SDK Validation
 on: [push, pull_request]
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+    validate:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "20"
+            - name: Setup Node.js
+              uses: actions/setup-node@v3
+              with:
+                  node-version: '20'
 
-      - name: Install dependencies
-        run: |
-          cd contract && forge install
-          cd ../sdk && npm install
+            - name: Install dependencies
+              run: |
+                  cd contract && forge install
+                  cd ../sdk && npm install
 
-      - name: Build contracts
-        run: cd contract && forge build
+            - name: Build contracts
+              run: cd contract && forge build
 
-      - name: Validate SDK
-        run: cd sdk && npm run validate
+            - name: Validate SDK
+              run: cd sdk && npm run validate
 
-      - name: Build SDK
-        run: cd sdk && npm run build:full
+            - name: Build SDK
+              run: cd sdk && npm run build:full
 ```
 
 ## 🔧 Setup Instructions
@@ -346,32 +335,32 @@ jobs:
 
 1. **Install Dependencies**
 
-   ```bash
-   cd sdk && npm install
-   ```
+    ```bash
+    cd sdk && npm install
+    ```
 
 2. **Build Contracts**
 
-   ```bash
-   cd contract && forge build
-   ```
+    ```bash
+    cd contract && forge build
+    ```
 
 3. **Generate Types**
 
-   ```bash
-   cd sdk && npm run codegen
-   ```
+    ```bash
+    cd sdk && npm run codegen
+    ```
 
 4. **Setup Git Hooks**
 
-   ```bash
-   cd sdk && ./scripts/setup-hooks.sh
-   ```
+    ```bash
+    cd sdk && ./scripts/setup-hooks.sh
+    ```
 
 5. **Validate Everything**
-   ```bash
-   npm run validate
-   ```
+    ```bash
+    npm run validate
+    ```
 
 ### Configuration Files
 

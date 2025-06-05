@@ -11,11 +11,13 @@ Determines the validity of a state transition or resolves disputes between chann
 **Type:** `view`
 
 **Parameters:**
+
 - **`chan`**: Unique identifier for the state channel
 - **`candidate`**: The proposed new state for the channel
 - **`proofs`**: Supporting states that prove the transition is valid
 
 **Returns:**
+
 - **`valid`** (`bool`): bool
 
 **Example Usage:**
@@ -23,16 +25,17 @@ Determines the validity of a state transition or resolves disputes between chann
 ```typescript
 // Read adjudicate from contract
 const result = await publicClient.readContract({
-  address: contractAddress,
-  abi: contractAbi,
-  functionName: 'adjudicate',
-  args: [chan, candidate, proofs],
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: 'adjudicate',
+    args: [chan, candidate, proofs],
 });
 ```
 
 ## Events
 
 No events defined.
+
 ## Errors
 
 ### `ECDSAInvalidSignature`
@@ -40,11 +43,13 @@ No events defined.
 ### `ECDSAInvalidSignatureLength`
 
 **Parameters:**
+
 - **`length`** (`uint256`): uint256
 
 ### `ECDSAInvalidSignatureS`
 
 **Parameters:**
+
 - **`s`** (`bytes32`): bytes32
 
 ## Type Safety
@@ -62,4 +67,3 @@ const result = await publicClient.readContract({
   args: [...], // ✅ Type-checked arguments
 });
 ```
-

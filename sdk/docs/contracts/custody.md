@@ -11,6 +11,7 @@ Initiates a challenge against a state channel, disputing the current state with 
 **Type:** `nonpayable`
 
 **Parameters:**
+
 - **`channelId`**: Unique 32-byte identifier
 - **`candidate`**: The proposed new state for the channel
 - **`proofs`**: Supporting states that prove the transition is valid
@@ -20,10 +21,10 @@ Initiates a challenge against a state channel, disputing the current state with 
 ```typescript
 // Execute challenge transaction
 const { request } = await publicClient.simulateContract({
-  address: contractAddress,
-  abi: contractAbi,
-  functionName: 'challenge',
-  args: [channelId, candidate, proofs],
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: 'challenge',
+    args: [channelId, candidate, proofs],
 });
 
 // Execute the transaction
@@ -37,6 +38,7 @@ Updates the channel to a new agreed-upon state, typically used to progress the c
 **Type:** `nonpayable`
 
 **Parameters:**
+
 - **`channelId`**: Unique 32-byte identifier
 - **`candidate`**: The proposed new state for the channel
 - **`proofs`**: Supporting states that prove the transition is valid
@@ -46,10 +48,10 @@ Updates the channel to a new agreed-upon state, typically used to progress the c
 ```typescript
 // Execute checkpoint transaction
 const { request } = await publicClient.simulateContract({
-  address: contractAddress,
-  abi: contractAbi,
-  functionName: 'checkpoint',
-  args: [channelId, candidate, proofs],
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: 'checkpoint',
+    args: [channelId, candidate, proofs],
 });
 
 // Execute the transaction
@@ -63,6 +65,7 @@ contract Custody is IChannel, IDeposit {
 **Type:** `nonpayable`
 
 **Parameters:**
+
 - **`channelId`**: Unique 32-byte identifier
 - **`candidate`**: The proposed new state for the channel
 - **``**: The token contract address (use address(0) for ETH)
@@ -72,10 +75,10 @@ contract Custody is IChannel, IDeposit {
 ```typescript
 // Execute close transaction
 const { request } = await publicClient.simulateContract({
-  address: contractAddress,
-  abi: contractAbi,
-  functionName: 'close',
-  args: [channelId, candidate, ],
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: 'close',
+    args: [channelId, candidate],
 });
 
 // Execute the transaction
@@ -89,10 +92,12 @@ contract Custody is IChannel, IDeposit {
 **Type:** `nonpayable`
 
 **Parameters:**
+
 - **`ch`**: Unique identifier for the state channel
 - **`initial`**: The starting state when creating a new channel
 
 **Returns:**
+
 - **`channelId`** (`bytes32`): bytes32
 
 **Example Usage:**
@@ -100,10 +105,10 @@ contract Custody is IChannel, IDeposit {
 ```typescript
 // Execute create transaction
 const { request } = await publicClient.simulateContract({
-  address: contractAddress,
-  abi: contractAbi,
-  functionName: 'create',
-  args: [ch, initial],
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: 'create',
+    args: [ch, initial],
 });
 
 // Execute the transaction
@@ -117,6 +122,7 @@ Deposits tokens or ETH into the custody contract for use in state channels.
 **Type:** `payable`
 
 **Parameters:**
+
 - **`token`**: The token contract address (use address(0) for ETH)
 - **`amount`**: Amount in the token's smallest unit (wei for ETH, etc.)
 
@@ -124,9 +130,10 @@ Deposits tokens or ETH into the custody contract for use in state channels.
 
 ```typescript
 // Log client methods for deposit
-            console.log("[depositToChannel] Available client methods:", Object.keys(client));
+console.log('[depositToChannel] Available client methods:', Object.keys(client));
 
-            const amountBigInt = typeof amount === "string" && !amount.startsWith("0x") ? parseTokenUnits(tokenAddress, amount) : BigInt(amount);
+const amountBigInt =
+    typeof amount === 'string' && !amount.startsWith('0x') ? parseTokenUnits(tokenAddress, amount) : BigInt(amount);
 ```
 
 ### `getAccountChannels`
@@ -136,9 +143,11 @@ contract Custody is IChannel, IDeposit {
 **Type:** `view`
 
 **Parameters:**
+
 - **`account`**: Ethereum address to query information for
 
 **Returns:**
+
 - **``** (`bytes32[]`): bytes32[]
 
 **Real Usage Examples:**
@@ -158,10 +167,12 @@ contract Custody is IChannel, IDeposit {
 **Type:** `view`
 
 **Parameters:**
+
 - **`user`**: Ethereum address of the user account
 - **`token`**: The token contract address (use address(0) for ETH)
 
 **Returns:**
+
 - **`available`** (`uint256`): uint256
 - **`channelCount`** (`uint256`): uint256
 
@@ -170,10 +181,10 @@ contract Custody is IChannel, IDeposit {
 ```typescript
 // Read getAccountInfo from contract
 const result = await publicClient.readContract({
-  address: contractAddress,
-  abi: contractAbi,
-  functionName: 'getAccountInfo',
-  args: [user, token],
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: 'getAccountInfo',
+    args: [user, token],
 });
 ```
 
@@ -187,6 +198,7 @@ const result = await publicClient.readContract({
 None
 
 **Returns:**
+
 - **`version`** (`string`): string
 - **`maxParticipants`** (`uint256`): uint256
 - **`minChallengePeriod`** (`uint256`): uint256
@@ -196,9 +208,9 @@ None
 ```typescript
 // Read getContractInfo from contract
 const result = await publicClient.readContract({
-  address: contractAddress,
-  abi: contractAbi,
-  functionName: 'getContractInfo',
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: 'getContractInfo',
 });
 ```
 
@@ -209,11 +221,13 @@ contract Custody is IChannel, IDeposit {
 **Type:** `nonpayable`
 
 **Parameters:**
+
 - **`channelId`**: Unique 32-byte identifier
 - **`index`**: Numeric value (in smallest units)
 - **`sig`**: tuple value
 
 **Returns:**
+
 - **``** (`bytes32`): bytes32
 
 **Real Usage Examples:**
@@ -233,6 +247,7 @@ contract Custody is IChannel, IDeposit {
 **Type:** `nonpayable`
 
 **Parameters:**
+
 - **`channelId`**: Unique 32-byte identifier
 - **`candidate`**: The proposed new state for the channel
 - **`proofs`**: Supporting states that prove the transition is valid
@@ -242,10 +257,10 @@ contract Custody is IChannel, IDeposit {
 ```typescript
 // Execute resize transaction
 const { request } = await publicClient.simulateContract({
-  address: contractAddress,
-  abi: contractAbi,
-  functionName: 'resize',
-  args: [channelId, candidate, proofs],
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: 'resize',
+    args: [channelId, candidate, proofs],
 });
 
 // Execute the transaction
@@ -259,6 +274,7 @@ Withdraws available funds from the custody contract back to the user's wallet.
 **Type:** `nonpayable`
 
 **Parameters:**
+
 - **`token`**: The token contract address (use address(0) for ETH)
 - **`amount`**: Amount in the token's smallest unit (wei for ETH, etc.)
 
@@ -267,10 +283,10 @@ Withdraws available funds from the custody contract back to the user's wallet.
 ```typescript
 // Execute withdraw transaction
 const { request } = await publicClient.simulateContract({
-  address: contractAddress,
-  abi: contractAbi,
-  functionName: 'withdraw',
-  args: [token, amount],
+    address: contractAddress,
+    abi: contractAbi,
+    functionName: 'withdraw',
+    args: [token, amount],
 });
 
 // Execute the transaction
@@ -282,23 +298,27 @@ const hash = await walletClient.writeContract(request);
 ### `Challenged`
 
 **Parameters:**
+
 - **`channelId`** (`bytes32`): bytes32
 - **`expiration`** (`uint256`): uint256
 
 ### `Checkpointed`
 
 **Parameters:**
+
 - **`channelId`** (`bytes32`): bytes32
 
 ### `Closed`
 
 **Parameters:**
+
 - **`channelId`** (`bytes32`): bytes32
 - **`finalState`** (`tuple (intent: uint8, version: uint256, data: bytes, allocations: tuple[], sigs: tuple[])`): struct State
 
 ### `Created`
 
 **Parameters:**
+
 - **`channelId`** (`bytes32`): bytes32
 - **`wallet`** (`address`): address
 - **`channel`** (`tuple (participants: address[], adjudicator: address, challenge: uint64, nonce: uint64)`): struct Channel
@@ -307,6 +327,7 @@ const hash = await walletClient.writeContract(request);
 ### `Deposited`
 
 **Parameters:**
+
 - **`wallet`** (`address`): address
 - **`token`** (`address`): address
 - **`amount`** (`uint256`): uint256
@@ -314,23 +335,27 @@ const hash = await walletClient.writeContract(request);
 ### `Joined`
 
 **Parameters:**
+
 - **`channelId`** (`bytes32`): bytes32
 - **`index`** (`uint256`): uint256
 
 ### `Opened`
 
 **Parameters:**
+
 - **`channelId`** (`bytes32`): bytes32
 
 ### `Resized`
 
 **Parameters:**
+
 - **`channelId`** (`bytes32`): bytes32
 - **`deltaAllocations`** (`int256[]`): int256[]
 
 ### `Withdrawn`
 
 **Parameters:**
+
 - **`wallet`** (`address`): address
 - **`token`** (`address`): address
 - **`amount`** (`uint256`): uint256
@@ -344,6 +369,7 @@ const hash = await walletClient.writeContract(request);
 ### `ChannelNotFound`
 
 **Parameters:**
+
 - **`channelId`** (`bytes32`): bytes32
 
 ### `ECDSAInvalidSignature`
@@ -351,16 +377,19 @@ const hash = await walletClient.writeContract(request);
 ### `ECDSAInvalidSignatureLength`
 
 **Parameters:**
+
 - **`length`** (`uint256`): uint256
 
 ### `ECDSAInvalidSignatureS`
 
 **Parameters:**
+
 - **`s`** (`bytes32`): bytes32
 
 ### `InsufficientBalance`
 
 **Parameters:**
+
 - **`available`** (`uint256`): uint256
 - **`required`** (`uint256`): uint256
 
@@ -385,11 +414,13 @@ const hash = await walletClient.writeContract(request);
 ### `SafeERC20FailedOperation`
 
 **Parameters:**
+
 - **`token`** (`address`): address
 
 ### `TransferFailed`
 
 **Parameters:**
+
 - **`token`** (`address`): address
 - **`to`** (`address`): address
 - **`amount`** (`uint256`): uint256
@@ -409,4 +440,3 @@ const result = await publicClient.readContract({
   args: [...], // ✅ Type-checked arguments
 });
 ```
-

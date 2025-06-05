@@ -21,29 +21,18 @@ This document explains how we've implemented a **TypeChain-equivalent solution**
 ### 1. **Wagmi CLI Configuration** (`wagmi.config.ts`)
 
 ```typescript
-import { defineConfig } from "@wagmi/cli";
-import { foundry } from "@wagmi/cli/plugins";
+import { defineConfig } from '@wagmi/cli';
+import { foundry } from '@wagmi/cli/plugins';
 
 export default defineConfig({
-  out: "src/generated.ts",
-  plugins: [
-    foundry({
-      project: "../contract",
-      include: [
-        "Custody.sol/**",
-        "Dummy.sol/**",
-        "Consensus.sol/**",
-        "Counter.sol/**",
-        "Remittance.sol/**",
-      ],
-      exclude: [
-        "*.t.sol/**",
-        "*.s.sol/**",
-        "forge-std/**",
-        "openzeppelin-contracts/**",
-      ],
-    }),
-  ],
+    out: 'src/generated.ts',
+    plugins: [
+        foundry({
+            project: '../contract',
+            include: ['Custody.sol/**', 'Dummy.sol/**', 'Consensus.sol/**', 'Counter.sol/**', 'Remittance.sol/**'],
+            exclude: ['*.t.sol/**', '*.s.sol/**', 'forge-std/**', 'openzeppelin-contracts/**'],
+        }),
+    ],
 });
 ```
 
@@ -51,24 +40,24 @@ export default defineConfig({
 
 ```json
 {
-  "scripts": {
-    "build": "npm run codegen && tsc",
-    "codegen": "wagmi generate"
-  }
+    "scripts": {
+        "build": "npm run codegen && tsc",
+        "codegen": "wagmi generate"
+    }
 }
 ```
 
 ### 3. **Usage in Code**
 
 ```typescript
-import { custodyAbi, dummyAbi, consensusAbi } from "./src/generated";
+import { custodyAbi, dummyAbi, consensusAbi } from './src/generated';
 
 // ✨ Full type safety and autocomplete
 const result = await publicClient.readContract({
-  address: CUSTODY_ADDRESS,
-  abi: custodyAbi,
-  functionName: "getAccountInfo", // ✅ Auto-complete available
-  args: [userAddress, tokenAddress], // ✅ Args type-checked
+    address: CUSTODY_ADDRESS,
+    abi: custodyAbi,
+    functionName: 'getAccountInfo', // ✅ Auto-complete available
+    args: [userAddress, tokenAddress], // ✅ Args type-checked
 });
 ```
 

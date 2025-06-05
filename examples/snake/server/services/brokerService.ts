@@ -12,7 +12,6 @@ import {
     NitroliteRPC,
     createGetLedgerBalancesMessage,
     CreateAppSessionRequest,
-    CloseAppSessionRequest,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
@@ -23,7 +22,7 @@ import { polygon } from "viem/chains";
 import util from 'util';
 util.inspect.defaultOptions.depth = null;
 
-const DEFAULT_PROTOCOL = "app_snake_nitrolite";
+export const DEFAULT_PROTOCOL = "app_snake_nitrolite";
 const DEFAULT_WEIGHTS: number[] = [0, 0, 100]; // Alice: 0, Bob: 0, Server: 100
 const DEFAULT_QUORUM: number = 100; // server alone decides the outcome
 

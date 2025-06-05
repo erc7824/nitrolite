@@ -1,223 +1,438 @@
 import { Hex } from 'viem';
-import { Room } from '../interfaces/index.ts';
-import { getRoom } from './stateService.ts';
-import { createEthersSigner } from './brokerService.ts';
-import { WALLET_PRIVATE_KEY } from '../config/index.ts';
-import { CreateAppSessionRequest, AppDefinition, NitroliteRPC } from '@erc7824/nitrolite';
+import { ethers } from 'ethers';
+import dotenv from 'dotenv';
+import { createAppSessionMessage, createCloseAppSessionMessage, AppDefinition, CreateAppSessionRequest, MessageSigner } from '@erc7824/nitrolite';
+import { SERVER_PRIVATE_KEY } from '../config/index.ts';
+import { DEFAULT_PROTOCOL, sendToBroker } from './brokerService.ts';
 
-const DEFAULT_PROTOCOL = "app_snake_nitrolite";
-const DEFAULT_WEIGHTS: number[] = [0, 0, 100]; // Alice: 0, Bob: 0, Server: 100
-const DEFAULT_QUORUM: number = 100; // server alone decides the outcome
+// Load environment variables
+dotenv.config();
 
-// Store pending app session creation data
-const pendingAppSessions = new Map<string, {
-  requestToSign: any;
-  signatures: Map<string, string>;
-  participants: Hex[];
+// Types
+interface AppSession {
+  appId: string;
+  participantA: Hex;
+  participantB: Hex;
+  serverAddress: Hex;
+  tokenAddress: string;
+  createdAt: number;
+}
+
+interface PendingAppSession {
+  appSessionData: CreateAppSessionRequest[];
   appDefinition: AppDefinition;
-  allocations: Array<{ participant: Hex; asset: string; amount: string }>;
-}>();
+  participantA: Hex;
+  participantB: Hex;
+  serverAddress: Hex;
+  signatures: Map<Hex, string>;
+  createdAt: number;
+  nonce: number;
+  requestToSign: any;
+  originalSignedMessage: string;
+}
+
+// Maps to store app sessions and pending signatures
+const roomAppSessions = new Map<string, AppSession>();
+const pendingAppSessions = new Map<string, PendingAppSession>();
+
+// Create server wallet for signing
+const serverWallet = new ethers.Wallet(SERVER_PRIVATE_KEY);
+
+// Create a compatible signer function
+const serverSigner: MessageSigner = async (payload: any): Promise<Hex> => {
+  const message = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  return await serverWallet.signMessage(message) as Hex;
+};
 
 /**
- * Generate the message structure that all participants will sign for app session creation
+ * Generate app session message for multi-signature collection
  */
-export function generateAppSessionMessage(roomId: string, participantA: Hex, participantB: Hex): any {
-  const room = getRoom(roomId);
-  if (!room) {
-    throw new Error(`Room ${roomId} not found`);
+export async function generateAppSessionMessage(roomId: string, participantA: Hex, participantB: Hex): Promise<{
+  appSessionData: CreateAppSessionRequest[];
+  appDefinition: AppDefinition;
+  participants: Hex[];
+  requestToSign: any;
+}> {
+  try {
+    // Format addresses to proper checksum format
+    const formattedParticipantA = ethers.utils.getAddress(participantA) as Hex;
+    const formattedParticipantB = ethers.utils.getAddress(participantB) as Hex;
+
+    console.log(`Generating app session message for room ${roomId} with participants A: ${formattedParticipantA}, B: ${formattedParticipantB}`);
+
+    // Check if we already have a pending session
+    let pendingSession = pendingAppSessions.get(roomId);
+
+    if (pendingSession) {
+      console.log(`Using existing app session message for room ${roomId} - nonce: ${pendingSession.nonce}, requestToSign: ${JSON.stringify(pendingSession.requestToSign)}`);
+      return {
+        appSessionData: pendingSession.appSessionData,
+        appDefinition: pendingSession.appDefinition,
+        participants: [pendingSession.participantA, pendingSession.participantB, pendingSession.serverAddress],
+        requestToSign: pendingSession.requestToSign
+      };
+    }
+
+    // Get the server's address
+    const serverAddress = serverWallet.address as Hex;
+
+    // Create app definition with fixed nonce
+    const nonce = Date.now();
+    const appDefinition: AppDefinition = {
+      protocol: DEFAULT_PROTOCOL,
+      participants: [formattedParticipantA, formattedParticipantB, serverAddress],
+      weights: [0, 0, 100],
+      quorum: 100,
+      challenge: 0,
+      nonce: nonce,
+    };
+
+    const appSessionData: CreateAppSessionRequest[] = [{
+      definition: appDefinition,
+      allocations: [
+        {
+          participant: formattedParticipantA,
+          asset: 'usdc',
+          amount: '0.01',
+        },
+        {
+          participant: formattedParticipantB,
+          asset: 'usdc',
+          amount: '0.01',
+        },
+        {
+          participant: serverAddress,
+          asset: 'usdc',
+          amount: '0',
+        },
+      ]
+    }];
+
+    // Generate the complete request structure
+    const sign = serverSigner;
+    const signedMessage = await createAppSessionMessage(sign, appSessionData);
+    const parsedMessage = JSON.parse(signedMessage);
+
+    // Extract the request structure that clients should sign
+    const requestToSign = parsedMessage.req;
+
+    console.debug(`Generated request structure for room ${roomId}:`, requestToSign);
+
+    // Store the pending app session data
+    pendingAppSessions.set(roomId, {
+      appSessionData,
+      appDefinition,
+      participantA: formattedParticipantA,
+      participantB: formattedParticipantB,
+      serverAddress,
+      signatures: new Map(),
+      createdAt: Date.now(),
+      nonce: nonce,
+      requestToSign: requestToSign,
+      originalSignedMessage: signedMessage
+    });
+
+    console.log(`App session message generated for room ${roomId} with nonce ${nonce}`);
+    return {
+      appSessionData,
+      appDefinition,
+      participants: [formattedParticipantA, formattedParticipantB, serverAddress],
+      requestToSign: requestToSign
+    };
+
+  } catch (error) {
+    console.error(`Error generating app session message for room ${roomId}:`, error);
+    throw error;
   }
-
-  const signer = createEthersSigner(WALLET_PRIVATE_KEY);
-  const participants = [participantA, participantB, signer.address as Hex];
-
-  const appDefinition: AppDefinition = {
-    protocol: DEFAULT_PROTOCOL,
-    participants,
-    weights: DEFAULT_WEIGHTS,
-    quorum: DEFAULT_QUORUM,
-    challenge: 0,
-    nonce: Date.now(),
-  };
-
-  const allocations = participants.map((participant, index) => ({
-    participant,
-    asset: "usdc",
-    amount: index < 2 ? "0.00001" : "0", // Players get 0.00001, server gets 0
-  }));
-
-  const requestId = Date.now();
-  const timestamp = Date.now();
-  const params: CreateAppSessionRequest[] = [{
-    definition: appDefinition,
-    allocations
-  }];
-
-  const requestToSign = [requestId, "create_app_session", params, timestamp];
-
-  // Store pending app session data
-  pendingAppSessions.set(roomId, {
-    requestToSign,
-    signatures: new Map(),
-    participants,
-    appDefinition,
-    allocations
-  });
-
-  return { requestToSign, participants };
 }
 
 /**
- * Add a signature for app session creation
+ * Add a signature to the pending app session
  */
-export function addAppSessionSignature(roomId: string, participantAddress: Hex, signature: string): boolean {
-  const pending = pendingAppSessions.get(roomId);
-  if (!pending) {
-    console.error(`No pending app session found for room ${roomId}`);
-    return false;
+export async function addAppSessionSignature(roomId: string, participantAddress: Hex, signature: string): Promise<boolean> {
+  try {
+    // Format the participant address
+    const formattedParticipantAddress = ethers.utils.getAddress(participantAddress) as Hex;
+
+    const pendingSession = pendingAppSessions.get(roomId);
+    if (!pendingSession) {
+      throw new Error(`No pending app session found for room ${roomId}`);
+    }
+
+    // Verify the participant is part of this session
+    const isValidParticipant = [pendingSession.participantA, pendingSession.participantB].includes(formattedParticipantAddress);
+    if (!isValidParticipant) {
+      throw new Error(`Invalid participant ${formattedParticipantAddress} for room ${roomId}`);
+    }
+
+    // Store the signature
+    pendingSession.signatures.set(formattedParticipantAddress, signature);
+
+    console.log(`Added signature for ${formattedParticipantAddress} in room ${roomId} (${pendingSession.signatures.size}/2 collected)`);
+    console.debug(`Signature details:`, { participantAddress: formattedParticipantAddress, signature: signature.substring(0, 10) + '...', signatureLength: signature.length });
+
+    // Check if we have all participant signatures
+    const allParticipantsSigned = pendingSession.signatures.has(pendingSession.participantA) &&
+      pendingSession.signatures.has(pendingSession.participantB);
+
+    return allParticipantsSigned;
+
+  } catch (error) {
+    console.error(`Error adding signature for room ${roomId}:`, error);
+    throw error;
   }
-
-  // Verify the participant is valid for this room
-  if (!pending.participants.includes(participantAddress)) {
-    console.error(`Participant ${participantAddress} not found in room ${roomId} participants`);
-    console.error(`Available participants: ${pending.participants.join(', ')}`);
-    return false;
-  }
-
-  // Store the signature
-  pending.signatures.set(participantAddress, signature);
-  console.log(`Added signature for ${participantAddress} in room ${roomId}. Total signatures: ${pending.signatures.size}/${pending.participants.length - 1} (excluding server)`);
-  console.log(`Participants with signatures: ${Array.from(pending.signatures.keys()).join(', ')}`);
-
-  return true;
 }
 
 /**
- * Create app session with all collected signatures
+ * Create an app session with collected signatures
  */
 export async function createAppSessionWithSignatures(roomId: string): Promise<string> {
-  const pending = pendingAppSessions.get(roomId);
-  if (!pending) {
-    throw new Error(`No pending app session found for room ${roomId}`);
-  }
-
-  // Verify we have signatures from all participants except server
-  const participantSignaturesNeeded = pending.participants.slice(0, -1); // Exclude server
-  console.log(`[createAppSessionWithSignatures] Verifying signatures for room ${roomId}`);
-  console.log(`[createAppSessionWithSignatures] Participants needed: ${participantSignaturesNeeded.join(', ')}`);
-  console.log(`[createAppSessionWithSignatures] Signatures collected: ${Array.from(pending.signatures.keys()).join(', ')}`);
-  
-  for (const participant of participantSignaturesNeeded) {
-    if (!pending.signatures.has(participant)) {
-      console.error(`[createAppSessionWithSignatures] Missing signature from participant ${participant}`);
-      console.error(`[createAppSessionWithSignatures] Available signatures: ${Array.from(pending.signatures.keys()).join(', ')}`);
-      throw new Error(`Missing signature from participant ${participant}`);
+  try {
+    const pendingSession = pendingAppSessions.get(roomId);
+    if (!pendingSession) {
+      throw new Error(`No pending app session found for room ${roomId}`);
     }
+
+    // Verify all signatures are collected
+    const allSigned = pendingSession.signatures.has(pendingSession.participantA) &&
+      pendingSession.signatures.has(pendingSession.participantB);
+
+    if (!allSigned) {
+      throw new Error(`Not all signatures collected for room ${roomId}`);
+    }
+
+    console.log(`Creating app session with collected signatures for room ${roomId}`);
+
+    // Collect all signatures including server signature
+    const participantASignature = pendingSession.signatures.get(pendingSession.participantA);
+    const participantBSignature = pendingSession.signatures.get(pendingSession.participantB);
+
+    console.debug(`Participant signatures for room ${roomId}:`, {
+      participantA: pendingSession.participantA,
+      participantB: pendingSession.participantB,
+      participantASignature,
+      participantBSignature,
+      allStoredSignatures: Array.from(pendingSession.signatures.entries())
+    });
+
+    // Validate that we have all participant signatures
+    if (!participantASignature) {
+      throw new Error(`Missing signature from participant A: ${pendingSession.participantA}`);
+    }
+    if (!participantBSignature) {
+      throw new Error(`Missing signature from participant B: ${pendingSession.participantB}`);
+    }
+
+    // Create a properly formatted message with all signatures
+    const allSignatures = [participantASignature, participantBSignature];
+
+    // Now let the server sign the same request structure as the clients
+    const sign = serverSigner;
+
+    console.debug(`Server signing request structure for room ${roomId}:`, pendingSession.requestToSign);
+
+    // Sign the same request structure that clients signed
+    const serverSignature = await sign(pendingSession.requestToSign);
+
+    console.debug(`Server signature created:`, serverSignature);
+
+    // Add server signature to complete the array
+    allSignatures.push(serverSignature);
+
+    console.debug(`Combined signatures for room ${roomId}:`, allSignatures);
+
+    // Create the final message with all signatures
+    const finalMessage = JSON.parse(pendingSession.originalSignedMessage);
+    finalMessage.sig = allSignatures;
+
+    console.debug(`Final message structure:`, {
+      req: finalMessage.req,
+      signatures: finalMessage.sig,
+      participantsOrder: pendingSession.appSessionData[0].definition.participants,
+      messageToSend: JSON.stringify(finalMessage)
+    });
+
+    console.log("[createAppSessionWithSignatures] Sending request:", finalMessage);
+    const result = await sendToBroker(finalMessage);
+    const appId = result.app_session_id || (typeof result[0] === "object" ? result[0].app_session_id : null);
+    console.log(`[createAppSessionWithSignatures] Created app session ${appId}`);
+
+    // Store the app ID for this room
+    roomAppSessions.set(roomId, {
+      appId,
+      participantA: pendingSession.participantA,
+      participantB: pendingSession.participantB,
+      serverAddress: pendingSession.serverAddress,
+      tokenAddress: process.env.USDC_TOKEN_ADDRESS || '',
+      createdAt: Date.now()
+    });
+
+    // Clean up pending session
+    pendingAppSessions.delete(roomId);
+
+    console.log(`Created app session with ID ${appId} for room ${roomId}`);
+    return appId;
+
+  } catch (error) {
+    console.error(`Error creating app session with signatures for room ${roomId}:`, error);
+    throw error;
   }
+}
 
-  // Server signs the same request
-  const signer = createEthersSigner(WALLET_PRIVATE_KEY);
-  const serverSignature = await signer.sign(pending.requestToSign);
+/**
+ * Close an app session with winner taking the allocation
+ */
+export async function closeAppSessionWithWinner(roomId: string, winnerId: 'A' | 'B' | null = null): Promise<boolean> {
+  try {
+    // Get the app session for this room
+    const appSession = roomAppSessions.get(roomId);
+    if (!appSession) {
+      console.warn(`No app session found for room ${roomId}`);
+      return false;
+    }
 
-  // Combine all signatures in participant order
-  const allSignatures: string[] = [];
-  console.log(`[createAppSessionWithSignatures] Combining signatures in participant order:`);
-  console.log(`[createAppSessionWithSignatures] Participants array: ${pending.participants.join(', ')}`);
-  console.log(`[createAppSessionWithSignatures] Server address: ${signer.address}`);
-  
-  for (let i = 0; i < pending.participants.length; i++) {
-    const participant = pending.participants[i];
-    console.log(`[createAppSessionWithSignatures] Processing participant ${i}: ${participant}`);
-    
-    if (participant === signer.address) {
-      console.log(`[createAppSessionWithSignatures] Adding server signature at position ${i}`);
-      allSignatures.push(serverSignature);
+    const { participantA, participantB } = appSession;
+
+    // Calculate allocations based on winner
+    let allocations: string[];
+    if (winnerId === 'A') {
+      // Player A wins - gets all the funds
+      allocations = ['0.02', '0', '0']; // A gets both initial allocations
+      console.log(`Player A (${participantA}) wins room ${roomId} - taking full allocation`);
+    } else if (winnerId === 'B') {
+      // Player B wins - gets all the funds
+      allocations = ['0', '0.02', '0']; // B gets both initial allocations
+      console.log(`Player B (${participantB}) wins room ${roomId} - taking full allocation`);
     } else {
-      const sig = pending.signatures.get(participant);
-      if (!sig) {
-        console.error(`[createAppSessionWithSignatures] Missing signature from participant ${participant}`);
-        throw new Error(`Missing signature from participant ${participant}`);
-      }
-      console.log(`[createAppSessionWithSignatures] Adding player signature at position ${i}: ${sig.substring(0, 10)}...`);
-      allSignatures.push(sig);
+      // Tie or no winner - split evenly
+      allocations = ['0.01', '0.01', '0'];
+      console.log(`Tie in room ${roomId} - splitting allocation evenly`);
     }
-  }
-  
-  console.log(`[createAppSessionWithSignatures] Final signature array length: ${allSignatures.length}`);
-  console.log(`[createAppSessionWithSignatures] Final signature order: ${allSignatures.map((sig, i) => `${i}: ${sig.substring(0, 10)}...`).join(', ')}`);
 
-  // Create the final signed request
-  const signedRequest = {
-    req: pending.requestToSign,
-    sig: allSignatures
+    // Use the existing closeAppSession function with calculated allocations
+    return await closeAppSession(roomId, allocations);
+
+  } catch (error) {
+    console.error(`Error closing app session with winner for room ${roomId}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Close an app session for a game room
+ */
+export async function closeAppSession(roomId: string, allocations: string[]): Promise<boolean> {
+  try {
+    // Get the app session for this room
+    const appSession = roomAppSessions.get(roomId);
+    if (!appSession) {
+      console.warn(`No app session found for room ${roomId}`);
+      return false;
+    }
+
+    // Make sure appId exists and is properly extracted
+    const appId = appSession.appId;
+    if (!appId) {
+      console.error(`No appId found in app session for room ${roomId}`);
+      return false;
+    }
+
+    console.log(`Closing app session ${appId} for room ${roomId}`);
+
+    // Extract participant addresses from the stored app session
+    const { participantA, participantB, serverAddress } = appSession;
+
+    // Check if we have all the required participants
+    if (!participantA || !participantB || !serverAddress) {
+      throw new Error('Missing participant information in app session');
+    }
+
+    const finalAllocations = [
+      {
+        participant: participantA,
+        asset: 'usdc',
+        amount: allocations[0],
+      },
+      {
+        participant: participantB,
+        asset: 'usdc',
+        amount: allocations[1],
+      },
+      {
+        participant: serverAddress,
+        asset: 'usdc',
+        amount: allocations[2],
+      },
+    ];
+
+    // Final allocations and close request
+    const closeRequest = {
+      app_session_id: appId as Hex,
+      allocations: finalAllocations,
+    };
+
+    // Use the server wallet for signing
+    const sign = serverSigner;
+
+    // Create the signed message
+    const signedMessage = await createCloseAppSessionMessage(
+      sign,
+      [closeRequest],
+    );
+
+    console.debug(`Signed app session close message for room ${roomId}:`, signedMessage);
+
+    // Remove the app session
+    roomAppSessions.delete(roomId);
+
+    console.log(`Closed app session ${appId} for room ${roomId}`);
+    return true;
+
+  } catch (error) {
+    console.error(`Error closing app session for room ${roomId}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Get the app session for a room
+ */
+export function getAppSession(roomId: string): AppSession | null {
+  return roomAppSessions.get(roomId) || null;
+}
+
+/**
+ * Get existing pending app session message for a room
+ */
+export function getPendingAppSessionMessage(roomId: string): {
+  appSessionData: CreateAppSessionRequest[];
+  appDefinition: AppDefinition;
+  participants: Hex[];
+  requestToSign: any;
+} | null {
+  const pendingSession = pendingAppSessions.get(roomId);
+  if (!pendingSession) {
+    return null;
+  }
+
+  return {
+    appSessionData: pendingSession.appSessionData,
+    appDefinition: pendingSession.appDefinition,
+    participants: [pendingSession.participantA, pendingSession.participantB, pendingSession.serverAddress],
+    requestToSign: pendingSession.requestToSign
   };
-
-  console.log(`[createAppSessionWithSignatures] Sending app session creation with ${allSignatures.length} signatures for room ${roomId}`);
-
-  // Send to broker via WebSocket (we'll need to integrate this with the existing broker service)
-  const response = await sendSignedRequestToBroker(signedRequest);
-
-  // Extract app session ID from response
-  const appId = response.app_session_id || (typeof response[0] === "object" ? response[0].app_session_id : null);
-
-  if (!appId) {
-    throw new Error("Failed to create app session - no app ID returned");
-  }
-
-  // Clean up pending data
-  pendingAppSessions.delete(roomId);
-
-  console.log(`[createAppSessionWithSignatures] Created app session ${appId} for room ${roomId}`);
-  return appId;
 }
 
 /**
- * Generate close app session message structure
+ * Check if a room has an app session
  */
-export function createCloseAppSessionMessage(roomId: string, appId: Hex, participantA: Hex, participantB: Hex): any {
-  const signer = createEthersSigner(WALLET_PRIVATE_KEY);
-  const participants = [participantA, participantB, signer.address as Hex];
-
-  const allocations = participants.map((participant, index) => ({
-    participant,
-    asset: "usdc",
-    amount: index < 2 ? "0.00001" : "0", // Same allocations as creation
-  }));
-
-  const requestId = Date.now();
-  const timestamp = Date.now();
-  const params = [{
-    app_session_id: appId,
-    allocations
-  }];
-
-  return [requestId, "close_app_session", params, timestamp];
+export function hasAppSession(roomId: string): boolean {
+  return roomAppSessions.has(roomId);
 }
 
 /**
- * Check if app session creation is pending for a room
+ * Get all app sessions
  */
-export function isAppSessionPending(roomId: string): boolean {
-  return pendingAppSessions.has(roomId);
-}
-
-/**
- * Get pending app session data for a room
- */
-export function getPendingAppSession(roomId: string) {
-  return pendingAppSessions.get(roomId);
-}
-
-/**
- * Clear pending app session data for a room
- */
-export function clearPendingAppSession(roomId: string): void {
-  pendingAppSessions.delete(roomId);
-}
-
-// Helper function to send signed request to broker
-// This will integrate with the existing broker service
-async function sendSignedRequestToBroker(signedRequest: any): Promise<any> {
-  // Import here to avoid circular dependency
-  const { sendToBroker } = await import('./brokerService.ts');
-  return sendToBroker(signedRequest);
+export function getAllAppSessions(): Map<string, AppSession> {
+  return roomAppSessions;
 }

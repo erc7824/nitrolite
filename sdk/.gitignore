@@ -49,9 +49,6 @@ Thumbs.db
 .temp/
 tmp/
 
-# Generated files
-src/generated.ts
-
 # Lock files (depending on your workflow)
 # package-lock.json
 # yarn.lock

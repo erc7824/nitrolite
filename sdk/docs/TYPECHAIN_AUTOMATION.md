@@ -32,7 +32,6 @@ export default defineConfig({
             project: '../contract',
             include: [
                 'Custody.sol/**',
-                'Adjudicator.sol/**',
                 // Add other contracts as needed
             ],
             exclude: ['*.t.sol/**', '*.s.sol/**', 'forge-std/**', 'openzeppelin-contracts/**'],

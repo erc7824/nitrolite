@@ -803,13 +803,18 @@ async function handleAppSessionSignature(ws: SnakeWebSocket, data: any): Promise
 
     if (hostClient && hostClient.readyState === WebSocket.OPEN) {
       const participantA = room.playerAddresses.get(players[0].id) as Hex;
-      const participantB = room.playerAddresses.get(players[1].id) as Hex;
-      const { requestToSign } = generateAppSessionMessage(roomId, participantA, participantB);
+      
+      // Get the existing pending app session data instead of generating new one
+      const { getPendingAppSession } = await import('./appSessionService.ts');
+      const pending = getPendingAppSession(roomId);
+      if (!pending) {
+        throw new Error("No pending app session found for room");
+      }
       
       hostClient.send(JSON.stringify({
         type: 'appSession:startGameRequest',
         roomId,
-        requestToSign,
+        requestToSign: pending.requestToSign,
         participantAddress: participantA
       }));
       console.log(`[handleAppSessionSignature] Sent start game request to host player ${hostPlayerId}`);

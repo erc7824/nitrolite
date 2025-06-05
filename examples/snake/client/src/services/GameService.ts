@@ -523,20 +523,53 @@ class GameService {
 
   private async signAppSessionRequest(requestToSign: any, walletClient: any): Promise<string> {
     try {
-      // Create a message hash from the request data (same as server-side)
+      // Use the exact same signing method as the tictactoe example
       const messageString = JSON.stringify(requestToSign);
+      console.log('[GameService] Signing request:', messageString);
       
-      // Use keccak256 hash of the JSON string (same as server does with ethers.utils.id)
-      const { keccak256, toBytes } = await import('viem');
-      const messageHash = keccak256(toBytes(messageString));
+      // Import ethers to match tictactoe signing exactly  
+      const { ethers } = await import('ethers');
       
-      // Sign the hash using the wallet client
-      const signature = await walletClient.signMessage({ 
-        message: { raw: messageHash }
-      });
+      // Create digest using ethers.id (same as tictactoe and server)
+      const digestHex = ethers.id(messageString);
+      console.log('[GameService] Message digest (ethers.id):', digestHex);
       
-      console.log('[GameService] Successfully signed app session request');
-      return signature;
+      // Convert digest to bytes for signing (same as tictactoe)
+      const messageBytes = ethers.getBytes(digestHex);
+      console.log('[GameService] Message bytes length:', messageBytes.length);
+      
+      try {
+        // Try to sign the digest bytes directly using MetaMask
+        // This should match the server's signDigest approach
+        const signature = await walletClient.request({
+          method: 'personal_sign',
+          params: [digestHex, walletClient.account.address]
+        });
+        console.log('[GameService] Successfully signed with personal_sign on digest');
+        return signature;
+      } catch (personalSignError) {
+        console.log('[GameService] personal_sign failed, trying eth_sign:', personalSignError);
+        
+        try {
+          // Try eth_sign as fallback
+          const signature = await walletClient.request({
+            method: 'eth_sign', 
+            params: [walletClient.account.address, digestHex]
+          });
+          console.log('[GameService] Successfully signed with eth_sign');
+          return signature;
+        } catch (ethSignError) {
+          console.log('[GameService] eth_sign failed, trying original message:', ethSignError);
+          
+          // Final fallback: sign the original message string
+          const signature = await walletClient.request({
+            method: 'personal_sign',
+            params: [messageString, walletClient.account.address]
+          });
+          console.log('[GameService] Successfully signed with personal_sign on original message');
+          return signature;
+        }
+      }
     } catch (error) {
       console.error('[GameService] Error signing app session request:', error);
       throw error;

@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
@@ -52,4 +55,10 @@ func getAppSessions(tx *gorm.DB, participantWallet string, status string) ([]App
 	}
 
 	return sessions, nil
+}
+
+// getAppSessionByID generates a session ID from the given app definition
+func getAppSessionID(appDedinition AppDefinition) common.Hash {
+	b, _ := json.Marshal(appDedinition)
+	return crypto.Keccak256Hash(b)
 }

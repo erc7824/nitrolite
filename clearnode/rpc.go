@@ -34,13 +34,13 @@ func ParseRPCMessage(data []byte) (*RPCMessage, error) {
 }
 
 // CreateResponse creates a response from a request with the given fields
-func CreateResponse(id uint64, method string, responseParams []any, newTimestamp time.Time) *RPCMessage {
+func CreateResponse(id uint64, method string, responseParams []any) *RPCMessage {
 	return &RPCMessage{
 		Res: &RPCData{
 			RequestID: id,
 			Method:    method,
 			Params:    responseParams,
-			Timestamp: uint64(newTimestamp.UnixMilli()),
+			Timestamp: uint64(time.Now().UnixMilli()),
 		},
 		Sig: []string{},
 	}

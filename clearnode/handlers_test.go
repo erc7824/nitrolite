@@ -264,7 +264,7 @@ func TestHandleCreateVirtualApp(t *testing.T) {
 	def := AppDefinition{
 		Protocol:           "test-proto",
 		ParticipantWallets: []string{addrA, addrB},
-		Weights:            []uint64{1, 1},
+		Weights:            []int64{1, 1},
 		Quorum:             2,
 		Challenge:          60,
 		Nonce:              ts, // if omitted, handler would use ts anyway

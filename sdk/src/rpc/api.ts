@@ -12,9 +12,10 @@ import {
     PartialEIP712AuthMessage,
     EIP712AuthTypes,
     EIP712AuthDomain,
+    EIP712AuthMessage,
 } from './types'; // Added ParsedResponse
 import { NitroliteRPC } from './nitrolite';
-import { generateRequestId, getCurrentTimestamp } from './utils';
+import { generateRequestId, getCurrentTimestamp, parseRPCResponse } from './utils';
 
 /**
  * Creates the signed, stringified message body for an 'auth_request'.
@@ -370,58 +371,30 @@ export function createEIP712AuthMessageSigner(
     domain: EIP712AuthDomain,
 ): MessageSigner {
     return async (data: any): Promise<`0x${string}`> => {
-        let challengeUUID = '';
+        // TODO: perhaps it would be better to pass full EIP712AuthMessage instead of parsing part of it
+        // out of untyped data 
         const address = walletClient.account?.address;
 
-        // The data coming in is the array from createAuthVerifyMessage
-        // Format: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
-        if (Array.isArray(data)) {
-            // Direct array access - data[2] should be the array with the challenge object
-            if (data.length >= 3 && Array.isArray(data[2]) && data[2].length > 0) {
-                const challengeObject = data[2][0];
-
-                if (challengeObject && challengeObject.challenge) {
-                    challengeUUID = challengeObject.challenge;
-                }
-            }
-        } else if (typeof data === 'string') {
-            try {
-                const parsed = JSON.parse(data);
-
-                // Handle different message structures
-                if (parsed.res && Array.isArray(parsed.res)) {
-                    // auth_challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
-                    if (parsed.res[1] === 'auth_challenge' && parsed.res[2]) {
-                        challengeUUID = parsed.res[2].challenge_message || parsed.res[2].challenge;
-                    }
-                    // auth_verify message: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
-                    else if (parsed.res[1] === 'auth_verify' && Array.isArray(parsed.res[2]) && parsed.res[2][0]) {
-                        challengeUUID = parsed.res[2][0].challenge;
-                    }
-                }
-                // Direct array format
-                else if (Array.isArray(parsed) && parsed.length >= 3 && Array.isArray(parsed[2])) {
-                    challengeUUID = parsed[2][0]?.challenge;
-                }
-            } catch (e) {
-                console.error('Could not parse challenge data:', e);
-                challengeUUID = data;
-            }
-        } else if (data && typeof data === 'object') {
-            // If data is already an object, try to extract challenge
-            challengeUUID = data.challenge || data.challenge_message;
+        if (!address) {
+            throw new Error('Wallet client is not connected or does not have an account.');
         }
 
-        if (!challengeUUID || challengeUUID.includes('[') || challengeUUID.includes('{')) {
-            console.error('Challenge extraction failed or contains invalid characters:', challengeUUID);
-            throw new Error('Could not extract valid challenge UUID for EIP-712 signing');
+        const response = parseRPCResponse(data)
+
+        if (response.method !== 'auth_challenge') {
+            throw new Error(`Expected 'auth_challenge' method, but received '${response.method}'`);
         }
 
-        const message: Record<string, unknown> = {
+        const challengeUUID = response.params.challengeMessage;
+        const message: EIP712AuthMessage = {
             ...partialMessage,
             challenge: challengeUUID,
             wallet: address as Address,
         };
+
+        const untypedMessage: Record<string, unknown> =  Object.fromEntries(
+            Object.entries(message)
+        );
 
         try {
             // Sign with EIP-712
@@ -430,7 +403,7 @@ export function createEIP712AuthMessageSigner(
                 domain,
                 types: EIP712AuthTypes,
                 primaryType: 'Policy',
-                message,
+                message: untypedMessage,
             });
 
             return signature;

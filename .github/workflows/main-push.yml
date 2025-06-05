@@ -188,17 +188,6 @@ jobs:
     if: always()
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Get commit info
-        id: commit_info
-        run: |
-          echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
-          echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
-
       - name: Slack Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -210,17 +199,11 @@ jobs:
           SLACK_TITLE: 'Nitrolite Clearnode Release Candidate'
           SLACK_MESSAGE_ON_SUCCESS: |
             ✅ RC build and deployment completed successfully!
-            
-            📝 Commit: ${{ steps.commit_info.outputs.message }}
-            👤 Author: ${{ steps.commit_info.outputs.author }}
+            ${{github.event.head_commit.message}}
           SLACK_MESSAGE_ON_FAILURE: |
             ❌ RC build or deployment failed!
-            
-            📝 Commit: ${{ steps.commit_info.outputs.message }}
-            👤 Author: ${{ steps.commit_info.outputs.author }}
+            ${{github.event.head_commit.message}}
           SLACK_MESSAGE_ON_CANCEL: |
             ⚠️ RC build or deployment was cancelled!
-            
-            📝 Commit: ${{ steps.commit_info.outputs.message }}
-            👤 Author: ${{ steps.commit_info.outputs.author }}
+            ${{github.event.head_commit.message}}
           SLACK_FOOTER: 'Nitrolite CI/CD Pipeline'

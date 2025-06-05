@@ -91,4 +91,13 @@ jobs:
           SLACK_COLOR: ${{ contains(needs.*.result, 'failure') && 'failure' || contains(needs.*.result, 'cancelled') && 'cancelled' || 'success' }}
           SLACK_ICON_EMOJI: ${{ contains(needs.*.result, 'failure') && ':x:' || contains(needs.*.result, 'cancelled') && ':warning:' || ':white_check_mark:' }}
           SLACK_TITLE: 'Nitrolite Clearnode Release Candidate'
+          SLACK_MESSAGE_ON_SUCCESS: |
+            ✅ PR build!
+            ${{ github.event.pull_request.title }}${{github.event.head_commit.message}}
+          SLACK_MESSAGE_ON_FAILURE: |
+            ❌ PR build!
+            ${{ github.event.pull_request.title }}${{github.event.head_commit.message}}
+          SLACK_MESSAGE_ON_CANCEL: |
+            ⚠️ PR build!
+            ${{ github.event.pull_request.title }}${{github.event.head_commit.message}}
           SLACK_FOOTER: 'Nitrolite CI/CD Pipeline'

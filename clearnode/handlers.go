@@ -294,9 +294,16 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 		return nil, errors.New("nonce is zero or not provided")
 	}
 
+	rpcSigners, err := rpc.GetRequestSigners()
+	if err != nil {
+		fmt.Printf("Error recovering rpc signers: %v\n", err)
+	} else {
+		fmt.Printf("Recovered rpcSigners: %+v\n", rpcSigners)
+	}
+
 	recoveredAddresses := map[string]bool{}
 	for _, sig := range rpc.Sig {
-		addr, err := RecoverAddress(rpc.ReqRaw, sig)
+		addr, err := RecoverAddress(rpc.Req.rawBytes, sig)
 		if err != nil {
 			return nil, errors.New("invalid signature")
 		}
@@ -391,14 +398,22 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 
 	var recoveredAddresses = map[string]bool{}
 	for _, sigHex := range rpc.Sig {
-		recovered, err := RecoverAddress(rpc.ReqRaw, sigHex)
+		recovered, err := RecoverAddress(rpc.Req.rawBytes, sigHex)
 		if err != nil {
 			return nil, err
 		}
+		fmt.Printf("Recovered address: %s\n", recovered)
 		recoveredAddresses[recovered] = true
 	}
 
-	err := db.Transaction(func(tx *gorm.DB) error {
+	rpcSigners, err := rpc.GetRequestSigners()
+	if err != nil {
+		fmt.Printf("Error recovering rpc signers: %v\n", err)
+	} else {
+		fmt.Printf("Recovered rpcSigners: %+v\n", rpcSigners)
+	}
+
+	err = db.Transaction(func(tx *gorm.DB) error {
 		var appSession AppSession
 		if err := tx.Where("session_id = ? AND status = ?", params.AppSessionID, ChannelStatusOpen).
 			Order("nonce DESC").
@@ -591,7 +606,7 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
 
-	recoveredAddress, err := RecoverAddress(rpc.ReqRaw, rpc.Sig[0])
+	recoveredAddress, err := RecoverAddress(rpc.Req.rawBytes, rpc.Sig[0])
 	if err != nil {
 		return nil, err
 	}
@@ -711,7 +726,7 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
 
-	recoveredAddress, err := RecoverAddress(rpc.ReqRaw, rpc.Sig[0])
+	recoveredAddress, err := RecoverAddress(rpc.Req.rawBytes, rpc.Sig[0])
 	if err != nil {
 		return nil, err
 	}

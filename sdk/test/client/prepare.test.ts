@@ -10,13 +10,7 @@ import { _prepareAndSignInitialState, _prepareAndSignFinalState } from '../../sr
 import { NitroliteService, Erc20Service } from '../../src/client/services';
 import { ContractAddresses } from '../../src/abis';
 import * as Errors from '../../src/errors';
-import {
-    CreateChannelParams,
-    CheckpointChannelParams,
-    ChallengeChannelParams,
-    CloseChannelParams,
-    Allocation,
-} from '../../src/client/types';
+import { CreateChannelParams, CheckpointChannelParams, Allocation } from '../../src/client/types';
 
 // TODO: remove ts-ignore
 describe('NitroliteTransactionPreparer', () => {
@@ -183,7 +177,7 @@ describe('NitroliteTransactionPreparer', () => {
                 // @ts-ignore
                 prep.prepareChallengeChannelTransaction({
                     channelId: '0xcid' as any,
-                    candidateState: {},
+                    candidateState: {} as any,
                     proofStates: [],
                 }),
             ).resolves.toBeDefined();

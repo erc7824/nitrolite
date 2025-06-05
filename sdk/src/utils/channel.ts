@@ -7,7 +7,7 @@ import { Channel, ChannelId } from '../client/types'; // Updated import path
  * @param channel The channel configuration object.
  * @returns The channel identifier as Hex.
  */
-export function getChannelId(channel: Channel): ChannelId {
+export function getChannelId(channel: Channel, chainId: number): ChannelId {
     const encoded = encodeAbiParameters(
         [
             { name: 'participants', type: 'address[]' },
@@ -17,7 +17,7 @@ export function getChannelId(channel: Channel): ChannelId {
             { name: 'chainId', type: 'uint256' },
         ],
         // @ts-ignore
-        [channel.participants, channel.adjudicator, channel.challenge, channel.nonce, channel.chainId],
+        [channel.participants, channel.adjudicator, channel.challenge, channel.nonce, chainId],
     );
 
     return keccak256(encoded);

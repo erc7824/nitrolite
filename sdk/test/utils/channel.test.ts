@@ -17,11 +17,12 @@ describe('getChannelId', () => {
         adjudicator: '0x3333333333333333333333333333333333333333' as Address,
         challenge: 100n,
         nonce: 200n,
-        chainId: 1,
     };
 
+    const chainId = 1;
+
     test('encodes parameters and hashes correctly', () => {
-        const id = getChannelId(channel);
+        const id = getChannelId(channel, chainId);
         expect(encodeAbiParameters).toHaveBeenCalledWith(
             [
                 { name: 'participants', type: 'address[]' },
@@ -30,7 +31,7 @@ describe('getChannelId', () => {
                 { name: 'nonce', type: 'uint64' },
                 { name: 'chainId', type: 'uint256' },
             ],
-            [channel.participants, channel.adjudicator, channel.challenge, channel.nonce, channel.chainId],
+            [channel.participants, channel.adjudicator, channel.challenge, channel.nonce, chainId],
         );
         expect(keccak256).toHaveBeenCalledWith('0xdeadbeef');
         expect(id).toBe('0xabc123');

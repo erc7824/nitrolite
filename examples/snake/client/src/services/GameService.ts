@@ -2,6 +2,7 @@ import { ref } from 'vue';
 import type { Ref } from 'vue';
 import clearNetService from './ClearNetService';
 import { GAMESERVER_WS_URL } from '../config';
+import { Account, ParseAccount, Chain, Transport, WalletClient } from 'viem';
 
 export interface GameState {
   type: string;
@@ -371,7 +372,7 @@ class GameService {
       type: 'finalizeGame',
       roomId: this.roomId.value
     }));
-    
+
     // Clear local room state since game is being finalized
     this.clearRoomState();
   }
@@ -461,24 +462,22 @@ class GameService {
   private async handleAppSessionSignatureRequest(data: any) {
     try {
       const { roomId, requestToSign, participantAddress } = data;
-      
+
       console.log('[GameService] Signing app session request for room:', roomId);
       console.log('[GameService] Request to sign:', requestToSign);
-      
+
       this.isSigningAppSession.value = true;
       this.signatureStatus.value = 'Please sign the app session creation request...';
-      
-      // Get the main wallet client from clearNetService
-      const walletClient = clearNetService.walletClient;
-      if (!walletClient) {
-        throw new Error('No wallet client available for signing');
+
+      const signer = clearNetService.stateWalletClient;
+      if (!signer) {
+        throw new Error('No state wallet client available for signing');
       }
 
-      // Sign the request using the main wallet (for app session creation)
-      const signature = await this.signAppSessionRequest(requestToSign, walletClient);
-      
+      const signature = await this.signAppSessionRequest(requestToSign, signer);
+
       this.signatureStatus.value = 'Signature submitted, processing...';
-      
+
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify({
           type: 'appSession:signature',
@@ -499,24 +498,22 @@ class GameService {
   private async handleAppSessionStartGameRequest(data: any) {
     try {
       const { roomId, requestToSign, participantAddress } = data;
-      
+
       console.log('[GameService] Signing start game request for room:', roomId);
       console.log('[GameService] Request to sign:', requestToSign);
-      
+
       this.isSigningAppSession.value = true;
       this.signatureStatus.value = 'Please sign to start the game...';
-      
-      // Get the main wallet client from clearNetService  
-      const walletClient = clearNetService.walletClient;
-      if (!walletClient) {
-        throw new Error('No wallet client available for signing');
+
+      const signer = clearNetService.stateWalletClient;
+      if (!signer) {
+        throw new Error('No state wallet client available for signing');
       }
 
-      // Sign the request using the main wallet (for app session creation)
-      const signature = await this.signAppSessionRequest(requestToSign, walletClient);
-      
+      const signature = await this.signAppSessionRequest(requestToSign, signer);
+
       this.signatureStatus.value = 'Starting game...';
-      
+
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify({
           type: 'appSession:startGame',
@@ -534,55 +531,16 @@ class GameService {
     }
   }
 
-  private async signAppSessionRequest(requestToSign: any, walletClient: any): Promise<string> {
+  private async signAppSessionRequest(
+    requestToSign: any,
+    signer: WalletClient<Transport, Chain, ParseAccount<Account>>,
+  ): Promise<string> {
     try {
-      // Use the exact same signing method as the tictactoe example
       const messageString = JSON.stringify(requestToSign);
       console.log('[GameService] Signing request:', messageString);
-      
-      // Import ethers to match tictactoe signing exactly  
-      const { ethers } = await import('ethers');
-      
-      // Create digest using ethers.id (same as tictactoe and server)
-      const digestHex = ethers.id(messageString);
-      console.log('[GameService] Message digest (ethers.id):', digestHex);
-      
-      // Convert digest to bytes for signing (same as tictactoe)
-      const messageBytes = ethers.getBytes(digestHex);
-      console.log('[GameService] Message bytes length:', messageBytes.length);
-      
-      try {
-        // Try to sign the digest bytes directly using MetaMask
-        // This should match the server's signDigest approach
-        const signature = await walletClient.request({
-          method: 'personal_sign',
-          params: [digestHex, walletClient.account.address]
-        });
-        console.log('[GameService] Successfully signed with personal_sign on digest');
-        return signature;
-      } catch (personalSignError) {
-        console.log('[GameService] personal_sign failed, trying eth_sign:', personalSignError);
-        
-        try {
-          // Try eth_sign as fallback
-          const signature = await walletClient.request({
-            method: 'eth_sign', 
-            params: [walletClient.account.address, digestHex]
-          });
-          console.log('[GameService] Successfully signed with eth_sign');
-          return signature;
-        } catch (ethSignError) {
-          console.log('[GameService] eth_sign failed, trying original message:', ethSignError);
-          
-          // Final fallback: sign the original message string
-          const signature = await walletClient.request({
-            method: 'personal_sign',
-            params: [messageString, walletClient.account.address]
-          });
-          console.log('[GameService] Successfully signed with personal_sign on original message');
-          return signature;
-        }
-      }
+      const signature = await signer.signMessage({ message: messageString });
+      console.log('[GameService] Successfully signed with session key');
+      return signature;
     } catch (error) {
       console.error('[GameService] Error signing app session request:', error);
       throw error;

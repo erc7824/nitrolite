@@ -12,11 +12,11 @@ import {
   initializeBroadcastFunction
 } from './gameService.ts';
 import { createAppSession, closeAppSession } from './brokerService.ts';
-import { 
-  generateAppSessionMessage, 
-  addAppSessionSignature, 
+import {
+  generateAppSessionMessage,
+  addAppSessionSignature,
   createAppSessionWithSignatures,
-  createCloseAppSessionMessage
+  getPendingAppSessionMessage
 } from './appSessionService.ts';
 import { Hex } from 'viem';
 
@@ -172,7 +172,7 @@ async function handleWebSocketMessage(ws: SnakeWebSocket, data: any): Promise<vo
 // Handle create room message
 async function handleCreateRoom(ws: SnakeWebSocket, data: any): Promise<void> {
   console.log('[websocketService] Creating room with data:', data);
-  
+
   // Check if player is already in a room
   if (ws.roomId) {
     console.log(`[websocketService] Player ${ws.playerId} already in room ${ws.roomId}, ignoring create room request`);
@@ -182,7 +182,7 @@ async function handleCreateRoom(ws: SnakeWebSocket, data: any): Promise<void> {
     }));
     return;
   }
-  
+
   const roomId = generateRoomId();
   const { nickname, channelId, walletAddress } = data;
   const gridSize = { width: 40, height: 30 };
@@ -223,7 +223,7 @@ async function handleCreateRoom(ws: SnakeWebSocket, data: any): Promise<void> {
   }));
 
   console.log(`[websocketService] Room created: ${roomId}, Player: ${player.id}, Address: ${walletAddress}`);
-  
+
   // Notify subscribers about new room
   broadcastRoomUpdate(roomId);
 }
@@ -231,7 +231,7 @@ async function handleCreateRoom(ws: SnakeWebSocket, data: any): Promise<void> {
 // Handle join room message
 async function handleJoinRoom(ws: SnakeWebSocket, data: any): Promise<void> {
   console.log('[websocketService] Joining room with data:', data);
-  
+
   // Check if player is already in a room
   if (ws.roomId) {
     console.log(`[websocketService] Player ${ws.playerId} already in room ${ws.roomId}, ignoring join room request`);
@@ -241,7 +241,7 @@ async function handleJoinRoom(ws: SnakeWebSocket, data: any): Promise<void> {
     }));
     return;
   }
-  
+
   const { roomId, nickname, channelId, walletAddress } = data;
   const room = getRoom(roomId);
   console.log('[websocketService] Room lookup result:', room ? 'found' : 'not found');
@@ -286,7 +286,7 @@ async function handleJoinRoom(ws: SnakeWebSocket, data: any): Promise<void> {
 
   console.log(`Player joined room: ${roomId}, Player: ${player.id}, Address: ${walletAddress}`);
   console.log('Room data:', room);
-  
+
   // Notify subscribers about room update
   broadcastRoomUpdate(roomId);
 
@@ -303,8 +303,8 @@ async function handleJoinRoom(ws: SnakeWebSocket, data: any): Promise<void> {
       });
 
       // Generate the message structure for signing
-      const { requestToSign, participants } = generateAppSessionMessage(roomId, participantA, participantB);
-      
+      const { requestToSign } = await generateAppSessionMessage(roomId, participantA, participantB);
+
       // Start signature collection with guest player (participant B)
       const guestPlayerId = players[1].id; // Second player to join
       const guestClient = Array.from(webSocketServer.clients).find(client => {
@@ -388,10 +388,10 @@ async function handlePlayAgain(data: any): Promise<void> {
   // Check if all players have voted to play again (and we have at least 2 players)
   if (room.playAgainVotes.size === room.players.size && room.players.size >= 2) {
     console.log(`[handlePlayAgain] All players voted to play again. Restarting game.`);
-    
+
     // Clear votes for next time
     room.playAgainVotes.clear();
-    
+
     // Reset game state
     room.isGameOver = false;
 
@@ -554,10 +554,10 @@ async function handleFinalizeGame(data: any): Promise<void> {
         snakeClient.roomId = undefined;
       }
     });
-    
+
     removeRoom(roomId);
     console.log(`[websocketService] Room deleted: ${roomId}`);
-    
+
     // Notify subscribers about room removal
     broadcastRoomRemoved(roomId);
   }, 2000);
@@ -587,12 +587,12 @@ async function handleDisconnect(ws: SnakeWebSocket): Promise<void> {
   // Remove the player from the room
   room.players.delete(ws.playerId);
   console.log(`[websocketService] Removed player ${ws.playerId} from room ${roomId}`);
-  
+
   // Remove player's vote if they had one
   if (room.playAgainVotes) {
     room.playAgainVotes.delete(ws.playerId);
   }
-  
+
   // Notify remaining players about the disconnect
   if (room.players.size > 0) {
     broadcastPlayerDisconnect(roomId, playerNickname);
@@ -662,7 +662,7 @@ async function handleDisconnect(ws: SnakeWebSocket): Promise<void> {
     // Remove the room
     removeRoom(roomId);
     console.log(`[websocketService] Room ${roomId} removed`);
-    
+
     // Notify subscribers about room removal
     broadcastRoomRemoved(roomId);
   }
@@ -672,7 +672,7 @@ async function handleDisconnect(ws: SnakeWebSocket): Promise<void> {
 function handleSubscribeRooms(ws: SnakeWebSocket): void {
   console.log(`[websocketService] Client ${ws.playerId} subscribing to room updates`);
   roomSubscribers.add(ws);
-  
+
   // Send current rooms list
   const availableRooms = getAvailableRoomsList();
   ws.send(JSON.stringify({
@@ -691,7 +691,7 @@ function handleUnsubscribeRooms(ws: SnakeWebSocket): void {
 function getAvailableRoomsList(): Array<any> {
   const allRooms = getAllRooms();
   const availableRooms: Array<any> = [];
-  
+
   allRooms.forEach((room, roomId) => {
     // Include rooms that are not full (less than 2 players) and not in active game
     if (room.players.size < 2 && !room.isGameOver) {
@@ -708,7 +708,7 @@ function getAvailableRoomsList(): Array<any> {
       });
     }
   });
-  
+
   return availableRooms;
 }
 
@@ -716,7 +716,7 @@ function getAvailableRoomsList(): Array<any> {
 export function broadcastRoomUpdate(roomId: string): void {
   const room = getRoom(roomId);
   if (!room) return;
-  
+
   const roomData = {
     id: roomId,
     name: `Room ${roomId.slice(0, 8)}`,
@@ -728,12 +728,12 @@ export function broadcastRoomUpdate(roomId: string): void {
     isGameActive: !!room.gameInterval && !room.isGameOver,
     createdAt: room.createdAt
   };
-  
+
   const updateMessage = JSON.stringify({
     type: 'roomUpdated',
     room: roomData
   });
-  
+
   // Send to all subscribers
   roomSubscribers.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
@@ -748,7 +748,7 @@ export function broadcastRoomRemoved(roomId: string): void {
     type: 'roomRemoved',
     roomId
   });
-  
+
   // Send to all subscribers
   roomSubscribers.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
@@ -760,7 +760,7 @@ export function broadcastRoomRemoved(roomId: string): void {
 // Handle app session signature submission from guest player
 async function handleAppSessionSignature(ws: SnakeWebSocket, data: any): Promise<void> {
   const { roomId, signature, participantAddress } = data;
-  
+
   if (!roomId || !signature || !participantAddress) {
     ws.send(JSON.stringify({
       type: 'error',
@@ -803,14 +803,13 @@ async function handleAppSessionSignature(ws: SnakeWebSocket, data: any): Promise
 
     if (hostClient && hostClient.readyState === WebSocket.OPEN) {
       const participantA = room.playerAddresses.get(players[0].id) as Hex;
-      
+
       // Get the existing pending app session data instead of generating new one
-      const { getPendingAppSession } = await import('./appSessionService.ts');
-      const pending = getPendingAppSession(roomId);
+      const pending = getPendingAppSessionMessage(roomId);
       if (!pending) {
         throw new Error("No pending app session found for room");
       }
-      
+
       hostClient.send(JSON.stringify({
         type: 'appSession:startGameRequest',
         roomId,
@@ -834,7 +833,7 @@ async function handleAppSessionSignature(ws: SnakeWebSocket, data: any): Promise
 // Handle app session start game (host signature submission)
 async function handleAppSessionStartGame(ws: SnakeWebSocket, data: any): Promise<void> {
   const { roomId, signature, participantAddress } = data;
-  
+
   if (!roomId || !signature || !participantAddress) {
     ws.send(JSON.stringify({
       type: 'error',
@@ -904,7 +903,7 @@ async function handleAppSessionStartGame(ws: SnakeWebSocket, data: any): Promise
 
   } catch (error) {
     console.error(`[handleAppSessionStartGame] Error starting game for room ${roomId}:`, error);
-    
+
     // Clean up any partial state
     if (room.appId) {
       try {

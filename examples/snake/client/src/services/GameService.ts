@@ -39,6 +39,8 @@ class GameService {
   private errorMessage: Ref<string> = ref('');
   private gameState: Ref<GameState | null> = ref(null);
   private availableRooms: Ref<Room[]> = ref([]);
+  private signatureStatus: Ref<string> = ref(''); // For UI feedback
+  private isSigningAppSession: Ref<boolean> = ref(false);
   private messageHandlers: Map<string, (data: any) => void> = new Map();
   private connectionPromise: Promise<void> | null = null;
   private reconnectAttempts = 0;
@@ -102,6 +104,38 @@ class GameService {
     this.messageHandlers.set('roomRemoved', (data) => {
       console.log('[GameService] Room removed:', data);
       this.availableRooms.value = this.availableRooms.value.filter(room => room.id !== data.roomId);
+    });
+
+    this.messageHandlers.set('playAgainVoteUpdate', (data) => {
+      console.log('[GameService] Play again vote update:', data);
+      // Handle play again vote updates if needed
+    });
+
+    this.messageHandlers.set('playerDisconnected', (data) => {
+      console.log('[GameService] Player disconnected:', data);
+      // Handle player disconnect notifications if needed
+    });
+
+    // App session signature collection handlers
+    this.messageHandlers.set('appSession:signatureRequest', (data) => {
+      console.log('[GameService] App session signature request:', data);
+      this.handleAppSessionSignatureRequest(data);
+    });
+
+    this.messageHandlers.set('appSession:startGameRequest', (data) => {
+      console.log('[GameService] App session start game request:', data);
+      this.handleAppSessionStartGameRequest(data);
+    });
+
+    this.messageHandlers.set('appSession:signatureConfirmed', (data) => {
+      console.log('[GameService] App session signature confirmed:', data);
+      this.signatureStatus.value = 'Waiting for host to start game...';
+    });
+
+    this.messageHandlers.set('appSession:gameStarted', (data) => {
+      console.log('[GameService] App session game started:', data);
+      this.isSigningAppSession.value = false;
+      this.signatureStatus.value = '';
     });
   }
 
@@ -335,6 +369,8 @@ class GameService {
     this.playerId.value = '';
     this.gameState.value = null;
     this.errorMessage.value = '';
+    this.isSigningAppSession.value = false;
+    this.signatureStatus.value = '';
   }
 
   async subscribeToRooms() {
@@ -409,6 +445,104 @@ class GameService {
     }
   }
 
+  private async handleAppSessionSignatureRequest(data: any) {
+    try {
+      const { roomId, requestToSign, participantAddress } = data;
+      
+      console.log('[GameService] Signing app session request for room:', roomId);
+      console.log('[GameService] Request to sign:', requestToSign);
+      
+      this.isSigningAppSession.value = true;
+      this.signatureStatus.value = 'Please sign the app session creation request...';
+      
+      // Get the main wallet client from clearNetService
+      const walletClient = clearNetService.walletClient;
+      if (!walletClient) {
+        throw new Error('No wallet client available for signing');
+      }
+
+      // Sign the request using the main wallet (for app session creation)
+      const signature = await this.signAppSessionRequest(requestToSign, walletClient);
+      
+      this.signatureStatus.value = 'Signature submitted, processing...';
+      
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({
+          type: 'appSession:signature',
+          roomId,
+          signature,
+          participantAddress
+        }));
+        console.log('[GameService] Sent app session signature for room:', roomId);
+      }
+    } catch (error) {
+      console.error('[GameService] Error handling app session signature request:', error);
+      this.isSigningAppSession.value = false;
+      this.signatureStatus.value = '';
+      this.errorMessage.value = 'Failed to sign app session request. Please try again.';
+    }
+  }
+
+  private async handleAppSessionStartGameRequest(data: any) {
+    try {
+      const { roomId, requestToSign, participantAddress } = data;
+      
+      console.log('[GameService] Signing start game request for room:', roomId);
+      console.log('[GameService] Request to sign:', requestToSign);
+      
+      this.isSigningAppSession.value = true;
+      this.signatureStatus.value = 'Please sign to start the game...';
+      
+      // Get the main wallet client from clearNetService  
+      const walletClient = clearNetService.walletClient;
+      if (!walletClient) {
+        throw new Error('No wallet client available for signing');
+      }
+
+      // Sign the request using the main wallet (for app session creation)
+      const signature = await this.signAppSessionRequest(requestToSign, walletClient);
+      
+      this.signatureStatus.value = 'Starting game...';
+      
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({
+          type: 'appSession:startGame',
+          roomId,
+          signature,
+          participantAddress
+        }));
+        console.log('[GameService] Sent start game signature for room:', roomId);
+      }
+    } catch (error) {
+      console.error('[GameService] Error handling start game request:', error);
+      this.isSigningAppSession.value = false;
+      this.signatureStatus.value = '';
+      this.errorMessage.value = 'Failed to sign start game request. Please try again.';
+    }
+  }
+
+  private async signAppSessionRequest(requestToSign: any, walletClient: any): Promise<string> {
+    try {
+      // Create a message hash from the request data (same as server-side)
+      const messageString = JSON.stringify(requestToSign);
+      
+      // Use keccak256 hash of the JSON string (same as server does with ethers.utils.id)
+      const { keccak256, toBytes } = await import('viem');
+      const messageHash = keccak256(toBytes(messageString));
+      
+      // Sign the hash using the wallet client
+      const signature = await walletClient.signMessage({ 
+        message: { raw: messageHash }
+      });
+      
+      console.log('[GameService] Successfully signed app session request');
+      return signature;
+    } catch (error) {
+      console.error('[GameService] Error signing app session request:', error);
+      throw error;
+    }
+  }
+
   // Getters for reactive state
   getIsConnected(): Ref<boolean> {
     return this.isConnected;
@@ -432,6 +566,14 @@ class GameService {
 
   getAvailableRooms(): Ref<Room[]> {
     return this.availableRooms;
+  }
+
+  getSignatureStatus(): Ref<string> {
+    return this.signatureStatus;
+  }
+
+  getIsSigningAppSession(): Ref<boolean> {
+    return this.isSigningAppSession;
   }
 
   // Get the WebSocket instance

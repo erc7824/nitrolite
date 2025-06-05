@@ -1,20 +1,21 @@
-import { Hex } from 'viem';
+import { Address, Hex } from 'viem';
+import * as Errors from '../errors';
+import { generateChannelNonce, getChannelId, getStateHash, removeQuotesFromRS, signState } from '../utils';
+import { PreparerDependencies } from './prepare';
 import {
-    CreateChannelParams,
-    State,
     Channel,
     ChannelId,
     CloseChannelParams,
-    StateIntent,
+    CreateChannelParams,
     ResizeChannelParams,
+    State,
+    StateIntent,
 } from './types';
-import { generateChannelNonce, getChannelId, getStateHash, signState, removeQuotesFromRS } from '../utils';
-import * as Errors from '../errors';
-import { PreparerDependencies } from './prepare';
 
 /**
  * Shared logic for preparing the channel object, initial state, and signing it.
  * Used by both direct execution (createChannel) and preparation (prepareCreateChannelTransaction).
+ * @param tokenAddress The address of the token for the channel.
  * @param deps - The dependencies needed (account, addresses, walletClient, challengeDuration). See {@link PreparerDependencies}.
  * @param params - Parameters for channel creation. See {@link CreateChannelParams}.
  * @returns An object containing the channel object, the signed initial state, and the channel ID.
@@ -22,6 +23,7 @@ import { PreparerDependencies } from './prepare';
  * @throws {Errors.InvalidParameterError} If participants are invalid.
  */
 export async function _prepareAndSignInitialState(
+    tokenAddress: Address,
     deps: PreparerDependencies,
     params: CreateChannelParams,
 ): Promise<{ channel: Channel; initialState: State; channelId: ChannelId }> {
@@ -35,7 +37,6 @@ export async function _prepareAndSignInitialState(
 
     const participants: [Hex, Hex] = [deps.account.address, deps.addresses.guestAddress];
     const channelParticipants: [Hex, Hex] = [deps.stateWalletClient.account.address, deps.addresses.guestAddress];
-    const tokenAddress = deps.addresses.tokenAddress;
     const adjudicatorAddress = deps.addresses.adjudicator;
     if (!adjudicatorAddress) {
         throw new Errors.MissingParameterError(

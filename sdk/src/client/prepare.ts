@@ -1,15 +1,24 @@
-import { Account, SimulateContractReturnType, WalletClient, Chain, Transport, ParseAccount, zeroAddress } from 'viem';
-import { NitroliteService, Erc20Service } from './services';
 import {
-    CreateChannelParams,
-    CheckpointChannelParams,
-    ChallengeChannelParams,
-    CloseChannelParams,
-    ResizeChannelParams,
-} from './types';
+    Account,
+    Address,
+    Chain,
+    ParseAccount,
+    SimulateContractReturnType,
+    Transport,
+    WalletClient,
+    zeroAddress,
+} from 'viem';
 import { ContractAddresses } from '../abis';
 import * as Errors from '../errors';
-import { _prepareAndSignInitialState, _prepareAndSignFinalState, _prepareAndSignResizeState } from './state';
+import { Erc20Service, NitroliteService } from './services';
+import { _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from './state';
+import {
+    ChallengeChannelParams,
+    CheckpointChannelParams,
+    CloseChannelParams,
+    CreateChannelParams,
+    ResizeChannelParams,
+} from './types';
 
 /**
  * Represents the data needed to construct a transaction or UserOperation call.
@@ -51,12 +60,12 @@ export class NitroliteTransactionPreparer {
     /**
      * Prepares the transactions data necessary for a deposit operation,
      * including ERC20 approval if required.
+     * @param tokenAddress The address of the token to deposit.
      * @param amount The amount of tokens/ETH to deposit.
      * @returns An array of PreparedTransaction objects (approve + deposit, or just deposit).
      */
-    async prepareDepositTransactions(amount: bigint): Promise<PreparedTransaction[]> {
+    async prepareDepositTransactions(tokenAddress: Address, amount: bigint): Promise<PreparedTransaction[]> {
         const transactions: PreparedTransaction[] = [];
-        const tokenAddress = this.deps.addresses.tokenAddress;
         const spender = this.deps.addresses.custody;
         const owner = this.deps.account.address;
 
@@ -89,12 +98,16 @@ export class NitroliteTransactionPreparer {
     /**
      * Prepares the transaction data for creating a new state channel.
      * Handles internal state construction and signing.
+     * @param tokenAddress The address of the token for the channel.
      * @param params Parameters for channel creation. See {@link CreateChannelParams}.
      * @returns The prepared transaction data ({ to, data, value }).
      */
-    async prepareCreateChannelTransaction(params: CreateChannelParams): Promise<PreparedTransaction> {
+    async prepareCreateChannelTransaction(
+        tokenAddress: Address,
+        params: CreateChannelParams,
+    ): Promise<PreparedTransaction> {
         try {
-            const { channel, initialState } = await _prepareAndSignInitialState(this.deps, params);
+            const { channel, initialState } = await _prepareAndSignInitialState(tokenAddress, this.deps, params);
 
             return await this.deps.nitroliteService.prepareCreateChannel(channel, initialState);
         } catch (err) {
@@ -106,17 +119,19 @@ export class NitroliteTransactionPreparer {
     /**
      * Prepares the transaction data for depositing funds and creating a channel in a single operation.
      * Includes potential ERC20 approval. Designed for batching.
+     * @param tokenAddress The address of the token to deposit and use for the channel.
      * @param depositAmount The amount to deposit.
      * @param params Parameters for channel creation. See {@link CreateChannelParams}.
      * @returns An array of PreparedTransaction objects (approve?, deposit, createChannel).
      */
     async prepareDepositAndCreateChannelTransactions(
+        tokenAddress: Address,
         depositAmount: bigint,
         params: CreateChannelParams,
     ): Promise<PreparedTransaction[]> {
         let allTransactions: PreparedTransaction[] = [];
         try {
-            const depositTxs = await this.prepareDepositTransactions(depositAmount);
+            const depositTxs = await this.prepareDepositTransactions(tokenAddress, depositAmount);
             allTransactions = allTransactions.concat(depositTxs);
         } catch (err) {
             throw new Errors.ContractCallError(
@@ -126,7 +141,7 @@ export class NitroliteTransactionPreparer {
             );
         }
         try {
-            const createChannelTx = await this.prepareCreateChannelTransaction(params);
+            const createChannelTx = await this.prepareCreateChannelTransaction(tokenAddress, params);
             allTransactions.push(createChannelTx);
         } catch (err) {
             throw new Errors.ContractCallError(
@@ -213,12 +228,11 @@ export class NitroliteTransactionPreparer {
     /**
      * Prepares the transaction data for withdrawing deposited funds from the custody contract.
      * This does not withdraw funds locked in active channels.
+     * @param tokenAddress The address of the token to withdraw.
      * @param amount The amount of tokens/ETH to withdraw.
      * @returns The prepared transaction data ({ to, data, value }).
      */
-    async prepareWithdrawalTransaction(amount: bigint): Promise<PreparedTransaction> {
-        const tokenAddress = this.deps.addresses.tokenAddress;
-
+    async prepareWithdrawalTransaction(tokenAddress: Address, amount: bigint): Promise<PreparedTransaction> {
         try {
             return await this.deps.nitroliteService.prepareWithdraw(tokenAddress, amount);
         } catch (err) {
@@ -229,11 +243,11 @@ export class NitroliteTransactionPreparer {
 
     /**
      * Prepares the transaction data for approving the custody contract to spend ERC20 tokens.
+     * @param tokenAddress The address of the ERC20 token to approve.
      * @param amount The amount to approve.
      * @returns The prepared transaction data ({ to, data, value }).
      */
-    async prepareApproveTokensTransaction(amount: bigint): Promise<PreparedTransaction> {
-        const tokenAddress = this.deps.addresses.tokenAddress;
+    async prepareApproveTokensTransaction(tokenAddress: Address, amount: bigint): Promise<PreparedTransaction> {
         const spender = this.deps.addresses.custody;
 
         if (tokenAddress === zeroAddress) {

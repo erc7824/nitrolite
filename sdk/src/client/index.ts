@@ -1,21 +1,21 @@
-import { Account, PublicClient, WalletClient, Chain, Transport, ParseAccount, Hash, zeroAddress } from 'viem';
+import { Account, Address, Chain, Hash, ParseAccount, PublicClient, Transport, WalletClient, zeroAddress } from 'viem';
 
-import { NitroliteService, Erc20Service, waitForTransaction } from './services';
-import {
-    State,
-    ChannelId,
-    NitroliteClientConfig,
-    CreateChannelParams,
-    CheckpointChannelParams,
-    ChallengeChannelParams,
-    CloseChannelParams,
-    AccountInfo,
-    ResizeChannelParams,
-} from './types';
-import * as Errors from '../errors';
 import { ContractAddresses } from '../abis';
-import { _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from './state';
+import * as Errors from '../errors';
 import { NitroliteTransactionPreparer, PreparerDependencies } from './prepare';
+import { Erc20Service, NitroliteService, waitForTransaction } from './services';
+import { _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from './state';
+import {
+    AccountInfo,
+    ChallengeChannelParams,
+    ChannelId,
+    CheckpointChannelParams,
+    CloseChannelParams,
+    CreateChannelParams,
+    NitroliteClientConfig,
+    ResizeChannelParams,
+    State,
+} from './types';
 
 const CUSTODY_MIN_CHALLENGE_DURATION = 3600n;
 
@@ -48,7 +48,6 @@ export class NitroliteClient {
         if (!config.addresses?.custody) throw new Errors.MissingParameterError('addresses.custody');
         if (!config.addresses?.adjudicator) throw new Errors.MissingParameterError('addresses.adjudicator');
         if (!config.addresses?.guestAddress) throw new Errors.MissingParameterError('addresses.guestAddress');
-        if (!config.addresses?.tokenAddress) throw new Errors.MissingParameterError('addresses.tokenAddress');
         if (!config.chainId) throw new Errors.MissingParameterError('chainId');
 
         this.publicClient = config.publicClient;
@@ -85,13 +84,13 @@ export class NitroliteClient {
     /**
      * Deposits tokens or ETH into the custody contract.
      * Handles ERC20 approval if necessary.
+     * @param tokenAddress The address of the token to deposit.
      * @param amount The amount of tokens/ETH to deposit.
      * @returns The transaction hash.
      */
-    async deposit(amount: bigint): Promise<Hash> {
+    async deposit(tokenAddress: Address, amount: bigint): Promise<Hash> {
         const owner = this.account.address;
         const spender = this.addresses.custody;
-        const tokenAddress = this.addresses.tokenAddress;
 
         if (tokenAddress !== zeroAddress) {
             const allowance = await this.erc20Service.getTokenAllowance(tokenAddress, owner, spender);
@@ -119,14 +118,20 @@ export class NitroliteClient {
     /**
      * Creates a new state channel on-chain.
      * Constructs the initial state, signs it, and calls the custody contract.
+     * @param tokenAddress The address of the token for the channel.
      * @param params Parameters for channel creation. See {@link CreateChannelParams}.
      * @returns The channel ID, the signed initial state, and the transaction hash.
      */
     async createChannel(
+        tokenAddress: Address,
         params: CreateChannelParams,
     ): Promise<{ channelId: ChannelId; initialState: State; txHash: Hash }> {
         try {
-            const { channel, initialState, channelId } = await _prepareAndSignInitialState(this.sharedDeps, params);
+            const { channel, initialState, channelId } = await _prepareAndSignInitialState(
+                tokenAddress,
+                this.sharedDeps,
+                params,
+            );
             const txHash = await this.nitroliteService.createChannel(channel, initialState);
 
             return { channelId, initialState, txHash };
@@ -137,16 +142,18 @@ export class NitroliteClient {
 
     /**
      * Deposits tokens and creates a new channel in a single operation.
+     * @param tokenAddress The address of the token to deposit and use for the channel.
      * @param depositAmount The amount of tokens to deposit.
      * @param params Parameters for channel creation. See {@link CreateChannelParams}.
      * @returns An object containing the channel ID, initial state, deposit transaction hash, and create channel transaction hash.
      */
     async depositAndCreateChannel(
+        tokenAddress: Address,
         depositAmount: bigint,
         params: CreateChannelParams,
     ): Promise<{ channelId: ChannelId; initialState: State; depositTxHash: Hash; createChannelTxHash: Hash }> {
-        const depositTxHash = await this.deposit(depositAmount);
-        const { channelId, initialState, txHash } = await this.createChannel(params);
+        const depositTxHash = await this.deposit(tokenAddress, depositAmount);
+        const { channelId, initialState, txHash } = await this.createChannel(tokenAddress, params);
 
         return { channelId, initialState, depositTxHash: depositTxHash, createChannelTxHash: txHash };
     }
@@ -224,12 +231,11 @@ export class NitroliteClient {
     /**
      * Withdraws tokens previously deposited into the custody contract.
      * This does not withdraw funds locked in active channels.
+     * @param tokenAddress The address of the token to withdraw.
      * @param amount The amount of tokens/ETH to withdraw.
      * @returns The transaction hash.
      */
-    async withdrawal(amount: bigint): Promise<Hash> {
-        const tokenAddress = this.addresses.tokenAddress;
-
+    async withdrawal(tokenAddress: Address, amount: bigint): Promise<Hash> {
         try {
             return await this.nitroliteService.withdraw(tokenAddress, amount);
         } catch (err) {
@@ -251,11 +257,12 @@ export class NitroliteClient {
 
     /**
      * Retrieves deposit and lock information for an account regarding a specific token.
+     * @param tokenAddress The address of the token to query.
      * @returns Account info including available, locked amounts and channel count.
      */
-    async getAccountInfo(): Promise<AccountInfo> {
+    async getAccountInfo(tokenAddress: Address): Promise<AccountInfo> {
         try {
-            return await this.nitroliteService.getAccountInfo(this.account.address, this.addresses.tokenAddress);
+            return await this.nitroliteService.getAccountInfo(this.account.address, tokenAddress);
         } catch (err) {
             throw err;
         }
@@ -263,11 +270,12 @@ export class NitroliteClient {
 
     /**
      * Approves the custody contract to spend a specified amount of an ERC20 token.
+     * @param tokenAddress The address of the ERC20 token to approve.
+     * @param amount The amount to approve.
      * @returns The transaction hash.
      */
-    async approveTokens(amount: bigint): Promise<Hash> {
+    async approveTokens(tokenAddress: Address, amount: bigint): Promise<Hash> {
         const spender = this.addresses.custody;
-        const tokenAddress = this.addresses.tokenAddress;
 
         try {
             return await this.erc20Service.approve(tokenAddress, spender, amount);
@@ -285,10 +293,10 @@ export class NitroliteClient {
 
     /**
      * Gets the current allowance granted by an owner to a spender for a specific ERC20 token.
+     * @param tokenAddress The address of the ERC20 token.
      * @returns The allowance amount as a bigint.
      */
-    async getTokenAllowance(): Promise<bigint> {
-        const tokenAddress = this.addresses.tokenAddress;
+    async getTokenAllowance(tokenAddress: Address): Promise<bigint> {
         const targetOwner = this.account.address;
         const targetSpender = this.addresses.custody;
 
@@ -308,10 +316,10 @@ export class NitroliteClient {
 
     /**
      * Gets the balance of a specific ERC20 token for an account.
+     * @param tokenAddress The address of the ERC20 token.
      * @returns The token balance as a bigint.
      */
-    async getTokenBalance(): Promise<bigint> {
-        const tokenAddress = this.addresses.tokenAddress;
+    async getTokenBalance(tokenAddress: Address): Promise<bigint> {
         const targetAccount = this.account.address;
         try {
             return await this.erc20Service.getTokenBalance(tokenAddress, targetAccount);

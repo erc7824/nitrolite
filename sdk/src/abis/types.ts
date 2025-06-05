@@ -10,9 +10,6 @@ export interface ContractAddresses {
     /** Counterparty address for channel */
     guestAddress: Address;
 
-    /** Address of token for channel */
-    tokenAddress: Address;
-
     /** Supported adjudicator addresses by type */
     adjudicator: Address;
 }

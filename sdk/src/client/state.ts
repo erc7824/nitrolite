@@ -60,7 +60,7 @@ export async function _prepareAndSignInitialState(
         nonce: channelNonce,
     };
 
-    const channelId = getChannelId(channel);
+    const channelId = getChannelId(channel, deps.chainId);
 
     const stateToSign: State = {
         data: stateData,

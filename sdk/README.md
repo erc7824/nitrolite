@@ -57,6 +57,7 @@ const client = new NitroliteClient({
         tokenAddress: '0xTokenAddress',
     },
     challengeDuration: 100n,
+    chainId: 1,
 });
 
 // 1. Deposit funds

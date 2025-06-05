@@ -30,6 +30,7 @@ export class NitroliteClient {
     public readonly addresses: ContractAddresses;
     public readonly challengeDuration: bigint;
     public readonly txPreparer: NitroliteTransactionPreparer;
+    public readonly chainId: number;
     private readonly stateWalletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
     private readonly nitroliteService: NitroliteService;
     private readonly erc20Service: Erc20Service;
@@ -48,6 +49,7 @@ export class NitroliteClient {
         if (!config.addresses?.adjudicator) throw new Errors.MissingParameterError('addresses.adjudicator');
         if (!config.addresses?.guestAddress) throw new Errors.MissingParameterError('addresses.guestAddress');
         if (!config.addresses?.tokenAddress) throw new Errors.MissingParameterError('addresses.tokenAddress');
+        if (!config.chainId) throw new Errors.MissingParameterError('chainId');
 
         this.publicClient = config.publicClient;
         this.walletClient = config.walletClient;
@@ -56,6 +58,7 @@ export class NitroliteClient {
         this.account = config.walletClient.account;
         this.addresses = config.addresses;
         this.challengeDuration = config.challengeDuration;
+        this.chainId = config.chainId;
 
         this.nitroliteService = new NitroliteService(
             this.publicClient,
@@ -73,6 +76,7 @@ export class NitroliteClient {
             walletClient: this.walletClient,
             challengeDuration: this.challengeDuration,
             stateWalletClient: this.stateWalletClient,
+            chainId: this.chainId,
         };
 
         this.txPreparer = new NitroliteTransactionPreparer(this.sharedDeps);

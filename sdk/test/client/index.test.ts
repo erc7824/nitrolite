@@ -8,7 +8,6 @@ import { Allocation, Channel, StateIntent } from '../../src/client/types';
 describe('NitroliteClient', () => {
     let client: NitroliteClient;
     const mockPublicClient = {
-        // @ts-ignore
         waitForTransactionReceipt: jest.fn().mockResolvedValue({ status: 'success' }),
     } as any;
     const mockAccount = { address: '0xOWNER' as Address };
@@ -20,6 +19,7 @@ describe('NitroliteClient', () => {
         tokenAddress: '0xTOKEN' as Address,
     };
     const challengeDuration = 3600n;
+    const chainId = 1;
 
     let mockNitroService: any;
     let mockErc20Service: any;
@@ -31,6 +31,7 @@ describe('NitroliteClient', () => {
             walletClient: mockWalletClient,
             addresses: mockAddresses,
             challengeDuration,
+            chainId: chainId,
         });
         mockNitroService = {
             deposit: jest.fn(),
@@ -113,6 +114,7 @@ describe('NitroliteClient', () => {
                 challenge: challengeDuration, // Duration in seconds for challenge period
                 nonce: 1n, // Unique per channel with same participants and adjudicator
             };
+
             const initialState = {
                 data: '0x00' as Hex,
                 intent: StateIntent.INITIALIZE,

@@ -66,6 +66,7 @@ export interface LegacyChannel {
     adjudicator: Address;
     challenge: bigint;
     nonce: bigint;
+    chainId: number; // Legacy field not in contract
 }
 
 export interface LegacyState {
@@ -105,6 +106,9 @@ export interface NitroliteClientConfig {
 
     /** Contract addresses required by the SDK. */
     addresses: ContractAddresses;
+
+    /** Chain ID for the channel */
+    chainId: number;
 
     /** Default challenge duration (in seconds) for new channels. */
     challengeDuration: bigint;

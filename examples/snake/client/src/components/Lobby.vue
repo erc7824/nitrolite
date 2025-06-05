@@ -5,14 +5,12 @@ import clearNetService from '../services/ClearNetService';
 import { Hex } from 'viem';
 
 const props = defineProps<{
-  nickname: string;
+  walletAddress: string;
   roomId: string;
   errorMessage: string;
-  walletAddress: string;
 }>();
 
 const emit = defineEmits([
-  'update:nickname',
   'update:roomId',
   'update:errorMessage',
   'create-room',
@@ -22,7 +20,6 @@ const emit = defineEmits([
 const isCreatingRoom = ref(false);
 const isJoiningRoom = ref(false);
 const channelInfo = ref<Hex | null>(null);
-const activeTab = ref<'create' | 'join'>('create');
 const availableRooms = gameService.getAvailableRooms();
 
 onMounted(async () => {
@@ -49,16 +46,12 @@ watch(gameError, (newError) => {
   }
 });
 
-const updateNickname = (e: Event) => {
-  emit('update:nickname', (e.target as HTMLInputElement).value);
-};
-
 const createRoom = () => {
   if (isCreatingRoom.value) return;
-  
+
   if (channelInfo.value) {
     isCreatingRoom.value = true;
-    gameService.createRoom(props.nickname, channelInfo.value, props.walletAddress);
+    gameService.createRoom(props.walletAddress, channelInfo.value, props.walletAddress);
     emit('create-room');
   } else {
     console.error("No active channel found");
@@ -66,14 +59,9 @@ const createRoom = () => {
   }
 };
 
-
-const setActiveTab = (tab: 'create' | 'join') => {
-  activeTab.value = tab;
-};
-
 const joinRoomFromList = async (room: Room) => {
   if (isJoiningRoom.value) return;
-  
+
   if (!channelInfo.value) {
     emit('update:errorMessage', 'No active channel found');
     return;
@@ -81,7 +69,7 @@ const joinRoomFromList = async (room: Room) => {
 
   isJoiningRoom.value = true;
   try {
-    await gameService.joinRoomById(room.id, props.nickname, channelInfo.value, props.walletAddress);
+    await gameService.joinRoomById(room.id, props.walletAddress, channelInfo.value, props.walletAddress);
     emit('join-room');
   } catch (error) {
     console.error('Error joining room:', error);
@@ -93,7 +81,6 @@ const formatAddress = (address: string): string => {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
-
 </script>
 
 <template>
@@ -103,12 +90,8 @@ const formatAddress = (address: string): string => {
       <div class="wallet-header">
         <div class="wallet-icon">
           <!-- Official MetaMask Logo from Wikipedia -->
-          <img 
-            src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" 
-            alt="MetaMask" 
-            width="28" 
-            height="28"
-          />
+          <img src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg" alt="MetaMask" width="28"
+            height="28" />
         </div>
         <div class="wallet-title">
           <h3>Wallet Connected</h3>
@@ -118,7 +101,7 @@ const formatAddress = (address: string): string => {
           </div>
         </div>
       </div>
-      
+
       <div class="wallet-details">
         <div class="detail-row">
           <div class="detail-label">
@@ -132,7 +115,7 @@ const formatAddress = (address: string): string => {
             {{ formatAddress(props.walletAddress) }}
           </div>
         </div>
-        
+
         <div class="detail-row">
           <div class="detail-label">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -157,101 +140,54 @@ const formatAddress = (address: string): string => {
       </div>
     </div>
 
-    <!-- Game Card with Tabs -->
+    <!-- Game Card -->
     <div class="form-container">
-      <!-- Tab Navigation -->
-      <div class="tab-nav">
-        <button 
-          @click="setActiveTab('create')" 
-          :class="{ active: activeTab === 'create' }"
-          class="tab-button"
-        >
-          Create Room
+      <!-- Create Room Button -->
+      <div class="create-room-section">
+        <button @click="createRoom" class="btn primary" :disabled="isCreatingRoom || !channelInfo">
+          {{ isCreatingRoom ? 'Creating Room...' : 'Create New Room' }}
         </button>
-        <button 
-          @click="setActiveTab('join')" 
-          :class="{ active: activeTab === 'join' }"
-          class="tab-button"
-        >
-          Join Room
-        </button>
+
+        <div class="requirements" v-if="!channelInfo">
+          <div class="requirement">⚠️ Waiting for channel connection...</div>
+        </div>
       </div>
 
-      <!-- Username Input (always visible) -->
-      <div class="form-group">
-        <label for="nickname">Your Nickname:</label>
-        <input 
-          id="nickname" 
-          type="text" 
-          :value="nickname" 
-          @input="updateNickname" 
-          placeholder="Enter your nickname"
-          :disabled="isCreatingRoom || isJoiningRoom" 
-        />
-      </div>
+      <!-- Available Rooms Section -->
+      <div class="rooms-section">
+        <h3>Available Rooms</h3>
+        <div class="rooms-list">
+          <div v-if="availableRooms.length === 0" class="no-rooms">
+            <div class="no-rooms-icon">🎮</div>
+            <p>No available rooms found</p>
+            <p class="no-rooms-subtitle">Create a new room or wait for others to create one</p>
+          </div>
 
-      <!-- Tab Content -->
-      <div class="tab-content">
-        <!-- Create Room Tab -->
-        <div v-if="activeTab === 'create'" class="tab-panel">
-          <button 
-            @click="createRoom" 
-            class="btn primary"
-            :disabled="!nickname || isCreatingRoom || !channelInfo"
-          >
-            {{ isCreatingRoom ? 'Creating Room...' : 'Create New Room' }}
-          </button>
-          
-          <div class="requirements" v-if="!nickname || !channelInfo">
-            <div v-if="!nickname" class="requirement">⚠️ Enter a nickname first</div>
-            <div v-if="!channelInfo" class="requirement">⚠️ Waiting for channel connection...</div>
+          <div v-else class="rooms-container">
+            <div v-for="room in availableRooms" :key="room.id" class="room-item"
+              :class="{ disabled: room.players.length >= room.maxPlayers || room.isGameActive }">
+              <div class="room-info">
+                <div class="room-name">{{ room.name || `Room ${room.id.slice(0, 8)}` }}</div>
+                <div class="room-players">
+                  {{ room.players.length }}/{{ room.maxPlayers }} players
+                </div>
+                <div class="room-status">
+                  <span v-if="room.isGameActive" class="status-badge active">In Game</span>
+                  <span v-else-if="room.players.length >= room.maxPlayers" class="status-badge full">Full</span>
+                  <span v-else class="status-badge waiting">Waiting</span>
+                </div>
+              </div>
+
+              <button @click="joinRoomFromList(room)" class="btn secondary room-join-btn"
+                :disabled="room.players.length >= room.maxPlayers || room.isGameActive || isJoiningRoom || !channelInfo">
+                {{ isJoiningRoom ? 'Joining...' : 'Join' }}
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Join Room Tab -->
-        <div v-if="activeTab === 'join'" class="tab-panel">
-          <div class="rooms-list">
-            <div v-if="availableRooms.length === 0" class="no-rooms">
-              <div class="no-rooms-icon">🎮</div>
-              <p>No available rooms found</p>
-              <p class="no-rooms-subtitle">Create a new room or wait for others to create one</p>
-            </div>
-            
-            <div v-else class="rooms-container">
-              <h3>Available Rooms</h3>
-              <div 
-                v-for="room in availableRooms" 
-                :key="room.id" 
-                class="room-item"
-                :class="{ disabled: room.players.length >= room.maxPlayers || room.isGameActive }"
-              >
-                <div class="room-info">
-                  <div class="room-name">{{ room.name || `Room ${room.id.slice(0, 8)}` }}</div>
-                  <div class="room-players">
-                    {{ room.players.length }}/{{ room.maxPlayers }} players
-                  </div>
-                  <div class="room-status">
-                    <span v-if="room.isGameActive" class="status-badge active">In Game</span>
-                    <span v-else-if="room.players.length >= room.maxPlayers" class="status-badge full">Full</span>
-                    <span v-else class="status-badge waiting">Waiting</span>
-                  </div>
-                </div>
-                
-                <button 
-                  @click="joinRoomFromList(room)"
-                  class="btn secondary room-join-btn"
-                  :disabled="!nickname || room.players.length >= room.maxPlayers || room.isGameActive || isJoiningRoom || !channelInfo"
-                >
-                  {{ isJoiningRoom ? 'Joining...' : 'Join' }}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="requirements" v-if="!nickname || !channelInfo">
-            <div v-if="!nickname" class="requirement">⚠️ Enter a nickname first</div>
-            <div v-if="!channelInfo" class="requirement">⚠️ Waiting for channel connection...</div>
-          </div>
+        <div class="requirements" v-if="!channelInfo">
+          <div class="requirement">⚠️ Waiting for channel connection...</div>
         </div>
       </div>
 
@@ -324,51 +260,21 @@ input::placeholder {
   color: #999;
 }
 
-/* Tab Navigation */
-.tab-nav {
-  display: flex;
-  border-bottom: 2px solid #ddd;
-  margin-bottom: 25px;
-  background: #f5f5f5;
-  border-radius: 4px 4px 0 0;
-  overflow: hidden;
+.create-room-section {
+  margin-bottom: 24px;
+  text-align: center;
 }
 
-.tab-button {
-  flex: 1;
-  padding: 15px 20px;
-  border: none;
-  background: #f5f5f5;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  color: #666;
-  transition: all 0.2s;
-}
-
-.tab-button:hover {
-  background: #e0e0e0;
-  color: #333;
-}
-
-.tab-button.active {
-  background: white;
-  color: #333;
-  font-weight: 600;
-  border-bottom: 2px solid #4CAF50;
-}
-
-.tab-button:not(:last-child) {
-  border-right: 1px solid #ddd;
-}
-
-/* Tab Content */
-.tab-content {
-  margin-top: 10px;
-}
-
-.tab-panel {
+.rooms-section {
   margin-top: 20px;
+}
+
+.rooms-section h3 {
+  color: #333;
+  margin-bottom: 16px;
+    font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 /* Button Styles */

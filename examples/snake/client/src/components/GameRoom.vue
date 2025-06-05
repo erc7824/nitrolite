@@ -5,7 +5,7 @@ import gameService from '../services/GameService';
 const props = defineProps<{
   roomId: string;
   playerId: string;
-  nickname: string;
+  walletAddress: string;
 }>();
 
 const emit = defineEmits(['exit-game']);
@@ -38,6 +38,11 @@ const totalPlayers = ref(0);
 const hasVoted = ref(false);
 const playerDisconnectMessage = ref('');
 const showDisconnectNotification = ref(false);
+
+// Add formatAddress function
+const formatAddress = (address: string): string => {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
 
 // Handle incoming WebSocket messages
 const handleMessage = (event: MessageEvent) => {
@@ -228,13 +233,13 @@ const drawGame = () => {
       });
     }
 
-    // Draw player nickname and score (for all players, even dead ones)
+    // Draw player wallet address and score (for all players, even dead ones)
     const status = player.isDead ? " (DEAD)" : "";
     ctx.value!.fillStyle = player.isDead ? "#999" : color;
     ctx.value!.font = '14px Arial';
     ctx.value!.textAlign = 'left';
     const scoreY = index === 0 ? 20 : 40;
-    ctx.value!.fillText(`${player.nickname}${status}: ${player.score}`, 10, scoreY);
+    ctx.value!.fillText(`${formatAddress(player.nickname)}${status}: ${player.score}`, 10, scoreY);
   });
 };
 

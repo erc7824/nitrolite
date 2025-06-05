@@ -4,10 +4,11 @@ Nitrolite is a lightweight, efficient state channel framework for Ethereum and o
 
 ## Overview
 
-The Nitrolite framework consists of two main components:
+Nitrolite is a complete state channel infrastructure consisting of three main components:
 
 1. **Smart Contracts**: On-chain infrastructure for state channel management
-2. **TypeScript SDK**: Client-side library for building custom state channel applications
+2. **Clearnode**: A broker providing ledger services for the Clearnet protocol
+3. **TypeScript SDK**: Client-side library for building custom state channel applications
 
 ### Key Benefits
 
@@ -22,8 +23,10 @@ The Nitrolite framework consists of two main components:
 This repository contains:
 
 - **[`/contract`](/contract)**: Solidity smart contracts for the state channel framework
+- **[`/clearnode`](/clearnode)**: Message broker implementation for the Clearnet protocol
 - **[`/sdk`](/sdk)**: TypeScript SDK for building applications with Nitrolite
 - **[`/docs`](/docs)**: Protocol specifications and documentation
+- **[`/examples`](/examples)**: Sample applications built with Nitrolite
 
 ## Protocol
 
@@ -48,12 +51,9 @@ The Nitrolite contract system provides:
 
 ### Deployments
 
-- CELO Custody: <https://celoscan.io/address/0xDB33fEC4e2994a675133320867a6439Da4A5acD8>
-- CELO NitroRPC: `0x6C68440eF55deecE7532CDa3b52D379d0Bb19cF5`
-- CELO Dummy: `0xC2BA5c5E2c4848F64187Aa1F3f32a331b0C031b9`
-- Polygon Custody: <https://polygonscan.com/address/0xDB33fEC4e2994a675133320867a6439Da4A5acD8>
-- Polygon NitroRPC: `0x6C68440eF55deecE7532CDa3b52D379d0Bb19cF5`
-- Polygon Dummy: `0xC2BA5c5E2c4848F64187Aa1F3f32a331b0C031b9`
+For the most up-to-date contract addresses on all supported networks, see the [contract deployments directory](/contract/deployments/).
+
+Each network directory contains deployment information with timestamps and contract addresses.
 
 ### Interface Structure
 
@@ -65,6 +65,22 @@ The core interfaces include:
 - **IComparable**: Interface for determining the ordering between states
 
 See the [contract README](/contract/README.md) for detailed contract documentation.
+
+## Clearnode
+
+Clearnode is an implementation of a message broker node providing ledger services for the Clearnet protocol. It enables efficient off-chain payment channels with on-chain settlement capabilities.
+
+### Features
+
+- **Multi-Chain Support**: Connect to multiple EVM blockchains (Polygon, Celo, Base)
+- **Off-Chain Payments**: Efficient payment channels for high-throughput transactions
+- **Virtual Applications**: Create multi-participant applications
+- **Message Forwarding**: Bi-directional message routing between application participants
+- **Flexible Database**: Support for both PostgreSQL and SQLite
+- **Prometheus Metrics**: Built-in monitoring and telemetry
+- **Quorum-Based Signatures**: Support for multi-signature schemes with weight-based quorums
+
+See the [Clearnode Documentation](/clearnode/README.md) for detailed documentation.
 
 ## TypeScript SDK
 
@@ -78,67 +94,34 @@ npm install @erc7824/nitrolite
 
 ### Quick Start
 
-```typescript
-import { NitroliteClient } from '@erc7824/nitrolite';
-import { createPublicClient, createWalletClient, http } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import { mainnet } from 'viem/chains';
+**[Check Quick Start Guide](https://erc7824.org/quick_start)**
 
-// Setup clients
-const publicClient = createPublicClient({
-  chain: mainnet,
-  transport: http('https://eth-mainnet.alchemyapi.io/v2/YOUR_API_KEY')
-});
-
-const account = privateKeyToAccount('0x...');
-const walletClient = createWalletClient({
-  account,
-  chain: mainnet,
-  transport: http('https://eth-mainnet.alchemyapi.io/v2/YOUR_API_KEY')
-});
-
-// Initialize Nitrolite client
-const client = new NitroliteClient({
-  publicClient,
-  walletClient,
-  account,
-  chainId: 1,
-  addresses: {
-    custody: '0xYOUR_CUSTODY_CONTRACT_ADDRESS',
-    adjudicators: {
-      base: '0xYOUR_BASE_ADJUDICATOR_ADDRESS'
-    }
-  }
-});
-
-// Create a channel
-const channel = client.createCustomChannel({
-  // Channel configuration
-});
-
-// Open the channel with initial funding
-await channel.open(
-  '0xTOKEN_ADDRESS',
-  [BigInt(100), BigInt(100)]
-);
-
-// Update state off-chain
-await channel.updateAppState({
-  // Your application state
-});
-
-// Close the channel when done
-await channel.close();
-```
 
 See the [SDK README](/sdk/README.md) for detailed SDK documentation.
 
 ## Examples
 
-Check out the examples in the [`/sdk/examples`](/sdk/examples) directory:
+The repository includes several example applications built with Nitrolite:
 
-- **NextJS TypeScript Example**: A complete frontend application demonstrating the SDK
-- **Nitrolite RPC Example**: Sample code for the WebSocket-based RPC protocol
+### Snake Game
+
+A multiplayer snake game that uses state channels for secure, off-chain gameplay payments:
+
+- **Real-time multiplayer**: WebSocket-based gameplay
+- **State channel integration**: Secure payments and state signing
+- **Fair fund distribution**: Based on game outcome
+
+[Learn more about Snake](/examples/snake)
+
+### Tic Tac Toe
+
+A simple tic-tac-toe game demonstrating the fundamentals of state channels:
+
+- **React frontend**: Simple, clean UI
+- **WebSocket backend**: For game coordination
+- **State channel integration**: For secure payments
+
+[Learn more about Tic Tac Toe](/examples/tictactoe)
 
 ## Key Concepts
 
@@ -194,21 +177,15 @@ docker-compose up -d
 # 1. Start a local Anvil blockchain on port 8545
 # 2. Deploy the Custody, ERC20, and FlagAdjudicator contracts
 # 3. Seed the database with test tokens information
-# 4. Start the Clearnode service on ports 8000 (HTTP) and 4242 (WebSocket)
-```
+# 4. Start the Clearnode service.
 
-To check the status:
-```bash
+# To check the status:
 docker-compose ps
-```
 
-To view logs:
-```bash
+# To view logs:
 docker-compose logs -f clearnode
-```
 
-To stop the environment:
-```bash
+# To stop the environment:
 docker-compose down
 ```
 

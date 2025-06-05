@@ -245,10 +245,6 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 				return fmt.Errorf("DB error fetching asset: %w", err)
 			}
 
-			if asset == nil {
-				return fmt.Errorf("Asset not found in database for token: %s", channel.Token)
-			}
-
 			tokenAmount := decimal.NewFromBigInt(big.NewInt(int64(channel.Amount)), -int32(asset.Decimals))
 
 			ledger := GetWalletLedger(tx, channel.Wallet)
@@ -288,10 +284,6 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			asset, err := GetAssetByToken(tx, channel.Token, c.chainID)
 			if err != nil {
 				return fmt.Errorf("DB error fetching asset: %w", err)
-			}
-
-			if asset == nil {
-				return fmt.Errorf("Asset not found in database for token: %s", channel.Token)
 			}
 
 			finalAllocation := ev.FinalState.Allocations[0].Amount
@@ -356,10 +348,6 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 				asset, err := GetAssetByToken(tx, channel.Token, c.chainID)
 				if err != nil {
 					return fmt.Errorf("DB error fetching asset: %w", err)
-				}
-
-				if asset == nil {
-					return fmt.Errorf("Asset not found in database for token: %s", channel.Token)
 				}
 
 				amount := decimal.NewFromBigInt(resizeAmount, -int32(asset.Decimals))

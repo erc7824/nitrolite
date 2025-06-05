@@ -505,7 +505,7 @@ func (h *UnifiedWSHandler) sendErrorResponse(sender string, rpc *RPCMessage, con
 
 	response := CreateResponse(reqID, "error", []any{map[string]any{
 		"error": errMsg,
-	}}, time.Now())
+	}})
 
 	byteData, _ := json.Marshal(response.Req)
 	signature, _ := h.signer.Sign(byteData)
@@ -538,7 +538,7 @@ func (h *UnifiedWSHandler) sendErrorResponse(sender string, rpc *RPCMessage, con
 
 // sendResponse sends a response with a given method and payload to a recipient
 func (h *UnifiedWSHandler) sendResponse(recipient string, method string, payload []any, updateType string) {
-	response := CreateResponse(uint64(time.Now().UnixMilli()), method, payload, time.Now())
+	response := CreateResponse(uint64(time.Now().UnixMilli()), method, payload)
 
 	byteData, _ := json.Marshal(response.Req)
 	signature, _ := h.signer.Sign(byteData)
@@ -638,7 +638,7 @@ func (h *UnifiedWSHandler) sendAssets(conn *websocket.Conn) {
 	}
 
 	// Create RPC response
-	rpcResponse := CreateResponse(uint64(time.Now().UnixMilli()), "assets", []any{response}, time.Now())
+	rpcResponse := CreateResponse(uint64(time.Now().UnixMilli()), "assets", []any{response})
 
 	sendMessage(conn, h.signer, rpcResponse)
 	log.Printf("Successfully sent welcome message with assets")
@@ -743,7 +743,7 @@ func HandleAuthRequest(signer *Signer, conn *websocket.Conn, rpc *RPCMessage, au
 	}
 
 	// Create RPC response with the challenge
-	response := CreateResponse(rpc.Req.RequestID, "auth_challenge", []any{challengeRes}, time.Now())
+	response := CreateResponse(rpc.Req.RequestID, "auth_challenge", []any{challengeRes})
 
 	// Sign the response with the server's key
 	resBytes, _ := json.Marshal(response.Req)
@@ -788,7 +788,7 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 			"session_key": claims.Policy.Participant,
 			// "jwt_token":   newJwtToken, TODO: add refresh token
 			"success": true,
-		}}, time.Now())
+		}})
 
 		if err = sendMessage(conn, signer, response); err != nil {
 			log.Printf("Error sending auth success: %v", err)
@@ -846,7 +846,7 @@ func HandleAuthVerify(conn *websocket.Conn, rpc *RPCMessage, authManager *AuthMa
 		"session_key": challenge.SessionKey,
 		"jwt_token":   jwtToken,
 		"success":     true,
-	}}, time.Now())
+	}})
 
 	if err = sendMessage(conn, signer, response); err != nil {
 		log.Printf("Error sending auth success: %v", err)

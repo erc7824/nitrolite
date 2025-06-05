@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"gorm.io/gorm"
 )
 
@@ -15,22 +17,13 @@ func (Asset) TableName() string {
 	return "assets"
 }
 
-func GetAssetByToken(db *gorm.DB, tokenAddress string, chainID uint32) (*Asset, error) {
+func GetAssetByToken(db *gorm.DB, tokenAddress string, chainID uint32) (Asset, error) {
 	var asset Asset
 	err := db.Where("token = ? AND chain_id = ?", tokenAddress, chainID).First(&asset).Error
 	if err == gorm.ErrRecordNotFound {
-		return nil, nil
+		return Asset{}, fmt.Errorf("asset not found: %s", tokenAddress)
 	}
-	return &asset, err
-}
-
-func GetAssetBySymbol(db *gorm.DB, symbol string, chainID uint32) (*Asset, error) {
-	var asset Asset
-	err := db.Where("symbol = ? AND chain_id = ?", symbol, chainID).First(&asset).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, nil
-	}
-	return &asset, err
+	return asset, err
 }
 
 // GetAllAssets returns all supported assets. If chainID is provided, it filters assets by that chain ID

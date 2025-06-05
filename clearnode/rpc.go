@@ -1,18 +1,20 @@
+// rpc.go
+
 package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 )
 
 // RPCMessage represents a complete message in the RPC protocol, including data and signatures
 type RPCMessage struct {
-	Req          *RPCData `json:"req,omitempty" validate:"required_without=Res,excluded_with=Res"`
-	Res          *RPCData `json:"res,omitempty" validate:"required_without=Req,excluded_with=Req"`
-	AppSessionID string   `json:"sid,omitempty"` // If specified, message is delivered to the virtual app session participants.
-	Sig          []string `json:"sig"`
+	ReqRaw       json.RawMessage `json:"req,omitempty"`
+	Req          *RPCData        `json:"-"`
+	Res          *RPCData        `json:"res,omitempty"`
+	AppSessionID string          `json:"sid,omitempty"`
+	Sig          []string        `json:"sig"`
 }
 
 // RPCData represents the common structure for both requests and responses
@@ -24,7 +26,7 @@ type RPCData struct {
 	Timestamp uint64
 }
 
-// ParseRPCMessage parses a JSON string into a RPCRequest
+// ParseRPCMessage parses a JSON string into an RPCMessage
 func ParseRPCMessage(data []byte) (*RPCMessage, error) {
 	var req RPCMessage
 	if err := json.Unmarshal(data, &req); err != nil {
@@ -47,48 +49,41 @@ func CreateResponse(id uint64, method string, responseParams []any) *RPCMessage 
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface for RPCMessage
-func (m *RPCData) UnmarshalJSON(data []byte) error {
-	// Parse as raw JSON array first
-	var rawMsg []json.RawMessage
-	if err := json.Unmarshal(data, &rawMsg); err != nil {
-		return err
+func (m *RPCMessage) UnmarshalJSON(data []byte) error {
+	// 1) First unmarshal into a temporary struct that has fields for
+	//    ReqRaw (json.RawMessage), Res, Sig, AppSessionID.
+	var aux struct {
+		ReqRaw       json.RawMessage `json:"req,omitempty"`
+		Res          *RPCData        `json:"res,omitempty"`
+		AppSessionID string          `json:"sid,omitempty"`
+		Sig          []string        `json:"sig"`
 	}
 
-	// Validate array length
-	if len(rawMsg) != 4 {
-		return errors.New("invalid message format: expected 4 elements")
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return fmt.Errorf("failed to unmarshal top‐level RPCMessage: %w", err)
 	}
 
-	// Parse RequestID (uint64)
-	var requestID uint64
-	if err := json.Unmarshal(rawMsg[0], &requestID); err != nil {
-		return fmt.Errorf("invalid rpc message id: %w", err)
-	}
-	m.RequestID = uint64(requestID)
+	// 2) Save the raw bytes for "req"
+	m.ReqRaw = aux.ReqRaw
+	m.Res = aux.Res
+	m.AppSessionID = aux.AppSessionID
+	m.Sig = aux.Sig
 
-	// Parse Method (string)
-	if err := json.Unmarshal(rawMsg[1], &m.Method); err != nil {
-		return fmt.Errorf("invalid method: %w", err)
+	// 3) If there was a "req" array, unmarshal that exact same raw array into RPCData
+	if len(aux.ReqRaw) > 0 {
+		var rpcdata RPCData
+		if err := json.Unmarshal(aux.ReqRaw, &rpcdata); err != nil {
+			return fmt.Errorf("failed to unmarshal RPCData from ReqRaw: %w", err)
+		}
+		m.Req = &rpcdata
 	}
-
-	// Parse Params ([]any)
-	if err := json.Unmarshal(rawMsg[2], &m.Params); err != nil {
-		return fmt.Errorf("invalid params: %w", err)
-	}
-
-	// Parse Timestamp (uint64)
-	var timestamp uint64
-	if err := json.Unmarshal(rawMsg[3], &timestamp); err != nil {
-		return fmt.Errorf("invalid timestamp: %w", err)
-	}
-	m.Timestamp = uint64(timestamp)
 
 	return nil
 }
 
-// MarshalJSON implements the json.Marshaler interface for RPCMessage
+// MarshalJSON implements the json.Marshaler interface for RPCData
 func (m RPCData) MarshalJSON() ([]byte, error) {
-	// Create array representation
+	// Create array representation in the exact order: [RequestID, Method, Params, Timestamp]
 	return json.Marshal([]any{
 		m.RequestID,
 		m.Method,

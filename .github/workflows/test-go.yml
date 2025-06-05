@@ -1,0 +1,35 @@
+name: Test Go Project
+
+on:
+  workflow_call:
+    inputs:
+      project-path:
+        description: 'Path to the Go project directory'
+        required: false
+        type: string
+        default: 'clearnode'
+      project-name:
+        description: 'Human-readable name for the project'
+        required: false
+        type: string
+        default: 'Go Project'
+
+jobs:
+  test:
+    name: Test ${{ inputs.project-name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: '${{ inputs.project-path }}/go.mod'
+          cache: true
+          cache-dependency-path: '${{ inputs.project-path }}/go.sum'
+
+      - name: Test
+        run: go test -v ./...
+        working-directory: ${{ inputs.project-path }}

@@ -1,0 +1,39 @@
+name: Test SDK Project
+
+on:
+  workflow_call:
+    inputs:
+      project-path:
+        description: 'Path to the SDK project directory'
+        required: false
+        type: string
+        default: 'sdk'
+      project-name:
+        description: 'Human-readable name for the project'
+        required: false
+        type: string
+        default: 'SDK'
+
+jobs:
+  test:
+    name: Test ${{ inputs.project-name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '${{ inputs.project-path }}/package.json'
+          cache: 'npm'
+          cache-dependency-path: '${{ inputs.project-path }}/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ inputs.project-path }}
+
+      - name: Run tests
+        run: npm test
+        working-directory: ${{ inputs.project-path }}

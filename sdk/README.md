@@ -6,6 +6,11 @@
 
 A TypeScript SDK for building scalable blockchain applications using ERC-7824. The SDK provides a simple client interface that allows developers to create and manage channels with custom application logic.
 
+## 📚 Documentation
+
+- [Complete Documentation](https://erc7824.org) - Full Documentation
+- [TypeChain Automation](./docs/TYPECHAIN_AUTOMATION.md) - Auto-generated types from contracts
+
 ## Features
 
 - **Instant Finality**: Transactions settle immediately between parties

@@ -220,6 +220,16 @@ onUnmounted(() => {
       </div>
 
       <div v-else>
+        <!-- Signature collection overlay -->
+        <div v-if="gameService.getIsSigningAppSession().value" class="signature-overlay">
+          <div class="signature-container">
+            <div class="signature-spinner"></div>
+            <h3>App Session Creation</h3>
+            <p>{{ gameService.getSignatureStatus().value }}</p>
+            <small>Please check your wallet for signature requests</small>
+          </div>
+        </div>
+
         <Lobby v-if="currentScreen === 'lobby'" v-model:nickname="nickname" v-model:roomId="roomId"
           :socket="gameService.getWebSocket()" :walletAddress="walletAddress"
           :errorMessage="gameService.getErrorMessage().value" @create-room="createRoom" @join-room="joinRoom" />
@@ -313,5 +323,55 @@ h1 {
 
 .retry-btn:hover {
   background-color: #388E3C;
+}
+
+.signature-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.signature-container {
+  background: white;
+  padding: 40px;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 400px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.signature-container h3 {
+  color: #4CAF50;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+}
+
+.signature-container p {
+  color: #333;
+  margin-bottom: 20px;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.signature-container small {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.signature-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
 }
 </style>

@@ -163,7 +163,7 @@ async function authenticateWithBroker(): Promise<void> {
                             chain: polygon,
                             transport: http()
                         });
-                        
+
                         if (!walletClient) {
                             throw new Error('No wallet client available for EIP-712 signing');
                         }
@@ -527,10 +527,10 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
     };
     const params: CreateAppSessionRequest[] = [{
         definition: appDefinition,
-        allocations: participants.map((participant) => ({
+        allocations: participants.map((participant, index) => ({
             participant,
             asset: "usdc",
-            amount: "0",
+            amount: index < 2 ? "0.00001" : "0", // Players get 0.00001, server gets 0
         }))
     }]
     const timestamp = Date.now();
@@ -547,7 +547,7 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
     return appId;
 }
 
-// Closes an application session in the broker
+// Closes an application session in the broker with server signature only
 export async function closeAppSession(appId: Hex, participantA: Hex, participantB: Hex): Promise<void> {
     // Ensure we're authenticated before closing an app session
     if (!isAuthenticated) {
@@ -588,25 +588,19 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
         }
     }
 
-    // Prepare the request
-    const requestId = Date.now();
-    const params: CloseAppSessionRequest[] = [{
-        app_session_id: appId,
-        allocations: [participantA, participantB, signer.address].map((participant) => ({
-            participant,
-            asset: "usdc",
-            amount: "0",
-        })),
-    }];
-    const timestamp = Date.now();
+    // Create close message and sign with server
+    const { createCloseAppSessionMessage } = await import('./appSessionService.ts');
+    const closeRequestData = createCloseAppSessionMessage('', appId, participantA, participantB);
+    const serverSignature = await signer.sign(closeRequestData);
 
-    // Create the request with properly formatted parameters
-    const request: { req: [number, string, CloseAppSessionRequest[], number] } = {
-        req: [requestId, "close_app_session", params, timestamp]
+    // Create the signed request with server signature only
+    const signedRequest = {
+        req: closeRequestData,
+        sig: [serverSignature]
     };
 
-    console.log("[closeAppSession] Sending close request:", request);
-    await sendToBroker(request);
+    console.log("[closeAppSession] Sending close request with server signature:", signedRequest);
+    await sendToBroker(signedRequest);
     console.log(`[closeAppSession] Closed app session ${appId}`);
 }
 

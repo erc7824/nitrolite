@@ -12,6 +12,12 @@ import {
   initializeBroadcastFunction
 } from './gameService.ts';
 import { createAppSession, closeAppSession } from './brokerService.ts';
+import { 
+  generateAppSessionMessage, 
+  addAppSessionSignature, 
+  createAppSessionWithSignatures,
+  createCloseAppSessionMessage
+} from './appSessionService.ts';
 import { Hex } from 'viem';
 
 // Global reference to the WebSocket server
@@ -150,6 +156,16 @@ async function handleWebSocketMessage(ws: SnakeWebSocket, data: any): Promise<vo
       handleUnsubscribeRooms(ws);
       break;
     }
+
+    case 'appSession:signature': {
+      await handleAppSessionSignature(ws, data);
+      break;
+    }
+
+    case 'appSession:startGame': {
+      await handleAppSessionStartGame(ws, data);
+      break;
+    }
   }
 }
 
@@ -274,77 +290,45 @@ async function handleJoinRoom(ws: SnakeWebSocket, data: any): Promise<void> {
   // Notify subscribers about room update
   broadcastRoomUpdate(roomId);
 
-  // If we have 2 players and a channel, create the app session
+  // If we have 2 players and a channel, initiate app session creation with signatures
   if (room.players.size === 2 && room.channelIds.size > 0) {
     try {
       const players = Array.from(room.players.values());
+      const participantA = room.playerAddresses.get(players[0].id) as Hex;
+      const participantB = room.playerAddresses.get(players[1].id) as Hex;
 
-      // Create the app session
-      console.log(`[websocketService] Creating app session for room ${roomId} with players:`, {
-        player1: { id: players[0].id, address: room.playerAddresses.get(players[0].id) },
-        player2: { id: players[1].id, address: room.playerAddresses.get(players[1].id) }
+      console.log(`[websocketService] Initiating app session creation for room ${roomId} with players:`, {
+        player1: { id: players[0].id, address: participantA },
+        player2: { id: players[1].id, address: participantB }
       });
 
-      const createdAppId = await createAppSession(
-        room.playerAddresses.get(players[0].id) as Hex,
-        room.playerAddresses.get(players[1].id) as Hex
-      );
+      // Generate the message structure for signing
+      const { requestToSign, participants } = generateAppSessionMessage(roomId, participantA, participantB);
+      
+      // Start signature collection with guest player (participant B)
+      const guestPlayerId = players[1].id; // Second player to join
+      const guestClient = Array.from(webSocketServer.clients).find(client => {
+        const snakeClient = client as SnakeWebSocket;
+        return snakeClient.playerId === guestPlayerId && snakeClient.roomId === roomId;
+      }) as SnakeWebSocket;
 
-      if (!createdAppId) {
-        throw new Error("Failed to create app session - no app ID returned");
+      if (guestClient && guestClient.readyState === WebSocket.OPEN) {
+        guestClient.send(JSON.stringify({
+          type: 'appSession:signatureRequest',
+          roomId,
+          requestToSign,
+          participantAddress: participantB
+        }));
+        console.log(`[websocketService] Sent signature request to guest player ${guestPlayerId}`);
+      } else {
+        throw new Error("Guest player not found or not connected");
       }
 
-      room.appId = createdAppId as Hex;
-      console.log(`[websocketService] Created app session ${createdAppId} for room ${roomId}`);
-
-      // Start the game
-      room.gameInterval = setInterval(async () => {
-        await gameTick(roomId);
-      }, 150);
-
-      // Initial game state broadcast
-      const gameState = {
-        type: 'gameState',
-        players: Array.from(room.players.values()).map(p => ({
-          id: p.id,
-          nickname: p.nickname,
-          segments: p.segments,
-          score: p.score,
-          isDead: p.isDead || false
-        })),
-        food: room.food,
-        gridSize: room.gridSize,
-        isGameOver: room.isGameOver || false,
-        stateVersion: ++room.stateVersion,
-        timestamp: Date.now()
-      };
-
-      // Store the current state in the room
-      room.currentState = gameState;
-
-      // Broadcast to all players in the room
-      broadcastGameState(roomId, gameState);
     } catch (error: unknown) {
-      console.error(`[websocketService] Error creating app session for room ${roomId}:`, error);
-
-      // Clean up any partial state
-      if (room.appId) {
-        try {
-          console.log(`[websocketService] Cleaning up failed app session ${room.appId}`);
-          const players = Array.from(room.players.values());
-          await closeAppSession(
-            room.appId,
-            room.playerAddresses.get(players[0].id) as Hex,
-            room.playerAddresses.get(players[1].id) as Hex);
-        } catch (closeError) {
-          console.error(`[websocketService] Error cleaning up failed app session:`, closeError);
-        }
-        room.appId = undefined; // Clear the app ID after successful closure
-      }
-
+      console.error(`[websocketService] Error initiating app session for room ${roomId}:`, error);
       ws.send(JSON.stringify({
         type: 'error',
-        message: 'Failed to create app session: ' + (error instanceof Error ? error.message : 'Unknown error')
+        message: 'Failed to initiate app session: ' + (error instanceof Error ? error.message : 'Unknown error')
       }));
     }
   }
@@ -771,4 +755,169 @@ export function broadcastRoomRemoved(roomId: string): void {
       client.send(removeMessage);
     }
   });
+}
+
+// Handle app session signature submission from guest player
+async function handleAppSessionSignature(ws: SnakeWebSocket, data: any): Promise<void> {
+  const { roomId, signature, participantAddress } = data;
+  
+  if (!roomId || !signature || !participantAddress) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'Missing required fields for app session signature'
+    }));
+    return;
+  }
+
+  const room = getRoom(roomId);
+  if (!room) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'Room not found'
+    }));
+    return;
+  }
+
+  try {
+    // Add the signature
+    const success = addAppSessionSignature(roomId, participantAddress as Hex, signature);
+    if (!success) {
+      throw new Error('Failed to add signature');
+    }
+
+    // Send confirmation to guest
+    ws.send(JSON.stringify({
+      type: 'appSession:signatureConfirmed',
+      roomId
+    }));
+
+    console.log(`[handleAppSessionSignature] Guest player ${ws.playerId} submitted signature for room ${roomId}`);
+
+    // Now send signature request to host player (participant A)
+    const players = Array.from(room.players.values());
+    const hostPlayerId = players[0].id; // First player to create room
+    const hostClient = Array.from(webSocketServer.clients).find(client => {
+      const snakeClient = client as SnakeWebSocket;
+      return snakeClient.playerId === hostPlayerId && snakeClient.roomId === roomId;
+    }) as SnakeWebSocket;
+
+    if (hostClient && hostClient.readyState === WebSocket.OPEN) {
+      const participantA = room.playerAddresses.get(players[0].id) as Hex;
+      const participantB = room.playerAddresses.get(players[1].id) as Hex;
+      const { requestToSign } = generateAppSessionMessage(roomId, participantA, participantB);
+      
+      hostClient.send(JSON.stringify({
+        type: 'appSession:startGameRequest',
+        roomId,
+        requestToSign,
+        participantAddress: participantA
+      }));
+      console.log(`[handleAppSessionSignature] Sent start game request to host player ${hostPlayerId}`);
+    } else {
+      throw new Error("Host player not found or not connected");
+    }
+
+  } catch (error) {
+    console.error(`[handleAppSessionSignature] Error handling signature for room ${roomId}:`, error);
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'Failed to process signature: ' + (error instanceof Error ? error.message : 'Unknown error')
+    }));
+  }
+}
+
+// Handle app session start game (host signature submission)
+async function handleAppSessionStartGame(ws: SnakeWebSocket, data: any): Promise<void> {
+  const { roomId, signature, participantAddress } = data;
+  
+  if (!roomId || !signature || !participantAddress) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'Missing required fields for start game'
+    }));
+    return;
+  }
+
+  const room = getRoom(roomId);
+  if (!room) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'Room not found'
+    }));
+    return;
+  }
+
+  try {
+    // Add the host's signature
+    const success = addAppSessionSignature(roomId, participantAddress as Hex, signature);
+    if (!success) {
+      throw new Error('Failed to add host signature');
+    }
+
+    console.log(`[handleAppSessionStartGame] Host player ${ws.playerId} submitted signature for room ${roomId}`);
+
+    // Now create the app session with all signatures
+    const appId = await createAppSessionWithSignatures(roomId);
+    room.appId = appId as Hex;
+
+    console.log(`[handleAppSessionStartGame] Created app session ${appId} for room ${roomId}`);
+
+    // Start the game
+    room.gameInterval = setInterval(async () => {
+      await gameTick(roomId);
+    }, 150);
+
+    // Initial game state broadcast
+    const gameState = {
+      type: 'gameState',
+      players: Array.from(room.players.values()).map(p => ({
+        id: p.id,
+        nickname: p.nickname,
+        segments: p.segments,
+        score: p.score,
+        isDead: p.isDead || false
+      })),
+      food: room.food,
+      gridSize: room.gridSize,
+      isGameOver: room.isGameOver || false,
+      stateVersion: ++room.stateVersion,
+      timestamp: Date.now()
+    };
+
+    // Store the current state in the room
+    room.currentState = gameState;
+
+    // Broadcast to all players in the room
+    broadcastGameState(roomId, gameState);
+
+    // Send success confirmation to host
+    ws.send(JSON.stringify({
+      type: 'appSession:gameStarted',
+      roomId,
+      appId
+    }));
+
+  } catch (error) {
+    console.error(`[handleAppSessionStartGame] Error starting game for room ${roomId}:`, error);
+    
+    // Clean up any partial state
+    if (room.appId) {
+      try {
+        console.log(`[handleAppSessionStartGame] Cleaning up failed app session ${room.appId}`);
+        const players = Array.from(room.players.values());
+        await closeAppSession(
+          room.appId,
+          room.playerAddresses.get(players[0].id) as Hex,
+          room.playerAddresses.get(players[1].id) as Hex);
+        room.appId = undefined;
+      } catch (closeError) {
+        console.error(`[handleAppSessionStartGame] Error cleaning up failed app session:`, closeError);
+      }
+    }
+
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'Failed to start game: ' + (error instanceof Error ? error.message : 'Unknown error')
+    }));
+  }
 }

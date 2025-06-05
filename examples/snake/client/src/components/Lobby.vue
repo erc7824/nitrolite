@@ -3,6 +3,14 @@ import { defineEmits, defineProps, ref, watch, onMounted, onUnmounted } from 'vu
 import gameService, { type Room } from '../services/GameService';
 import clearNetService from '../services/ClearNetService';
 import { Hex } from 'viem';
+import { Web3Provider } from '@ethersproject/providers';
+
+// Add type declaration for window.ethereum
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
 
 const props = defineProps<{
   walletAddress: string;
@@ -21,12 +29,20 @@ const isCreatingRoom = ref(false);
 const isJoiningRoom = ref(false);
 const channelInfo = ref<Hex | null>(null);
 const availableRooms = gameService.getAvailableRooms();
+const networkName = ref<string>('');
 
 onMounted(async () => {
   try {
     channelInfo.value = await clearNetService.getActiveChannel();
     // Subscribe to room updates when component mounts
     await gameService.subscribeToRooms();
+
+    // Get network information
+    if (window.ethereum) {
+      const provider = new Web3Provider(window.ethereum);
+      const network = await provider.getNetwork();
+      networkName.value = network.chainId.toString();
+    }
   } catch (error) {
     console.error('Failed to load active channel:', error);
     emit('update:errorMessage', 'Failed to load active channel');
@@ -113,6 +129,22 @@ const formatAddress = (address: string): string => {
           </div>
           <div class="detail-value wallet-address">
             {{ formatAddress(props.walletAddress) }}
+          </div>
+        </div>
+
+        <div class="detail-row">
+          <div class="detail-label">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+            </svg>
+            Network
+          </div>
+          <div class="detail-value chain-info">
+            <span>{{ networkName }}</span>
+            <div class="status-indicator">
+              <div class="status-dot connected"></div>
+              <span class="status-text">Connected</span>
+            </div>
           </div>
         </div>
 
@@ -446,6 +478,19 @@ input::placeholder {
   border: 1px solid #ddd;
 }
 
+.chain-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chain-info span {
+  font-family: monospace;
+  background: #f0f0f0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
 .channel-connected {
   display: flex;
   align-items: center;

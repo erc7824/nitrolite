@@ -47,6 +47,7 @@ class GameService {
   private maxReconnectAttempts = 3;
   private isConnecting = false;
   private reconnectTimeout: number | null = null;
+  private isCreatingRoom = false; // Add flag to track room creation state
 
   constructor() {
     this.setupMessageHandlers();
@@ -286,6 +287,13 @@ class GameService {
 
   async createRoom(nickname: string, channelId: string, walletAddress: string) {
     try {
+      // Check if room creation is already in progress
+      if (this.isCreatingRoom) {
+        console.log('[GameService] Room creation already in progress, ignoring duplicate request');
+        return;
+      }
+
+      this.isCreatingRoom = true;
       await this.ensureConnected();
 
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -302,6 +310,11 @@ class GameService {
       console.error('Error creating room:', error);
       this.errorMessage.value = 'Failed to create room. Please try again.';
       throw error;
+    } finally {
+      // Reset the flag after a short delay to prevent race conditions
+      setTimeout(() => {
+        this.isCreatingRoom = false;
+      }, 1000);
     }
   }
 

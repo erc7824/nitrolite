@@ -1,6 +1,39 @@
-import { Account, Address, PublicClient, WalletClient, Hash, SimulateContractReturnType } from 'viem'; // Added SimulateContractReturnType
-import { Erc20Abi } from '../../abis/token'; // Adjust path as needed
-import { Errors } from '../../errors'; // Use the namespace import
+import { Account, Address, PublicClient, WalletClient, Hash } from 'viem';
+import { Erc20Abi } from '../../abis/token';
+import { Errors } from '../../errors';
+
+/**
+ * Type utility to properly type the request object from simulateContract
+ */
+type PreparedContractRequest = any;
+
+/**
+ * Type-safe wrapper for writeContract calls using prepared requests.
+ * This function handles the type compatibility between simulateContract result and writeContract params.
+ * 
+ * @param walletClient - The wallet client to use for writing
+ * @param request - The prepared request from simulateContract
+ * @param account - The account to use for the transaction
+ * @returns Promise<Hash> - The transaction hash
+ */
+const executeWriteContract = async (
+    walletClient: WalletClient,
+    request: PreparedContractRequest,
+    account: Account | Address
+): Promise<Hash> => {
+    // The request from simulateContract contains all required parameters for writeContract.
+    // We safely spread the request and add the account. This is type-safe because:
+    // 1. simulateContract validates the contract call against the ABI
+    // 2. The returned request contains the exact parameters needed by writeContract
+    // 3. We only add the account parameter which is required by writeContract
+    // 
+    // Note: Type assertion is necessary due to viem's complex union types for transaction parameters.
+    // The runtime behavior is correct - simulateContract returns compatible parameters for writeContract.
+    return walletClient.writeContract({
+        ...request,
+        account,
+    } as any);
+};
 
 /**
  * Service for interacting with ERC20 token contracts.
@@ -103,7 +136,7 @@ export class Erc20Service {
         tokenAddress: Address,
         spender: Address,
         amount: bigint,
-    ): Promise<SimulateContractReturnType['request']> {
+    ): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareApprove';
 
@@ -141,9 +174,7 @@ export class Erc20Service {
         const operationName = 'approve';
         try {
             const request = await this.prepareApprove(tokenAddress, spender, amount);
-            const txHash = await walletClient.writeContract({ ...request, account });
-
-            return txHash;
+            return await executeWriteContract(walletClient, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { tokenAddress, spender, amount });

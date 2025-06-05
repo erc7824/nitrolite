@@ -8,6 +8,7 @@ import { Allocation, Channel, StateIntent } from '../../src/client/types';
 describe('NitroliteClient', () => {
     let client: NitroliteClient;
     const mockPublicClient = {
+        // @ts-ignore
         waitForTransactionReceipt: jest.fn().mockResolvedValue({ status: 'success' }),
     } as any;
     const mockAccount = { address: '0xOWNER' as Address };
@@ -19,7 +20,6 @@ describe('NitroliteClient', () => {
         tokenAddress: '0xTOKEN' as Address,
     };
     const challengeDuration = 3600n;
-    const chainId = 1;
 
     let mockNitroService: any;
     let mockErc20Service: any;
@@ -31,7 +31,6 @@ describe('NitroliteClient', () => {
             walletClient: mockWalletClient,
             addresses: mockAddresses,
             challengeDuration,
-            chainId: chainId,
         });
         mockNitroService = {
             deposit: jest.fn(),
@@ -110,7 +109,6 @@ describe('NitroliteClient', () => {
         test('success', async () => {
             const channel: Channel = {
                 participants: ['0x0', '0x1'], // List of participants in the channel [Host, Guest]
-                chainId: chainId, // Chain ID of the network
                 adjudicator: mockAddresses.adjudicator, // Address of the contract that validates final states
                 challenge: challengeDuration, // Duration in seconds for challenge period
                 nonce: 1n, // Unique per channel with same participants and adjudicator

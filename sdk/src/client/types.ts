@@ -33,32 +33,47 @@ export interface Allocation {
  * Channel configuration structure
  */
 export interface Channel {
-    participants: [Address, Address]; // List of participants in the channel [Host, Guest]
+    participants: Address[]; // List of participants in the channel
     adjudicator: Address; // Address of the contract that validates final states
-    challenge: bigint; // Duration in seconds for challenge period
-    nonce: bigint; // Unique per channel with same participants and adjudicator
-    chainId: number; // Chain ID for the channel
+    challenge: bigint; // Duration in seconds for challenge period (uint64 in contract)
+    nonce: bigint; // Unique per channel with same participants and adjudicator (uint64 in contract)
 }
 
 /**
- * Channel status enum
+ * Channel status enum - matches the StateIntent enum in the contract
  */
 export enum StateIntent {
-    OPERATE, // Operate the state application
-    INITIALIZE, // Initial funding state
-    RESIZE, // Resize state
-    FINALIZE, // Final closing state
+    OPERATE = 0, // Operate the state application
+    INITIALIZE = 1, // Initial funding state
+    RESIZE = 2, // Resize state
+    FINALIZE = 3, // Final closing state
 }
 
 /**
- * Channel state structure
+ * Channel state structure - matches the contract State struct
  */
 export interface State {
-    intent: StateIntent; // Intent of the state (e.g., INITIAL, ACTIVE, FINAL)
-    version: bigint; // Version of the state, incremented for each update
-    data: Hex; // Application data encoded, decoded by the adjudicator for business logic
-    allocations: [Allocation, Allocation]; // Combined asset allocation and destination for each participant
-    sigs: Signature[]; // stateHash signatures
+    intent: StateIntent; // Intent of the state (uint8 enum in contract)
+    version: bigint; // Version of the state (uint256 in contract)
+    data: Hex; // Application data encoded (bytes in contract)
+    allocations: Allocation[]; // Asset allocation array
+    sigs: Signature[]; // State signatures array
+}
+
+// Legacy types for backward compatibility
+export interface LegacyChannel {
+    participants: [Address, Address]; // Legacy: exactly 2 participants
+    adjudicator: Address;
+    challenge: bigint;
+    nonce: bigint;
+}
+
+export interface LegacyState {
+    intent: StateIntent;
+    version: bigint;
+    data: Hex;
+    allocations: [Allocation, Allocation]; // Legacy: exactly 2 allocations
+    sigs: Signature[];
 }
 
 /**
@@ -90,9 +105,6 @@ export interface NitroliteClientConfig {
 
     /** Contract addresses required by the SDK. */
     addresses: ContractAddresses;
-
-    /** Chain ID for the channel */
-    chainId: number;
 
     /** Default challenge duration (in seconds) for new channels. */
     challengeDuration: bigint;

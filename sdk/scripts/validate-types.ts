@@ -15,7 +15,7 @@ interface ValidationResult {
  * Validates that generated.ts exists and is valid
  */
 async function validateGeneratedFile(): Promise<ValidationResult> {
-    const generatedPath = join(__dirname, '../src/generated.ts');
+    const generatedPath = join(__dirname, '../src/abis/generated.ts');
 
     if (!existsSync(generatedPath)) {
         return {
@@ -91,7 +91,7 @@ async function validateTypeScriptCompilation(): Promise<ValidationResult> {
 async function validateContractSync(): Promise<ValidationResult> {
     try {
         // Check if contract build artifacts are newer than generated types
-        const generatedPath = join(__dirname, '../src/generated.ts');
+        const generatedPath = join(__dirname, '../src/abis/generated.ts');
         const contractOutPath = join(__dirname, '../../contract/out');
 
         if (!existsSync(contractOutPath)) {
@@ -144,10 +144,10 @@ async function validateSDKStructure(): Promise<ValidationResult> {
 
         // Check for essential exports
         const essentialExports = [
-            'export * from "./types"',
-            'export * from "./utils"',
-            'export * from "./client"',
-            'export * from "./abis"',
+            "export * from './types'",
+            "export * from './utils'",
+            "export * from './client'",
+            "export * from './abis'",
         ];
 
         const missingExports = essentialExports.filter((exp) => !content.includes(exp));

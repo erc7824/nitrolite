@@ -34,7 +34,6 @@ describe('_prepareAndSignInitialState', () => {
             },
             addresses: {
                 guestAddress,
-                tokenAddress,
                 adjudicator: adjudicatorAddress,
             },
             challengeDuration,
@@ -46,7 +45,7 @@ describe('_prepareAndSignInitialState', () => {
             initialAllocationAmounts: [10n, 20n],
             stateData: 'customData',
         };
-        const { channel, initialState, channelId } = await _prepareAndSignInitialState(deps, params as any);
+        const { channel, initialState, channelId } = await _prepareAndSignInitialState(tokenAddress, deps, params as any);
 
         // Channel fields
         expect(utils.generateChannelNonce).toHaveBeenCalledWith(deps.account.address);
@@ -83,7 +82,7 @@ describe('_prepareAndSignInitialState', () => {
     test('throws if no adjudicator', async () => {
         deps.addresses.adjudicator = undefined;
         await expect(
-            _prepareAndSignInitialState(deps, {
+            _prepareAndSignInitialState(tokenAddress, deps, {
                 initialAllocationAmounts: [1n, 2n],
                 stateData: '0xdata',
             }),
@@ -92,7 +91,7 @@ describe('_prepareAndSignInitialState', () => {
 
     test('throws if bad allocations length', async () => {
         await expect(
-            _prepareAndSignInitialState(deps, {
+            _prepareAndSignInitialState(tokenAddress, deps, {
                 initialAllocationAmounts: [1n],
                 stateData: 'd',
             } as any),

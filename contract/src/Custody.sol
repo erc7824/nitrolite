@@ -609,3 +609,4 @@ contract Custody is IChannel, IDeposit {
             chMeta.actualDeposits[i].amount = finalAllocations[i].amount;
         }
     }
+}

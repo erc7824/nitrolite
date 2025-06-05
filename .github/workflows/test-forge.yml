@@ -1,0 +1,49 @@
+name: Test Forge Project
+
+on:
+  workflow_call:
+    inputs:
+      project-path:
+        description: 'Path to the Forge project directory'
+        required: false
+        type: string
+        default: 'contract'
+      project-name:
+        description: 'Human-readable name for the project'
+        required: false
+        type: string
+        default: 'Foundry'
+
+jobs:
+  test:
+    name: Test ${{ inputs.project-name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      FOUNDRY_PROFILE: ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Show Forge version
+        run: forge --version
+
+      - name: Run Forge fmt
+        run: forge fmt --check
+        working-directory: ${{ inputs.project-path }}
+        id: fmt
+
+      - name: Run Forge build
+        run: forge build --sizes
+        working-directory: ${{ inputs.project-path }}
+        id: build
+
+      - name: Run Forge tests
+        run: forge test -vvv
+        working-directory: ${{ inputs.project-path }}
+        id: test

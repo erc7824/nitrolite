@@ -7,78 +7,24 @@ on:
 jobs:
   test-clearnode:
     name: Test (Clearnode)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: 'clearnode/go.mod'
-          cache: true
-          cache-dependency-path: 'clearnode/go.sum'
-
-      - name: Test
-        run: go test -v ./...
-        working-directory: clearnode
+    uses: ./.github/workflows/test-go.yml
+    with:
+      project-path: 'clearnode'
+      project-name: 'Clearnode'
 
   test-forge:
     name: Test (Foundry)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      FOUNDRY_PROFILE: ci
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Show Forge version
-        run: forge --version
-
-      - name: Run Forge fmt
-        run: forge fmt --check
-        working-directory: contract
-        id: fmt
-
-      - name: Run Forge build
-        run: forge build --sizes
-        working-directory: contract
-        id: build
-
-      - name: Run Forge tests
-        run: forge test -vvv
-        working-directory: contract
-        id: test
+    uses: ./.github/workflows/test-forge.yml
+    with:
+      project-path: 'contract'
+      project-name: 'Foundry'
 
   test-sdk:
     name: Test (SDK)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: 'sdk/package.json'
-          cache: 'npm'
-          cache-dependency-path: 'sdk/package-lock.json'
-
-      - name: Install dependencies
-        run: npm ci
-        working-directory: sdk
-
-      - name: Run tests
-        run: npm test
-        working-directory: sdk
+    uses: ./.github/workflows/test-sdk.yml
+    with:
+      project-path: 'sdk'
+      project-name: 'SDK'
 
   test-examples:
     name: Test Examples Compilation

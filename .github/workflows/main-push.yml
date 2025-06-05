@@ -26,6 +26,27 @@ jobs:
       project-path: 'sdk'
       project-name: 'SDK'
 
+  test-examples:
+    name: Test Examples Compilation
+    uses: ./.github/workflows/build-node-project.yml
+    strategy:
+      matrix:
+        include:
+          - path: examples/snake/client
+            name: Snake Client
+          - path: examples/snake/server
+            name: Snake Server
+          - path: examples/tictactoe/client
+            name: Tic Tac Toe Client
+          # NOTE: TicTacToe does not require to be compiled,
+          #       still it's present here just to make sure all
+          #       components of example apps are listed.
+          # - path: examples/tictactoe/server
+          #   name: Tic Tac Toe Server
+    with:
+      project-path: ${{ matrix.path }}
+      project-name: ${{ matrix.name }}
+
   auto-tag:
     name: Auto-Tag
     needs: test-clearnode

@@ -609,9 +609,3 @@ contract Custody is IChannel, IDeposit {
             chMeta.actualDeposits[i].amount = finalAllocations[i].amount;
         }
     }
-
-    /// Newly added function to test type chain
-    function getContractInfo() external pure returns (string memory version, uint256 maxParticipants, uint256 minChallengePeriod) {
-        return ("1.0.0", PART_NUM, 60); 
-    }
-}

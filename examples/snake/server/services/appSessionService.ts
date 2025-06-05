@@ -79,12 +79,14 @@ export function addAppSessionSignature(roomId: string, participantAddress: Hex, 
   // Verify the participant is valid for this room
   if (!pending.participants.includes(participantAddress)) {
     console.error(`Participant ${participantAddress} not found in room ${roomId} participants`);
+    console.error(`Available participants: ${pending.participants.join(', ')}`);
     return false;
   }
 
   // Store the signature
   pending.signatures.set(participantAddress, signature);
-  console.log(`Added signature for ${participantAddress} in room ${roomId}. Total signatures: ${pending.signatures.size}/${pending.participants.length}`);
+  console.log(`Added signature for ${participantAddress} in room ${roomId}. Total signatures: ${pending.signatures.size}/${pending.participants.length - 1} (excluding server)`);
+  console.log(`Participants with signatures: ${Array.from(pending.signatures.keys()).join(', ')}`);
 
   return true;
 }
@@ -100,8 +102,14 @@ export async function createAppSessionWithSignatures(roomId: string): Promise<st
 
   // Verify we have signatures from all participants except server
   const participantSignaturesNeeded = pending.participants.slice(0, -1); // Exclude server
+  console.log(`[createAppSessionWithSignatures] Verifying signatures for room ${roomId}`);
+  console.log(`[createAppSessionWithSignatures] Participants needed: ${participantSignaturesNeeded.join(', ')}`);
+  console.log(`[createAppSessionWithSignatures] Signatures collected: ${Array.from(pending.signatures.keys()).join(', ')}`);
+  
   for (const participant of participantSignaturesNeeded) {
     if (!pending.signatures.has(participant)) {
+      console.error(`[createAppSessionWithSignatures] Missing signature from participant ${participant}`);
+      console.error(`[createAppSessionWithSignatures] Available signatures: ${Array.from(pending.signatures.keys()).join(', ')}`);
       throw new Error(`Missing signature from participant ${participant}`);
     }
   }
@@ -112,17 +120,30 @@ export async function createAppSessionWithSignatures(roomId: string): Promise<st
 
   // Combine all signatures in participant order
   const allSignatures: string[] = [];
-  for (const participant of pending.participants) {
+  console.log(`[createAppSessionWithSignatures] Combining signatures in participant order:`);
+  console.log(`[createAppSessionWithSignatures] Participants array: ${pending.participants.join(', ')}`);
+  console.log(`[createAppSessionWithSignatures] Server address: ${signer.address}`);
+  
+  for (let i = 0; i < pending.participants.length; i++) {
+    const participant = pending.participants[i];
+    console.log(`[createAppSessionWithSignatures] Processing participant ${i}: ${participant}`);
+    
     if (participant === signer.address) {
+      console.log(`[createAppSessionWithSignatures] Adding server signature at position ${i}`);
       allSignatures.push(serverSignature);
     } else {
       const sig = pending.signatures.get(participant);
       if (!sig) {
+        console.error(`[createAppSessionWithSignatures] Missing signature from participant ${participant}`);
         throw new Error(`Missing signature from participant ${participant}`);
       }
+      console.log(`[createAppSessionWithSignatures] Adding player signature at position ${i}: ${sig.substring(0, 10)}...`);
       allSignatures.push(sig);
     }
   }
+  
+  console.log(`[createAppSessionWithSignatures] Final signature array length: ${allSignatures.length}`);
+  console.log(`[createAppSessionWithSignatures] Final signature order: ${allSignatures.map((sig, i) => `${i}: ${sig.substring(0, 10)}...`).join(', ')}`);
 
   // Create the final signed request
   const signedRequest = {

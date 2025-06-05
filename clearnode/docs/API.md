@@ -33,17 +33,17 @@ Initiates authentication with the server.
 {
   "req": [1, "auth_request", [{
     "address": "0x1234567890abcdef...",
-    "session_key": "0x9876543210fedcba...", // Optional: If specified, enables delegation to this key
-    "app_name": "Example App", // Optional: Application name for analytics
-    "allowances": [ // Optional: Asset allowances for the session
-      {
-        "asset": "usdc", 
-        "amount": "100.0"
-      }
+    "session_key": "0x9876543210fedcba...", // If specified, enables delegation to this key
+    "app_name": "Example App", // Application name for analytics
+    "allowances": [ // Asset allowances for the session
+      [
+        "usdc", 
+        "100.0"
+      ]
     ],
-    "scope": "app.create", // Optional: Permission scope (e.g., "app.create", "ledger.readonly")
-    "expire": "24h", // Optional: Session expiration (e.g., "1h", "24h", "7d")
-    "application": "0xApplication1234..." // Optional: Application public address
+    "scope": "app.create", // Permission scope (e.g., "app.create", "ledger.readonly")
+    "expire": "3600", //  Session expiration
+    "application": "0xApp1234567890abcdef..." // Application public address
   }], 1619123456789],
   "sig": ["0x5432abcdef..."] // Client's signature of the entire 'req' object
 }
@@ -73,10 +73,9 @@ Completes authentication with a challenge response.
 ```json
 {
   "req": [2, "auth_verify", [{
-    "address": "0x1234567890abcdef...",
     "challenge": "550e8400-e29b-41d4-a716-446655440000"
   }], 1619123456789],
-  "sig": ["0x2345bcdef..."] // Client's signature of the entire 'req' object
+  "sig": ["0x2345bcdef..."] // Client's EIP-712 signatures of the challenge data object
 }
 ```
 

@@ -82,30 +82,24 @@ jobs:
 
   test-examples:
     name: Test Examples Compilation
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    uses: ./.github/workflows/build-node-project.yml
     strategy:
       matrix:
-        example: [snake, tictactoe]
-        component: [client, server]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: 'examples/${{ matrix.example }}/${{ matrix.component }}/package.json'
-          cache: 'npm'
-          cache-dependency-path: 'examples/${{ matrix.example }}/${{ matrix.component }}/package-lock.json'
-
-      - name: Install dependencies
-        run: npm ci
-        working-directory: examples/${{ matrix.example }}/${{ matrix.component }}
-
-      - name: Build
-        run: npm run build
-        working-directory: examples/${{ matrix.example }}/${{ matrix.component }}
+        include:
+          - path: examples/snake/client
+            name: Snake Client
+          - path: examples/snake/server
+            name: Snake Server
+          - path: examples/tictactoe/client
+            name: Tic Tac Toe Client
+          # NOTE: TicTacToe does not require to be compiled,
+          #       still it's present here just to make sure all
+          #       components of example apps are listed.
+          # - path: examples/tictactoe/server
+          #   name: Tic Tac Toe Server
+    with:
+      project-path: ${{ matrix.path }}
+      project-name: ${{ matrix.name }}
 
   build-and-publish-clearnode:
     name: Build and Publish (Clearnode)

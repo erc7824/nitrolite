@@ -143,8 +143,13 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 				wsResponseData, _ := json.Marshal(rpcResponse)
 
 				if err := h.writeWSResponse(conn, wsResponseData); err != nil {
+					// Track RPC request failure by method
+					h.metrics.RPCRequests.WithLabelValues(rpcMsg.Req.Method, "failure").Inc()
 					continue
 				}
+
+				// Track RPC request success by method
+				h.metrics.RPCRequests.WithLabelValues(rpcMsg.Req.Method, "success").Inc()
 			}
 			continue
 
@@ -286,8 +291,6 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		var handlerErr error
 		var recordHistory = false
 
-		// Track RPC request by method
-		h.metrics.RPCRequests.WithLabelValues(msg.Req.Method).Inc()
 		if policy == nil {
 			h.sendErrorResponse(walletAddress, &msg, conn, "Policy not found for the user")
 			continue
@@ -425,6 +428,10 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 // forwardMessage forwards an RPC message to all recipients in a virtual app
 func forwardMessage(rpc *RPCMessage, msg []byte, fromAddress string, h *UnifiedWSHandler) error {
+	// Track RPC request by method
+	requestHandleStatus := "failure"
+	defer h.metrics.RPCRequests.WithLabelValues(rpc.Req.Method, requestHandleStatus).Inc()
+
 	var data *RPCData
 	if rpc.Req != nil {
 		data = rpc.Req
@@ -478,25 +485,31 @@ func forwardMessage(rpc *RPCMessage, msg []byte, fromAddress string, h *UnifiedW
 		}
 	}
 
+	requestHandleStatus = "success"
 	return nil
 }
 
 // sendErrorResponse creates and sends an error response to the client
 func (h *UnifiedWSHandler) sendErrorResponse(sender string, rpc *RPCMessage, conn *websocket.Conn, errMsg string) {
+	reqMethod := "unknown"
 	reqID := uint64(time.Now().UnixMilli())
 	if rpc != nil && rpc.Req != nil {
 		reqID = rpc.Req.RequestID
 		var messageBody string
-		if rpc != nil {
-			messageBodyBytes, err := json.Marshal(rpc)
-			if err != nil {
-				messageBody = "could not marshal rpc message"
-			} else {
-				messageBody = string(messageBodyBytes)
-			}
+		messageBodyBytes, err := json.Marshal(rpc)
+		if err != nil {
+			messageBody = "could not marshal rpc message"
+		} else {
+			messageBody = string(messageBodyBytes)
 		}
+
 		log.Printf("error: %s, wallet: %s, method: %s, request: %s", errMsg, sender, rpc.Req.Method, messageBody)
+		reqMethod = rpc.Req.Method
 	}
+
+	// Track RPC request by method
+	requestHandleStatus := "failure"
+	defer h.metrics.RPCRequests.WithLabelValues(reqMethod, requestHandleStatus).Inc()
 
 	response := CreateResponse(reqID, "error", []any{map[string]any{
 		"error": errMsg,
@@ -533,6 +546,10 @@ func (h *UnifiedWSHandler) sendErrorResponse(sender string, rpc *RPCMessage, con
 
 // sendResponse sends a response with a given method and payload to a recipient
 func (h *UnifiedWSHandler) sendResponse(recipient string, method string, payload []any, updateType string) {
+	// Track RPC request by method
+	requestHandleStatus := "failure"
+	defer h.metrics.RPCRequests.WithLabelValues(method, requestHandleStatus).Inc()
+
 	response := CreateResponse(uint64(time.Now().UnixMilli()), method, payload)
 
 	byteData, _ := json.Marshal(response.Req)
@@ -558,8 +575,9 @@ func (h *UnifiedWSHandler) sendResponse(recipient string, method string, payload
 		log.Printf("Successfully sent %s update to %s", updateType, recipient)
 	} else {
 		log.Printf("Recipient %s not connected", recipient)
-		return
 	}
+
+	requestHandleStatus = "success"
 }
 
 // sendBalanceUpdate sends balance updates to the client

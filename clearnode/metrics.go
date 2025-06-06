@@ -99,7 +99,7 @@ func NewMetrics() *Metrics {
 				Name: "clearnet_rpc_requests_total",
 				Help: "The total number of RPC requests by method",
 			},
-			[]string{"method"},
+			[]string{"method", "status"},
 		),
 		BrokerBalanceAvailable: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{

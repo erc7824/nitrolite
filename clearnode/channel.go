@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"gorm.io/gorm"
@@ -62,7 +61,6 @@ func CreateChannel(tx *gorm.DB, channelID, wallet, participantSigner string, non
 		return Channel{}, fmt.Errorf("failed to create channel: %w", err)
 	}
 
-	log.Printf("Created new channel with ID: %s, chainID: %d", channelID, chainID)
 	return channel, nil
 }
 

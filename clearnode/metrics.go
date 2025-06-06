@@ -127,7 +127,8 @@ func NewMetrics() *Metrics {
 	return metrics
 }
 
-func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[string]*Custody) {
+func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[string]*Custody, logger Logger) {
+	logger = logger.NewSystem("metrics")
 	dbTicker := time.NewTicker(15 * time.Second)
 	defer dbTicker.Stop()
 
@@ -139,12 +140,14 @@ func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[stri
 			m.UpdateChannelMetrics(db)
 			m.UpdateAppSessionMetrics(db)
 		case <-balanceTicker.C:
+			ctx := context.Background()
+			ctx = SetContextLogger(ctx, logger)
+
 			// Update metrics for each custody client
 			for _, client := range custodyClients {
-
 				assets, err := GetAllAssets(db, &client.chainID)
 				if err != nil {
-					logger.Errorw("failed to retreive assets", "err", err)
+					logger.Error("failed to retrieve assets", "err", err)
 					continue
 				}
 
@@ -160,7 +163,7 @@ func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[stri
 				}
 				assets = append(assets, baseAsset)
 
-				client.UpdateBalanceMetrics(context.Background(), assets, m)
+				client.UpdateBalanceMetrics(ctx, assets, m)
 			}
 		}
 	}

@@ -3,6 +3,7 @@ import type { Ref } from 'vue';
 import clearNetService from './ClearNetService';
 import { GAMESERVER_WS_URL } from '../config';
 import { Account, ParseAccount, Chain, Transport, WalletClient } from 'viem';
+import { createEthersSigner } from '../crypto';
 
 export interface GameState {
   type: string;
@@ -469,13 +470,7 @@ class GameService {
       this.isSigningAppSession.value = true;
       this.signatureStatus.value = 'Please sign the app session creation request...';
 
-      const signer = clearNetService.stateWalletClient;
-      if (!signer) {
-        throw new Error('No state wallet client available for signing');
-      }
-
-      const signature = await this.signAppSessionRequest(requestToSign, signer);
-
+      const signature = await this.signAppSessionRequest(requestToSign);
       this.signatureStatus.value = 'Signature submitted, processing...';
 
       if (this.ws?.readyState === WebSocket.OPEN) {
@@ -505,13 +500,7 @@ class GameService {
       this.isSigningAppSession.value = true;
       this.signatureStatus.value = 'Please sign to start the game...';
 
-      const signer = clearNetService.stateWalletClient;
-      if (!signer) {
-        throw new Error('No state wallet client available for signing');
-      }
-
-      const signature = await this.signAppSessionRequest(requestToSign, signer);
-
+      const signature = await this.signAppSessionRequest(requestToSign);
       this.signatureStatus.value = 'Starting game...';
 
       if (this.ws?.readyState === WebSocket.OPEN) {
@@ -531,16 +520,14 @@ class GameService {
     }
   }
 
-  private async signAppSessionRequest(
-    requestToSign: any,
-    signer: WalletClient<Transport, Chain, ParseAccount<Account>>,
-  ): Promise<string> {
+  private async signAppSessionRequest(requestToSign: any): Promise<string> {
     try {
       const messageString = JSON.stringify(requestToSign);
       console.log('[GameService] Signing request:', messageString);
-      const signature = await signer.signMessage({ message: messageString });
+      const keyPair = await clearNetService.getOrCreateKeyPair();
+      const signer = createEthersSigner(keyPair.privateKey);
       console.log('[GameService] Successfully signed with session key');
-      return signature;
+      return signer.sign(requestToSign);
     } catch (error) {
       console.error('[GameService] Error signing app session request:', error);
       throw error;

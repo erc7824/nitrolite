@@ -1,13 +1,10 @@
 import {
     createGetLedgerBalancesMessage,
     createPingMessage,
-    MessageSigner,
-    RequestData,
-    ResponsePayload,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, CHAIN_ID } from "../config";
 import { createEthersSigner, generateKeyPair } from "../crypto";
-import type { Account, Transport, Chain, Hex, ParseAccount, WalletClient, SignableMessage } from "viem";
+import type { Account, Transport, Chain, Hex, ParseAccount, WalletClient } from "viem";
 import { authenticate } from "./authentication";
 
 class ClearNetService {
@@ -170,10 +167,11 @@ class ClearNetService {
         }, delay) as unknown as number;
     }
 
-    private async getOrCreateKeyPair() {
-        let keyPair = null;
-        const savedKeys = localStorage.getItem("crypto_keypair");
+    async getOrCreateKeyPair() {
+        const KEY_PAIR_KEY = "crypto_keypair";
+        const savedKeys = localStorage.getItem(KEY_PAIR_KEY);
 
+        let keyPair = null;
         if (savedKeys) {
             try {
                 keyPair = JSON.parse(savedKeys);
@@ -181,11 +179,10 @@ class ClearNetService {
                 keyPair = null;
             }
         }
-
         if (!keyPair) {
             keyPair = await generateKeyPair();
             if (typeof window !== "undefined") {
-                localStorage.setItem("crypto_keypair", JSON.stringify(keyPair));
+                localStorage.setItem(KEY_PAIR_KEY, JSON.stringify(keyPair));
             }
         }
 
@@ -218,6 +215,7 @@ class ClearNetService {
                 console.log("Authentication successful, sending get_balances");
 
                 // Send get_balances message after successful authentication
+                // TODO: channel ID should not be stored in local storage
                 const nitroChannelId = localStorage.getItem("nitro_channel_id");
                 if (nitroChannelId && this.wsConnection) {
                     const getBalancesMsg = await createGetLedgerBalancesMessage(

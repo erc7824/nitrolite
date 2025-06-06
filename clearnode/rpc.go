@@ -46,7 +46,7 @@ func (r RPCMessage) GetRequestSignersArray() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	signers := make([]string, len(signersMap))
+	signers := make([]string, 0)
 	for signer, _ := range signersMap {
 		signers = append(signers, signer)
 	}

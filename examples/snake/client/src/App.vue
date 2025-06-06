@@ -8,6 +8,7 @@ import { createWalletClient, custom, Hex } from 'viem';
 import { polygon } from 'viem/chains';
 import { CryptoKeypair, generateKeyPair } from './crypto';
 import { privateKeyToAccount } from 'viem/accounts';
+import { ethers } from "ethers";
 
 const nickname = ref('');
 const roomId = ref('');

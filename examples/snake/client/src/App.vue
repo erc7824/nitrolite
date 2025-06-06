@@ -145,28 +145,17 @@ const autoConnect = async () => {
     });
 
     // Get or create session key
-    let keyPair: CryptoKeypair | null = null;
-    const savedKeys = localStorage.getItem('crypto_keypair');
+    let keyPair: CryptoKeypair = await clearNetService.getOrCreateKeyPair();
+    const wallet = new ethers.Wallet(keyPair.privateKey);
+    const stateWalletClient = {
+      ...wallet,
+      account: { address: wallet.address, },
+      signMessage: async ({ message: { raw } }: { message: { raw: string } }) => {
+        const { serialized: signature } = wallet.signingKey.sign(raw as ethers.BytesLike);
 
-    if (savedKeys) {
-      try {
-        keyPair = JSON.parse(savedKeys);
-      } catch (error) {
-        console.error('[App] Failed to parse saved keypair, generating new one');
-        keyPair = null;
-      }
-    }
-
-    if (!keyPair) {
-      keyPair = await generateKeyPair();
-      localStorage.setItem('crypto_keypair', JSON.stringify(keyPair));
-    }
-
-    const stateWalletClient = createWalletClient({
-      account: privateKeyToAccount(keyPair.privateKey),
-      chain: polygon,
-      transport: custom(ethereum)
-    });
+        return signature as Hex;
+      },
+    };
 
     console.log('[App] Initializing ClearNetService...');
     // @ts-ignore

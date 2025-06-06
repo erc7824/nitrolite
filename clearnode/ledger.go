@@ -116,3 +116,26 @@ func (l *WalletLedger) GetEntries(accountID, assetSymbol string) ([]Entry, error
 	}
 	return entries, nil
 }
+
+func getAppSessionBalances(tx *gorm.DB, appSessionID string) (map[string]decimal.Decimal, error) {
+	type row struct {
+		Asset   string          `gorm:"column:asset_symbol"`
+		Balance decimal.Decimal `gorm:"column:balance"`
+	}
+
+	var rows []row
+	if err := tx.
+		Model(&Entry{}).
+		Where("account_id = ?", appSessionID).
+		Select("asset_symbol", "COALESCE(SUM(credit),0) - COALESCE(SUM(debit),0) AS balance").
+		Group("asset_symbol").
+		Scan(&rows).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch balances for account %s: %w", appSessionID, err)
+	}
+
+	result := make(map[string]decimal.Decimal, len(rows))
+	for _, r := range rows {
+		result[r.Asset] = r.Balance
+	}
+	return result, nil
+}

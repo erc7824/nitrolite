@@ -38,22 +38,6 @@ func (r RPCMessage) GetRequestSignersMap() (map[string]struct{}, error) {
 	return recoveredAddresses, nil
 }
 
-// GetRequestSignersArray returns array of RPCMessage signers
-// We first call GetRequestSignersMap in order to make sure, that user
-// did not submit several copies of the same signature to reach desired quorum
-func (r RPCMessage) GetRequestSignersArray() ([]string, error) {
-	signersMap, err := r.GetRequestSignersMap()
-	if err != nil {
-		return nil, err
-	}
-	signers := make([]string, 0)
-	for signer, _ := range signersMap {
-		signers = append(signers, signer)
-	}
-
-	return signers, nil
-}
-
 // RPCData represents the common structure for both requests and responses
 // Format: [request_id, method, params, ts]
 type RPCData struct {

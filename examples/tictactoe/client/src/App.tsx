@@ -10,6 +10,8 @@ import "./App.css";
 import { useWebSocketNitrolite } from "./hooks/useWebSocketNitrolite";
 import { useNitroliteIntegration } from "./hooks/useNitroliteIntegration";
 import { useNitrolite } from "./context/NitroliteClientWrapper";
+import { WalletButton } from "@rainbow-me/rainbowkit";
+import "@rainbow-me/rainbowkit/styles.css";
 
 function App() {
     // Player's Ethereum address - now managed by useMetaMask hook in Lobby
@@ -19,15 +21,15 @@ function App() {
     const [gameView, setGameView] = useState<"lobby" | "game">("lobby");
 
     // WebSocket connection
-    const { 
-        error: wsError, 
-        lastMessage, 
-        joinRoom, 
-        makeMove, 
-        startGame, 
+    const {
+        error: wsError,
+        lastMessage,
+        joinRoom,
+        makeMove,
+        startGame,
         getAvailableRooms,
         sendAppSessionSignature,
-        sendAppSessionStartGame
+        sendAppSessionStartGame,
     } = useWebSocket();
     useWebSocketNitrolite();
     const { client, loading: nitroliteLoading, error: nitroliteError } = useNitrolite();
@@ -68,7 +70,7 @@ function App() {
         awaitingHostStart,
         signAndStartGame,
         isSigningInProgress,
-        signatureError
+        signatureError,
     } = useGameState(lastMessage, eoaAddress, sendAppSessionSignature, sendAppSessionStartGame);
 
     // Handle errors
@@ -81,7 +83,7 @@ function App() {
 
         if (combinedError) {
             console.log("Error detected:", combinedError);
-            
+
             // Don't show error modal for MetaMask connection message
             if (combinedError === "MetaMask not connected. Please connect your wallet.") {
                 setShowError(false);
@@ -208,10 +210,12 @@ function App() {
 
             {/* Main Content */}
             <div className="max-w-xl w-full relative z-10">
+                <WalletButton wallet="cmbevh1e30022l80nhp974z8m" />
+
                 {gameView === "lobby" ? (
-                    <GameLobbyIntegrated 
-                        onJoinRoom={handleJoinRoom} 
-                        availableRooms={availableRooms} 
+                    <GameLobbyIntegrated
+                        onJoinRoom={handleJoinRoom}
+                        availableRooms={availableRooms}
                         onGetAvailableRooms={handleGetAvailableRooms}
                         onlineUsers={onlineUsers}
                     />

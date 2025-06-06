@@ -13,6 +13,7 @@ import {
     createGetLedgerBalancesMessage,
     CreateAppSessionRequest,
     createCloseAppSessionMessage,
+    CloseAppSessionRequest,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
@@ -600,8 +601,19 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
     }
 
     // Create close message and sign with server
-    const closeRequestData = await createCloseAppSessionMessage(signer, '', appId, participantA, participantB);
-    const serverSignature = await signer.sign(closeRequestData);
+    const params: CloseAppSessionRequest[] = [
+        {
+            app_session_id: appId,
+            allocations: [participantA, participantB, signer.address].map((participant, index) => ({
+                participant,
+                asset: "usdc",
+                amount: index < 2 ? "0.00001" : "0", // Players get 0.00001, server gets 0
+            }))
+        }
+    ]
+    const closeRequestData = await createCloseAppSessionMessage(signer.sign, params);
+    const req = JSON.parse(closeRequestData);
+    const serverSignature = await signer.sign(req);
 
     // Create the signed request with server signature only
     const signedRequest = {

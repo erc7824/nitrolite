@@ -6,8 +6,7 @@ import clearNetService from './services/ClearNetService';
 import gameService from './services/GameService';
 import { createWalletClient, custom, Hex } from 'viem';
 import { polygon } from 'viem/chains';
-import { CryptoKeypair, generateKeyPair } from './crypto';
-import { privateKeyToAccount } from 'viem/accounts';
+import { CryptoKeypair } from './crypto';
 import { ethers } from "ethers";
 
 const nickname = ref('');
@@ -224,7 +223,7 @@ onUnmounted(() => {
           :socket="gameService.getWebSocket()" :walletAddress="walletAddress"
           :errorMessage="gameService.getErrorMessage().value" @create-room="createRoom" @join-room="joinRoom" />
 
-        <GameRoom v-else-if="currentScreen === 'game'" :roomId="gameService.getRoomId().value"
+        <GameRoom v-else-if="currentScreen === 'game'" :roomId="gameService.getRoomId().value" :walletAddress="walletAddress"
           :playerId="gameService.getPlayerId().value" :nickname="nickname" :socket="gameService.getWebSocket()"
           @exit-game="currentScreen = 'lobby'" />
       </div>

@@ -1,6 +1,6 @@
 {
     "name": "@erc7824/nitrolite",
-    "version": "0.2.9",
+    "version": "0.2.10",
     "description": "The Nitrolite SDK empowers developers to build high-performance, scalable web3 applications using state channels. It's designed to provide near-instant transactions and significantly improved user experiences by minimizing direct blockchain interactions.",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
@@ -9,8 +9,8 @@
         "README.md"
     ],
     "scripts": {
-        "build": "npm run codegen && tsc",
-        "build:prod": "npm run codegen && npm run validate && tsc -p tsconfig.prod.json",
+        "build": "npm run codegen && npm run test && tsc",
+        "build:prod": "npm run codegen && npm run test && npm run validate && tsc -p tsconfig.prod.json",
         "build:full": "npm run validate && npm run build",
         "codegen": "ts-node scripts/generate-abi.ts",
         "docs": "ts-node scripts/generate-docs.ts",

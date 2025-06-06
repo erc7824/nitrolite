@@ -9,7 +9,6 @@ import { polygon } from 'viem/chains';
 import { CryptoKeypair } from './crypto';
 import { ethers } from "ethers";
 
-const nickname = ref('');
 const roomId = ref('');
 const currentScreen = ref('lobby'); // 'lobby' or 'game'
 const errorMessage = ref('');
@@ -18,10 +17,6 @@ const walletAddress = ref('');
 
 // Create a new game room
 const createRoom = async () => {
-  if (!nickname.value.trim()) {
-    errorMessage.value = 'Please enter a nickname';
-    return;
-  }
   if (!clearNetService) {
     errorMessage.value = 'ClearNet service not initialized';
     return;
@@ -37,7 +32,7 @@ const createRoom = async () => {
   try {
     const walletAddress = clearNetService.walletClient?.account.address as Hex;
     await gameService.createRoom(
-      nickname.value.trim(),
+      walletAddress,
       activeChannelId,
       walletAddress
     );
@@ -49,11 +44,6 @@ const createRoom = async () => {
 
 // Join an existing game room
 const joinRoom = async () => {
-  if (!nickname.value.trim()) {
-    errorMessage.value = 'Please enter a nickname';
-    return;
-  }
-
   if (!roomId.value.trim()) {
     errorMessage.value = 'Please enter a room ID';
     return;
@@ -74,7 +64,7 @@ const joinRoom = async () => {
     const walletAddress = clearNetService.walletClient?.account.address as Hex;
     await gameService.joinRoom(
       roomId.value.trim(),
-      nickname.value.trim(),
+      walletAddress,
       activeChannelId,
       walletAddress
     );
@@ -219,13 +209,13 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <Lobby v-if="currentScreen === 'lobby'" v-model:nickname="nickname" v-model:roomId="roomId"
-          :socket="gameService.getWebSocket()" :walletAddress="walletAddress"
-          :errorMessage="gameService.getErrorMessage().value" @create-room="createRoom" @join-room="joinRoom" />
+        <Lobby v-if="currentScreen === 'lobby'" v-model:roomId="roomId" :socket="gameService.getWebSocket()"
+          :walletAddress="walletAddress" :errorMessage="gameService.getErrorMessage().value" @create-room="createRoom"
+          @join-room="joinRoom" />
 
-        <GameRoom v-else-if="currentScreen === 'game'" :roomId="gameService.getRoomId().value" :walletAddress="walletAddress"
-          :playerId="gameService.getPlayerId().value" :nickname="nickname" :socket="gameService.getWebSocket()"
-          @exit-game="currentScreen = 'lobby'" />
+        <GameRoom v-else-if="currentScreen === 'game'" :roomId="gameService.getRoomId().value"
+          :walletAddress="walletAddress" :playerId="gameService.getPlayerId().value"
+          :socket="gameService.getWebSocket()" @exit-game="currentScreen = 'lobby'" />
       </div>
     </main>
   </div>

@@ -17,6 +17,7 @@
 | `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
 | `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
 | `create_app_session` | Creates a new virtual application on a ledger | Private |
+| `submit_state` | Submits an intermediate state into a virtual application | Private |
 | `close_app_session` | Closes a virtual application | Private |
 | `close_channel` | Closes a payment channel | Private |
 | `resize_channel` | Adjusts channel capacity | Private |
@@ -444,6 +445,44 @@ Creates a virtual application between participants.
   "res": [1, "create_app_session", [{
     "app_session_id": "0x3456789012abcdef...",
     "status": "open"
+  }], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+### Submit State
+
+Submits an intermediate state into a virtual application and redistributes funds in an app session.
+
+**Request:**
+
+```json
+{
+  "req": [1, "submit_state", [{
+    "app_session_id": "0x3456789012abcdef...",
+    "allocations": [
+      {
+        "participant": "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
+        "asset": "usdc",
+        "amount": "0.0"
+      },
+      {
+        "participant": "0x00112233445566778899AaBbCcDdEeFf00112233",
+        "asset": "usdc",
+        "amount": "200.0"
+      }
+    ]
+  }], 1619123456789],
+  "sig": ["0x9876fedcba...", "0x8765fedcba..."]
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "submit_state", [{
+    "app_session_id": "0x3456789012abcdef...",
+    "status": "success"
   }], 1619123456789],
   "sig": ["0xabcd1234..."]
 }

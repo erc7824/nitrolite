@@ -294,25 +294,15 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 		return nil, errors.New("nonce is zero or not provided")
 	}
 
-	rpcSigners, err := rpc.GetRequestSigners()
+	rpcSigners, err := rpc.GetRequestSignersMap()
 	if err != nil {
-		fmt.Printf("Error recovering rpc signers: %v\n", err)
-	} else {
-		fmt.Printf("Recovered rpcSigners: %+v\n", rpcSigners)
+		return nil, err
 	}
 
-	recoveredAddresses := map[string]bool{}
-	for _, sig := range rpc.Sig {
-		addr, err := RecoverAddress(rpc.Req.rawBytes, sig)
-		if err != nil {
-			return nil, errors.New("invalid signature")
-		}
-
+	for addr := range rpcSigners {
 		walletAddress := GetWalletBySigner(addr)
 		if walletAddress != "" {
-			recoveredAddresses[walletAddress] = true
-		} else {
-			recoveredAddresses[addr] = true
+			rpcSigners[walletAddress] = struct{}{}
 		}
 	}
 
@@ -328,8 +318,11 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 			if allocation.Amount.IsNegative() {
 				return fmt.Errorf("invalid allocation: negative amount")
 			}
-			if allocation.Amount.IsPositive() && !recoveredAddresses[allocation.ParticipantWallet] {
-				return fmt.Errorf("missing signature for participant %s", allocation.ParticipantWallet)
+			// When creating application, every participant with allocation must sign the RPC message
+			if allocation.Amount.IsPositive() {
+				if _, ok := rpcSigners[allocation.ParticipantWallet]; !ok {
+					return fmt.Errorf("missing signature for participant %s", allocation.ParticipantWallet)
+				}
 			}
 
 			walletAddress := GetWalletBySigner(allocation.ParticipantWallet)
@@ -396,21 +389,9 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 		assets[a.AssetSymbol] = struct{}{}
 	}
 
-	var recoveredAddresses = map[string]bool{}
-	for _, sigHex := range rpc.Sig {
-		recovered, err := RecoverAddress(rpc.Req.rawBytes, sigHex)
-		if err != nil {
-			return nil, err
-		}
-		fmt.Printf("Recovered address: %s\n", recovered)
-		recoveredAddresses[recovered] = true
-	}
-
-	rpcSigners, err := rpc.GetRequestSigners()
+	rpcSigners, err := rpc.GetRequestSignersMap()
 	if err != nil {
-		fmt.Printf("Error recovering rpc signers: %v\n", err)
-	} else {
-		fmt.Printf("Recovered rpcSigners: %+v\n", rpcSigners)
+		return nil, err
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -427,7 +408,7 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 		}
 
 		var totalWeight int64
-		for address := range recoveredAddresses {
+		for address := range rpcSigners {
 			addr := address
 			if walletAddress := GetWalletBySigner(address); walletAddress != "" {
 				addr = walletAddress
@@ -606,10 +587,17 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
 
-	recoveredAddress, err := RecoverAddress(rpc.Req.rawBytes, rpc.Sig[0])
+	rpcSigners, err := rpc.GetRequestSignersArray()
 	if err != nil {
 		return nil, err
 	}
+
+	if len(rpcSigners) < 1 {
+		return nil, errors.New("missing participant signature")
+
+	}
+
+	recoveredAddress := rpcSigners[0]
 
 	walletAddress := GetWalletBySigner(recoveredAddress)
 	if walletAddress != "" {
@@ -726,11 +714,17 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
 
-	recoveredAddress, err := RecoverAddress(rpc.Req.rawBytes, rpc.Sig[0])
+	rpcSigners, err := rpc.GetRequestSignersArray()
 	if err != nil {
 		return nil, err
 	}
 
+	if len(rpcSigners) < 1 {
+		return nil, errors.New("missing participant signature")
+
+	}
+
+	recoveredAddress := rpcSigners[0]
 	walletAddress := GetWalletBySigner(recoveredAddress)
 	if walletAddress != "" {
 		recoveredAddress = walletAddress

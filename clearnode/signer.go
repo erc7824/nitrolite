@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"strings"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/common"
@@ -80,15 +79,6 @@ func (s *Signer) GetPrivateKey() *ecdsa.PrivateKey {
 // GetAddress returns the address derived from the signer's public key
 func (s *Signer) GetAddress() common.Address {
 	return crypto.PubkeyToAddress(*s.GetPublicKey())
-}
-
-// ValidateSignature validates the signature of a message against the provided address
-func ValidateSignature(message []byte, signatureHex, expectedAddrHex string) (bool, error) {
-	recoveredHex, err := RecoverAddress(message, signatureHex)
-	if err != nil {
-		return false, err
-	}
-	return strings.EqualFold(recoveredHex, expectedAddrHex), nil
 }
 
 // RecoverAddress takes the original message and its hex-encoded signature, and returns the address

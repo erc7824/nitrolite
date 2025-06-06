@@ -24,17 +24,34 @@ func ParseRPCMessage(data []byte) (RPCMessage, error) {
 	return req, nil
 }
 
-func (r RPCMessage) GetRequestSigners() ([]string, error) {
-	recoveredAddresses := make([]string, len(r.Sig))
-	for i, sigHex := range r.Sig {
+// GetRequestSignersMap returns map with request signers public adresses
+func (r RPCMessage) GetRequestSignersMap() (map[string]struct{}, error) {
+	recoveredAddresses := make(map[string]struct{}, len(r.Sig))
+	for _, sigHex := range r.Sig {
 		recovered, err := RecoverAddress(r.Req.rawBytes, sigHex)
 		if err != nil {
 			return nil, err
 		}
-		recoveredAddresses[i] = recovered
+		recoveredAddresses[recovered] = struct{}{}
 	}
 
 	return recoveredAddresses, nil
+}
+
+// GetRequestSignersArray returns array of RPCMessage signers
+// We first call GetRequestSignersMap in order to make sure, that user
+// did not submit several copies of the same signature to reach desired quorum
+func (r RPCMessage) GetRequestSignersArray() ([]string, error) {
+	signersMap, err := r.GetRequestSignersMap()
+	if err != nil {
+		return nil, err
+	}
+	signers := make([]string, len(signersMap))
+	for signer, _ := range signersMap {
+		signers = append(signers, signer)
+	}
+
+	return signers, nil
 }
 
 // RPCData represents the common structure for both requests and responses
@@ -74,9 +91,8 @@ func (m *RPCData) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("invalid timestamp: %w", err)
 	}
 
+	// Store raw bytes for signature verification
 	m.rawBytes = data
-
-	fmt.Printf("Raw data: %s\n", string(data))
 
 	return nil
 }

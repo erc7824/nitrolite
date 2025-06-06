@@ -12,6 +12,7 @@ import {
     NitroliteRPC,
     createGetLedgerBalancesMessage,
     CreateAppSessionRequest,
+    createCloseAppSessionMessage,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
@@ -323,6 +324,17 @@ export function handleBrokerMessage(message: any): void {
         const requestId = message.res[0];
         const method = message.res[1];
         const payload = message.res[2];
+
+        // Handle ping messages
+        if (method === "ping") {
+            console.log("Received ping from broker, sending pong");
+            const brokerWs = getBrokerWebSocket();
+            if (brokerWs && brokerWs.readyState === WebSocket.OPEN) {
+                brokerWs.send(JSON.stringify({ type: "pong" }));
+            }
+            return;
+        }
+
         // Handle RPC format (new format with 'res' array)
         if (message.res && Array.isArray(message.res)) {
             // Check if it's an error message
@@ -588,8 +600,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
     }
 
     // Create close message and sign with server
-    const { createCloseAppSessionMessage } = await import('./appSessionService.ts');
-    const closeRequestData = createCloseAppSessionMessage('', appId, participantA, participantB);
+    const closeRequestData = await createCloseAppSessionMessage(signer, '', appId, participantA, participantB);
     const serverSignature = await signer.sign(closeRequestData);
 
     // Create the signed request with server signature only
@@ -637,13 +648,16 @@ export function createEthersSigner(privateKey: string): WalletSigner {
         const wallet = new ethers.Wallet(privateKey);
 
         return {
-            publicKey: wallet.publicKey,
+            publicKey: wallet.address,
             address: wallet.address as Hex,
-            sign: async (payload: RequestData | ResponsePayload): Promise<Hex> => {
+            sign: async (data: RequestData | ResponsePayload): Promise<Hex> => {
                 try {
-                    const messageBytes = ethers.utils.arrayify(ethers.utils.id(JSON.stringify(payload)));
-                    const flatSignature = wallet._signingKey().signDigest(messageBytes);
-                    const signature = ethers.utils.joinSignature(flatSignature);
+                    const messageStr = typeof data === "string" ? data : JSON.stringify(data);
+
+                    const digestHex = ethers.id(messageStr);
+                    const messageBytes = ethers.getBytes(digestHex);
+
+                    const { serialized: signature } = wallet.signingKey.sign(messageBytes);
                     return signature as Hex;
                 } catch (error) {
                     console.error("Error signing message:", error);
@@ -667,7 +681,7 @@ export async function signRpcRequest(requestData: any[]): Promise<string> {
 export function verifySignature(message: string, signature: string, expectedAddress: string): boolean {
     try {
         // Use standard Ethereum message verification
-        const recoveredAddress = ethers.utils.verifyMessage(message, signature);
+        const recoveredAddress = ethers.verifyMessage(message, signature);
 
         // Check if the recovered address matches the expected address
         return recoveredAddress.toLowerCase() === expectedAddress.toLowerCase();

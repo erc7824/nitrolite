@@ -1,0 +1,267 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Shadcn Variables */
+    --background: 225 71% 3%;
+    --foreground: 210 20% 98%;
+    --card: 224 71% 4%;
+    --card-foreground: 210 20% 98%;
+    --popover: 224 71% 4%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 187 100% 50%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 300 100% 64%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 215 27.9% 16.9%;
+    --muted-foreground: 217.9 10.6% 64.9%;
+    --accent: 216 34% 17%;
+    --accent-foreground: 210 20% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 187 100% 50%;
+    --radius: 0.5rem;
+
+    /* Viper Duel Brand Color Palette */
+    --color-green: #2AFF6B;
+    --color-green-dark: #1ACC53;
+    --color-purple: #B425FF;
+    --color-purple-dark: #8B1ACC;
+    --color-charcoal: #0E0F11;
+    --color-charcoal-light: #1A1C1F;
+    --color-yellow: #FFED00;
+    --color-grey: #9DA0A5;
+  }
+}
+
+/* Base styles */
+@layer base {
+  html, body {
+    min-height: 100vh;
+    overflow-x: hidden;
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+    color-scheme: dark;
+    color: rgba(255, 255, 255, 0.95);
+    background-color: var(--color-charcoal);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    display: flex;
+    min-width: 320px;
+    /* Enhanced radial gradient with brand colors */
+    background: radial-gradient(circle at center, var(--color-charcoal-light) 0%, var(--color-charcoal) 100%);
+    position: relative;
+  }
+
+  /* Neon grid pattern overlay with brand green */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+      linear-gradient(rgba(42, 255, 107, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(42, 255, 107, 0.03) 1px, transparent 1px);
+    background-size: 30px 30px;
+    z-index: -1;
+  }
+}
+
+/* Viper Duel brand components */
+@layer components {
+  /* Text styles with glow effects */
+  .text-glow-green {
+    @apply text-[#2AFF6B];
+    text-shadow: 0 0 8px rgba(42, 255, 107, 0.8);
+  }
+  
+  .text-glow-purple {
+    @apply text-[#B425FF];
+    text-shadow: 0 0 8px rgba(180, 37, 255, 0.8);
+  }
+
+  .text-glow-yellow {
+    @apply text-[#FFED00];
+    text-shadow: 0 0 8px rgba(255, 237, 0, 0.8);
+  }
+
+  /* Glowing Snake elements */
+  .snake-player1 {
+    text-shadow: 0 0 10px #2AFF6B, 0 0 20px #2AFF6B50, 0 0 30px #2AFF6B30;
+    position: relative;
+  }
+
+  .snake-player2 {
+    text-shadow: 0 0 10px #B425FF, 0 0 20px #B425FF50, 0 0 30px #B425FF30;
+    position: relative;
+  }
+
+  /* Grid pattern background */
+  .bg-grid-pattern {
+    background-image:
+      linear-gradient(to right, var(--color-green) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-green) 1px, transparent 1px);
+    background-size: 20px 20px;
+    opacity: 0.05;
+  }
+
+  /* Glass panel effect */
+  .glass-panel {
+    @apply bg-gray-900/30 backdrop-blur-md border border-gray-800/40 rounded-xl;
+  }
+
+  /* Glow effects */
+  .glow-green {
+    box-shadow: 0 0 15px 5px rgba(42, 255, 107, 0.15);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 15px 5px rgba(180, 37, 255, 0.15);
+  }
+
+  .glow-yellow {
+    box-shadow: 0 0 15px 5px rgba(255, 237, 0, 0.15);
+  }
+
+  /* Aura effects for snake segments */
+  .aura-green {
+    position: relative;
+  }
+
+  .aura-green::before {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    border-radius: 8px;
+    background: radial-gradient(circle at center, rgba(42, 255, 107, 0.2) 0%, transparent 70%);
+    opacity: 0.5;
+    z-index: -1;
+  }
+
+  .aura-purple {
+    position: relative;
+  }
+
+  .aura-purple::before {
+    content: "";
+    position: absolute;
+    inset: -5px;
+    border-radius: 8px;
+    background: radial-gradient(circle at center, rgba(180, 37, 255, 0.2) 0%, transparent 70%);
+    opacity: 0.5;
+    z-index: -1;
+  }
+  
+  /* Text shadow utilities for elements */
+  .text-shadow-green {
+    text-shadow: 0 0 10px #2AFF6B, 0 0 20px #2AFF6B50, 0 0 30px #2AFF6B30;
+  }
+  
+  .text-shadow-purple {
+    text-shadow: 0 0 10px #B425FF, 0 0 20px #B425FF50, 0 0 30px #B425FF30;
+  }
+
+  .text-shadow-yellow {
+    text-shadow: 0 0 10px #FFED00, 0 0 20px #FFED0050, 0 0 30px #FFED0030;
+  }
+
+  /* Enhanced button styling */
+  .button-viper {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    transition: all 0.3s ease;
+  }
+
+  .button-viper::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.7s ease;
+  }
+
+  .button-viper:hover::before {
+    left: 100%;
+  }
+
+  /* Improved logo styling */
+  .logo-enhanced {
+    filter: drop-shadow(0 0 20px rgba(42, 255, 107, 0.3)) 
+            drop-shadow(0 0 40px rgba(180, 37, 255, 0.2));
+  }
+}
+
+/* Game-specific particles effect */
+.particles {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-image: radial-gradient(circle, #ffffff 1px, transparent 1px);
+  background-size: 16px 16px;
+  opacity: 0.05;
+  mix-blend-mode: screen;
+  animation: float 8s infinite linear;
+  pointer-events: none;
+}
+
+/* Improved pulse animation for snake segments */
+@keyframes pulse-green {
+  0% { box-shadow: 0 0 10px rgba(42, 255, 107, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(42, 255, 107, 0.7), 0 0 30px rgba(42, 255, 107, 0.3); }
+  100% { box-shadow: 0 0 10px rgba(42, 255, 107, 0.5); }
+}
+
+@keyframes pulse-purple {
+  0% { box-shadow: 0 0 10px rgba(180, 37, 255, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(180, 37, 255, 0.7), 0 0 30px rgba(180, 37, 255, 0.3); }
+  100% { box-shadow: 0 0 10px rgba(180, 37, 255, 0.5); }
+}
+
+@keyframes pulse-yellow {
+  0% { box-shadow: 0 0 10px rgba(255, 237, 0, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(255, 237, 0, 0.7), 0 0 30px rgba(255, 237, 0, 0.3); }
+  100% { box-shadow: 0 0 10px rgba(255, 237, 0, 0.5); }
+}
+
+@keyframes float {
+  0% { background-position: 0 0; }
+  100% { background-position: 100px 100px; }
+}
+
+@keyframes sparkle {
+  0% { transform: translateY(0) rotate(0deg); }
+  100% { transform: translateY(-100px) rotate(20deg); }
+}
+
+@keyframes pulse {
+  0% { opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}

@@ -50,6 +50,15 @@ const handleMessage = (event: MessageEvent) => {
     const data = JSON.parse(event.data);
 
     if (data.type === 'gameState') {
+      // Replace nickname with wallet address for the current player
+      if (data.players) {
+        data.players = data.players.map(player => {
+          if (player.id === props.playerId) {
+            return { ...player, nickname: props.walletAddress };
+          }
+          return player;
+        });
+      }
       gameState.value = data;
       isGameStarted.value = true;
       waitingForPlayer.value = false;

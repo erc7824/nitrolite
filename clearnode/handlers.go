@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
@@ -926,19 +925,17 @@ func getWallets(rpc *RPCMessage) (map[string]struct{}, error) {
 
 // verifySigner checks that the recovered signer matches the channel's wallet.
 func verifySigner(rpc *RPCMessage, channelWallet string) error {
-	signers, err := rpc.GetRequestSignersArray()
+	if len(rpc.Sig) < 1 {
+		return errors.New("missing participant signature")
+	}
+	recovered, err := RecoverAddress(rpc.Req.rawBytes, rpc.Sig[0])
 	if err != nil {
 		return err
 	}
-	if len(signers) < 1 {
-		return errors.New("missing participant signature")
-	}
-
-	recovered := signers[0]
 	if mapped := GetWalletBySigner(recovered); mapped != "" {
 		recovered = mapped
 	}
-	if !strings.EqualFold(recovered, channelWallet) {
+	if recovered != channelWallet {
 		return errors.New("invalid signature")
 	}
 	return nil

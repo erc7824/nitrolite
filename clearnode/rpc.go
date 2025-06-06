@@ -9,47 +9,49 @@ import (
 
 // RPCMessage represents a complete message in the RPC protocol, including data and signatures
 type RPCMessage struct {
-	ReqRaw       json.RawMessage `json:"req,omitempty" validate:"required_without=Res,excluded_with=Res"` // Keep raw req for signature validation
-	Req          *RPCData        `json:"-"`
-	Res          *RPCData        `json:"res,omitempty" validate:"required_without=ReqRaw,excluded_with=ReqRaw"`
-	AppSessionID string          `json:"sid,omitempty"`
-	Sig          []string        `json:"sig"`
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface for RPCMessage
-func (m *RPCMessage) UnmarshalJSON(data []byte) error {
-	var aux struct {
-		ReqRaw       json.RawMessage `json:"req,omitempty"`
-		Res          *RPCData        `json:"res,omitempty"`
-		AppSessionID string          `json:"sid,omitempty"`
-		Sig          []string        `json:"sig"`
-	}
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return fmt.Errorf("failed to unmarshal top‐level RPCMessage: %w", err)
-	}
-
-	m.ReqRaw = aux.ReqRaw
-	m.Res = aux.Res
-	m.AppSessionID = aux.AppSessionID
-	m.Sig = aux.Sig
-
-	if len(aux.ReqRaw) > 0 {
-		var parsed RPCData
-		if err := json.Unmarshal(aux.ReqRaw, &parsed); err != nil {
-			return fmt.Errorf("failed to unmarshal RPCData from ReqRaw: %w", err)
-		}
-		m.Req = &parsed
-	}
-	return nil
+	Req          *RPCData `json:"req,omitempty" validate:"required_without=Res,excluded_with=Res"`
+	Res          *RPCData `json:"res,omitempty" validate:"required_without=Req,excluded_with=Req"`
+	AppSessionID string   `json:"sid,omitempty"`
+	Sig          []string `json:"sig"`
 }
 
 // ParseRPCMessage parses a JSON string into an RPCMessage
-func ParseRPCMessage(data []byte) (*RPCMessage, error) {
+func ParseRPCMessage(data []byte) (RPCMessage, error) {
 	var req RPCMessage
 	if err := json.Unmarshal(data, &req); err != nil {
-		return nil, fmt.Errorf("failed to parse request: %w", err)
+		return RPCMessage{}, fmt.Errorf("failed to parse request: %w", err)
 	}
-	return &req, nil
+	return req, nil
+}
+
+// GetRequestSignersMap returns map with request signers public adresses
+func (r RPCMessage) GetRequestSignersMap() (map[string]struct{}, error) {
+	recoveredAddresses := make(map[string]struct{}, len(r.Sig))
+	for _, sigHex := range r.Sig {
+		recovered, err := RecoverAddress(r.Req.rawBytes, sigHex)
+		if err != nil {
+			return nil, err
+		}
+		recoveredAddresses[recovered] = struct{}{}
+	}
+
+	return recoveredAddresses, nil
+}
+
+// GetRequestSignersArray returns array of RPCMessage signers
+// We first call GetRequestSignersMap in order to make sure, that user
+// did not submit several copies of the same signature to reach desired quorum
+func (r RPCMessage) GetRequestSignersArray() ([]string, error) {
+	signersMap, err := r.GetRequestSignersMap()
+	if err != nil {
+		return nil, err
+	}
+	signers := make([]string, len(signersMap))
+	for signer, _ := range signersMap {
+		signers = append(signers, signer)
+	}
+
+	return signers, nil
 }
 
 // RPCData represents the common structure for both requests and responses
@@ -59,8 +61,10 @@ type RPCData struct {
 	Method    string
 	Params    []any
 	Timestamp uint64
+	rawBytes  []byte
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface for RPCMessage
 func (m *RPCData) UnmarshalJSON(data []byte) error {
 	var rawArr []json.RawMessage
 	if err := json.Unmarshal(data, &rawArr); err != nil {
@@ -86,6 +90,10 @@ func (m *RPCData) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(rawArr[3], &m.Timestamp); err != nil {
 		return fmt.Errorf("invalid timestamp: %w", err)
 	}
+
+	// Store raw bytes for signature verification
+	m.rawBytes = data
+
 	return nil
 }
 

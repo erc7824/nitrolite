@@ -187,7 +187,7 @@ func TestHandleCloseVirtualApp(t *testing.T) {
 	// 1) Marshal rpc.Req to get the exact raw bytes of [request_id, method, params, timestamp]
 	rawReq, err := json.Marshal(req.Req)
 	require.NoError(t, err)
-	req.ReqRaw = rawReq
+	req.Req.rawBytes = rawReq
 
 	// 2) Sign rawReq directly
 	sigBytes, err := signer.Sign(rawReq)
@@ -275,7 +275,7 @@ func TestHandleCreateVirtualApp(t *testing.T) {
 	// 1) Marshal rpcReq.Req exactly as a JSON array
 	rawReq, err := json.Marshal(rpcReq.Req)
 	require.NoError(t, err)
-	rpcReq.ReqRaw = rawReq
+	rpcReq.Req.rawBytes = rawReq
 
 	// 2) Sign rawReq with both participants
 	sigA, err := signerA.Sign(rawReq)
@@ -1098,7 +1098,7 @@ func TestHandleGetRPCHistory(t *testing.T) {
 	// Set ReqRaw so it’s available—though this handler doesn’t perform signature validation
 	rawReq, err := json.Marshal(rpcRequest.Req)
 	require.NoError(t, err)
-	rpcRequest.ReqRaw = rawReq
+	rpcRequest.Req.rawBytes = rawReq
 
 	signed, err := signer.Sign(rawReq)
 	require.NoError(t, err)
@@ -1131,7 +1131,7 @@ func TestHandleGetRPCHistory(t *testing.T) {
 	// Also set ReqRaw to avoid nil pointer, though policy is empty
 	rawReq2, err := json.Marshal(missingParamReq.Req)
 	require.NoError(t, err)
-	missingParamReq.ReqRaw = rawReq2
+	missingParamReq.Req.rawBytes = rawReq2
 	missingParamReq.Sig = []string{hexutil.Encode(signed)}
 
 	_, err = HandleGetRPCHistory(&Policy{}, missingParamReq, rpcStore)

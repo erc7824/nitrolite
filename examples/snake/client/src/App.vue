@@ -203,9 +203,8 @@ onUnmounted(() => {
         <div v-if="gameService.getIsSigningAppSession().value" class="signature-overlay">
           <div class="signature-container">
             <div class="signature-spinner"></div>
-            <h3>App Session Creation</h3>
+            <h3>App Session</h3>
             <p>{{ gameService.getSignatureStatus().value }}</p>
-            <small>Please check your wallet for signature requests</small>
           </div>
         </div>
 

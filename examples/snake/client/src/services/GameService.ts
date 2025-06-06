@@ -135,9 +135,16 @@ class GameService {
     });
 
     this.messageHandlers.set('appSession:gameStarted', (data) => {
-      console.log('[GameService] App session game started:', data);
-      this.isSigningAppSession.value = false;
-      this.signatureStatus.value = '';
+      this.handleGameStarted(data);
+    });
+
+    this.messageHandlers.set('appSession:closeRequest', (data) => {
+      this.handleCloseSessionSignatureRequest(data);
+    });
+
+    this.messageHandlers.set('appSession:closed', () => {
+      console.log('[GameService] App session closed, clearing room state');
+      this.clearRoomState();
     });
   }
 
@@ -213,13 +220,16 @@ class GameService {
 
         this.ws.onmessage = (event) => {
           try {
+            console.log('[GameService] Received WebSocket message:', event.data);
             const data = JSON.parse(event.data);
             const handler = this.messageHandlers.get(data.type);
             if (handler) {
               handler(data);
+            } else {
+              console.log('[GameService] No handler found for message type:', data.type);
             }
           } catch (error) {
-            console.error('Error parsing message:', error);
+            console.error('[GameService] Error parsing message:', error);
           }
         };
       } catch (error) {
@@ -365,16 +375,22 @@ class GameService {
 
   finalizeGame() {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.error('[GameService] Cannot finalize game - WebSocket not connected');
       return;
     }
 
+    console.log('[GameService] Sending finalizeGame message with data:', {
+      roomId: this.roomId.value,
+      playerId: this.playerId.value,
+      walletAddress: window.ethereum.selectedAddress
+    });
+
     this.ws.send(JSON.stringify({
       type: 'finalizeGame',
-      roomId: this.roomId.value
+      roomId: this.roomId.value,
+      playerId: this.playerId.value,
+      walletAddress: window.ethereum.selectedAddress
     }));
-
-    // Clear local room state since game is being finalized
-    this.clearRoomState();
   }
 
   clearRoomState() {
@@ -515,7 +531,7 @@ class GameService {
       console.error('[GameService] Error handling start game request:', error);
       this.isSigningAppSession.value = false;
       this.signatureStatus.value = '';
-      this.errorMessage.value = 'Failed to sign start game request. Please try again.';
+      this.errorMessage.value = 'Failed to sign start game reqest. Please try again.';
     }
   }
 
@@ -531,6 +547,43 @@ class GameService {
       console.error('[GameService] Error signing app session request:', error);
       throw error;
     }
+  }
+
+  private async handleCloseSessionSignatureRequest(data: any) {
+    try {
+      const { roomId, requestToSign, participantAddress } = data;
+
+      console.log('[GameService] Signing app session close request for room:', roomId);
+      console.log('[GameService] Request to sign:', requestToSign);
+
+      this.isSigningAppSession.value = true;
+      this.signatureStatus.value = 'Please sign to close the game session...';
+
+      const signature = await this.signAppSessionRequest(requestToSign);
+      this.signatureStatus.value = 'Signature submitted, closing session...';
+
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({
+          type: 'closeSessionSignature',
+          roomId,
+          playerId: this.playerId.value,
+          signature,
+          participantAddress
+        }));
+        console.log('[GameService] Sent app session close signature for room:', roomId);
+      }
+    } catch (error) {
+      console.error('[GameService] Error handling app session close request:', error);
+      this.signatureStatus.value = '';
+      this.errorMessage.value = 'Failed to sign app session close request. Please try again.';
+    }
+    this.isSigningAppSession.value = false;
+  }
+
+  private handleGameStarted(data: any) {
+    console.log('[GameService] App session game started:', data);
+    this.isSigningAppSession.value = false;
+    this.signatureStatus.value = '';
   }
 
   // Getters for reactive state

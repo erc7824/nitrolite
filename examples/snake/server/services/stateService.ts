@@ -1,5 +1,6 @@
 import { WebSocket } from 'ws';
 import { Room, PendingRequest } from '../interfaces/index.ts';
+import { Hex } from 'viem';
 
 // Global state
 export const rooms = new Map<string, Room>();
@@ -64,4 +65,21 @@ export function clearPendingRequest(requestId: string): void {
     clearTimeout(timeout);
     pendingRequests.delete(requestId);
   }
+}
+
+export function createRoom(id: string): Room {
+  return {
+    id,
+    players: new Map(),
+    food: { x: 0, y: 0 },
+    gameInterval: null,
+    gridSize: { width: 30, height: 30 },
+    channelIds: new Set(),
+    playerAddresses: new Map(),
+    currentState: null,
+    stateVersion: 0,
+    createdAt: Date.now(),
+    closeSessionSignatures: new Map(),
+    serverAddress: '' as Hex // This will be set when the room is created
+  };
 }

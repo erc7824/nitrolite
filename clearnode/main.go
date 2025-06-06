@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"embed"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,25 +16,29 @@ import (
 var embedMigrations embed.FS
 
 func main() {
-	config, err := LoadConfig()
+	logger := NewLoggerIPFS("root")
+
+	config, err := LoadConfig(logger)
 	if err != nil {
-		log.Fatalf("failed to load configuration: %v", err)
+		logger.Fatal("failed to load configuration", "error", err)
 	}
 
 	db, err := ConnectToDB(config.dbConf)
 	if err != nil {
-		log.Fatalf("Failed to setup database: %v", err)
+		logger.Fatal("Failed to setup database", "error", err)
 	}
 
 	err = loadWalletCache(db)
 	if err != nil {
-		log.Fatalf("Failed to load wallet cache: %v", err)
+		logger.Fatal("Failed to load wallet cache", "error", err)
 	}
 
 	signer, err := NewSigner(config.privateKeyHex)
 	if err != nil {
-		log.Fatalf("failed to initialise signer: %v", err)
+		logger.Fatal("failed to initialise signer", "error", err)
 	}
+	logger.Info("broker signer initialized", "address", signer.GetAddress().Hex())
+
 	rpcStore := NewRPCStore(db)
 
 	// Initialize Prometheus metrics
@@ -43,47 +46,51 @@ func main() {
 	// Map to store custody clients for later reference
 	custodyClients := make(map[string]*Custody)
 
-	unifiedWSHandler, err := NewUnifiedWSHandler(signer, db, metrics, rpcStore, config)
+	wsListenAddr := ":8000"
+	wsEndpoint := "/ws"
+	unifiedWSHandler, err := NewUnifiedWSHandler(signer, db, metrics, rpcStore, config, logger)
 	if err != nil {
-		log.Fatalf("Failed to initialize WebSocket handler: %v", err)
+		logger.Fatal("failed to initialize WebSocket handler", "error", err)
 	}
-	http.HandleFunc("/ws", unifiedWSHandler.HandleConnection)
+	http.HandleFunc(wsEndpoint, unifiedWSHandler.HandleConnection)
 
 	for name, network := range config.networks {
-		client, err := NewCustody(signer, db, unifiedWSHandler.sendBalanceUpdate, unifiedWSHandler.sendChannelUpdate, network.InfuraURL, network.CustodyAddress, network.AdjudicatorAddress, network.ChainID)
+		client, err := NewCustody(signer, db, unifiedWSHandler.sendBalanceUpdate, unifiedWSHandler.sendChannelUpdate, network.InfuraURL, network.CustodyAddress, network.AdjudicatorAddress, network.ChainID, logger)
 		if err != nil {
-			log.Printf("Warning: Failed to initialize %s blockchain client: %v", name, err)
+			logger.Warn("failed to initialize blockchain client", "network", name, "error", err)
 			continue
 		}
 		custodyClients[name] = client
 		go client.ListenEvents(context.Background())
 	}
 
+	metricsListenAddr := ":4242"
+	metricsEndpoint := "/metrics"
 	// Set up a separate mux for metrics
 	metricsMux := http.NewServeMux()
-	metricsMux.Handle("/metrics", promhttp.Handler())
+	metricsMux.Handle(metricsEndpoint, promhttp.Handler())
 
 	// Start metrics server on a separate port
 	metricsServer := &http.Server{
-		Addr:    ":4242",
+		Addr:    metricsListenAddr,
 		Handler: metricsMux,
 	}
 
 	// Start metrcis monitoring
-	go metrics.RecordMetricsPeriodically(db, custodyClients)
+	go metrics.RecordMetricsPeriodically(db, custodyClients, logger)
 
 	go func() {
-		log.Printf("Prometheus metrics available at http://localhost:4242/metrics")
+		logger.Info("Prometheus metrics available", "listenAddr", metricsListenAddr, "endpoint", metricsEndpoint)
 		if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("Error starting metrics server: %v", err)
+			logger.Error("metrics server failure", "error", err)
 		}
 	}()
 
 	// Start the main HTTP server.
 	go func() {
-		log.Printf("Starting server, visit http://localhost:8000")
-		if err := http.ListenAndServe(":8000", nil); err != nil {
-			log.Fatal(err)
+		logger.Info("WebSocket server available", "listenAddr", wsListenAddr, "endpoint", wsEndpoint)
+		if err := http.ListenAndServe(wsListenAddr, nil); err != nil {
+			logger.Fatal("WebSocket server failure", "error", err)
 		}
 	}()
 
@@ -92,15 +99,15 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
 
-	log.Println("Shutting down...")
+	logger.Info("shutting down")
 
 	// Shutdown metrics server
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := metricsServer.Shutdown(ctx); err != nil {
-		log.Printf("Error shutting down metrics server: %v", err)
+		logger.Error("failed to shut down metrics server", "error", err)
 	}
 
 	unifiedWSHandler.CloseAllConnections()
-	log.Println("Server stopped")
+	logger.Info("shutdown complete")
 }

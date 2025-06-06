@@ -29,10 +29,6 @@ func NewSigner(privateKeyHex string) (*Signer, error) {
 		return nil, err
 	}
 
-	publicKey := privateKey.Public().(*ecdsa.PublicKey)
-
-	log.Printf("Broker signer initialized with address: %s", crypto.PubkeyToAddress(*publicKey).Hex())
-
 	return &Signer{privateKey: privateKey}, nil
 }
 
@@ -154,14 +150,12 @@ func RecoverAddressFromEip712Signature(
 	// 1. Hash the typed data (domain separator + message struct hash)
 	typedDataHash, _, err := apitypes.TypedDataAndHash(typedData)
 	if err != nil {
-		log.Printf("Failed to hash typed data: %v", err)
 		return "", err
 	}
 
 	// 2. Example signature
 	sig, err := hexutil.Decode(signatureHex)
 	if err != nil {
-		log.Printf("Failed to decode signature: %v", err)
 		return "", err
 	}
 
@@ -173,7 +167,6 @@ func RecoverAddressFromEip712Signature(
 	// 4. Recover public key
 	pubKey, err := crypto.SigToPub(typedDataHash, sig)
 	if err != nil {
-		log.Printf("Failed to recover public key: %v", err)
 		return "", err
 	}
 

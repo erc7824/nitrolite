@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -43,11 +42,13 @@ type Config struct {
 }
 
 // LoadConfig builds configuration from environment variables
-func LoadConfig() (*Config, error) {
+func LoadConfig(logger Logger) (*Config, error) {
+	logger = logger.NewSystem("config")
+
 	var err error
 	// Load environment variables
 	if err = godotenv.Load(); err != nil {
-		log.Println("Warning: .env file not found")
+		logger.Warn(".env file not found")
 	}
 
 	// Get database URL from environment variables
@@ -59,13 +60,13 @@ func LoadConfig() (*Config, error) {
 	if dbURL != "" {
 		dbConf, err = ParseConnectionString(dbURL)
 		if err != nil {
-			logger.Errorw("failed to parse connection string", "err", err)
+			logger.Error("failed to parse connection string", "err", err)
 			return nil, err
 		}
 	} else {
 		// Read db config
 		if err := cleanenv.ReadEnv(&dbConf); err != nil {
-			logger.Errorw("failed to read env", "err", err)
+			logger.Error("failed to read env", "err", err)
 			return nil, err
 		}
 	}
@@ -73,7 +74,7 @@ func LoadConfig() (*Config, error) {
 	// Retrieve the private key.
 	privateKeyHex := os.Getenv("BROKER_PRIVATE_KEY")
 	if privateKeyHex == "" {
-		log.Println("BROKER_PRIVATE_KEY environment variable is required")
+		logger.Fatal("BROKER_PRIVATE_KEY environment variable is required")
 	}
 
 	messageTimestampExpiry := 60
@@ -81,10 +82,10 @@ func LoadConfig() (*Config, error) {
 		if parsed, err := strconv.Atoi(messageExpiry); err == nil && parsed > 0 {
 			messageTimestampExpiry = parsed
 		} else {
-			log.Println("Invalid MSG_EXPIRY_TIME, using default value")
+			logger.Warn("Invalid MSG_EXPIRY_TIME", "messageExpiry", messageExpiry)
 		}
 	}
-	log.Printf("Using %d seconds message expiry time", messageTimestampExpiry)
+	logger.Info("set message expiry time", "value", messageTimestampExpiry)
 
 	config := Config{
 		networks:      make(map[string]*NetworkConfig),

@@ -35,10 +35,11 @@ type Custody struct {
 	adjudicatorAddress common.Address
 	sendBalanceUpdate  func(string)
 	sendChannelUpdate  func(Channel)
+	logger             Logger
 }
 
 // NewCustody initializes the Ethereum client and custody contract wrapper.
-func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr, adjudicatorAddr string, chain uint32) (*Custody, error) {
+func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr, adjudicatorAddr string, chain uint32, logger Logger) (*Custody, error) {
 	custodyAddress := common.HexToAddress(custodyAddressStr)
 	client, err := ethclient.Dial(infuraURL)
 	if err != nil {
@@ -74,17 +75,18 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 		adjudicatorAddress: common.HexToAddress(adjudicatorAddr),
 		sendBalanceUpdate:  sendBalanceUpdate,
 		sendChannelUpdate:  sendChannelUpdate,
+		logger:             logger.NewSystem("custody").With("chainID", chainID.Int64()).With("custodyAddress", custodyAddressStr),
 	}, nil
 }
 
 // ListenEvents initializes event listening for the custody contract
 func (c *Custody) ListenEvents(ctx context.Context) {
 	// TODO: store processed events in a database
-	listenEvents(ctx, c.client, c.custodyAddr, c.chainID, 0, c.handleBlockChainEvent)
+	listenEvents(ctx, c.client, c.custodyAddr, c.chainID, 0, c.handleBlockChainEvent, c.logger)
 }
 
 // Join calls the join method on the custody contract
-func (c *Custody) Join(channelID string, lastStateData []byte) error {
+func (c *Custody) Join(channelID string, lastStateData []byte) (common.Hash, error) {
 	// Convert string channelID to bytes32
 	channelIDBytes := common.HexToHash(channelID)
 
@@ -93,41 +95,44 @@ func (c *Custody) Join(channelID string, lastStateData []byte) error {
 
 	sig, err := c.signer.NitroSign(lastStateData)
 	if err != nil {
-		return fmt.Errorf("failed to sign data: %w", err)
+		return common.Hash{}, fmt.Errorf("failed to sign data: %w", err)
 	}
 
 	gasPrice, err := c.client.SuggestGasPrice(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed to suggest gas price: %w", err)
+		return common.Hash{}, fmt.Errorf("failed to suggest gas price: %w", err)
 	}
 
 	c.transactOpts.GasPrice = gasPrice.Add(gasPrice, gasPrice)
 	// Call the join method on the custody contract
 	tx, err := c.custody.Join(c.transactOpts, channelIDBytes, index, sig)
 	if err != nil {
-		return fmt.Errorf("failed to join channel: %w", err)
+		return common.Hash{}, fmt.Errorf("failed to join channel: %w", err)
 	}
-	log.Println("TxHash:", tx.Hash().Hex())
 
-	return nil
+	return tx.Hash(), nil
 }
 
 // handleBlockChainEvent processes different event types received from the blockchain
-func (c *Custody) handleBlockChainEvent(l types.Log) {
-	log.Printf("Received event: %+v\n", l)
+func (c *Custody) handleBlockChainEvent(ctx context.Context, l types.Log) {
+	ctx = SetContextLogger(ctx, c.logger)
+	logger := LoggerFromContext(ctx)
+	logger.Debug("received event", "blockNumber", l.BlockNumber, "txHahs", l.TxHash.String(), "logIndex", l.Index)
 
 	eventID := l.Topics[0]
 	switch eventID {
 	case custodyAbi.Events["Created"].ID:
+		logger := logger.With("event", "Created")
 		ev, err := c.custody.ParseCreated(l)
-		log.Printf("[Created] Event data: %+v\n", ev)
 		if err != nil {
-			log.Println("error parsing Created event:", err)
+			logger.Warn("error parsing event", "error", err)
 			return
 		}
+		channelID := common.Hash(ev.ChannelId).Hex()
+		logger.Debug("parsed event", "channelId", channelID, "wallet", ev.Wallet.Hex(), "channel", ev.Channel, "initial", ev.Initial)
 
 		if len(ev.Channel.Participants) < 2 {
-			log.Println("[Created] Error: not enough participants in the channel")
+			logger.Warn("not enough participants in the channel")
 			return
 		}
 
@@ -142,46 +147,45 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 
 		brokerAmount := ev.Initial.Allocations[1].Amount.Int64()
 		if brokerAmount != 0 {
-			log.Printf("[Created] Error: broker amount should be 0, got %d\n", brokerAmount)
+			logger.Warn("non-zero broker amount", "amount", brokerAmount)
 			return
 		}
 
 		if challenge < 3600 {
-			log.Printf("[Created] Error: invalid challenge period: %d\n", challenge)
+			logger.Warn("invalid challenge period", "challenge", challenge)
 			return
 		}
 
 		if adjudicator != c.adjudicatorAddress {
-			log.Printf("[Created] Error: unsupported adjudicator %s, expected %s\n", adjudicator.Hex(), c.adjudicatorAddress.Hex())
+			logger.Warn("unsupported adjudicator", "actual", adjudicator.Hex(), "expected", c.adjudicatorAddress.Hex())
 			return
 		}
 
 		// Check if channel was created with the broker.
 		if broker != c.signer.GetAddress() {
-			log.Printf("participantB %s is not Broker %s\n", broker, c.signer.GetAddress().Hex())
+			logger.Warn("participantB is not Broker", "actual", c.signer.GetAddress().Hex(), "expected", broker)
 			return
 		}
 
 		// Check if there is already existing open channel with the broker
 		existingOpenChannel, err := CheckExistingChannels(c.db, participantSigner, tokenAddress, c.chainID)
 		if err != nil {
-			log.Printf("[Created] Error checking channels in database: %v", err)
+			logger.Error("error checking channels in database", "error", err)
 			return
 		}
 
 		if existingOpenChannel != nil {
-			log.Printf("[Created] An open channel with broker already exists: %s", existingOpenChannel.ChannelID)
+			logger.Error("an open channel with broker already exists", "existingChannelId", existingOpenChannel.ChannelID)
 			return
 		}
 
 		err = AddSigner(c.db, wallet, participantSigner)
 		if err != nil {
-			log.Printf("[Created] Error recording signer in database: %v", err)
+			logger.Error("error recording signer in database", "error", err)
 			return
 		}
 
 		var ch Channel
-		channelID := common.BytesToHash(ev.ChannelId[:]).Hex()
 		err = c.db.Transaction(func(tx *gorm.DB) error {
 			ch, err = CreateChannel(
 				tx,
@@ -207,42 +211,43 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			tokenAmount := decimal.NewFromBigInt(big.NewInt(tokenAmount), -int32(asset.Decimals))
 			ledger := GetWalletLedger(tx, wallet)
 			if err := ledger.Record(channelID, asset.Symbol, tokenAmount); err != nil {
-				log.Printf("[ChannelCreated] Error recording balance update for wallet: %v", err)
-				return err
+				return fmt.Errorf("error recording balance update for wallet: %w", err)
 			}
 
 			return nil
 		})
 		if err != nil {
-			log.Printf("[ChannelCreated] Error creating channel in database: %v", err)
+			logger.Error("error creating channel in database", "error", err)
 			return
 		}
 
 		encodedState, err := nitrolite.EncodeState(ev.ChannelId, nitrolite.IntentINITIALIZE, big.NewInt(0), ev.Initial.Data, ev.Initial.Allocations)
 		if err != nil {
-			log.Printf("[ChannelCreated] Error encoding state hash: %v", err)
+			logger.Error("error encoding state hash", "error", err)
 			return
 		}
 
-		if err := c.Join(channelID, encodedState); err != nil {
-			log.Printf("[ChannelCreated] Error joining channel: %v", err)
+		txHash, err := c.Join(channelID, encodedState)
+		if err != nil {
+			logger.Error("error joining channel", "error", err)
 			return
 		}
 
 		c.sendChannelUpdate(ch)
 
-		log.Printf("[ChannelCreated] Successfully initiated join for channel %s on chain %d", channelID, c.chainID)
+		logger.Info("successfully initiated join for channel", "channelId", channelID, "txHash", txHash.Hex())
 
 	case custodyAbi.Events["Joined"].ID:
+		logger := logger.With("event", "Joined")
 		ev, err := c.custody.ParseJoined(l)
 		if err != nil {
-			log.Println("error parsing ChannelJoined event:", err)
+			logger.Warn("error parsing event", "error", err)
 			return
 		}
-		log.Printf("Joined event data: %+v\n", ev)
+		channelID := common.Hash(ev.ChannelId).Hex()
+		logger.Debug("parsed event", "channelId", channelID, "index", ev.Index)
 
 		var channel Channel
-		channelID := common.BytesToHash(ev.ChannelId[:]).Hex()
 		err = c.db.Transaction(func(tx *gorm.DB) error {
 			result := tx.Where("channel_id = ?", channelID).First(&channel)
 			if result.Error != nil {
@@ -258,7 +263,6 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			if err := tx.Save(&channel).Error; err != nil {
 				return fmt.Errorf("failed to close channel: %w", err)
 			}
-			log.Printf("Joined channel with ID: %s", channelID)
 
 			asset, err := GetAssetByToken(tx, channel.Token, c.chainID)
 			if err != nil {
@@ -275,29 +279,30 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 
 			ledger = GetWalletLedger(tx, channel.Wallet)
 			if err := ledger.Record(channel.Wallet, asset.Symbol, tokenAmount); err != nil {
-				log.Printf("[Joined] Error recording balance update for wallet: %v", err)
-				return err
+				return fmt.Errorf("error recording balance update for wallet: %w", err)
 			}
 
 			return nil
 		})
 		if err != nil {
-			log.Printf("[Joined] Error joining: %v", err)
+			logger.Error("failed to join channel", "channelId", channelID, "error", err)
 			return
 		}
+		logger.Info("joined channel", "channelId", channelID)
+
 		c.sendBalanceUpdate(channel.Wallet)
 		c.sendChannelUpdate(channel)
 
 	case custodyAbi.Events["Closed"].ID:
 		ev, err := c.custody.ParseClosed(l)
 		if err != nil {
-			log.Println("error parsing ChannelClosed event:", err)
+			logger.Warn("error parsing event", "error", err)
 			return
 		}
-		log.Printf("Closed event data: %+v\n", ev)
+		channelID := common.Hash(ev.ChannelId).Hex()
+		logger.Debug("parsed event", "channelId", channelID, "final", ev.FinalState)
 
 		var channel Channel
-		channelID := common.BytesToHash(ev.ChannelId[:]).Hex()
 		err = c.db.Transaction(func(tx *gorm.DB) error {
 			result := tx.Where("channel_id = ?", channelID).First(&channel)
 			if result.Error != nil {
@@ -318,8 +323,7 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			// Transfer fron unified account into channel account and then withdraw immidiately.
 			ledger := GetWalletLedger(tx, channel.Wallet)
 			if err := ledger.Record(channel.Wallet, asset.Symbol, tokenAmount.Neg()); err != nil {
-				log.Printf("[Closed] Error recording balance update for participant: %v", err)
-				return err
+				return fmt.Errorf("error recording balance update for participant: %w", err)
 			}
 			ledger = GetWalletLedger(tx, channel.Wallet)
 			if err := ledger.Record(channelID, asset.Symbol, tokenAmount); err != nil {
@@ -340,24 +344,25 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 				return fmt.Errorf("failed to close channel: %w", err)
 			}
 
-			log.Printf("Closed channel with ID: %s", channelID)
-
 			return nil
 		})
 		if err != nil {
-			log.Printf("[Closed] Error closing channel: %v", err)
+			logger.Error("failed to close channel", "channelId", channelID, "error", err)
 			return
 		}
+		logger.Info("closed channel", "channelId", channelID)
+
 		c.sendBalanceUpdate(channel.Wallet)
 		c.sendChannelUpdate(channel)
 
 	case custodyAbi.Events["Resized"].ID:
 		ev, err := c.custody.ParseResized(l)
 		if err != nil {
-			log.Println("error parsing Resized event:", err)
+			logger.Warn("error parsing event", "error", err)
 			return
 		}
-		log.Printf("Resized event data: %+v\n", ev)
+		channelID := common.Hash(ev.ChannelId).Hex()
+		logger.Debug("parsed event", "channelId", channelID, "deltaAllocations", ev.DeltaAllocations)
 
 		var channel Channel
 		err = c.db.Transaction(func(tx *gorm.DB) error {
@@ -376,7 +381,7 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 			channel.UpdatedAt = time.Now()
 			channel.Version++
 			if err := c.db.Save(&channel).Error; err != nil {
-				return fmt.Errorf("[Resized] Error saving channel in database: %w", err)
+				return fmt.Errorf("error saving channel in database: %w", err)
 			}
 
 			resizeAmount := ev.DeltaAllocations[0] // Participant deposits or withdraws.
@@ -392,35 +397,29 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 					// 1. Deposit into a channel account.
 					ledger := GetWalletLedger(tx, channel.Wallet)
 					if err := ledger.Record(channelID, asset.Symbol, amount); err != nil {
-						log.Printf("[Resized] Error recording balance update for wallet: %v", err)
-						return err
+						return fmt.Errorf("error recording balance update for wallet: %w", err)
 					}
 					// 2. Immediately transfer from the channel account into the unified account.
 					if err := ledger.Record(channelID, asset.Symbol, amount.Neg()); err != nil {
-						log.Printf("[Resized] Error recording balance update for wallet: %v", err)
-						return err
+						return fmt.Errorf("error recording balance update for wallet: %w", err)
 					}
 					ledger = GetWalletLedger(tx, channel.Wallet)
 					if err := ledger.Record(channel.Wallet, asset.Symbol, amount); err != nil {
-						log.Printf("[Resized] Error recording balance update for participant: %v", err)
-						return err
+						return fmt.Errorf("error recording balance update for participant: %w", err)
 					}
 				} else {
 					// 1. Withdraw from the unified account and immediately transfer into the unified account.
 					ledger := GetWalletLedger(tx, channel.Wallet)
 					if err := ledger.Record(channel.Wallet, asset.Symbol, amount); err != nil {
-						log.Printf("[Resized] Error recording balance update for participant: %v", err)
-						return err
+						return fmt.Errorf("error recording balance update for participant: %w", err)
 					}
 					if err := ledger.Record(channelID, asset.Symbol, amount.Neg()); err != nil {
-						log.Printf("[Resized] Error recording balance update for wallet: %v", err)
-						return err
+						return fmt.Errorf("error recording balance update for wallet: %w", err)
 					}
 					// 2. Withdraw from the channel account.
 					ledger = GetWalletLedger(tx, channel.Wallet)
 					if err := ledger.Record(channelID, asset.Symbol, amount); err != nil {
-						log.Printf("[Resized] Error recording balance update for wallet: %v", err)
-						return err
+						return fmt.Errorf("error recording balance update for wallet: %w", err)
 					}
 				}
 			}
@@ -429,21 +428,24 @@ func (c *Custody) handleBlockChainEvent(l types.Log) {
 		})
 
 		if err != nil {
-			log.Printf("[Resized] Error resizing channel: %v", err)
+			logger.Error("failed to resize channel", "channelId", channelID, "error", err)
 			return
 		}
+		logger.Info("resized channel", "channelId", channelID, "newAmount", channel.Amount)
 
 		c.sendBalanceUpdate(channel.Wallet)
 		c.sendChannelUpdate(channel)
 	default:
-		log.Println("Unknown event ID:", eventID.Hex())
+		logger.Warn("unknown event", "eventID", eventID.Hex())
 	}
 }
 
 // UpdateBalanceMetrics fetches the broker's account information from the smart contract and updates metrics
 func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metrics *Metrics) {
+	logger := LoggerFromContext(ctx)
+
 	if metrics == nil {
-		logger.Errorw("Metrics not initialized for custody client", "network", c.chainID)
+		logger.Error("metrics not initialized for custody client", "network", c.chainID)
 		return
 	}
 
@@ -454,12 +456,12 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			Context: ctx,
 		}
 
-		logger.Infow("Fetching account info", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "broker", brokerAddr.Hex())
+		logger.Debug("fetching account info", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "broker", brokerAddr.Hex())
 		// Call getAccountInfo on the custody contract
 		tokenAddr := common.HexToAddress(asset.Token)
 		info, err := c.custody.GetAccountInfo(callOpts, brokerAddr, tokenAddr)
 		if err != nil {
-			logger.Errorw("Failed to get account info", "network", c.chainID, "token", asset.Token, "error", err)
+			logger.Error("failed to get account info", "network", c.chainID, "token", asset.Token, "error", err)
 			continue
 		}
 
@@ -475,7 +477,7 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			"network": fmt.Sprintf("%d", c.chainID),
 		}).Set(float64(info.ChannelCount.Int64()))
 
-		logger.Infow("Updated contract balance metrics", "network", c.chainID, "available", availableBalance.String(), "channels", info.ChannelCount.String())
+		logger.Info("updated contract balance metrics", "network", c.chainID, "available", availableBalance.String(), "channels", info.ChannelCount.String())
 
 		// Fetch broker wallet balances
 		walletBalance := decimal.Zero
@@ -483,7 +485,7 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 		if asset.Token == "0x0000000000000000000000000000000000000000" {
 			walletBalanceRaw, err := c.client.BalanceAt(context.TODO(), brokerAddr, nil)
 			if err != nil {
-				logger.Errorw("Failed to get base_asset balance", "network", c.chainID, "token", asset.Token, "error", err)
+				logger.Error("failed to get base_asset balance", "network", c.chainID, "token", asset.Token, "error", err)
 				continue
 			}
 			walletBalance = decimal.NewFromBigInt(walletBalanceRaw, -int32(asset.Decimals))
@@ -491,13 +493,13 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 		} else {
 			caller, err := nitrolite.NewErc20(tokenAddr, c.client)
 			if err != nil {
-				logger.Errorw("Failed to initialize erc20 caller", "network", c.chainID, "token", asset.Token, "error", err)
+				logger.Error("failed to initialize erc20 caller", "network", c.chainID, "token", asset.Token, "error", err)
 				continue
 			}
 
 			walletBalanceRaw, err := caller.BalanceOf(callOpts, brokerAddr)
 			if err != nil {
-				logger.Errorw("Failed to get erc20 balance", "network", c.chainID, "token", asset.Token, "error", err)
+				logger.Error("failed to get erc20 balance", "network", c.chainID, "token", asset.Token, "error", err)
 				continue
 			}
 			walletBalance = decimal.NewFromBigInt(walletBalanceRaw, -int32(asset.Decimals))
@@ -509,6 +511,6 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			"asset":   asset.Symbol,
 		}).Set(walletBalance.InexactFloat64())
 
-		logger.Infow("Updated erc20 balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "balance", walletBalance.String())
+		logger.Info("updated erc20 balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "balance", walletBalance.String())
 	}
 }

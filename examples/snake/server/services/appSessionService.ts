@@ -55,8 +55,8 @@ export async function generateAppSessionMessage(roomId: string, participantA: He
 }> {
   try {
     // Format addresses to proper checksum format
-    const formattedParticipantA = ethers.utils.getAddress(participantA) as Hex;
-    const formattedParticipantB = ethers.utils.getAddress(participantB) as Hex;
+    const formattedParticipantA = ethers.getAddress(participantA) as Hex;
+    const formattedParticipantB = ethers.getAddress(participantB) as Hex;
 
     console.log(`Generating app session message for room ${roomId} with participants A: ${formattedParticipantA}, B: ${formattedParticipantB}`);
 
@@ -93,12 +93,12 @@ export async function generateAppSessionMessage(roomId: string, participantA: He
         {
           participant: formattedParticipantA,
           asset: 'usdc',
-          amount: '0.01',
+          amount: '0.00001',
         },
         {
           participant: formattedParticipantB,
           asset: 'usdc',
-          amount: '0.01',
+          amount: '0.00001',
         },
         {
           participant: serverAddress,
@@ -109,8 +109,7 @@ export async function generateAppSessionMessage(roomId: string, participantA: He
     }];
 
     // Generate the complete request structure
-    const sign = serverSigner;
-    const signedMessage = await createAppSessionMessage(sign, appSessionData);
+    const signedMessage = await createAppSessionMessage(serverSigner, appSessionData);
     const parsedMessage = JSON.parse(signedMessage);
 
     // Extract the request structure that clients should sign
@@ -152,7 +151,7 @@ export async function generateAppSessionMessage(roomId: string, participantA: He
 export async function addAppSessionSignature(roomId: string, participantAddress: Hex, signature: string): Promise<boolean> {
   try {
     // Format the participant address
-    const formattedParticipantAddress = ethers.utils.getAddress(participantAddress) as Hex;
+    const formattedParticipantAddress = ethers.getAddress(participantAddress) as Hex;
 
     const pendingSession = pendingAppSessions.get(roomId);
     if (!pendingSession) {

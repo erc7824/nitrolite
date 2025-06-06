@@ -11,7 +11,7 @@ import {
   clearNetRPC,
   initializeBroadcastFunction
 } from './gameService.ts';
-import { createAppSession, closeAppSession } from './brokerService.ts';
+import { closeAppSession } from './brokerService.ts';
 import {
   generateAppSessionMessage,
   addAppSessionSignature,

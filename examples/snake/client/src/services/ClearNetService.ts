@@ -1,9 +1,13 @@
 import {
     createGetLedgerBalancesMessage,
+    createPingMessage,
+    MessageSigner,
+    RequestData,
+    ResponsePayload,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, CHAIN_ID } from "../config";
 import { createEthersSigner, generateKeyPair } from "../crypto";
-import type { Account, Transport, Chain, Hex, ParseAccount, WalletClient } from "viem";
+import type { Account, Transport, Chain, Hex, ParseAccount, WalletClient, SignableMessage } from "viem";
 import { authenticate } from "./authentication";
 
 class ClearNetService {
@@ -166,24 +170,7 @@ class ClearNetService {
         }, delay) as unknown as number;
     }
 
-    private async authenticateWithBroker(): Promise<void> {
-        // If authentication is already in progress, return the existing promise
-        if (this.authenticationInProgress) {
-            console.log("Authentication already in progress, reusing existing authentication flow");
-            return this.authenticationInProgress;
-        }
-
-        if (!this.wsConnection || this.wsConnection.readyState !== WebSocket.OPEN) {
-            throw new Error("WebSocket not connected");
-        }
-
-        // Verify we have wallet client for authentication
-        const eip712SignerWalletClient = this.walletClient;
-        if (!eip712SignerWalletClient) {
-            throw new Error('No main wallet client (e.g., MetaMask) available for EIP-712 authentication');
-        }
-
-        // Get or create session key signer
+    private async getOrCreateKeyPair() {
         let keyPair = null;
         const savedKeys = localStorage.getItem("crypto_keypair");
 
@@ -202,6 +189,27 @@ class ClearNetService {
             }
         }
 
+        return keyPair;
+    }
+
+    private async authenticateWithBroker(): Promise<void> {
+        // If authentication is already in progress, return the existing promise
+        if (this.authenticationInProgress) {
+            console.log("Authentication already in progress, reusing existing authentication flow");
+            return this.authenticationInProgress;
+        }
+
+        if (!this.wsConnection || this.wsConnection.readyState !== WebSocket.OPEN) {
+            throw new Error("WebSocket not connected");
+        }
+
+        // Verify we have wallet client for authentication
+        const eip712SignerWalletClient = this.walletClient;
+        if (!eip712SignerWalletClient) {
+            throw new Error('No main wallet client (e.g., MetaMask) available for EIP-712 authentication');
+        }
+
+        const keyPair = await this.getOrCreateKeyPair();
         const signer = createEthersSigner(keyPair.privateKey);
 
         // Create and store the authentication promise
@@ -226,7 +234,7 @@ class ClearNetService {
         return this.authenticationInProgress;
     }
 
-    private handleWebSocketMessage(message: any): void {
+    private async handleWebSocketMessage(message: any): Promise<void> {
         console.log("Received WebSocket message:", message);
 
         // Check if it's a response to a pending request
@@ -251,6 +259,12 @@ class ClearNetService {
                 this.activeChannel = channel.channel_id;
                 console.log('[ClearNetService] Active channel updated:', this.activeChannel);
             }
+        }
+        if (message.res[1] === "ping") {
+            const keyPair = await this.getOrCreateKeyPair();
+            const signer = createEthersSigner(keyPair.privateKey);
+            const message = await createPingMessage(signer.sign);
+            this.wsConnection?.send(message);
         }
     }
 

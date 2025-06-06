@@ -3,7 +3,7 @@ import { defineEmits, defineProps, ref, watch, onMounted, onUnmounted } from 'vu
 import gameService, { type Room } from '../services/GameService';
 import clearNetService from '../services/ClearNetService';
 import { Hex } from 'viem';
-import { Web3Provider } from '@ethersproject/providers';
+import { CHAIN_ID } from '../config';
 
 // Add type declaration for window.ethereum
 declare global {
@@ -30,6 +30,7 @@ const isJoiningRoom = ref(false);
 const channelInfo = ref<Hex | null>(null);
 const availableRooms = gameService.getAvailableRooms();
 const networkName = ref<string>('');
+const isWrongChain = ref(false);
 
 onMounted(async () => {
   try {
@@ -39,9 +40,15 @@ onMounted(async () => {
 
     // Get network information
     if (window.ethereum) {
-      const provider = new Web3Provider(window.ethereum);
-      const network = await provider.getNetwork();
-      networkName.value = network.chainId.toString();
+      // const provider = new Web3Provider(window.ethereum);
+      // const network = await provider.getNetwork();
+      // networkName.value = network.chainId.toString();
+
+      // Check if the current chain matches the configured chain
+      // isWrongChain.value = network.chainId !== CHAIN_ID;
+      if (isWrongChain.value) {
+        emit('update:errorMessage', `Please switch to the correct network (Chain ID: ${CHAIN_ID})`);
+      }
     }
   } catch (error) {
     console.error('Failed to load active channel:', error);
@@ -139,11 +146,13 @@ const formatAddress = (address: string): string => {
             </svg>
             Network
           </div>
-          <div class="detail-value chain-info">
+          <div class="detail-value chain-info" :class="{ 'wrong-chain': isWrongChain }">
             <span>{{ networkName }}</span>
             <div class="status-indicator">
-              <div class="status-dot connected"></div>
-              <span class="status-text">Connected</span>
+              <div class="status-dot" :class="{ 'connected': !isWrongChain, 'error': isWrongChain }"></div>
+              <span class="status-text" :class="{ 'error': isWrongChain }">
+                {{ isWrongChain ? `switch to ${CHAIN_ID} & refresh page` : 'Connected' }}
+              </span>
             </div>
           </div>
         </div>
@@ -646,5 +655,17 @@ input::placeholder {
   margin-left: 16px;
   padding: 8px 16px;
   font-size: 0.9rem;
+}
+.chain-info.wrong-chain span {
+  color: #f44336;
+  border-color: #f44336;
+}
+
+.status-dot.error {
+  background-color: #f44336;
+}
+
+.status-text.error {
+  color: #f44336;
 }
 </style>

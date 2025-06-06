@@ -150,8 +150,13 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 				wsResponseData, _ := json.Marshal(rpcResponse)
 
 				if err := h.writeWSResponse(conn, wsResponseData); err != nil {
+					// Track RPC request failure by method
+					h.incrementRPCRequestCount(rpcMsg.Req.Method, "failure")
 					continue
 				}
+
+				// Track RPC request success by method
+				h.incrementRPCRequestCount(rpcMsg.Req.Method, "success")
 			}
 			continue
 
@@ -295,8 +300,6 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		var handlerErr error
 		var recordHistory = false
 
-		// Track RPC request by method
-		h.metrics.RPCRequests.WithLabelValues(msg.Req.Method).Inc()
 		if policy == nil {
 			h.sendErrorResponse(walletAddress, &msg, conn, "Policy not found for the user")
 			continue
@@ -438,6 +441,10 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 func forwardMessage(ctx context.Context, rpc *RPCMessage, msg []byte, fromAddress string, h *UnifiedWSHandler) error {
 	logger := LoggerFromContext(ctx)
 
+	// Track RPC request by method
+	requestHandleStatus := "failure"
+	defer h.incrementRPCRequestCount(rpc.Req.Method, requestHandleStatus)
+
 	var data *RPCData
 	if rpc.Req != nil {
 		data = rpc.Req
@@ -491,15 +498,21 @@ func forwardMessage(ctx context.Context, rpc *RPCMessage, msg []byte, fromAddres
 		}
 	}
 
+	requestHandleStatus = "success"
 	return nil
 }
 
 // sendErrorResponse creates and sends an error response to the client
 func (h *UnifiedWSHandler) sendErrorResponse(sender string, rpc *RPCMessage, conn *websocket.Conn, errMsg string) {
+	reqMethod := "unknown"
 	reqID := uint64(time.Now().UnixMilli())
 	if rpc != nil && rpc.Req != nil {
 		reqID = rpc.Req.RequestID
+		reqMethod = rpc.Req.Method
 	}
+
+	// Track RPC request by method
+	defer h.incrementRPCRequestCount(reqMethod, "failure")
 
 	response := CreateResponse(reqID, "error", []any{map[string]any{
 		"error": errMsg,
@@ -537,6 +550,11 @@ func (h *UnifiedWSHandler) sendErrorResponse(sender string, rpc *RPCMessage, con
 // sendResponse sends a response with a given method and payload to a recipient
 func (h *UnifiedWSHandler) sendResponse(recipient string, method string, payload []any, updateType string) {
 	logger := h.logger.With("updateType", updateType)
+
+	// Track RPC request by method
+	requestHandleStatus := "failure"
+	defer h.incrementRPCRequestCount(method, requestHandleStatus)
+
 	response := CreateResponse(uint64(time.Now().UnixMilli()), method, payload)
 
 	byteData, _ := json.Marshal(response.Req)
@@ -561,9 +579,22 @@ func (h *UnifiedWSHandler) sendResponse(recipient string, method string, payload
 
 		logger.Debug("successfully sent update", "recipient", recipient)
 	} else {
-		logger.Warn("recipient not connected", "recipient", recipient)
+		logger.Debug("recipient not connected", "recipient", recipient)
+
+		requestHandleStatus = ""
 		return
 	}
+
+	requestHandleStatus = "success"
+}
+
+// incrementRPCRequestCount increments the count of RPC requests for a specific method and status
+func (h *UnifiedWSHandler) incrementRPCRequestCount(method string, status string) {
+	if method == "" || status == "" {
+		return
+	}
+
+	h.metrics.RPCRequests.WithLabelValues(method, status).Inc()
 }
 
 // sendBalanceUpdate sends balance updates to the client

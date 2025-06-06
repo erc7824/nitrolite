@@ -40,11 +40,11 @@ export async function authenticate(
     }
 
     const rawWalletAddress = walletClient.account?.address;
-    
+
     if (!rawWalletAddress) {
         throw new Error('No wallet address available for authentication');
     }
-    
+
     // Ensure the address is properly checksummed for EIP-55 compliance
     const walletAddress = getAddress(rawWalletAddress);
 
@@ -120,7 +120,7 @@ export async function authenticate(
             authTimeoutId = setTimeout(() => {
                 cleanup();
                 reject(new Error('Authentication timeout'));
-            }, timeout);
+            }, timeout) as unknown as number;
         };
 
         const handleAuthResponse = async (event: MessageEvent) => {
@@ -197,17 +197,17 @@ export async function authenticate(
                         response.err?.[1] || response.error || response.res?.[2]?.[0]?.error || 'Authentication failed';
 
                     console.error('Authentication failed:', errorMsg);
-                    
+
                     // Check if this is a JWT authentication failure and fallback to signer auth
                     const errorString = String(errorMsg).toLowerCase();
                     if (errorString.includes('jwt') || errorString.includes('token') || errorString.includes('invalid') || errorString.includes('expired')) {
                         console.warn('JWT authentication failed on server, attempting fallback to signer authentication');
                         window.localStorage.removeItem('jwt_token');
-                        
+
                         try {
                             // Restart authentication with signer
                             const fallbackAuthRequest = await createAuthRequestMessage(authMessage);
-                            
+
                             console.log('Sending fallback auth_request with signer:', fallbackAuthRequest);
                             ws.send(fallbackAuthRequest);
                             resetTimeout(); // Reset timeout for the fallback attempt
@@ -219,7 +219,7 @@ export async function authenticate(
                             return;
                         }
                     }
-                    
+
                     window.localStorage.removeItem('jwt_token');
                     cleanup();
                     reject(new Error(String(errorMsg)));

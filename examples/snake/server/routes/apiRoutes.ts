@@ -217,7 +217,7 @@ export function setupApiRoutes(app: Express): void {
   app.post('/api/auth/challenge', ((req, res) => {
     const { address } = req.body;
 
-    if (!address || !ethers.utils.isAddress(address)) {
+    if (!address || !ethers.isAddress(address)) {
       return res.status(400).json({ error: 'Valid Ethereum address is required' });
     }
 

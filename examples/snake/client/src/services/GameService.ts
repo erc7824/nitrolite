@@ -2,7 +2,6 @@ import { ref } from 'vue';
 import type { Ref } from 'vue';
 import clearNetService from './ClearNetService';
 import { GAMESERVER_WS_URL } from '../config';
-import { Account, ParseAccount, Chain, Transport, WalletClient } from 'viem';
 import { createEthersSigner } from '../crypto';
 
 export interface GameState {

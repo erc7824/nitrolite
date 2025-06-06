@@ -601,16 +601,14 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
     }
 
     // Create close message and sign with server
-    const params: CloseAppSessionRequest[] = [
-        {
-            app_session_id: appId,
-            allocations: [participantA, participantB, signer.address].map((participant, index) => ({
-                participant,
-                asset: "usdc",
-                amount: index < 2 ? "0.00001" : "0", // Players get 0.00001, server gets 0
-            }))
-        }
-    ]
+    const params: CloseAppSessionRequest[] = [{
+        app_session_id: appId,
+        allocations: [participantA, participantB, signer.address].map((participant, index) => ({
+            participant,
+            asset: "usdc",
+            amount: index < 2 ? "0.00001" : "0", // Players get 0.00001, server gets 0
+        }))
+    }]
     const closeRequestData = await createCloseAppSessionMessage(signer.sign, params);
     const req = JSON.parse(closeRequestData);
     const serverSignature = await signer.sign(req);

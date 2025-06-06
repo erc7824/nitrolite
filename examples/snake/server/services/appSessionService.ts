@@ -1,7 +1,7 @@
 import { Hex } from 'viem';
 import { ethers } from 'ethers';
 import dotenv from 'dotenv';
-import { createAppSessionMessage, createCloseAppSessionMessage, AppDefinition, CreateAppSessionRequest, MessageSigner } from '@erc7824/nitrolite';
+import { createAppSessionMessage, AppDefinition, CreateAppSessionRequest, MessageSigner } from '@erc7824/nitrolite';
 import { SERVER_PRIVATE_KEY } from '../config/index.ts';
 import { DEFAULT_PROTOCOL, sendToBroker } from './brokerService.ts';
 
@@ -36,10 +36,10 @@ const roomAppSessions = new Map<string, AppSession>();
 const pendingAppSessions = new Map<string, PendingAppSession>();
 
 // Create server wallet for signing
-const serverWallet = new ethers.Wallet(SERVER_PRIVATE_KEY);
+export const serverWallet = new ethers.Wallet(SERVER_PRIVATE_KEY);
 
 // Create a compatible signer function
-const serverSigner: MessageSigner = async (payload: any): Promise<Hex> => {
+export const serverSigner: MessageSigner = async (payload: any): Promise<Hex> => {
   const message = typeof payload === 'string' ? payload : JSON.stringify(payload);
   return await serverWallet.signMessage(message) as Hex;
 };
@@ -275,121 +275,6 @@ export async function createAppSessionWithSignatures(roomId: string): Promise<st
   } catch (error) {
     console.error(`Error creating app session with signatures for room ${roomId}:`, error);
     throw error;
-  }
-}
-
-/**
- * Close an app session with winner taking the allocation
- */
-export async function closeAppSessionWithWinner(roomId: string, winnerId: 'A' | 'B' | null = null): Promise<boolean> {
-  try {
-    // Get the app session for this room
-    const appSession = roomAppSessions.get(roomId);
-    if (!appSession) {
-      console.warn(`No app session found for room ${roomId}`);
-      return false;
-    }
-
-    const { participantA, participantB } = appSession;
-
-    // Calculate allocations based on winner
-    let allocations: string[];
-    if (winnerId === 'A') {
-      // Player A wins - gets all the funds
-      allocations = ['0.02', '0', '0']; // A gets both initial allocations
-      console.log(`Player A (${participantA}) wins room ${roomId} - taking full allocation`);
-    } else if (winnerId === 'B') {
-      // Player B wins - gets all the funds
-      allocations = ['0', '0.02', '0']; // B gets both initial allocations
-      console.log(`Player B (${participantB}) wins room ${roomId} - taking full allocation`);
-    } else {
-      // Tie or no winner - split evenly
-      allocations = ['0.01', '0.01', '0'];
-      console.log(`Tie in room ${roomId} - splitting allocation evenly`);
-    }
-
-    // Use the existing closeAppSession function with calculated allocations
-    return await closeAppSession(roomId, allocations);
-
-  } catch (error) {
-    console.error(`Error closing app session with winner for room ${roomId}:`, error);
-    return false;
-  }
-}
-
-/**
- * Close an app session for a game room
- */
-export async function closeAppSession(roomId: string, allocations: string[]): Promise<boolean> {
-  try {
-    // Get the app session for this room
-    const appSession = roomAppSessions.get(roomId);
-    if (!appSession) {
-      console.warn(`No app session found for room ${roomId}`);
-      return false;
-    }
-
-    // Make sure appId exists and is properly extracted
-    const appId = appSession.appId;
-    if (!appId) {
-      console.error(`No appId found in app session for room ${roomId}`);
-      return false;
-    }
-
-    console.log(`Closing app session ${appId} for room ${roomId}`);
-
-    // Extract participant addresses from the stored app session
-    const { participantA, participantB, serverAddress } = appSession;
-
-    // Check if we have all the required participants
-    if (!participantA || !participantB || !serverAddress) {
-      throw new Error('Missing participant information in app session');
-    }
-
-    const finalAllocations = [
-      {
-        participant: participantA,
-        asset: 'usdc',
-        amount: allocations[0],
-      },
-      {
-        participant: participantB,
-        asset: 'usdc',
-        amount: allocations[1],
-      },
-      {
-        participant: serverAddress,
-        asset: 'usdc',
-        amount: allocations[2],
-      },
-    ];
-
-    // Final allocations and close request
-    const closeRequest = {
-      app_session_id: appId as Hex,
-      allocations: finalAllocations,
-    };
-
-    // Use the server wallet for signing
-    const sign = serverSigner;
-
-    // Create the signed message
-    const signedMessage = await createCloseAppSessionMessage(
-      sign,
-      [closeRequest],
-    );
-
-    console.debug(`Signed app session close message for room ${roomId}:`, signedMessage);
-
-    // Remove the app session
-    roomAppSessions.delete(roomId);
-
-    console.log(`Closed app session ${appId} for room ${roomId}`);
-    return true;
-
-  } catch (error) {
-    console.error(`Error closing app session for room ${roomId}:`, error);
-    return false;
   }
 }
 

@@ -1,10 +1,11 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type SignerWallet struct {
@@ -16,8 +17,10 @@ func (SignerWallet) TableName() string {
 	return "signers"
 }
 
+// walletCache is a thread-safe cache for signer-wallet mappings.
 var walletCache sync.Map
 
+// loadWalletCache populates the walletCache from the database.
 func loadWalletCache(db *gorm.DB) error {
 	var all []SignerWallet
 	if err := db.Find(&all).Error; err != nil {
@@ -29,6 +32,7 @@ func loadWalletCache(db *gorm.DB) error {
 	return nil
 }
 
+// GetWalletBySigner retrieves the wallet address associated with a given signer from the cache.
 func GetWalletBySigner(signer string) string {
 	if w, ok := walletCache.Load(signer); ok {
 		return w.(string)
@@ -36,23 +40,44 @@ func GetWalletBySigner(signer string) string {
 	return ""
 }
 
+// AddSigner adds a new signer-wallet mapping to the database.
 func AddSigner(db *gorm.DB, wallet, signer string) error {
-	sw := &SignerWallet{Signer: signer, Wallet: wallet}
+	return db.Transaction(func(tx *gorm.DB) error {
+		var existingSigner SignerWallet
 
-	if err := db.
-		Clauses(clause.OnConflict{DoNothing: true}).
-		Create(sw).Error; err != nil {
-		return err
-	}
+		err := tx.Where("signer = ?", signer).First(&existingSigner).Error
+		switch {
+		case err == nil:
+			if existingSigner.Wallet == wallet {
+				walletCache.Store(signer, wallet)
+				return nil
+			}
+			return fmt.Errorf("signer is already in use for another waller")
 
-	walletCache.Store(signer, wallet)
-	return nil
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			sw := &SignerWallet{Signer: signer, Wallet: wallet}
+			if err := tx.Create(sw).Error; err != nil {
+				return err
+			}
+			walletCache.Store(signer, wallet)
+			return nil
+
+		default:
+			return err
+		}
+	})
 }
 
+// RemoveSigner deletes a signer-wallet mapping from the database and cache.
 func RemoveSigner(db *gorm.DB, walletAddress, signerAddress string) error {
 	sw := &SignerWallet{
 		Signer: signerAddress,
 		Wallet: walletAddress,
 	}
-	return db.Delete(&sw).Error
+	if err := db.Delete(&sw).Error; err != nil {
+		return err
+	}
+
+	walletCache.Delete(signerAddress)
+	return nil
 }

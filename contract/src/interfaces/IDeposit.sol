@@ -26,10 +26,11 @@ interface IDeposit {
     /**
      * @notice Deposits tokens into the contract
      * @dev For native tokens, the value should be sent with the transaction
+     * @param account Address of the account whose ledger is changed
      * @param token Token address (use address(0) for native tokens)
      * @param amount Amount of tokens to deposit
      */
-    function deposit(address token, uint256 amount) external payable;
+    function deposit(address account, address token, uint256 amount) external payable;
 
     /**
      * @notice Withdraws tokens from the contract

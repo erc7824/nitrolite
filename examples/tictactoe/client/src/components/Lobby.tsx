@@ -6,7 +6,8 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { cn } from "../lib/utils";
 import { Wallet, Users, Loader2, KeyRound, GamepadIcon, RefreshCw, Clock, AlertCircle } from "lucide-react";
-import { useMetaMask } from "../hooks/useMetaMask";
+import { useAccount } from "wagmi";
+import { StyledWalletButton } from "./ui/styled-wallet-button";
 import { ChannelRequiredModal } from "./ChannelRequiredModal";
 import { OnlinePlayersCounter } from "./OnlinePlayersCounter";
 
@@ -30,8 +31,11 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
     // Use channel hook to check if channel exists
     const { isChannelOpen } = { isChannelOpen: true };
 
-    // Use MetaMask hook for wallet connection
-    const { address, isConnected: isWalletConnected, connectWallet, isConnecting, error: metamaskError, isMetaMaskInstalled } = useMetaMask();
+    // Use wagmi hook for wallet connection
+    const { address, isConnected: isWalletConnected } = useAccount();
+    
+    // Check if MetaMask is installed
+    const isMetaMaskInstalled = typeof window !== 'undefined' && typeof window.ethereum !== 'undefined';
 
     // Fetch available rooms when tab changes to 'join'
     useEffect(() => {
@@ -192,10 +196,6 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
         }
     };
 
-    // Handle connect wallet button click
-    const handleConnectWallet = async () => {
-        await connectWallet();
-    };
 
     return (
         <div className="flex flex-col items-center relative">
@@ -254,21 +254,7 @@ export function Lobby({ onJoinRoom, isConnected, error, availableRooms = [], onG
                                         Connect Your Wallet
                                     </h3>
                                     <p className="text-sm text-gray-400 mb-6">Connect your MetaMask wallet to create or join games.</p>
-                                    <Button onClick={handleConnectWallet} variant="glowCyan" size="xl" className="w-full" disabled={isConnecting}>
-                                        {isConnecting ? (
-                                            <>
-                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                                Connecting...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Wallet className="h-4 w-4 mr-2" />
-                                                Connect MetaMask
-                                            </>
-                                        )}
-                                    </Button>
-
-                                    {metamaskError && <p className="mt-4 text-sm text-red-400">{metamaskError}</p>}
+                                    <StyledWalletButton />
                                 </div>
                             </div>
                         </div>

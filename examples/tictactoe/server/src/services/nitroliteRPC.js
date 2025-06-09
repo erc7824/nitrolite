@@ -2,7 +2,14 @@
  * Nitrolite RPC (WebSocket) client
  * This file handles all WebSocket communication with Nitrolite server
  */
-import { createAuthRequestMessage, createAuthVerifyMessage, createPingMessage, NitroliteRPC } from "@erc7824/nitrolite";
+import { 
+    createAuthRequestMessage, 
+    createAuthVerifyMessage, 
+    createEIP712AuthMessageSigner,
+    createPingMessage, 
+    NitroliteRPC,
+    parseRPCResponse
+} from "@erc7824/nitrolite";
 import dotenv from "dotenv";
 import { ethers } from "ethers";
 import WebSocket from "ws";
@@ -12,28 +19,12 @@ import logger from "../utils/logger.js";
 import { getWalletClient } from "./nitroliteOnChain.js";
 
 /**
- * EIP-712 domain and types for auth_verify challenge
+ * EIP-712 domain for auth_verify challenge
  */
 const getAuthDomain = () => {
     return {
         name: "Nitro Aura",
     };
-};
-
-const AUTH_TYPES = {
-    Policy: [
-        { name: "challenge", type: "string" },
-        { name: "scope", type: "string" },
-        { name: "wallet", type: "address" },
-        { name: "application", type: "address" },
-        { name: "participant", type: "address" },
-        { name: "expire", type: "uint256" },
-        { name: "allowances", type: "Allowance[]" },
-    ],
-    Allowance: [
-        { name: "asset", type: "string" },
-        { name: "amount", type: "uint256" },
-    ],
 };
 
 const expire = String(Math.floor(Date.now() / 1000) + 24 * 60 * 60);
@@ -142,160 +133,120 @@ export class NitroliteRPCClient {
         this.onStatusChangeCallbacks.forEach((callback) => callback(status));
     }
 
-    // Extract challenge UUID from various data formats
-    extractChallenge(data) {
-        let challengeUUID = "";
-
-        if (Array.isArray(data)) {
-            logger.auth("Data is array, extracting challenge from position [2][0].challenge");
-            if (data.length >= 3 && Array.isArray(data[2]) && data[2].length > 0) {
-                const challengeObject = data[2][0];
-                if (challengeObject && challengeObject.challenge) {
-                    challengeUUID = challengeObject.challenge;
-                    logger.auth("Extracted challenge UUID from array:", challengeUUID);
-                }
-            }
-        } else if (typeof data === "string") {
-            try {
-                const parsed = JSON.parse(data);
-                logger.auth("Parsed challenge data:", parsed);
-
-                if (parsed.res && Array.isArray(parsed.res)) {
-                    if (parsed.res[1] === "auth_challenge" && parsed.res[2]) {
-                        challengeUUID = parsed.res[2].challenge_message || parsed.res[2].challenge;
-                        logger.auth("Extracted challenge UUID from auth_challenge:", challengeUUID);
-                    } else if (parsed.res[1] === "auth_verify" && Array.isArray(parsed.res[2]) && parsed.res[2][0]) {
-                        challengeUUID = parsed.res[2][0].challenge;
-                        logger.auth("Extracted challenge UUID from auth_verify:", challengeUUID);
-                    }
-                } else if (Array.isArray(parsed) && parsed.length >= 3 && Array.isArray(parsed[2])) {
-                    challengeUUID = parsed[2][0]?.challenge;
-                    logger.auth("Extracted challenge UUID from direct array:", challengeUUID);
-                }
-            } catch (e) {
-                logger.error("Could not parse challenge data:", e);
-                logger.auth("Using raw string as challenge");
-                challengeUUID = data;
-            }
-        } else if (data && typeof data === "object") {
-            challengeUUID = data.challenge || data.challenge_message;
-            logger.auth("Extracted challenge from object:", challengeUUID);
-        }
-
-        return challengeUUID;
-    }
-
-    // Sign message function that can be reused across the client
+    // Sign message function for non-auth requests
     async signMessage(data) {
-        const challengeUUID = this.extractChallenge(data);
-        const address = this.address;
-
-        if (!challengeUUID || challengeUUID.includes("[") || challengeUUID.includes("{")) {
-            // Fallback to regular signing for non-auth messages
-            if (!challengeUUID) {
-                const messageStr = typeof data === "string" ? data : JSON.stringify(data);
-
-                const digestHex = ethers.id(messageStr);
-                const messageBytes = ethers.getBytes(digestHex);
-
-                const { serialized: signature } = this.wallet.signingKey.sign(messageBytes);
-                return signature;
-            }
-
-            throw new Error("Could not extract valid challenge UUID for EIP-712 signing");
-        }
-
-        // Create EIP-712 message
-        const message = {
-            challenge: challengeUUID,
-            scope: "app.nitro.aura",
-            wallet: address,
-            application: address,
-            participant: address,
-            expire: expire,
-            allowances: [],
-        };
-
-        logger.auth("EIP-712 message to sign:", message);
-
-        try {
-            // Sign with EIP-712 using ethers
-            const signature = await this.wallet.signTypedData(getAuthDomain(), AUTH_TYPES, message);
-            logger.auth("EIP-712 signature generated for challenge:", signature);
-            return signature;
-        } catch (eip712Error) {
-            logger.error("EIP-712 signing failed:", eip712Error);
-            logger.auth("Attempting fallback to regular message signing...");
-
-            try {
-                // Fallback to regular message signing if EIP-712 fails
-                const fallbackMessage = `Authentication challenge for ${address}: ${challengeUUID}`;
-                logger.auth("Fallback message:", fallbackMessage);
-
-                const digestHex = ethers.id(fallbackMessage);
-                const messageBytes = ethers.getBytes(digestHex);
-
-                const { serialized: fallbackSignature } = this.wallet.signingKey.sign(messageBytes);
-                logger.auth("Fallback signature generated:", fallbackSignature);
-                return fallbackSignature;
-            } catch (fallbackError) {
-                logger.error("Fallback signing also failed:", fallbackError);
-                throw new Error(`Both EIP-712 and fallback signing failed: ${eip712Error.message}`);
-            }
-        }
+        const messageStr = typeof data === "string" ? data : JSON.stringify(data);
+        const digestHex = ethers.id(messageStr);
+        const messageBytes = ethers.getBytes(digestHex);
+        const { serialized: signature } = this.wallet.signingKey.sign(messageBytes);
+        return signature;
     }
 
-    // Authenticate with WebSocket server
-    async authenticate() {
+    /**
+     * Authenticates with the WebSocket server using:
+     * 1. auth_request: empty signature with wallet address
+     * 2. auth_verify: EIP-712 signature for challenge verification
+     *
+     * @param timeout - Timeout in milliseconds for the entire process
+     * @returns A Promise that resolves when authenticated
+     */
+    async authenticate(timeout = 10000) {
         if (!this.ws) {
             throw new Error("WebSocket not connected");
         }
 
-        logger.auth("Starting authentication process...");
+        logger.auth("Starting authentication with SDK 0.2.11 flow...");
+        logger.auth("- Wallet address:", this.address);
+        logger.auth("- EIP-712 signature for auth_verify challenge");
 
-        // Use the signMessage method for consistency
-        const sign = this.signMessage.bind(this);
+        const authMessage = {
+            wallet: this.address,
+            participant: this.address,
+            app_name: "Nitro Aura",
+            expire: expire, // 24 hours in seconds
+            scope: "console",
+            application: this.address,
+            allowances: [],
+        };
 
         return new Promise((resolve, reject) => {
-            const authRequest = async () => {
-                try {
-                    const request = await createAuthRequestMessage({
-                        wallet: this.address,
-                        participant: this.address,
-                        app_name: "Nitro Aura",
-                        expire: expire,
-                        scope: "app.nitro.aura",
-                        application: this.address,
-                        allowances: [],
-                    });
+            let authTimeoutId = null;
 
-                    logger.auth("Sending auth request:", request.slice(0, 100) + "...");
-                    this.ws.send(request);
-                } catch (error) {
-                    logger.error("Error creating auth request:", error);
-                    reject(error);
+            const cleanup = () => {
+                if (authTimeoutId) {
+                    clearTimeout(authTimeoutId);
+                    authTimeoutId = null;
                 }
+                this.ws.removeEventListener("message", handleAuthResponse);
             };
 
-            // Set up response handler
-            const handleAuthResponse = async (data) => {
+            const resetTimeout = () => {
+                if (authTimeoutId) {
+                    clearTimeout(authTimeoutId);
+                }
+                authTimeoutId = setTimeout(() => {
+                    cleanup();
+                    reject(new Error("Authentication timeout"));
+                }, timeout);
+            };
+
+            const handleAuthResponse = async (event) => {
+                const data = event.data || event;
+                
                 try {
-                    logger.auth(`Received authentication response: ${data.slice(0, 100)}...`);
+                    const response = parseRPCResponse(data);
 
-                    const response = JSON.parse(data);
+                    // Check for challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
+                    if (response.method === "auth_challenge") {
+                        logger.auth("Received auth_challenge, preparing EIP-712 auth_verify...");
+                        resetTimeout(); // Reset timeout while we process and send verify
 
-                    if (response.res && response.res[1] === "auth_challenge") {
-                        logger.auth("Received auth challenge, sending verification...");
+                        try {
+                            logger.auth("Creating EIP-712 signing function...");
+                            
+                            // Ensure we have a wallet client for EIP-712 signing
+                            if (!this.walletClient) {
+                                logger.auth("Initializing wallet client for EIP-712 signing...");
+                                this.walletClient = await getWalletClient(this.privateKey);
+                            }
+                            
+                            const eip712SigningFunction = createEIP712AuthMessageSigner(
+                                this.walletClient,
+                                {
+                                    scope: authMessage.scope,
+                                    application: authMessage.application,
+                                    participant: authMessage.participant,
+                                    expire: authMessage.expire,
+                                    allowances: authMessage.allowances.map((allowance) => ({
+                                        asset: allowance.symbol || allowance.asset,
+                                        amount: allowance.amount.toString(),
+                                    })),
+                                },
+                                getAuthDomain(),
+                            );
 
-                        // Use the same signMessage method for auth verification
-                        const authVerify = await createAuthVerifyMessage(sign, data);
-                        logger.auth(`Sending auth verification: ${authVerify.slice(0, 100)}...`);
-                        this.ws.send(authVerify);
-                    } else if (response.res && response.res[1] === "auth_verify") {
-                        logger.auth("Authentication successful!");
-                        this.ws.removeListener("message", authMessageHandler);
+                            logger.auth("Calling createAuthVerifyMessage...");
+                            const authVerify = await createAuthVerifyMessage(eip712SigningFunction, response);
 
-                        // Make sure status is set to CONNECTED before making any requests
+                            logger.auth("Sending auth_verify with EIP-712 signature");
+                            this.ws.send(authVerify);
+                            logger.auth("auth_verify sent successfully");
+                        } catch (eip712Error) {
+                            logger.error("Error creating EIP-712 auth_verify:", eip712Error);
+                            logger.error("Error stack:", eip712Error.stack);
+
+                            cleanup();
+                            reject(new Error(`EIP-712 auth_verify failed: ${eip712Error.message}`));
+                            return;
+                        }
+                    }
+                    // Check for success response
+                    else if (response.method === "auth_verify" && response.params.success) {
+                        logger.auth("Authentication successful");
+
+                        cleanup();
+                        
+                        // Set status to connected
                         this.setStatus(WSStatus.CONNECTED);
 
                         try {
@@ -313,32 +264,51 @@ export class NitroliteRPCClient {
                         }
 
                         resolve();
-                    } else if (response.err) {
-                        logger.error("Authentication error:", response.err);
-                        this.ws.removeListener("message", authMessageHandler);
-                        reject(new Error(response.err[2] || "Authentication failed"));
+                    }
+                    // Check for error response
+                    else if (response.method === "error") {
+                        const errorMsg = response.params.error || "Authentication failed";
+
+                        logger.error("Authentication failed:", errorMsg);
+                        cleanup();
+                        reject(new Error(String(errorMsg)));
+                    } else {
+                        logger.auth("Received non-auth message during auth, continuing to listen:", response);
+                        // Keep listening if it wasn't a final success/error
                     }
                 } catch (error) {
+                    // Ignore non-auth methods during authentication
+                    if (error.message && error.message.includes("Unknown method:")) {
+                        logger.auth("Ignoring non-auth message during authentication:", error.message);
+                        return;
+                    }
+                    
                     logger.error("Error handling auth response:", error);
-                    this.ws.removeListener("message", authMessageHandler);
-                    reject(error);
+                    logger.error("Error stack:", error.stack);
+                    cleanup();
+                    reject(new Error(`Authentication error: ${error instanceof Error ? error.message : String(error)}`));
                 }
             };
 
-            const authMessageHandler = (data) => {
-                handleAuthResponse(data.toString());
+            // Step 1: Send auth_request
+            const sendAuthRequest = async () => {
+                try {
+                    logger.auth("Sending auth_request...");
+                    const authRequest = await createAuthRequestMessage(authMessage);
+                    this.ws.send(authRequest);
+                    logger.auth("auth_request sent successfully");
+                } catch (requestError) {
+                    logger.error("Error creating auth_request:", requestError);
+                    cleanup();
+                    reject(new Error(`Failed to create auth_request: ${requestError.message}`));
+                }
             };
 
-            this.ws.on("message", authMessageHandler);
+            this.ws.addEventListener("message", handleAuthResponse);
+            resetTimeout(); // Start the initial timeout
 
             // Start authentication process
-            authRequest();
-
-            // Set timeout
-            setTimeout(() => {
-                this.ws.removeListener("message", authMessageHandler);
-                reject(new Error("Authentication timeout"));
-            }, 10000);
+            sendAuthRequest();
         });
     }
 
@@ -409,7 +379,7 @@ export class NitroliteRPCClient {
         return new Promise(async (resolve, reject) => {
             try {
                 const request = NitroliteRPC.createRequest(requestId, method, params);
-                const signedRequest = await NitroliteRPC.signRequestMessage(sign, request);
+                const signedRequest = await NitroliteRPC.signRequestMessage(request, sign);
 
                 logger.ws(`Sending request: ${JSON.stringify(signedRequest).slice(0, 100)}...`);
 

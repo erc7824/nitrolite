@@ -5,6 +5,7 @@ import { useStore } from "../store/storeUtils";
 import { parseTokenUnits } from "./utils/tokenDecimals";
 import { useWebSocketContext } from "../context/WebSocketContext";
 import type { State } from "@erc7824/nitrolite";
+import { USDC_ADDRESS } from '../context/NitroliteClientWrapper';
 
 // Define localStorage keys
 const STORAGE_KEYS = {
@@ -102,7 +103,7 @@ export function useChannel() {
                 console.log("Available client methods:", Object.keys(client));
 
                 const amountBigInt = parseTokenUnits(tokenAddress, amount);
-                const result = await client.createChannel({
+                const result = await client.createChannel(USDC_ADDRESS, {
                     initialAllocationAmounts: [amountBigInt, BigInt(0)],
                     stateData: EMPTY_STATE_DATA,
                 });
@@ -110,9 +111,8 @@ export function useChannel() {
                 saveChannelToStorage(result.initialState, result.channelId);
                 WalletStore.setChannelOpen(true);
 
-                // Set the channel in WebSocketContext
-                if (setNitroliteChannel && result.channel) {
-                    setNitroliteChannel(result.channel);
+                if (setNitroliteChannel && result) {
+                    setNitroliteChannel(result as any);
                 }
 
                 return result;
@@ -153,7 +153,7 @@ export function useChannel() {
 
             const amountBigInt = typeof amount === "string" && !amount.startsWith("0x") ? parseTokenUnits(tokenAddress, amount) : BigInt(amount);
 
-            await client.deposit(amountBigInt);
+            await client.deposit(USDC_ADDRESS, amountBigInt);
             WalletStore.openChannel(tokenAddress, amountBigInt.toString());
 
             return true;

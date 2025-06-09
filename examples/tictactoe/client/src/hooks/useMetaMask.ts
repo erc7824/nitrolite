@@ -1,136 +1,108 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ethers } from 'ethers';
+import { useState, useEffect } from 'react';
+import { type Address } from 'viem';
+import { useAccountModal, useConnectModal } from '@rainbow-me/rainbowkit';
+import { useAccount, useConnect, useSwitchChain } from 'wagmi';
+import { SettingsStore, WalletStore } from '../store';
+import { useStore } from '../store/storeUtils';
 
-interface MetaMaskState {
-  isConnected: boolean;
-  address: string;
-  provider: ethers.BrowserProvider | null;
-  isConnecting: boolean;
-  error: string | null;
-}
+// Storage key for wallet connection
+const WALLET_CONNECTION_KEY = 'wallet_connection';
 
 export function useMetaMask() {
-  const [state, setState] = useState<MetaMaskState>({
-    isConnected: false,
-    address: '',
-    provider: null,
-    isConnecting: false,
-    error: null,
-  });
+    const [isMetaMaskInstalled, setIsMetaMaskInstalled] =
+        useState<boolean>(false);
+    const walletState = useStore(WalletStore.state);
+    const settingsState = useStore(SettingsStore.state);
 
-  // Check if MetaMask is installed
-  const checkIfMetaMaskInstalled = useCallback((): boolean => {
-    const { ethereum } = window as any;
-    return Boolean(ethereum && ethereum.isMetaMask);
-  }, []);
+    const { openConnectModal } = useConnectModal();
+    const { openAccountModal } = useAccountModal();
 
-  // Connect to MetaMask
-  const connectWallet = useCallback(async () => {
-    try {
-      setState(prev => ({ ...prev, isConnecting: true, error: null }));
-      
-      if (!checkIfMetaMaskInstalled()) {
-        throw new Error('MetaMask is not installed');
-      }
+    const { address, isConnected, isConnecting, chain } = useAccount();
+    const { connect, connectors } = useConnect();
+    const { switchChain } = useSwitchChain();
 
-      const { ethereum } = window as any;
-      const provider = new ethers.BrowserProvider(ethereum);
-      
-      // Request accounts access
-      const accounts = await provider.send("eth_requestAccounts", []);
-      const address = ethers.getAddress(accounts[0]);
-      
-      // Update state with connection details
-      setState({
-        isConnected: true,
-        address,
-        provider,
-        isConnecting: false,
-        error: null,
-      });
-
-      return address;
-    } catch (error: any) {
-      console.error('Error connecting to MetaMask:', error);
-      setState(prev => ({
-        ...prev,
-        isConnecting: false,
-        isConnected: false,
-        error: error.message || 'Failed to connect to MetaMask',
-      }));
-      return null;
-    }
-  }, [checkIfMetaMaskInstalled]);
-
-  // Disconnect from MetaMask
-  const disconnectWallet = useCallback(() => {
-    setState({
-      isConnected: false,
-      address: '',
-      provider: null,
-      isConnecting: false,
-      error: null,
-    });
-  }, []);
-
-  // Listen for account changes
-  useEffect(() => {
-    if (!checkIfMetaMaskInstalled()) return;
-
-    const { ethereum } = window as any;
-    
-    const handleAccountsChanged = (accounts: string[]) => {
-      if (accounts.length === 0) {
-        // User disconnected their wallet
-        disconnectWallet();
-      } else if (ethers.getAddress(accounts[0]) !== state.address) {
-        // Account changed, update state
-        setState(prev => ({
-          ...prev,
-          address: ethers.getAddress(accounts[0]),
-          isConnected: true,
-        }));
-      }
-    };
-
-    const handleChainChanged = () => {
-      // Handle chain change by refreshing the page
-      window.location.reload();
-    };
-
-    // Subscribe to events
-    ethereum.on('accountsChanged', handleAccountsChanged);
-    ethereum.on('chainChanged', handleChainChanged);
-
-    // Check if already connected
-    ethereum.request({ method: 'eth_accounts' })
-      .then((accounts: string[]) => {
-        if (accounts.length > 0) {
-          const provider = new ethers.BrowserProvider(ethereum);
-          setState({
-            isConnected: true,
-            address: ethers.getAddress(accounts[0]),
-            provider,
-            isConnecting: false,
-            error: null,
-          });
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setIsMetaMaskInstalled(!!window.ethereum?.isMetaMask);
         }
-      })
-      .catch((err: Error) => console.error('Error checking accounts:', err));
+    }, []);
 
-    // Cleanup listeners on unmount
-    return () => {
-      if (ethereum.removeListener) {
-        ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        ethereum.removeListener('chainChanged', handleChainChanged);
-      }
+    useEffect(() => {
+        if (isConnected && address) {
+            if (
+                !walletState.isConnected ||
+                walletState.walletAddress !== address
+            ) {
+                WalletStore.connect(address as Address);
+                localStorage.setItem(WALLET_CONNECTION_KEY, 'true');
+            }
+
+            if (chain && walletState.chainId !== chain.id) {
+                WalletStore.setChainId(chain.id);
+            }
+        } else if (!isConnected && walletState.isConnected) {
+            localStorage.removeItem(WALLET_CONNECTION_KEY);
+        }
+    }, [
+        isConnected,
+        address,
+        chain,
+        walletState.isConnected,
+        walletState.walletAddress,
+        walletState.chainId,
+    ]);
+
+    // Connect using RainbowKit
+    const connectWallet = async () => {
+        try {
+            // Find MetaMask connector
+            const metamaskConnector = connectors.find((connector) =>
+                connector.name.toLowerCase().includes('metamask')
+            );
+
+            if (metamaskConnector) {
+                connect({ connector: metamaskConnector });
+            } else {
+                openConnectModal?.();
+            }
+        } catch (error) {
+            console.error('Error connecting wallet:', error);
+            WalletStore.setError('Failed to connect wallet');
+        }
     };
-  }, [checkIfMetaMaskInstalled, disconnectWallet, state.address]);
 
-  return {
-    ...state,
-    connectWallet,
-    disconnectWallet,
-    isMetaMaskInstalled: checkIfMetaMaskInstalled(),
-  };
+    const switchNetwork = async (chainId: number) => {
+        try {
+            await switchChain({ chainId });
+        } catch (error) {
+            console.error('Error switching network:', error);
+            WalletStore.setError('Failed to switch network');
+        }
+    };
+
+    useEffect(() => {
+        if (
+            settingsState.activeChain &&
+            chain &&
+            settingsState.activeChain !== chain.id &&
+            isConnected
+        ) {
+            WalletStore.setChainId(chain.id);
+        }
+    }, [settingsState.activeChain, chain, isConnected]);
+
+    return {
+        isMetaMaskInstalled,
+        isConnected: walletState.isConnected,
+        account: walletState.walletAddress,
+        address: walletState.walletAddress,
+        chainId: walletState.chainId,
+        error: walletState.error,
+        connect: connectWallet,
+        connectWallet,
+        openConnectModal,
+        openAccountModal,
+        switchNetwork,
+        isConnecting,
+    };
 }

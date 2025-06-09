@@ -42,6 +42,13 @@ func GetWalletBySigner(signer string) string {
 
 // AddSigner adds a new signer-wallet mapping to the database.
 func AddSigner(db *gorm.DB, wallet, signer string) error {
+	if w, ok := walletCache.Load(signer); ok {
+		if w.(string) == wallet {
+			return nil
+		}
+		return fmt.Errorf("signer is already in use for another wallet")
+	}
+
 	return db.Transaction(func(tx *gorm.DB) error {
 		var existingSigner SignerWallet
 
@@ -52,7 +59,7 @@ func AddSigner(db *gorm.DB, wallet, signer string) error {
 				walletCache.Store(signer, wallet)
 				return nil
 			}
-			return fmt.Errorf("signer is already in use for another waller")
+			return fmt.Errorf("signer is already in use for another wallet")
 
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			sw := &SignerWallet{Signer: signer, Wallet: wallet}

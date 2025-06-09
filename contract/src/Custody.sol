@@ -102,7 +102,7 @@ contract Custody is IChannel, IDeposit {
         _ledgers[account].tokens[token] += amount;
 
         if (token != address(0)) {
-            IERC20(token).safeTransferFrom(account, address(this), amount);
+            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         }
 
         emit Deposited(account, token, amount);

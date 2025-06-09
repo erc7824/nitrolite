@@ -23,11 +23,7 @@ export { server, wss };
 // Import after exports to avoid circular dependencies
 import { connectToBroker } from './services/brokerService.ts';
 import { setupWebSocketHandlers } from './services/websocketService.ts';
-import { setupApiRoutes } from './routes/apiRoutes.ts';
 import { gracefulShutdown } from './utils/shutdown.ts';
-
-// Setup API routes
-setupApiRoutes(app);
 
 // Setup WebSocket handlers
 setupWebSocketHandlers(wss);

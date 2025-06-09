@@ -4,6 +4,7 @@ import {
     createAuthRequestMessage,
     createAuthVerifyMessage,
     createAuthVerifyMessageWithJWT,
+    createEIP712AuthMessageSigner,
     RequestData,
     ResponsePayload,
     MessageSigner,
@@ -11,16 +12,19 @@ import {
     NitroliteRPC,
     createGetLedgerBalancesMessage,
     CreateAppSessionRequest,
+    createCloseAppSessionMessage,
     CloseAppSessionRequest,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
-import { Hex } from "viem";
+import { Hex, createWalletClient, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { polygon } from "viem/chains";
 
 import util from 'util';
 util.inspect.defaultOptions.depth = null;
 
-const DEFAULT_PROTOCOL = "app_snake_nitrolite";
+export const DEFAULT_PROTOCOL = "app_snake_nitrolite";
 const DEFAULT_WEIGHTS: number[] = [0, 0, 100]; // Alice: 0, Bob: 0, Server: 100
 const DEFAULT_QUORUM: number = 100; // server alone decides the outcome
 
@@ -118,6 +122,21 @@ async function authenticateWithBroker(): Promise<void> {
 
     const expire = String(Math.floor(Date.now() / 1000) + 24 * 60 * 60);
 
+    const authMessage = {
+        wallet: serverAddress,
+        participant: serverAddress,
+        app_name: 'Snake Game',
+        expire: expire,
+        scope: 'snake-game',
+        application: serverAddress,
+        allowances: [
+            {
+                symbol: 'usdc',
+                amount: '0',
+            },
+        ],
+    };
+
     return new Promise(async (resolve, reject) => {
         let authTimeout: NodeJS.Timeout;
 
@@ -139,8 +158,29 @@ async function authenticateWithBroker(): Promise<void> {
 
                     try {
                         // Step 2: Create EIP-712 signing function for challenge verification
+                        const account = privateKeyToAccount(WALLET_PRIVATE_KEY as Hex);
+                        const walletClient = createWalletClient({
+                            account,
+                            chain: polygon,
+                            transport: http()
+                        });
+
+                        if (!walletClient) {
+                            throw new Error('No wallet client available for EIP-712 signing');
+                        }
+
                         console.log('Creating EIP-712 signing function...');
-                        const eip712SigningFunction = createEIP712SigningFunction(serverAddress, expire);
+                        // @ts-ignore
+                        const eip712SigningFunction = createEIP712AuthMessageSigner(walletClient, {
+                            scope: authMessage.scope,
+                            application: authMessage.application,
+                            participant: authMessage.participant,
+                            expire: authMessage.expire,
+                            allowances: authMessage.allowances.map((allowance) => ({
+                                asset: allowance.symbol,
+                                amount: allowance.amount.toString(),
+                            })),
+                        }, getAuthDomain());
 
                         console.log('Calling createAuthVerifyMessage...');
                         // Create and send verification message with EIP-712 signature
@@ -197,20 +237,7 @@ async function authenticateWithBroker(): Promise<void> {
 
                         try {
                             // Restart authentication with signer
-                            const fallbackAuthRequest = await createAuthRequestMessage({
-                                wallet: serverAddress,
-                                participant: serverAddress,
-                                app_name: 'Snake Game',
-                                expire: expire,
-                                scope: 'snake-game',
-                                application: serverAddress,
-                                allowances: [
-                                    {
-                                        symbol: 'usdc',
-                                        amount: '0',
-                                    },
-                                ],
-                            });
+                            const fallbackAuthRequest = await createAuthRequestMessage(authMessage);
 
                             console.log('Sending fallback auth_request with signer:', fallbackAuthRequest);
                             brokerWs.send(fallbackAuthRequest);
@@ -271,38 +298,12 @@ async function authenticateWithBroker(): Promise<void> {
                     console.warn('JWT auth failed, falling back to signer authentication:', jwtError);
                     // Clear invalid JWT token
                     jwtToken = null;
-                    authRequest = await createAuthRequestMessage({
-                        wallet: serverAddress,
-                        participant: serverAddress,
-                        app_name: 'Snake Game',
-                        expire: expire,
-                        scope: 'snake-game',
-                        application: serverAddress,
-                        allowances: [
-                            {
-                                symbol: 'usdc',
-                                amount: '0',
-                            },
-                        ],
-                    });
+                    authRequest = await createAuthRequestMessage(authMessage);
                     usingJWT = false;
                 }
             } else {
                 console.log('No JWT token found, proceeding with challenge-response authentication');
-                authRequest = await createAuthRequestMessage({
-                    wallet: serverAddress,
-                    participant: serverAddress,
-                    app_name: 'Snake Game',
-                    expire: expire,
-                    scope: 'snake-game',
-                    application: serverAddress,
-                    allowances: [
-                        {
-                            symbol: 'usdc',
-                            amount: '0',
-                        },
-                    ],
-                });
+                authRequest = await createAuthRequestMessage(authMessage);
                 usingJWT = false;
             }
 
@@ -325,6 +326,17 @@ export function handleBrokerMessage(message: any): void {
         const requestId = message.res[0];
         const method = message.res[1];
         const payload = message.res[2];
+
+        // Handle ping messages
+        if (method === "ping") {
+            console.log("Received ping from broker, sending pong");
+            const brokerWs = getBrokerWebSocket();
+            if (brokerWs && brokerWs.readyState === WebSocket.OPEN) {
+                brokerWs.send(JSON.stringify({ type: "pong" }));
+            }
+            return;
+        }
+
         // Handle RPC format (new format with 'res' array)
         if (message.res && Array.isArray(message.res)) {
             // Check if it's an error message
@@ -528,10 +540,10 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
     };
     const params: CreateAppSessionRequest[] = [{
         definition: appDefinition,
-        allocations: participants.map((participant) => ({
+        allocations: participants.map((participant, index) => ({
             participant,
             asset: "usdc",
-            amount: "0",
+            amount: index < 2 ? "0.00001" : "0", // Players get 0.00001, server gets 0
         }))
     }]
     const timestamp = Date.now();
@@ -548,7 +560,7 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
     return appId;
 }
 
-// Closes an application session in the broker
+// Closes an application session in the broker with server signature only
 export async function closeAppSession(appId: Hex, participantA: Hex, participantB: Hex): Promise<void> {
     // Ensure we're authenticated before closing an app session
     if (!isAuthenticated) {
@@ -589,25 +601,27 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
         }
     }
 
-    // Prepare the request
-    const requestId = Date.now();
+    // Create close message and sign with server
     const params: CloseAppSessionRequest[] = [{
         app_session_id: appId,
-        allocations: [participantA, participantB, signer.address].map((participant) => ({
+        allocations: [participantA, participantB, signer.address].map((participant, index) => ({
             participant,
             asset: "usdc",
-            amount: "0",
-        })),
-    }];
-    const timestamp = Date.now();
+            amount: index < 2 ? "0.00001" : "0", // Players get 0.00001, server gets 0
+        }))
+    }]
+    const closeRequestData = await createCloseAppSessionMessage(signer.sign, params);
+    const req = JSON.parse(closeRequestData);
+    const serverSignature = await signer.sign(req);
 
-    // Create the request with properly formatted parameters
-    const request: { req: [number, string, CloseAppSessionRequest[], number] } = {
-        req: [requestId, "close_app_session", params, timestamp]
+    // Create the signed request with server signature only
+    const signedRequest = {
+        req: closeRequestData,
+        sig: [serverSignature]
     };
 
-    console.log("[closeAppSession] Sending close request:", request);
-    await sendToBroker(request);
+    console.log("[closeAppSession] Sending close request with server signature:", signedRequest);
+    await sendToBroker(signedRequest);
     console.log(`[closeAppSession] Closed app session ${appId}`);
 }
 
@@ -645,13 +659,16 @@ export function createEthersSigner(privateKey: string): WalletSigner {
         const wallet = new ethers.Wallet(privateKey);
 
         return {
-            publicKey: wallet.publicKey,
+            publicKey: wallet.address,
             address: wallet.address as Hex,
-            sign: async (payload: RequestData | ResponsePayload): Promise<Hex> => {
+            sign: async (data: RequestData | ResponsePayload): Promise<Hex> => {
                 try {
-                    const messageBytes = ethers.utils.arrayify(ethers.utils.id(JSON.stringify(payload)));
-                    const flatSignature = wallet._signingKey().signDigest(messageBytes);
-                    const signature = ethers.utils.joinSignature(flatSignature);
+                    const messageStr = typeof data === "string" ? data : JSON.stringify(data);
+
+                    const digestHex = ethers.id(messageStr);
+                    const messageBytes = ethers.getBytes(digestHex);
+
+                    const { serialized: signature } = wallet.signingKey.sign(messageBytes);
                     return signature as Hex;
                 } catch (error) {
                     console.error("Error signing message:", error);
@@ -675,7 +692,7 @@ export async function signRpcRequest(requestData: any[]): Promise<string> {
 export function verifySignature(message: string, signature: string, expectedAddress: string): boolean {
     try {
         // Use standard Ethereum message verification
-        const recoveredAddress = ethers.utils.verifyMessage(message, signature);
+        const recoveredAddress = ethers.verifyMessage(message, signature);
 
         // Check if the recovered address matches the expected address
         return recoveredAddress.toLowerCase() === expectedAddress.toLowerCase();
@@ -694,120 +711,4 @@ const getAuthDomain = () => {
     };
 };
 
-const AUTH_TYPES = {
-    Policy: [
-        { name: 'challenge', type: 'string' },
-        { name: 'scope', type: 'string' },
-        { name: 'wallet', type: 'address' },
-        { name: 'application', type: 'address' },
-        { name: 'participant', type: 'address' },
-        { name: 'expire', type: 'uint256' },
-        { name: 'allowances', type: 'Allowance[]' },
-    ],
-    Allowance: [
-        { name: 'asset', type: 'string' },
-        { name: 'amount', type: 'uint256' },
-    ],
-};
 
-/**
- * Creates EIP-712 signing function for challenge verification with proper challenge extraction
- */
-function createEIP712SigningFunction(serverAddress: string, expire: string) {
-    const wallet = new ethers.Wallet(WALLET_PRIVATE_KEY);
-
-    return async (data: any): Promise<Hex> => {
-        console.log('Signing auth_verify challenge with EIP-712:', data);
-
-        let challengeUUID = '';
-
-        // The data coming in is the array from createAuthVerifyMessage
-        // Format: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
-        if (Array.isArray(data)) {
-            console.log('Data is array, extracting challenge from position [2][0].challenge');
-
-            // Direct array access - data[2] should be the array with the challenge object
-            if (data.length >= 3 && Array.isArray(data[2]) && data[2].length > 0) {
-                const challengeObject = data[2][0];
-
-                if (challengeObject && challengeObject.challenge) {
-                    challengeUUID = challengeObject.challenge;
-                    console.log('Extracted challenge UUID from array:', challengeUUID);
-                }
-            }
-        } else if (typeof data === 'string') {
-            try {
-                const parsed = JSON.parse(data);
-
-                console.log('Parsed challenge data:', parsed);
-
-                // Handle different message structures
-                if (parsed.res && Array.isArray(parsed.res)) {
-                    // auth_challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
-                    if (parsed.res[1] === 'auth_challenge' && parsed.res[2]) {
-                        challengeUUID = parsed.res[2].challenge_message || parsed.res[2].challenge;
-                        console.log('Extracted challenge UUID from auth_challenge:', challengeUUID);
-                    }
-                    // auth_verify message: [timestamp, "auth_verify", [{"address": "0x...", "challenge": "uuid"}], timestamp]
-                    else if (parsed.res[1] === 'auth_verify' && Array.isArray(parsed.res[2]) && parsed.res[2][0]) {
-                        challengeUUID = parsed.res[2][0].challenge;
-                        console.log('Extracted challenge UUID from auth_verify:', challengeUUID);
-                    }
-                }
-                // Direct array format
-                else if (Array.isArray(parsed) && parsed.length >= 3 && Array.isArray(parsed[2])) {
-                    challengeUUID = parsed[2][0]?.challenge;
-                    console.log('Extracted challenge UUID from direct array:', challengeUUID);
-                }
-            } catch (e) {
-                console.error('Could not parse challenge data:', e);
-                console.log('Using raw string as challenge');
-                challengeUUID = data;
-            }
-        } else if (data && typeof data === 'object') {
-            // If data is already an object, try to extract challenge
-            challengeUUID = data.challenge || data.challenge_message;
-            console.log('Extracted challenge from object:', challengeUUID);
-        }
-
-        if (!challengeUUID || challengeUUID.includes('[') || challengeUUID.includes('{')) {
-            console.error('Challenge extraction failed or contains invalid characters:', challengeUUID);
-            throw new Error('Could not extract valid challenge UUID for EIP-712 signing');
-        }
-
-        console.log('Final challenge UUID for EIP-712:', challengeUUID);
-        console.log('Signing for address (original):', serverAddress);
-        console.log('Signing for address (type):', typeof serverAddress);
-        console.log('Auth domain:', getAuthDomain());
-
-        // Create EIP-712 message with ONLY the challenge UUID
-        const message = {
-            challenge: challengeUUID,
-            scope: 'snake-game',
-            wallet: serverAddress as `0x${string}`,
-            application: serverAddress as `0x${string}`,
-            participant: serverAddress as `0x${string}`,
-            expire: expire,
-            allowances: [
-                {
-                    asset: 'usdc',
-                    amount: '0',
-                },
-            ],
-        };
-
-
-        try {
-            // Sign with EIP-712
-            const signature = await wallet._signTypedData(getAuthDomain(), AUTH_TYPES, message);
-
-            console.log('EIP-712 signature generated for challenge:', signature);
-
-
-            return signature as `0x${string}`;
-        } catch (eip712Error) {
-            console.error('EIP-712 signing failed:', eip712Error);
-            throw new Error(`EIP-712 signing failed: ${(eip712Error as Error).message}`);
-        }
-    };
-}

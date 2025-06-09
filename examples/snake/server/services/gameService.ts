@@ -1,8 +1,6 @@
 import { randomBytes } from 'crypto';
 import { Player } from '../interfaces/index.ts';
 import { getRoom } from './stateService.ts';
-import { closeAppSession } from './brokerService.ts';
-import { Hex } from 'viem';
 
 // Import websocketService to broadcast game state - imported at bottom of file to avoid circular dependency
 let broadcastGameStateToClients: (roomId: string, gameState: any) => void;
@@ -194,33 +192,6 @@ export async function broadcastGameState(roomId: string): Promise<void> {
   // Store the current state in the room
   room.currentState = gameState;
 
-  // If game is over, close the app session on the broker
-  if (gameState.isGameOver && room.appId && room.channelIds.size > 0 && !room.isClosingAppSession) {
-    console.log(`[broadcastGameState] Game is over, preparing to close app session`);
-
-    try {
-      // Mark that we're closing the app session
-      room.isClosingAppSession = true;
-
-      // Close the app session
-      console.log(`[broadcastGameState] Closing app session`);
-      const players = Array.from(room.players.values());
-      await closeAppSession(
-        room.appId,
-        room.playerAddresses.get(players[0].id) as Hex,
-        room.playerAddresses.get(players[1].id) as Hex);
-      console.log(`[broadcastGameState] App session closed successfully`);
-
-      // Clear the app ID after successful closure
-      room.appId = undefined;
-    } catch (error) {
-      console.error(`[broadcastGameState] Error closing app session:`, error);
-      // Don't clear the app ID on error - it might still be valid
-    } finally {
-      room.isClosingAppSession = false;
-    }
-  }
-
   // Broadcast to all players in the room if the broadcast function is initialized
   if (broadcastGameStateToClients) {
     console.log(`[broadcastGameState] Broadcasting to clients at ${Date.now()}`);
@@ -231,20 +202,3 @@ export async function broadcastGameState(roomId: string): Promise<void> {
   }
 }
 
-// Mock ClearNet RPC for now
-// TODO: drop this
-export const clearNetRPC = {
-  getChannelInfo: async (channelId: string) => {
-    return {
-      id: channelId,
-      participants: [],
-      status: 'open',
-      allocations: [100, 100] // Default allocations for testing
-    };
-  },
-  finalizeChannel: async (channelId: string, finalState: any) => {
-    // TODO: Implement finalize channel
-    console.log(`Mock finalizing channel ${channelId} with state:`, finalState);
-    return true;
-  }
-};

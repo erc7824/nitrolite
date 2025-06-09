@@ -6,10 +6,9 @@ import clearNetService from './services/ClearNetService';
 import gameService from './services/GameService';
 import { createWalletClient, custom, Hex } from 'viem';
 import { polygon } from 'viem/chains';
-import { CryptoKeypair, generateKeyPair } from './crypto';
-import { privateKeyToAccount } from 'viem/accounts';
+import { CryptoKeypair } from './crypto';
+import { ethers } from "ethers";
 
-const nickname = ref('');
 const roomId = ref('');
 const currentScreen = ref('lobby'); // 'lobby' or 'game'
 const errorMessage = ref('');
@@ -18,10 +17,6 @@ const walletAddress = ref('');
 
 // Create a new game room
 const createRoom = async () => {
-  if (!nickname.value.trim()) {
-    errorMessage.value = 'Please enter a nickname';
-    return;
-  }
   if (!clearNetService) {
     errorMessage.value = 'ClearNet service not initialized';
     return;
@@ -37,7 +32,7 @@ const createRoom = async () => {
   try {
     const walletAddress = clearNetService.walletClient?.account.address as Hex;
     await gameService.createRoom(
-      nickname.value.trim(),
+      walletAddress,
       activeChannelId,
       walletAddress
     );
@@ -49,11 +44,6 @@ const createRoom = async () => {
 
 // Join an existing game room
 const joinRoom = async () => {
-  if (!nickname.value.trim()) {
-    errorMessage.value = 'Please enter a nickname';
-    return;
-  }
-
   if (!roomId.value.trim()) {
     errorMessage.value = 'Please enter a room ID';
     return;
@@ -74,7 +64,7 @@ const joinRoom = async () => {
     const walletAddress = clearNetService.walletClient?.account.address as Hex;
     await gameService.joinRoom(
       roomId.value.trim(),
-      nickname.value.trim(),
+      walletAddress,
       activeChannelId,
       walletAddress
     );
@@ -145,28 +135,17 @@ const autoConnect = async () => {
     });
 
     // Get or create session key
-    let keyPair: CryptoKeypair | null = null;
-    const savedKeys = localStorage.getItem('crypto_keypair');
+    let keyPair: CryptoKeypair = await clearNetService.getOrCreateKeyPair();
+    const wallet = new ethers.Wallet(keyPair.privateKey);
+    const stateWalletClient = {
+      ...wallet,
+      account: { address: wallet.address, },
+      signMessage: async ({ message: { raw } }: { message: { raw: string } }) => {
+        const { serialized: signature } = wallet.signingKey.sign(raw as ethers.BytesLike);
 
-    if (savedKeys) {
-      try {
-        keyPair = JSON.parse(savedKeys);
-      } catch (error) {
-        console.error('[App] Failed to parse saved keypair, generating new one');
-        keyPair = null;
-      }
-    }
-
-    if (!keyPair) {
-      keyPair = await generateKeyPair();
-      localStorage.setItem('crypto_keypair', JSON.stringify(keyPair));
-    }
-
-    const stateWalletClient = createWalletClient({
-      account: privateKeyToAccount(keyPair.privateKey),
-      chain: polygon,
-      transport: custom(ethereum)
-    });
+        return signature as Hex;
+      },
+    };
 
     console.log('[App] Initializing ClearNetService...');
     // @ts-ignore
@@ -220,13 +199,22 @@ onUnmounted(() => {
       </div>
 
       <div v-else>
-        <Lobby v-if="currentScreen === 'lobby'" v-model:nickname="nickname" v-model:roomId="roomId"
-          :socket="gameService.getWebSocket()" :walletAddress="walletAddress"
-          :errorMessage="gameService.getErrorMessage().value" @create-room="createRoom" @join-room="joinRoom" />
+        <!-- Signature collection overlay -->
+        <div v-if="gameService.getIsSigningAppSession().value" class="signature-overlay">
+          <div class="signature-container">
+            <div class="signature-spinner"></div>
+            <h3>App Session</h3>
+            <p>{{ gameService.getSignatureStatus().value }}</p>
+          </div>
+        </div>
+
+        <Lobby v-if="currentScreen === 'lobby'" v-model:roomId="roomId" :socket="gameService.getWebSocket()"
+          :walletAddress="walletAddress" :errorMessage="gameService.getErrorMessage().value" @create-room="createRoom"
+          @join-room="joinRoom" />
 
         <GameRoom v-else-if="currentScreen === 'game'" :roomId="gameService.getRoomId().value"
-          :playerId="gameService.getPlayerId().value" :nickname="nickname" :socket="gameService.getWebSocket()"
-          @exit-game="currentScreen = 'lobby'" />
+          :walletAddress="walletAddress" :playerId="gameService.getPlayerId().value"
+          :socket="gameService.getWebSocket()" @exit-game="currentScreen = 'lobby'" />
       </div>
     </main>
   </div>
@@ -313,5 +301,55 @@ h1 {
 
 .retry-btn:hover {
   background-color: #388E3C;
+}
+
+.signature-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.signature-container {
+  background: white;
+  padding: 40px;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 400px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.signature-container h3 {
+  color: #4CAF50;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+}
+
+.signature-container p {
+  color: #333;
+  margin-bottom: 20px;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.signature-container small {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.signature-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
 }
 </style>

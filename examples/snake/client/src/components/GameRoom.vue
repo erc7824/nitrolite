@@ -5,7 +5,7 @@ import gameService from '../services/GameService';
 const props = defineProps<{
   roomId: string;
   playerId: string;
-  nickname: string;
+  walletAddress: string;
 }>();
 
 const emit = defineEmits(['exit-game']);
@@ -39,12 +39,26 @@ const hasVoted = ref(false);
 const playerDisconnectMessage = ref('');
 const showDisconnectNotification = ref(false);
 
+// Add formatAddress function
+const formatAddress = (address: string): string => {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
+
 // Handle incoming WebSocket messages
 const handleMessage = (event: MessageEvent) => {
   try {
     const data = JSON.parse(event.data);
 
     if (data.type === 'gameState') {
+      // Replace nickname with wallet address for the current player
+      if (data.players) {
+        data.players = data.players.map((player: Player) => {
+          if (player.id === props.playerId) {
+            return { ...player, nickname: props.walletAddress };
+          }
+          return player;
+        });
+      }
       gameState.value = data;
       isGameStarted.value = true;
       waitingForPlayer.value = false;
@@ -228,13 +242,13 @@ const drawGame = () => {
       });
     }
 
-    // Draw player nickname and score (for all players, even dead ones)
+    // Draw player wallet address and score (for all players, even dead ones)
     const status = player.isDead ? " (DEAD)" : "";
     ctx.value!.fillStyle = player.isDead ? "#999" : color;
     ctx.value!.font = '14px Arial';
     ctx.value!.textAlign = 'left';
     const scoreY = index === 0 ? 20 : 40;
-    ctx.value!.fillText(`${player.nickname}${status}: ${player.score}`, 10, scoreY);
+    ctx.value!.fillText(`${formatAddress(player.nickname)}${status}: ${player.score}`, 10, scoreY);
   });
 };
 
@@ -313,23 +327,33 @@ const copyRoomId = () => {
     });
 };
 
-// Close channel and withdraw funds
-const closeChannel = async () => {
+const closeSession = async () => {
   try {
-    // Notify the server to finalize the game and close the app session
-    const ws = gameService.getWebSocket();
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'finalizeGame',
-        roomId: props.roomId,
-        playerId: props.playerId
-      }));
+    // Disable the button to prevent double-clicks
+    const closeButton = document.querySelector('.close-channel-btn') as HTMLButtonElement;
+    if (closeButton) {
+      closeButton.disabled = true;
+      closeButton.textContent = 'Closing Channel...';
     }
+
+    // Call finalizeGame on the game service
+    gameService.finalizeGame();
+
+    // Wait a short moment to ensure the message is processed
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Exit game and return to lobby
     emit('exit-game');
   } catch (error) {
     console.error('Error closing channel:', error);
+    // Re-enable the button if there's an error
+    const closeButton = document.querySelector('.close-channel-btn') as HTMLButtonElement;
+    if (closeButton) {
+      closeButton.disabled = false;
+      closeButton.textContent = 'Exit';
+    }
+    // Show error to user
+    alert('Failed to close channel. Please try again.');
   }
 };
 
@@ -357,7 +381,8 @@ const playAgain = () => {
         Room:
         <span class="room-id" @click="copyRoomId" title="Click to copy">{{ roomId.slice(0, 8) }}</span>
         <button class="copy-btn" @click="copyRoomId" title="Copy room ID">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
           </svg>
@@ -376,7 +401,7 @@ const playAgain = () => {
       <div v-if="gameState">
         <div v-for="player in gameState.players" :key="player.id" class="player-result">
           <span :class="{ 'winner': isHighestScore(player) }">
-            {{ player.nickname }}: {{ player.score }} points
+            {{ player.nickname.slice(0, 8) }}: {{ player.score }} points
             <span v-if="isHighestScore(player)" class="winner-badge">
               {{ isTie() ? 'TIE!' : 'WINNER!' }}
             </span>
@@ -402,14 +427,9 @@ const playAgain = () => {
       </div>
 
       <div class="game-over-actions">
-        <button @click="closeChannel" class="close-channel-btn">Close Channel & Withdraw</button>
-        <button
-          v-if="!showDisconnectNotification"
-          @click="playAgain"
-          class="play-again-btn"
-          :class="{ 'voted': hasVoted }"
-          :disabled="hasVoted"
-        >
+        <button @click="closeSession" class="close-channel-btn">Exit</button>
+        <button v-if="!showDisconnectNotification" @click="playAgain" class="play-again-btn"
+          :class="{ 'voted': hasVoted }" :disabled="hasVoted">
           {{ hasVoted ? 'Voted to Play Again' : 'Vote to Play Again' }}
         </button>
       </div>

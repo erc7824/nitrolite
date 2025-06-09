@@ -8,8 +8,8 @@ const challenges = new Map<string, { challenge: string, timestamp: number }>();
 export function generateChallenge(address: string): { challenge: string, timestamp: number } {
   // Generate a random challenge
   const timestamp = Date.now();
-  const randomBytes = ethers.utils.randomBytes(16);
-  const randomHex = ethers.utils.hexlify(randomBytes);
+  const randomBytes = ethers.randomBytes(16);
+  const randomHex = ethers.hexlify(randomBytes);
   const challenge = `Sign this message to authenticate with Nitro Snake: ${randomHex} at ${timestamp}`;
 
   // Store the challenge
@@ -20,7 +20,7 @@ export function generateChallenge(address: string): { challenge: string, timesta
 
 // Verify a client's signature against a stored challenge
 export function verifyChallengeSignature(address: string, signature: string): boolean {
-  if (!ethers.utils.isAddress(address)) {
+  if (!ethers.isAddress(address)) {
     return false;
   }
 

@@ -8,11 +8,17 @@ import {
   generateFood,
   initializePlayer,
   gameTick,
-  clearNetRPC,
   initializeBroadcastFunction
 } from './gameService.ts';
-import { createAppSession, closeAppSession } from './brokerService.ts';
+import { closeAppSession, sendToBroker } from './brokerService.ts';
+import {
+  generateAppSessionMessage,
+  addAppSessionSignature,
+  serverSigner,
+  serverWallet
+} from './appSessionService.ts';
 import { Hex } from 'viem';
+import { CloseAppSessionRequest, createCloseAppSessionMessage } from '@erc7824/nitrolite';
 
 // Global reference to the WebSocket server
 let webSocketServer: WebSocketServer;
@@ -115,6 +121,8 @@ function broadcastPlayerDisconnect(roomId: string, playerNickname: string): void
 
 // Handle WebSocket message
 async function handleWebSocketMessage(ws: SnakeWebSocket, data: any): Promise<void> {
+  console.log(`[websocketService] Received message type: ${data.type}`, data);
+
   switch (data.type) {
     case 'createRoom': {
       await handleCreateRoom(ws, data);
@@ -137,6 +145,7 @@ async function handleWebSocketMessage(ws: SnakeWebSocket, data: any): Promise<vo
     }
 
     case 'finalizeGame': {
+      console.log('[websocketService] Handling finalizeGame message:', data);
       await handleFinalizeGame(data);
       break;
     }
@@ -150,13 +159,28 @@ async function handleWebSocketMessage(ws: SnakeWebSocket, data: any): Promise<vo
       handleUnsubscribeRooms(ws);
       break;
     }
+
+    case 'appSession:signature': {
+      await handleAppSessionSignature(ws, data);
+      break;
+    }
+
+    case 'closeSessionSignature': {
+      await handleCloseSessionSignature(data);
+      break;
+    }
+
+    default: {
+      console.log(`[websocketService] Unknown message type: ${data.type}`);
+      break;
+    }
   }
 }
 
 // Handle create room message
 async function handleCreateRoom(ws: SnakeWebSocket, data: any): Promise<void> {
   console.log('[websocketService] Creating room with data:', data);
-  
+
   // Check if player is already in a room
   if (ws.roomId) {
     console.log(`[websocketService] Player ${ws.playerId} already in room ${ws.roomId}, ignoring create room request`);
@@ -166,7 +190,7 @@ async function handleCreateRoom(ws: SnakeWebSocket, data: any): Promise<void> {
     }));
     return;
   }
-  
+
   const roomId = generateRoomId();
   const { nickname, channelId, walletAddress } = data;
   const gridSize = { width: 40, height: 30 };
@@ -185,7 +209,8 @@ async function handleCreateRoom(ws: SnakeWebSocket, data: any): Promise<void> {
     playerAddresses: new Map([[player.id, walletAddress]]),
     currentState: null,
     stateVersion: 0,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    closeSessionSignatures: new Map()
   };
 
   // Add channelId if provided
@@ -207,7 +232,7 @@ async function handleCreateRoom(ws: SnakeWebSocket, data: any): Promise<void> {
   }));
 
   console.log(`[websocketService] Room created: ${roomId}, Player: ${player.id}, Address: ${walletAddress}`);
-  
+
   // Notify subscribers about new room
   broadcastRoomUpdate(roomId);
 }
@@ -215,7 +240,7 @@ async function handleCreateRoom(ws: SnakeWebSocket, data: any): Promise<void> {
 // Handle join room message
 async function handleJoinRoom(ws: SnakeWebSocket, data: any): Promise<void> {
   console.log('[websocketService] Joining room with data:', data);
-  
+
   // Check if player is already in a room
   if (ws.roomId) {
     console.log(`[websocketService] Player ${ws.playerId} already in room ${ws.roomId}, ignoring join room request`);
@@ -225,7 +250,7 @@ async function handleJoinRoom(ws: SnakeWebSocket, data: any): Promise<void> {
     }));
     return;
   }
-  
+
   const { roomId, nickname, channelId, walletAddress } = data;
   const room = getRoom(roomId);
   console.log('[websocketService] Room lookup result:', room ? 'found' : 'not found');
@@ -270,81 +295,49 @@ async function handleJoinRoom(ws: SnakeWebSocket, data: any): Promise<void> {
 
   console.log(`Player joined room: ${roomId}, Player: ${player.id}, Address: ${walletAddress}`);
   console.log('Room data:', room);
-  
+
   // Notify subscribers about room update
   broadcastRoomUpdate(roomId);
 
-  // If we have 2 players and a channel, create the app session
+  // If we have 2 players and a channel, initiate app session creation with signatures
   if (room.players.size === 2 && room.channelIds.size > 0) {
     try {
       const players = Array.from(room.players.values());
+      const participantA = room.playerAddresses.get(players[0].id) as Hex;
+      const participantB = room.playerAddresses.get(players[1].id) as Hex;
 
-      // Create the app session
-      console.log(`[websocketService] Creating app session for room ${roomId} with players:`, {
-        player1: { id: players[0].id, address: room.playerAddresses.get(players[0].id) },
-        player2: { id: players[1].id, address: room.playerAddresses.get(players[1].id) }
+      console.log(`[websocketService] Initiating app session creation for room ${roomId} with players:`, {
+        player1: { id: players[0].id, address: participantA },
+        player2: { id: players[1].id, address: participantB }
       });
 
-      const createdAppId = await createAppSession(
-        room.playerAddresses.get(players[0].id) as Hex,
-        room.playerAddresses.get(players[1].id) as Hex
-      );
+      // Generate the message structure for signing
+      const { requestToSign } = await generateAppSessionMessage(roomId, participantA, participantB);
 
-      if (!createdAppId) {
-        throw new Error("Failed to create app session - no app ID returned");
+      // Start signature collection with guest player (participant B)
+      const guestPlayerId = players[1].id; // Second player to join
+      const guestClient = Array.from(webSocketServer.clients).find(client => {
+        const snakeClient = client as SnakeWebSocket;
+        return snakeClient.playerId === guestPlayerId && snakeClient.roomId === roomId;
+      }) as SnakeWebSocket;
+
+      if (guestClient && guestClient.readyState === WebSocket.OPEN) {
+        guestClient.send(JSON.stringify({
+          type: 'appSession:signatureRequest',
+          roomId,
+          requestToSign,
+          participantAddress: participantB
+        }));
+        console.log(`[websocketService] Sent signature request to guest player ${guestPlayerId}`);
+      } else {
+        throw new Error("Guest player not found or not connected");
       }
 
-      room.appId = createdAppId as Hex;
-      console.log(`[websocketService] Created app session ${createdAppId} for room ${roomId}`);
-
-      // Start the game
-      room.gameInterval = setInterval(async () => {
-        await gameTick(roomId);
-      }, 150);
-
-      // Initial game state broadcast
-      const gameState = {
-        type: 'gameState',
-        players: Array.from(room.players.values()).map(p => ({
-          id: p.id,
-          nickname: p.nickname,
-          segments: p.segments,
-          score: p.score,
-          isDead: p.isDead || false
-        })),
-        food: room.food,
-        gridSize: room.gridSize,
-        isGameOver: room.isGameOver || false,
-        stateVersion: ++room.stateVersion,
-        timestamp: Date.now()
-      };
-
-      // Store the current state in the room
-      room.currentState = gameState;
-
-      // Broadcast to all players in the room
-      broadcastGameState(roomId, gameState);
     } catch (error: unknown) {
-      console.error(`[websocketService] Error creating app session for room ${roomId}:`, error);
-
-      // Clean up any partial state
-      if (room.appId) {
-        try {
-          console.log(`[websocketService] Cleaning up failed app session ${room.appId}`);
-          const players = Array.from(room.players.values());
-          await closeAppSession(
-            room.appId,
-            room.playerAddresses.get(players[0].id) as Hex,
-            room.playerAddresses.get(players[1].id) as Hex);
-        } catch (closeError) {
-          console.error(`[websocketService] Error cleaning up failed app session:`, closeError);
-        }
-        room.appId = undefined; // Clear the app ID after successful closure
-      }
-
+      console.error(`[websocketService] Error initiating app session for room ${roomId}:`, error);
       ws.send(JSON.stringify({
         type: 'error',
-        message: 'Failed to create app session: ' + (error instanceof Error ? error.message : 'Unknown error')
+        message: 'Failed to initiate app session: ' + (error instanceof Error ? error.message : 'Unknown error')
       }));
     }
   }
@@ -404,10 +397,10 @@ async function handlePlayAgain(data: any): Promise<void> {
   // Check if all players have voted to play again (and we have at least 2 players)
   if (room.playAgainVotes.size === room.players.size && room.players.size >= 2) {
     console.log(`[handlePlayAgain] All players voted to play again. Restarting game.`);
-    
+
     // Clear votes for next time
     room.playAgainVotes.clear();
-    
+
     // Reset game state
     room.isGameOver = false;
 
@@ -464,8 +457,8 @@ async function handlePlayAgain(data: any): Promise<void> {
 
 // Handle finalize game message
 async function handleFinalizeGame(data: any): Promise<void> {
-  const { roomId } = data;
-  if (!roomId) return;
+  const { roomId, playerId, walletAddress } = data;
+  if (!roomId || !playerId || !walletAddress) return;
 
   const room = getRoom(roomId);
   if (!room || !room.appId) {
@@ -475,108 +468,153 @@ async function handleFinalizeGame(data: any): Promise<void> {
 
   console.log(`[websocketService] Finalizing game for room ${roomId} with app session ${room.appId}`);
 
-  // For manual finalization - end the game immediately
-  if (room.gameInterval) {
-    clearInterval(room.gameInterval);
-    room.gameInterval = null;
-  }
-
+  // Mark game as over
   room.isGameOver = true;
 
-  // Clear any pending votes
-  if (room.playAgainVotes) {
-    room.playAgainVotes.clear();
+  // Get player addresses
+  const playerAddresses = Array.from(room.playerAddresses.values());
+  const server = serverWallet.address as Hex;
+
+  try {
+    // Create close message and sign with server
+    const params: CloseAppSessionRequest[] = [{
+      app_session_id: room.appId,
+      allocations: [
+        {
+          participant: playerAddresses[0] as Hex,
+          asset: "usdc",
+          amount: "0.00001"
+        },
+        {
+          participant: playerAddresses[1] as Hex,
+          asset: "usdc",
+          amount: "0.00001"
+        },
+        {
+          participant: server,
+          asset: "usdc",
+          amount: "0"
+        }
+      ]
+    }];
+
+    // Create the message to be signed by all participants
+    const closeRequestData = await createCloseAppSessionMessage(serverSigner, params);
+
+    // Store the request in the room for later use
+    const requestToSign = JSON.parse(closeRequestData);
+    console.log('[websocketService] Close session request to sign:', requestToSign);
+    room.closeSessionRequest = requestToSign;
+    room.closeSessionSignatures = new Map();
+
+    // Send signature request to all players
+    console.log('[websocketService] Sending close request to all players');
+    webSocketServer.clients.forEach(client => {
+      const snakeClient = client as SnakeWebSocket;
+      const closeRequest = {
+        type: 'appSession:closeRequest',
+        roomId,
+        requestToSign,
+        participantAddress: room.playerAddresses.get(playerId)
+      };
+      if (snakeClient.roomId === roomId && snakeClient.readyState === WebSocket.OPEN) {
+        snakeClient.send(JSON.stringify(closeRequest));
+      }
+    });
+
+    // Create and broadcast final game state
+    const gameState = {
+      type: 'gameState',
+      players: Array.from(room.players.values()).map(p => ({
+        id: p.id,
+        nickname: p.nickname,
+        segments: p.segments,
+        score: p.score,
+        isDead: p.isDead || false
+      })),
+      food: room.food,
+      gridSize: room.gridSize,
+      isGameOver: true,
+      stateVersion: ++room.stateVersion,
+      timestamp: Date.now()
+    };
+
+    // Store the current state in the room
+    room.currentState = gameState;
+
+    // Broadcast to all players in the room
+    broadcastGameState(roomId, gameState);
+  } catch (error) {
+    console.error(`[websocketService] Error preparing close session request for room ${roomId}:`, error);
+  }
+}
+
+// Handle close session signature
+async function handleCloseSessionSignature(data: any): Promise<void> {
+  const { roomId, playerId, signature, participantAddress } = data;
+  if (!roomId || !playerId || !signature || !participantAddress) {
+    console.log(`[websocketService] Missing required fields for close session signature`);
+    return;
   }
 
-  // Create final state with game results
-  const finalState = {
-    roomId,
-    stateVersion: room.stateVersion,
-    players: Array.from(room.players.values()).map(p => ({
-      id: p.id,
-      nickname: p.nickname,
-      score: p.score,
-      isDead: p.isDead || false
-    })),
-    isGameOver: true,
-    finalizedAt: Date.now(),
-    reason: 'game_ended'
-  };
-
-  // Finalize all channels associated with this room
-  if (room.channelIds.size > 0) {
-    const finalizePromises = Array.from(room.channelIds).map(id =>
-      clearNetRPC.finalizeChannel(id, finalState)
-    );
-
-    try {
-      await Promise.all(finalizePromises);
-      console.log(`[websocketService] Finalized all channels for room ${roomId}`);
-    } catch (error) {
-      console.error(`[websocketService] Error finalizing channels for room ${roomId}:`, error);
-    }
+  const room = getRoom(roomId);
+  if (!room || !room.appId || !room.closeSessionRequest) {
+    console.log(`[websocketService] Cannot process signature - room ${roomId} not found or no close session request`);
+    return;
   }
 
-  // Close the app session if not already being closed
-  if (room.appId && !room.isClosingAppSession) {
+  // Store the signature
+  room.closeSessionSignatures.set(playerId, signature);
+  console.log(`[websocketService] Received signature from player ${playerId} for room ${roomId}`);
+
+  // Check if we have all required signatures
+  if (room.closeSessionSignatures.size === room.players.size) {
     try {
       room.isClosingAppSession = true;
-      console.log(`[websocketService] Closing app session ${room.appId} for room ${roomId}`);
-      const players = Array.from(room.players.values());
-      await closeAppSession(
-        room.appId,
-        room.playerAddresses.get(players[0].id) as Hex,
-        room.playerAddresses.get(players[1].id) as Hex);
+      console.log(`[websocketService] All player signatures received, closing app session ${room.appId}`);
+
+      // Get server signature
+      const serverSignature = await serverSigner(room.closeSessionRequest);
+      console.log(`[websocketService] Server signature created for room ${roomId}`);
+
+      // Combine all signatures
+      const allSignatures = [
+        ...Array.from(room.closeSessionSignatures.values()),
+        serverSignature
+      ];
+
+      // Create final message with all signatures
+      const finalMessage = {
+        req: room.closeSessionRequest.req,
+        sig: allSignatures
+      };
+
+      console.log(`[websocketService] Sending final close request to broker for room ${roomId}`);
+      await sendToBroker(finalMessage);
       console.log(`[websocketService] App session ${room.appId} closed successfully`);
-      room.appId = undefined; // Clear the app ID after successful closure
+
+      // Notify all players that the session is closed
+      webSocketServer.clients.forEach(client => {
+        const snakeClient = client as SnakeWebSocket;
+        if (snakeClient.roomId === roomId && snakeClient.readyState === WebSocket.OPEN) {
+          snakeClient.send(JSON.stringify({
+            type: 'appSession:closed'
+          }));
+        }
+      });
+
+      // Clean up room state
+      room.appId = undefined;
+      room.closeSessionRequest = undefined;
+      room.closeSessionSignatures.clear();
     } catch (error) {
       console.error(`[websocketService] Error closing app session ${room.appId}:`, error);
-      // Don't clear the app ID on error - it might still be valid
     } finally {
       room.isClosingAppSession = false;
     }
+  } else {
+    console.log(`[websocketService] Waiting for more signatures for room ${roomId} (${room.closeSessionSignatures.size}/${room.players.size})`);
   }
-
-  // Create and broadcast final game state
-  const gameState = {
-    type: 'gameState',
-    players: Array.from(room.players.values()).map(p => ({
-      id: p.id,
-      nickname: p.nickname,
-      segments: p.segments,
-      score: p.score,
-      isDead: p.isDead || false
-    })),
-    food: room.food,
-    gridSize: room.gridSize,
-    isGameOver: true,
-    stateVersion: ++room.stateVersion,
-    timestamp: Date.now()
-  };
-
-  // Store the current state in the room
-  room.currentState = gameState;
-
-  // Broadcast to all players in the room
-  broadcastGameState(roomId, gameState);
-
-  // Clean up the room after a short delay to allow clients to receive the final state
-  setTimeout(() => {
-    // Clear roomId from all connected clients in this room before deleting
-    webSocketServer.clients.forEach(client => {
-      const snakeClient = client as SnakeWebSocket;
-      if (snakeClient.roomId === roomId) {
-        console.log(`[websocketService] Clearing roomId for player ${snakeClient.playerId}`);
-        snakeClient.roomId = undefined;
-      }
-    });
-    
-    removeRoom(roomId);
-    console.log(`[websocketService] Room deleted: ${roomId}`);
-    
-    // Notify subscribers about room removal
-    broadcastRoomRemoved(roomId);
-  }, 2000);
 }
 
 // Handle client disconnect
@@ -603,12 +641,12 @@ async function handleDisconnect(ws: SnakeWebSocket): Promise<void> {
   // Remove the player from the room
   room.players.delete(ws.playerId);
   console.log(`[websocketService] Removed player ${ws.playerId} from room ${roomId}`);
-  
+
   // Remove player's vote if they had one
   if (room.playAgainVotes) {
     room.playAgainVotes.delete(ws.playerId);
   }
-  
+
   // Notify remaining players about the disconnect
   if (room.players.size > 0) {
     broadcastPlayerDisconnect(roomId, playerNickname);
@@ -648,37 +686,10 @@ async function handleDisconnect(ws: SnakeWebSocket): Promise<void> {
       }
     }
 
-    // Finalize all channels associated with this room
-    if (room.channelIds.size > 0) {
-      const finalState = {
-        roomId,
-        players: Array.from(room.players.values()).map(p => ({
-          id: p.id,
-          nickname: p.nickname,
-          score: p.score,
-          isDead: p.isDead || false
-        })),
-        isGameOver: true,
-        finalizedAt: Date.now(),
-        reason: 'player_disconnected'
-      };
-
-      const finalizePromises = Array.from(room.channelIds).map(id =>
-        clearNetRPC.finalizeChannel(id, finalState)
-      );
-
-      try {
-        await Promise.all(finalizePromises);
-        console.log(`[websocketService] Finalized all channels for room ${roomId}`);
-      } catch (error) {
-        console.error(`[websocketService] Error finalizing channels for room ${roomId}:`, error);
-      }
-    }
-
     // Remove the room
     removeRoom(roomId);
     console.log(`[websocketService] Room ${roomId} removed`);
-    
+
     // Notify subscribers about room removal
     broadcastRoomRemoved(roomId);
   }
@@ -688,7 +699,7 @@ async function handleDisconnect(ws: SnakeWebSocket): Promise<void> {
 function handleSubscribeRooms(ws: SnakeWebSocket): void {
   console.log(`[websocketService] Client ${ws.playerId} subscribing to room updates`);
   roomSubscribers.add(ws);
-  
+
   // Send current rooms list
   const availableRooms = getAvailableRoomsList();
   ws.send(JSON.stringify({
@@ -707,7 +718,7 @@ function handleUnsubscribeRooms(ws: SnakeWebSocket): void {
 function getAvailableRoomsList(): Array<any> {
   const allRooms = getAllRooms();
   const availableRooms: Array<any> = [];
-  
+
   allRooms.forEach((room, roomId) => {
     // Include rooms that are not full (less than 2 players) and not in active game
     if (room.players.size < 2 && !room.isGameOver) {
@@ -724,7 +735,7 @@ function getAvailableRoomsList(): Array<any> {
       });
     }
   });
-  
+
   return availableRooms;
 }
 
@@ -732,7 +743,7 @@ function getAvailableRoomsList(): Array<any> {
 export function broadcastRoomUpdate(roomId: string): void {
   const room = getRoom(roomId);
   if (!room) return;
-  
+
   const roomData = {
     id: roomId,
     name: `Room ${roomId.slice(0, 8)}`,
@@ -744,12 +755,12 @@ export function broadcastRoomUpdate(roomId: string): void {
     isGameActive: !!room.gameInterval && !room.isGameOver,
     createdAt: room.createdAt
   };
-  
+
   const updateMessage = JSON.stringify({
     type: 'roomUpdated',
     room: roomData
   });
-  
+
   // Send to all subscribers
   roomSubscribers.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
@@ -764,11 +775,108 @@ export function broadcastRoomRemoved(roomId: string): void {
     type: 'roomRemoved',
     roomId
   });
-  
+
   // Send to all subscribers
   roomSubscribers.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(removeMessage);
     }
   });
+}
+
+// Handle app session signature submission from guest player
+async function handleAppSessionSignature(ws: SnakeWebSocket, data: any): Promise<void> {
+  const { roomId, signature, participantAddress } = data;
+
+  if (!roomId || !signature || !participantAddress) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'Missing required fields for app session signature'
+    }));
+    return;
+  }
+
+  const room = getRoom(roomId);
+  if (!room) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'Room not found'
+    }));
+    return;
+  }
+
+  try {
+    // Add the signature
+    const allSigned = addAppSessionSignature(roomId, participantAddress as Hex, signature);
+    if (!allSigned) {
+      // Send confirmation to the player who just signed
+      ws.send(JSON.stringify({
+        type: 'appSession:signatureConfirmed',
+        roomId
+      }));
+      console.log(`[handleAppSessionSignature] Player ${ws.playerId} submitted signature for room ${roomId}, waiting for other player`);
+      return;
+    }
+
+    console.log(`[handleAppSessionSignature] All signatures collected for room ${roomId}, creating app session`);
+
+    // Create the app session with all signatures
+    // const appId = await createAppSessionWithSignatures(roomId);
+    const appId = '0x66ffb53d1b788f396dca76d79ef95a6203aba487d4d2bec1a3a7cf3c7a0a40cb';
+    room.appId = appId as Hex;
+
+    console.log(`[handleAppSessionSignature] Created app session ${appId} for room ${roomId}`);
+
+    // Start the game
+    room.gameInterval = setInterval(async () => {
+      await gameTick(roomId);
+    }, 150);
+
+    // Initial game state broadcast
+    const gameState = {
+      type: 'gameState',
+      players: Array.from(room.players.values()).map(p => ({
+        id: p.id,
+        nickname: p.nickname,
+        segments: p.segments,
+        score: p.score,
+        isDead: p.isDead || false
+      })),
+      food: room.food,
+      gridSize: room.gridSize,
+      isGameOver: room.isGameOver || false,
+      stateVersion: ++room.stateVersion,
+      timestamp: Date.now()
+    };
+
+    // Store the current state in the room
+    room.currentState = gameState;
+
+    // Broadcast to all players in the room
+    broadcastGameState(roomId, gameState);
+
+    // Notify all players that the game has started
+    const players = Array.from(room.players.values());
+    for (const player of players) {
+      const client = Array.from(webSocketServer.clients).find(client => {
+        const snakeClient = client as SnakeWebSocket;
+        return snakeClient.playerId === player.id && snakeClient.roomId === roomId;
+      }) as SnakeWebSocket;
+
+      if (client && client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({
+          type: 'appSession:gameStarted',
+          roomId,
+          appId
+        }));
+      }
+    }
+
+  } catch (error) {
+    console.error(`[handleAppSessionSignature] Error handling signature for room ${roomId}:`, error);
+    ws.send(JSON.stringify({
+      type: 'error',
+      message: 'Failed to process signature: ' + (error instanceof Error ? error.message : 'Unknown error')
+    }));
+  }
 }

@@ -65,3 +65,19 @@ export function clearPendingRequest(requestId: string): void {
     pendingRequests.delete(requestId);
   }
 }
+
+export function createRoom(id: string): Room {
+  return {
+    id,
+    players: new Map(),
+    food: { x: 0, y: 0 },
+    gameInterval: null,
+    gridSize: { width: 30, height: 30 },
+    channelIds: new Set(),
+    playerAddresses: new Map(),
+    currentState: null,
+    stateVersion: 0,
+    createdAt: Date.now(),
+    closeSessionSignatures: new Map(),
+  };
+}

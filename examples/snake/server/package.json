@@ -9,10 +9,10 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@erc7824/nitrolite": "0.2.6",
+    "@erc7824/nitrolite": "0.2.7",
     "body-parser": "^2.2.0",
     "dotenv": "^16.5.0",
-    "ethers": "5.7.2",
+    "ethers": "6.7.1",
     "express": "^5.1.0",
     "viem": "2.29.3",
     "ws": "^8.16.0"

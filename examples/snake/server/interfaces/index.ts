@@ -32,6 +32,8 @@ export interface Room {
   createdAt: number; // Timestamp when the room was created
   isClosingAppSession?: boolean;
   playAgainVotes?: Set<string>; // Set of player IDs who voted to play again
+  closeSessionRequest?: any;
+  closeSessionSignatures: Map<string, string>;
 }
 
 export interface PendingRequest {

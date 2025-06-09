@@ -1,5 +1,6 @@
 import {
     createGetLedgerBalancesMessage,
+    createPingMessage,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, CHAIN_ID } from "../config";
 import { createEthersSigner, generateKeyPair } from "../crypto";
@@ -166,6 +167,28 @@ class ClearNetService {
         }, delay) as unknown as number;
     }
 
+    async getOrCreateKeyPair() {
+        const KEY_PAIR_KEY = "crypto_keypair";
+        const savedKeys = localStorage.getItem(KEY_PAIR_KEY);
+
+        let keyPair = null;
+        if (savedKeys) {
+            try {
+                keyPair = JSON.parse(savedKeys);
+            } catch (error) {
+                keyPair = null;
+            }
+        }
+        if (!keyPair) {
+            keyPair = await generateKeyPair();
+            if (typeof window !== "undefined") {
+                localStorage.setItem(KEY_PAIR_KEY, JSON.stringify(keyPair));
+            }
+        }
+
+        return keyPair;
+    }
+
     private async authenticateWithBroker(): Promise<void> {
         // If authentication is already in progress, return the existing promise
         if (this.authenticationInProgress) {
@@ -183,25 +206,7 @@ class ClearNetService {
             throw new Error('No main wallet client (e.g., MetaMask) available for EIP-712 authentication');
         }
 
-        // Get or create session key signer
-        let keyPair = null;
-        const savedKeys = localStorage.getItem("crypto_keypair");
-
-        if (savedKeys) {
-            try {
-                keyPair = JSON.parse(savedKeys);
-            } catch (error) {
-                keyPair = null;
-            }
-        }
-
-        if (!keyPair) {
-            keyPair = await generateKeyPair();
-            if (typeof window !== "undefined") {
-                localStorage.setItem("crypto_keypair", JSON.stringify(keyPair));
-            }
-        }
-
+        const keyPair = await this.getOrCreateKeyPair();
         const signer = createEthersSigner(keyPair.privateKey);
 
         // Create and store the authentication promise
@@ -210,6 +215,7 @@ class ClearNetService {
                 console.log("Authentication successful, sending get_balances");
 
                 // Send get_balances message after successful authentication
+                // TODO: channel ID should not be stored in local storage
                 const nitroChannelId = localStorage.getItem("nitro_channel_id");
                 if (nitroChannelId && this.wsConnection) {
                     const getBalancesMsg = await createGetLedgerBalancesMessage(
@@ -226,7 +232,7 @@ class ClearNetService {
         return this.authenticationInProgress;
     }
 
-    private handleWebSocketMessage(message: any): void {
+    private async handleWebSocketMessage(message: any): Promise<void> {
         console.log("Received WebSocket message:", message);
 
         // Check if it's a response to a pending request
@@ -251,6 +257,12 @@ class ClearNetService {
                 this.activeChannel = channel.channel_id;
                 console.log('[ClearNetService] Active channel updated:', this.activeChannel);
             }
+        }
+        if (message.res[1] === "ping") {
+            const keyPair = await this.getOrCreateKeyPair();
+            const signer = createEthersSigner(keyPair.privateKey);
+            const message = await createPingMessage(signer.sign);
+            this.wsConnection?.send(message);
         }
     }
 

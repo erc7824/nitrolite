@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/lib/pq"
 	"gorm.io/gorm"
@@ -19,6 +20,8 @@ type AppSession struct {
 	Quorum             uint64         `gorm:"column:quorum;default:100"`
 	Version            uint64         `gorm:"column:version;default:1"`
 	Status             ChannelStatus  `gorm:"column:status;not null"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 func (AppSession) TableName() string {
@@ -47,6 +50,7 @@ func getAppSessions(tx *gorm.DB, participantWallet string, status string) ([]App
 		query = query.Where("status = ?", status)
 	}
 
+	query = query.Order("updated_at DESC")
 	if err := query.Find(&sessions).Error; err != nil {
 		return nil, err
 	}

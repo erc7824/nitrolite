@@ -24,6 +24,14 @@ interface IDeposit {
     event Withdrawn(address indexed wallet, address indexed token, uint256 amount);
 
     /**
+     * @notice Gets the balance of a specific account for a given token
+     * @param account Address of the account to check
+     * @param token Token address (use address(0) for native tokens)
+     * @return balance of the account in the specified token
+     */
+    function getAccountBalance(address account, address token) external view returns (uint256);
+
+    /**
      * @notice Deposits tokens into the contract
      * @dev For native tokens, the value should be sent with the transaction
      * @param account Address of the account whose ledger is changed

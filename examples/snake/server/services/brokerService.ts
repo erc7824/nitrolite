@@ -170,6 +170,7 @@ async function authenticateWithBroker(): Promise<void> {
                         }
 
                         console.log('Creating EIP-712 signing function...');
+                        // @ts-ignore
                         const eip712SigningFunction = createEIP712AuthMessageSigner(walletClient, {
                             scope: authMessage.scope,
                             application: authMessage.application,

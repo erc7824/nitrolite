@@ -1,7 +1,7 @@
 import { WebSocketServer } from 'ws';
 import WebSocket from 'ws';
 import { randomBytes } from 'crypto';
-import { Room, SnakeWebSocket, Player } from '../interfaces/index.ts';
+import { Room, SnakeWebSocket } from '../interfaces/index.ts';
 import { getRoom, addRoom, removeRoom, getAllRooms } from './stateService.ts';
 import {
   generateRoomId,
@@ -19,17 +19,6 @@ import {
 } from './appSessionService.ts';
 import { Hex } from 'viem';
 import { CloseAppSessionRequest, createCloseAppSessionMessage } from '@erc7824/nitrolite';
-
-// Extend Room interface to include new properties
-declare module '../interfaces/index.ts' {
-  interface Room {
-    closeSessionRequest?: any;
-    closeSessionSignatures: Map<string, string>;
-  }
-  interface Player {
-    ws: SnakeWebSocket;
-  }
-}
 
 // Global reference to the WebSocket server
 let webSocketServer: WebSocketServer;
@@ -605,16 +594,14 @@ async function handleCloseSessionSignature(data: any): Promise<void> {
       console.log(`[websocketService] App session ${room.appId} closed successfully`);
 
       // Notify all players that the session is closed
-      const players = Array.from(room.players.values());
-      for (const player of players) {
-        const playerWs = player.ws;
-        if (playerWs && playerWs.readyState === WebSocket.OPEN) {
-          playerWs.send(JSON.stringify({
+      webSocketServer.clients.forEach(client => {
+        const snakeClient = client as SnakeWebSocket;
+        if (snakeClient.roomId === roomId && snakeClient.readyState === WebSocket.OPEN) {
+          snakeClient.send(JSON.stringify({
             type: 'appSession:closed'
           }));
-          console.log(`[websocketService] Notified player ${player.id} that session is closed`);
         }
-      }
+      });
 
       // Clean up room state
       room.appId = undefined;

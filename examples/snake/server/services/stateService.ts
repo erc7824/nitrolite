@@ -1,6 +1,5 @@
 import { WebSocket } from 'ws';
 import { Room, PendingRequest } from '../interfaces/index.ts';
-import { Hex } from 'viem';
 
 // Global state
 export const rooms = new Map<string, Room>();
@@ -80,6 +79,5 @@ export function createRoom(id: string): Room {
     stateVersion: 0,
     createdAt: Date.now(),
     closeSessionSignatures: new Map(),
-    serverAddress: '' as Hex // This will be set when the room is created
   };
 }

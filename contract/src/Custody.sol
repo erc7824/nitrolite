@@ -311,39 +311,39 @@ contract Custody is IChannel, IDeposit {
             emit Challenged(channelId, block.timestamp);
             emit Closed(channelId, candidate);
             return;
-        } else {
-            // meta.stage == ChannelStatus.ACTIVE
-            // main goal: verify Candidate is valid and >= LastValidState (in RESIZE case states should be equal)
-            if (lastValidStateIntent == StateIntent.INITIALIZE) {
-                if (candidate.intent == StateIntent.INITIALIZE) {
-                    if (!Utils.statesAreEqual(candidate, meta.lastValidState)) revert InvalidState();
-                } else {
-                    if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
-                    if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) {
-                        revert InvalidState();
-                    }
+        }
+
+        // meta.stage == ChannelStatus.ACTIVE
+        // main goal: verify Candidate is valid and >= LastValidState (in RESIZE case states should be equal)
+        if (lastValidStateIntent == StateIntent.INITIALIZE) {
+            if (candidate.intent == StateIntent.INITIALIZE) {
+                if (!Utils.statesAreEqual(candidate, meta.lastValidState)) revert InvalidState();
+            } else {
+                if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) {
+                    revert InvalidState();
                 }
-            } else if (lastValidStateIntent == StateIntent.OPERATE) {
-                if (candidate.intent != StateIntent.OPERATE) revert InvalidState();
-                if (!Utils.statesAreEqual(candidate, meta.lastValidState)) {
-                    if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
-                    if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) {
-                        revert InvalidState();
-                    }
+            }
+        } else if (lastValidStateIntent == StateIntent.OPERATE) {
+            if (candidate.intent != StateIntent.OPERATE) revert InvalidState();
+            if (!Utils.statesAreEqual(candidate, meta.lastValidState)) {
+                if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) {
+                    revert InvalidState();
+                }
+            }
+        } else {
+            // lastValidStateIntent == StateIntent.RESIZE
+            if (candidate.intent == StateIntent.INITIALIZE) revert InvalidState();
+            if (candidate.intent == StateIntent.OPERATE) {
+                if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
+                if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) {
+                    revert InvalidState();
                 }
             } else {
-                // lastValidStateIntent == StateIntent.RESIZE
-                if (candidate.intent == StateIntent.INITIALIZE) revert InvalidState();
-                if (candidate.intent == StateIntent.OPERATE) {
-                    if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
-                    if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) {
-                        revert InvalidState();
-                    }
-                } else {
-                    // candidate.intent == StateIntent.RESIZE
-                    if (!Utils.statesAreEqual(candidate, meta.lastValidState)) {
-                        revert InvalidState();
-                    }
+                // candidate.intent == StateIntent.RESIZE
+                if (!Utils.statesAreEqual(candidate, meta.lastValidState)) {
+                    revert InvalidState();
                 }
             }
         }

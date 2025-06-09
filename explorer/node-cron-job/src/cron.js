@@ -5,7 +5,7 @@ const { upsertLedgerEntry, upsertChannel } = require('./prisma');
 //console.log('upsertLedgerEntry:', upsertLedgerEntry);
 //console.log('upsertChannel:', upsertChannel);
 
-const WSS_URL = 'wss://canarynet.yellow.com/ws';
+const WSS_URL = 'wss://clearnet.yellow.com/ws';
 
 let ws;
 
@@ -110,20 +110,29 @@ function processLedgerEntries(data) {
     }
 }
 
-function processChannels(data) {
+async function processChannels(data) {
+    console.log('Raw channels data received:', JSON.stringify(data, null, 2));
+    
     // Initialize channels array
     let channels = [];
     
     // Handle various possible data structures
     try {
         if (data && data.res) {
+            console.log('Processing data.res structure...');
+            console.log('data.res length:', data.res.length);
+            console.log('data.res[2] type:', typeof data.res[2]);
+            console.log('data.res[2] sample:', Array.isArray(data.res[2]) ? data.res[2].slice(0, 1) : data.res[2]);
+            
             if (Array.isArray(data.res[2])) {
-                // Check if res[2] contains an array of channel objects directly
-                if (data.res[2].length > 0 && typeof data.res[2][0] === 'object' && data.res[2][0] !== null) {
-                    channels = data.res[2];
-                } else if (data.res[2] && Array.isArray(data.res[2][0])) {
-                    // Handle nested array in res[2][0]
+                // Check if data.res[2] contains another array (nested structure)
+                if (Array.isArray(data.res[2][0])) {
                     channels = data.res[2][0];
+                    console.log('Found channels in data.res[2][0], length:', channels.length);
+                } else {
+                    // data.res[2] is directly the channels array
+                    channels = data.res[2];
+                    console.log('Found channels in data.res[2], length:', channels.length);
                 }
             } else if (typeof data.res[2] === 'string') {
                 // Handle string that might be a stringified JSON array
@@ -131,6 +140,7 @@ function processChannels(data) {
                     const parsed = JSON.parse(data.res[2]);
                     if (Array.isArray(parsed)) {
                         channels = parsed;
+                        console.log('Parsed channels from string, length:', channels.length);
                     }
                 } catch (jsonError) {
                     console.error('Error parsing string data:', jsonError);
@@ -139,31 +149,41 @@ function processChannels(data) {
         } else if (Array.isArray(data)) {
             // Directly handle array of channels
             channels = data;
+            console.log('Data is directly an array, length:', channels.length);
         }
         
         console.log('Number of channels extracted:', channels.length);
-        /*
+        console.log('Sample channel data:', channels[0]);
+        
         // Modified validation to properly check for valid channel objects
-        channels = channels.filter(channel => {
+        console.log('Before validation - channels length:', channels.length);
+        console.log('First channel before validation:', channels[0]);
+        
+        channels = channels.filter((channel, index) => {
+            console.log(`Validating channel ${index}:`, typeof channel, channel?.channel_id);
+            
             if (!channel || typeof channel !== 'object') {
-                console.warn('Skipping invalid channel (not an object):', channel);
+                console.warn(`Skipping invalid channel ${index} (not an object):`, channel);
                 return false;
             }
             
             // Check if the channel has a channel_id property
             if (!channel.hasOwnProperty('channel_id') || !channel.channel_id) {
-                console.warn('Skipping channel missing channel_id:', JSON.stringify(channel, null, 2));
+                console.warn(`Skipping channel ${index} missing channel_id:`, JSON.stringify(channel, null, 2));
                 return false;
             }
             
+            console.log(`✅ Channel ${index} passed validation:`, channel.channel_id);
             return true;
-        });*/
+        });
         
         console.log('Number of valid channels after filtering:', channels.length);
         
         // Process each channel
-        channels.forEach(async (channel, index) => {
+        for (const [index, channel] of channels.entries()) {
             try {
+                console.log(`Processing channel ${index + 1}/${channels.length}:`, channel.channel_id);
+                
                 // Format the data to match your Prisma model
                 const processedChannel = {
                     channelId: channel.channel_id,
@@ -172,16 +192,16 @@ function processChannels(data) {
                     token: channel.token || "",
                     wallet: channel.wallet || "",
                     amount: channel.amount !== undefined ? BigInt(String(channel.amount)) : BigInt(0),
-                    chainId: String(channel.chain_id || ""),  // Convert to string to match your model
+                    chainId: parseInt(channel.chain_id) || 0,  // Convert to integer to match Prisma schema
                     adjudicator: channel.adjudicator || "",
-                    challenge: channel.challenge || "",
+                    challenge: parseInt(channel.challenge) || 0,  // Ensure this is also an integer
                     nonce: channel.nonce ? BigInt(String(channel.nonce)) : BigInt(0),
-                    version: channel.version || 0,
+                    version: parseInt(channel.version) || 0,  // Ensure this is an integer
                     createdAt: channel.created_at ? new Date(channel.created_at) : new Date(),
                     updatedAt: channel.updated_at ? new Date(channel.updated_at) : new Date()
                 };
 
-                //console.log(`Processed channel data [${index}]:`, processedChannel);
+                console.log(`Processed channel data [${index}]:`, processedChannel);
 
                 const result = await upsertChannel({
                     where: { channelId: channel.channel_id },
@@ -189,13 +209,14 @@ function processChannels(data) {
                     update: processedChannel,
                 });
 
-                console.log(`Upserted channel ${channel.channel_id}`);
+                console.log(`✅ Successfully upserted channel ${channel.channel_id}`);
             } catch (error) {
-                console.error(`Error upserting channel at index ${index}:`, error);
+                console.error(`❌ Error upserting channel at index ${index}:`, error);
                 console.error('Error details:', error.message);
-                console.error('Failed channel data:', channel);
+                console.error('Failed channel data:', JSON.stringify(channel, null, 2));
+                console.error('Full error stack:', error.stack);
             }
-        });
+        }
     } catch (error) {
         console.error('Error processing channels:', error);
         console.error('Original data structure:', data);

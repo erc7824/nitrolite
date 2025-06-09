@@ -98,7 +98,6 @@ Y: a state the channel is being challenged with.
 
 General checks:
 
-- Y is not INITIALIZE.
 - !(X != RESIZE && Y == RESIZE). In such case a user should call `resize` function.
 - Y is not FINALIZE. In such case a user should call `close` function.
 
@@ -133,7 +132,6 @@ Another almost\* general rule is that after all checks there are the following o
     - verify adjudicate(Y, proof)
 - X is OPERATE state:
   - verify Y is OPERATE
-    verify NOT isMoreRecent(X, Y) (Y it not older than X)
     if (X != Y):
     - verify isMoreRecent(Y, X)
       verify adjudicate(Y, proof)

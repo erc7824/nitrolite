@@ -198,18 +198,6 @@ contract CustodyTest is Test {
         return Signature({v: v, r: r, s: s});
     }
 
-    // Helper to sign a challenge
-    function signChallenge(Channel memory chan, State memory state, uint256 privateKey)
-        internal
-        view
-        returns (Signature memory)
-    {
-        bytes32 stateHash = Utils.getStateHash(chan, state);
-        bytes32 challengeHash = keccak256(abi.encode(stateHash, "challenge"));
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, challengeHash);
-        return Signature({v: v, r: r, s: s});
-    }
-
     function signChallenge(Channel memory chan, State memory state, uint256 privateKey)
         internal
         view
@@ -234,7 +222,7 @@ contract CustodyTest is Test {
 
     // ==== 1. Channel Creation and Joining ====
 
-    function test_ChannelCreation() public {
+    function test_Create() public {
         // 1. Prepare channel and initial state
         Channel memory chan = createTestChannelWithSK();
         State memory initialState = createInitialStateWithSK();
@@ -357,7 +345,7 @@ contract CustodyTest is Test {
 
     // ==== 2. Channel Closing ====
 
-    function test_ChannelCooperativeClose() public {
+    function test_CooperativeClose() public {
         // 1. First create and fund a channel
         Channel memory chan = createTestChannelWithSK();
         State memory initialState = createInitialStateWithSK();
@@ -455,7 +443,7 @@ contract CustodyTest is Test {
 
     // ==== 3. Challenge Mechanism ====
 
-    function test_RejectEqualVersionChallenge() public {
+    function test_RejectChallengeDuringChallenge() public {
         // 1. Create and fund a channel
         Channel memory chan = createTestChannelWithSK();
         State memory initialState = createInitialStateWithSK();
@@ -507,11 +495,28 @@ contract CustodyTest is Test {
 
         // 4. Try to challenge with the same version - should revert
         vm.prank(hostSK);
-        vm.expectRevert(Custody.InvalidState.selector);
+        vm.expectRevert(Custody.InvalidStatus.selector);
         custody.challenge(channelId, sameVersionChallenge, new State[](0));
+
+        // 5. Create a new challenge state with a higher version number
+        State memory higherVersionChallenge = initialState;
+        higherVersionChallenge.intent = StateIntent.OPERATE;
+        higherVersionChallenge.data = abi.encode(44); // Different data
+        higherVersionChallenge.version = 98; // Higher version than the previous challenge (97)
+
+        // Host signs the higher version challenge
+        Signature memory hostHigherVersionSig = signState(chan, higherVersionChallenge, hostSKPrivKey);
+        Signature[] memory higherVersionSigs = new Signature[](1);
+        higherVersionSigs[0] = hostHigherVersionSig;
+        higherVersionChallenge.sigs = higherVersionSigs;
+
+        // 6. Try to challenge with the higher version - must revert
+        vm.prank(hostSK);
+        vm.expectRevert(Custody.InvalidStatus.selector);
+        custody.challenge(channelId, higherVersionChallenge, new State[](0));
     }
 
-    function test_ChannelChallenge() public {
+    function test_Challenge() public {
         // 1. Create and fund a channel
         Channel memory chan = createTestChannelWithSK();
         State memory initialState = createInitialStateWithSK();
@@ -549,30 +554,11 @@ contract CustodyTest is Test {
         vm.prank(hostSK);
         custody.challenge(channelId, challengeState, new State[](0));
 
-        // 4. Create a counter-challenge state
-        State memory counterChallengeState = initialState;
-        counterChallengeState.intent = StateIntent.OPERATE;
-        counterChallengeState.data = abi.encode(4242);
-        counterChallengeState.version = 98; // Higher version than the challenge state (97)
-
-        // Both sign the counter-challenge
-        Signature memory hostCounterSig = signState(chan, counterChallengeState, hostSKPrivKey);
-        Signature memory guestCounterSig = signState(chan, counterChallengeState, guestSKPrivKey);
-
-        Signature[] memory counterChallengeSigs = new Signature[](2);
-        counterChallengeSigs[0] = hostCounterSig;
-        counterChallengeSigs[1] = guestCounterSig;
-        counterChallengeState.sigs = counterChallengeSigs;
-
-        // 5. Guest counter-challenges
-        vm.prank(guestSK);
-        custody.challenge(channelId, counterChallengeState, new State[](0));
-
-        // 6. Skip time and close the channel
+        // 4. Skip time and close the channel
         skipChallengeTime();
 
         vm.prank(hostSK);
-        custody.close(channelId, counterChallengeState, new State[](0));
+        custody.close(channelId, challengeState, new State[](0));
 
         // 7. Verify channel is closed and funds returned
         bytes32[] memory hostChannels = custody.getAccountChannels(hostSK);
@@ -634,6 +620,37 @@ contract CustodyTest is Test {
         custody.challenge(nonExistentChannelId, invalidState, new State[](0));
     }
 
+    function test_challengeInitial() public {
+        // 1. Create and fund a channel
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
+
+        // Set up signatures
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
+        Signature[] memory hostSigs = new Signature[](1);
+        hostSigs[0] = hostSig;
+        initialState.sigs = hostSigs;
+
+        // Create channel with host
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+        vm.prank(hostSK);
+        bytes32 channelId = custody.create(chan, initialState);
+
+        // Guest does NOT join the channel
+        // 2. Host challenges with initial state
+        vm.prank(hostSK);
+        custody.challenge(channelId, initialState, new State[](0));
+
+        // verify channel is immediately closed and funds distributed
+        (uint256 hostAvailable, uint256 hostChannelCount) = custody.getAccountInfo(hostSK, address(token));
+        (, uint256 guestChannelCount) = custody.getAccountInfo(guestSK, address(token));
+
+        assertEq(hostChannelCount, 0, "Host should have no channels after challenge");
+        assertEq(guestChannelCount, 0, "Guest should have no channels after challenge");
+
+        assertEq(hostAvailable, DEPOSIT_AMOUNT * 2, "Host's available balance incorrect");
+    }
+
     // ==== 4. Checkpoint Mechanism ====
 
     function test_RejectEqualVersion() public {
@@ -693,6 +710,7 @@ contract CustodyTest is Test {
         sameVersionState.sigs = sameVersionSigs;
 
         // 5. Try to checkpoint with the same version - should revert
+        adjudicator.setCompareReturnValue(0);
         vm.prank(hostSK);
         vm.expectRevert(Custody.InvalidState.selector);
         custody.checkpoint(channelId, sameVersionState, new State[](0));
@@ -749,12 +767,7 @@ contract CustodyTest is Test {
         challengeSigs[0] = hostChallengeSig;
         challengeState.sigs = challengeSigs;
 
-        adjudicator.setCompareReturnValue(false); // make sure adjudicator allows the state
         vm.prank(hostSK);
-        custody.challenge(channelId, challengeState, new State[](0));
-        adjudicator.setCompareReturnValue(true); // set value back
-
-        // 5. Checkpoint should resolve the challenge
         custody.challenge(channelId, challengeState, new State[](0));
 
         // 5. Checkpoint should resolve the challenge with a higher version state
@@ -774,9 +787,6 @@ contract CustodyTest is Test {
 
         vm.prank(guestSK);
         custody.checkpoint(channelId, resolveState, new State[](0));
-
-        // Close with checkpointed state
-        skipChallengeTime();
 
         // Try to close normally - should succeed because challenge timer expired
         State memory closeState = createClosingStateWithSK();

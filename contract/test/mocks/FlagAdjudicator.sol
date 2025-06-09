@@ -7,27 +7,21 @@ import {IComparable} from "../../src/interfaces/IComparable.sol";
 
 contract FlagAdjudicator is IAdjudicator, IComparable {
     bool public adjudicateReturnValue = true;
-    bool public compareReturnValue = true;
+    int8 public compareReturnValue = 1;
 
     function setAdjudicateReturnValue(bool value) external {
         adjudicateReturnValue = value;
     }
 
-    function setCompareReturnValue(bool value) external {
+    function setCompareReturnValue(int8 value) external {
         compareReturnValue = value;
     }
 
-    function adjudicate(Channel calldata, State calldata, State[] calldata)
-        external
-        view
-        override
-        returns (bool valid)
-    {
-        // Always return true to indicate that the state is valid
+    function adjudicate(Channel calldata, State calldata, State[] calldata) external view returns (bool valid) {
         return adjudicateReturnValue;
     }
 
-    function compare(State calldata, State calldata) external view override returns (int8) {
-        return compareReturnValue ? int8(1) : -1;
+    function compare(State calldata, State calldata) external view virtual returns (int8) {
+        return compareReturnValue;
     }
 }

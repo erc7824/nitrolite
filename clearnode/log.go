@@ -111,6 +111,7 @@ func init() {
 	}
 
 	log.SetupLogging(log.Config{
-		Level: zapLevel,
+		Level:  zapLevel,
+		Stderr: true,
 	})
 }

@@ -15,6 +15,8 @@ const CRYPTO_KEYPAIR_KEY = "crypto_keypair";
 
 export const CHAINS = polygon;
 
+export const USDC_ADDRESS = APP_CONFIG.TOKENS[polygon.id] as Hex;
+
 // Create context for the Nitrolite client
 interface NitroliteContextType {
     client: NitroliteClient | null;
@@ -43,7 +45,7 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
     });
 
     // Use MetaMask hook for wallet connection
-    const { provider, address, isConnected } = useMetaMask();
+    const { address, isConnected } = useMetaMask();
 
     const initializeKeys = useCallback(async (): Promise<{ keyPair: unknown; stateWalletClient: unknown }> => {
         try {
@@ -93,7 +95,7 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
                 setClientState((prev) => ({ ...prev, loading: true, error: null }));
 
                 // Only proceed if MetaMask is connected
-                if (!isConnected || !provider || !address) {
+                if (!isConnected || !address) {
                     setClientState((prev) => ({
                         ...prev,
                         loading: false,
@@ -148,7 +150,6 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
                     custody: APP_CONFIG.CUSTODIES[polygon.id],
                     adjudicator: APP_CONFIG.ADJUDICATORS[polygon.id],
                     guestAddress: APP_CONFIG.CHANNEL.DEFAULT_GUEST as Hex,
-                    tokenAddress: APP_CONFIG.TOKENS[polygon.id] as Hex,
                 };
 
                 const challengeDuration = APP_CONFIG.CHANNEL.CHALLENGE_PERIOD;
@@ -164,7 +165,6 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
                         custody: addresses.custody,
                         adjudicator: addresses.adjudicator,
                         guestAddress: addresses.guestAddress,
-                        tokenAddress: addresses.tokenAddress,
                     },
                 });
 
@@ -215,7 +215,6 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
                     console.debug("Error details:", {
                         message: error.message,
                         stack: error.stack,
-                        provider: provider ? "available" : "not available",
                         address: address || "not available",
                     });
                 }
@@ -229,7 +228,7 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
         };
 
         initializeNitrolite();
-    }, [initializeKeys, provider, address, isConnected]);
+    }, [initializeKeys, address, isConnected]);
 
     // Provide the client through context
     return <NitroliteContext.Provider value={clientState}>{children}</NitroliteContext.Provider>;

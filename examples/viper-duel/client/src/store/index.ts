@@ -1,5 +1,5 @@
-import { Store } from "./storeUtils";
-import type { Address, WalletClient } from "viem";
+import { Store } from './storeUtils';
+import type { Address, WalletClient } from 'viem';
 
 // Nitrolite Store
 interface NitroliteStoreState {
@@ -14,8 +14,8 @@ export const NitroliteStore = {
     }),
 
     setClient(client: any): void {
-        this.state.set("client", client);
-        this.state.set("isInitialized", true);
+        this.state.set('client', client);
+        this.state.set('isInitialized', true);
     },
 };
 
@@ -28,6 +28,7 @@ interface WalletStoreState {
     walletClient: WalletClient | null;
     channelToken: Address | null;
     channelAmount: string | null;
+    error: string | null;
 }
 
 export const WalletStore = {
@@ -39,19 +40,32 @@ export const WalletStore = {
         walletClient: null,
         channelToken: null,
         channelAmount: null,
+        error: null,
     }),
 
+    connect(address: Address): void {
+        this.state.setState({
+            walletAddress: address,
+            isConnected: true,
+            error: null,
+        });
+    },
+
+    setError(error: string | null): void {
+        this.state.set('error', error);
+    },
+
     setWalletAddress(address: string | null): void {
-        this.state.set("walletAddress", address);
-        this.state.set("isConnected", !!address);
+        this.state.set('walletAddress', address);
+        this.state.set('isConnected', !!address);
     },
 
     setChainId(chainId: number | null): void {
-        this.state.set("chainId", chainId);
+        this.state.set('chainId', chainId);
     },
 
     setChannelOpen(isOpen: boolean): void {
-        this.state.set("channelOpen", isOpen);
+        this.state.set('channelOpen', isOpen);
     },
 
     openChannel(token: Address, amount: string): void {
@@ -67,10 +81,10 @@ export const WalletStore = {
      * @param walletClient Wallet client instance
      */
     setWalletClient(walletClient: WalletClient | null): void {
-        this.state.set("walletClient", walletClient);
+        this.state.set('walletClient', walletClient);
 
         if (walletClient?.account?.address) {
-            this.state.set("walletAddress", walletClient.account.address);
+            this.state.set('walletAddress', walletClient.account.address);
         }
     },
 
@@ -101,6 +115,6 @@ export const SettingsStore = {
     }),
 
     setActiveChain(chainId: number): void {
-        this.state.set("activeChain", chainId);
+        this.state.set('activeChain', chainId);
     },
 };

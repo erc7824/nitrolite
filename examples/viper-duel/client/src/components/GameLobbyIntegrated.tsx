@@ -4,7 +4,7 @@ import { Lobby } from "./Lobby";
 import { useChannel } from "../hooks/useChannel";
 import { useWebSocketContext } from "../context/WebSocketContext";
 import { useNitroliteIntegration } from "../hooks/useNitroliteIntegration";
-import { useMetaMask } from "../hooks/useMetaMask";
+import { useAccount } from 'wagmi';
 import type { JoinRoomPayload, AvailableRoom } from "../types";
 import { Card, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -23,7 +23,7 @@ export function GameLobbyIntegrated({ onJoinRoom, availableRooms = [], onGetAvai
     const [isLoading, setIsLoading] = useState(true);
     const { isConnected, status } = useWebSocketContext();
     const { clearStoredChannel } = useChannel();
-    const { isConnected: isMetaMaskConnected } = useMetaMask();
+    const { isConnected: isMetaMaskConnected } = useAccount();
     useNitroliteIntegration(); // Ensure proper integration
     
     // Handle channel initialization on component mount

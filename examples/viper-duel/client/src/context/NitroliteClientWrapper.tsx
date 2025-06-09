@@ -9,11 +9,13 @@ import { ethers } from "ethers";
 import { generateKeyPair } from "./createSigner";
 import { polygon } from "viem/chains";
 import APP_CONFIG from "./app";
-import { useMetaMask } from "../hooks/useMetaMask";
+import { useAccount, useWalletClient } from 'wagmi';
 
 const CRYPTO_KEYPAIR_KEY = "crypto_keypair";
 
 export const CHAINS = polygon;
+
+export const USDC_ADDRESS = APP_CONFIG.TOKENS[polygon.id] as Hex;
 
 // Create context for the Nitrolite client
 interface NitroliteContextType {
@@ -42,8 +44,9 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
         error: null,
     });
 
-    // Use MetaMask hook for wallet connection
-    const { provider, address, isConnected } = useMetaMask();
+    // Use wagmi hooks for wallet connection
+    const { address, isConnected } = useAccount();
+    const { data: walletClient } = useWalletClient();
 
     const initializeKeys = useCallback(async (): Promise<{ keyPair: unknown; stateWalletClient: unknown }> => {
         try {
@@ -92,22 +95,12 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
             try {
                 setClientState((prev) => ({ ...prev, loading: true, error: null }));
 
-                // Only proceed if MetaMask is connected
-                if (!isConnected || !provider || !address) {
+                // Only proceed if wallet is connected
+                if (!isConnected || !address || !walletClient) {
                     setClientState((prev) => ({
                         ...prev,
                         loading: false,
-                        error: "MetaMask not connected. Please connect your wallet.",
-                    }));
-                    return;
-                }
-
-                // Check if window.ethereum is available
-                if (!(window as any).ethereum) {
-                    setClientState((prev) => ({
-                        ...prev,
-                        loading: false,
-                        error: "MetaMask provider not found. Please refresh the page or reinstall MetaMask.",
+                        error: "Wallet not connected. Please connect your wallet.",
                     }));
                     return;
                 }
@@ -124,31 +117,15 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
                     chain: polygon,
                 });
 
-                // Use MetaMask provider for the walletClient
-                console.log("Creating wallet client with ethereum provider...");
-                const ethereum = (window as any).ethereum;
-                console.log("Ethereum provider:", ethereum ? "available" : "not available");
-
-                if (!ethereum) {
-                    throw new Error("Ethereum provider not found in window object");
-                }
-
-                // Create the wallet client using the ethereum provider
-                const walletClient = createWalletClient({
-                    transport: custom(ethereum),
-                    chain: polygon,
-                    account: address as Hex,
-                });
-
+                // Use wagmi wallet client
+                console.log("Using wagmi wallet client...");
                 WalletStore.setWalletClient(walletClient);
-
-                console.log("Wallet client created successfully:", walletClient.account);
+                console.log("Wallet client set successfully:", walletClient.account);
 
                 const addresses: ContractAddresses = {
                     custody: APP_CONFIG.CUSTODIES[polygon.id],
                     adjudicator: APP_CONFIG.ADJUDICATORS[polygon.id],
                     guestAddress: APP_CONFIG.CHANNEL.DEFAULT_GUEST as Hex,
-                    tokenAddress: APP_CONFIG.TOKENS[polygon.id] as Hex,
                 };
 
                 const challengeDuration = APP_CONFIG.CHANNEL.CHALLENGE_PERIOD;
@@ -164,7 +141,6 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
                         custody: addresses.custody,
                         adjudicator: addresses.adjudicator,
                         guestAddress: addresses.guestAddress,
-                        tokenAddress: addresses.tokenAddress,
                     },
                 });
 
@@ -215,7 +191,6 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
                     console.debug("Error details:", {
                         message: error.message,
                         stack: error.stack,
-                        provider: provider ? "available" : "not available",
                         address: address || "not available",
                     });
                 }
@@ -229,7 +204,7 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
         };
 
         initializeNitrolite();
-    }, [initializeKeys, provider, address, isConnected]);
+    }, [initializeKeys, address, isConnected, walletClient]);
 
     // Provide the client through context
     return <NitroliteContext.Provider value={clientState}>{children}</NitroliteContext.Provider>;

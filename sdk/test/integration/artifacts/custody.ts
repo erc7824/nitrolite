@@ -1,0 +1,1221 @@
+export const CustodyArtifacts = {
+    abi: [
+        {
+            type: 'function',
+            name: 'challenge',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    internalType: 'bytes32',
+                },
+                {
+                    name: 'candidate',
+                    type: 'tuple',
+                    internalType: 'struct State',
+                    components: [
+                        {
+                            name: 'intent',
+                            type: 'uint8',
+                            internalType: 'enum StateIntent',
+                        },
+                        {
+                            name: 'version',
+                            type: 'uint256',
+                            internalType: 'uint256',
+                        },
+                        {
+                            name: 'data',
+                            type: 'bytes',
+                            internalType: 'bytes',
+                        },
+                        {
+                            name: 'allocations',
+                            type: 'tuple[]',
+                            internalType: 'struct Allocation[]',
+                            components: [
+                                {
+                                    name: 'destination',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'token',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'amount',
+                                    type: 'uint256',
+                                    internalType: 'uint256',
+                                },
+                            ],
+                        },
+                        {
+                            name: 'sigs',
+                            type: 'tuple[]',
+                            internalType: 'struct Signature[]',
+                            components: [
+                                {
+                                    name: 'v',
+                                    type: 'uint8',
+                                    internalType: 'uint8',
+                                },
+                                {
+                                    name: 'r',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                                {
+                                    name: 's',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                            ],
+                        },
+                    ],
+                },
+                {
+                    name: 'proofs',
+                    type: 'tuple[]',
+                    internalType: 'struct State[]',
+                    components: [
+                        {
+                            name: 'intent',
+                            type: 'uint8',
+                            internalType: 'enum StateIntent',
+                        },
+                        {
+                            name: 'version',
+                            type: 'uint256',
+                            internalType: 'uint256',
+                        },
+                        {
+                            name: 'data',
+                            type: 'bytes',
+                            internalType: 'bytes',
+                        },
+                        {
+                            name: 'allocations',
+                            type: 'tuple[]',
+                            internalType: 'struct Allocation[]',
+                            components: [
+                                {
+                                    name: 'destination',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'token',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'amount',
+                                    type: 'uint256',
+                                    internalType: 'uint256',
+                                },
+                            ],
+                        },
+                        {
+                            name: 'sigs',
+                            type: 'tuple[]',
+                            internalType: 'struct Signature[]',
+                            components: [
+                                {
+                                    name: 'v',
+                                    type: 'uint8',
+                                    internalType: 'uint8',
+                                },
+                                {
+                                    name: 'r',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                                {
+                                    name: 's',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+            outputs: [],
+            stateMutability: 'nonpayable',
+        },
+        {
+            type: 'function',
+            name: 'checkpoint',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    internalType: 'bytes32',
+                },
+                {
+                    name: 'candidate',
+                    type: 'tuple',
+                    internalType: 'struct State',
+                    components: [
+                        {
+                            name: 'intent',
+                            type: 'uint8',
+                            internalType: 'enum StateIntent',
+                        },
+                        {
+                            name: 'version',
+                            type: 'uint256',
+                            internalType: 'uint256',
+                        },
+                        {
+                            name: 'data',
+                            type: 'bytes',
+                            internalType: 'bytes',
+                        },
+                        {
+                            name: 'allocations',
+                            type: 'tuple[]',
+                            internalType: 'struct Allocation[]',
+                            components: [
+                                {
+                                    name: 'destination',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'token',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'amount',
+                                    type: 'uint256',
+                                    internalType: 'uint256',
+                                },
+                            ],
+                        },
+                        {
+                            name: 'sigs',
+                            type: 'tuple[]',
+                            internalType: 'struct Signature[]',
+                            components: [
+                                {
+                                    name: 'v',
+                                    type: 'uint8',
+                                    internalType: 'uint8',
+                                },
+                                {
+                                    name: 'r',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                                {
+                                    name: 's',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                            ],
+                        },
+                    ],
+                },
+                {
+                    name: 'proofs',
+                    type: 'tuple[]',
+                    internalType: 'struct State[]',
+                    components: [
+                        {
+                            name: 'intent',
+                            type: 'uint8',
+                            internalType: 'enum StateIntent',
+                        },
+                        {
+                            name: 'version',
+                            type: 'uint256',
+                            internalType: 'uint256',
+                        },
+                        {
+                            name: 'data',
+                            type: 'bytes',
+                            internalType: 'bytes',
+                        },
+                        {
+                            name: 'allocations',
+                            type: 'tuple[]',
+                            internalType: 'struct Allocation[]',
+                            components: [
+                                {
+                                    name: 'destination',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'token',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'amount',
+                                    type: 'uint256',
+                                    internalType: 'uint256',
+                                },
+                            ],
+                        },
+                        {
+                            name: 'sigs',
+                            type: 'tuple[]',
+                            internalType: 'struct Signature[]',
+                            components: [
+                                {
+                                    name: 'v',
+                                    type: 'uint8',
+                                    internalType: 'uint8',
+                                },
+                                {
+                                    name: 'r',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                                {
+                                    name: 's',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+            outputs: [],
+            stateMutability: 'nonpayable',
+        },
+        {
+            type: 'function',
+            name: 'close',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    internalType: 'bytes32',
+                },
+                {
+                    name: 'candidate',
+                    type: 'tuple',
+                    internalType: 'struct State',
+                    components: [
+                        {
+                            name: 'intent',
+                            type: 'uint8',
+                            internalType: 'enum StateIntent',
+                        },
+                        {
+                            name: 'version',
+                            type: 'uint256',
+                            internalType: 'uint256',
+                        },
+                        {
+                            name: 'data',
+                            type: 'bytes',
+                            internalType: 'bytes',
+                        },
+                        {
+                            name: 'allocations',
+                            type: 'tuple[]',
+                            internalType: 'struct Allocation[]',
+                            components: [
+                                {
+                                    name: 'destination',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'token',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'amount',
+                                    type: 'uint256',
+                                    internalType: 'uint256',
+                                },
+                            ],
+                        },
+                        {
+                            name: 'sigs',
+                            type: 'tuple[]',
+                            internalType: 'struct Signature[]',
+                            components: [
+                                {
+                                    name: 'v',
+                                    type: 'uint8',
+                                    internalType: 'uint8',
+                                },
+                                {
+                                    name: 'r',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                                {
+                                    name: 's',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                            ],
+                        },
+                    ],
+                },
+                {
+                    name: '',
+                    type: 'tuple[]',
+                    internalType: 'struct State[]',
+                    components: [
+                        {
+                            name: 'intent',
+                            type: 'uint8',
+                            internalType: 'enum StateIntent',
+                        },
+                        {
+                            name: 'version',
+                            type: 'uint256',
+                            internalType: 'uint256',
+                        },
+                        {
+                            name: 'data',
+                            type: 'bytes',
+                            internalType: 'bytes',
+                        },
+                        {
+                            name: 'allocations',
+                            type: 'tuple[]',
+                            internalType: 'struct Allocation[]',
+                            components: [
+                                {
+                                    name: 'destination',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'token',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'amount',
+                                    type: 'uint256',
+                                    internalType: 'uint256',
+                                },
+                            ],
+                        },
+                        {
+                            name: 'sigs',
+                            type: 'tuple[]',
+                            internalType: 'struct Signature[]',
+                            components: [
+                                {
+                                    name: 'v',
+                                    type: 'uint8',
+                                    internalType: 'uint8',
+                                },
+                                {
+                                    name: 'r',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                                {
+                                    name: 's',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+            outputs: [],
+            stateMutability: 'nonpayable',
+        },
+        {
+            type: 'function',
+            name: 'create',
+            inputs: [
+                {
+                    name: 'ch',
+                    type: 'tuple',
+                    internalType: 'struct Channel',
+                    components: [
+                        {
+                            name: 'participants',
+                            type: 'address[]',
+                            internalType: 'address[]',
+                        },
+                        {
+                            name: 'adjudicator',
+                            type: 'address',
+                            internalType: 'address',
+                        },
+                        {
+                            name: 'challenge',
+                            type: 'uint64',
+                            internalType: 'uint64',
+                        },
+                        {
+                            name: 'nonce',
+                            type: 'uint64',
+                            internalType: 'uint64',
+                        },
+                    ],
+                },
+                {
+                    name: 'initial',
+                    type: 'tuple',
+                    internalType: 'struct State',
+                    components: [
+                        {
+                            name: 'intent',
+                            type: 'uint8',
+                            internalType: 'enum StateIntent',
+                        },
+                        {
+                            name: 'version',
+                            type: 'uint256',
+                            internalType: 'uint256',
+                        },
+                        {
+                            name: 'data',
+                            type: 'bytes',
+                            internalType: 'bytes',
+                        },
+                        {
+                            name: 'allocations',
+                            type: 'tuple[]',
+                            internalType: 'struct Allocation[]',
+                            components: [
+                                {
+                                    name: 'destination',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'token',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'amount',
+                                    type: 'uint256',
+                                    internalType: 'uint256',
+                                },
+                            ],
+                        },
+                        {
+                            name: 'sigs',
+                            type: 'tuple[]',
+                            internalType: 'struct Signature[]',
+                            components: [
+                                {
+                                    name: 'v',
+                                    type: 'uint8',
+                                    internalType: 'uint8',
+                                },
+                                {
+                                    name: 'r',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                                {
+                                    name: 's',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+            outputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    internalType: 'bytes32',
+                },
+            ],
+            stateMutability: 'nonpayable',
+        },
+        {
+            type: 'function',
+            name: 'deposit',
+            inputs: [
+                {
+                    name: 'token',
+                    type: 'address',
+                    internalType: 'address',
+                },
+                {
+                    name: 'amount',
+                    type: 'uint256',
+                    internalType: 'uint256',
+                },
+            ],
+            outputs: [],
+            stateMutability: 'payable',
+        },
+        {
+            type: 'function',
+            name: 'getAccountChannels',
+            inputs: [
+                {
+                    name: 'account',
+                    type: 'address',
+                    internalType: 'address',
+                },
+            ],
+            outputs: [{ name: '', type: 'bytes32[]', internalType: 'bytes32[]' }],
+            stateMutability: 'view',
+        },
+        {
+            type: 'function',
+            name: 'getAccountInfo',
+            inputs: [
+                {
+                    name: 'user',
+                    type: 'address',
+                    internalType: 'address',
+                },
+                {
+                    name: 'token',
+                    type: 'address',
+                    internalType: 'address',
+                },
+            ],
+            outputs: [
+                {
+                    name: 'available',
+                    type: 'uint256',
+                    internalType: 'uint256',
+                },
+                {
+                    name: 'channelCount',
+                    type: 'uint256',
+                    internalType: 'uint256',
+                },
+            ],
+            stateMutability: 'view',
+        },
+        {
+            type: 'function',
+            name: 'join',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    internalType: 'bytes32',
+                },
+                {
+                    name: 'index',
+                    type: 'uint256',
+                    internalType: 'uint256',
+                },
+                {
+                    name: 'sig',
+                    type: 'tuple',
+                    internalType: 'struct Signature',
+                    components: [
+                        {
+                            name: 'v',
+                            type: 'uint8',
+                            internalType: 'uint8',
+                        },
+                        {
+                            name: 'r',
+                            type: 'bytes32',
+                            internalType: 'bytes32',
+                        },
+                        {
+                            name: 's',
+                            type: 'bytes32',
+                            internalType: 'bytes32',
+                        },
+                    ],
+                },
+            ],
+            outputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
+            stateMutability: 'nonpayable',
+        },
+        {
+            type: 'function',
+            name: 'resize',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    internalType: 'bytes32',
+                },
+                {
+                    name: 'candidate',
+                    type: 'tuple',
+                    internalType: 'struct State',
+                    components: [
+                        {
+                            name: 'intent',
+                            type: 'uint8',
+                            internalType: 'enum StateIntent',
+                        },
+                        {
+                            name: 'version',
+                            type: 'uint256',
+                            internalType: 'uint256',
+                        },
+                        {
+                            name: 'data',
+                            type: 'bytes',
+                            internalType: 'bytes',
+                        },
+                        {
+                            name: 'allocations',
+                            type: 'tuple[]',
+                            internalType: 'struct Allocation[]',
+                            components: [
+                                {
+                                    name: 'destination',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'token',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'amount',
+                                    type: 'uint256',
+                                    internalType: 'uint256',
+                                },
+                            ],
+                        },
+                        {
+                            name: 'sigs',
+                            type: 'tuple[]',
+                            internalType: 'struct Signature[]',
+                            components: [
+                                {
+                                    name: 'v',
+                                    type: 'uint8',
+                                    internalType: 'uint8',
+                                },
+                                {
+                                    name: 'r',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                                {
+                                    name: 's',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                            ],
+                        },
+                    ],
+                },
+                {
+                    name: 'proofs',
+                    type: 'tuple[]',
+                    internalType: 'struct State[]',
+                    components: [
+                        {
+                            name: 'intent',
+                            type: 'uint8',
+                            internalType: 'enum StateIntent',
+                        },
+                        {
+                            name: 'version',
+                            type: 'uint256',
+                            internalType: 'uint256',
+                        },
+                        {
+                            name: 'data',
+                            type: 'bytes',
+                            internalType: 'bytes',
+                        },
+                        {
+                            name: 'allocations',
+                            type: 'tuple[]',
+                            internalType: 'struct Allocation[]',
+                            components: [
+                                {
+                                    name: 'destination',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'token',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'amount',
+                                    type: 'uint256',
+                                    internalType: 'uint256',
+                                },
+                            ],
+                        },
+                        {
+                            name: 'sigs',
+                            type: 'tuple[]',
+                            internalType: 'struct Signature[]',
+                            components: [
+                                {
+                                    name: 'v',
+                                    type: 'uint8',
+                                    internalType: 'uint8',
+                                },
+                                {
+                                    name: 'r',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                                {
+                                    name: 's',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+            outputs: [],
+            stateMutability: 'nonpayable',
+        },
+        {
+            type: 'function',
+            name: 'withdraw',
+            inputs: [
+                {
+                    name: 'token',
+                    type: 'address',
+                    internalType: 'address',
+                },
+                {
+                    name: 'amount',
+                    type: 'uint256',
+                    internalType: 'uint256',
+                },
+            ],
+            outputs: [],
+            stateMutability: 'nonpayable',
+        },
+        {
+            type: 'event',
+            name: 'Challenged',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    indexed: true,
+                    internalType: 'bytes32',
+                },
+                {
+                    name: 'expiration',
+                    type: 'uint256',
+                    indexed: false,
+                    internalType: 'uint256',
+                },
+            ],
+            anonymous: false,
+        },
+        {
+            type: 'event',
+            name: 'Checkpointed',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    indexed: true,
+                    internalType: 'bytes32',
+                },
+            ],
+            anonymous: false,
+        },
+        {
+            type: 'event',
+            name: 'Closed',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    indexed: true,
+                    internalType: 'bytes32',
+                },
+                {
+                    name: 'finalState',
+                    type: 'tuple',
+                    indexed: false,
+                    internalType: 'struct State',
+                    components: [
+                        {
+                            name: 'intent',
+                            type: 'uint8',
+                            internalType: 'enum StateIntent',
+                        },
+                        {
+                            name: 'version',
+                            type: 'uint256',
+                            internalType: 'uint256',
+                        },
+                        {
+                            name: 'data',
+                            type: 'bytes',
+                            internalType: 'bytes',
+                        },
+                        {
+                            name: 'allocations',
+                            type: 'tuple[]',
+                            internalType: 'struct Allocation[]',
+                            components: [
+                                {
+                                    name: 'destination',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'token',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'amount',
+                                    type: 'uint256',
+                                    internalType: 'uint256',
+                                },
+                            ],
+                        },
+                        {
+                            name: 'sigs',
+                            type: 'tuple[]',
+                            internalType: 'struct Signature[]',
+                            components: [
+                                {
+                                    name: 'v',
+                                    type: 'uint8',
+                                    internalType: 'uint8',
+                                },
+                                {
+                                    name: 'r',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                                {
+                                    name: 's',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+            anonymous: false,
+        },
+        {
+            type: 'event',
+            name: 'Created',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    indexed: true,
+                    internalType: 'bytes32',
+                },
+                {
+                    name: 'wallet',
+                    type: 'address',
+                    indexed: true,
+                    internalType: 'address',
+                },
+                {
+                    name: 'channel',
+                    type: 'tuple',
+                    indexed: false,
+                    internalType: 'struct Channel',
+                    components: [
+                        {
+                            name: 'participants',
+                            type: 'address[]',
+                            internalType: 'address[]',
+                        },
+                        {
+                            name: 'adjudicator',
+                            type: 'address',
+                            internalType: 'address',
+                        },
+                        {
+                            name: 'challenge',
+                            type: 'uint64',
+                            internalType: 'uint64',
+                        },
+                        {
+                            name: 'nonce',
+                            type: 'uint64',
+                            internalType: 'uint64',
+                        },
+                    ],
+                },
+                {
+                    name: 'initial',
+                    type: 'tuple',
+                    indexed: false,
+                    internalType: 'struct State',
+                    components: [
+                        {
+                            name: 'intent',
+                            type: 'uint8',
+                            internalType: 'enum StateIntent',
+                        },
+                        {
+                            name: 'version',
+                            type: 'uint256',
+                            internalType: 'uint256',
+                        },
+                        {
+                            name: 'data',
+                            type: 'bytes',
+                            internalType: 'bytes',
+                        },
+                        {
+                            name: 'allocations',
+                            type: 'tuple[]',
+                            internalType: 'struct Allocation[]',
+                            components: [
+                                {
+                                    name: 'destination',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'token',
+                                    type: 'address',
+                                    internalType: 'address',
+                                },
+                                {
+                                    name: 'amount',
+                                    type: 'uint256',
+                                    internalType: 'uint256',
+                                },
+                            ],
+                        },
+                        {
+                            name: 'sigs',
+                            type: 'tuple[]',
+                            internalType: 'struct Signature[]',
+                            components: [
+                                {
+                                    name: 'v',
+                                    type: 'uint8',
+                                    internalType: 'uint8',
+                                },
+                                {
+                                    name: 'r',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                                {
+                                    name: 's',
+                                    type: 'bytes32',
+                                    internalType: 'bytes32',
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+            anonymous: false,
+        },
+        {
+            type: 'event',
+            name: 'Deposited',
+            inputs: [
+                {
+                    name: 'wallet',
+                    type: 'address',
+                    indexed: true,
+                    internalType: 'address',
+                },
+                {
+                    name: 'token',
+                    type: 'address',
+                    indexed: true,
+                    internalType: 'address',
+                },
+                {
+                    name: 'amount',
+                    type: 'uint256',
+                    indexed: false,
+                    internalType: 'uint256',
+                },
+            ],
+            anonymous: false,
+        },
+        {
+            type: 'event',
+            name: 'Joined',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    indexed: true,
+                    internalType: 'bytes32',
+                },
+                {
+                    name: 'index',
+                    type: 'uint256',
+                    indexed: false,
+                    internalType: 'uint256',
+                },
+            ],
+            anonymous: false,
+        },
+        {
+            type: 'event',
+            name: 'Opened',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    indexed: true,
+                    internalType: 'bytes32',
+                },
+            ],
+            anonymous: false,
+        },
+        {
+            type: 'event',
+            name: 'Resized',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    indexed: true,
+                    internalType: 'bytes32',
+                },
+                {
+                    name: 'deltaAllocations',
+                    type: 'int256[]',
+                    indexed: false,
+                    internalType: 'int256[]',
+                },
+            ],
+            anonymous: false,
+        },
+        {
+            type: 'event',
+            name: 'Withdrawn',
+            inputs: [
+                {
+                    name: 'wallet',
+                    type: 'address',
+                    indexed: true,
+                    internalType: 'address',
+                },
+                {
+                    name: 'token',
+                    type: 'address',
+                    indexed: true,
+                    internalType: 'address',
+                },
+                {
+                    name: 'amount',
+                    type: 'uint256',
+                    indexed: false,
+                    internalType: 'uint256',
+                },
+            ],
+            anonymous: false,
+        },
+        { type: 'error', name: 'ChallengeNotExpired', inputs: [] },
+        { type: 'error', name: 'ChannelNotFinal', inputs: [] },
+        {
+            type: 'error',
+            name: 'ChannelNotFound',
+            inputs: [
+                {
+                    name: 'channelId',
+                    type: 'bytes32',
+                    internalType: 'bytes32',
+                },
+            ],
+        },
+        { type: 'error', name: 'ECDSAInvalidSignature', inputs: [] },
+        {
+            type: 'error',
+            name: 'ECDSAInvalidSignatureLength',
+            inputs: [
+                {
+                    name: 'length',
+                    type: 'uint256',
+                    internalType: 'uint256',
+                },
+            ],
+        },
+        {
+            type: 'error',
+            name: 'ECDSAInvalidSignatureS',
+            inputs: [{ name: 's', type: 'bytes32', internalType: 'bytes32' }],
+        },
+        {
+            type: 'error',
+            name: 'InsufficientBalance',
+            inputs: [
+                {
+                    name: 'available',
+                    type: 'uint256',
+                    internalType: 'uint256',
+                },
+                {
+                    name: 'required',
+                    type: 'uint256',
+                    internalType: 'uint256',
+                },
+            ],
+        },
+        { type: 'error', name: 'InvalidAdjudicator', inputs: [] },
+        { type: 'error', name: 'InvalidAllocations', inputs: [] },
+        { type: 'error', name: 'InvalidAmount', inputs: [] },
+        { type: 'error', name: 'InvalidChallengePeriod', inputs: [] },
+        { type: 'error', name: 'InvalidParticipant', inputs: [] },
+        { type: 'error', name: 'InvalidState', inputs: [] },
+        { type: 'error', name: 'InvalidStateSignatures', inputs: [] },
+        { type: 'error', name: 'InvalidStatus', inputs: [] },
+        { type: 'error', name: 'InvalidValue', inputs: [] },
+        {
+            type: 'error',
+            name: 'SafeERC20FailedOperation',
+            inputs: [
+                {
+                    name: 'token',
+                    type: 'address',
+                    internalType: 'address',
+                },
+            ],
+        },
+        {
+            type: 'error',
+            name: 'TransferFailed',
+            inputs: [
+                {
+                    name: 'token',
+                    type: 'address',
+                    internalType: 'address',
+                },
+                { name: 'to', type: 'address', internalType: 'address' },
+                {
+                    name: 'amount',
+                    type: 'uint256',
+                    internalType: 'uint256',
+                },
+            ],
+        },
+    ],
+    bytecode:
+        '0x60808060405234601557613b29908161001a8239f35b5f80fdfe60806040526004361015610011575f80fd5b5f3560e01c8063259311c914611dce57806347e7ef2414611c6f5780636332fef614611c085780637de7ad621461177d5780637e2d8d72146116c6578063a22b823d14611483578063d0cce1e8146110f9578063d37ff7b514610834578063de22731f1461021a5763f3fef3a314610087575f80fd5b34610216576040600319360112610216576100a0612609565b60243590335f52600160205260405f20906001600160a01b0381165f528160205260405f2054918383106101e6576001600160a01b0392508282165f5260205260405f206100ef84825461290f565b9055169081610194575f80808084335af13d1561018f573d610110816126c6565b9061011e60405192836126a3565b81525f60203d92013e5b1561015c575b6040519081527fd1c19fbcd4551a5edfb66d43d2e337c04837afda3482b42bdf569a8fccdae5fb60203392a3005b907fbf182be8000000000000000000000000000000000000000000000000000000005f526004523360245260445260645ffd5b610128565b6101e16040517fa9059cbb000000000000000000000000000000000000000000000000000000006020820152336024820152826044820152604481526101db6064826126a3565b83613818565b61012e565b50507fcf479181000000000000000000000000000000000000000000000000000000005f5260045260245260445ffd5b5f80fd5b34610216576102283661258d565b5050815f525f60205260405f206003810160ff815416600581101561082057801561080d576002810361079b5750823560048110156102165761026a816129ec565b6003810361060a576020840135801561060a576080850191600261028e8488612b22565b905003610773576102b16102a186612b58565b6102ab36896127c9565b90613398565b1561077357600f8501906102c4816129ec565b60ff60ff1983541691161790556010840155601183016102e76040860186612bb4565b9067ffffffffffffffff821161075f576103018354612be7565b601f8111610724575b505f90601f83116001146106c05761033992915f91836106b5575b50508160011b915f199060031b1c19161790565b90555b6012830161034d6060860186612b22565b91906103598383612c35565b905f5260205f205f915b83831061064f575050505061037c601384019185612b22565b91906103888383612cb7565b905f5260205f205f915b8383106106325750505050600460ff198254161790555b6103c06103b96060840184612b22565b36916126fa565b600281510361060a575f5b600281106105ed575050335f5260016020526103ed83600160405f20016138ed565b505f5b600281106105b4575050815f525f60205260405f2080545f82558061059a575b505f60018201555f60028201555f600382015561043c600682016104378160048501612c1f565b613340565b610448600a8201613340565b5f600e8201555f600f8201555f6010820155601181016104688154612be7565b9081610557575b5050601281018054905f81558161051e575b50506013018054905f8155816104d1575b837f3646844802330633cc652490829391a0e9ddb82143a86a7e39ca148dfb05c9106104cc85604051918291602083526020830190612dab565b0390a2005b8160030291600383040361050a575f5260205f20908101905b8181101561049257805f600392555f60018201555f6002820155016104ea565b634e487b7160e01b5f52601160045260245ffd5b8160030291600383040361050a575f5260205f20908101905b8181101561048157805f600392555f60018201555f600282015501610537565b81601f5f931160011461056e5750555b838061046f565b8183526020832061058a91601f0160051c810190600101612c1f565b8082528160208120915555610567565b6105ae90825f5260205f2090810190612c1f565b83610410565b806001600160a01b036105c96001938561318c565b90549060031b1c165f52816020526105e6858360405f20016138ed565b50016103f0565b806106046105fd60019385612939565b5187613765565b016103cb565b7fbaf3f0f7000000000000000000000000000000000000000000000000000000005f5260045ffd5b600360608261064360019486612d25565b01920192019190610392565b60036060826001600160a01b03610667600195612ca3565b166001600160a01b031986541617855561068360208201612ca3565b6001600160a01b0385870191166001600160a01b03198254161790556040810135600286015501920192019190610363565b013590508980610325565b601f19831691845f5260205f20925f5b81811061070c57509084600195949392106106f3575b505050811b01905561033c565b01355f19600384901b60f8161c191690558880806106e6565b919360206001819287870135815501950192016106d0565b61074f90845f5260205f20601f850160051c81019160208610610755575b601f0160051c0190612c1f565b8861030a565b9091508190610742565b634e487b7160e01b5f52604160045260245ffd5b7f773a750f000000000000000000000000000000000000000000000000000000005f5260045ffd5b6003036107e557600e82015442106107bd57600460ff198254161790556103a9565b7f151f07fe000000000000000000000000000000000000000000000000000000005f5260045ffd5b7ff525e320000000000000000000000000000000000000000000000000000000005f5260045ffd5b846379c1d89f60e11b5f5260045260245ffd5b634e487b7160e01b5f52602160045260245ffd5b346102165760406003193601126102165760043567ffffffffffffffff8111610216578060040190803603906080600319830112610216576024359167ffffffffffffffff831161021657826004019160a0600319853603011261021657600261089e8680613218565b9050148015906110d1575b80156110a3575b801561105a575b61103257602481016001600160a01b036108d082612ca3565b161561100a576044820190610e1067ffffffffffffffff6108f08461324e565b1610610fe25784359260048410156102165761090b846129ec565b6001840361060a576024870135968761060a5761093061092b368b613278565b6136c8565b97885f525f60205260ff600360405f200154166005811015610820576107e55761096d61095d368c613278565b610967368b6127c9565b906134ef565b6084830190600161097e838c612b22565b9050036107735761098f828b612b22565b15610dc05761099e8d80613218565b92909215610dc0576109bd6109b56109c394612ca3565b923690612790565b906135d6565b1561077357606483019260026109d9858c612b22565b905003610fba578a5f525f60205260405f20926109f68d80613218565b9067ffffffffffffffff821161075f5768010000000000000000821161075f578554828755808310610f9e575b50855f5260205f205f5b838110610f835750505050600184016001600160a01b03610a4d89612ca3565b166001600160a01b0319825416178155610a668961324e565b7fffffffff0000000000000000ffffffffffffffffffffffffffffffffffffffff7bffffffffffffffff000000000000000000000000000000000000000083549260a01b1691161790556002840198606487019967ffffffffffffffff610acc8c61324e565b82547fffffffffffffffffffffffffffffffffffffffffffffffff000000000000000016911617905560038501805460ff191660011790556004850180546001600160a01b03191633179055600f850190610b26816129ec565b60ff60ff1983541691161790556010840155610b4960446011850192018b612bb4565b9067ffffffffffffffff821161075f57610b638354612be7565b601f8111610f53575b505f90601f8311600114610eef57610b9a92915f9183610ee45750508160011b915f199060031b1c19161790565b90555b60128201610bab848b612b22565b9190610bb78383612c35565b905f5260205f205f915b838310610e7e5750505050610bda60138301918a612b22565b9190610be68383612cb7565b905f5260205f205f915b838310610e6157505050505f91600a600683019201925b60028110610dd457505090610c1e610c63926131a1565b90610c3a6001600160a01b038351166020840151908c3361360e565b9060206001916001600160a01b0380825116166001600160a01b03198554161784550151910155565b610c6d8880613218565b15610dc057610c836001600160a01b0391612ca3565b165f526001602052610c9b87600160405f2001613885565b5060405194604086527fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffdd60c087019935910181121561021657016024600482013591019767ffffffffffffffff8211610216578160051b36038913610216578190608060408801525260e0850197905f5b818110610d985750505092610d8d60209767ffffffffffffffff610d797f7044488f9b947dc40d596a71992214b1050317a18ab1dced28e9d22320c398429682610d6e87986001600160a01b03610d638f9d61261f565b1660608a0152613263565b166080870152613263565b1660a0840152828103898401523396612dab565b0390a3604051908152f35b9091986020806001926001600160a01b03610db28e61261f565b168152019a01929101610d0c565b634e487b7160e01b5f52603260045260245ffd5b80610e398b6040610e0a84610df888610e046020610dfe60019b610df8858b612b22565b90612d66565b01612ca3565b95612b22565b01356001600160a01b0360405192610e218461266b565b1682526020820152610e338387612d53565b906131c8565b610e5b604051610e488161266b565b5f81525f6020820152610e338388612d53565b01610c07565b6003606082610e7260019486612d25565b01920192019190610bf0565b60036060826001600160a01b03610e96600195612ca3565b166001600160a01b0319865416178555610eb260208201612ca3565b6001600160a01b0385870191166001600160a01b03198254161790556040810135600286015501920192019190610bc1565b013590508f80610325565b601f19831691845f5260205f20925f5b818110610f3b5750908460019594939210610f22575b505050811b019055610b9d565b01355f19600384901b60f8161c191690558e8080610f15565b91936020600181928787013581550195019201610eff565b610f7d90845f5260205f20601f850160051c8101916020861061075557601f0160051c0190612c1f565b8e610b6c565b6001906020610f9185612ca3565b9401938184015501610a2d565b610fb490875f528360205f209182019101612c1f565b8f610a23565b7f52e4cb1c000000000000000000000000000000000000000000000000000000005f5260045ffd5b7fb4e12433000000000000000000000000000000000000000000000000000000005f5260045ffd5b7fea9e70ce000000000000000000000000000000000000000000000000000000005f5260045ffd5b7fa145c43e000000000000000000000000000000000000000000000000000000005f5260045ffd5b506110658580613218565b15610dc05761107390612ca3565b61107d8680613218565b60011015610dc0576001600160a01b0361109a6020829301612ca3565b169116146108b7565b506110ae8580613218565b60011015610dc0576110ca60206001600160a01b039201612ca3565b16156108b0565b506110dc8580613218565b15610dc0576110f26001600160a01b0391612ca3565b16156108a9565b34610216576111073661258d565b91835f525f60205260405f2092600384019260ff84541691600583101561082057821561147057600483146107e55760808401926111458486612b22565b9050156107735760011480611463575b61060a57602061118b916001600160a01b036001890154169360405193849283926305b959ef60e01b8452898c60048601612f0b565b0381855afa908115611458575f91611429575b501561060a57602083013590600f860160108701918254841461060a576111cf90866111c984612fa3565b91613427565b1561060a5784356004811015610216576111e8816129ec565b60ff60ff19835416911617905555601184016112076040840184612bb4565b9067ffffffffffffffff821161075f576112218354612be7565b601f81116113f9575b505f90601f83116001146113955761125892915f91836106b55750508160011b915f199060031b1c19161790565b90555b6012840161126c6060840184612b22565b91906112788383612c35565b905f5260205f205f915b83831061132f575050505061129b906013850192612b22565b91906112a78383612cb7565b905f5260205f205f915b838310611312575050505060ff8154166005811015610820576003146112f9575b827f1f681d6befe6e92b986338164917aaa3f065b8d2de29bb520aa373114e5ec0345f80a2005b5f91600e91600260ff19825416179055015581806112d2565b600360608261132360019486612d25565b019201920191906112b1565b60036060826001600160a01b03611347600195612ca3565b166001600160a01b031986541617855561136360208201612ca3565b6001600160a01b0385870191166001600160a01b03198254161790556040810135600286015501920192019190611282565b601f19831691845f5260205f20925f5b8181106113e157509084600195949392106113c8575b505050811b01905561125b565b01355f19600384901b60f8161c191690558880806113bb565b919360206001819287870135815501950192016113a5565b61142390845f5260205f20601f850160051c8101916020861061075557601f0160051c0190612c1f565b8861122a565b61144b915060203d602011611451575b61144381836126a3565b81019061294d565b8761119e565b503d611439565b6040513d5f823e3d90fd5b5060208401351515611155565b866379c1d89f60e11b5f5260045260245ffd5b346102165760a06003193601126102165760043560607fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbc36011261021657805f525f60205260405f20906003820160ff81541660058110156108205780156116b3575f19016107e55760016024350361103257600d8301546110325761151761150b84612b58565b610967600f8601612fa3565b926001600160a01b0361152982613174565b90549060031b1c16936040519161153f8361264f565b60443560ff8116968782036102165761156d91855260643594856020820152608435948560408301526135d6565b156107735760138101918254926801000000000000000084101561075f5760018401808255841015610dc0576020976001600160a01b0395611631956002935f5260038b5f209102019160ff19835416178255600182015501556116166115d6600883016131a1565b6115e9858251168983015190893361360e565b600c83019060206001916001600160a01b0380825116166001600160a01b03198554161784550151910155565b600581018333166001600160a01b0319825416179055613174565b90549060031b1c165f526001835261164f82600160405f2001613885565b50600260ff19825416179055807fe8e915db7b3549b9e9e9b3e2ec2dc3edd1f76961504366998824836401f6846a8360405160018152a260405190807fd087f17acc177540af5f382bc30c65363705b90855144d285a822536ee11fdd15f80a28152f35b826379c1d89f60e11b5f5260045260245ffd5b34610216576020600319360112610216576001600160a01b036116e7612609565b165f526001602052600160405f2001604051806020835491828152019081935f5260205f20905f5b81811061176757505050816117259103826126a3565b604051918291602083019060208452518091526040830191905f5b81811061174e575050500390f35b8251845285945060209384019390920191600101611740565b825484526020909301926001928301920161170f565b346102165761178b3661258d565b9091835f525f60205260405f2092600384019260ff84541691600583101561082057821561147057600483146107e55760808401926117ca8486612b22565b9050156107735760011480611bfb575b61060a5760408401916117ed8386612bb4565b9050611b43575b6117fe8386612bb4565b9050158015611b07575b611a71575b5050600f85018335600481101561021657611827816129ec565b60ff60ff1983541691161790556020830135601086015561184c601186019184612bb4565b9067ffffffffffffffff821161075f576118668354612be7565b601f8111611a41575b505f90601f83116001146119dd5761189d92915f91836106b55750508160011b915f199060031b1c19161790565b90555b601284016118b16060840184612b22565b91906118bd8383612c35565b905f5260205f205f915b83831061197757505050506118e0906013850192612b22565b91906118ec8383612cb7565b905f5260205f205f915b83831061195a57867f08818bbbf6e59017d5461143d9f1c4e3fb74703f7fb792c207cbeed4b344cefc60208888600e61194067ffffffffffffffff600185015460a01c1642612b15565b9201918255600360ff1982541617905554604051908152a2005b600360608261196b60019486612d25565b019201920191906118f6565b60036060826001600160a01b0361198f600195612ca3565b166001600160a01b03198654161785556119ab60208201612ca3565b6001600160a01b0385870191166001600160a01b031982541617905560408101356002860155019201920191906118c7565b601f19831691845f5260205f20925f5b818110611a295750908460019594939210611a10575b505050811b0190556118a0565b01355f19600384901b60f8161c19169055888080611a03565b919360206001819287870135815501950192016119ed565b611a6b90845f5260205f20601f850160051c8101916020861061075557601f0160051c0190612c1f565b8861186f565b6020611aa3916001600160a01b0360018a0154169360405193849283926305b959ef60e01b84528a8d60048601612f0b565b0381855afa908115611458575f91611ae8575b501561060a57601086015460208501351461060a57611adc90846111c9600f8901612fa3565b1561060a57868061180d565b611b01915060203d6020116114515761144381836126a3565b88611ab6565b508435600481101561021657611b1c816129ec565b60018114159081611b2e575b50611808565b60029150611b3b816129ec565b141589611b28565b8435600481101561021657611b57816129ec565b60018103611b66575b506117f4565b600290611b72816129ec565b14611b7e575b88611b60565b611b916007880154600989015490612b15565b60608601611b9f8188612b22565b91909115610dc057611bb19088612b22565b60019291921015610dc057604060a0611bce930135910135612b15565b14611b78577f52e4cb1c000000000000000000000000000000000000000000000000000000005f5260045ffd5b50602084013515156117da565b3461021657604060031936011261021657611c21612609565b6024356001600160a01b0381168103610216576001600160a01b03604092165f5260016020526001600160a01b03825f2091165f52806020526001825f205491015482519182526020820152f35b604060031936011261021657611c83612609565b602435908115611da6576001600160a01b03169081158015611d7857813403611d50575b335f52600160205260405f20835f5260205260405f20611cc8838254612b15565b905515611cfe575b6040519081527f8752a472e571a816aea92eec8dae9baf628e840f4929fbcc2d155e6233ff68a760203392a3005b611d4b6040517f23b872dd000000000000000000000000000000000000000000000000000000006020820152336024820152306044820152826064820152606481526101db6084826126a3565b611cd0565b7faa7feadc000000000000000000000000000000000000000000000000000000005f5260045ffd5b3415611ca7577faa7feadc000000000000000000000000000000000000000000000000000000005f5260045ffd5b7f2c5211c6000000000000000000000000000000000000000000000000000000005f5260045ffd5b3461021657611ddc3661258d565b919290815f525f60205260405f209160ff600384015416600581101561082057801561257a577ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe016107e557831561060a57813592609e1983360301938481121561021657611e4e90840136906127c9565b5f1986019686881161050a57601f19611e7f611e698a6126e2565b99611e776040519b8c6126a3565b808b526126e2565b015f5b81811061254357505060015b87811015611ede578060051b86013587811215610216575f1982019190870181831161050a57828b611ed0600195611eca611ed79536906127c9565b92612939565b528b612939565b5001611e8e565b50876001600160a01b0360018501541660405180926305b959ef60e01b825260606004830152611f26611f1460648401896129a5565b60031984820301602485015287612a1b565b600319838203016044840152815180825260208201916020808360051b8301019401925f915b83831061251257505050505091818060209403915afa908115611458575f916124f3575b501561060a5760208101359160208101516001810180911161050a57830361060a5760600192611fa08451613362565b60608201611fb9611fb46103b98386612b22565b613362565b611fcf611fc583612b58565b6102ab36866127c9565b156107735760408301611fe28185612bb4565b810195906020818803126102165780359067ffffffffffffffff821161021657019686601f890112156102165787359661201b886126e2565b986120296040519a8b6126a3565b888a5260208a01906020829a60051b82010192831161021657602001905b8282106124e357505050853590600482101561021657612066826129ec565b6002820361060a575161207c6103b98689612b22565b9060028a510361060a576120ae8160406120a58161209c6120e69661291c565b51015192612929565b51015190612b15565b916120e06120d08c6120c96120c28261291c565b5191612929565b519061340c565b9160406120a58161209c8461291c565b9261340c565b03610fba576120f86103b98588612b22565b600686016001600160a01b03815416805f5b8d8d6002831061248257925050505f5b600281106123e257505050905f90600a8801915b6002811061239f5750505050600f850190612148816129ec565b60ff60ff1983541691161790556010840155612168601184019185612bb4565b9067ffffffffffffffff821161075f576121828354612be7565b601f811161236f575b505f90601f831160011461230b576121b992915f91836123005750508160011b915f199060031b1c19161790565b90555b6121ca601283019184612b22565b91906121d68383612c35565b905f5260205f205f915b83831061229a575050505060136121fd9101916080810190612b22565b91906122098383612cb7565b905f5260205f205f915b83831061227d575050505060405191602083019060208452518091526040830191905f5b81811061226757857ff3b6c524f73df7344d9fcf2f960a57aba7fba7e292d8b79ed03d786f7b2b112f86860387a2005b8251845260209384019390920191600101612237565b600360608261228e60019486612d25565b01920192019190612213565b60036060826001600160a01b036122b2600195612ca3565b166001600160a01b03198654161785556122ce60208201612ca3565b6001600160a01b0385870191166001600160a01b031982541617905560408101356002860155019201920191906121e0565b013590508a80610325565b601f19831691845f5260205f20925f5b818110612357575090846001959493921061233e575b505050811b0190556121bc565b01355f19600384901b60f8161c19169055898080612331565b9193602060018192878701358155019501920161231b565b61239990845f5260205f20601f850160051c8101916020861061075557601f0160051c0190612c1f565b8961218b565b8060406123ae60019385612939565b510151826123bc8388612d53565b50015560406123cb8285612939565b510151826123d98387612d53565b5001550161212e565b895f6123ee8385612939565b5112612401575b508c915060010161211a565b816001600160a01b0361241a8260046124289501613209565b90549060031b1c1693612939565b517f8000000000000000000000000000000000000000000000000000000000000000811461050a576001928f61247992604051926124658461264f565b83528660208401525f036040830152613765565b8c9150896123f5565b60019383928d5f6124938686612939565b51136124a7575b505050505001819061210a565b846001600160a01b036124c36124d89760046124d19501613209565b90549060031b1c1694612939565b519261360e565b808d8f85908d61249a565b8135815260209182019101612047565b61250c915060203d6020116114515761144381836126a3565b85611f70565b91939550919360208061253183601f1986600196030187528951612a1b565b97019301930190928795949293611f4c565b60209060405161255281612633565b5f81525f83820152606060408201526060808201526060608082015282828d01015201611e82565b506379c1d89f60e11b5f5260045260245ffd5b906060600319830112610216576004359160243567ffffffffffffffff81116102165760a06003198284030112610216576004019160443567ffffffffffffffff811161021657826023820112156102165780600401359267ffffffffffffffff84116102165760248460051b83010111610216576024019190565b600435906001600160a01b038216820361021657565b35906001600160a01b038216820361021657565b60a0810190811067ffffffffffffffff82111761075f57604052565b6060810190811067ffffffffffffffff82111761075f57604052565b6040810190811067ffffffffffffffff82111761075f57604052565b6080810190811067ffffffffffffffff82111761075f57604052565b90601f601f19910116810190811067ffffffffffffffff82111761075f57604052565b67ffffffffffffffff811161075f57601f01601f191660200190565b67ffffffffffffffff811161075f5760051b60200190565b929192612706826126e2565b9361271460405195866126a3565b606060208685815201930282019181831161021657925b8284106127385750505050565b6060848303126102165760206060916040516127538161264f565b61275c8761261f565b815261276983880161261f565b838201526040870135604082015281520193019261272b565b359060ff8216820361021657565b9190826060910312610216576040516127a88161264f565b60408082946127b681612782565b8452602081013560208501520135910152565b919060a083820312610216576040516127e181612633565b80938035600481101561021657825260208101356020830152604081013567ffffffffffffffff811161021657810183601f82011215610216578035612826816126c6565b9161283460405193846126a3565b818352856020838301011161021657815f92602080930183860137830101526040830152606081013567ffffffffffffffff811161021657810183601f820112156102165783816020612889933591016126fa565b606083015260808101359067ffffffffffffffff8211610216570182601f820112156102165780356128ba816126e2565b936128c860405195866126a3565b8185526020606081870193028401019281841161021657602001915b8383106128f5575050505060800152565b60206060916129048486612790565b8152019201916128e4565b9190820391821161050a57565b805115610dc05760200190565b805160011015610dc05760400190565b8051821015610dc05760209160051b010190565b90816020910312610216575180151581036102165790565b90602082549182815201915f5260205f20905f5b8181106129865750505090565b82546001600160a01b0316845260209093019260019283019201612979565b9060808152606067ffffffffffffffff60026129c46080850186612965565b948260018201546001600160a01b038116602088015260a01c16604086015201541691015290565b6004111561082057565b90601f19601f602080948051918291828752018686015e5f8582860101520116010190565b8051612a26816129ec565b825260208101516020830152612a4b604082015160a0604085015260a08401906129f6565b906060810151918381036060850152602080845192838152019301905f5b818110612acd5750505060800151916080818303910152602080835192838152019201905f5b818110612a9c5750505090565b909192602060606001926040875160ff81511683528481015185840152015160408201520194019101919091612a8f565b9091936020612b0b60019287519060406060926001600160a01b0381511683526001600160a01b036020820151166020840152015160408201520190565b9501929101612a69565b9190820180921161050a57565b903590601e1981360301821215610216570180359067ffffffffffffffff82116102165760200191606082023603831361021657565b90604051612b6581612687565b606067ffffffffffffffff60028395604051612b8c81612b858185612965565b03826126a3565b85528260018201546001600160a01b038116602088015260a01c166040860152015416910152565b903590601e1981360301821215610216570180359067ffffffffffffffff82116102165760200191813603831361021657565b90600182811c92168015612c15575b6020831014612c0157565b634e487b7160e01b5f52602260045260245ffd5b91607f1691612bf6565b818110612c2a575050565b5f8155600101612c1f565b9068010000000000000000811161075f57815491818155828210612c5857505050565b8260030292600384040361050a578160030291600383040361050a575f5260205f2091820191015b818110612c8b575050565b805f600392555f60018201555f600282015501612c80565b356001600160a01b03811681036102165790565b9068010000000000000000811161075f57815491818155828210612cda57505050565b8260030292600384040361050a578160030291600383040361050a575f5260205f2091820191015b818110612d0d575050565b805f600392555f60018201555f600282015501612d02565b90803560ff81168091036102165760029160409160ff19855416178455602081013560018501550135910155565b906002811015610dc05760011b01905f90565b9190811015610dc0576060020190565b9035601e198236030181121561021657016020813591019167ffffffffffffffff821161021657606082023603831361021657565b8035600481101561021657612dbf816129ec565b8252602081013560208301526040810135601e198236030181121561021657810160208135910167ffffffffffffffff82116102165781360381136102165781601f1992601f9260a060408801528160a088015260c08701375f60c08287010152011682019060c082019160e0612e396060840184612d76565b86840360c0016060880152948590529101925f5b818110612ebf57505050612e678160806020930190612d76565b92909360808183039101528281520191905f5b818110612e875750505090565b90919260608060019260ff612e9b88612782565b16815260208701356020820152604087013560408201520194019101919091612e7a565b9091936060806001926001600160a01b03612ed98961261f565b1681526001600160a01b03612ef060208a0161261f565b16602082015260408881013590820152019501929101612e4d565b91612f21612f2f926060855260608501906129a5565b908382036020850152612dab565b906040818303910152828152602081019260208160051b83010193835f91609e1982360301945b848410612f67575050505050505090565b90919293949596601f19828203018352873587811215610216576020612f9260019387839401612dab565b990193019401929195949390612f56565b90604051612fb081612633565b809260ff815416612fc0816129ec565b8252600181015460208301526002810160405190815f825492612fe284612be7565b8084529360018116908115613152575060011461310e575b50613007925003826126a3565b604083015260038101805461301b816126e2565b9161302960405193846126a3565b81835260208301905f5260205f205f915b8383106130c557505050509060049160608401520190815461305b816126e2565b9261306960405194856126a3565b81845260208401905f5260205f205f915b83831061308b575050505060800152565b6003602060019260405161309e8161264f565b60ff865416815284860154838201526002860154604082015281520192019201919061307a565b600360206001926040516130d88161264f565b6001600160a01b0386541681526001600160a01b038587015416838201526002860154604082015281520192019201919061303a565b90505f9291925260205f20905f915b818310613136575050906020613007928201015f612ffa565b602091935080600191548385880101520191019091839261311d565b6020935061300795925060ff1991501682840152151560051b8201015f612ffa565b805460011015610dc0575f52600160205f2001905f90565b8054821015610dc0575f5260205f2001905f90565b906040516131ae8161266b565b6020600182946001600160a01b0381541684520154910152565b91906131f6576020816001600160a01b03806001945116166001600160a01b03198554161784550151910155565b634e487b7160e01b5f525f60045260245ffd5b6002821015610dc05701905f90565b903590601e1981360301821215610216570180359067ffffffffffffffff821161021657602001918160051b3603831361021657565b3567ffffffffffffffff811681036102165790565b359067ffffffffffffffff8216820361021657565b919091608081840312610216576040519061329282612687565b8193813567ffffffffffffffff81116102165782019080601f830112156102165781356132be816126e2565b926132cc60405194856126a3565b81845260208085019260051b82010192831161021657602001905b82821061332857505050606080926133239285526133076020820161261f565b602086015261331860408201613263565b604086015201613263565b910152565b602080916133358461261f565b8152019101906132e7565b60048101905b818110613351575050565b5f8082556001820155600201613346565b600281510361060a576001600160a01b03602061338d82826133838661291c565b5101511693612929565b510151160361060a57565b9060806133a582846134ef565b910190600282515103613405575f5b600281106133c55750505050600190565b6133f06133d3828551612939565b516001600160a01b036133e7848851612939565b511690846135d6565b156133fd576001016133b4565b505050505f90565b5050505f90565b9190915f838201938412911290801582169115161761050a57565b919091602060405180927fcc2a842d00000000000000000000000000000000000000000000000000000000825260406004830152816001600160a01b0381613487613475604483018b612dab565b60031983820301602484015289612a1b565b0392165afa5f91816134b2575b506134a757506020809101519101351190565b90505f8092500b1390565b9091506020813d6020116134e7575b816134ce602093836126a3565b810103126102165751805f0b810361021657905f613494565b3d91506134c1565b6134f8906136c8565b90805190613505826129ec565b60208101519161354a60606040840151930151926040519485936020850197885261352f816129ec565b6040850152606084015260a0608084015260c08301906129f6565b91601f198284030160a0830152602080825194858152019101925f5b818110613588575050613582925003601f1981018352826126a3565b51902090565b9160019193506135c760209186519060406060926001600160a01b0381511683526001600160a01b036020820151166020840152015160408201520190565b94019101918492939193613566565b613607926135fe6001600160a01b039392849360ff81511660406020830151920151926139aa565b90959195613a2c565b1691161490565b83156136c2576001600160a01b03165f52600160205260405f206001600160a01b0383165f528060205260405f2054848110613692578461364e9161290f565b906001600160a01b0384165f5260205260405f20555f525f6020526001600160a01b03601460405f200191165f5260205261368e60405f20918254612b15565b9055565b84907fcf479181000000000000000000000000000000000000000000000000000000005f5260045260245260445ffd5b50505050565b80516001600160a01b0360208301511667ffffffffffffffff60608160408601511694015116604051928391602083019560c084019460a088528351809652602060e086019401955f5b81811061374357505061358295506040850152606084015260808301524660a083015203601f1981018352826126a3565b87516001600160a01b0316865260209788019789975090950194600101613712565b906040810191825115613813575f525f602052601460405f20019160208201916001600160a01b0380845116165f528360205260405f205493841561380c576001600160a01b0392518086115f14613801576137c290809661290f565b908380865116165f5260205260405f205551165f5260016020526001600160a01b038060405f20925116165f5260205261368e60405f20918254612b15565b506137c2858061290f565b5050505050565b505050565b905f602091828151910182855af115611458575f513d61387c57506001600160a01b0381163b155b6138475750565b6001600160a01b03907f5274afe7000000000000000000000000000000000000000000000000000000005f521660045260245ffd5b60011415613840565b6001810190825f528160205260405f2054155f146134055780546801000000000000000081101561075f576138da6138c482600187940185558461318c565b819391549060031b91821b915f19901b19161790565b905554915f5260205260405f2055600190565b906001820191815f528260205260405f20548015155f146133fd575f19810181811161050a5782545f1981019190821161050a57818103613975575b50505080548015613961575f190190613942828261318c565b8154905f199060031b1b19169055555f526020525f6040812055600190565b634e487b7160e01b5f52603160045260245ffd5b6139956139856138c4938661318c565b90549060031b1c9283928661318c565b90555f528360205260405f20555f8080613929565b91907f7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a08411613a21579160209360809260ff5f9560405194855216868401526040830152606082015282805260015afa15611458575f516001600160a01b03811615613a1757905f905f90565b505f906001905f90565b5050505f9160039190565b613a35816129ec565b80613a3e575050565b613a47816129ec565b60018103613a77577ff645eedf000000000000000000000000000000000000000000000000000000005f5260045ffd5b613a80816129ec565b60028103613ab457507ffce698f7000000000000000000000000000000000000000000000000000000005f5260045260245ffd5b600390613ac0816129ec565b14613ac85750565b7fd78bce0c000000000000000000000000000000000000000000000000000000005f5260045260245ffdfea26469706673582212202544094f3fdd4107fa45a56c2926654b8b3d94cb6bb5d9a80700d6b4ce8f424464736f6c634300081b0033' as `0x${string}`,
+};

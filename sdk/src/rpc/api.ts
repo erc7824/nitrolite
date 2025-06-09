@@ -4,7 +4,6 @@ import {
     AccountID,
     RequestID,
     Timestamp,
-    ParsedResponse,
     CloseAppSessionRequest,
     CreateAppSessionRequest,
     ResizeChannel,
@@ -13,9 +12,12 @@ import {
     EIP712AuthTypes,
     EIP712AuthDomain,
     EIP712AuthMessage,
-} from './types'; // Added ParsedResponse
+    AuthChallengeRPCResponse,
+    RequestData,
+    Method,
+} from './types';
 import { NitroliteRPC } from './nitrolite';
-import { generateRequestId, getCurrentTimestamp, parseRPCResponse } from './utils';
+import { generateRequestId, getCurrentTimestamp } from './utils';
 
 /**
  * Creates the signed, stringified message body for an 'auth_request'.
@@ -86,37 +88,13 @@ export async function createAuthVerifyMessageFromChallenge(
  */
 export async function createAuthVerifyMessage(
     signer: MessageSigner,
-    rawChallengeResponse: string | object,
+    challenge: AuthChallengeRPCResponse,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const parsedResponse: ParsedResponse = NitroliteRPC.parseResponse(rawChallengeResponse);
-
-    if (!parsedResponse.isValid) {
-        throw new Error(`Invalid auth_challenge response received: ${parsedResponse.error}`);
-    }
-    if (parsedResponse.method !== 'auth_challenge') {
-        throw new Error(`Expected 'auth_challenge' method in response, but received '${parsedResponse.method}'`);
-    }
-
-    if (
-        !parsedResponse.data ||
-        !Array.isArray(parsedResponse.data) ||
-        parsedResponse.data.length === 0 ||
-        typeof parsedResponse.data[0]?.challenge_message !== 'string'
-    ) {
-        throw new Error(
-            "Malformed data in auth_challenge response: Expected array with object containing 'challenge_message'.",
-        );
-    }
-
-    const challenge: string = parsedResponse.data[0].challenge_message;
-    const params = [{ challenge: challenge }];
-
+    const params = [{ challenge: challenge.params.challengeMessage }];
     const request = NitroliteRPC.createRequest(requestId, 'auth_verify', params, timestamp);
-
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
     return JSON.stringify(signedRequest);
 }
 
@@ -135,9 +113,7 @@ export async function createAuthVerifyMessageWithJWT(
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
     const params = [{ jwt: jwtToken }];
-
     const request = NitroliteRPC.createRequest(requestId, 'auth_verify', params, timestamp);
-
     return JSON.stringify(request);
 }
 
@@ -370,22 +346,24 @@ export function createEIP712AuthMessageSigner(
     partialMessage: PartialEIP712AuthMessage,
     domain: EIP712AuthDomain,
 ): MessageSigner {
-    return async (data: any): Promise<`0x${string}`> => {
+    return async (data: RequestData): Promise<Hex> => {
         // TODO: perhaps it would be better to pass full EIP712AuthMessage instead of parsing part of it
-        // out of untyped data 
+        // out of untyped data
         const address = walletClient.account?.address;
-
         if (!address) {
             throw new Error('Wallet client is not connected or does not have an account.');
         }
 
-        const response = parseRPCResponse(data)
-
-        if (response.method !== 'auth_challenge') {
-            throw new Error(`Expected 'auth_challenge' method, but received '${response.method}'`);
+        const method: Method = data[1];
+        let challengeUUID: string = '';
+        if (method === 'auth_challenge') {
+            challengeUUID = data[2][0].challengeMessage;
+        } else if (method === 'auth_verify') {
+            challengeUUID = data[2][0].challenge;
+        } else {
+            throw new Error(`Expected 'auth_challenge' or 'auth_verify' method, but received '${method}'`);
         }
 
-        const challengeUUID = response.params.challengeMessage;
         const message: EIP712AuthMessage = {
             ...partialMessage,
             challenge: challengeUUID,

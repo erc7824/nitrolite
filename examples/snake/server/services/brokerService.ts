@@ -14,10 +14,12 @@ import {
     CreateAppSessionRequest,
     createCloseAppSessionMessage,
     CloseAppSessionRequest,
+    parseRPCResponse,
+    RPCResponse,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
-import { Hex, createWalletClient, http } from "viem";
+import { Hex, WalletClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { polygon } from "viem/chains";
 
@@ -149,11 +151,17 @@ async function authenticateWithBroker(): Promise<void> {
         // Create a one-time message handler for authentication
         const authMessageHandler = async (data: WebSocket.RawData) => {
             try {
-                const message = JSON.parse(data.toString());
+                let message: RPCResponse;
+                try {
+                    message = parseRPCResponse(data.toString());
+                } catch (error) {
+                    console.warn("Error parsing auth message from broker, skipping:", error.message);
+                    return;
+                }
                 console.log("Auth process message received:", message);
 
                 // Check for auth_challenge response (response to our auth_request)
-                if (message.res && message.res[1] === "auth_challenge") {
+                if (message.method === "auth_challenge") {
                     console.log("Received auth_challenge, preparing EIP-712 auth_verify...");
 
                     try {
@@ -182,12 +190,9 @@ async function authenticateWithBroker(): Promise<void> {
                             })),
                         }, getAuthDomain());
 
-                        console.log('Calling createAuthVerifyMessage...');
                         // Create and send verification message with EIP-712 signature
-                        const authVerify = await createAuthVerifyMessage(
-                            eip712SigningFunction,
-                            data.toString(), // Pass the raw challenge response string
-                        );
+                        console.log('Calling createAuthVerifyMessage...');
+                        const authVerify = await createAuthVerifyMessage(eip712SigningFunction, message);
 
                         console.log('Sending auth_verify with EIP-712 signature');
                         brokerWs.send(authVerify);
@@ -210,13 +215,13 @@ async function authenticateWithBroker(): Promise<void> {
                     }
                 }
                 // Check for auth_verify success response
-                else if (message.res && (message.res[1] === "auth_verify" || message.res[1] === 'auth_success')) {
+                else if (message.method === "auth_verify") {
                     console.log("Authentication successful");
 
                     // If response contains a JWT token, store it
-                    if (message.res[2]?.[0]?.['jwt_token']) {
-                        console.log('JWT token received:', message.res[2][0]['jwt_token']);
-                        jwtToken = message.res[2][0]['jwt_token'];
+                    if (message.params.jwtToken) {
+                        console.log('JWT token received:', message.params.jwtToken);
+                        jwtToken = message.params.jwtToken;
                     }
 
                     isAuthenticated = true;
@@ -224,9 +229,8 @@ async function authenticateWithBroker(): Promise<void> {
                     resolve();
                 }
                 // Check for error responses
-                else if (message.err || (message.res && message.res[1] === "error")) {
-                    const errorMsg = message.err?.[1] || message.error || message.res?.[2]?.[0]?.error || 'Authentication failed';
-
+                else if (message.method === "error") {
+                    const errorMsg = message.params.error || 'Authentication failed';
                     console.error('Authentication failed:', errorMsg);
 
                     // Check if this is a JWT authentication failure and fallback to signer auth

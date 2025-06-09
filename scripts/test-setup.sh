@@ -71,7 +71,7 @@ start_anvil() {
         --gas-limit 12000000 \
         --gas-price 20000000000 \
         --block-time 1 \
-        --silent > anvil.log 2>&1 &
+        --silent > anvil.log &
     
     ANVIL_PID=$!
     echo $ANVIL_PID > anvil.pid
@@ -136,19 +136,15 @@ run_sdk_tests() {
     
     # Install dependencies
     print_status "Installing SDK dependencies..."
-    bun install
-    
-    # Build SDK
-    print_status "Building SDK..."
-    bun run build
+    npm ci
     
     # Run unit tests
     print_status "Running unit tests..."
-    bun run test
+    npm run test
     
     # Run integration tests
     print_status "Running integration tests..."
-    ENV_RPC_URL="http://$ANVIL_HOST:$ANVIL_PORT" bun run test:integration
+    ENV_RPC_URL="http://$ANVIL_HOST:$ANVIL_PORT" npm run test:integration
     
     cd - >/dev/null
     print_success "SDK tests completed"
@@ -198,11 +194,11 @@ cleanup() {
     print_success "Cleanup completed"
 }
 
-# Trap to ensure cleanup on exit
-trap cleanup EXIT
-
 # Main execution
 main() {
+    # Trap to ensure cleanup on exit
+    trap cleanup EXIT
+
     print_status "Starting Nitrolite test suite..."
     
     # Check prerequisites
@@ -211,8 +207,8 @@ main() {
         exit 1
     fi
     
-    if ! command -v bun &> /dev/null; then
-        print_error "Bun not found. Please install Bun."
+    if ! command -v npm &> /dev/null; then
+        print_error "NPM not found. Please install NPM."
         exit 1
     fi
     
@@ -226,6 +222,7 @@ main() {
     run_sdk_tests || exit 1
     run_go_tests
     
+    cleanup
     print_success "All tests completed successfully! 🎉"
 }
 
@@ -233,7 +230,7 @@ main() {
 case "${1:-}" in
     "start-anvil")
         start_anvil
-        print_success "Anvil started. Use 'kill $(cat anvil.pid)' to stop."
+        print_success "Anvil started with PID $(cat anvil.pid). Use 'cleanup' command to stop."
         ;;
     "deploy")
         deploy_contracts

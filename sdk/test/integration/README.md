@@ -32,7 +32,7 @@ Ensure you have the following installed:
 
 ```bash
 # Required tools
-- Bun >= 1.0.0
+- NPM >= 10.0.0
 - Node.js >= 18.0.0
 - Foundry (forge, anvil)
 - Go >= 1.21 (for clearnode tests)
@@ -56,16 +56,16 @@ Ensure you have the following installed:
 
 ```bash
 # SDK unit tests only
-cd sdk && bun run test
+cd sdk && npm run test
 
 # SDK integration tests only
-cd sdk && bun run test:integration
+cd sdk && npm run test:integration
 
 # SDK non-regression tests (alias for integration)
-cd sdk && bun run test:nonregression
+cd sdk && npm run test:nonregression
 
 # All SDK tests with coverage
-cd sdk && bun run test:all
+cd sdk && npm run test:all
 
 # Go clearnode tests
 cd clearnode && go test -v ./pkg/testing/...
@@ -184,8 +184,6 @@ The framework includes a comprehensive CI/CD pipeline:
 - Multi-job execution (TypeScript SDK + Go clearnode)
 - Automated Anvil setup and contract deployment
 - Coverage reporting with Codecov integration
-- Automatic NPM publishing on successful main branch tests
-- Support for both npm and Bun package managers
 ```
 
 ### Workflow Jobs
@@ -214,8 +212,8 @@ Integrated with Codecov for comprehensive coverage tracking:
 
 ```bash
 # Generate coverage reports
-bun run test:coverage              # Unit tests
-bun run test:integration:coverage  # Integration tests
+npm run test:coverage              # Unit tests
+npm run test:integration:coverage  # Integration tests
 go test -coverprofile=coverage.out # Go tests
 ```
 
@@ -299,7 +297,7 @@ Enable verbose logging:
 export DEBUG=true
 
 # Jest with verbose output
-bun run test:integration --verbose
+npm run test:integration --verbose
 
 # Go tests with race detection
 go test -v -race ./pkg/testing/...
@@ -358,4 +356,4 @@ The framework provides confidence for releasing SDK updates and serves as docume
 
 ---
 
-This test framework fully addresses GitHub issue #119 by providing a comprehensive, production-ready testing solution that ensures SDK non-regression across all development cycles. 
+This test framework fully addresses GitHub issue #119 by providing a comprehensive, production-ready testing solution that ensures SDK non-regression across all development cycles.

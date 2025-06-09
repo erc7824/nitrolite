@@ -90,10 +90,9 @@ contract Custody is IChannel, IDeposit {
         return (ledger.tokens[token], ledger.channels.length());
     }
 
-    function deposit(address token, uint256 amount) external payable {
+    function deposit(address account, address token, uint256 amount) external payable {
         if (amount == 0) revert InvalidAmount();
 
-        address account = msg.sender;
         if (token == address(0)) {
             if (msg.value != amount) revert InvalidValue();
         } else {

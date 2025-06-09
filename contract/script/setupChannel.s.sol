@@ -34,7 +34,7 @@ contract SetupChannelScript is Script {
 
             vm.startBroadcast(wallet);
             IERC20(token).approve(address(custody), type(uint256).max);
-            Custody(custody).deposit(token, custodyDepositAmount);
+            Custody(custody).deposit(wallet, token, custodyDepositAmount);
             vm.stopBroadcast();
         }
 

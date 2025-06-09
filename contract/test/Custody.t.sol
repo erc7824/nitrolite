@@ -200,7 +200,7 @@ contract CustodyTest is Test {
 
     function depositTokens(address user, uint256 amount) internal {
         vm.prank(user);
-        custody.deposit(address(token), amount);
+        custody.deposit(user, address(token), amount);
     }
 
     function skipChallengeTime() internal {
@@ -227,7 +227,7 @@ contract CustodyTest is Test {
 
         // 3. Deposit tokens for the host
         vm.prank(hostSK);
-        custody.deposit(address(token), DEPOSIT_AMOUNT * 2);
+        custody.deposit(hostSK, address(token), DEPOSIT_AMOUNT * 2);
 
         // 4. Create the channel as host
         vm.prank(hostSK);
@@ -770,7 +770,7 @@ contract CustodyTest is Test {
     function test_DepositAndWithdraw() public {
         // 1. Test deposit
         vm.startPrank(hostSK);
-        custody.deposit(address(token), DEPOSIT_AMOUNT);
+        custody.deposit(hostSK, address(token), DEPOSIT_AMOUNT);
 
         (uint256 available,) = custody.getAccountInfo(hostSK, address(token));
         assertEq(available, DEPOSIT_AMOUNT, "Deposit not recorded correctly");
@@ -1074,7 +1074,7 @@ contract CustodyTest is Test {
 
         // 3. Depositor deposits tokens into the participant accounts first
         vm.startPrank(depositor);
-        custody.deposit(address(token), DEPOSIT_AMOUNT);
+        custody.deposit(depositor, address(token), DEPOSIT_AMOUNT);
         vm.stopPrank();
 
         // 4. Create the channel as host participant
@@ -1093,7 +1093,7 @@ contract CustodyTest is Test {
         vm.startPrank(guestWallet);
         token.mint(guestWallet, INITIAL_BALANCE);
         token.approve(address(custody), INITIAL_BALANCE);
-        custody.deposit(address(token), DEPOSIT_AMOUNT);
+        custody.deposit(guestWallet, address(token), DEPOSIT_AMOUNT);
         vm.stopPrank();
 
         // Sign the state by guest participant

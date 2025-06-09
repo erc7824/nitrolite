@@ -3,6 +3,9 @@ import { Address, Hex } from 'viem';
 /** Type alias for Request ID (uint64) */
 export type RequestID = number;
 
+/** Type alias for Method (string) */
+export type Method = string;
+
 /** Type alias for Timestamp (uint64) */
 export type Timestamp = number;
 
@@ -10,10 +13,10 @@ export type Timestamp = number;
 export type AccountID = Hex;
 
 /** Represents the data payload within a request message: [requestId, method, params, timestamp?]. */
-export type RequestData = [RequestID, string, any[], Timestamp?];
+export type RequestData = [RequestID, Method, any[], Timestamp?];
 
 /** Represents the data payload within a successful response message: [requestId, method, result, timestamp?]. */
-export type ResponseData = [RequestID, string, any[], Timestamp?];
+export type ResponseData = [RequestID, Method, any[], Timestamp?];
 
 /** Represents a single allowance for an asset, used in application sessions.
  * This structure defines the symbol of the asset and the amount that is allowed to be spent.
@@ -89,7 +92,7 @@ export interface ParsedResponse {
     /** The Request ID from the response payload. Undefined if structure is invalid. */
     requestId?: RequestID;
     /** The method name from the response payload. Undefined if structure is invalid. */
-    method?: string;
+    method?: Method;
     /** The extracted data payload (result array for success, error detail object for error). Undefined if structure is invalid or error payload malformed. */
     data?: any[] | NitroliteRPCErrorDetail;
     /** The Application Session ID from the message envelope. Undefined if structure is invalid. */
@@ -140,7 +143,7 @@ export interface AuthRequest {
  * Defines the parameters required for the 'create_application' RPC method.
  */
 export interface CreateAppSessionRequest {
-    /** The detailed definition of the application being created. 
+    /** The detailed definition of the application being created.
      * Example:
      * {
         "protocol": "NitroRPC/0.2",

@@ -1,4 +1,4 @@
-import { describe, test, expect, jest } from '@jest/globals';
+import { describe, test, expect, jest, afterEach } from '@jest/globals';
 import { Address, Hex } from 'viem';
 import {
     createAuthRequestMessage,
@@ -18,10 +18,10 @@ import {
 } from '../../src/rpc/api';
 import {
     CreateAppSessionRequest,
-    CloseAppSessionRequest,
     ResizeChannel,
     MessageSigner,
     AuthRequest,
+    AuthChallengeRPCResponse,
 } from '../../src/rpc/types';
 
 describe('API message creators', () => {
@@ -32,7 +32,6 @@ describe('API message creators', () => {
     const channelId = '0x000000000000000000000000000000000000cdef' as Hex;
     const appId = '0x000000000000000000000000000000000000ffff' as Hex;
     const fundDestination = '0x' as Address;
-    const sampleIntent = [1, 2, 3];
 
     afterEach(() => {
         jest.clearAllMocks();
@@ -43,7 +42,7 @@ describe('API message creators', () => {
             wallet: clientAddress,
             participant: clientAddress,
             app_name: 'test-app',
-            allowances: {},
+            allowances: [],
         };
         const msgStr = await createAuthRequestMessage(authRequest, requestId, timestamp);
         expect(signer).not.toHaveBeenCalled();
@@ -66,9 +65,15 @@ describe('API message creators', () => {
     });
 
     describe('createAuthVerifyMessage', () => {
-        const rawResponse = JSON.stringify({
-            res: [999, 'auth_challenge', [{ challenge_message: 'msg' }], 200],
-        });
+        const rawResponse: AuthChallengeRPCResponse = {
+            method: 'auth_challenge',
+            requestId: 999,
+            timestamp: 200,
+            params: {
+                challengeMessage: 'msg',
+            },
+            signatures: [],
+        };
 
         test('successful challenge flow', async () => {
             const msgStr = await createAuthVerifyMessage(signer, rawResponse, requestId, timestamp);
@@ -78,21 +83,6 @@ describe('API message creators', () => {
                 req: [requestId, 'auth_verify', [{ challenge: 'msg' }], timestamp],
                 sig: ['0xsig'],
             });
-        });
-
-        test('throws on invalid response', async () => {
-            await expect(createAuthVerifyMessage(signer, '{}', requestId, timestamp)).rejects.toThrow(
-                'Invalid auth_challenge response',
-            );
-        });
-
-        test('throws on wrong method', async () => {
-            const wrong = JSON.stringify({
-                res: [100, 'other', [{ challenge_message: 'msg' }], 200],
-            });
-            await expect(createAuthVerifyMessage(signer, wrong, requestId, timestamp)).rejects.toThrow(
-                "Expected 'auth_challenge' method",
-            );
         });
     });
 

@@ -86,6 +86,7 @@ library Utils {
             if (
                 a.allocations[i].amount != b.allocations[i].amount
                     || a.allocations[i].destination != b.allocations[i].destination
+                    || a.allocations[i].token != b.allocations[i].token
             ) {
                 return false;
             }

@@ -334,7 +334,7 @@ contract Custody is IChannel, IDeposit {
             } else {
                 // lastValidStateIntent == StateIntent.RESIZE
                 if (candidate.intent == StateIntent.INITIALIZE) revert InvalidState();
-                if (candidate.intent != StateIntent.OPERATE) {
+                if (candidate.intent == StateIntent.OPERATE) {
                     if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
                     if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) {
                         revert InvalidState();
@@ -538,30 +538,6 @@ contract Custody is IChannel, IDeposit {
         }
 
         return true;
-    }
-
-    function _requireValidSignatures(Channel memory chan, State memory state) internal view {
-        bytes32 stateHash = Utils.getStateHash(chan, state);
-        uint256 sigsLength = state.sigs.length;
-
-        for (uint256 i = 0; i < sigsLength; i++) {
-            if (!Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i])) {
-                revert InvalidStateSignatures();
-            }
-        }
-    }
-
-    function _requireChannelHasNFulfilledDeposits(bytes32 channelId, uint256 n) internal view {
-        Metadata storage meta = _channels[channelId];
-
-        uint256 fulfilledDeposits = 0;
-        for (uint256 i = 0; i < PART_NUM; i++) {
-            if (meta.actualDeposits[i].amount != meta.expectedDeposits[i].amount) {
-                fulfilledDeposits++;
-            }
-        }
-
-        if (fulfilledDeposits < n) revert DepositsNotFulfilled(n, fulfilledDeposits);
     }
 
     /**

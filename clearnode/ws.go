@@ -432,18 +432,19 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		}
 
 		if err := h.writeWSResponse(conn, wsResponseData); err != nil {
+			// Track RPC request failure by method
+			h.incrementRPCRequestCount(msg.Req.Method, "failure")
 			continue
 		}
+
+		// Track RPC request success by method
+		h.incrementRPCRequestCount(msg.Req.Method, "success")
 	}
 }
 
 // forwardMessage forwards an RPC message to all recipients in a virtual app
 func forwardMessage(ctx context.Context, rpc *RPCMessage, msg []byte, fromAddress string, h *UnifiedWSHandler) error {
 	logger := LoggerFromContext(ctx)
-
-	// Track RPC request by method
-	requestHandleStatus := "failure"
-	defer h.incrementRPCRequestCount(rpc.Req.Method, requestHandleStatus)
 
 	var data *RPCData
 	if rpc.Req != nil {
@@ -454,6 +455,7 @@ func forwardMessage(ctx context.Context, rpc *RPCMessage, msg []byte, fromAddres
 
 	reqBytes, err := json.Marshal(data)
 	if err != nil {
+		h.incrementRPCRequestCount(data.Method, "failure")
 		return errors.New("Error validating signature: " + err.Error())
 	}
 
@@ -461,6 +463,7 @@ func forwardMessage(ctx context.Context, rpc *RPCMessage, msg []byte, fromAddres
 	for _, sig := range rpc.Sig {
 		addr, err := RecoverAddress(reqBytes, sig)
 		if err != nil {
+			h.incrementRPCRequestCount(data.Method, "failure")
 			return errors.New("invalid signature: " + err.Error())
 		}
 		recoveredAddresses[addr] = true
@@ -493,12 +496,12 @@ func forwardMessage(ctx context.Context, rpc *RPCMessage, msg []byte, fromAddres
 
 			logger.Debug("successfully forwarded message", "recipient", recipient)
 		} else {
-			logger.Warn("recipient not connected", "recipient", recipient)
+			logger.Debug("recipient not connected", "recipient", recipient)
 			continue
 		}
 	}
 
-	requestHandleStatus = "success"
+	h.incrementRPCRequestCount(data.Method, "success")
 	return nil
 }
 
@@ -551,10 +554,6 @@ func (h *UnifiedWSHandler) sendErrorResponse(sender string, rpc *RPCMessage, con
 func (h *UnifiedWSHandler) sendResponse(recipient string, method string, payload []any, updateType string) {
 	logger := h.logger.With("updateType", updateType)
 
-	// Track RPC request by method
-	requestHandleStatus := "failure"
-	defer h.incrementRPCRequestCount(method, requestHandleStatus)
-
 	response := CreateResponse(uint64(time.Now().UnixMilli()), method, payload)
 
 	byteData, _ := json.Marshal(response.Req)
@@ -564,6 +563,7 @@ func (h *UnifiedWSHandler) sendResponse(recipient string, method string, payload
 	responseData, err := json.Marshal(response)
 	if err != nil {
 		logger.Error("error marshaling response", "error", err)
+		h.incrementRPCRequestCount(method, "failure")
 		return
 	}
 
@@ -574,18 +574,17 @@ func (h *UnifiedWSHandler) sendResponse(recipient string, method string, payload
 		// Write the response
 		if err := h.writeWSResponse(recipientConn, responseData); err != nil {
 			logger.Error("error writing update", "recipient", recipient, "error", err)
+			h.incrementRPCRequestCount(method, "failure")
 			return
 		}
 
 		logger.Debug("successfully sent update", "recipient", recipient)
 	} else {
 		logger.Debug("recipient not connected", "recipient", recipient)
-
-		requestHandleStatus = ""
 		return
 	}
 
-	requestHandleStatus = "success"
+	h.incrementRPCRequestCount(method, "success")
 }
 
 // incrementRPCRequestCount increments the count of RPC requests for a specific method and status

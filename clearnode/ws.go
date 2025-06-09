@@ -378,6 +378,15 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			}
 			h.sendBalanceUpdate(walletAddress)
 			recordHistory = true
+		case "submit_state":
+			rpcResponse, handlerErr = HandleSubmitState(policy, &msg, h.db)
+			if handlerErr != nil {
+				logger.Warn("Error handling submit_state", "error", handlerErr)
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to update application state: "+handlerErr.Error())
+				continue
+			}
+			h.sendBalanceUpdate(walletAddress)
+			recordHistory = true
 		case "close_app_session":
 			rpcResponse, handlerErr = HandleCloseApplication(policy, &msg, h.db)
 			if handlerErr != nil {

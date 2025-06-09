@@ -1,5 +1,3 @@
-// main.go
-
 package main
 
 import (
@@ -7,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
@@ -19,7 +16,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// AppDefinition represents the definition of an application on the ledger
 type AppDefinition struct {
 	Protocol           string   `json:"protocol"`
 	ParticipantWallets []string `json:"participants"`
@@ -29,10 +25,19 @@ type AppDefinition struct {
 	Nonce              uint64   `json:"nonce"`
 }
 
-// CreateAppSessionParams represents parameters needed for virtual app creation
 type CreateAppSessionParams struct {
 	Definition  AppDefinition   `json:"definition"`
 	Allocations []AppAllocation `json:"allocations"`
+}
+
+type SubmitStateParams struct {
+	AppSessionID string          `json:"app_session_id"`
+	Allocations  []AppAllocation `json:"allocations"`
+}
+
+type CloseAppSessionParams struct {
+	AppSessionID string          `json:"app_session_id"`
+	Allocations  []AppAllocation `json:"allocations"`
 }
 
 type AppAllocation struct {
@@ -41,13 +46,6 @@ type AppAllocation struct {
 	Amount            decimal.Decimal `json:"amount"`
 }
 
-// CloseAppSessionParams represents parameters needed for virtual app closure
-type CloseAppSessionParams struct {
-	AppSessionID string          `json:"app_session_id"`
-	Allocations  []AppAllocation `json:"allocations"`
-}
-
-// AppSessionResponse represents response data for application operations
 type AppSessionResponse struct {
 	AppSessionID       string   `json:"app_session_id"`
 	Status             string   `json:"status"`
@@ -60,7 +58,6 @@ type AppSessionResponse struct {
 	Nonce              uint64   `json:"nonce"`
 }
 
-// ResizeChannelParams represents parameters needed for resizing a channel
 type ResizeChannelParams struct {
 	ChannelID        string   `json:"channel_id"                          validate:"required"`
 	AllocateAmount   *big.Int `json:"allocate_amount,omitempty"           validate:"required_without=ResizeAmount"`
@@ -68,7 +65,6 @@ type ResizeChannelParams struct {
 	FundsDestination string   `json:"funds_destination"                   validate:"required"`
 }
 
-// ResizeChannelResponse represents the response for resizing a channel
 type ResizeChannelResponse struct {
 	ChannelID   string       `json:"channel_id"`
 	StateData   string       `json:"state_data"`
@@ -85,7 +81,6 @@ type Allocation struct {
 	Amount       *big.Int `json:"amount,string"`
 }
 
-// LedgerEntryResponse is used by HandleGetLedgerEntries
 type LedgerEntryResponse struct {
 	ID          uint            `json:"id"`
 	AccountID   string          `json:"account_id"`
@@ -97,13 +92,11 @@ type LedgerEntryResponse struct {
 	CreatedAt   time.Time       `json:"created_at"`
 }
 
-// CloseChannelParams represents parameters needed for channel closure
 type CloseChannelParams struct {
 	ChannelID        string `json:"channel_id"`
 	FundsDestination string `json:"funds_destination"`
 }
 
-// CloseChannelResponse represents the response for closing a channel
 type CloseChannelResponse struct {
 	ChannelID        string       `json:"channel_id"`
 	Intent           uint8        `json:"intent"`
@@ -114,7 +107,6 @@ type CloseChannelResponse struct {
 	Signature        Signature    `json:"server_signature"`
 }
 
-// ChannelResponse represents a channel's details in the response
 type ChannelResponse struct {
 	ChannelID   string        `json:"channel_id"`
 	Participant string        `json:"participant"`
@@ -142,7 +134,6 @@ type Balance struct {
 	Amount decimal.Decimal `json:"amount"`
 }
 
-// NetworkInfo represents information about a supported network
 type NetworkInfo struct {
 	Name               string `json:"name"`
 	ChainID            uint32 `json:"chain_id"`
@@ -150,13 +141,11 @@ type NetworkInfo struct {
 	AdjudicatorAddress string `json:"adjudicator_address"`
 }
 
-// BrokerConfig represents the broker configuration information
 type BrokerConfig struct {
 	BrokerAddress string        `json:"broker_address"`
 	Networks      []NetworkInfo `json:"networks"`
 }
 
-// RPCEntry represents an RPC record from history.
 type RPCEntry struct {
 	ID        uint     `json:"id"`
 	Sender    string   `json:"sender"`
@@ -169,7 +158,6 @@ type RPCEntry struct {
 	ResSig    []string `json:"res_sig"`
 }
 
-// AssetResponse represents an asset in the response
 type AssetResponse struct {
 	Token    string `json:"token"`
 	ChainID  uint32 `json:"chain_id"`
@@ -179,7 +167,7 @@ type AssetResponse struct {
 
 // HandleGetConfig returns the broker configuration
 func HandleGetConfig(rpc *RPCMessage, config *Config, signer *Signer) (*RPCMessage, error) {
-	supportedNetworks := []NetworkInfo{}
+	supportedNetworks := make([]NetworkInfo, 0, len(config.networks))
 
 	for name, networkConfig := range config.networks {
 		supportedNetworks = append(supportedNetworks, NetworkInfo{
@@ -208,8 +196,7 @@ func HandleGetLedgerBalances(rpc *RPCMessage, walletAddress string, db *gorm.DB)
 	var account string
 
 	if len(rpc.Req.Params) > 0 {
-		paramsJSON, err := json.Marshal(rpc.Req.Params[0])
-		if err == nil {
+		if paramsJSON, err := json.Marshal(rpc.Req.Params[0]); err == nil {
 			var params map[string]string
 			if err := json.Unmarshal(paramsJSON, &params); err == nil {
 				account = params["participant"]
@@ -238,8 +225,7 @@ func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) 
 	var accountID, asset, wallet string
 
 	if len(rpc.Req.Params) > 0 {
-		paramsJSON, err := json.Marshal(rpc.Req.Params[0])
-		if err == nil {
+		if paramsJSON, err := json.Marshal(rpc.Req.Params[0]); err == nil {
 			var params map[string]string
 			if err := json.Unmarshal(paramsJSON, &params); err == nil {
 				accountID = params["account_id"]
@@ -261,9 +247,9 @@ func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) 
 		return nil, fmt.Errorf("failed to find ledger entries: %w", err)
 	}
 
-	response := make([]LedgerEntryResponse, len(entries))
+	resp := make([]LedgerEntryResponse, len(entries))
 	for i, entry := range entries {
-		response[i] = LedgerEntryResponse{
+		resp[i] = LedgerEntryResponse{
 			ID:          entry.ID,
 			AccountID:   entry.AccountID,
 			AccountType: entry.AccountType,
@@ -275,7 +261,7 @@ func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) 
 		}
 	}
 
-	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{response}), nil
+	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{resp}), nil
 }
 
 // HandleCreateApplication creates a virtual application between participants
@@ -294,55 +280,48 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 		return nil, errors.New("nonce is zero or not provided")
 	}
 
-	rpcSigners, err := rpc.GetRequestSignersMap()
+	rpcSigners, err := getWallets(rpc)
 	if err != nil {
 		return nil, err
 	}
 
-	for addr := range rpcSigners {
-		walletAddress := GetWalletBySigner(addr)
-		if walletAddress != "" {
-			rpcSigners[walletAddress] = struct{}{}
-		}
-	}
-
 	// Generate a unique ID for the virtual application
-	b, err := json.Marshal(params.Definition)
+	appBytes, err := json.Marshal(params.Definition)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate app session ID: %w", err)
 	}
-	appSessionID := crypto.Keccak256Hash(b).Hex()
+	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		for _, allocation := range params.Allocations {
-			if allocation.Amount.IsNegative() {
+		for _, alloc := range params.Allocations {
+			if alloc.Amount.IsNegative() {
 				return fmt.Errorf("invalid allocation: negative amount")
 			}
-			// When creating application, every participant with allocation must sign the RPC message
-			if allocation.Amount.IsPositive() {
-				if _, ok := rpcSigners[allocation.ParticipantWallet]; !ok {
-					return fmt.Errorf("missing signature for participant %s", allocation.ParticipantWallet)
+			if alloc.Amount.IsPositive() {
+				if _, ok := rpcSigners[alloc.ParticipantWallet]; !ok {
+					return fmt.Errorf("missing signature for participant %s", alloc.ParticipantWallet)
 				}
 			}
 
-			walletAddress := GetWalletBySigner(allocation.ParticipantWallet)
-			if walletAddress == "" {
-				walletAddress = allocation.ParticipantWallet
+			walletAddress := alloc.ParticipantWallet
+			if wallet := GetWalletBySigner(alloc.ParticipantWallet); wallet != "" {
+				walletAddress = wallet
 			}
 
-			participantWallet := GetWalletLedger(tx, walletAddress)
-			balance, err := participantWallet.Balance(walletAddress, allocation.AssetSymbol)
+			ledger := GetWalletLedger(tx, walletAddress)
+			balance, err := ledger.Balance(walletAddress, alloc.AssetSymbol)
 			if err != nil {
 				return fmt.Errorf("failed to check participant balance: %w", err)
 			}
-			if allocation.Amount.GreaterThan(balance) {
-				return fmt.Errorf("insufficient funds: %s for asset %s", allocation.ParticipantWallet, allocation.AssetSymbol)
+
+			if alloc.Amount.GreaterThan(balance) {
+				return fmt.Errorf("insufficient funds: %s for asset %s", alloc.ParticipantWallet, alloc.AssetSymbol)
 			}
-			if err := participantWallet.Record(walletAddress, allocation.AssetSymbol, allocation.Amount.Neg()); err != nil {
-				return fmt.Errorf("failed to transfer funds from participant: %w", err)
+			if err := ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
+				return fmt.Errorf("failed to debit participant: %w", err)
 			}
-			if err := participantWallet.Record(appSessionID, allocation.AssetSymbol, allocation.Amount); err != nil {
-				return fmt.Errorf("failed to transfer funds to virtual app: %w", err)
+			if err := ledger.Record(appSessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
+				return fmt.Errorf("failed to credit virtual app: %w", err)
 			}
 		}
 
@@ -371,6 +350,89 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 	}), nil
 }
 
+// HandleSubmitState updates funds allocations distribution a virtual app session
+func HandleSubmitState(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+	var params SubmitStateParams
+	if err := parseParams(rpc.Req.Params, &params); err != nil {
+		return nil, err
+	}
+	if params.AppSessionID == "" || len(params.Allocations) == 0 {
+		return nil, errors.New("missing required parameters: app_id or allocations")
+	}
+
+	rpcSigners, err := getWallets(rpc)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Transaction(func(tx *gorm.DB) error {
+		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
+		if err != nil {
+			return err
+		}
+
+		appSessionBalance, err := getAppSessionBalances(tx, appSession.SessionID)
+		if err != nil {
+			return err
+		}
+
+		allocationSum := map[string]decimal.Decimal{}
+		for _, alloc := range params.Allocations {
+			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
+			if walletAddress == "" {
+				walletAddress = alloc.ParticipantWallet
+			}
+
+			if _, ok := participantWeights[walletAddress]; !ok {
+				return fmt.Errorf("allocation to non-participant %s", walletAddress)
+			}
+
+			ledger := GetWalletLedger(tx, walletAddress)
+			balance, err := ledger.Balance(appSession.SessionID, alloc.AssetSymbol)
+			if err != nil {
+				return fmt.Errorf("failed to get participant balance: %w", err)
+			}
+
+			// Reset participant allocation in app session to the new amount
+			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, balance.Neg()); err != nil {
+				return fmt.Errorf("failed to debit session: %w", err)
+			}
+			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
+				return fmt.Errorf("failed to credit participant: %w", err)
+			}
+
+			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
+		}
+
+		return verifyAllocations(appSessionBalance, allocationSum)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{
+		&AppSessionResponse{
+			AppSessionID: params.AppSessionID,
+			Status:       "success",
+		},
+	}), nil
+}
+
+func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {
+	for asset, bal := range appSessionBalance {
+		if alloc, ok := allocationSum[asset]; !ok || !bal.Equal(alloc) {
+			return fmt.Errorf("asset %s not fully redistributed", asset)
+		}
+	}
+	for asset := range allocationSum {
+		if _, ok := appSessionBalance[asset]; !ok {
+			return fmt.Errorf("allocation references unknown asset %s", asset)
+		}
+	}
+	return nil
+}
+
 // HandleCloseApplication closes a virtual app session and redistributes funds to participants
 func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var params CloseAppSessionParams
@@ -381,66 +443,20 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 		return nil, errors.New("missing required parameters: app_id or allocations")
 	}
 
-	assets := map[string]struct{}{}
-	for _, a := range params.Allocations {
-		if a.ParticipantWallet == "" || a.AssetSymbol == "" || a.Amount.IsNegative() {
-			return nil, errors.New("invalid allocation row")
-		}
-		assets[a.AssetSymbol] = struct{}{}
-	}
-
-	rpcSigners, err := rpc.GetRequestSignersMap()
+	rpcSigners, err := getWallets(rpc)
 	if err != nil {
 		return nil, err
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		var appSession AppSession
-		if err := tx.Where("session_id = ? AND status = ?", params.AppSessionID, ChannelStatusOpen).
-			Order("nonce DESC").
-			First(&appSession).Error; err != nil {
-			return fmt.Errorf("virtual app not found or not open: %w", err)
+		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
+		if err != nil {
+			return err
 		}
 
-		participantWeights := map[string]int64{}
-		for i, addr := range appSession.ParticipantWallets {
-			participantWeights[addr] = appSession.Weights[i]
-		}
-
-		var totalWeight int64
-		for address := range rpcSigners {
-			addr := address
-			if walletAddress := GetWalletBySigner(address); walletAddress != "" {
-				addr = walletAddress
-			}
-			weight, ok := participantWeights[addr]
-			if !ok {
-				return fmt.Errorf("signature from unknown participant wallet %s", addr)
-			}
-			if weight <= 0 {
-				return fmt.Errorf("zero weight for signer %s", addr)
-			}
-			totalWeight += weight
-		}
-		if totalWeight < int64(appSession.Quorum) {
-			return fmt.Errorf("quorum not met: %d / %d", totalWeight, appSession.Quorum)
-		}
-
-		appSessionBalance := map[string]decimal.Decimal{}
-		for _, participant := range appSession.ParticipantWallets {
-			walletAddress := GetWalletBySigner(participant)
-			if walletAddress == "" {
-				walletAddress = participant
-			}
-
-			ledger := GetWalletLedger(tx, walletAddress)
-			for asset := range assets {
-				bal, err := ledger.Balance(appSession.SessionID, asset)
-				if err != nil {
-					return fmt.Errorf("failed to read balance for %s:%s: %w", participant, asset, err)
-				}
-				appSessionBalance[asset] = appSessionBalance[asset].Add(bal)
-			}
+		appSessionBalance, err := getAppSessionBalances(tx, appSession.SessionID)
+		if err != nil {
+			return err
 		}
 
 		allocationSum := map[string]decimal.Decimal{}
@@ -471,15 +487,8 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
 		}
 
-		for asset, bal := range appSessionBalance {
-			if alloc, ok := allocationSum[asset]; !ok || !bal.Equal(alloc) {
-				return fmt.Errorf("asset %s not fully redistributed", asset)
-			}
-		}
-		for asset := range allocationSum {
-			if _, ok := appSessionBalance[asset]; !ok {
-				return fmt.Errorf("allocation references unknown asset %s", asset)
-			}
+		if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
+			return err
 		}
 
 		return tx.Model(&appSession).Updates(map[string]any{
@@ -504,8 +513,7 @@ func HandleGetAppDefinition(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var sessionID string
 
 	if len(rpc.Req.Params) > 0 {
-		paramsJSON, err := json.Marshal(rpc.Req.Params[0])
-		if err == nil {
+		if paramsJSON, err := json.Marshal(rpc.Req.Params[0]); err == nil {
 			var params map[string]string
 			if err := json.Unmarshal(paramsJSON, &params); err == nil {
 				sessionID = params["app_session_id"]
@@ -539,8 +547,7 @@ func HandleGetAppSessions(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var participant, status string
 
 	if len(rpc.Req.Params) > 0 {
-		paramsJSON, err := json.Marshal(rpc.Req.Params[0])
-		if err == nil {
+		if paramsJSON, err := json.Marshal(rpc.Req.Params[0]); err == nil {
 			var params map[string]string
 			if err := json.Unmarshal(paramsJSON, &params); err == nil {
 				participant = params["participant"]
@@ -554,9 +561,9 @@ func HandleGetAppSessions(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 		return nil, fmt.Errorf("failed to find application sessions: %w", err)
 	}
 
-	response := make([]AppSessionResponse, len(sessions))
+	resp := make([]AppSessionResponse, len(sessions))
 	for i, session := range sessions {
-		response[i] = AppSessionResponse{
+		resp[i] = AppSessionResponse{
 			AppSessionID:       session.SessionID,
 			Status:             string(session.Status),
 			ParticipantWallets: session.ParticipantWallets,
@@ -569,7 +576,7 @@ func HandleGetAppSessions(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 		}
 	}
 
-	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{response}), nil
+	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{resp}), nil
 }
 
 // HandleResizeChannel processes a request to resize a payment channel
@@ -587,24 +594,8 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
 
-	rpcSigners, err := rpc.GetRequestSignersArray()
-	if err != nil {
+	if err := verifySigner(rpc, channel.Wallet); err != nil {
 		return nil, err
-	}
-
-	if len(rpcSigners) < 1 {
-		return nil, errors.New("missing participant signature")
-
-	}
-
-	recoveredAddress := rpcSigners[0]
-
-	walletAddress := GetWalletBySigner(recoveredAddress)
-	if walletAddress != "" {
-		recoveredAddress = walletAddress
-	}
-	if !strings.EqualFold(recoveredAddress, channel.Wallet) {
-		return nil, errors.New("invalid signature")
 	}
 
 	asset, err := GetAssetByToken(db, channel.Token, channel.ChainID)
@@ -655,30 +646,25 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ABI type for intentions: %w", err)
 	}
-
-	intentionsArgs := abi.Arguments{
-		{Type: intentionType},
-	}
-	encodedIntentions, err := intentionsArgs.Pack(resizeAmounts)
+	intentionArgs := abi.Arguments{{Type: intentionType}}
+	encodedIntentions, err := intentionArgs.Pack(resizeAmounts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pack intentions: %w", err)
 	}
 
-	// Encode the channel ID and state for signing
-	channelID := common.HexToHash(channel.ChannelID)
-	encodedState, err := nitrolite.EncodeState(channelID, nitrolite.IntentRESIZE, big.NewInt(int64(channel.Version)+1), encodedIntentions, allocations)
+	// 6) Encode & sign the new state
+	channelIDHash := common.HexToHash(channel.ChannelID)
+	encodedState, err := nitrolite.EncodeState(channelIDHash, nitrolite.IntentRESIZE, big.NewInt(int64(channel.Version)+1), encodedIntentions, allocations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode state hash: %w", err)
 	}
-
-	// Generate state hash and sign it
 	stateHash := crypto.Keccak256Hash(encodedState).Hex()
 	sig, err := signer.NitroSign(encodedState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign state: %w", err)
 	}
 
-	response := ResizeChannelResponse{
+	resp := ResizeChannelResponse{
 		ChannelID: channel.ChannelID,
 		Intent:    uint8(nitrolite.IntentRESIZE),
 		Version:   channel.Version + 1,
@@ -692,14 +678,14 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 	}
 
 	for _, alloc := range allocations {
-		response.Allocations = append(response.Allocations, Allocation{
+		resp.Allocations = append(resp.Allocations, Allocation{
 			Participant:  alloc.Destination.Hex(),
 			TokenAddress: alloc.Token.Hex(),
 			Amount:       alloc.Amount,
 		})
 	}
 
-	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{response}), nil
+	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{resp}), nil
 }
 
 // HandleCloseChannel processes a request to close a payment channel
@@ -714,23 +700,8 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
 
-	rpcSigners, err := rpc.GetRequestSignersArray()
-	if err != nil {
+	if err := verifySigner(rpc, channel.Wallet); err != nil {
 		return nil, err
-	}
-
-	if len(rpcSigners) < 1 {
-		return nil, errors.New("missing participant signature")
-
-	}
-
-	recoveredAddress := rpcSigners[0]
-	walletAddress := GetWalletBySigner(recoveredAddress)
-	if walletAddress != "" {
-		recoveredAddress = walletAddress
-	}
-	if !strings.EqualFold(recoveredAddress, channel.Wallet) {
-		return nil, errors.New("invalid signature")
 	}
 
 	asset, err := GetAssetByToken(db, channel.Token, channel.ChainID)
@@ -744,7 +715,7 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 		return nil, fmt.Errorf("failed to check participant balance: %w", err)
 	}
 	if balance.IsNegative() {
-		return nil, errors.New("insufficient funds for participant: " + channel.Token)
+		return nil, fmt.Errorf("insufficient funds for participant: %s", channel.Token)
 	}
 
 	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
@@ -766,28 +737,26 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 		},
 	}
 
-	stateDataStr := "0x"
-	stateData, err := hexutil.Decode(stateDataStr)
+	stateDataHex := "0x"
+	stateDataBytes, err := hexutil.Decode(stateDataHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode state data: %w", err)
 	}
-
-	encodedState, err := nitrolite.EncodeState(common.HexToHash(channel.ChannelID), nitrolite.IntentFINALIZE, big.NewInt(int64(channel.Version)+1), stateData, allocations)
+	encodedState, err := nitrolite.EncodeState(common.HexToHash(channel.ChannelID), nitrolite.IntentFINALIZE, big.NewInt(int64(channel.Version)+1), stateDataBytes, allocations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode state hash: %w", err)
 	}
-
 	stateHash := crypto.Keccak256Hash(encodedState).Hex()
 	sig, err := signer.NitroSign(encodedState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign state: %w", err)
 	}
 
-	response := CloseChannelResponse{
+	resp := CloseChannelResponse{
 		ChannelID: channel.ChannelID,
 		Intent:    uint8(nitrolite.IntentFINALIZE),
 		Version:   channel.Version + 1,
-		StateData: stateDataStr,
+		StateData: stateDataHex,
 		StateHash: stateHash,
 		Signature: Signature{
 			V: sig.V,
@@ -797,14 +766,14 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 	}
 
 	for _, alloc := range allocations {
-		response.FinalAllocations = append(response.FinalAllocations, Allocation{
+		resp.FinalAllocations = append(resp.FinalAllocations, Allocation{
 			Participant:  alloc.Destination.Hex(),
 			TokenAddress: alloc.Token.Hex(),
 			Amount:       alloc.Amount,
 		})
 	}
 
-	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{response}), nil
+	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{resp}), nil
 }
 
 // HandleGetChannels returns a list of channels for a given account
@@ -812,8 +781,7 @@ func HandleGetChannels(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var participant, status string
 
 	if len(rpc.Req.Params) > 0 {
-		paramsJSON, err := json.Marshal(rpc.Req.Params[0])
-		if err == nil {
+		if paramsJSON, err := json.Marshal(rpc.Req.Params[0]); err == nil {
 			var params map[string]string
 			if err := json.Unmarshal(paramsJSON, &params); err == nil {
 				participant = params["participant"]
@@ -831,14 +799,11 @@ func HandleGetChannels(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 			query = query.Where("status = ?", status)
 		}
 		err = query.Order("created_at DESC").Find(&channels).Error
-		if err != nil {
-			return nil, fmt.Errorf("failed to get all channels: %w", err)
-		}
 	} else {
 		channels, err = getChannelsByWallet(db, participant, status)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get channels: %w", err)
-		}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get channels: %w", err)
 	}
 
 	response := make([]ChannelResponse, 0, len(channels))
@@ -846,9 +811,9 @@ func HandleGetChannels(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 		response = append(response, ChannelResponse{
 			ChannelID:   channel.ChannelID,
 			Participant: channel.Participant,
-			Wallet:      channel.Wallet,
 			Status:      channel.Status,
 			Token:       channel.Token,
+			Wallet:      channel.Wallet,
 			Amount:      big.NewInt(int64(channel.Amount)),
 			ChainID:     channel.ChainID,
 			Adjudicator: channel.Adjudicator,
@@ -889,7 +854,6 @@ func HandleGetRPCHistory(policy *Policy, rpc *RPCMessage, store *RPCStore) (*RPC
 			Result:    string(record.Response),
 		})
 	}
-
 	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{response}), nil
 }
 
@@ -898,8 +862,7 @@ func HandleGetAssets(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var chainID *uint32
 
 	if len(rpc.Req.Params) > 0 {
-		paramsJSON, err := json.Marshal(rpc.Req.Params[0])
-		if err == nil {
+		if paramsJSON, err := json.Marshal(rpc.Req.Params[0]); err == nil {
 			var params map[string]interface{}
 			if err := json.Unmarshal(paramsJSON, &params); err == nil {
 				if cid, ok := params["chain_id"]; ok {
@@ -917,9 +880,9 @@ func HandleGetAssets(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 		return nil, fmt.Errorf("failed to retrieve assets: %w", err)
 	}
 
-	response := make([]AssetResponse, 0, len(assets))
+	resp := make([]AssetResponse, 0, len(assets))
 	for _, asset := range assets {
-		response = append(response, AssetResponse{
+		resp = append(resp, AssetResponse{
 			Token:    asset.Token,
 			ChainID:  asset.ChainID,
 			Symbol:   asset.Symbol,
@@ -927,7 +890,7 @@ func HandleGetAssets(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 		})
 	}
 
-	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{response}), nil
+	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{resp}), nil
 }
 
 func parseParams(params []any, unmarshalTo any) error {
@@ -939,4 +902,41 @@ func parseParams(params []any, unmarshalTo any) error {
 		return fmt.Errorf("failed to parse parameters: %w", err)
 	}
 	return json.Unmarshal(paramsJSON, &unmarshalTo)
+}
+
+// getWallets retrieves the set of wallet addresses (keys) from RPC request signers.
+func getWallets(rpc *RPCMessage) (map[string]struct{}, error) {
+	rpcSigners, err := rpc.GetRequestSignersMap()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]struct{})
+	for addr := range rpcSigners {
+		walletAddress := GetWalletBySigner(addr)
+		if walletAddress != "" {
+			result[walletAddress] = struct{}{}
+		} else {
+			result[addr] = struct{}{}
+		}
+	}
+	return result, nil
+}
+
+// verifySigner checks that the recovered signer matches the channel's wallet.
+func verifySigner(rpc *RPCMessage, channelWallet string) error {
+	if len(rpc.Sig) < 1 {
+		return errors.New("missing participant signature")
+	}
+	recovered, err := RecoverAddress(rpc.Req.rawBytes, rpc.Sig[0])
+	if err != nil {
+		return err
+	}
+	if mapped := GetWalletBySigner(recovered); mapped != "" {
+		recovered = mapped
+	}
+	if recovered != channelWallet {
+		return errors.New("invalid signature")
+	}
+	return nil
 }

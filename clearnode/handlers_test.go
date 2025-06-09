@@ -1367,6 +1367,88 @@ func TestHandleCreateVirtualApp(t *testing.T) {
 	assert.Equal(t, decimal.NewFromInt(200).String(), vBalB.String())
 }
 
+// TestHandleSubmitState tests the submit state into a virtual app handler functionality
+func TestHandleSubmitState(t *testing.T) {
+	rawKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	signer := Signer{privateKey: rawKey}
+	participantA := signer.GetAddress().Hex()
+	participantB := "0xParticipantB"
+
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	tokenAddress := "0xToken123"
+	require.NoError(t, db.Create(&Channel{
+		ChannelID:   "0xChannelA",
+		Participant: participantA,
+		Status:      ChannelStatusOpen,
+		Token:       tokenAddress,
+		Nonce:       1,
+	}).Error)
+	require.NoError(t, db.Create(&Channel{
+		ChannelID:   "0xChannelB",
+		Participant: participantB,
+		Status:      ChannelStatusOpen,
+		Token:       tokenAddress,
+		Nonce:       1,
+	}).Error)
+
+	vAppID := "0xVApp123"
+	require.NoError(t, db.Create(&AppSession{
+		SessionID:          vAppID,
+		ParticipantWallets: []string{participantA, participantB},
+		Status:             ChannelStatusOpen,
+		Challenge:          60,
+		Weights:            []int64{100, 0},
+		Quorum:             100,
+	}).Error)
+
+	assetSymbol := "usdc"
+	require.NoError(t, GetWalletLedger(db, participantA).Record(vAppID, assetSymbol, decimal.NewFromInt(200)))
+	require.NoError(t, GetWalletLedger(db, participantB).Record(vAppID, assetSymbol, decimal.NewFromInt(300)))
+
+	submitStateParams := SubmitStateParams{
+		AppSessionID: vAppID,
+		Allocations: []AppAllocation{
+			{ParticipantWallet: participantA, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+			{ParticipantWallet: participantB, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+		},
+	}
+
+	// Create RPC request
+	paramsJSON, _ := json.Marshal(submitStateParams)
+	req := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 1,
+			Method:    "submit_state",
+			Params:    []any{json.RawMessage(paramsJSON)},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+	}
+
+	// 1) Marshal rpc.Req to get the exact raw bytes of [request_id, method, params, timestamp]
+	rawReq, err := json.Marshal(req.Req)
+	require.NoError(t, err)
+	req.Req.rawBytes = rawReq
+
+	// 2) Sign rawReq directly
+	sigBytes, err := signer.Sign(rawReq)
+	require.NoError(t, err)
+	req.Sig = []string{hexutil.Encode(sigBytes)}
+
+	// Call handler
+	resp, err := HandleSubmitState(nil, req, db)
+	require.NoError(t, err)
+	assert.Equal(t, "submit_state", resp.Res.Method)
+
+	// Check balances redistributed
+	balA, _ := GetWalletLedger(db, participantA).Balance(vAppID, "usdc")
+	balB, _ := GetWalletLedger(db, participantB).Balance(vAppID, "usdc")
+	assert.Equal(t, decimal.NewFromInt(250), balA)
+	assert.Equal(t, decimal.NewFromInt(250), balB)
+}
+
 // TestHandleCloseVirtualApp tests the close virtual app handler functionality
 func TestHandleCloseVirtualApp(t *testing.T) {
 	rawKey, err := crypto.GenerateKey()

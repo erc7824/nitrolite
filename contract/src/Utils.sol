@@ -64,6 +64,37 @@ library Utils {
     }
 
     /**
+     * @notice Compares two states for equality
+     * @param a The first state to compare
+     * @param b The second state to compare
+     * @return True if the states are equal, false otherwise
+     */
+    function statesAreEqual(State memory a, State memory b) internal pure returns (bool) {
+        if (a.version != b.version || a.intent != b.intent || a.data.length != b.data.length) {
+            return false;
+        }
+
+        if (keccak256(a.data) != keccak256(b.data)) {
+            return false;
+        }
+
+        if (a.allocations.length != b.allocations.length) {
+            return false;
+        }
+
+        for (uint256 i = 0; i < a.allocations.length; i++) {
+            if (
+                a.allocations[i].amount != b.allocations[i].amount
+                    || a.allocations[i].destination != b.allocations[i].destination
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * @notice Validates that a state is a valid initial state for a channel
      * @dev Initial states must have version 0 and INITIALIZE intent
      * @param state The state to validate

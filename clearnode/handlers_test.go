@@ -124,190 +124,67 @@ func TestHandlePing(t *testing.T) {
 	require.Equal(t, "pong", response1.Res.Method)
 }
 
-// TestHandleCloseVirtualApp tests the close virtual app handler functionality
-func TestHandleCloseVirtualApp(t *testing.T) {
-	rawKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	signer := Signer{privateKey: rawKey}
-	participantA := signer.GetAddress().Hex()
-	participantB := "0xParticipantB"
-
+// TestHandleGetAppDefinition tests the GetAppDefinition handler
+func TestHandleGetAppDefinition_Success(t *testing.T) {
+	// Setup
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	tokenAddress := "0xToken123"
-	require.NoError(t, db.Create(&Channel{
-		ChannelID:   "0xChannelA",
-		Participant: participantA,
-		Status:      ChannelStatusOpen,
-		Token:       tokenAddress,
-		Nonce:       1,
-	}).Error)
-	require.NoError(t, db.Create(&Channel{
-		ChannelID:   "0xChannelB",
-		Participant: participantB,
-		Status:      ChannelStatusOpen,
-		Token:       tokenAddress,
-		Nonce:       1,
-	}).Error)
-
-	vAppID := "0xVApp123"
-	require.NoError(t, db.Create(&AppSession{
-		SessionID:          vAppID,
-		ParticipantWallets: []string{participantA, participantB},
-		Status:             ChannelStatusOpen,
-		Challenge:          60,
-		Weights:            []int64{100, 0},
-		Quorum:             100,
-	}).Error)
-
-	assetSymbol := "usdc"
-	require.NoError(t, GetWalletLedger(db, participantA).Record(vAppID, assetSymbol, decimal.NewFromInt(200)))
-	require.NoError(t, GetWalletLedger(db, participantB).Record(vAppID, assetSymbol, decimal.NewFromInt(300)))
-
-	closeParams := CloseAppSessionParams{
-		AppSessionID: vAppID,
-		Allocations: []AppAllocation{
-			{ParticipantWallet: participantA, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
-			{ParticipantWallet: participantB, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
-		},
+	// Seed an AppSession
+	session := AppSession{
+		SessionID:          "0xSess123",
+		ParticipantWallets: []string{"0xA", "0xB"},
+		Protocol:           "proto",
+		Weights:            []int64{10, 20},
+		Quorum:             15,
+		Challenge:          30,
+		Nonce:              99,
 	}
+	require.NoError(t, db.Create(&session).Error)
 
-	// Create RPC request
-	paramsJSON, _ := json.Marshal(closeParams)
-	req := &RPCMessage{
-		Req: &RPCData{
-			RequestID: 1,
-			Method:    "close_app_session",
-			Params:    []any{json.RawMessage(paramsJSON)},
-			Timestamp: uint64(time.Now().Unix()),
-		},
-	}
-
-	// 1) Marshal rpc.Req to get the exact raw bytes of [request_id, method, params, timestamp]
-	rawReq, err := json.Marshal(req.Req)
-	require.NoError(t, err)
-	req.Req.rawBytes = rawReq
-
-	// 2) Sign rawReq directly
-	sigBytes, err := signer.Sign(rawReq)
-	require.NoError(t, err)
-	req.Sig = []string{hexutil.Encode(sigBytes)}
+	// Build RPC request
+	params := map[string]string{"app_session_id": session.SessionID}
+	b, _ := json.Marshal(params)
+	rpcReq := &RPCMessage{Req: &RPCData{RequestID: 5, Method: "get_app_definition", Params: []any{json.RawMessage(b)}, Timestamp: uint64(time.Now().Unix())}}
 
 	// Call handler
-	resp, err := HandleCloseApplication(nil, req, db)
+	resp, err := HandleGetAppDefinition(rpcReq, db)
 	require.NoError(t, err)
-	assert.Equal(t, "close_app_session", resp.Res.Method)
+	assert.Equal(t, "get_app_definition", resp.Res.Method)
 
-	var updated AppSession
-	require.NoError(t, db.Where("session_id = ?", vAppID).First(&updated).Error)
-	assert.Equal(t, ChannelStatusClosed, updated.Status)
-
-	// Check balances redistributed
-	balA, _ := GetWalletLedger(db, participantA).Balance(participantA, "usdc")
-	balB, _ := GetWalletLedger(db, participantB).Balance(participantB, "usdc")
-	assert.Equal(t, decimal.NewFromInt(250), balA)
-	assert.Equal(t, decimal.NewFromInt(250), balB)
-
-	// v-app accounts drained
-	vBalA, _ := GetWalletLedger(db, participantA).Balance(vAppID, "usdc")
-	vBalB, _ := GetWalletLedger(db, participantB).Balance(vAppID, "usdc")
-	assert.True(t, vBalA.IsZero(), "Participant A vApp balance should be zero")
-	assert.True(t, vBalB.IsZero(), "Participant B vApp balance should be zero")
+	// Validate response payload
+	def, ok := resp.Res.Params[0].(AppDefinition)
+	require.True(t, ok)
+	assert.Equal(t, session.Protocol, def.Protocol)
+	assert.EqualValues(t, session.ParticipantWallets, def.ParticipantWallets)
+	assert.EqualValues(t, session.Weights, def.Weights)
+	assert.Equal(t, session.Quorum, def.Quorum)
+	assert.Equal(t, session.Challenge, def.Challenge)
+	assert.Equal(t, session.Nonce, def.Nonce)
 }
 
-func TestHandleCreateVirtualApp(t *testing.T) {
-	rawA, _ := crypto.GenerateKey()
-	rawB, _ := crypto.GenerateKey()
-	signerA := Signer{privateKey: rawA}
-	signerB := Signer{privateKey: rawB}
-	addrA := signerA.GetAddress().Hex()
-	addrB := signerB.GetAddress().Hex()
-
+func TestHandleGetAppDefinition_MissingID(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	token := "0xTokenXYZ"
-	for i, p := range []string{addrA, addrB} {
-		ch := &Channel{
-			ChannelID:   fmt.Sprintf("0xChannel%c", 'A'+i),
-			Wallet:      p,
-			Participant: p,
-			Status:      ChannelStatusOpen,
-			Token:       token,
-			Nonce:       1,
-		}
-		require.NoError(t, db.Create(ch).Error)
-		require.NoError(t, db.Create(&SignerWallet{
-			Signer: p, Wallet: p,
-		}).Error)
-	}
+	rpcReq := &RPCMessage{Req: &RPCData{RequestID: 6, Method: "get_app_definition", Params: []any{}, Timestamp: uint64(time.Now().Unix())}}
 
-	require.NoError(t, GetWalletLedger(db, addrA).Record(addrA, "usdc", decimal.NewFromInt(100)))
-	require.NoError(t, GetWalletLedger(db, addrB).Record(addrB, "usdc", decimal.NewFromInt(200)))
+	_, err := HandleGetAppDefinition(rpcReq, db)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing account ID")
+}
 
-	ts := uint64(time.Now().Unix())
-	def := AppDefinition{
-		Protocol:           "test-proto",
-		ParticipantWallets: []string{addrA, addrB},
-		Weights:            []int64{1, 1},
-		Quorum:             2,
-		Challenge:          60,
-		Nonce:              ts,
-	}
-	createParams := CreateAppSessionParams{
-		Definition: def,
-		Allocations: []AppAllocation{
-			{ParticipantWallet: addrA, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-			{ParticipantWallet: addrB, AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
-		},
-	}
+func TestHandleGetAppDefinition_NotFound(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
 
-	rpcReq := &RPCMessage{
-		Req: &RPCData{
-			RequestID: 42,
-			Method:    "create_app_session",
-			Params:    []any{createParams},
-			Timestamp: ts,
-		},
-	}
+	params := map[string]string{"app_session_id": "nonexistent"}
+	b, _ := json.Marshal(params)
+	rpcReq := &RPCMessage{Req: &RPCData{RequestID: 7, Method: "get_app_definition", Params: []any{json.RawMessage(b)}, Timestamp: uint64(time.Now().Unix())}}
 
-	// 1) Marshal rpcReq.Req exactly as a JSON array
-	rawReq, err := json.Marshal(rpcReq.Req)
-	require.NoError(t, err)
-	rpcReq.Req.rawBytes = rawReq
-
-	// 2) Sign rawReq with both participants
-	sigA, err := signerA.Sign(rawReq)
-	require.NoError(t, err)
-	sigB, err := signerB.Sign(rawReq)
-	require.NoError(t, err)
-	rpcReq.Sig = []string{hexutil.Encode(sigA), hexutil.Encode(sigB)}
-
-	// Call handler
-	resp, err := HandleCreateApplication(nil, rpcReq, db)
-	require.NoError(t, err)
-
-	assert.Equal(t, "create_app_session", resp.Res.Method)
-	appResp, ok := resp.Res.Params[0].(*AppSessionResponse)
-	require.True(t, ok)
-	assert.Equal(t, string(ChannelStatusOpen), appResp.Status)
-
-	var vApp AppSession
-	require.NoError(t, db.Where("session_id = ?", appResp.AppSessionID).First(&vApp).Error)
-	assert.ElementsMatch(t, []string{addrA, addrB}, vApp.ParticipantWallets)
-
-	// Participant accounts drained
-	partBalA, _ := GetWalletLedger(db, addrA).Balance(addrA, "usdc")
-	partBalB, _ := GetWalletLedger(db, addrB).Balance(addrB, "usdc")
-	assert.True(t, partBalA.IsZero(), "Participant A balance should be zero")
-	assert.True(t, partBalB.IsZero(), "Participant B balance should be zero")
-
-	// Virtual-app funded
-	vBalA, _ := GetWalletLedger(db, addrA).Balance(appResp.AppSessionID, "usdc")
-	vBalB, _ := GetWalletLedger(db, addrB).Balance(appResp.AppSessionID, "usdc")
-	assert.Equal(t, decimal.NewFromInt(100).String(), vBalA.String())
-	assert.Equal(t, decimal.NewFromInt(200).String(), vBalB.String())
+	_, err := HandleGetAppDefinition(rpcReq, db)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "failed to find application")
 }
 
 // TestHandleGetLedgerBalances tests the get ledger balances handler functionality
@@ -1394,4 +1271,340 @@ func TestAssetsForWebSocketConnection(t *testing.T) {
 	}
 	assert.True(t, foundSymbols["usdc"], "Should include USDC")
 	assert.True(t, foundSymbols["celo"], "Should include CELO")
+}
+
+func TestHandleCreateVirtualApp(t *testing.T) {
+	rawA, _ := crypto.GenerateKey()
+	rawB, _ := crypto.GenerateKey()
+	signerA := Signer{privateKey: rawA}
+	signerB := Signer{privateKey: rawB}
+	addrA := signerA.GetAddress().Hex()
+	addrB := signerB.GetAddress().Hex()
+
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	token := "0xTokenXYZ"
+	for i, p := range []string{addrA, addrB} {
+		ch := &Channel{
+			ChannelID:   fmt.Sprintf("0xChannel%c", 'A'+i),
+			Wallet:      p,
+			Participant: p,
+			Status:      ChannelStatusOpen,
+			Token:       token,
+			Nonce:       1,
+		}
+		require.NoError(t, db.Create(ch).Error)
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: p, Wallet: p,
+		}).Error)
+	}
+
+	require.NoError(t, GetWalletLedger(db, addrA).Record(addrA, "usdc", decimal.NewFromInt(100)))
+	require.NoError(t, GetWalletLedger(db, addrB).Record(addrB, "usdc", decimal.NewFromInt(200)))
+
+	ts := uint64(time.Now().Unix())
+	def := AppDefinition{
+		Protocol:           "test-proto",
+		ParticipantWallets: []string{addrA, addrB},
+		Weights:            []int64{1, 1},
+		Quorum:             2,
+		Challenge:          60,
+		Nonce:              ts,
+	}
+	createParams := CreateAppSessionParams{
+		Definition: def,
+		Allocations: []AppAllocation{
+			{ParticipantWallet: addrA, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+			{ParticipantWallet: addrB, AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+		},
+	}
+
+	rpcReq := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 42,
+			Method:    "create_app_session",
+			Params:    []any{createParams},
+			Timestamp: ts,
+		},
+	}
+
+	// 1) Marshal rpcReq.Req exactly as a JSON array
+	rawReq, err := json.Marshal(rpcReq.Req)
+	require.NoError(t, err)
+	rpcReq.Req.rawBytes = rawReq
+
+	// 2) Sign rawReq with both participants
+	sigA, err := signerA.Sign(rawReq)
+	require.NoError(t, err)
+	sigB, err := signerB.Sign(rawReq)
+	require.NoError(t, err)
+	rpcReq.Sig = []string{hexutil.Encode(sigA), hexutil.Encode(sigB)}
+
+	// Call handler
+	resp, err := HandleCreateApplication(nil, rpcReq, db)
+	require.NoError(t, err)
+
+	assert.Equal(t, "create_app_session", resp.Res.Method)
+	appResp, ok := resp.Res.Params[0].(*AppSessionResponse)
+	require.True(t, ok)
+	assert.Equal(t, string(ChannelStatusOpen), appResp.Status)
+
+	var vApp AppSession
+	require.NoError(t, db.Where("session_id = ?", appResp.AppSessionID).First(&vApp).Error)
+	assert.ElementsMatch(t, []string{addrA, addrB}, vApp.ParticipantWallets)
+
+	// Participant accounts drained
+	partBalA, _ := GetWalletLedger(db, addrA).Balance(addrA, "usdc")
+	partBalB, _ := GetWalletLedger(db, addrB).Balance(addrB, "usdc")
+	assert.True(t, partBalA.IsZero(), "Participant A balance should be zero")
+	assert.True(t, partBalB.IsZero(), "Participant B balance should be zero")
+
+	// Virtual-app funded
+	vBalA, _ := GetWalletLedger(db, addrA).Balance(appResp.AppSessionID, "usdc")
+	vBalB, _ := GetWalletLedger(db, addrB).Balance(appResp.AppSessionID, "usdc")
+	assert.Equal(t, decimal.NewFromInt(100).String(), vBalA.String())
+	assert.Equal(t, decimal.NewFromInt(200).String(), vBalB.String())
+}
+
+// TestHandleCloseVirtualApp tests the close virtual app handler functionality
+func TestHandleCloseVirtualApp(t *testing.T) {
+	rawKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	signer := Signer{privateKey: rawKey}
+	participantA := signer.GetAddress().Hex()
+	participantB := "0xParticipantB"
+
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	tokenAddress := "0xToken123"
+	require.NoError(t, db.Create(&Channel{
+		ChannelID:   "0xChannelA",
+		Participant: participantA,
+		Status:      ChannelStatusOpen,
+		Token:       tokenAddress,
+		Nonce:       1,
+	}).Error)
+	require.NoError(t, db.Create(&Channel{
+		ChannelID:   "0xChannelB",
+		Participant: participantB,
+		Status:      ChannelStatusOpen,
+		Token:       tokenAddress,
+		Nonce:       1,
+	}).Error)
+
+	vAppID := "0xVApp123"
+	require.NoError(t, db.Create(&AppSession{
+		SessionID:          vAppID,
+		ParticipantWallets: []string{participantA, participantB},
+		Status:             ChannelStatusOpen,
+		Challenge:          60,
+		Weights:            []int64{100, 0},
+		Quorum:             100,
+	}).Error)
+
+	assetSymbol := "usdc"
+	require.NoError(t, GetWalletLedger(db, participantA).Record(vAppID, assetSymbol, decimal.NewFromInt(200)))
+	require.NoError(t, GetWalletLedger(db, participantB).Record(vAppID, assetSymbol, decimal.NewFromInt(300)))
+
+	closeParams := CloseAppSessionParams{
+		AppSessionID: vAppID,
+		Allocations: []AppAllocation{
+			{ParticipantWallet: participantA, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+			{ParticipantWallet: participantB, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+		},
+	}
+
+	// Create RPC request
+	paramsJSON, _ := json.Marshal(closeParams)
+	req := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 1,
+			Method:    "close_app_session",
+			Params:    []any{json.RawMessage(paramsJSON)},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+	}
+
+	// 1) Marshal rpc.Req to get the exact raw bytes of [request_id, method, params, timestamp]
+	rawReq, err := json.Marshal(req.Req)
+	require.NoError(t, err)
+	req.Req.rawBytes = rawReq
+
+	// 2) Sign rawReq directly
+	sigBytes, err := signer.Sign(rawReq)
+	require.NoError(t, err)
+	req.Sig = []string{hexutil.Encode(sigBytes)}
+
+	// Call handler
+	resp, err := HandleCloseApplication(nil, req, db)
+	require.NoError(t, err)
+	assert.Equal(t, "close_app_session", resp.Res.Method)
+
+	var updated AppSession
+	require.NoError(t, db.Where("session_id = ?", vAppID).First(&updated).Error)
+	assert.Equal(t, ChannelStatusClosed, updated.Status)
+
+	// Check balances redistributed
+	balA, _ := GetWalletLedger(db, participantA).Balance(participantA, "usdc")
+	balB, _ := GetWalletLedger(db, participantB).Balance(participantB, "usdc")
+	assert.Equal(t, decimal.NewFromInt(250), balA)
+	assert.Equal(t, decimal.NewFromInt(250), balB)
+
+	// v-app accounts drained
+	vBalA, _ := GetWalletLedger(db, participantA).Balance(vAppID, "usdc")
+	vBalB, _ := GetWalletLedger(db, participantB).Balance(vAppID, "usdc")
+	assert.True(t, vBalA.IsZero(), "Participant A vApp balance should be zero")
+	assert.True(t, vBalB.IsZero(), "Participant B vApp balance should be zero")
+}
+
+// TestHandleResizeChannel tests the resize channel handler functionality
+func TestHandleResizeChannel(t *testing.T) {
+	rawKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	signer := Signer{privateKey: rawKey}
+	addr := signer.GetAddress().Hex()
+
+	// Setup test DB
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create asset
+	asset := Asset{Token: "0xTokenResize", ChainID: 137, Symbol: "usdc", Decimals: 6}
+	require.NoError(t, db.Create(&asset).Error)
+
+	// Create channel with initial amount 1000
+	initialAmount := uint64(1000)
+	ch := Channel{
+		ChannelID:   "0xChanResize",
+		Participant: addr,
+		Wallet:      addr,
+		Status:      ChannelStatusOpen,
+		Token:       asset.Token,
+		ChainID:     137,
+		Amount:      initialAmount,
+		Version:     1,
+	}
+	require.NoError(t, db.Create(&ch).Error)
+
+	// Fund participant ledger with 1000 USDC
+	require.NoError(t, GetWalletLedger(db, addr).Record(addr, "usdc", decimal.NewFromInt(int64(initialAmount))))
+
+	// Prepare resize params: increase by 200
+	resizeParams := ResizeChannelParams{
+		ChannelID:        ch.ChannelID,
+		AllocateAmount:   big.NewInt(200),
+		FundsDestination: addr,
+	}
+	paramsBytes, _ := json.Marshal(resizeParams)
+
+	rpcReq := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 1,
+			Method:    "resize_channel",
+			Params:    []any{json.RawMessage(paramsBytes)},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+	}
+
+	// Sign request
+	rawReq, err := json.Marshal(rpcReq.Req)
+	require.NoError(t, err)
+	rpcReq.Req.rawBytes = rawReq
+	sig, err := signer.Sign(rawReq)
+	require.NoError(t, err)
+	rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+	// Call handler
+	resp, err := HandleResizeChannel(nil, rpcReq, db, &signer)
+	require.NoError(t, err)
+
+	// Validate response
+	assert.Equal(t, "resize_channel", resp.Res.Method)
+	resObj, ok := resp.Res.Params[0].(ResizeChannelResponse)
+	require.True(t, ok, "Response should be ResizeChannelResponse")
+	assert.Equal(t, ch.ChannelID, resObj.ChannelID)
+	assert.Equal(t, ch.Version+1, resObj.Version)
+
+	// New channel amount should be initial + 200
+	expected := new(big.Int).Add(new(big.Int).SetUint64(initialAmount), big.NewInt(200))
+	assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expected), "Allocated amount mismatch")
+	assert.Equal(t, 0, resObj.Allocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+}
+
+// TestHandleCloseChannel tests the close channel handler functionality
+func TestHandleCloseChannel(t *testing.T) {
+	rawKey, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	signer := Signer{privateKey: rawKey}
+	addr := signer.GetAddress().Hex()
+
+	// Setup test DB
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	// Create asset
+	asset := Asset{Token: "0xTokenClose", ChainID: 137, Symbol: "usdc", Decimals: 6}
+	require.NoError(t, db.Create(&asset).Error)
+
+	// Create channel with amount 500
+	initialAmount := uint64(500)
+	ch := Channel{
+		ChannelID:   "0xChanClose",
+		Participant: addr,
+		Wallet:      addr,
+		Status:      ChannelStatusOpen,
+		Token:       asset.Token,
+		ChainID:     137,
+		Amount:      initialAmount,
+		Version:     2,
+	}
+	require.NoError(t, db.Create(&ch).Error)
+
+	// Fund participant ledger so that raw units match channel.Amount
+	require.NoError(t, GetWalletLedger(db, addr).Record(
+		addr,
+		"usdc",
+		decimal.NewFromBigInt(big.NewInt(int64(initialAmount)), -int32(asset.Decimals)),
+	))
+
+	// Prepare close params
+	closeParams := CloseChannelParams{
+		ChannelID:        ch.ChannelID,
+		FundsDestination: addr,
+	}
+	paramsBytes, _ := json.Marshal(closeParams)
+
+	rpcReq := &RPCMessage{
+		Req: &RPCData{
+			RequestID: 10,
+			Method:    "close_channel",
+			Params:    []any{json.RawMessage(paramsBytes)},
+			Timestamp: uint64(time.Now().Unix()),
+		},
+	}
+
+	// Sign request
+	rawReq, err := json.Marshal(rpcReq.Req)
+	require.NoError(t, err)
+	rpcReq.Req.rawBytes = rawReq
+	sig, err := signer.Sign(rawReq)
+	require.NoError(t, err)
+	rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+	// Call handler
+	resp, err := HandleCloseChannel(nil, rpcReq, db, &signer)
+	require.NoError(t, err)
+
+	// Validate response
+	assert.Equal(t, "close_channel", resp.Res.Method)
+	resObj, ok := resp.Res.Params[0].(CloseChannelResponse)
+	require.True(t, ok, "Response should be CloseChannelResponse")
+	assert.Equal(t, ch.ChannelID, resObj.ChannelID)
+	assert.Equal(t, ch.Version+1, resObj.Version)
+
+	// Final allocation should send full balance to destination
+	assert.Equal(t, 0, resObj.FinalAllocations[0].Amount.Cmp(new(big.Int).SetUint64(initialAmount)), "Primary allocation mismatch")
+	assert.Equal(t, 0, resObj.FinalAllocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
 }

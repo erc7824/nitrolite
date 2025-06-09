@@ -386,7 +386,6 @@ contract Custody is IChannel, IDeposit, IChannelReader {
      * @param challengerSig Challenger signature over `keccak256(abi.encode(stateHash, "challenge"))` to disallow 3rd party
      * to challenge with a stolen state and its signature
      */
-    // TODO: add a challengerSig and check that it signed by either participant of the channel to disallow non-channel participants to challenge with stolen state
     function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs, Signature calldata challengerSig) external {
         Metadata storage meta = _channels[channelId];
 

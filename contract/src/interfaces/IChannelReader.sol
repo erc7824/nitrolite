@@ -5,50 +5,63 @@ import {Channel, State, ChannelStatus, Amount} from "./Types.sol";
 
 interface IChannelReader {
     /**
-     * @notice Get a list of all channel IDs associated with the caller
-     * @return Array of channel IDs
+     * @notice Get the list of open channels for a list of accounts
+     * @param accounts Array of account addresses to check for open channels
+     * @return Array of arrays, where each inner array contains channel IDs for the corresponding account
      */
-    function getAccountChannels(address account) external view returns (bytes32[] memory);
+    function getOpenChannels(address[] memory accounts) external view returns (bytes32[][] memory);
+
+    /**
+     * @notice Get the config of a specific channel
+     * @param channelId The unique identifier of the channel
+     * @return Channel configuration for the specified channel
+     */
+    function getChannelConfig(bytes32 channelId) external view returns (Channel memory);
+
+    /**
+     * @notice Get the status of a specific channel
+     * @param channelId The unique identifier of the channel
+     * @return ChannelStatus representing the current status of the channel
+     */
+    function getChannelStatus(bytes32 channelId) external view returns (ChannelStatus);
+
+    /**
+     * @notice Get the last valid state of a specific channel
+     * @param channelId The unique identifier of the channel
+     * @return State representing the last valid state of the channel
+     */
+    function getChannelLastValidState(bytes32 channelId) external view returns (State memory);
+
+    /**
+     * @notice Get the challenge expiry time for a specific channel
+     * @param channelId The unique identifier of the channel
+     * @return uint256 representing the challenge expiry timestamp
+     */
+    function getChannelChallengeExpiry(bytes32 channelId) external view returns (uint256);
 
     /**
      * @notice Get detailed information about a specific channel
      * @param channelId The unique identifier of the channel
-     * @return exists Whether the channel exists
-     * @return channel The channel configuration
-     * @return status Current channel status
-     * @return creator Address that created the channel
-     * @return expectedDeposits Expected deposits for each participant
-     * @return actualDeposits Actual deposits made by each participant
-     * @return challengeExpiry Timestamp when challenge period expires (0 if no active challenge)
+     * @return channel The Channel configuration
+     * @return status The current status of the channel
+     * @return challengeExpiry The challenge expiry timestamp
      * @return lastValidState The last valid state of the channel
      */
-    function getChannelInfo(bytes32 channelId)
+    function getChannelData(bytes32 channelId)
         external
         view
         returns (
-            bool exists,
             Channel memory channel,
-            ChannelStatus status, 
-            address creator,
-            Amount[2] memory expectedDeposits,
-            Amount[2] memory actualDeposits,
+            ChannelStatus status,
             uint256 challengeExpiry,
             State memory lastValidState
         );
 
     /**
-     * @notice Get token balance information for a specific channel
+     * @notice Get the balance of a channel for a list of tokens
      * @param channelId The unique identifier of the channel
-     * @param token The token address (zero address for native token)
-     * @return balance The current balance of the specified token in the channel
+     * @param tokens Array of token addresses to check balances for (use address(0) for native tokens)
+     * @return balances Array of balances corresponding to the provided tokens
      */
-    function getChannelBalance(bytes32 channelId, address token) external view returns (uint256 balance);
-
-    /**
-     * @notice Get account information for a specific token
-     * @param user The address of the user
-     * @param token The token address (zero address for native token)
-     * @return balance The available balance of the specified token for the user
-     */
-    function getAccountBalance(address user, address token) external view returns (uint256 balance);
+    function getChannelBalances(bytes32 channelId, address[] memory tokens) external view returns (uint256[] memory balances);
 }

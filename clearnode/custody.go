@@ -230,6 +230,29 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 
 	var ch Channel
 	err = c.db.Transaction(func(tx *gorm.DB) error {
+		// Save event in DB
+		eventData, err := MarshalCustodyCreated(*ev)
+		if err != nil {
+			return err
+		}
+
+		contractEvent := &ContractEvent{
+			ID:              0,
+			ContractAddress: c.custodyAddr.Hex(),
+			ChainID:         c.chainID,
+			Name:            "created",
+			BlockNumber:     ev.Raw.BlockNumber,
+			TransactionHash: ev.Raw.TxHash.Hex(),
+			LogIndex:        uint32(ev.Raw.Index),
+			Data:            eventData,
+			CreatedAt:       time.Time{},
+		}
+
+		err = StoreContractEvent(tx, contractEvent)
+		if err != nil {
+			return err
+		}
+
 		ch, err = CreateChannel(
 			tx,
 			channelID,
@@ -288,6 +311,29 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
+		// Save event in DB
+		eventData, err := MarshalCustodyJoined(*ev)
+		if err != nil {
+			return err
+		}
+
+		contractEvent := &ContractEvent{
+			ID:              0,
+			ContractAddress: c.custodyAddr.Hex(),
+			ChainID:         c.chainID,
+			Name:            "joined",
+			BlockNumber:     ev.Raw.BlockNumber,
+			TransactionHash: ev.Raw.TxHash.Hex(),
+			LogIndex:        uint32(ev.Raw.Index),
+			Data:            eventData,
+			CreatedAt:       time.Time{},
+		}
+
+		err = StoreContractEvent(tx, contractEvent)
+		if err != nil {
+			return err
+		}
+
 		result := tx.Where("channel_id = ?", channelID).First(&channel)
 		if result.Error != nil {
 			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -340,6 +386,29 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
+		// Save event in DB
+		eventData, err := MarshalCustodyChallenged(*ev)
+		if err != nil {
+			return err
+		}
+
+		contractEvent := &ContractEvent{
+			ID:              0,
+			ContractAddress: c.custodyAddr.Hex(),
+			ChainID:         c.chainID,
+			Name:            "challenged",
+			BlockNumber:     ev.Raw.BlockNumber,
+			TransactionHash: ev.Raw.TxHash.Hex(),
+			LogIndex:        uint32(ev.Raw.Index),
+			Data:            eventData,
+			CreatedAt:       time.Time{},
+		}
+
+		err = StoreContractEvent(tx, contractEvent)
+		if err != nil {
+			return err
+		}
+
 		result := tx.Where("channel_id = ?", channelID).First(&channel)
 		if result.Error != nil {
 			return fmt.Errorf("error finding channel: %w", result.Error)
@@ -370,6 +439,29 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
+		// Save event in DB
+		eventData, err := MarshalCustodyResized(*ev)
+		if err != nil {
+			return err
+		}
+
+		contractEvent := &ContractEvent{
+			ID:              0,
+			ContractAddress: c.custodyAddr.Hex(),
+			ChainID:         c.chainID,
+			Name:            "resized",
+			BlockNumber:     ev.Raw.BlockNumber,
+			TransactionHash: ev.Raw.TxHash.Hex(),
+			LogIndex:        uint32(ev.Raw.Index),
+			Data:            eventData,
+			CreatedAt:       time.Time{},
+		}
+
+		err = StoreContractEvent(tx, contractEvent)
+		if err != nil {
+			return err
+		}
+
 		result := tx.Where("channel_id = ?", channelID).First(&channel)
 		if result.Error != nil {
 			return fmt.Errorf("error finding channel: %w", result.Error)
@@ -447,6 +539,29 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
+		// Save event in DB
+		eventData, err := MarshalCustodyClosed(*ev)
+		if err != nil {
+			return err
+		}
+
+		contractEvent := &ContractEvent{
+			ID:              0,
+			ContractAddress: c.custodyAddr.Hex(),
+			ChainID:         c.chainID,
+			Name:            "closed",
+			BlockNumber:     ev.Raw.BlockNumber,
+			TransactionHash: ev.Raw.TxHash.Hex(),
+			LogIndex:        uint32(ev.Raw.Index),
+			Data:            eventData,
+			CreatedAt:       time.Time{},
+		}
+
+		err = StoreContractEvent(tx, contractEvent)
+		if err != nil {
+			return err
+		}
+
 		result := tx.Where("channel_id = ?", channelID).First(&channel)
 		if result.Error != nil {
 			if errors.Is(result.Error, gorm.ErrRecordNotFound) {

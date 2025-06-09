@@ -56,6 +56,8 @@ type AppSessionResponse struct {
 	Quorum             uint64   `json:"quorum"`
 	Version            uint64   `json:"version"`
 	Nonce              uint64   `json:"nonce"`
+	CreatedAt          string   `json:"created_at"`
+	UpdatedAt          string   `json:"updated_at"`
 }
 
 type ResizeChannelParams struct {
@@ -334,7 +336,7 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 			Weights:            params.Definition.Weights,
 			Quorum:             params.Definition.Quorum,
 			Nonce:              params.Definition.Nonce,
-			Version:            rpc.Req.Timestamp,
+			Version:            1,
 		}).Error
 	})
 
@@ -345,6 +347,7 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{
 		&AppSessionResponse{
 			AppSessionID: appSessionID,
+			Version:      1,
 			Status:       string(ChannelStatusOpen),
 		},
 	}), nil
@@ -365,6 +368,7 @@ func HandleSubmitState(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessag
 		return nil, err
 	}
 
+	var newVersion uint64
 	err = db.Transaction(func(tx *gorm.DB) error {
 		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
 		if err != nil {
@@ -404,7 +408,15 @@ func HandleSubmitState(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessag
 			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
 		}
 
-		return verifyAllocations(appSessionBalance, allocationSum)
+		if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
+			return err
+		}
+
+		newVersion = appSession.Version + 1
+
+		return tx.Model(&appSession).Updates(map[string]any{
+			"version": newVersion,
+		}).Error
 	})
 
 	if err != nil {
@@ -414,7 +426,8 @@ func HandleSubmitState(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessag
 	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{
 		&AppSessionResponse{
 			AppSessionID: params.AppSessionID,
-			Status:       "success",
+			Version:      newVersion,
+			Status:       string(ChannelStatusOpen),
 		},
 	}), nil
 }
@@ -448,6 +461,7 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 		return nil, err
 	}
 
+	var newVersion uint64
 	err = db.Transaction(func(tx *gorm.DB) error {
 		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
 		if err != nil {
@@ -491,8 +505,11 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 			return err
 		}
 
+		newVersion = appSession.Version + 1
+
 		return tx.Model(&appSession).Updates(map[string]any{
-			"status": ChannelStatusClosed,
+			"status":  ChannelStatusClosed,
+			"version": newVersion,
 		}).Error
 	})
 
@@ -503,6 +520,7 @@ func HandleCloseApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCM
 	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{
 		&AppSessionResponse{
 			AppSessionID: params.AppSessionID,
+			Version:      newVersion,
 			Status:       string(ChannelStatusClosed),
 		},
 	}), nil
@@ -573,6 +591,8 @@ func HandleGetAppSessions(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 			Quorum:             session.Quorum,
 			Version:            session.Version,
 			Nonce:              session.Nonce,
+			CreatedAt:          session.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:          session.UpdatedAt.Format(time.RFC3339),
 		}
 	}
 

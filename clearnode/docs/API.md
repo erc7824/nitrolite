@@ -144,7 +144,7 @@ Retrieves the application definition for a specific ledger account.
 
 ### Get App Sessions
 
-Lists all virtual applications for a participant. Optionally, you can filter the results by status (open, closed).
+Lists all virtual applications for a participant sorted by updated_at from the newest to oldest. Optionally, you can filter the results by status (open, closed).
 
 **Request:**
 
@@ -444,6 +444,7 @@ Creates a virtual application between participants.
 {
   "res": [1, "create_app_session", [{
     "app_session_id": "0x3456789012abcdef...",
+    "version": "1",
     "status": "open"
   }], 1619123456789],
   "sig": ["0xabcd1234..."]
@@ -482,7 +483,8 @@ Submits an intermediate state into a virtual application and redistributes funds
 {
   "res": [1, "submit_state", [{
     "app_session_id": "0x3456789012abcdef...",
-    "status": "success"
+    "version": "567",
+    "status": "open"
   }], 1619123456789],
   "sig": ["0xabcd1234..."]
 }
@@ -521,6 +523,7 @@ Closes a virtual application and redistributes funds.
 {
   "res": [1, "close_app_session", [{
     "app_session_id": "0x3456789012abcdef...",
+    "version": "3",
     "status": "closed"
   }], 1619123456789],
   "sig": ["0xabcd1234..."]

@@ -1349,10 +1349,12 @@ func TestHandleCreateVirtualApp(t *testing.T) {
 	appResp, ok := resp.Res.Params[0].(*AppSessionResponse)
 	require.True(t, ok)
 	assert.Equal(t, string(ChannelStatusOpen), appResp.Status)
+	assert.Equal(t, uint64(1), appResp.Version)
 
 	var vApp AppSession
 	require.NoError(t, db.Where("session_id = ?", appResp.AppSessionID).First(&vApp).Error)
 	assert.ElementsMatch(t, []string{addrA, addrB}, vApp.ParticipantWallets)
+	assert.Equal(t, uint64(1), vApp.Version)
 
 	// Participant accounts drained
 	partBalA, _ := GetWalletLedger(db, addrA).Balance(addrA, "usdc")
@@ -1402,6 +1404,7 @@ func TestHandleSubmitState(t *testing.T) {
 		Challenge:          60,
 		Weights:            []int64{100, 0},
 		Quorum:             100,
+		Version:            1,
 	}).Error)
 
 	assetSymbol := "usdc"
@@ -1441,6 +1444,15 @@ func TestHandleSubmitState(t *testing.T) {
 	resp, err := HandleSubmitState(nil, req, db)
 	require.NoError(t, err)
 	assert.Equal(t, "submit_state", resp.Res.Method)
+	appResp, ok := resp.Res.Params[0].(*AppSessionResponse)
+	require.True(t, ok)
+	assert.Equal(t, string(ChannelStatusOpen), appResp.Status)
+	assert.Equal(t, uint64(2), appResp.Version)
+
+	var updated AppSession
+	require.NoError(t, db.Where("session_id = ?", vAppID).First(&updated).Error)
+	assert.Equal(t, ChannelStatusOpen, updated.Status)
+	assert.Equal(t, uint64(2), updated.Version)
 
 	// Check balances redistributed
 	balA, _ := GetWalletLedger(db, participantA).Balance(vAppID, "usdc")
@@ -1484,6 +1496,7 @@ func TestHandleCloseVirtualApp(t *testing.T) {
 		Challenge:          60,
 		Weights:            []int64{100, 0},
 		Quorum:             100,
+		Version:            2,
 	}).Error)
 
 	assetSymbol := "usdc"
@@ -1523,10 +1536,15 @@ func TestHandleCloseVirtualApp(t *testing.T) {
 	resp, err := HandleCloseApplication(nil, req, db)
 	require.NoError(t, err)
 	assert.Equal(t, "close_app_session", resp.Res.Method)
+	appResp, ok := resp.Res.Params[0].(*AppSessionResponse)
+	require.True(t, ok)
+	assert.Equal(t, string(ChannelStatusClosed), appResp.Status)
+	assert.Equal(t, uint64(3), appResp.Version)
 
 	var updated AppSession
 	require.NoError(t, db.Where("session_id = ?", vAppID).First(&updated).Error)
 	assert.Equal(t, ChannelStatusClosed, updated.Status)
+	assert.Equal(t, uint64(3), updated.Version)
 
 	// Check balances redistributed
 	balA, _ := GetWalletLedger(db, participantA).Balance(participantA, "usdc")

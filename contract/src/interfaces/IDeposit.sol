@@ -24,12 +24,13 @@ interface IDeposit {
     event Withdrawn(address indexed wallet, address indexed token, uint256 amount);
 
     /**
-     * @notice Gets the balance of a specific account for a given token
-     * @param account Address of the account to check
-     * @param token Token address (use address(0) for native tokens)
-     * @return balance of the account in the specified token
+     * @notice Gets the balances of multiple accounts for multiple tokens
+     * @dev Returns a 2D array where each inner array corresponds to the balances of the tokens for each account
+     * @param accounts Array of account addresses to check balances for
+     * @param tokens Array of token addresses to check balances for (use address(0) for native tokens)
+     * @return A 2D array of balances, where each inner array corresponds to the balances of the tokens for each account
      */
-    function getAccountBalance(address account, address token) external view returns (uint256);
+    function getAccountsBalances(address[] calldata accounts, address[] calldata tokens) external view returns (uint256[][] memory);
 
     /**
      * @notice Deposits tokens into the contract

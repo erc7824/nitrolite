@@ -19,7 +19,7 @@ import {
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
-import { Hex, WalletClient, createWalletClient, http } from "viem";
+import { Hex, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { polygon } from "viem/chains";
 
@@ -155,7 +155,7 @@ async function authenticateWithBroker(): Promise<void> {
                 try {
                     message = parseRPCResponse(data.toString());
                 } catch (error) {
-                    console.warn("Error parsing auth message from broker, skipping:", error.message);
+                    console.warn("Error parsing auth message from broker, skipping:", error);
                     return;
                 }
                 console.log("Auth process message received:", message);

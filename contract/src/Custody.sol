@@ -261,7 +261,6 @@ contract Custody is IChannel, IDeposit, IChannelReader {
     /**
      * @notice Deposit funds and create a channel
      * @dev This function allows a user to deposit funds and create a channel in one transaction
-     * @param account The account that funds will be deposited to
      * @param token The token address to deposit (use address(0) for native tokens)
      * @param amount The amount of tokens to deposit
      * @param ch Channel configuration with participants, adjudicator, challenge period, and nonce
@@ -269,13 +268,12 @@ contract Custody is IChannel, IDeposit, IChannelReader {
      * @return channelId Unique identifier for the created channel
      */
     function depositAndCreate(
-        address account,
         address token,
         uint256 amount,
         Channel calldata ch,
         State calldata initial
     ) external payable returns (bytes32) {
-        deposit(account, token, amount);
+        deposit(msg.sender, token, amount);
         return create(ch, initial);
     }
 

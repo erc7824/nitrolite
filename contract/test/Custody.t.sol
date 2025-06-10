@@ -286,7 +286,7 @@ contract CustodyTest is Test {
 
         // 3. Create the channel as host
         vm.prank(hostSK);
-        bytes32 channelId = custody.depositAndCreate(hostSK, address(token), DEPOSIT_AMOUNT * 2, chan, initialState);
+        bytes32 channelId = custody.depositAndCreate(address(token), DEPOSIT_AMOUNT * 2, chan, initialState);
 
         // Verify the channel is created and in INITIAL state
         (uint256 available, uint256 channelCount) = getAvailableBalanceAndChannelCount(hostSK, address(token));

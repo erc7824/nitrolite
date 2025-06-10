@@ -273,6 +273,31 @@ contract CustodyTest is Test {
         assertEq(channelId, expectedChannelId, "Channel ID is incorrect");
     }
 
+    function test_depositAndCreate() public {
+        // 1. Prepare channel and initial state
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
+
+        // 2. Sign the state by the host
+        Signature memory hostSig = signState(chan, initialState, hostSKPrivKey);
+        Signature[] memory sigs = new Signature[](1);
+        sigs[0] = hostSig;
+        initialState.sigs = sigs;
+
+        // 3. Create the channel as host
+        vm.prank(hostSK);
+        bytes32 channelId = custody.depositAndCreate(hostSK, address(token), DEPOSIT_AMOUNT * 2, chan, initialState);
+
+        // Verify the channel is created and in INITIAL state
+        (uint256 available, uint256 channelCount) = getAvailableBalanceAndChannelCount(hostSK, address(token));
+        assertEq(available, DEPOSIT_AMOUNT, "Host should have correct available balance");
+        assertEq(channelCount, 1, "Host should have 1 channel");
+
+        // Also check that the channelId is consistent
+        bytes32 expectedChannelId = Utils.getChannelId(chan);
+        assertEq(channelId, expectedChannelId, "Channel ID is incorrect");
+    }
+
     function test_CompleteChannelFunding() public {
         // 1. Create channel with host
         Channel memory chan = createTestChannelWithSK();

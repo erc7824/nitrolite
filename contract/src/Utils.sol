@@ -64,6 +64,16 @@ library Utils {
     }
 
     /**
+     * @notice Compares two states for equality
+     * @param a The first state to compare
+     * @param b The second state to compare
+     * @return True if the states are equal, false otherwise
+     */
+    function statesAreEqual(State memory a, State memory b) internal pure returns (bool) {
+        return keccak256(abi.encode(a)) == keccak256(abi.encode(b));
+    }
+
+    /**
      * @notice Validates that a state is a valid initial state for a channel
      * @dev Initial states must have version 0 and INITIALIZE intent
      * @param state The state to validate

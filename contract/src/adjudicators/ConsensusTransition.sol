@@ -6,18 +6,18 @@ import {Channel, State, Allocation, Signature, StateIntent} from "../interfaces/
 import {Utils} from "../Utils.sol";
 
 /**
- * @title MutualConsent Adjudicator
- * @notice An adjudicator that validates state based on mutual signatures from both participants
- * @dev Any state is considered valid as long as it's signed by both participants
+ * @title Mutual consent transition Adjudicator
+ * @notice An adjudicator that validates state based on mutual signatures from both participants and the transition from the previous state.
+ * @dev Any state is considered valid as long as it's signed by both participants and is a valid transition from the previous state.
  */
-contract Consensus is IAdjudicator {
+contract ConsensusTransition is IAdjudicator {
     using Utils for State;
 
     /**
      * @notice Validates that the state is signed by both participants
      * @param chan The channel configuration
      * @param candidate The proposed state
-     * @param proofs Array of previous states (unused in this implementation)
+     * @param proofs Array of previous states
      * @return valid True if the state is valid, false otherwise
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)

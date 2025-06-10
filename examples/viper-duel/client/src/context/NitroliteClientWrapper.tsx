@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { createPublicClient, createWalletClient, custom, http, type Hex } from "viem";
+import { createPublicClient, http, type Hex } from "viem";
 import { NitroliteStore, WalletStore } from "../store";
 import { NitroliteClient, type ContractAddresses } from "@erc7824/nitrolite";
 

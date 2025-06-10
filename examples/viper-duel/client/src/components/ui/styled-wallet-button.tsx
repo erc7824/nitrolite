@@ -1,4 +1,3 @@
-import React from 'react';
 import { WalletButton } from '@rainbow-me/rainbowkit';
 import { Wallet, Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -41,7 +40,7 @@ export function StyledWalletButton({
 
     return (
         <WalletButton.Custom wallet="metaMask">
-            {({ ready, connect, connecting }) => {
+            {({ ready, connect, loading }) => {
                 const buttonDisabled = !ready || disabled;
                 
                 return (
@@ -53,7 +52,7 @@ export function StyledWalletButton({
                             'opacity-50 cursor-not-allowed': buttonDisabled
                         })}
                     >
-                        {connecting ? (
+                        {loading ? (
                             <>
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                 Connecting...

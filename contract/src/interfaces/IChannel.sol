@@ -34,15 +34,17 @@ interface IChannel {
     /**
      * @notice Emitted when a channel enters the challenge period
      * @param channelId Unique identifier for the channel
+     * @param state The state that initiated the challenge
      * @param expiration Timestamp when the challenge period expires
      */
-    event Challenged(bytes32 indexed channelId, uint256 expiration);
+    event Challenged(bytes32 indexed channelId, State state, uint256 expiration);
 
     /**
      * @notice Emitted when a state is checkpointed on-chain
      * @param channelId Unique identifier for the channel
+     * @param state The state that is checkpointed
      */
-    event Checkpointed(bytes32 indexed channelId);
+    event Checkpointed(bytes32 indexed channelId, State state);
 
     /**
      * @notice Emitted when a channel is resized

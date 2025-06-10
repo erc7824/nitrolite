@@ -308,7 +308,7 @@ contract Custody is IChannel, IDeposit {
 
             _closeEffectsAndInteractions(channelId, candidate.allocations);
 
-            emit Challenged(channelId, block.timestamp);
+            emit Challenged(channelId, candidate, block.timestamp);
             emit Closed(channelId, candidate);
             return;
         }
@@ -351,11 +351,12 @@ contract Custody is IChannel, IDeposit {
         }
 
         // effects
+        uint256 challengeExpiration = block.timestamp + meta.chan.challenge;
+        meta.challengeExpire = challengeExpiration;
         meta.lastValidState = candidate;
-        meta.challengeExpire = block.timestamp + meta.chan.challenge;
         meta.stage = ChannelStatus.DISPUTE;
 
-        emit Challenged(channelId, meta.challengeExpire);
+        emit Challenged(channelId, candidate, challengeExpiration);
     }
 
     /**
@@ -400,7 +401,7 @@ contract Custody is IChannel, IDeposit {
         meta.stage = ChannelStatus.ACTIVE;
         meta.lastValidState = candidate;
 
-        emit Checkpointed(channelId);
+        emit Checkpointed(channelId, candidate);
     }
 
     /**

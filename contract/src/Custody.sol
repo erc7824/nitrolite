@@ -1,22 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {IChannel} from "./interfaces/IChannel.sol";
-import {IDeposit} from "./interfaces/IDeposit.sol";
-import {IAdjudicator} from "./interfaces/IAdjudicator.sol";
-import {IComparable} from "./interfaces/IComparable.sol";
-import {Channel, State, Allocation, ChannelStatus, StateIntent, Signature, Amount} from "./interfaces/Types.sol";
-import {Utils} from "./Utils.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
+
+import {IAdjudicator} from "./interfaces/IAdjudicator.sol";
+import {IChannelReader} from "./interfaces/IChannelReader.sol";
+import {IComparable} from "./interfaces/IComparable.sol";
+import {IChannel} from "./interfaces/IChannel.sol";
+import {IDeposit} from "./interfaces/IDeposit.sol";
+import {Channel, State, Allocation, ChannelStatus, StateIntent, Signature, Amount} from "./interfaces/Types.sol";
+import {Utils} from "./Utils.sol";
 
 /**
  * @title Custody
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
  * @dev This implementation currently only supports 2 participant channels (CLIENT and SERVER)
  */
-contract Custody is IChannel, IDeposit {
+contract Custody is IChannel, IDeposit, IChannelReader {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using SafeERC20 for IERC20;
 
@@ -67,30 +69,83 @@ contract Custody is IChannel, IDeposit {
     mapping(bytes32 channelId => Metadata chMeta) internal _channels;
     mapping(address account => Ledger ledger) internal _ledgers;
 
+    // ========== Read methods ==========
+
     /**
-     * @notice Get channels associated with an account
-     * @param account The account address
-     * @return List of channel IDs associated with the account
+     * @notice Gets the balances of multiple accounts for multiple tokens
+     * @dev Returns a 2D array where each inner array corresponds to the balances of the tokens for each account
+     * @param accounts Array of account addresses to check balances for
+     * @param tokens Array of token addresses to check balances for (use address(0) for native tokens)
+     * @return A 2D array of balances, where each inner array corresponds to the balances of the tokens for each account
      */
-    function getAccountChannels(address account) public view returns (bytes32[] memory) {
-        return _ledgers[account].channels.values();
+    function getAccountsBalances(address[] calldata accounts, address[] calldata tokens) external view returns (uint256[][] memory) {
+        uint256[][] memory balances = new uint256[][](accounts.length);
+        for (uint256 i = 0; i < accounts.length; i++) {
+            balances[i] = new uint256[](tokens.length);
+            for (uint256 j = 0; j < tokens.length; j++) {
+                balances[i][j] = _ledgers[accounts[i]].tokens[tokens[j]];
+            }
+        }
+        return balances;
     }
 
     /**
-     * @notice Get account information for a specific token
-     * @param user The account address
-     * @param token The token address
-     * @return available Amount available for withdrawal or allocation
-     * @return channelCount Number of associated channels
+     * @notice Get the list of open channels for a list of accounts
+     * @param accounts Array of account addresses to check for open channels
+     * @return Array of arrays, where each inner array contains channel IDs for the corresponding account
      */
-    function getAccountInfo(address user, address token)
-        public
-        view
-        returns (uint256 available, uint256 channelCount)
-    {
-        Ledger storage ledger = _ledgers[user];
-        return (ledger.tokens[token], ledger.channels.length());
+    function getOpenChannels(address[] memory accounts) external view returns (bytes32[][] memory) {
+        bytes32[][] memory channels = new bytes32[][](accounts.length);
+        for (uint256 i = 0; i < accounts.length; i++) {
+            channels[i] = _ledgers[accounts[i]].channels.values();
+        }
+        return channels;
     }
+
+    /**
+     * @notice Get detailed information about a specific channel
+     * @param channelId The unique identifier of the channel
+     * @return channel The Channel configuration
+     * @return status The current status of the channel
+     * @return wallets The list of wallets that have funded the channel
+     * @return challengeExpiry The challenge expiry timestamp
+     * @return lastValidState The last valid state of the channel
+     */
+    function getChannelData(bytes32 channelId)
+        external
+        view
+        returns (
+            Channel memory channel,
+            ChannelStatus status,
+            address[] memory wallets,
+            uint256 challengeExpiry,
+            State memory lastValidState
+        ) {
+            Metadata storage meta = _channels[channelId];
+            channel = meta.chan;
+            status = meta.stage;
+            wallets = new address[](PART_NUM);
+            for (uint256 i = 0; i < PART_NUM; i++) {
+                wallets[i] = meta.wallets[i];
+            }
+            challengeExpiry = meta.challengeExpire;
+            lastValidState = meta.lastValidState;
+        }
+
+    /**
+     * @notice Get the balance of a channel for a list of tokens
+     * @param channelId The unique identifier of the channel
+     * @param tokens Array of token addresses to check balances for (use address(0) for native tokens)
+     * @return balances Array of balances corresponding to the provided tokens
+     */
+    function getChannelBalances(bytes32 channelId, address[] memory tokens) external view returns (uint256[] memory balances) {
+        balances = new uint256[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            balances[i] = _channels[channelId].tokenBalances[tokens[i]];
+        }
+    }
+
+    // ========== Write public methods ==========
 
     function deposit(address account, address token, uint256 amount) external payable {
         if (amount == 0) revert InvalidAmount();
@@ -453,6 +508,8 @@ contract Custody is IChannel, IDeposit {
 
         emit Resized(channelId, resizeAmounts);
     }
+
+    // ========== Write internal methods ==========
 
     function _transfer(address token, address to, uint256 amount) internal {
         if (token == address(0)) {

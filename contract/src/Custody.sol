@@ -147,7 +147,13 @@ contract Custody is IChannel, IDeposit, IChannelReader {
 
     // ========== Write public methods ==========
 
-    function deposit(address account, address token, uint256 amount) external payable {
+    /**
+     * @notice Deposit tokens into the contract
+     * @param account The account that funds will be deposited to
+     * @param token The token address to deposit (use address(0) for native tokens)
+     * @param amount The amount of tokens to deposit
+     */
+    function deposit(address account, address token, uint256 amount) public payable {
         if (amount == 0) revert InvalidAmount();
 
         if (token == address(0)) {
@@ -165,6 +171,12 @@ contract Custody is IChannel, IDeposit, IChannelReader {
         emit Deposited(account, token, amount);
     }
 
+    /**
+     * @notice Withdraw tokens from the contract
+     * @dev Can only withdraw available (not locked in channels) funds
+     * @param token The token address to withdraw (use address(0) for native tokens)
+     * @param amount The amount of tokens to withdraw
+     */
     function withdraw(address token, uint256 amount) external {
         address account = msg.sender;
         Ledger storage ledger = _ledgers[account];
@@ -244,6 +256,25 @@ contract Custody is IChannel, IDeposit, IChannelReader {
         emit Created(channelId, wallet, ch, initial);
 
         return channelId;
+    }
+
+    /**
+     * @notice Deposit funds and create a channel
+     * @dev This function allows a user to deposit funds and create a channel in one transaction
+     * @param token The token address to deposit (use address(0) for native tokens)
+     * @param amount The amount of tokens to deposit
+     * @param ch Channel configuration with participants, adjudicator, challenge period, and nonce
+     * @param initial Initial state with StateIntent.INITIALIZE and expected allocations
+     * @return channelId Unique identifier for the created channel
+     */
+    function depositAndCreate(
+        address token,
+        uint256 amount,
+        Channel calldata ch,
+        State calldata initial
+    ) external payable returns (bytes32) {
+        deposit(msg.sender, token, amount);
+        return create(ch, initial);
     }
 
     /**

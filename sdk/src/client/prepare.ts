@@ -126,31 +126,38 @@ export class NitroliteTransactionPreparer {
      */
     async prepareDepositAndCreateChannelTransactions(
         tokenAddress: Address,
-        depositAmount: bigint,
+        amount: bigint,
         params: CreateChannelParams,
     ): Promise<PreparedTransaction[]> {
-        let allTransactions: PreparedTransaction[] = [];
-        try {
-            const depositTxs = await this.prepareDepositTransactions(tokenAddress, depositAmount);
-            allTransactions = allTransactions.concat(depositTxs);
-        } catch (err) {
-            throw new Errors.ContractCallError(
-                'Failed to prepare deposit part of depositAndCreateChannel',
-                err as Error,
-                { depositAmount },
-            );
+        const transactions: PreparedTransaction[] = [];
+        const spender = this.deps.addresses.custody;
+        const owner = this.deps.account.address;
+
+        if (tokenAddress !== zeroAddress) {
+            const allowance = await this.deps.erc20Service.getTokenAllowance(tokenAddress, owner, spender);
+            if (allowance < amount) {
+                try {
+                    const approveTx = await this.deps.erc20Service.prepareApprove(tokenAddress, spender, amount);
+                    transactions.push(approveTx);
+                } catch (err) {
+                    throw new Errors.ContractCallError('prepareApprove (for deposit)', err as Error, {
+                        tokenAddress,
+                        spender,
+                        amount,
+                    });
+                }
+            }
         }
+
         try {
-            const createChannelTx = await this.prepareCreateChannelTransaction(tokenAddress, params);
-            allTransactions.push(createChannelTx);
+            const { channel, initialState } = await _prepareAndSignInitialState(tokenAddress, this.deps, params);
+            const depositTx = await this.deps.nitroliteService.prepareDepositAndCreateChannel(tokenAddress, amount, channel, initialState);
+            transactions.push(depositTx);
         } catch (err) {
-            throw new Errors.ContractCallError(
-                'Failed to prepare createChannel part of depositAndCreateChannel',
-                err as Error,
-                { depositAmount },
-            );
+            throw new Errors.ContractCallError('prepareDepositAndCreateChannel', err as Error, { tokenAddress, amount });
         }
-        return allTransactions;
+
+        return transactions;
     }
 
     /**

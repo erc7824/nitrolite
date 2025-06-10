@@ -253,7 +253,6 @@ contract Custody is IChannel, IDeposit {
 
         // checks
         if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
-        if (meta.stage == ChannelStatus.INITIAL || meta.stage == ChannelStatus.FINAL) revert InvalidStatus();
 
         if (meta.stage == ChannelStatus.ACTIVE) {
             if (candidate.intent != StateIntent.FINALIZE) revert InvalidState();
@@ -263,8 +262,7 @@ contract Custody is IChannel, IDeposit {
             if (!_verifyAllSignatures(meta.chan, candidate)) revert InvalidStateSignatures();
 
             meta.lastValidState = candidate;
-        } else {
-            //meta.stage == ChannelStatus.DISPUTE
+        } else if (meta.stage == ChannelStatus.DISPUTE) {
             // Can overwrite any challenge state with a valid final state
             if (block.timestamp < meta.challengeExpire) {
                 if (candidate.intent != StateIntent.FINALIZE) revert InvalidState();
@@ -276,6 +274,8 @@ contract Custody is IChannel, IDeposit {
             } else {
                 // Already in DISPUTE with an expired challenge - can proceed to finalization
             }
+        } else {
+            revert InvalidStatus();
         }
 
         _closeEffectsAndInteractions(channelId, meta.lastValidState.allocations);
@@ -332,20 +332,22 @@ contract Custody is IChannel, IDeposit {
                     revert InvalidState();
                 }
             }
-        } else {
-            // lastValidStateIntent == StateIntent.RESIZE
+        } else if (lastValidStateIntent == StateIntent.RESIZE) {
             if (candidate.intent == StateIntent.INITIALIZE) revert InvalidState();
             if (candidate.intent == StateIntent.OPERATE) {
                 if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
                 if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) {
                     revert InvalidState();
                 }
-            } else {
-                // candidate.intent == StateIntent.RESIZE
+            } else if (candidate.intent == StateIntent.RESIZE) {
                 if (!Utils.statesAreEqual(candidate, meta.lastValidState)) {
                     revert InvalidState();
                 }
+            } else {
+                revert InvalidState(); // should not happen, but added for readability
             }
+        } else {
+            revert InvalidState(); // should not happen, but added for readability
         }
 
         // effects

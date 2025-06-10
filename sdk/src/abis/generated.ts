@@ -547,6 +547,11 @@ export const custodyAbi = [
     "name": "deposit",
     "inputs": [
       {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "token",
         "type": "address",
         "internalType": "address"

@@ -101,6 +101,25 @@ contract CustodyTest is Test {
         vm.stopPrank();
     }
 
+    function getAccountChannels(address user) internal view returns (bytes32[] memory) {
+        address[] memory users = new address[](1);
+        users[0] = user;
+        return custody.getOpenChannels(users)[0];
+    }
+
+    function getAvailableBalanceAndChannelCount(address user, address tokenAddress)
+        internal
+        view
+        returns (uint256 available, uint256 channelCount)
+    {
+        address[] memory users = new address[](1);
+        users[0] = user;
+        address[] memory tokens = new address[](1);
+        tokens[0] = tokenAddress;
+        available = custody.getAccountsBalances(users, tokens)[0][0];
+        channelCount = custody.getOpenChannels(users)[0].length;
+    }
+
     function createTestChannelWithSK() internal view returns (Channel memory) {
         address[] memory participants = new address[](2);
         participants[0] = hostSK;
@@ -245,7 +264,7 @@ contract CustodyTest is Test {
         bytes32 channelId = custody.create(chan, initialState);
 
         // Verify the channel is created and in INITIAL state
-        (uint256 available, uint256 channelCount) = custody.getAccountInfo(hostSK, address(token));
+        (uint256 available, uint256 channelCount) = getAvailableBalanceAndChannelCount(hostSK, address(token));
         assertEq(available, DEPOSIT_AMOUNT, "Host should have correct available balance");
         assertEq(channelCount, 1, "Host should have 1 channel");
 
@@ -278,15 +297,15 @@ contract CustodyTest is Test {
         custody.join(channelId, 1, guestSig);
 
         // Verify channel is now ACTIVE
-        bytes32[] memory hostChannels = custody.getAccountChannels(hostSK);
+        bytes32[] memory hostChannels = getAccountChannels(hostSK);
         assertEq(hostChannels.length, 1, "Host should have 1 channel");
 
-        bytes32[] memory guestChannels = custody.getAccountChannels(guestSK);
+        bytes32[] memory guestChannels = getAccountChannels(guestSK);
         assertEq(guestChannels.length, 1, "Guest should have 1 channel");
 
         // Check available amounts
-        (uint256 hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
-        (uint256 guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
+        (uint256 hostAvailable,) = getAvailableBalanceAndChannelCount(hostSK, address(token));
+        (uint256 guestAvailable,) = getAvailableBalanceAndChannelCount(guestSK, address(token));
 
         assertEq(hostAvailable, DEPOSIT_AMOUNT, "Host should have correct available balance");
         assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest should have correct available balance");
@@ -385,11 +404,11 @@ contract CustodyTest is Test {
         custody.close(channelId, finalState, new State[](0));
 
         // 4. Verify channel is closed and funds returned
-        bytes32[] memory hostChannels = custody.getAccountChannels(hostSK);
+        bytes32[] memory hostChannels = getAccountChannels(hostSK);
         assertEq(hostChannels.length, 0, "Host should have no channels after close");
 
-        (uint256 hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
-        (uint256 guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
+        (uint256 hostAvailable,) = getAvailableBalanceAndChannelCount(hostSK, address(token));
+        (uint256 guestAvailable,) = getAvailableBalanceAndChannelCount(guestSK, address(token));
 
         assertEq(hostAvailable, DEPOSIT_AMOUNT, "Host's available balance incorrect");
         assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest's available balance incorrect");
@@ -561,11 +580,11 @@ contract CustodyTest is Test {
         custody.close(channelId, challengeState, new State[](0));
 
         // 7. Verify channel is closed and funds returned
-        bytes32[] memory hostChannels = custody.getAccountChannels(hostSK);
+        bytes32[] memory hostChannels = getAccountChannels(hostSK);
         assertEq(hostChannels.length, 0, "Host should have no channels after challenge resolution");
 
-        (uint256 hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
-        (uint256 guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
+        (uint256 hostAvailable,) = getAvailableBalanceAndChannelCount(hostSK, address(token));
+        (uint256 guestAvailable,) = getAvailableBalanceAndChannelCount(guestSK, address(token));
 
         assertEq(hostAvailable, DEPOSIT_AMOUNT * 2, "Host's available balance incorrect");
         assertEq(guestAvailable, DEPOSIT_AMOUNT * 2, "Guest's available balance incorrect");
@@ -642,8 +661,8 @@ contract CustodyTest is Test {
         custody.challenge(channelId, initialState, new State[](0));
 
         // verify channel is immediately closed and funds distributed
-        (uint256 hostAvailable, uint256 hostChannelCount) = custody.getAccountInfo(hostSK, address(token));
-        (, uint256 guestChannelCount) = custody.getAccountInfo(guestSK, address(token));
+        (uint256 hostAvailable, uint256 hostChannelCount) = getAvailableBalanceAndChannelCount(hostSK, address(token));
+        (, uint256 guestChannelCount) = getAvailableBalanceAndChannelCount(guestSK, address(token));
 
         assertEq(hostChannelCount, 0, "Host should have no channels after challenge");
         assertEq(guestChannelCount, 0, "Guest should have no channels after challenge");
@@ -810,13 +829,13 @@ contract CustodyTest is Test {
         vm.startPrank(hostSK);
         custody.deposit(hostSK, address(token), DEPOSIT_AMOUNT);
 
-        (uint256 available,) = custody.getAccountInfo(hostSK, address(token));
+        (uint256 available,) = getAvailableBalanceAndChannelCount(hostSK, address(token));
         assertEq(available, DEPOSIT_AMOUNT, "Deposit not recorded correctly");
 
         // 2. Test withdrawal
         custody.withdraw(address(token), DEPOSIT_AMOUNT / 2);
 
-        (available,) = custody.getAccountInfo(hostSK, address(token));
+        (available,) = getAvailableBalanceAndChannelCount(hostSK, address(token));
         assertEq(available, DEPOSIT_AMOUNT / 2, "Withdrawal not processed correctly");
 
         // 3. Test insufficient balance for withdrawal
@@ -853,8 +872,8 @@ contract CustodyTest is Test {
         custody.join(channelId, 1, guestSig);
 
         // 1.1 Check available and locked are correct
-        (uint256 hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
-        (uint256 guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
+        (uint256 hostAvailable,) = getAvailableBalanceAndChannelCount(hostSK, address(token));
+        (uint256 guestAvailable,) = getAvailableBalanceAndChannelCount(guestSK, address(token));
 
         assertEq(hostAvailable, DEPOSIT_AMOUNT, "Host's initial available tokens should be DEPOSIT_AMOUNT");
         assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest's initial available tokens should be DEPOSIT_AMOUNT");
@@ -916,12 +935,12 @@ contract CustodyTest is Test {
         custody.resize(channelId, resizedState, proof);
 
         // 4. Verify channel has been resized correctly
-        bytes32[] memory hostChannels = custody.getAccountChannels(hostSK);
+        bytes32[] memory hostChannels = getAccountChannels(hostSK);
         assertEq(hostChannels.length, 1, "Host should still have 1 channel after resize");
 
         // Check locked amounts have been updated correctly
-        (hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
-        (guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
+        (hostAvailable,) = getAvailableBalanceAndChannelCount(hostSK, address(token));
+        (guestAvailable,) = getAvailableBalanceAndChannelCount(guestSK, address(token));
 
         assertEq(
             hostAvailable, DEPOSIT_AMOUNT * 2 - resizedHostLockedBalance, "Host's available tokens should decrease"
@@ -954,8 +973,8 @@ contract CustodyTest is Test {
         custody.checkpoint(channelId, afterResizeState, new State[](0));
 
         // 5. Check available and locked balances after resize
-        (hostAvailable,) = custody.getAccountInfo(hostSK, address(token));
-        (guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
+        (hostAvailable,) = getAvailableBalanceAndChannelCount(hostSK, address(token));
+        (guestAvailable,) = getAvailableBalanceAndChannelCount(guestSK, address(token));
 
         assertEq(
             hostAvailable,
@@ -976,7 +995,7 @@ contract CustodyTest is Test {
         custody.withdraw(address(token), absResizeGuestDelta);
 
         // Check balances after withdrawal
-        (guestAvailable,) = custody.getAccountInfo(guestSK, address(token));
+        (guestAvailable,) = getAvailableBalanceAndChannelCount(guestSK, address(token));
         assertEq(
             guestAvailable,
             DEPOSIT_AMOUNT * 2 - resizedGuestLockedBalance - absResizeGuestDelta,
@@ -1087,8 +1106,8 @@ contract CustodyTest is Test {
 
         // 5. Verify channel has been resized correctly with implicit transfer
         // Check locked amounts have been updated correctly
-        (uint256 hostAvailableAfterResize,) = custody.getAccountInfo(hostWallet, address(token));
-        (uint256 guestAvailableAfterResize,) = custody.getAccountInfo(guestWallet, address(token));
+        (uint256 hostAvailableAfterResize,) = getAvailableBalanceAndChannelCount(hostWallet, address(token));
+        (uint256 guestAvailableAfterResize,) = getAvailableBalanceAndChannelCount(guestWallet, address(token));
 
         assertEq(hostAvailableAfterResize, 0, "Host's available tokens should be updated to new amount");
         // Guest should have received the withdrawn amount
@@ -1120,11 +1139,11 @@ contract CustodyTest is Test {
         bytes32 channelId = custody.create(chan, initialState);
 
         // 5. Verify the channel is created
-        (uint256 available, uint256 channelCount) = custody.getAccountInfo(depositor, address(token));
+        (uint256 available, uint256 channelCount) = getAvailableBalanceAndChannelCount(depositor, address(token));
         assertEq(available, 0, "Depositor should have no available balance after locking");
         assertEq(channelCount, 0, "Depositor should have 0 channels");
 
-        bytes32[] memory hostChannels = custody.getAccountChannels(hostWallet);
+        bytes32[] memory hostChannels = getAccountChannels(hostWallet);
         assertEq(hostChannels.length, 1, "Host should have 1 channel");
 
         // 6. Guest participant joins the channel
@@ -1142,13 +1161,13 @@ contract CustodyTest is Test {
         custody.join(channelId, 1, guestPartSig);
 
         // 7. Verify channel is ACTIVE
-        bytes32[] memory depositorChannels = custody.getAccountChannels(depositor);
+        bytes32[] memory depositorChannels = getAccountChannels(depositor);
         assertEq(depositorChannels.length, 0, "Depositor should have 0 channels");
 
-        hostChannels = custody.getAccountChannels(hostWallet);
+        hostChannels = getAccountChannels(hostWallet);
         assertEq(hostChannels.length, 1, "Host should have 1 channel");
 
-        bytes32[] memory guestChannels = custody.getAccountChannels(guestWallet);
+        bytes32[] memory guestChannels = getAccountChannels(guestWallet);
         assertEq(guestChannels.length, 1, "Guest participant should have 1 channel");
 
         // 8. Create a checkpoint state
@@ -1189,14 +1208,14 @@ contract CustodyTest is Test {
         custody.close(channelId, finalState, new State[](0));
 
         // 12. Verify funds are returned correctly
-        bytes32[] memory depositorChannelsAfter = custody.getAccountChannels(depositor);
+        bytes32[] memory depositorChannelsAfter = getAccountChannels(depositor);
         assertEq(depositorChannelsAfter.length, 0, "Depositor should have no channels after close");
 
-        bytes32[] memory guestChannelsAfter = custody.getAccountChannels(guestWallet);
+        bytes32[] memory guestChannelsAfter = getAccountChannels(guestWallet);
         assertEq(guestChannelsAfter.length, 0, "Guest participant should have no channels after close");
 
-        (uint256 depositorAvailable,) = custody.getAccountInfo(depositor, address(token));
-        (uint256 guestAvailable,) = custody.getAccountInfo(guestWallet, address(token));
+        (uint256 depositorAvailable,) = getAvailableBalanceAndChannelCount(depositor, address(token));
+        (uint256 guestAvailable,) = getAvailableBalanceAndChannelCount(guestWallet, address(token));
 
         // In this flow, the funds go back to participants (who are also depositors)
         assertEq(depositorAvailable, DEPOSIT_AMOUNT, "Depositor available balance incorrect");

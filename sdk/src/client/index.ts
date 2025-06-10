@@ -145,17 +145,25 @@ export class NitroliteClient {
      * @param tokenAddress The address of the token to deposit and use for the channel.
      * @param depositAmount The amount of tokens to deposit.
      * @param params Parameters for channel creation. See {@link CreateChannelParams}.
-     * @returns An object containing the channel ID, initial state, deposit transaction hash, and create channel transaction hash.
+     * @returns An object containing the channel ID, initial state, and the transaction hash.
      */
     async depositAndCreateChannel(
         tokenAddress: Address,
         depositAmount: bigint,
         params: CreateChannelParams,
-    ): Promise<{ channelId: ChannelId; initialState: State; depositTxHash: Hash; createChannelTxHash: Hash }> {
-        const depositTxHash = await this.deposit(tokenAddress, depositAmount);
-        const { channelId, initialState, txHash } = await this.createChannel(tokenAddress, params);
+    ): Promise<{ channelId: ChannelId; initialState: State; txHash: Hash }> {
+        try {
+            const { channel, initialState, channelId } = await _prepareAndSignInitialState(
+                tokenAddress,
+                this.sharedDeps,
+                params,
+            );
+            const txHash = await this.nitroliteService.depositAndCreateChannel(tokenAddress, depositAmount, channel, initialState);
 
-        return { channelId, initialState, depositTxHash: depositTxHash, createChannelTxHash: txHash };
+            return { channelId, initialState, txHash };
+        } catch (err) {
+            throw new Errors.ContractCallError('Failed to execute createChannel on contract', err as Error);
+        }
     }
 
     /**

@@ -1,9 +1,9 @@
-import { 
-    Account, 
-    Address, 
-    PublicClient, 
-    WalletClient, 
-    Hash, 
+import {
+    Account,
+    Address,
+    PublicClient,
+    WalletClient,
+    Hash,
     zeroAddress
 } from 'viem';
 import { custodyAbi } from '../../abis/generated';
@@ -14,7 +14,7 @@ import { Channel, ChannelId, Signature, State } from '../types';
 /**
  * Type utility to properly type the request object from simulateContract
  * This ensures type safety when passing the request to writeContract
- * 
+ *
  * The SimulateContractReturnType['request'] contains all necessary parameters
  * for writeContract, but viem's complex union types make direct compatibility challenging.
  * We use a more practical approach with proper type comments explaining the safety.
@@ -24,7 +24,7 @@ type PreparedContractRequest = any;
 /**
  * Type-safe wrapper for writeContract calls using prepared requests.
  * This function handles the type compatibility between simulateContract result and writeContract params.
- * 
+ *
  * @param walletClient - The wallet client to use for writing
  * @param request - The prepared request from simulateContract
  * @param account - The account to use for the transaction
@@ -40,7 +40,7 @@ const executeWriteContract = async (
     // 1. simulateContract validates the contract call against the ABI
     // 2. The returned request contains the exact parameters needed by writeContract
     // 3. We only add the account parameter which is required by writeContract
-    // 
+    //
     // Note: Type assertion is necessary due to viem's complex union types for transaction parameters.
     // The runtime behavior is correct - simulateContract returns compatible parameters for writeContract.
     return walletClient.writeContract({
@@ -115,7 +115,7 @@ export class NitroliteService {
 
     /**
      * Converts State type to format expected by generated ABI
-     * REQUIRED: 
+     * REQUIRED:
      * - StateIntent enum -> number conversion
      * - Mutable arrays -> readonly arrays
      * - Proper type constraints for viem compatibility
@@ -260,6 +260,70 @@ export class NitroliteService {
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { channel, initial });
+        }
+    }
+
+    /**
+     * Prepares the request data for depositing funds and creating a new channel in one operation.
+     * Useful for batching multiple calls in a single UserOperation.
+     * @param tokenAddress Address of the token (use zeroAddress for ETH).
+     * @param amount Amount to deposit.
+     * @param channel Channel configuration. See {@link Channel} for details.
+     * @param initial Initial state. See {@link State} for details.
+     * @returns The prepared transaction request object.
+     */
+    async prepareDepositAndCreateChannel(tokenAddress: Address, amount: bigint, channel: Channel, initial: State): Promise<PreparedContractRequest> {
+        const account = this.ensureAccount();
+        const operationName = 'prepareDepositAndCreateChannel';
+        const accountAddress = typeof account === 'string' ? account : account.address;
+
+        try {
+            const abiChannel = this.convertChannelForABI(channel);
+            const abiState = this.convertStateForABI(initial);
+
+            const { request } = await this.publicClient.simulateContract({
+                address: this.custodyAddress,
+                abi: custodyAbi,
+                functionName: 'depositAndCreate',
+                args: [accountAddress, tokenAddress, amount, abiChannel, abiState],
+                account: account,
+                value: tokenAddress === zeroAddress ? amount : 0n,
+            });
+
+            return request;
+        } catch (error: any) {
+            if (error instanceof Errors.NitroliteError) throw error;
+            throw new Errors.ContractCallError(operationName, error, { tokenAddress, amount, channel, initial });
+        }
+    }
+
+    /**
+     * Deposits tokens or ETH and creates a new channel in one operation.
+     * This method simulates and executes the transaction directly.
+     * You do not need to call `prepareDepositAndCreateChannel` separately unless batching operations.
+     * @param tokenAddress Address of the token (use zeroAddress for ETH).
+     * @param amount Amount to deposit.
+     * @param channel Channel configuration. See {@link Channel} for details.
+     * @param initial Initial state. See {@link State} for details.
+     * @returns Transaction hash.
+     * @error Throws ContractCallError | TransactionError
+     */
+    async depositAndCreateChannel(
+        tokenAddress: Address,
+        amount: bigint,
+        channel: Channel,
+        initial: State,
+    ): Promise<Hash> {
+        const walletClient = this.ensureWalletClient();
+        const account = this.ensureAccount();
+        const operationName = 'depositAndCreateChannel';
+
+        try {
+            const request = await this.prepareDepositAndCreateChannel(tokenAddress, amount, channel, initial);
+            return await executeWriteContract(walletClient, request, account);
+        } catch (error: any) {
+            if (error instanceof Errors.NitroliteError) throw error;
+            throw new Errors.TransactionError(operationName, error, { tokenAddress, amount, channel, initial });
         }
     }
 

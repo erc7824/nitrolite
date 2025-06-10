@@ -152,12 +152,7 @@ describe('NitroliteClient', () => {
 
     describe('depositAndCreateChannel', () => {
         test('combines deposit and create', async () => {
-            jest.spyOn(client, 'deposit').mockResolvedValueOnce('0xDEP' as Hash);
-            jest.spyOn(client, 'createChannel').mockResolvedValueOnce({
-                channelId: '0xcid' as Hex,
-                initialState: {} as any,
-                txHash: '0xCRE' as Hash,
-            });
+            mockNitroService.depositAndCreateChannel.mockResolvedValue('0xDEPandCRE' as Hash);
 
             const res = await client.depositAndCreateChannel(tokenAddress, 10n, {
                 initialAllocationAmounts: [1n, 2n],
@@ -168,8 +163,7 @@ describe('NitroliteClient', () => {
             expect(res).toEqual({
                 channelId: '0xcid' as Hex,
                 initialState: {},
-                depositTxHash: '0xDEP',
-                createChannelTxHash: '0xCRE',
+                txHash: '0xDEPandCRE' as Hash,
             });
         });
     });

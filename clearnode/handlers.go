@@ -267,7 +267,7 @@ func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) 
 }
 
 // HandleCreateApplication creates a virtual application between participants
-func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func HandleCreateApplication(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var params CreateAppSessionParams
 	if err := parseParams(rpc.Req.Params, &params); err != nil {
 		return nil, err
@@ -295,19 +295,40 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
 
 	err = db.Transaction(func(tx *gorm.DB) error {
+		policiesToUse := make(map[string]*DBPolicy) // Use map to skip duplicates
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsNegative() {
 				return fmt.Errorf("invalid allocation: negative amount")
 			}
+
+			signer := alloc.ParticipantWallet
+			walletAddress := signer
+			if wallet := GetWalletBySigner(signer); wallet != "" {
+				walletAddress = wallet
+			}
+
 			if alloc.Amount.IsPositive() {
 				if _, ok := rpcSigners[alloc.ParticipantWallet]; !ok {
 					return fmt.Errorf("missing signature for participant %s", alloc.ParticipantWallet)
 				}
-			}
-
-			walletAddress := alloc.ParticipantWallet
-			if wallet := GetWalletBySigner(alloc.ParticipantWallet); wallet != "" {
-				walletAddress = wallet
+				userPolicy, err := GetPolicy(tx, params.Definition.Protocol, walletAddress, signer, "app.create")
+				if err != nil {
+					return fmt.Errorf("failed to get policy for participant %s: %w", alloc.ParticipantWallet, err)
+				}
+				if userPolicy == nil {
+					return fmt.Errorf("no policy found for participant %s", alloc.ParticipantWallet)
+				}
+				sufficientPolicy := false
+				for _, allowance := range userPolicy.Allowances {
+					if allowance.Asset == alloc.AssetSymbol && allowance.Amount.GreaterThanOrEqual(alloc.Amount) {
+						sufficientPolicy = true
+						break
+					}
+				}
+				if !sufficientPolicy {
+					return fmt.Errorf("insufficient policy for participant %s: %s", alloc.ParticipantWallet, alloc.AssetSymbol)
+				}
+				policiesToUse[walletAddress+signer] = userPolicy
 			}
 
 			ledger := GetWalletLedger(tx, walletAddress)
@@ -324,6 +345,12 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 			}
 			if err := ledger.Record(appSessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit virtual app: %w", err)
+			}
+		}
+
+		for _, policy := range policiesToUse {
+			if err := UsePolicy(tx, policy); err != nil {
+				return fmt.Errorf("failed to use policy: %w", err)
 			}
 		}
 

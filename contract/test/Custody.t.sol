@@ -104,7 +104,7 @@ contract CustodyTest is Test {
     function getAccountChannels(address user) internal view returns (bytes32[] memory) {
         address[] memory users = new address[](1);
         users[0] = user;
-        return custody.getOpenedChannels(users)[0];
+        return custody.getOpenChannels(users)[0];
     }
 
     function getAvailableBalanceAndChannelCount(address user, address tokenAddress)
@@ -117,7 +117,7 @@ contract CustodyTest is Test {
         address[] memory tokens = new address[](1);
         tokens[0] = tokenAddress;
         available = custody.getAccountsBalances(users, tokens)[0][0];
-        channelCount = custody.getOpenedChannels(users)[0].length;
+        channelCount = custody.getOpenChannels(users)[0].length;
     }
 
     function createTestChannelWithSK() internal view returns (Channel memory) {

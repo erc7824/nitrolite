@@ -94,7 +94,7 @@ contract Custody is IChannel, IDeposit, IChannelReader {
      * @param accounts Array of account addresses to check for open channels
      * @return Array of arrays, where each inner array contains channel IDs for the corresponding account
      */
-    function getOpenedChannels(address[] memory accounts) external view returns (bytes32[][] memory) {
+    function getOpenChannels(address[] memory accounts) external view returns (bytes32[][] memory) {
         bytes32[][] memory channels = new bytes32[][](accounts.length);
         for (uint256 i = 0; i < accounts.length; i++) {
             channels[i] = _ledgers[accounts[i]].channels.values();

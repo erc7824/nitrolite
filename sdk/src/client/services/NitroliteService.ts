@@ -168,13 +168,14 @@ export class NitroliteService {
     async prepareDeposit(tokenAddress: Address, amount: bigint): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareDeposit';
+        const accountAddress = typeof account === 'string' ? account : account.address;
 
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: 'deposit',
-                args: [tokenAddress, amount],
+                args: [accountAddress, tokenAddress, amount],
                 account: account,
                 value: tokenAddress === zeroAddress ? amount : 0n,
             });

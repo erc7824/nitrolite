@@ -35,9 +35,8 @@ type Logger interface {
 }
 
 func NewLoggerIPFS(name string) Logger {
-	lg := log.Logger(name)
 	return &ipfsLogger{
-		lg:                  &lg.SugaredLogger,
+		lg:                  log.Logger(name).SugaredLogger.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar(),
 		commonKeysAndValues: []interface{}{},
 	}
 }
@@ -79,7 +78,7 @@ func (l *ipfsLogger) With(key string, value interface{}) Logger {
 func (l *ipfsLogger) NewSystem(name string) Logger {
 	lg := log.Logger(name)
 	return &ipfsLogger{
-		lg:                  (&lg.SugaredLogger).With(l.commonKeysAndValues...),
+		lg:                  lg.SugaredLogger.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar().With(l.commonKeysAndValues...),
 		commonKeysAndValues: []interface{}{},
 	}
 }

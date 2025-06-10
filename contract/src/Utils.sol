@@ -70,29 +70,7 @@ library Utils {
      * @return True if the states are equal, false otherwise
      */
     function statesAreEqual(State memory a, State memory b) internal pure returns (bool) {
-        if (a.version != b.version || a.intent != b.intent || a.data.length != b.data.length) {
-            return false;
-        }
-
-        if (keccak256(a.data) != keccak256(b.data)) {
-            return false;
-        }
-
-        if (a.allocations.length != b.allocations.length) {
-            return false;
-        }
-
-        for (uint256 i = 0; i < a.allocations.length; i++) {
-            if (
-                a.allocations[i].amount != b.allocations[i].amount
-                    || a.allocations[i].destination != b.allocations[i].destination
-                    || a.allocations[i].token != b.allocations[i].token
-            ) {
-                return false;
-            }
-        }
-
-        return true;
+        return keccak256(abi.encode(a)) == keccak256(abi.encode(b));
     }
 
     /**

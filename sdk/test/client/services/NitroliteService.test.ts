@@ -19,6 +19,7 @@ describe('NitroliteService', () => {
     const participantSig = '0xsig' as unknown as Signature;
     const candidateState = {} as State;
     const proofs = [{} as State];
+    const challengerSig = '0xchallengerSig' as unknown as Signature;
     const newChannelConfig = {} as Channel;
     const newDepositState = {} as State;
 
@@ -95,8 +96,8 @@ describe('NitroliteService', () => {
         {
             prepareName: 'prepareChallenge',
             execName: 'challenge',
-            prepare: () => service.prepareChallenge(channelId, candidateState, proofs),
-            exec: () => service.challenge(channelId, candidateState, proofs),
+            prepare: () => service.prepareChallenge(channelId, candidateState, proofs, challengerSig),
+            exec: () => service.challenge(channelId, candidateState, proofs, challengerSig),
             fn: 'challenge',
         },
         {

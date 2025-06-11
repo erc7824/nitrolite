@@ -1,8 +1,9 @@
-import { Address, Hex } from 'viem';
+import { Address, encodeAbiParameters, Hex, keccak256 } from 'viem';
 import * as Errors from '../errors';
 import { generateChannelNonce, getChannelId, getStateHash, removeQuotesFromRS, signState } from '../utils';
 import { PreparerDependencies } from './prepare';
 import {
+    ChallengeChannelParams,
     Channel,
     ChannelId,
     CloseChannelParams,
@@ -10,6 +11,7 @@ import {
     ResizeChannelParams,
     State,
     StateIntent,
+    Signature,
 } from './types';
 
 /**
@@ -84,6 +86,35 @@ export async function _prepareAndSignInitialState(
     };
 
     return { channel, initialState, channelId };
+}
+
+/**
+ * Shared logic for preparing the challenger signature for a challenge state.
+ * Used by both direct execution (challengeChannel) and preparation (prepareChallengeChannelTransaction).
+ * @param deps - The dependencies needed (account, addresses, walletClient, challengeDuration). See {@link PreparerDependencies}.
+ * @param params - Parameters for challenging the channel. See {@link ChallengeChannelParams}.
+ * @returns An object containing the challenger signature.
+ */
+export async function _prepareAndSignChallengeState(
+    deps: PreparerDependencies,
+    params: ChallengeChannelParams,
+): Promise<{
+    channelId: ChannelId,
+    candidateState: State,
+    proofs: State[],
+    challengerSig: Signature,
+}> {
+    const { channelId, candidateState, proofStates = [] } = params;
+
+    const stateHash = getStateHash(channelId, candidateState);
+    const encoded = encodeAbiParameters([
+        { type: 'bytes32', name: 'stateHash' },
+        { type: 'string', name: 'challenge' },
+    ], [stateHash, 'challenge']);
+    const challengeHash = keccak256(encoded) as Hex;
+    const challengerSig = await signState(challengeHash, deps.stateWalletClient.signMessage);
+
+    return { channelId, candidateState, proofs: proofStates, challengerSig };
 }
 
 /**

@@ -23,6 +23,7 @@ contract Custody is IChannel, IDeposit, IChannelReader {
     using SafeERC20 for IERC20;
 
     // Errors
+    // TODO: sort errors
     error ChannelNotFound(bytes32 channelId);
     error ChannelNotFinal();
     error InvalidParticipant();
@@ -33,6 +34,7 @@ contract Custody is IChannel, IDeposit, IChannelReader {
     error DepositsNotFulfilled(uint256 expectedFulfilled, uint256 actualFulfilled);
     error InvalidStateSignatures();
     error InvalidAdjudicator();
+    error InvalidChallengerSignature();
     error InvalidChallengePeriod();
     error InvalidValue();
     error InvalidAmount();
@@ -381,15 +383,22 @@ contract Custody is IChannel, IDeposit, IChannelReader {
      * @param channelId Unique identifier for the channel
      * @param candidate The latest known valid state
      * @param proofs is an array of valid state required by the adjudicator
+     * @param challengerSig Challenger signature over `keccak256(abi.encode(stateHash, "challenge"))` to disallow 3rd party
+     * to challenge with a stolen state and its signature
      */
-    // TODO: add a challengerSig and check that it signed by either participant of the channel to disallow non-channel participants to challenge with stolen state
-    function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs) external {
+    function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs, Signature calldata challengerSig) external {
         Metadata storage meta = _channels[channelId];
 
         // checks
         if (meta.stage == ChannelStatus.VOID) revert ChannelNotFound(channelId);
         if (meta.stage == ChannelStatus.DISPUTE || meta.stage == ChannelStatus.FINAL) revert InvalidStatus();
         if (candidate.intent == StateIntent.FINALIZE) revert InvalidState();
+
+        _requireChallengerIsParticipant(
+            Utils.getStateHash(meta.chan, candidate),
+            [meta.chan.participants[CLIENT_IDX], meta.chan.participants[SERVER_IDX]],
+            challengerSig
+        );
 
         StateIntent lastValidStateIntent = meta.lastValidState.intent;
 
@@ -636,6 +645,21 @@ contract Custody is IChannel, IDeposit, IChannelReader {
         }
 
         return true;
+    }
+
+    function _requireChallengerIsParticipant(
+        bytes32 challengedStateHash,
+        address[2] memory participants,
+        Signature memory challengerSig
+    ) internal pure {
+        address challenger = Utils.recoverSigner(
+			keccak256(abi.encode(challengedStateHash, 'challenge')),
+			challengerSig
+		);
+
+        if (challenger != participants[CLIENT_IDX] && challenger != participants[SERVER_IDX]) {
+            revert InvalidChallengerSignature();
+        }
     }
 
     /**

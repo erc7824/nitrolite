@@ -450,12 +450,14 @@ export class NitroliteService {
      * @param channelId Channel ID.
      * @param candidate State being challenged. See {@link State} for details.
      * @param proofs Supporting proofs. See {@link State} for details.
+     * @param challengerSig Challenger signature. See {@link Signature} for details.
      * @returns The prepared transaction request object.
      */
     async prepareChallenge(
         channelId: ChannelId,
         candidate: State,
         proofs: State[] = [],
+        challengerSig: Signature,
     ): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareChallenge';
@@ -468,7 +470,7 @@ export class NitroliteService {
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: 'challenge',
-                args: [channelId, abiCandidate, abiProofs],
+                args: [channelId, abiCandidate, abiProofs, challengerSig],
                 account: account,
             });
 
@@ -489,13 +491,13 @@ export class NitroliteService {
      * @returns Transaction hash.
      * @error Throws ContractCallError | TransactionError
      */
-    async challenge(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<Hash> {
+    async challenge(channelId: ChannelId, candidate: State, proofs: State[] = [], challengerSig: Signature): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
         const operationName = 'challenge';
 
         try {
-            const request = await this.prepareChallenge(channelId, candidate, proofs);
+            const request = await this.prepareChallenge(channelId, candidate, proofs, challengerSig);
             return await executeWriteContract(walletClient, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;

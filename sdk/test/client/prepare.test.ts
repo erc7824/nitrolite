@@ -2,11 +2,12 @@ import { jest } from '@jest/globals';
 jest.mock('../../src/client/state', () => ({
     _prepareAndSignInitialState: jest.fn(),
     _prepareAndSignFinalState: jest.fn(),
+    _prepareAndSignChallengeState: jest.fn(),
 }));
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { Hex, zeroAddress } from 'viem';
 import { NitroliteTransactionPreparer } from '../../src/client/prepare';
-import { _prepareAndSignInitialState, _prepareAndSignFinalState } from '../../src/client/state';
+import { _prepareAndSignInitialState, _prepareAndSignFinalState, _prepareAndSignChallengeState } from '../../src/client/state';
 import { NitroliteService, Erc20Service } from '../../src/client/services';
 import { ContractAddresses } from '../../src/abis';
 import * as Errors from '../../src/errors';
@@ -14,12 +15,11 @@ import { CreateChannelParams, CheckpointChannelParams, Allocation } from '../../
 
 // TODO: remove ts-ignore
 describe('NitroliteTransactionPreparer', () => {
-    const tokenAddress = '0xTOK' as const;
-    const custody = '0xCUST' as const;
-    const accountAddress = '0xACC' as const;
-    const guestAddress = '0xGUEST' as const;
-
-    const adjudicator = '0xADD' as const;
+    const tokenAddress = '0x4444444444444444444444444444444444444444' as const;
+    const custody = '0x1111111111111111111111111111111111111111' as const;
+    const accountAddress = '0x1234567890123456789012345678901234567890' as const;
+    const guestAddress = '0x3333333333333333333333333333333333333333' as const;
+    const adjudicator = '0x2222222222222222222222222222222222222222' as const;
 
     const addresses: ContractAddresses = {
         custody,
@@ -33,6 +33,8 @@ describe('NitroliteTransactionPreparer', () => {
     let deps: any;
     let prep: NitroliteTransactionPreparer;
 
+    const mockSignMessage = jest.fn().mockResolvedValue('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1b');
+
     beforeEach(() => {
         mockNitro = {
             prepareDeposit: jest.fn(),
@@ -42,6 +44,7 @@ describe('NitroliteTransactionPreparer', () => {
             prepareChallenge: jest.fn(),
             prepareClose: jest.fn(),
             prepareWithdraw: jest.fn(),
+            prepareDepositAndCreateChannel: jest.fn(),
         } as any;
         mockERC20 = {
             getTokenAllowance: jest.fn(),
@@ -52,11 +55,13 @@ describe('NitroliteTransactionPreparer', () => {
             erc20Service: mockERC20,
             addresses: addresses,
             account,
-            walletClient: {},
-            stateWalletClient: {},
+            walletClient: { signMessage: mockSignMessage },
+            stateWalletClient: { signMessage: mockSignMessage },
             challengeDuration: 100n,
         };
         prep = new NitroliteTransactionPreparer(deps);
+        // Mock _prepareAndSignChallengeState for challenge tests
+        (_prepareAndSignChallengeState as jest.Mock) = jest.fn().mockResolvedValue({ challengerSig: { r: '0x1', s: '0x2', v: 27 } });
     });
 
     describe('prepareDepositTransactions', () => {
@@ -119,12 +124,29 @@ describe('NitroliteTransactionPreparer', () => {
 
     describe('prepareDepositAndCreateChannelTransactions', () => {
         test('combines flows', async () => {
-            mockERC20.getTokenAllowance.mockResolvedValue(100n);
+            // Test case where approval is needed
+            mockERC20.getTokenAllowance.mockResolvedValue(5n); // Less than deposit amount
+            mockERC20.prepareApprove.mockResolvedValue({ to: '0xA', data: '0xA' } as any);
             // @ts-ignore
             (_prepareAndSignInitialState as jest.Mock).mockResolvedValue({ channel: {}, initialState: {} });
-            mockNitro.prepareDepositAndCreateChannel.mockResolvedValue({ to: '0xDC', data: '0xDC' } as any);
-            const all = await prep.prepareDepositAndCreateChannelTransactions(tokenAddress, 10n, {} as any);
-            expect(all).toHaveLength(1);
+            mockNitro.prepareDepositAndCreateChannel.mockResolvedValue({ to: '0xD', data: '0xD' });
+
+            const all = await prep.prepareDepositAndCreateChannelTransactions(tokenAddress, 10n, {
+                initialAllocationAmounts: [1n, 2n],
+                stateData: '0x00' as any,
+            });
+
+            expect(all).toHaveLength(2);
+            expect(all[0]).toEqual({ to: '0xA', data: '0xA' }); // Approval transaction
+            expect(all[1]).toEqual({ to: '0xD', data: '0xD' }); // Deposit and create channel transaction
+
+            // Verify the correct calls were made
+            expect(mockERC20.getTokenAllowance).toHaveBeenCalledWith(tokenAddress, accountAddress, custody);
+            expect(mockERC20.prepareApprove).toHaveBeenCalledWith(tokenAddress, custody, 10n);
+            expect(_prepareAndSignInitialState).toHaveBeenCalledWith(tokenAddress, deps, {
+                initialAllocationAmounts: [1n, 2n],
+                stateData: '0x00' as any,
+            });
         });
 
         test('rethrows NitroliteError from deposit prepare', async () => {
@@ -133,30 +155,29 @@ describe('NitroliteTransactionPreparer', () => {
             // @ts-ignore
             (_prepareAndSignInitialState as jest.Mock).mockResolvedValue({ channel: {}, initialState: {} });
             mockNitro.prepareDepositAndCreateChannel.mockRejectedValueOnce(ne);
-            await expect(prep.prepareDepositAndCreateChannelTransactions(tokenAddress, 10n, {} as any)).rejects.toThrow(
-                Errors.ContractCallError,
-            );
+            await expect(prep.prepareDepositAndCreateChannelTransactions(tokenAddress, 10n, {} as any)).rejects.toBe(ne);
         });
 
         test('rethrows NitroliteError from createChannel prepare', async () => {
+            const ne = new Errors.MissingParameterError('y');
             mockERC20.getTokenAllowance.mockResolvedValue(100n);
             // @ts-ignore
             (_prepareAndSignInitialState as jest.Mock).mockResolvedValue({ channel: {}, initialState: {} });
-            const ne = new Errors.MissingParameterError('y');
             mockNitro.prepareDepositAndCreateChannel.mockRejectedValueOnce(ne);
-            await expect(prep.prepareDepositAndCreateChannelTransactions(tokenAddress, 10n, {} as any)).rejects.toThrow(
-                Errors.ContractCallError,
-            );
+            await expect(prep.prepareDepositAndCreateChannelTransactions(tokenAddress, 10n, {} as any)).rejects.toBe(ne);
         });
     });
 
     describe('prepareCheckpointChannelTransaction', () => {
         const good: CheckpointChannelParams = {
-            channelId: '0xcid' as any,
+            channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
             candidateState: { sigs: [1, 2] } as any,
             proofStates: [],
         };
-        const bad: CheckpointChannelParams = { channelId: '0xcid' as any, candidateState: { sigs: [1] } as any };
+        const bad: CheckpointChannelParams = {
+            channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
+            candidateState: { sigs: [1] } as any
+        };
         test('valid', async () => {
             mockNitro.prepareCheckpoint.mockResolvedValue({ to: '0xK', data: '0xK' } as any);
             await expect(prep.prepareCheckpointChannelTransaction(good)).resolves.toEqual({
@@ -175,7 +196,7 @@ describe('NitroliteTransactionPreparer', () => {
             await expect(
                 // @ts-ignore
                 prep.prepareChallengeChannelTransaction({
-                    channelId: '0xcid' as any,
+                    channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
                     candidateState: {} as any,
                     proofStates: [],
                 }),
@@ -186,13 +207,16 @@ describe('NitroliteTransactionPreparer', () => {
     describe('prepareCloseChannelTransaction', () => {
         test('success', async () => {
             // @ts-ignore
-            (_prepareAndSignFinalState as jest.Mock).mockResolvedValue({ finalStateWithSigs: {}, channelId: '0xcid' });
+            (_prepareAndSignFinalState as jest.Mock).mockResolvedValue({
+                finalStateWithSigs: {},
+                channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex
+            });
             mockNitro.prepareClose.mockResolvedValue({ to: '0xX', data: '0xX' } as any);
             await expect(
                 prep.prepareCloseChannelTransaction({
                     finalState: {
                         stateData: '0xA' as any,
-                        channelId: '0xcid' as any,
+                        channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
                         allocations: [
                             { destination: '0x0' as Hex, token: tokenAddress, amount: 10n },
                             { destination: '0x0' as Hex, token: tokenAddress, amount: 10n },
@@ -211,7 +235,7 @@ describe('NitroliteTransactionPreparer', () => {
                 prep.prepareCloseChannelTransaction({
                     finalState: {
                         stateData: '0xA' as any,
-                        channelId: '0xcid' as any,
+                        channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
                         allocations: [
                             { destination: '0x0' as Hex, token: tokenAddress, amount: 10n },
                             { destination: '0x0' as Hex, token: tokenAddress, amount: 10n },
@@ -225,14 +249,17 @@ describe('NitroliteTransactionPreparer', () => {
 
         test('wraps non-NitroliteError from close', async () => {
             // @ts-ignore
-            (_prepareAndSignFinalState as jest.Mock).mockResolvedValue({ finalStateWithSigs: {}, channelId: '0xcid' });
+            (_prepareAndSignFinalState as jest.Mock).mockResolvedValue({
+                finalStateWithSigs: {},
+                channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex
+            });
             const err = new Error('oops');
             mockNitro.prepareClose.mockRejectedValueOnce(err);
             await expect(
                 prep.prepareCloseChannelTransaction({
                     finalState: {
                         stateData: '0xA' as any,
-                        channelId: '0xcid' as any,
+                        channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
                         allocations: [
                             { destination: '0x0' as Hex, token: tokenAddress, amount: 10n },
                             { destination: '0x0' as Hex, token: tokenAddress, amount: 10n },
@@ -246,14 +273,17 @@ describe('NitroliteTransactionPreparer', () => {
 
         test('rethrows NitroliteError from close', async () => {
             // @ts-ignore
-            (_prepareAndSignFinalState as jest.Mock).mockResolvedValue({ finalStateWithSigs: {}, channelId: '0xcid' });
+            (_prepareAndSignFinalState as jest.Mock).mockResolvedValue({
+                finalStateWithSigs: {},
+                channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex
+            });
             const ne = new Errors.MissingParameterError('z');
             mockNitro.prepareClose.mockRejectedValueOnce(ne);
             await expect(
                 prep.prepareCloseChannelTransaction({
                     finalState: {
                         stateData: '0xA' as any,
-                        channelId: '0xcid' as any,
+                        channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
                         allocations: [
                             { destination: '0x0' as Hex, token: tokenAddress, amount: 10n },
                             { destination: '0x0' as Hex, token: tokenAddress, amount: 10n },

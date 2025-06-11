@@ -140,6 +140,28 @@ export const custodyAbi = [
             ]
           }
         ]
+      },
+      {
+        "name": "challengerSig",
+        "type": "tuple",
+        "internalType": "struct Signature",
+        "components": [
+          {
+            "name": "v",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "r",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
       }
     ],
     "outputs": [],
@@ -1644,6 +1666,11 @@ export const custodyAbi = [
   {
     "type": "error",
     "name": "InvalidChallengePeriod",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidChallengerSignature",
     "inputs": []
   },
   {

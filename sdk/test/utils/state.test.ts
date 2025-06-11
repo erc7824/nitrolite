@@ -74,7 +74,7 @@ describe('signState', () => {
         // @ts-ignore
         viemMock.parseSignature.mockReturnValueOnce({ r: '0xr', s: '0xs' });
         // @ts-ignore
-        await expect(signState(fakeHash, signer)).rejects.toThrow(/Signature parsing did not return a 'v'/);
+        await expect(signState(fakeHash, signer)).rejects.toThrow(/Invalid signature format: missing v or yParity value/);
     });
 
     test('throws on signer error', async () => {

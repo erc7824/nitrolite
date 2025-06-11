@@ -147,6 +147,7 @@ export class NitroliteClient {
 
     /**
      * Deposits tokens and creates a new channel in a single operation.
+     * Approves the custody contract to spend the tokens if necessary.
      * @param tokenAddress The address of the token to deposit and use for the channel.
      * @param depositAmount The amount of tokens to deposit.
      * @param params Parameters for channel creation. See {@link CreateChannelParams}.
@@ -170,7 +171,8 @@ export class NitroliteClient {
                 const allowance = await this.erc20Service.getTokenAllowance(tokenAddress, owner, spender);
                 if (allowance < depositAmount) {
                     try {
-                        const hash = await this.erc20Service.approve(tokenAddress, spender, depositAmount);
+                        // approve only the required amount, so that `approved == depositAmount`
+                        const hash = await this.erc20Service.approve(tokenAddress, spender, depositAmount - allowance);
                         await waitForTransaction(this.publicClient, hash);
                     } catch (err) {
                         const error = new Errors.TokenError('Failed to approve tokens for deposit');

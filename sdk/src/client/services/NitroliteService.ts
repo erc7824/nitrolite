@@ -152,6 +152,39 @@ export class NitroliteService {
     }
 
     /**
+     * Converts contract Channel result to SDK Channel type
+     */
+    private convertChannelFromContract(contractChannel: any): Channel {
+        return {
+            participants: [...contractChannel.participants],
+            adjudicator: contractChannel.adjudicator,
+            challenge: contractChannel.challenge,
+            nonce: contractChannel.nonce,
+        };
+    }
+
+    /**
+     * Converts contract State result to SDK State type
+     */
+    private convertStateFromContract(contractState: any): State {
+        return {
+            intent: contractState.intent,
+            version: contractState.version,
+            data: contractState.data,
+            allocations: contractState.allocations.map((alloc: any) => ({
+                destination: alloc.destination,
+                token: alloc.token,
+                amount: alloc.amount,
+            })),
+            sigs: contractState.sigs.map((sig: any) => ({
+                v: sig.v,
+                r: sig.r,
+                s: sig.s,
+            })),
+        };
+    }
+
+    /**
      * Prepares the request data for a deposit transaction.
      * Useful for batching multiple calls in a single UserOperation.
      * @param tokenAddress Address of the token (use zeroAddress for ETH).
@@ -807,8 +840,13 @@ export class NitroliteService {
                 args: [channelId],
             });
 
-            // contract returns `wallets` as `Address[]`, but it can be sufficiently downcasted to `[Address, Address]`
-            return result as unknown as ChannelData;
+            return {
+                channel: this.convertChannelFromContract(result[0]),
+                status: result[1],
+                wallets: result[2] as [Address, Address],
+                challengeExpiry: result[3],
+                lastValidState: this.convertStateFromContract(result[4]),
+            };
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.ContractReadError(functionName, error, { channelId });

@@ -237,16 +237,53 @@ describe('NitroliteService', () => {
 
     describe('getChannelData', () => {
         test('success', async () => {
-            const data = {
-                channel: channelConfig,
-                status: 0, // ChannelStatus.INITIAL
-                wallets: ['0xabc', '0xdef'] as Address[],
+            // Mock contract returns a tuple array matching the actual contract structure
+            const contractResult = [
+                // result[0] - channel
+                {
+                    participants: ['0xabc', '0xdef'] as readonly Address[],
+                    adjudicator: '0x123' as Address,
+                    challenge: 100n,
+                    nonce: 1n,
+                },
+                // result[1] - status
+                0, // ChannelStatus.INITIAL
+                // result[2] - wallets
+                ['0xabc', '0xdef'] as readonly Address[],
+                // result[3] - challengeExpiry
+                1234567890n,
+                // result[4] - lastValidState
+                {
+                    intent: 0,
+                    version: 1n,
+                    data: '0x123' as Hex,
+                    allocations: [] as readonly any[],
+                    sigs: [] as readonly any[],
+                },
+            ];
+
+            const expectedResult = {
+                channel: {
+                    participants: ['0xabc', '0xdef'],
+                    adjudicator: '0x123',
+                    challenge: 100n,
+                    nonce: 1n,
+                },
+                status: 0,
+                wallets: ['0xabc', '0xdef'],
                 challengeExpiry: 1234567890n,
-                lastValidState: initialState,
+                lastValidState: {
+                    intent: 0,
+                    version: 1n,
+                    data: '0x123',
+                    allocations: [],
+                    sigs: [],
+                },
             };
-            (mockPublicClient.readContract as any).mockResolvedValue(data);
+
+            (mockPublicClient.readContract as any).mockResolvedValue(contractResult);
             const res = await service.getChannelData(channelId);
-            expect(res).toEqual(data);
+            expect(res).toEqual(expectedResult);
             expect(mockPublicClient.readContract).toHaveBeenCalledWith({
                 address: custodyAddress,
                 abi: CustodyAbi,

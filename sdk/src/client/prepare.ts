@@ -11,7 +11,7 @@ import {
 import { ContractAddresses } from '../abis';
 import * as Errors from '../errors';
 import { Erc20Service, NitroliteService } from './services';
-import { _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from './state';
+import { _prepareAndSignChallengeState, _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from './state';
 import {
     ChallengeChannelParams,
     CheckpointChannelParams,
@@ -190,9 +190,10 @@ export class NitroliteTransactionPreparer {
      */
     async prepareChallengeChannelTransaction(params: ChallengeChannelParams): Promise<PreparedTransaction> {
         const { channelId, candidateState, proofStates = [] } = params;
+        const { challengerSig } = await _prepareAndSignChallengeState(this.deps, params);
 
         try {
-            return await this.deps.nitroliteService.prepareChallenge(channelId, candidateState, proofStates);
+            return await this.deps.nitroliteService.prepareChallenge(channelId, candidateState, proofStates, challengerSig);
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
             throw new Errors.ContractCallError('prepareChallengeChannelTransaction', err as Error, { params });

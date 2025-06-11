@@ -140,6 +140,28 @@ export const custodyAbi = [
             ]
           }
         ]
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint8",
+            "name": "v",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "r",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "s",
+            "type": "bytes32"
+          }
+        ],
+        "internalType": "struct Signature",
+        "name": "challengerSig",
+        "type": "tuple"
       }
     ],
     "outputs": [],

@@ -218,6 +218,15 @@ export enum NitroliteErrorCode {
 export type MessageSigner = (payload: RequestData | ResponsePayload) => Promise<Hex>;
 
 /**
+ * Defines the function signature for signing challenge state data.
+ * This signer is specifically used for signing state challenges in the form of keccak256(abi.encode(stateHash, 'challenge')).
+ *
+ * @param stateHash - The state hash as a Hex string
+ * @returns A Promise that resolves to the cryptographic signature as a Hex string.
+ */
+export type ChallengeStateSigner = (stateHash: Hex) => Promise<Hex>;
+
+/**
  * Defines the function signature for verifying a single message signature against its payload.
  * @param payload - The RequestData or ResponsePayload object (array) that was signed.
  * @param signature - The single signature (Hex string) to verify.

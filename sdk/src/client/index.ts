@@ -4,7 +4,7 @@ import { ContractAddresses } from '../abis';
 import * as Errors from '../errors';
 import { NitroliteTransactionPreparer, PreparerDependencies } from './prepare';
 import { Erc20Service, NitroliteService, waitForTransaction } from './services';
-import { _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from './state';
+import { _prepareAndSignChallengeState, _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from './state';
 import {
     ChallengeChannelParams,
     ChannelData,
@@ -196,9 +196,10 @@ export class NitroliteClient {
      */
     async challengeChannel(params: ChallengeChannelParams): Promise<Hash> {
         const { channelId, candidateState, proofStates = [] } = params;
+        const { challengerSig } = await _prepareAndSignChallengeState(this.sharedDeps, params);
 
         try {
-            return await this.nitroliteService.challenge(channelId, candidateState, proofStates);
+            return await this.nitroliteService.challenge(channelId, candidateState, proofStates, challengerSig);
         } catch (err) {
             throw new Errors.ContractCallError('Failed to execute challengeChannel on contract', err as Error);
         }

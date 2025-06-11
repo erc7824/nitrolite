@@ -1,4 +1,4 @@
-import { Address, Hex, WalletClient } from 'viem';
+import { Address, encodeAbiParameters, Hex, keccak256, WalletClient } from 'viem';
 import {
     MessageSigner,
     AccountID,
@@ -13,7 +13,11 @@ import {
     EIP712AuthTypes,
     EIP712AuthDomain,
     EIP712AuthMessage,
-} from './types'; // Added ParsedResponse
+    AuthChallengeRPCResponse,
+    RequestData,
+    Method,
+    ChallengeStateSigner,
+} from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp, parseRPCResponse } from './utils';
 
@@ -372,7 +376,7 @@ export function createEIP712AuthMessageSigner(
 ): MessageSigner {
     return async (data: any): Promise<`0x${string}`> => {
         // TODO: perhaps it would be better to pass full EIP712AuthMessage instead of parsing part of it
-        // out of untyped data 
+        // out of untyped data
         const address = walletClient.account?.address;
 
         if (!address) {

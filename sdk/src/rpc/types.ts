@@ -309,6 +309,15 @@ export const EIP712AuthTypes = {
 };
 
 /**
+ * Represents the RPC methods used in the Nitrolite protocol.
+ */
+export enum RPCMethod {
+    AuthChallenge = 'auth_challenge',
+    AuthVerify = 'auth_verify',
+    Error = 'error',
+}
+
+/**
  * Represents a generic RPC response structure that includes common fields.
  * This interface is extended by specific RPC response types.
  */
@@ -319,36 +328,51 @@ interface GenericRPCResponse {
 }
 
 /**
+ * Represents the parameters for the 'auth_challenge' RPC method.
+ */
+export interface AuthChallengeRPCParams {
+    challengeMessage: string;
+}
+
+/**
  * Represents the response structure for the 'auth_challenge'
  */
 export interface AuthChallengeRPCResponse extends GenericRPCResponse {
-    method: 'auth_challenge';
-    params: {
-        challengeMessage: string;
-    };
+    method: RPCMethod.AuthChallenge;
+    params: AuthChallengeRPCParams;
+}
+
+/**
+ * Represents the parameters for the 'auth_verify' RPC method.
+ */
+export interface AuthVerifyRPCParams {
+    address: Address;
+    jwtToken: string;
+    sessionKey: Address;
+    success: boolean;
 }
 
 /**
  * Represents the response structure for the 'auth_verify'
  */
 export interface AuthVerifyRPCResponse extends GenericRPCResponse {
-    method: 'auth_verify';
-    params: {
-        address: Address;
-        jwtToken: string;
-        sessionKey: Address;
-        success: boolean;
-    };
+    method: RPCMethod.AuthVerify;
+    params: AuthVerifyRPCParams;
+}
+
+/**
+ * Represents the parameters for the 'error' RPC method.
+ */
+export interface ErrorRPCParams {
+    error: string;
 }
 
 /**
  * Represents the response structure for an error response.
  */
 export interface ErrorRPCResponse extends GenericRPCResponse {
-    method: 'error';
-    params: {
-        error: string;
-    };
+    method: RPCMethod.Error;
+    params: ErrorRPCParams;
 }
 
 /**
@@ -581,3 +605,12 @@ export type RPCResponse =
     | GetChannelsRPCResponse
     | GetRPCHistoryRPCResponse
     | GetAssetsRPCResponse;
+
+/**
+ * Maps RPC methods to their corresponding parameter types.
+ */
+export type RPCParamsByMethod = {
+    [RPCMethod.AuthChallenge]: AuthChallengeRPCParams;
+    [RPCMethod.AuthVerify]: AuthVerifyRPCParams;
+    [RPCMethod.Error]: ErrorRPCParams;
+};

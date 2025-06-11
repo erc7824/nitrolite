@@ -7,5 +7,5 @@
   "chainId": 480,
   "contractPath": "./src/adjudicators/SimpleConsensus.sol:SimpleConsensus",
   "constructorArgs": [],
-  "comment": "UAT v0.2.12"
+  "comment": "PROD v0.2.12"
 }

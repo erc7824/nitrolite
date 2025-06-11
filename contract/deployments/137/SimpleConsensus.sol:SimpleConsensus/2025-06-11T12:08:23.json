@@ -1,0 +1,11 @@
+{
+  "deployer": "0x1cc434634DCc1f4C92552057d18D205b919DEF4A",
+  "deployedTo": "0x132C865E708D53A0e26E134157Ef08cb6cC41624",
+  "transactionHash": "0xc069af1bf685b1dac0a2f986a48336428fe9285f3679b41ee0ae300f950977d7",
+  "commit": "2fe44ff73bd780a1252e7b437f675d62a0a248a5",
+  "timestamp": 1749643703,
+  "chainId": 137,
+  "contractPath": "./src/adjudicators/SimpleConsensus.sol:SimpleConsensus",
+  "constructorArgs": [],
+  "comment": "UAT v0.2.12"
+}

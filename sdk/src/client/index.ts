@@ -6,8 +6,8 @@ import { NitroliteTransactionPreparer, PreparerDependencies } from './prepare';
 import { Erc20Service, NitroliteService, waitForTransaction } from './services';
 import { _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from './state';
 import {
-    AccountInfo,
     ChallengeChannelParams,
+    ChannelData,
     ChannelId,
     CheckpointChannelParams,
     CloseChannelParams,
@@ -162,7 +162,7 @@ export class NitroliteClient {
 
             return { channelId, initialState, txHash };
         } catch (err) {
-            throw new Errors.ContractCallError('Failed to execute createChannel on contract', err as Error);
+            throw new Errors.ContractCallError('Failed to execute depositAndCreateChannel on contract', err as Error);
         }
     }
 
@@ -255,9 +255,9 @@ export class NitroliteClient {
      * Retrieves a list of channel IDs associated with a specific account.
      * @returns An array of Channel IDs.
      */
-    async getAccountChannels(): Promise<ChannelId[]> {
+    async getOpenChannels(): Promise<ChannelId[]> {
         try {
-            return await this.nitroliteService.getAccountChannels(this.account.address);
+            return (await this.nitroliteService.getOpenChannels(this.account.address));
         } catch (err) {
             throw err;
         }
@@ -268,9 +268,48 @@ export class NitroliteClient {
      * @param tokenAddress The address of the token to query.
      * @returns Account info including available, locked amounts and channel count.
      */
-    async getAccountInfo(tokenAddress: Address): Promise<AccountInfo> {
+    async getAccountBalance(tokenAddress: Address): Promise<bigint>
+    async getAccountBalance(tokenAddress: Address[]): Promise<bigint[]>
+    async getAccountBalance(tokenAddress: Address | Address[]): Promise<bigint | bigint[]> {
         try {
-            return await this.nitroliteService.getAccountInfo(this.account.address, tokenAddress);
+            if (Array.isArray(tokenAddress)) {
+                return await this.nitroliteService.getAccountBalance(this.account.address, tokenAddress);
+            } else {
+                return await this.nitroliteService.getAccountBalance(this.account.address, tokenAddress);
+            }
+        } catch (err) {
+            throw err;
+        }
+    }
+
+    /**
+     * Retrieves the balances of all channels for a specific channel ID.
+     * @param channelId The ID of the channel to query.
+     * @param tokenAddress The address of the token to query balances for.
+     * @returns An array of balances for the specified channel and token.
+     */
+    async getChannelBalance(channelId: ChannelId, tokenAddress: Address): Promise<bigint>
+    async getChannelBalance(channelId: ChannelId, tokenAddress: Address[]): Promise<bigint[]>
+    async getChannelBalance(channelId: ChannelId, tokenAddress: Address | Address[]): Promise<bigint | bigint[]> {
+        try {
+            if (Array.isArray(tokenAddress)) {
+                return await this.nitroliteService.getChannelBalance(channelId, tokenAddress);
+            } else {
+                return await this.nitroliteService.getChannelBalance(channelId, tokenAddress);
+            }
+        } catch (err) {
+            throw err;
+        }
+    }
+
+    /**
+     * Retrieves detailed channel data for a specific channel ID.
+     * @param channelId The ID of the channel to query.
+     * @returns An object containing channel data including participants, adjudicator, challenge duration, and allocations.
+     */
+    async getChannelData(channelId: ChannelId): Promise<ChannelData> {
+        try {
+            return await this.nitroliteService.getChannelData(channelId);
         } catch (err) {
             throw err;
         }

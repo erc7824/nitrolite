@@ -449,16 +449,14 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 		return
 	}
 
+	callOpts := &bind.CallOpts{
+		Context: ctx,
+	}
+
 	brokerAddr := c.signer.GetAddress()
 	// TODO: refactor to select with GetAccountsBalances in one query
-	// Same for GetOpenChannels
 	// Use balanceChecker to get Balances for erc20 tokens in one query
 	for _, asset := range assets {
-		// Create a call opts with the provided context
-		callOpts := &bind.CallOpts{
-			Context: ctx,
-		}
-
 		logger.Debug("fetching account info", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "broker", brokerAddr.Hex())
 		// Call GetAccountsBalances on the custody contract
 		tokenAddr := common.HexToAddress(asset.Token)
@@ -480,24 +478,6 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			"token":   asset.Token,
 			"asset":   asset.Symbol,
 		}).Set(availableBalance.InexactFloat64())
-
-		openChannelsInfo, err := c.custody.GetOpenChannels(callOpts, []common.Address{brokerAddr})
-
-		if err != nil {
-			logger.Error("failed to get open channels", "network", c.chainID, "broker", brokerAddr, "error", err)
-			continue
-		}
-
-		if len(openChannelsInfo) == 0 {
-			logger.Warn("no open channels found", "network", c.chainID, "broker", brokerAddr)
-			continue
-		}
-
-		metrics.BrokerChannelCount.With(prometheus.Labels{
-			"network": fmt.Sprintf("%d", c.chainID),
-		}).Set(float64(len(openChannelsInfo[0])))
-
-		logger.Info("updated contract balance metrics", "network", c.chainID, "available", availableBalance.String(), "channels", len(openChannelsInfo[0]))
 
 		// Fetch broker wallet balances
 		walletBalance := decimal.Zero
@@ -533,4 +513,22 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 
 		logger.Info("updated erc20 balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "balance", walletBalance.String())
 	}
+
+	openChannelsInfo, err := c.custody.GetOpenChannels(callOpts, []common.Address{brokerAddr})
+
+	if err != nil {
+		logger.Error("failed to get open channels", "network", c.chainID, "broker", brokerAddr, "error", err)
+		return
+	}
+
+	if len(openChannelsInfo) == 0 {
+		logger.Warn("no open channels found", "network", c.chainID, "broker", brokerAddr)
+		return
+	}
+
+	metrics.BrokerChannelCount.With(prometheus.Labels{
+		"network": fmt.Sprintf("%d", c.chainID),
+	}).Set(float64(len(openChannelsInfo[0])))
+
+	logger.Info("updated contract total open channels metric", "network", c.chainID, "channels", len(openChannelsInfo[0]))
 }

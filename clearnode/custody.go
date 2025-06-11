@@ -450,6 +450,9 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 	}
 
 	brokerAddr := c.signer.GetAddress()
+	// TODO: refactor to select with GetAccountsBalances in one query
+	// Same for GetOpenChannels
+	// Use balanceChecker to get Balances for erc20 tokens in one query
 	for _, asset := range assets {
 		// Create a call opts with the provided context
 		callOpts := &bind.CallOpts{
@@ -465,6 +468,11 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			continue
 		}
 
+		if len(info) == 0 || len(info[0]) == 0 {
+			logger.Warn("no account info found", "network", c.chainID, "token", asset.Token)
+			continue
+		}
+
 		availableBalance := decimal.NewFromBigInt(info[0][0], -int32(asset.Decimals))
 
 		metrics.BrokerBalanceAvailable.With(prometheus.Labels{
@@ -473,11 +481,23 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			"asset":   asset.Symbol,
 		}).Set(availableBalance.InexactFloat64())
 
-		// metrics.BrokerChannelCount.With(prometheus.Labels{
-		// 	"network": fmt.Sprintf("%d", c.chainID),
-		// }).Set(float64(info.ChannelCount.Int64()))
+		openChannelsInfo, err := c.custody.GetOpenChannels(callOpts, []common.Address{brokerAddr})
 
-		// logger.Info("updated contract balance metrics", "network", c.chainID, "available", availableBalance.String(), "channels", info.ChannelCount.String())
+		if err != nil {
+			logger.Error("failed to get open channels", "network", c.chainID, "broker", brokerAddr, "error", err)
+			continue
+		}
+
+		if len(openChannelsInfo) == 0 {
+			logger.Warn("no open channels found", "network", c.chainID, "broker", brokerAddr)
+			continue
+		}
+
+		metrics.BrokerChannelCount.With(prometheus.Labels{
+			"network": fmt.Sprintf("%d", c.chainID),
+		}).Set(float64(len(openChannelsInfo[0])))
+
+		logger.Info("updated contract balance metrics", "network", c.chainID, "available", availableBalance.String(), "channels", len(openChannelsInfo[0]))
 
 		// Fetch broker wallet balances
 		walletBalance := decimal.Zero

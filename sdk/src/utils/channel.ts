@@ -1,4 +1,4 @@
-import { keccak256, encodeAbiParameters, Address, Hex } from 'viem';
+import { keccak256, encodeAbiParameters, Address } from 'viem';
 import { Channel, ChannelId } from '../client/types'; // Updated import path
 
 /**
@@ -37,7 +37,14 @@ export function generateChannelNonce(address?: Address): bigint {
     let combinedNonce = (timestamp << 32n) | randomComponent;
 
     if (address) {
-        const addressComponent = BigInt(`0x${address.slice(-16)}`);
+        // Remove any existing 0x prefix to avoid double prefix
+        const cleanAddress = address.startsWith('0x') ? address.slice(2) : address;
+
+        if (!/^[0-9a-fA-F]+$/.test(cleanAddress)) {
+            throw new Error(`Invalid address format: ${address}. Address must be a valid hex string.`);
+        }
+
+        const addressComponent = BigInt(`0x${cleanAddress.slice(-16)}`);
         combinedNonce = combinedNonce ^ addressComponent;
     }
 

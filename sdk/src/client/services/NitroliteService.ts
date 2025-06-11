@@ -9,7 +9,7 @@ import {
 import { custodyAbi } from '../../abis/generated';
 import { ContractAddresses } from '../../abis';
 import { Errors } from '../../errors';
-import { Channel, ChannelId, Signature, State } from '../types';
+import { Channel, ChannelData, ChannelId, Signature, State } from '../types';
 
 /**
  * Type utility to properly type the request object from simulateContract
@@ -285,7 +285,7 @@ export class NitroliteService {
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: 'depositAndCreate',
-                args: [accountAddress, tokenAddress, amount, abiChannel, abiState],
+                args: [tokenAddress, amount, abiChannel, abiState],
                 account: account,
                 value: tokenAddress === zeroAddress ? amount : 0n,
             });
@@ -672,56 +672,145 @@ export class NitroliteService {
     }
 
     /**
-     * Get the list of channels for a given account
-     * @param account Address of the account
-     * @returns List of channel IDs
+     * Get the list of open channels for specified accounts
+     * @param account Address or addresses of the accounts
+     * @returns Matrix of Channel IDs, where each sub-array corresponds to an account
      * @error Throws ContractReadError if the read operation fails
      */
-    async getAccountChannels(account: Address): Promise<ChannelId[]> {
-        const functionName = 'getAccountChannels';
+    async getOpenChannels(account: Address): Promise<ChannelId[]>;
+    async getOpenChannels(account: Address[]): Promise<ChannelId[][]>;
+    async getOpenChannels(account: Address | Address[]): Promise<ChannelId[] | ChannelId[][]> {
+        const functionName = 'getOpenChannels';
+
+        const accountsArg = Array.isArray(account) ? account : [account];
+        if (accountsArg.length === 0) {
+            throw new Errors.MissingParameterError('accounts');
+        }
 
         try {
             const result = await this.publicClient.readContract({
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: functionName,
-                args: [account],
+                args: [accountsArg],
             });
 
-            return result as ChannelId[];
+            if (Array.isArray(account)) {
+                return result as ChannelId[][];
+            } else {
+                return result[0] as ChannelId[];
+            }
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
-            throw new Errors.ContractReadError(functionName, error, { account });
+            throw new Errors.ContractReadError(functionName, error, { accountsArg });
         }
     }
 
     /**
-     * Get account balance information for a specific token.
-     * @param user The address of the user.
-     * @param token The address of the token.
-     * @returns An object containing available balance, locked balance, and channel count.
-     * @error Throws ContractReadError if the read operation fails.
+     * Get balances for specified accounts and tokens
+     * @param user Address or addresses of the accounts
+     * @param token Address or addresses of the tokens (use zeroAddress for ETH)
+     * @returns Matrix of balances, where each sub-array corresponds to an account and token
+     * @error Throws ContractReadError if the read operation fails
      */
-    async getAccountInfo(user: Address, token: Address): Promise<{ available: bigint; channelCount: bigint }> {
-        const functionName = 'getAccountInfo';
+    async getAccountBalance(user: Address, token: Address): Promise<bigint>;
+    async getAccountBalance(user: Address, token: Address[]): Promise<bigint[]>;
+    async getAccountBalance(user: Address[], token: Address): Promise<bigint[]>;
+    async getAccountBalance(user: Address[], token: Address[]): Promise<bigint[][]>;
+    async getAccountBalance(user: Address | Address[], token: Address | Address[]): Promise<bigint | bigint[] | bigint[][]> {
+        const functionName = 'getAccountsBalances';
+
+        const usersArg = Array.isArray(user) ? user : [user];
+        const tokensArg = Array.isArray(token) ? token : [token];
+        if (usersArg.length === 0 || tokensArg.length === 0) {
+            throw new Errors.MissingParameterError('users or tokens');
+        }
 
         try {
             const result = await this.publicClient.readContract({
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: functionName,
-                args: [user, token],
+                args: [usersArg, tokensArg],
             });
 
-            const [available, channelCount] = result as [bigint, bigint];
-
-            return {
-                available: available,
-                channelCount: channelCount,
-            };
+            if (Array.isArray(token)) {
+                if (Array.isArray(user)) {
+                    return result as bigint[][];
+                } else {
+                    return result[0] as bigint[];
+                }
+            } else {
+                if (Array.isArray(user)) {
+                    return result[0] as bigint[];
+                } else {
+                    return result[0][0] as bigint;
+                }
+            }
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
-            throw new Errors.ContractReadError(functionName, error, { user, token });
+            throw new Errors.ContractReadError(functionName, error, { usersArg, tokensArg });
+        }
+    }
+
+    /**
+     * Get the balances for a specific channel and token or tokens.
+     * @param channelId ID of the channel to retrieve balances for.
+     * @param token Address or addresses of the tokens (use zeroAddress for ETH).
+     * @returns Array of balances for the specified tokens.
+     * @error Throws ContractReadError if the read operation fails.
+     */
+    async getChannelBalance(channelId: ChannelId, token: Address): Promise<bigint>;
+    async getChannelBalance(channelId: ChannelId, token: Address[]): Promise<bigint[]>;
+    async getChannelBalance(channelId: ChannelId, token: Address | Address[]): Promise<bigint | bigint[]> {
+        const functionName = 'getChannelBalances';
+
+        const tokensArg = Array.isArray(token) ? token : [token];
+        if (tokensArg.length === 0) {
+            throw new Errors.MissingParameterError('tokens');
+        }
+
+        try {
+            const result = await this.publicClient.readContract({
+                address: this.custodyAddress,
+                abi: custodyAbi,
+                functionName: functionName,
+                args: [channelId, tokensArg],
+            });
+
+            if (Array.isArray(token)) {
+                return result as bigint[];
+            } else {
+                return result[0] as bigint;
+            }
+        } catch (error: any) {
+            if (error instanceof Errors.NitroliteError) throw error;
+            throw new Errors.ContractReadError(functionName, error, { channelId, tokensArg });
+        }
+    }
+
+    /**
+     * Get channel data for a specific channel ID.
+     * @param channelId ID of the channel to retrieve data for.
+     * @returns ChannelData object containing participants and adjudicator address.
+     * @error Throws ContractReadError if the read operation fails.
+     */
+    async getChannelData(channelId: ChannelId): Promise<ChannelData> {
+        const functionName = 'getChannelData';
+
+        try {
+            const result = await this.publicClient.readContract({
+                address: this.custodyAddress,
+                abi: custodyAbi,
+                functionName: functionName,
+                args: [channelId],
+            });
+
+            // contract returns `wallets` as `Address[]`, but it can be sufficiently downcasted to `[Address, Address]`
+            return result as unknown as ChannelData;
+        } catch (error: any) {
+            if (error instanceof Errors.NitroliteError) throw error;
+            throw new Errors.ContractReadError(functionName, error, { channelId });
         }
     }
 }

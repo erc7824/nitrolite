@@ -3,7 +3,7 @@ import { NitroliteClient } from '../../src/client/index';
 import { Errors } from '../../src/errors';
 import { Address, Hash, Hex } from 'viem';
 import * as stateModule from '../../src/client/state';
-import { Allocation, Channel, StateIntent } from '../../src/client/types';
+import { Allocation, Channel, ChannelId, ChannelStatus, State, StateIntent } from '../../src/client/types';
 
 describe('NitroliteClient', () => {
     let client: NitroliteClient;
@@ -36,12 +36,15 @@ describe('NitroliteClient', () => {
         mockNitroService = {
             deposit: jest.fn(),
             createChannel: jest.fn(),
+            depositAndCreateChannel: jest.fn(),
             checkpoint: jest.fn(),
             challenge: jest.fn(),
             close: jest.fn(),
             withdraw: jest.fn(),
-            getAccountChannels: jest.fn(),
-            getAccountInfo: jest.fn(),
+            getOpenChannels: jest.fn(),
+            getAccountBalance: jest.fn(),
+            getChannelBalance: jest.fn(),
+            getChannelData: jest.fn(),
         };
         mockErc20Service = {
             getTokenAllowance: jest.fn(),
@@ -156,6 +159,7 @@ describe('NitroliteClient', () => {
 
             const res = await client.depositAndCreateChannel(tokenAddress, 10n, {
                 initialAllocationAmounts: [1n, 2n],
+                stateData: '0x00' as any,
             } as any);
 
             expect(client.deposit).toHaveBeenCalledWith(tokenAddress, 10n);
@@ -266,28 +270,69 @@ describe('NitroliteClient', () => {
         });
     });
 
-    describe('getAccountChannels', () => {
+    describe('getOpenChannels', () => {
         test('success', async () => {
-            mockNitroService.getAccountChannels.mockResolvedValue(['0xc1', '0xc2'] as Address[]);
-            const res = await client.getAccountChannels();
+            mockNitroService.getOpenChannels.mockResolvedValue(['0xc1', '0xc2'] as Address[]);
+            const res = await client.getOpenChannels();
             expect(res).toEqual(['0xc1', '0xc2']);
-            expect(mockNitroService.getAccountChannels).toHaveBeenCalledWith(mockAccount.address);
+            expect(mockNitroService.getOpenChannels).toHaveBeenCalledWith(mockAccount.address);
         });
     });
 
-    describe('getAccountInfo', () => {
+    describe('getAccountBalances', () => {
         test('success', async () => {
-            const info = {
-                available: 1n,
-                locked: 2n,
-                channelCount: 3n,
-            };
-            mockNitroService.getAccountInfo.mockResolvedValue(info);
-            const res = await client.getAccountInfo(tokenAddress);
-            expect(res).toEqual(info);
-            expect(mockNitroService.getAccountInfo).toHaveBeenCalledWith(
+            const balances = 42n;
+            mockNitroService.getAccountBalance.mockResolvedValue(balances);
+            const res = await client.getAccountBalance(tokenAddress);
+            expect(res).toEqual(balances);
+            expect(mockNitroService.getAccountBalance).toHaveBeenCalledWith(
                 mockAccount.address,
                 tokenAddress,
+            );
+        });
+    });
+
+    describe('getChannelBalances', () => {
+        test('success', async () => {
+            const balances = 42n;
+            mockNitroService.getChannelBalance.mockResolvedValue(balances);
+            const res = await client.getChannelBalance('0xcid' as ChannelId, tokenAddress);
+            expect(res).toEqual(balances);
+            expect(mockNitroService.getChannelBalance).toHaveBeenCalledWith(
+                '0xcid' as ChannelId,
+                tokenAddress,
+            );
+        });
+    });
+
+    describe('getChannelData', () => {
+        test('success', async () => {
+            const data = {
+                channel: {
+                    participants: ['0x0', '0x1'] as Address[],
+                    adjudicator: mockAddresses.adjudicator,
+                    challenge: challengeDuration,
+                    nonce: 1n,
+                },
+                status: ChannelStatus.INITIAL,
+                wallets: ['0xabc', '0xdef'] as Address[],
+                challengeExpiry: 1234567890n,
+                lastValidState: {
+                    data: '0x00' as Hex,
+                    intent: StateIntent.INITIALIZE,
+                    version: 0n,
+                    allocations: [
+                        { destination: '0x0', token: '0xtok', amount: 50n },
+                        { destination: '0x1', token: '0xtok', amount: 50n },
+                    ],
+                    sigs: [],
+                },
+            };
+            mockNitroService.getChannelData.mockResolvedValue(data);
+            const res = await client.getChannelData('0xcid' as ChannelId);
+            expect(res).toEqual(data);
+            expect(mockNitroService.getChannelData).toHaveBeenCalledWith(
+                '0xcid' as ChannelId
             );
         });
     });

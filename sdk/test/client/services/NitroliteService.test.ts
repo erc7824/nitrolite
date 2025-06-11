@@ -72,6 +72,13 @@ describe('NitroliteService', () => {
             fn: 'create',
         },
         {
+            prepareName: 'prepareDepositAndCreateChannel',
+            execName: 'depositAndCreateChannel',
+            prepare: () => service.prepareDepositAndCreateChannel(custodyAddress, 123n, channelConfig, initialState),
+            exec: () => service.depositAndCreateChannel(custodyAddress, 123n, channelConfig, initialState),
+            fn: 'depositAndCreate',
+        },
+        {
             prepareName: 'prepareJoinChannel',
             execName: 'joinChannel',
             prepare: () => service.prepareJoinChannel(channelId, participantIndex, participantSig),
@@ -168,41 +175,87 @@ describe('NitroliteService', () => {
         });
     }
 
-    describe('getAccountChannels', () => {
+    describe('getOpenChannels', () => {
         test('success', async () => {
             const arr = ['0xA', '0xB'];
             (mockPublicClient.readContract as any).mockResolvedValue(arr);
-            const out = await service.getAccountChannels(account);
+            const out = await service.getOpenChannels(account);
             expect(out).toEqual(arr);
             expect(mockPublicClient.readContract).toHaveBeenCalledWith({
                 address: custodyAddress,
                 abi: CustodyAbi,
-                functionName: 'getAccountChannels',
+                functionName: 'getOpenChannels',
                 args: [account],
             });
         });
         test('ContractReadError', async () => {
             (mockPublicClient.readContract as any).mockRejectedValue(new Error('fail'));
-            await expect(service.getAccountChannels(account)).rejects.toThrow(Errors.ContractReadError);
+            await expect(service.getOpenChannels(account)).rejects.toThrow(Errors.ContractReadError);
         });
     });
 
-    describe('getAccountInfo', () => {
+    describe('getAccountBalance', () => {
+        const tokens = ['0xtok1', '0xtok2'] as Address[];
         test('success', async () => {
-            const data = [1n, 3n] as [bigint, bigint];
+            const data = [[1n, 3n]] as bigint[][];
             (mockPublicClient.readContract as any).mockResolvedValue(data);
-            const info = await service.getAccountInfo(account, custodyAddress);
-            expect(info).toEqual({ available: 1n, channelCount: 3n });
+            const info = await service.getAccountBalance(account, tokens);
+            expect(info).toEqual(data);
             expect(mockPublicClient.readContract).toHaveBeenCalledWith({
                 address: custodyAddress,
                 abi: CustodyAbi,
-                functionName: 'getAccountInfo',
-                args: [account, custodyAddress],
+                functionName: 'getAccountsBalances',
+                args: [account, tokens],
             });
         });
         test('ContractReadError', async () => {
             (mockPublicClient.readContract as any).mockRejectedValue(new Error('err'));
-            await expect(service.getAccountInfo(account, custodyAddress)).rejects.toThrow(Errors.ContractReadError);
+            await expect(service.getAccountBalance(account, tokens)).rejects.toThrow(Errors.ContractReadError);
+        });
+    });
+
+    describe('getChannelBalance', () => {
+        const tokens = ['0xtok1', '0xtok2'] as Address[];
+        test('success', async () => {
+            const data = [[1n, 3n]] as bigint[][];
+            (mockPublicClient.readContract as any).mockResolvedValue(data);
+            const info = await service.getChannelBalance(channelId, tokens);
+            expect(info).toEqual(data);
+            expect(mockPublicClient.readContract).toHaveBeenCalledWith({
+                address: custodyAddress,
+                abi: CustodyAbi,
+                functionName: 'getChannelBalances',
+                args: [channelId, tokens],
+            });
+        });
+        test('ContractReadError', async () => {
+            (mockPublicClient.readContract as any).mockRejectedValue(new Error('err'));
+            await expect(service.getChannelBalance(channelId, tokens)).rejects.toThrow(Errors.ContractReadError);
+        });
+    });
+
+    describe('getChannelData', () => {
+        test('success', async () => {
+            const data = {
+                channel: channelConfig,
+                status: 0, // ChannelStatus.INITIAL
+                wallets: ['0xabc', '0xdef'] as Address[],
+                challengeExpiry: 1234567890n,
+                lastValidState: initialState,
+            };
+            (mockPublicClient.readContract as any).mockResolvedValue(data);
+            const res = await service.getChannelData(channelId);
+            expect(res).toEqual(data);
+            expect(mockPublicClient.readContract).toHaveBeenCalledWith({
+                address: custodyAddress,
+                abi: CustodyAbi,
+                functionName: 'getChannelData',
+                args: [channelId],
+            });
+        });
+        test('ContractReadError', async () => {
+            (mockPublicClient.readContract as any).mockRejectedValue(new Error('fail'));
+            await expect(service.getChannelData(channelId)).rejects.toThrow(Errors.ContractReadError);
         });
     });
 });

@@ -7,6 +7,20 @@ import {
     RPCMethod,
     RPCParamsByMethod,
     RPCResponse,
+    AppDefinition,
+    GetConfigRPCParams,
+    GetLedgerBalancesRPCParams,
+    GetLedgerEntriesRPCParams,
+    CreateApplicationRPCParams,
+    SubmitStateRPCParams,
+    CloseApplicationRPCParams,
+    GetAppDefinitionRPCParams,
+    GetAppSessionsRPCParams,
+    ResizeChannelRPCParams,
+    CloseChannelRPCParams,
+    GetChannelsRPCParams,
+    GetRPCHistoryRPCParams,
+    GetAssetsRPCParams,
 } from './types';
 
 /**
@@ -192,6 +206,63 @@ function parseRPCParameters<M extends RPCMethod>(method: M, params: Array<any>):
             return {
                 error: extractRPCParameter<string>(params, 'error'),
             } as ErrorRPCParams as RPCParamsByMethod[M];
+        case RPCMethod.GetConfig:
+            return {
+                broker_address: extractRPCParameter<Address>(params, 'broker_address'),
+                networks: extractRPCParameter<GetConfigRPCParams['networks']>(params, 'networks'),
+            } as GetConfigRPCParams as RPCParamsByMethod[M];
+        case RPCMethod.GetLedgerBalances:
+            return extractRPCParameter<GetLedgerBalancesRPCParams[]>(params, 'balances') as RPCParamsByMethod[M];
+        case RPCMethod.GetLedgerEntries:
+            return extractRPCParameter<GetLedgerEntriesRPCParams[]>(params, 'entries') as RPCParamsByMethod[M];
+        case RPCMethod.CreateApplication:
+            return {
+                app_session_id: extractRPCParameter<Hex>(params, 'app_session_id'),
+                version: extractRPCParameter<number>(params, 'version'),
+                status: extractRPCParameter<string>(params, 'status'),
+            } as CreateApplicationRPCParams as RPCParamsByMethod[M];
+        case RPCMethod.SubmitState:
+            return {
+                app_session_id: extractRPCParameter<Hex>(params, 'app_session_id'),
+                version: extractRPCParameter<number>(params, 'version'),
+                status: extractRPCParameter<string>(params, 'status'),
+            } as SubmitStateRPCParams as RPCParamsByMethod[M];
+        case RPCMethod.CloseApplication:
+            return {
+                app_session_id: extractRPCParameter<Hex>(params, 'app_session_id'),
+                version: extractRPCParameter<number>(params, 'version'),
+                status: extractRPCParameter<string>(params, 'status'),
+            } as CloseApplicationRPCParams as RPCParamsByMethod[M];
+        case RPCMethod.GetAppDefinition:
+            return extractRPCParameter<GetAppDefinitionRPCParams>(params, 'definition') as RPCParamsByMethod[M];
+        case RPCMethod.GetAppSessions:
+            return extractRPCParameter<GetAppSessionsRPCParams[]>(params, 'sessions') as RPCParamsByMethod[M];
+        case RPCMethod.ResizeChannel:
+            return {
+                channel_id: extractRPCParameter<Hex>(params, 'channel_id'),
+                intent: extractRPCParameter<number>(params, 'intent'),
+                version: extractRPCParameter<number>(params, 'version'),
+                state_data: extractRPCParameter<string>(params, 'state_data'),
+                allocations: extractRPCParameter<ResizeChannelRPCParams['allocations']>(params, 'allocations'),
+                state_hash: extractRPCParameter<string>(params, 'state_hash'),
+                server_signature: extractRPCParameter<ResizeChannelRPCParams['server_signature']>(params, 'server_signature'),
+            } as ResizeChannelRPCParams as RPCParamsByMethod[M];
+        case RPCMethod.CloseChannel:
+            return {
+                channel_id: extractRPCParameter<Hex>(params, 'channel_id'),
+                intent: extractRPCParameter<number>(params, 'intent'),
+                version: extractRPCParameter<number>(params, 'version'),
+                state_data: extractRPCParameter<string>(params, 'state_data'),
+                allocations: extractRPCParameter<CloseChannelRPCParams['allocations']>(params, 'allocations'),
+                state_hash: extractRPCParameter<string>(params, 'state_hash'),
+                server_signature: extractRPCParameter<CloseChannelRPCParams['server_signature']>(params, 'server_signature'),
+            } as CloseChannelRPCParams as RPCParamsByMethod[M];
+        case RPCMethod.GetChannels:
+            return extractRPCParameter<GetChannelsRPCParams[]>(params, 'channels') as RPCParamsByMethod[M];
+        case RPCMethod.GetRPCHistory:
+            return extractRPCParameter<GetRPCHistoryRPCParams[]>(params, 'history') as RPCParamsByMethod[M];
+        case RPCMethod.GetAssets:
+            return extractRPCParameter<GetAssetsRPCParams[]>(params, 'assets') as RPCParamsByMethod[M];
         default:
             throw new Error(`Unknown method for parameter extraction: ${method}`);
     }

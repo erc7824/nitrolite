@@ -2,6 +2,7 @@ export * from './types';
 export * from './utils';
 export * from './errors';
 export * from './client';
+export * from './helpers/createDeterministicPrivateKey';
 export * from './client/services';
 export * from './client/types';
 export * from './client/state';

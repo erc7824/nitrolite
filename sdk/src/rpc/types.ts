@@ -352,7 +352,232 @@ export interface ErrorRPCResponse extends GenericRPCResponse {
 }
 
 /**
+ * Represents the response structure for the 'get_config' RPC method.
+ */
+export interface GetConfigRPCResponse extends GenericRPCResponse {
+    method: 'get_config';
+    params: {
+        broker_address: Address;
+        networks: {
+            name: string;
+            chain_id: number;
+            custody_address: Address;
+            adjudicator_address: Address;
+        }[];
+    };
+}
+
+/**
+ * Represents the response structure for the 'get_ledger_balances' RPC method.
+ */
+export interface GetLedgerBalancesRPCResponse extends GenericRPCResponse {
+    method: 'get_ledger_balances';
+    params: {
+        asset: string;
+        amount: string;
+    }[];
+}
+
+/**
+ * Represents the response structure for the 'get_ledger_entries' RPC method.
+ */
+export interface GetLedgerEntriesRPCResponse extends GenericRPCResponse {
+    method: 'get_ledger_entries';
+    params: {
+        id: number;
+        account_id: string;
+        account_type: string;
+        asset: string;
+        participant: Address;
+        credit: string;
+        debit: string;
+        created_at: string;
+    }[];
+}
+
+/**
+ * Represents the response structure for the 'create_application' RPC method.
+ */
+export interface CreateApplicationRPCResponse extends GenericRPCResponse {
+    method: 'create_application';
+    params: {
+        app_session_id: Hex;
+        version: number;
+        status: string;
+    };
+}
+
+/**
+ * Represents the response structure for the 'submit_state' RPC method.
+ */
+export interface SubmitStateRPCResponse extends GenericRPCResponse {
+    method: 'submit_state';
+    params: {
+        app_session_id: Hex;
+        version: number;
+        status: string;
+    };
+}
+
+/**
+ * Represents the response structure for the 'close_application' RPC method.
+ */
+export interface CloseApplicationRPCResponse extends GenericRPCResponse {
+    method: 'close_application';
+    params: {
+        app_session_id: Hex;
+        version: number;
+        status: string;
+    };
+}
+
+/**
+ * Represents the response structure for the 'get_app_definition' RPC method.
+ */
+export interface GetAppDefinitionRPCResponse extends GenericRPCResponse {
+    method: 'get_app_definition';
+    params: AppDefinition;
+}
+
+/**
+ * Represents the response structure for the 'get_app_sessions' RPC method.
+ */
+export interface GetAppSessionsRPCResponse extends GenericRPCResponse {
+    method: 'get_app_sessions';
+    params: {
+        app_session_id: Hex;
+        status: string;
+        participants: Address[];
+        protocol: string;
+        challenge: number;
+        weights: number[];
+        quorum: number;
+        version: number;
+        nonce: number;
+        created_at: string;
+        updated_at: string;
+    }[];
+}
+
+/**
+ * Represents the response structure for the 'resize_channel' RPC method.
+ */
+export interface ResizeChannelRPCResponse extends GenericRPCResponse {
+    method: 'resize_channel';
+    params: {
+        channel_id: Hex;
+        state_data: string;
+        intent: number;
+        version: number;
+        allocations: {
+            destination: Address;
+            token: Address;
+            amount: string;
+        }[];
+        state_hash: string;
+        server_signature: {
+            v: string;
+            r: string;
+            s: string;
+        };
+    };
+}
+
+/**
+ * Represents the response structure for the 'close_channel' RPC method.
+ */
+export interface CloseChannelRPCResponse extends GenericRPCResponse {
+    method: 'close_channel';
+    params: {
+        channel_id: Hex;
+        intent: number;
+        version: number;
+        state_data: string;
+        allocations: {
+            destination: Address;
+            token: Address;
+            amount: string;
+        }[];
+        state_hash: string;
+        server_signature: {
+            v: string;
+            r: string;
+            s: string;
+        };
+    };
+}
+
+/**
+ * Represents the response structure for the 'get_channels' RPC method.
+ */
+export interface GetChannelsRPCResponse extends GenericRPCResponse {
+    method: 'get_channels';
+    params: {
+        channel_id: Hex;
+        participant: Address;
+        status: string;
+        token: Address;
+        wallet: Address;
+        amount: string;
+        chain_id: number;
+        adjudicator: Address;
+        challenge: number;
+        nonce: number;
+        version: number;
+        created_at: string;
+        updated_at: string;
+    }[];
+}
+
+/**
+ * Represents the response structure for the 'get_rpc_history' RPC method.
+ */
+export interface GetRPCHistoryRPCResponse extends GenericRPCResponse {
+    method: 'get_rpc_history';
+    params: {
+        id: number;
+        sender: Address;
+        req_id: number;
+        method: string;
+        params: string;
+        timestamp: number;
+        req_sig: Hex[];
+        res_sig: Hex[];
+        response: string;
+    }[];
+}
+
+/**
+ * Represents the response structure for the 'get_assets' RPC method.
+ */
+export interface GetAssetsRPCResponse extends GenericRPCResponse {
+    method: 'get_assets';
+    params: {
+        token: Address;
+        chain_id: number;
+        symbol: string;
+        decimals: number;
+    }[];
+}
+
+/**
  * Union type for all possible RPC response types.
  * This allows for type-safe handling of different response structures.
  */
-export type RPCResponse = AuthChallengeRPCResponse | AuthVerifyRPCResponse | ErrorRPCResponse;
+export type RPCResponse =
+    | AuthChallengeRPCResponse
+    | AuthVerifyRPCResponse
+    | ErrorRPCResponse
+    | GetConfigRPCResponse
+    | GetLedgerBalancesRPCResponse
+    | GetLedgerEntriesRPCResponse
+    | CreateApplicationRPCResponse
+    | SubmitStateRPCResponse
+    | CloseApplicationRPCResponse
+    | GetAppDefinitionRPCResponse
+    | GetAppSessionsRPCResponse
+    | ResizeChannelRPCResponse
+    | CloseChannelRPCResponse
+    | GetChannelsRPCResponse
+    | GetRPCHistoryRPCResponse
+    | GetAssetsRPCResponse;

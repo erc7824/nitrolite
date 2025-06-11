@@ -1561,76 +1561,658 @@ func TestHandleCloseVirtualApp(t *testing.T) {
 
 // TestHandleResizeChannel tests the resize channel handler functionality
 func TestHandleResizeChannel(t *testing.T) {
-	rawKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	signer := Signer{privateKey: rawKey}
-	addr := signer.GetAddress().Hex()
+	t.Run("SuccessfulIncrease", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
 
-	// Setup test DB
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
+		// Setup test DB
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
 
-	// Create asset
-	asset := Asset{Token: "0xTokenResize", ChainID: 137, Symbol: "usdc", Decimals: 6}
-	require.NoError(t, db.Create(&asset).Error)
+		// Create asset
+		asset := Asset{Token: "0xTokenResize", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
 
-	// Create channel with initial amount 1000
-	initialAmount := uint64(1000)
-	ch := Channel{
-		ChannelID:   "0xChanResize",
-		Participant: addr,
-		Wallet:      addr,
-		Status:      ChannelStatusOpen,
-		Token:       asset.Token,
-		ChainID:     137,
-		Amount:      initialAmount,
-		Version:     1,
-	}
-	require.NoError(t, db.Create(&ch).Error)
+		// Create channel with initial amount 1000
+		initialAmount := uint64(1000)
+		ch := Channel{
+			ChannelID:   "0xChanResize",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      initialAmount,
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&ch).Error)
 
-	// Fund participant ledger with 1000 USDC
-	require.NoError(t, GetWalletLedger(db, addr).Record(addr, "usdc", decimal.NewFromInt(int64(initialAmount))))
+		// Fund participant ledger with 1500 USDC (enough for resize)
+		ledger := GetWalletLedger(db, addr)
+		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(1500)))
 
-	// Prepare resize params: increase by 200
-	resizeParams := ResizeChannelParams{
-		ChannelID:        ch.ChannelID,
-		AllocateAmount:   big.NewInt(200),
-		FundsDestination: addr,
-	}
-	paramsBytes, _ := json.Marshal(resizeParams)
+		// Verify initial balance
+		initialBalance, err := ledger.Balance(addr, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(1500), initialBalance)
 
-	rpcReq := &RPCMessage{
-		Req: &RPCData{
-			RequestID: 1,
-			Method:    "resize_channel",
-			Params:    []any{json.RawMessage(paramsBytes)},
-			Timestamp: uint64(time.Now().Unix()),
-		},
-	}
+		// Prepare resize params: increase by 200
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			AllocateAmount:   big.NewInt(200),
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
 
-	// Sign request
-	rawReq, err := json.Marshal(rpcReq.Req)
-	require.NoError(t, err)
-	rpcReq.Req.rawBytes = rawReq
-	sig, err := signer.Sign(rawReq)
-	require.NoError(t, err)
-	rpcReq.Sig = []string{hexutil.Encode(sig)}
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 1,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
 
-	// Call handler
-	resp, err := HandleResizeChannel(nil, rpcReq, db, &signer)
-	require.NoError(t, err)
+		// Sign request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
 
-	// Validate response
-	assert.Equal(t, "resize_channel", resp.Res.Method)
-	resObj, ok := resp.Res.Params[0].(ResizeChannelResponse)
-	require.True(t, ok, "Response should be ResizeChannelResponse")
-	assert.Equal(t, ch.ChannelID, resObj.ChannelID)
-	assert.Equal(t, ch.Version+1, resObj.Version)
+		// Call handler
+		resp, err := HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.NoError(t, err)
 
-	// New channel amount should be initial + 200
-	expected := new(big.Int).Add(new(big.Int).SetUint64(initialAmount), big.NewInt(200))
-	assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expected), "Allocated amount mismatch")
-	assert.Equal(t, 0, resObj.Allocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		// Validate response
+		assert.Equal(t, "resize_channel", resp.Res.Method)
+		resObj, ok := resp.Res.Params[0].(ResizeChannelResponse)
+		require.True(t, ok, "Response should be ResizeChannelResponse")
+		assert.Equal(t, ch.ChannelID, resObj.ChannelID)
+		assert.Equal(t, ch.Version+1, resObj.Version)
+
+		// New channel amount should be initial + 200
+		expected := new(big.Int).Add(new(big.Int).SetUint64(initialAmount), big.NewInt(200))
+		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expected), "Allocated amount mismatch")
+		assert.Equal(t, 0, resObj.Allocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+
+		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
+		var unchangedChannel Channel
+		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
+		assert.Equal(t, initialAmount, unchangedChannel.Amount) // Should remain unchanged
+		assert.Equal(t, ch.Version, unchangedChannel.Version)   // Should remain unchanged
+		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
+
+		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
+		finalBalance, err := ledger.Balance(addr, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(1500), finalBalance) // Should remain unchanged
+	})
+
+	t.Run("SuccessfulDecrease", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		asset := Asset{Token: "0xTokenResize2", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		initialAmount := uint64(1000)
+		ch := Channel{
+			ChannelID:   "0xChanResize2",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      initialAmount,
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		ledger := GetWalletLedger(db, addr)
+		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(500)))
+
+		// Prepare resize params: decrease by 300
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			AllocateAmount:   big.NewInt(-300),
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 2,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		resp, err := HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.NoError(t, err)
+
+		resObj, ok := resp.Res.Params[0].(ResizeChannelResponse)
+		require.True(t, ok)
+
+		// Channel amount should decrease
+		expected := new(big.Int).Sub(new(big.Int).SetUint64(initialAmount), big.NewInt(300))
+		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expected), "Decreased amount mismatch")
+
+		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
+		finalBalance, err := ledger.Balance(addr, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(500), finalBalance) // Should remain unchanged
+	})
+
+	t.Run("ErrorInvalidChannelID", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		resizeParams := ResizeChannelParams{
+			ChannelID:        "0xNonExistentChannel",
+			AllocateAmount:   big.NewInt(100),
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 3,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "channel not found")
+	})
+
+	t.Run("ErrorChannelClosed", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		asset := Asset{Token: "0xTokenClosed", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		ch := Channel{
+			ChannelID:   "0xChanClosed",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusClosed,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      1000,
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			AllocateAmount:   big.NewInt(100),
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 4,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "channel must be open to resize")
+	})
+
+	t.Run("ErrorChannelJoining", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		asset := Asset{Token: "0xTokenJoining", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		ch := Channel{
+			ChannelID:   "0xChanJoining",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusJoining,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      1000,
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			AllocateAmount:   big.NewInt(100),
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 10,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "channel must be open to resize")
+		assert.Contains(t, err.Error(), "joining")
+	})
+
+	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		asset := Asset{Token: "0xTokenInsufficient", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		ch := Channel{
+			ChannelID:   "0xChanInsufficient",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      1000,
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		// Fund with very small amount (0.000001 USDC), but try to allocate 200 raw units
+		// This will create insufficient balance when converted to raw units
+		ledger := GetWalletLedger(db, addr)
+		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromFloat(0.000001)))
+
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			AllocateAmount:   big.NewInt(200),
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 5,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "insufficient unified balance")
+	})
+
+	t.Run("ErrorZeroAmounts", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		asset := Asset{Token: "0xTokenZero", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		ch := Channel{
+			ChannelID:   "0xChanZero",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      1000,
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		ledger := GetWalletLedger(db, addr)
+		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(1500)))
+
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			AllocateAmount:   big.NewInt(0),
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 6,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		// Zero allocation should now be rejected as it's a wasteful no-op operation
+		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "resize operation requires non-zero ResizeAmount or AllocateAmount")
+	})
+
+	t.Run("SuccessfulResizeAmountOnly", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		asset := Asset{Token: "0xTokenResizeOnly", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		initialAmount := uint64(1000)
+		ch := Channel{
+			ChannelID:   "0xChanResizeOnly",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      initialAmount,
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		// Fund the ledger to pass balance validation
+		ledger := GetWalletLedger(db, addr)
+		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(1500)))
+
+		// Only ResizeAmount, no AllocateAmount
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			ResizeAmount:     big.NewInt(100),
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 11,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		resp, err := HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.NoError(t, err)
+
+		resObj, ok := resp.Res.Params[0].(ResizeChannelResponse)
+		require.True(t, ok)
+
+		// Should be initial amount (1000) + allocate amount (0) + resize amount (100) = 1100
+		expected := new(big.Int).Add(new(big.Int).SetUint64(initialAmount), big.NewInt(100))
+		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expected))
+	})
+
+	t.Run("ErrorExcessiveDecrease", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		asset := Asset{Token: "0xTokenExcessive", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		ch := Channel{
+			ChannelID:   "0xChanExcessive",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      1000,
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		// Try to decrease by more than channel amount
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			AllocateAmount:   big.NewInt(-1500),
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 7,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "new channel amount must be positive")
+	})
+
+	t.Run("ErrorInvalidSignature", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		// Create a different signer for invalid signature
+		wrongKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		wrongSigner := Signer{privateKey: wrongKey}
+
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		asset := Asset{Token: "0xTokenSig", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		ch := Channel{
+			ChannelID:   "0xChanSig",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      1000,
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			AllocateAmount:   big.NewInt(100),
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 8,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+
+		// Sign with wrong signer
+		sig, err := wrongSigner.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid signature")
+	})
+
+	t.Run("BoundaryLargeAllocation", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		asset := Asset{Token: "0xTokenLarge", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		ch := Channel{
+			ChannelID:   "0xChanLarge",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      1000,
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		// Fund with a very large amount
+		ledger := GetWalletLedger(db, addr)
+		largeAmount := decimal.NewFromBigInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil), 0) // 10^18
+		require.NoError(t, ledger.Record(addr, "usdc", largeAmount))
+
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			AllocateAmount:   new(big.Int).Exp(big.NewInt(10), big.NewInt(15), nil), // 10^15
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 9,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		resp, err := HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.NoError(t, err)
+
+		resObj, ok := resp.Res.Params[0].(ResizeChannelResponse)
+		require.True(t, ok)
+
+		// Verify the large allocation was processed correctly
+		expectedAmount := new(big.Int).Add(big.NewInt(1000), new(big.Int).Exp(big.NewInt(10), big.NewInt(15), nil))
+		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expectedAmount))
+	})
 }
 
 // TestHandleCloseChannel tests the close channel handler functionality

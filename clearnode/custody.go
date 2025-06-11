@@ -511,7 +511,7 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			"asset":   asset.Symbol,
 		}).Set(walletBalance.InexactFloat64())
 
-		logger.Info("updated erc20 balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "balance", walletBalance.String())
+		logger.Debug("updated erc20 balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "balance", walletBalance.String())
 	}
 
 	openChannelsInfo, err := c.custody.GetOpenChannels(callOpts, []common.Address{brokerAddr})
@@ -530,5 +530,5 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 		"network": fmt.Sprintf("%d", c.chainID),
 	}).Set(float64(len(openChannelsInfo[0])))
 
-	logger.Info("updated contract total open channels metric", "network", c.chainID, "channels", len(openChannelsInfo[0]))
+	logger.Debug("updated contract total open channels metric", "network", c.chainID, "channels", len(openChannelsInfo[0]))
 }

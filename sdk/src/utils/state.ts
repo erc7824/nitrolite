@@ -68,14 +68,20 @@ export async function signState(
         const signatureHex = await signMessage({ message: { raw: stateHash } });
         const parsedSig = parseSignature(signatureHex);
 
-        if (typeof parsedSig.v === 'undefined') {
-            throw new Error("Signature parsing did not return a 'v' value. Unexpected signature format.");
+        // Handle both legacy (27/28) and EIP-155 (0/1) v values
+        let v: number;
+        if (parsedSig.v !== undefined) {
+            v = Number(parsedSig.v);
+        } else if (parsedSig.yParity !== undefined) {
+            v = parsedSig.yParity + 27;
+        } else {
+            throw new Error('Invalid signature format: missing v or yParity value');
         }
 
         return {
             r: parsedSig.r,
             s: parsedSig.s,
-            v: Number(parsedSig.v),
+            v,
         };
     } catch (error) {
         console.error('Error signing state hash:', error);

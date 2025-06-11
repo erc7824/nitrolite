@@ -12,15 +12,16 @@ describe('NitroliteClient', () => {
     } as any;
     const mockAccount = { address: '0x1234567890123456789012345678901234567890' as Address };
     const mockSignMessage = jest.fn(() =>
-        Promise.resolve('0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12341c')
+        Promise.resolve(
+            '0x' +
+            '1234567890abcdef'.repeat(8) + // 128 hex chars
+            '1b' // v = 27
+        )
     );
     const mockWalletClient = {
         account: mockAccount,
         signMessage: mockSignMessage,
     } as any;
-    const mockAccount = { address: '0x1234567890123456789012345678901234567890' as Address };
-    const mockSignMessage = jest.fn().mockResolvedValue('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1b');
-    const mockWalletClient = { account: mockAccount, signMessage: mockSignMessage } as any;
     const mockAddresses = {
         custody: '0x1111111111111111111111111111111111111111' as Address,
         adjudicator: '0x2222222222222222222222222222222222222222' as Address,
@@ -55,7 +56,6 @@ describe('NitroliteClient', () => {
             getAccountBalance: jest.fn(),
             getChannelBalance: jest.fn(),
             getChannelData: jest.fn(),
-            depositAndCreateChannel: jest.fn(),
             prepareDepositAndCreateChannel: jest.fn(),
         };
         mockErc20Service = {

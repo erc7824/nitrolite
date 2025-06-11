@@ -1,11 +1,4 @@
-import {
-    Account,
-    Address,
-    PublicClient,
-    WalletClient,
-    Hash,
-    zeroAddress
-} from 'viem';
+import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress } from 'viem';
 import { custodyAbi } from '../../abis/generated';
 import { ContractAddresses } from '../../abis';
 import { Errors } from '../../errors';
@@ -33,7 +26,7 @@ type PreparedContractRequest = any;
 const executeWriteContract = async (
     walletClient: WalletClient,
     request: PreparedContractRequest,
-    account: Account | Address
+    account: Account | Address,
 ): Promise<Hash> => {
     // The request from simulateContract contains all required parameters for writeContract.
     // We safely spread the request and add the account. This is type-safe because:
@@ -272,7 +265,12 @@ export class NitroliteService {
      * @param initial Initial state. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
-    async prepareDepositAndCreateChannel(tokenAddress: Address, amount: bigint, channel: Channel, initial: State): Promise<PreparedContractRequest> {
+    async prepareDepositAndCreateChannel(
+        tokenAddress: Address,
+        amount: bigint,
+        channel: Channel,
+        initial: State,
+    ): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareDepositAndCreateChannel';
         const accountAddress = typeof account === 'string' ? account : account.address;
@@ -335,11 +333,7 @@ export class NitroliteService {
      * @param sig Participant signature.
      * @returns The prepared transaction request object.
      */
-    async prepareJoinChannel(
-        channelId: ChannelId,
-        index: bigint,
-        sig: Signature,
-    ): Promise<PreparedContractRequest> {
+    async prepareJoinChannel(channelId: ChannelId, index: bigint, sig: Signature): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareJoinChannel';
 
@@ -465,12 +459,13 @@ export class NitroliteService {
         try {
             const abiCandidate = this.convertStateForABI(candidate);
             const abiProofs = proofs.map((proof) => this.convertStateForABI(proof));
+            const challengerSigABI = this.convertSignatureForABI(challengerSig);
 
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: 'challenge',
-                args: [channelId, abiCandidate, abiProofs, challengerSig],
+                args: [channelId, abiCandidate, abiProofs, challengerSigABI],
                 account: account,
             });
 
@@ -491,7 +486,12 @@ export class NitroliteService {
      * @returns Transaction hash.
      * @error Throws ContractCallError | TransactionError
      */
-    async challenge(channelId: ChannelId, candidate: State, proofs: State[] = [], challengerSig: Signature): Promise<Hash> {
+    async challenge(
+        channelId: ChannelId,
+        candidate: State,
+        proofs: State[] = [],
+        challengerSig: Signature,
+    ): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
         const operationName = 'challenge';
@@ -572,11 +572,7 @@ export class NitroliteService {
      * @param proofs Supporting proofs. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
-    async prepareClose(
-        channelId: ChannelId,
-        candidate: State,
-        proofs: State[] = [],
-    ): Promise<PreparedContractRequest> {
+    async prepareClose(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareClose';
 
@@ -719,7 +715,10 @@ export class NitroliteService {
     async getAccountBalance(user: Address, token: Address[]): Promise<bigint[]>;
     async getAccountBalance(user: Address[], token: Address): Promise<bigint[]>;
     async getAccountBalance(user: Address[], token: Address[]): Promise<bigint[][]>;
-    async getAccountBalance(user: Address | Address[], token: Address | Address[]): Promise<bigint | bigint[] | bigint[][]> {
+    async getAccountBalance(
+        user: Address | Address[],
+        token: Address | Address[],
+    ): Promise<bigint | bigint[] | bigint[][]> {
         const functionName = 'getAccountsBalances';
 
         const usersArg = Array.isArray(user) ? user : [user];

@@ -30,7 +30,7 @@ export async function _prepareAndSignInitialState(
     const { initialAllocationAmounts, stateData } = params;
 
     if (!stateData) {
-        throw new Errors.MissingParameterError('State data is required for creating the channel.');
+        throw new Errors.MissingParameterError('State data is required for creating the channel');
     }
 
     const channelNonce = generateChannelNonce(deps.account.address);

@@ -37,6 +37,7 @@ describe('NitroliteTransactionPreparer', () => {
         mockNitro = {
             prepareDeposit: jest.fn(),
             prepareCreateChannel: jest.fn(),
+            prepareDepositAndCreateChannel: jest.fn(),
             prepareCheckpoint: jest.fn(),
             prepareChallenge: jest.fn(),
             prepareClose: jest.fn(),
@@ -119,18 +120,19 @@ describe('NitroliteTransactionPreparer', () => {
     describe('prepareDepositAndCreateChannelTransactions', () => {
         test('combines flows', async () => {
             mockERC20.getTokenAllowance.mockResolvedValue(100n);
-            mockNitro.prepareDeposit.mockResolvedValue({ to: '0xD', data: '0xD' } as any);
             // @ts-ignore
             (_prepareAndSignInitialState as jest.Mock).mockResolvedValue({ channel: {}, initialState: {} });
-            mockNitro.prepareCreateChannel.mockResolvedValue({ to: '0xC', data: '0xC' } as any);
+            mockNitro.prepareDepositAndCreateChannel.mockResolvedValue({ to: '0xDC', data: '0xDC' } as any);
             const all = await prep.prepareDepositAndCreateChannelTransactions(tokenAddress, 10n, {} as any);
-            expect(all).toHaveLength(2);
+            expect(all).toHaveLength(1);
         });
 
         test('rethrows NitroliteError from deposit prepare', async () => {
             const ne = new Errors.MissingParameterError('d');
             mockERC20.getTokenAllowance.mockResolvedValue(100n);
-            mockNitro.prepareDeposit.mockRejectedValueOnce(ne);
+            // @ts-ignore
+            (_prepareAndSignInitialState as jest.Mock).mockResolvedValue({ channel: {}, initialState: {} });
+            mockNitro.prepareDepositAndCreateChannel.mockRejectedValueOnce(ne);
             await expect(prep.prepareDepositAndCreateChannelTransactions(tokenAddress, 10n, {} as any)).rejects.toThrow(
                 Errors.ContractCallError,
             );
@@ -138,11 +140,10 @@ describe('NitroliteTransactionPreparer', () => {
 
         test('rethrows NitroliteError from createChannel prepare', async () => {
             mockERC20.getTokenAllowance.mockResolvedValue(100n);
-            mockNitro.prepareDeposit.mockResolvedValue({ to: '0xD', data: '0xD' } as any);
             // @ts-ignore
             (_prepareAndSignInitialState as jest.Mock).mockResolvedValue({ channel: {}, initialState: {} });
             const ne = new Errors.MissingParameterError('y');
-            mockNitro.prepareCreateChannel.mockRejectedValueOnce(ne);
+            mockNitro.prepareDepositAndCreateChannel.mockRejectedValueOnce(ne);
             await expect(prep.prepareDepositAndCreateChannelTransactions(tokenAddress, 10n, {} as any)).rejects.toThrow(
                 Errors.ContractCallError,
             );

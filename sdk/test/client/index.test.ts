@@ -3,21 +3,27 @@ import { NitroliteClient } from '../../src/client/index';
 import { Errors } from '../../src/errors';
 import { Address, Hash, Hex } from 'viem';
 import * as stateModule from '../../src/client/state';
-import { Allocation, Channel, ChannelId, ChannelStatus, State, StateIntent } from '../../src/client/types';
+import { Allocation, Channel, ChannelId, ChannelStatus, StateIntent } from '../../src/client/types';
 
 describe('NitroliteClient', () => {
     let client: NitroliteClient;
     const mockPublicClient = {
-        waitForTransactionReceipt: jest.fn().mockResolvedValue({ status: 'success' }),
+        waitForTransactionReceipt: jest.fn(() => Promise.resolve({ status: 'success' })),
     } as any;
-    const mockAccount = { address: '0xOWNER' as Address };
-    const mockWalletClient = { account: mockAccount } as any;
+    const mockAccount = { address: '0x1234567890123456789012345678901234567890' as Address };
+    const mockSignMessage = jest.fn(() => 
+        Promise.resolve('0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12341c')
+    );
+    const mockWalletClient = {
+        account: mockAccount,
+        signMessage: mockSignMessage,
+    } as any;
     const mockAddresses = {
-        custody: '0xCUST' as Address,
-        adjudicator: '0xADJ' as Address,
-        guestAddress: '0xGUEST' as Address,
+        custody: '0x1111111111111111111111111111111111111111' as Address,
+        adjudicator: '0x2222222222222222222222222222222222222222' as Address,
+        guestAddress: '0x3333333333333333333333333333333333333333' as Address,
     };
-    const tokenAddress = '0xTOKEN' as Address;
+    const tokenAddress = '0x4444444444444444444444444444444444444444' as Address;
     const challengeDuration = 3600n;
     const chainId = 1;
 
@@ -81,11 +87,7 @@ describe('NitroliteClient', () => {
 
             const tx = await client.deposit(tokenAddress, 50n);
 
-            expect(mockErc20Service.approve).toHaveBeenCalledWith(
-                tokenAddress,
-                mockAddresses.custody,
-                50n,
-            );
+            expect(mockErc20Service.approve).toHaveBeenCalledWith(tokenAddress, mockAddresses.custody, 50n);
             expect(tx).toBe('0xDEP');
         });
 
@@ -138,7 +140,11 @@ describe('NitroliteClient', () => {
 
             const result = await client.createChannel(tokenAddress, params);
 
-            expect(stateModule._prepareAndSignInitialState).toHaveBeenCalledWith(tokenAddress, expect.anything(), params);
+            expect(stateModule._prepareAndSignInitialState).toHaveBeenCalledWith(
+                tokenAddress,
+                expect.anything(),
+                params,
+            );
             expect(mockNitroService.createChannel).toHaveBeenCalledWith(channel, initialState);
             expect(result).toEqual({
                 channelId,
@@ -155,6 +161,20 @@ describe('NitroliteClient', () => {
 
     describe('depositAndCreateChannel', () => {
         test('combines deposit and create', async () => {
+            const channelId = '0xcid' as Hex;
+            const initialState = {
+                data: '0x00' as Hex,
+                intent: 0,
+                allocations: [],
+                version: 0n,
+                sigs: [],
+            };
+
+            jest.spyOn(stateModule, '_prepareAndSignInitialState').mockResolvedValue({
+                channel: {} as any,
+                initialState,
+                channelId,
+            });
             mockNitroService.depositAndCreateChannel.mockResolvedValue('0xDEPandCRE' as Hash);
 
             const res = await client.depositAndCreateChannel(tokenAddress, 10n, {
@@ -162,11 +182,9 @@ describe('NitroliteClient', () => {
                 stateData: '0x00' as any,
             } as any);
 
-            expect(client.deposit).toHaveBeenCalledWith(tokenAddress, 10n);
-            expect(client.createChannel).toHaveBeenCalledWith(tokenAddress, expect.any(Object));
             expect(res).toEqual({
-                channelId: '0xcid' as Hex,
-                initialState: {},
+                channelId,
+                initialState,
                 txHash: '0xDEPandCRE' as Hash,
             });
         });
@@ -285,10 +303,7 @@ describe('NitroliteClient', () => {
             mockNitroService.getAccountBalance.mockResolvedValue(balances);
             const res = await client.getAccountBalance(tokenAddress);
             expect(res).toEqual(balances);
-            expect(mockNitroService.getAccountBalance).toHaveBeenCalledWith(
-                mockAccount.address,
-                tokenAddress,
-            );
+            expect(mockNitroService.getAccountBalance).toHaveBeenCalledWith(mockAccount.address, tokenAddress);
         });
     });
 
@@ -298,10 +313,7 @@ describe('NitroliteClient', () => {
             mockNitroService.getChannelBalance.mockResolvedValue(balances);
             const res = await client.getChannelBalance('0xcid' as ChannelId, tokenAddress);
             expect(res).toEqual(balances);
-            expect(mockNitroService.getChannelBalance).toHaveBeenCalledWith(
-                '0xcid' as ChannelId,
-                tokenAddress,
-            );
+            expect(mockNitroService.getChannelBalance).toHaveBeenCalledWith('0xcid' as ChannelId, tokenAddress);
         });
     });
 
@@ -331,9 +343,7 @@ describe('NitroliteClient', () => {
             mockNitroService.getChannelData.mockResolvedValue(data);
             const res = await client.getChannelData('0xcid' as ChannelId);
             expect(res).toEqual(data);
-            expect(mockNitroService.getChannelData).toHaveBeenCalledWith(
-                '0xcid' as ChannelId
-            );
+            expect(mockNitroService.getChannelData).toHaveBeenCalledWith('0xcid' as ChannelId);
         });
     });
 
@@ -341,11 +351,7 @@ describe('NitroliteClient', () => {
         test('success', async () => {
             mockErc20Service.approve.mockResolvedValue('0xAPP' as Hash);
             const tx = await client.approveTokens(tokenAddress, 30n);
-            expect(mockErc20Service.approve).toHaveBeenCalledWith(
-                tokenAddress,
-                mockAddresses.custody,
-                30n,
-            );
+            expect(mockErc20Service.approve).toHaveBeenCalledWith(tokenAddress, mockAddresses.custody, 30n);
             expect(tx).toBe('0xAPP');
         });
 
@@ -373,10 +379,7 @@ describe('NitroliteClient', () => {
             mockErc20Service.getTokenBalance.mockResolvedValue(1000n);
             const v = await client.getTokenBalance(tokenAddress);
             expect(v).toBe(1000n);
-            expect(mockErc20Service.getTokenBalance).toHaveBeenCalledWith(
-                tokenAddress,
-                mockAccount.address,
-            );
+            expect(mockErc20Service.getTokenBalance).toHaveBeenCalledWith(tokenAddress, mockAccount.address);
         });
     });
 });

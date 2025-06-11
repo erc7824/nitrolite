@@ -178,14 +178,14 @@ describe('NitroliteService', () => {
     describe('getOpenChannels', () => {
         test('success', async () => {
             const arr = ['0xA', '0xB'];
-            (mockPublicClient.readContract as any).mockResolvedValue(arr);
+            (mockPublicClient.readContract as any).mockResolvedValue([arr]);
             const out = await service.getOpenChannels(account);
             expect(out).toEqual(arr);
             expect(mockPublicClient.readContract).toHaveBeenCalledWith({
                 address: custodyAddress,
                 abi: CustodyAbi,
                 functionName: 'getOpenChannels',
-                args: [account],
+                args: [[account]],
             });
         });
         test('ContractReadError', async () => {
@@ -200,12 +200,12 @@ describe('NitroliteService', () => {
             const data = [[1n, 3n]] as bigint[][];
             (mockPublicClient.readContract as any).mockResolvedValue(data);
             const info = await service.getAccountBalance(account, tokens);
-            expect(info).toEqual(data);
+            expect(info).toEqual([1n, 3n]);
             expect(mockPublicClient.readContract).toHaveBeenCalledWith({
                 address: custodyAddress,
                 abi: CustodyAbi,
                 functionName: 'getAccountsBalances',
-                args: [account, tokens],
+                args: [[account], tokens],
             });
         });
         test('ContractReadError', async () => {

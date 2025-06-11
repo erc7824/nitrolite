@@ -41,10 +41,10 @@ func (r RPCMessage) GetRequestSignersMap() (map[string]struct{}, error) {
 // RPCData represents the common structure for both requests and responses
 // Format: [request_id, method, params, ts]
 type RPCData struct {
-	RequestID uint64
-	Method    string
-	Params    []any
-	Timestamp uint64
+	RequestID uint64 `json:"request_id" validate:"required"`
+	Method    string `json:"method" validate:"required"`
+	Params    []any  `json:"params" validate:"required"`
+	Timestamp uint64 `json:"ts" validate:"required"`
 	rawBytes  []byte
 }
 

@@ -11,13 +11,16 @@ describe('NitroliteClient', () => {
         waitForTransactionReceipt: jest.fn(() => Promise.resolve({ status: 'success' })),
     } as any;
     const mockAccount = { address: '0x1234567890123456789012345678901234567890' as Address };
-    const mockSignMessage = jest.fn(() => 
+    const mockSignMessage = jest.fn(() =>
         Promise.resolve('0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12341c')
     );
     const mockWalletClient = {
         account: mockAccount,
         signMessage: mockSignMessage,
     } as any;
+    const mockAccount = { address: '0x1234567890123456789012345678901234567890' as Address };
+    const mockSignMessage = jest.fn().mockResolvedValue('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1b');
+    const mockWalletClient = { account: mockAccount, signMessage: mockSignMessage } as any;
     const mockAddresses = {
         custody: '0x1111111111111111111111111111111111111111' as Address,
         adjudicator: '0x2222222222222222222222222222222222222222' as Address,
@@ -38,6 +41,7 @@ describe('NitroliteClient', () => {
             addresses: mockAddresses,
             challengeDuration,
             chainId: chainId,
+            stateWalletClient: { ...mockWalletClient, signMessage: mockSignMessage },
         });
         mockNitroService = {
             deposit: jest.fn(),
@@ -51,6 +55,8 @@ describe('NitroliteClient', () => {
             getAccountBalance: jest.fn(),
             getChannelBalance: jest.fn(),
             getChannelData: jest.fn(),
+            depositAndCreateChannel: jest.fn(),
+            prepareDepositAndCreateChannel: jest.fn(),
         };
         mockErc20Service = {
             getTokenAllowance: jest.fn(),
@@ -124,13 +130,13 @@ describe('NitroliteClient', () => {
                 data: '0x00' as Hex,
                 intent: StateIntent.INITIALIZE,
                 allocations: [
-                    { destination: '0x0' as Hex, token: '0x0', amount: 1n } as Allocation,
-                    { destination: '0x1' as Hex, token: '0x0', amount: 2n } as Allocation,
+                    { destination: '0x1234567890123456789012345678901234567890' as Hex, token: '0x0', amount: 1n } as Allocation,
+                    { destination: '0x2345678901234567890123456789012345678901' as Hex, token: '0x0', amount: 2n } as Allocation,
                 ] as [Allocation, Allocation],
                 version: 0n,
                 sigs: [],
             };
-            const channelId = '0xcid' as Hex;
+            const channelId = '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex;
             jest.spyOn(stateModule, '_prepareAndSignInitialState').mockResolvedValue({
                 channel,
                 initialState,
@@ -176,7 +182,6 @@ describe('NitroliteClient', () => {
                 channelId,
             });
             mockNitroService.depositAndCreateChannel.mockResolvedValue('0xDEPandCRE' as Hash);
-
             const res = await client.depositAndCreateChannel(tokenAddress, 10n, {
                 initialAllocationAmounts: [1n, 2n],
                 stateData: '0x00' as any,
@@ -193,7 +198,7 @@ describe('NitroliteClient', () => {
     describe('checkpointChannel', () => {
         test('success', async () => {
             const params = {
-                channelId: '0xcid' as Hex,
+                channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
                 candidateState: { sigs: ['s1', 's2'] } as any,
                 proofStates: [],
             };
@@ -210,7 +215,7 @@ describe('NitroliteClient', () => {
 
         test('insufficient sigs throws InvalidParameterError', async () => {
             const params = {
-                channelId: '0xcid' as Hex,
+                channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
                 candidateState: { sigs: ['s1'] } as any,
             };
             await expect(client.checkpointChannel(params)).rejects.toThrow(Errors.InvalidParameterError);
@@ -219,25 +224,44 @@ describe('NitroliteClient', () => {
 
     describe('challengeChannel', () => {
         test('success', async () => {
+            mockNitroService.challenge.mockResolvedValue('0xCHL' as Hash);
             const params = {
-                channelId: '0xcid' as Hex,
-                candidateState: {} as any,
+                channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
+                candidateState: {
+                    intent: 0,
+                    version: 1n,
+                    data: '0x00' as Hex,
+                    allocations: [
+                        { destination: '0x1234567890123456789012345678901234567890' as Hex, token: tokenAddress, amount: 1n },
+                        { destination: '0x2345678901234567890123456789012345678901' as Hex, token: tokenAddress, amount: 2n },
+                    ],
+                    sigs: [],
+                },
                 proofStates: [],
             };
-            mockNitroService.challenge.mockResolvedValue('0xCHL' as Hash);
             const tx = await client.challengeChannel(params);
             expect(mockNitroService.challenge).toHaveBeenCalledWith(
                 params.channelId,
                 params.candidateState,
                 params.proofStates,
+                expect.any(Object), // the signature
             );
             expect(tx).toBe('0xCHL');
         });
 
         test('failure throws ContractCallError', async () => {
             const params = {
-                channelId: '0xcid' as Hex,
-                candidateState: {} as any,
+                channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
+                candidateState: {
+                    intent: 0,
+                    version: 1n,
+                    data: '0x00' as Hex,
+                    allocations: [
+                        { destination: '0x1234567890123456789012345678901234567890' as Hex, token: tokenAddress, amount: 1n },
+                        { destination: '0x2345678901234567890123456789012345678901' as Hex, token: tokenAddress, amount: 2n },
+                    ],
+                    sigs: [],
+                },
                 proofStates: [],
             };
             mockNitroService.challenge.mockRejectedValue(new Error('fail'));
@@ -249,26 +273,26 @@ describe('NitroliteClient', () => {
         test('success', async () => {
             jest.spyOn(stateModule, '_prepareAndSignFinalState').mockResolvedValue({
                 finalStateWithSigs: {} as any,
-                channelId: '0xcid' as Hex,
+                channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
             });
             mockNitroService.close.mockResolvedValue('0xCLS' as Hash);
 
             const tx = await client.closeChannel({
                 finalState: {
-                    channelId: '0xcid',
+                    channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
                     allocations: [],
                     version: 0n,
                     serverSignature: [] as any,
                 } as any,
             });
             expect(stateModule._prepareAndSignFinalState).toHaveBeenCalledWith(expect.anything(), expect.any(Object));
-            expect(mockNitroService.close).toHaveBeenCalledWith('0xcid', {} as any);
+            expect(mockNitroService.close).toHaveBeenCalledWith('0x0000000000000000000000000000000000000000000000000000000000000001', {} as any);
             expect(tx).toBe('0xCLS');
         });
 
         test('failure throws ContractCallError', async () => {
             jest.spyOn(stateModule, '_prepareAndSignFinalState').mockRejectedValue(new Error('fail'));
-            await expect(client.closeChannel({ finalState: { channelId: '0xcid' } as any } as any)).rejects.toThrow(
+            await expect(client.closeChannel({ finalState: { channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex } as any } as any)).rejects.toThrow(
                 Errors.ContractCallError,
             );
         });

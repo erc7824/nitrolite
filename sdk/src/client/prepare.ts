@@ -154,6 +154,7 @@ export class NitroliteTransactionPreparer {
             const depositTx = await this.deps.nitroliteService.prepareDepositAndCreateChannel(tokenAddress, amount, channel, initialState);
             transactions.push(depositTx);
         } catch (err) {
+            if (err instanceof Errors.NitroliteError) throw err;
             throw new Errors.ContractCallError('prepareDepositAndCreateChannel', err as Error, { tokenAddress, amount });
         }
 

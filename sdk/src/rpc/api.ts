@@ -15,9 +15,11 @@ import {
     AuthChallengeRPCResponse,
     RequestData,
     Method,
+    ResponsePayload,
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
+import { ethers } from 'ethers';
 
 /**
  * Creates the signed, stringified message body for an 'auth_request'.
@@ -339,7 +341,6 @@ export async function createGetChannelsMessage(
  * @param partialMessage - The partial EIP-712 message structure to complete with the challenge.
  * @param authDomain - The domain name for the EIP-712 signing context.
  * @returns A MessageSigner function that takes the challenge data and returns the EIP-712 signature.
- * @throws Error if the wallet client is not available or if challenge extraction fails.
  */
 export function createEIP712AuthMessageSigner(
     walletClient: WalletClient,
@@ -370,9 +371,7 @@ export function createEIP712AuthMessageSigner(
             wallet: address as Address,
         };
 
-        const untypedMessage: Record<string, unknown> =  Object.fromEntries(
-            Object.entries(message)
-        );
+        const untypedMessage: Record<string, unknown> = Object.fromEntries(Object.entries(message));
 
         try {
             // Sign with EIP-712
@@ -388,6 +387,32 @@ export function createEIP712AuthMessageSigner(
         } catch (eip712Error) {
             console.error('EIP-712 signing failed:', eip712Error);
             throw new Error(`EIP-712  signing failed: ${eip712Error}`);
+        }
+    };
+}
+
+/**
+ * Creates a message signer function that uses ECDSA signing with a provided private key.
+ * 
+ * Note: for session key signing only, do not use this method with EOA keys.
+ * @param privateKey - The private key to use for ECDSA signing.
+ * @returns A MessageSigner function that signs the payload using ECDSA.
+ */
+export function createECDSAMessageSigner(privateKey: string): MessageSigner {
+    const wallet = new ethers.Wallet(privateKey);
+
+    return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
+        try {
+            const messageBytes = ethers.utils.arrayify(ethers.utils.id(JSON.stringify(payload)));
+
+            const flatSignature = await wallet._signingKey().signDigest(messageBytes);
+
+            const signature = ethers.utils.joinSignature(flatSignature);
+
+            return signature as Hex;
+        } catch (error) {
+            console.error('ECDSA signing failed:', error);
+            throw new Error(`EIP-712  signing failed: ${error}`);
         }
     };
 }

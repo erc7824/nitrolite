@@ -7,9 +7,9 @@ import (
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var ErrEventHasAlreadyBeenProcessed = errors.New("contract event has already been processed")
@@ -31,15 +31,8 @@ func (ContractEvent) TableName() string {
 }
 
 func StoreContractEvent(tx *gorm.DB, event *ContractEvent) error {
-	err := tx.Create(event).Error
-
-	if postgresErr, ok := err.(*pgconn.PgError); ok {
-		if postgresErr.Code == "23505" {
-			return ErrEventHasAlreadyBeenProcessed
-		}
-	}
-
-	return err
+	// Skip if the event has already been processed
+	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(event).Error
 }
 
 func MarshalCustodyResized(event nitrolite.CustodyResized) ([]byte, error) {

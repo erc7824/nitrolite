@@ -89,8 +89,20 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 
 // ListenEvents initializes event listening for the custody contract
 func (c *Custody) ListenEvents(ctx context.Context) {
-	// TODO: store processed events in a database
-	listenEvents(ctx, c.client, c.custodyAddr, c.chainID, 0, c.handleBlockChainEvent, c.logger)
+	ev, err := GetLatestContractEvent(c.db, c.custodyAddr.Hex(), c.chainID)
+	if err != nil {
+		c.logger.Error("failed to get latest contract event", "error", err)
+		return
+	}
+
+	var lastBlock uint64
+	var lastIndex uint32
+	if ev != nil {
+		lastBlock = ev.BlockNumber
+		lastIndex = ev.LogIndex
+	}
+
+	listenEvents(ctx, c.client, c.custodyAddr, c.chainID, lastBlock, lastIndex, c.handleBlockChainEvent, c.logger)
 }
 
 // Join calls the join method on the custody contract

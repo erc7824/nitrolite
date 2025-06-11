@@ -22,7 +22,7 @@ require (
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
-	github.com/DataDog/zstd v1.4.5 // indirect
+	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.2 // indirect
 	github.com/cockroachdb/errors v1.11.3 // indirect
 	github.com/cockroachdb/fifo v0.0.0-20240606204812-0bbfbd93a7ce // indirect
@@ -133,6 +133,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
+	github.com/layer-3/clearsync v0.0.129
 	github.com/lufia/plan9stats v0.0.0-20250317134145-8bc96cf8fc35 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -148,7 +149,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/pressly/goose/v3 v3.24.3

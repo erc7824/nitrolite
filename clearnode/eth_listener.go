@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"math/big"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -13,7 +16,11 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ipfs/go-log/v2"
+	"github.com/layer-3/clearsync/pkg/debounce"
+	"github.com/pkg/errors"
 )
+
+var ethLogger = log.Logger("base-event-listener")
 
 const (
 	maxBackOffCount = 5
@@ -64,11 +71,12 @@ func listenEvents(
 	contractAddress common.Address,
 	chainID uint32,
 	lastBlock uint64,
+	lastIndex uint32,
 	handler LogHandler,
 	logger Logger,
 ) {
 	var backOffCount atomic.Uint64
-	var currentCh chan types.Log
+	var historicalCh, currentCh chan types.Log
 	var eventSubscription event.Subscription
 
 	logger.Info("starting listening events", "chainID", chainID, "contractAddress", contractAddress.String())
@@ -76,12 +84,43 @@ func listenEvents(
 		if eventSubscription == nil {
 			waitForBackOffTimeout(logger, int(backOffCount.Load()))
 
+			historicalCh = make(chan types.Log, 1)
 			currentCh = make(chan types.Log, 100)
+
+			if lastBlock == 0 {
+				logger.Info("skipping historical logs fetching", "chainID", chainID, "contractAddress", contractAddress.String())
+			} else {
+				var header *types.Header
+				var err error
+				headerCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+				err = debounce.Debounce(headerCtx, ethLogger, func(ctx context.Context) error {
+					header, err = client.HeaderByNumber(ctx, nil)
+					return err
+				})
+				cancel()
+				if err != nil {
+					logger.Error("failed to get latest block", "error", err, "chainID", chainID, "contractAddress", contractAddress.String())
+					backOffCount.Add(1)
+					continue
+				}
+
+				go ReconcileBlockRange(
+					client,
+					contractAddress,
+					chainID,
+					header.Number.Uint64(),
+					lastBlock,
+					lastIndex,
+					&backOffCount,
+					historicalCh,
+					logger,
+				)
+			}
 
 			watchFQ := ethereum.FilterQuery{
 				Addresses: []common.Address{contractAddress},
 			}
-			eventSub, err := client.SubscribeFilterLogs(ctx, watchFQ, currentCh)
+			eventSub, err := client.SubscribeFilterLogs(context.Background(), watchFQ, currentCh)
 			if err != nil {
 				logger.Error("failed to subscribe on events", "error", err, "chainID", chainID, "contractAddress", contractAddress.String())
 				backOffCount.Add(1)
@@ -94,6 +133,9 @@ func listenEvents(
 		}
 
 		select {
+		case eventLog := <-historicalCh:
+			logger.Debug("received new event", "chainID", chainID, "contractAddress", contractAddress.String(), "blockNumber", lastBlock, "logIndex", eventLog.Index)
+			handler(ctx, eventLog)
 		case eventLog := <-currentCh:
 			lastBlock = eventLog.BlockNumber
 			logger.Debug("received new event", "chainID", chainID, "contractAddress", contractAddress.String(), "blockNumber", lastBlock, "logIndex", eventLog.Index)
@@ -109,6 +151,103 @@ func listenEvents(
 			eventSubscription = nil
 		}
 	}
+}
+
+func ReconcileBlockRange(
+	client bind.ContractBackend,
+	contractAddress common.Address,
+	chainID uint32,
+	currentBlock uint64,
+	lastBlock uint64,
+	lastIndex uint32,
+	backOffCount *atomic.Uint64,
+	historicalCh chan types.Log,
+	logger Logger,
+) {
+	const blockStep = 10000
+	startBlock := lastBlock
+	endBlock := startBlock + blockStep
+
+	for currentBlock > startBlock {
+		// We need to refetch events starting from last known block without adding 1 to it
+		// because it's possible that block includes more than 1 event, and some may be still unprocessed.
+		//
+		// This will cause duplicate key error in logs, but it's completely fine.
+		if endBlock > currentBlock {
+			endBlock = currentBlock
+		}
+
+		fetchFQ := ethereum.FilterQuery{
+			Addresses: []common.Address{contractAddress},
+			FromBlock: new(big.Int).SetUint64(startBlock),
+			ToBlock:   new(big.Int).SetUint64(endBlock),
+			// Topics:    topics,
+		}
+
+		var logs []types.Log
+		var err error
+		logsCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+		err = debounce.Debounce(logsCtx, ethLogger, func(ctx context.Context) error {
+			logs, err = client.FilterLogs(ctx, fetchFQ)
+			return err
+		})
+		cancel()
+		if err != nil {
+			newStartBlock, newEndBlock, extractErr := extractAdvisedBlockRange(err.Error())
+			if extractErr != nil {
+				logger.Error("failed to filter logs", "error", err, "chainID", chainID, "contractAddress", contractAddress.String())
+				backOffCount.Add(1)
+				continue
+			}
+			startBlock, endBlock = newStartBlock, newEndBlock
+			logger.Info("retrying with advised block range", "chainID", chainID, "contractAddress", contractAddress.String(), "startBlock", startBlock, "endBlock", endBlock)
+			continue // retry with the advised block range
+		}
+		logger.Info("fetched historical logs", "chainID", chainID, "contractAddress", contractAddress.String(), "count", len(logs), "startBlock", startBlock, "endBlock", endBlock)
+
+		for _, ethLog := range logs {
+			// Filter out previously known events
+			if ethLog.BlockNumber == lastBlock && ethLog.Index <= uint(lastIndex) {
+				logger.Info("skipping previously known event", "chainID", chainID, "contractAddress", contractAddress.String(), "blockNumber", ethLog.BlockNumber, "logIndex", ethLog.Index)
+				continue
+			}
+
+			historicalCh <- ethLog
+		}
+
+		startBlock = endBlock + 1
+		endBlock += blockStep
+	}
+}
+
+// extractAdvisedBlockRange extracts the advised block range from an error message
+// when the error indicates too many query results.
+// Assumed error format:
+// "query returned more than 10000 results. Try with this block range [0x953260, 0x954ED4]."
+func extractAdvisedBlockRange(msg string) (startBlock, endBlock uint64, err error) {
+	if !strings.Contains(msg, "query returned more than 10000 results") {
+		err = errors.New("error message doesn't contain advised block range")
+		return
+	}
+
+	re := regexp.MustCompile(`\[0x([0-9a-fA-F]+), 0x([0-9a-fA-F]+)\]`)
+	match := re.FindStringSubmatch(msg)
+	if len(match) != 3 { // Match contains the whole match and two capture groups
+		err = errors.New("failed to extract block range from error message")
+		return
+	}
+
+	startBlock, err = strconv.ParseUint(match[1], 16, 64)
+	if err != nil {
+		err = errors.Wrap(err, "failed to parse block range from error message")
+		return
+	}
+	endBlock, err = strconv.ParseUint(match[2], 16, 64)
+	if err != nil {
+		err = errors.Wrap(err, "failed to parse block range from error message")
+		return
+	}
+	return
 }
 
 // waitForBackOffTimeout implements exponential backoff between retries

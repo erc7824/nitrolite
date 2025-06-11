@@ -99,18 +99,21 @@ export async function _prepareAndSignChallengeState(
     deps: PreparerDependencies,
     params: ChallengeChannelParams,
 ): Promise<{
-    channelId: ChannelId,
-    candidateState: State,
-    proofs: State[],
-    challengerSig: Signature,
+    channelId: ChannelId;
+    candidateState: State;
+    proofs: State[];
+    challengerSig: Signature;
 }> {
     const { channelId, candidateState, proofStates = [] } = params;
 
     const stateHash = getStateHash(channelId, candidateState);
-    const encoded = encodeAbiParameters([
-        { type: 'bytes32', name: 'stateHash' },
-        { type: 'string', name: 'challenge' },
-    ], [stateHash, 'challenge']);
+    const encoded = encodeAbiParameters(
+        [
+            { type: 'bytes32', name: 'stateHash' },
+            { type: 'string', name: 'challenge' },
+        ],
+        [stateHash, 'challenge'],
+    );
     const challengeHash = keccak256(encoded) as Hex;
     const challengerSig = await signState(challengeHash, deps.stateWalletClient.signMessage);
 
@@ -156,7 +159,6 @@ export async function _prepareAndSignResizeState(
     };
 
     let proofs: State[] = [...proofStates];
-    proofs.push(resizeStateWithSigs);
 
     return { resizeStateWithSigs, proofs, channelId };
 }

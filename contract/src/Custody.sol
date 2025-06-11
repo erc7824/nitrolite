@@ -386,7 +386,12 @@ contract Custody is IChannel, IDeposit, IChannelReader {
      * @param challengerSig Challenger signature over `keccak256(abi.encode(stateHash, "challenge"))` to disallow 3rd party
      * to challenge with a stolen state and its signature
      */
-    function challenge(bytes32 channelId, State calldata candidate, State[] calldata proofs, Signature calldata challengerSig) external {
+    function challenge(
+        bytes32 channelId,
+        State calldata candidate,
+        State[] calldata proofs,
+        Signature calldata challengerSig
+    ) external {
         Metadata storage meta = _channels[channelId];
 
         // checks
@@ -652,10 +657,7 @@ contract Custody is IChannel, IDeposit, IChannelReader {
         address[2] memory participants,
         Signature memory challengerSig
     ) internal pure {
-        address challenger = Utils.recoverSigner(
-			keccak256(abi.encode(challengedStateHash, 'challenge')),
-			challengerSig
-		);
+        address challenger = Utils.recoverSigner(keccak256(abi.encode(challengedStateHash, "challenge")), challengerSig);
 
         if (challenger != participants[CLIENT_IDX] && challenger != participants[SERVER_IDX]) {
             revert InvalidChallengerSignature();

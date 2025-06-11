@@ -37,5 +37,8 @@ interface IChannelReader {
      * @param tokens Array of token addresses to check balances for (use address(0) for native tokens)
      * @return balances Array of balances corresponding to the provided tokens
      */
-    function getChannelBalances(bytes32 channelId, address[] memory tokens) external view returns (uint256[] memory balances);
+    function getChannelBalances(bytes32 channelId, address[] memory tokens)
+        external
+        view
+        returns (uint256[] memory balances);
 }

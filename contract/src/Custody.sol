@@ -78,7 +78,11 @@ contract Custody is IChannel, IDeposit, IChannelReader {
      * @param tokens Array of token addresses to check balances for (use address(0) for native tokens)
      * @return A 2D array of balances, where each inner array corresponds to the balances of the tokens for each account
      */
-    function getAccountsBalances(address[] calldata accounts, address[] calldata tokens) external view returns (uint256[][] memory) {
+    function getAccountsBalances(address[] calldata accounts, address[] calldata tokens)
+        external
+        view
+        returns (uint256[][] memory)
+    {
         uint256[][] memory balances = new uint256[][](accounts.length);
         for (uint256 i = 0; i < accounts.length; i++) {
             balances[i] = new uint256[](tokens.length);
@@ -120,17 +124,18 @@ contract Custody is IChannel, IDeposit, IChannelReader {
             address[] memory wallets,
             uint256 challengeExpiry,
             State memory lastValidState
-        ) {
-            Metadata storage meta = _channels[channelId];
-            channel = meta.chan;
-            status = meta.stage;
-            wallets = new address[](PART_NUM);
-            for (uint256 i = 0; i < PART_NUM; i++) {
-                wallets[i] = meta.wallets[i];
-            }
-            challengeExpiry = meta.challengeExpire;
-            lastValidState = meta.lastValidState;
+        )
+    {
+        Metadata storage meta = _channels[channelId];
+        channel = meta.chan;
+        status = meta.stage;
+        wallets = new address[](PART_NUM);
+        for (uint256 i = 0; i < PART_NUM; i++) {
+            wallets[i] = meta.wallets[i];
         }
+        challengeExpiry = meta.challengeExpire;
+        lastValidState = meta.lastValidState;
+    }
 
     /**
      * @notice Get the balance of a channel for a list of tokens
@@ -138,7 +143,11 @@ contract Custody is IChannel, IDeposit, IChannelReader {
      * @param tokens Array of token addresses to check balances for (use address(0) for native tokens)
      * @return balances Array of balances corresponding to the provided tokens
      */
-    function getChannelBalances(bytes32 channelId, address[] memory tokens) external view returns (uint256[] memory balances) {
+    function getChannelBalances(bytes32 channelId, address[] memory tokens)
+        external
+        view
+        returns (uint256[] memory balances)
+    {
         balances = new uint256[](tokens.length);
         for (uint256 i = 0; i < tokens.length; i++) {
             balances[i] = _channels[channelId].tokenBalances[tokens[i]];
@@ -267,12 +276,11 @@ contract Custody is IChannel, IDeposit, IChannelReader {
      * @param initial Initial state with StateIntent.INITIALIZE and expected allocations
      * @return channelId Unique identifier for the created channel
      */
-    function depositAndCreate(
-        address token,
-        uint256 amount,
-        Channel calldata ch,
-        State calldata initial
-    ) external payable returns (bytes32) {
+    function depositAndCreate(address token, uint256 amount, Channel calldata ch, State calldata initial)
+        external
+        payable
+        returns (bytes32)
+    {
         deposit(msg.sender, token, amount);
         return create(ch, initial);
     }

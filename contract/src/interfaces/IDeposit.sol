@@ -30,7 +30,10 @@ interface IDeposit {
      * @param tokens Array of token addresses to check balances for (use address(0) for native tokens)
      * @return A 2D array of balances, where each inner array corresponds to the balances of the tokens for each account
      */
-    function getAccountsBalances(address[] calldata accounts, address[] calldata tokens) external view returns (uint256[][] memory);
+    function getAccountsBalances(address[] calldata accounts, address[] calldata tokens)
+        external
+        view
+        returns (uint256[][] memory);
 
     /**
      * @notice Deposits tokens into the contract

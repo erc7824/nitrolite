@@ -457,15 +457,15 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 		}
 
 		logger.Debug("fetching account info", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "broker", brokerAddr.Hex())
-		// Call getAccountInfo on the custody contract
+		// Call GetAccountsBalances on the custody contract
 		tokenAddr := common.HexToAddress(asset.Token)
-		info, err := c.custody.GetAccountInfo(callOpts, brokerAddr, tokenAddr)
+		info, err := c.custody.GetAccountsBalances(callOpts, []common.Address{brokerAddr}, []common.Address{tokenAddr})
 		if err != nil {
 			logger.Error("failed to get account info", "network", c.chainID, "token", asset.Token, "error", err)
 			continue
 		}
 
-		availableBalance := decimal.NewFromBigInt(info.Available, -int32(asset.Decimals))
+		availableBalance := decimal.NewFromBigInt(info[0][0], -int32(asset.Decimals))
 
 		metrics.BrokerBalanceAvailable.With(prometheus.Labels{
 			"network": fmt.Sprintf("%d", c.chainID),
@@ -473,11 +473,11 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			"asset":   asset.Symbol,
 		}).Set(availableBalance.InexactFloat64())
 
-		metrics.BrokerChannelCount.With(prometheus.Labels{
-			"network": fmt.Sprintf("%d", c.chainID),
-		}).Set(float64(info.ChannelCount.Int64()))
+		// metrics.BrokerChannelCount.With(prometheus.Labels{
+		// 	"network": fmt.Sprintf("%d", c.chainID),
+		// }).Set(float64(info.ChannelCount.Int64()))
 
-		logger.Info("updated contract balance metrics", "network", c.chainID, "available", availableBalance.String(), "channels", info.ChannelCount.String())
+		// logger.Info("updated contract balance metrics", "network", c.chainID, "available", availableBalance.String(), "channels", info.ChannelCount.String())
 
 		// Fetch broker wallet balances
 		walletBalance := decimal.Zero

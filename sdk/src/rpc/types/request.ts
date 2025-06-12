@@ -31,14 +31,10 @@ export interface AuthChallengeRequest extends GenericRPCMessage {
  * Represents the request parameters for the 'auth_verify' RPC method.
  */
 export interface AuthVerifyRequestParams {
-    /** The Ethereum address of the client attempting to authenticate. */
-    address: Address;
+    /** The challenge token received from auth_challenge response. Used to verify the client's signature and prevent replay attacks. */
+    challenge: string,
     /** JSON Web Token for authentication, if provided. */
-    jwtToken: string;
-    /** The session key address associated with the authentication attempt. */
-    sessionKey: Address;
-    /** Indicates whether the authentication attempt was successful. */
-    success: boolean;
+    jwt: string;
 }
 
 /**

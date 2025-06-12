@@ -82,9 +82,9 @@ describe('API message creators', () => {
             method: RPCMethod.AuthChallenge,
             requestId: 999,
             timestamp: 200,
-            params: {
-                challengeMessage: 'msg',
-            },
+            params: [{
+                challenge_message: 'msg',
+            }],
             signatures: [],
         };
 

@@ -3,7 +3,6 @@ import {
     NitroliteRPCMessage,
     RequestData,
     NitroliteRPCErrorDetail,
-    AccountID,
     MessageSigner,
     SingleMessageVerifier,
     MultiMessageVerifier,
@@ -11,19 +10,6 @@ import {
     ResponsePayload,
     ApplicationRPCMessage,
     RPCResponse,
-    GetConfigRPCResponse,
-    GetLedgerBalancesRPCResponse,
-    GetLedgerEntriesRPCResponse,
-    CreateApplicationRPCResponse,
-    SubmitStateRPCResponse,
-    CloseApplicationRPCResponse,
-    GetAppDefinitionRPCResponse,
-    GetAppSessionsRPCResponse,
-    ResizeChannelRPCResponse,
-    CloseChannelRPCResponse,
-    GetChannelsRPCResponse,
-    GetRPCHistoryRPCResponse,
-    GetAssetsRPCResponse,
 } from './types';
 import { getCurrentTimestamp, generateRequestId } from './utils';
 
@@ -174,97 +160,6 @@ export class NitroliteRPC {
      */
     static isResponseType<T extends RPCResponse>(response: ParsedResponse, method: T['method']): response is ParsedResponse & { data: T['params'] } {
         return response.isValid && !response.isError && response.method === method;
-    }
-
-    /**
-     * Type guard for GetConfigRPCResponse
-     */
-    static isGetConfigResponse(response: ParsedResponse): response is ParsedResponse & { data: GetConfigRPCResponse['params'] } {
-        return this.isResponseType(response, 'get_config');
-    }
-
-    /**
-     * Type guard for GetLedgerBalancesRPCResponse
-     */
-    static isGetLedgerBalancesResponse(response: ParsedResponse): response is ParsedResponse & { data: GetLedgerBalancesRPCResponse['params'] } {
-        return this.isResponseType(response, 'get_ledger_balances');
-    }
-
-    /**
-     * Type guard for GetLedgerEntriesRPCResponse
-     */
-    static isGetLedgerEntriesResponse(response: ParsedResponse): response is ParsedResponse & { data: GetLedgerEntriesRPCResponse['params'] } {
-        return this.isResponseType(response, 'get_ledger_entries');
-    }
-
-    /**
-     * Type guard for CreateApplicationRPCResponse
-     */
-    static isCreateApplicationResponse(response: ParsedResponse): response is ParsedResponse & { data: CreateApplicationRPCResponse['params'] } {
-        return this.isResponseType(response, 'create_application');
-    }
-
-    /**
-     * Type guard for SubmitStateRPCResponse
-     */
-    static isSubmitStateResponse(response: ParsedResponse): response is ParsedResponse & { data: SubmitStateRPCResponse['params'] } {
-        return this.isResponseType(response, 'submit_state');
-    }
-
-    /**
-     * Type guard for CloseApplicationRPCResponse
-     */
-    static isCloseApplicationResponse(response: ParsedResponse): response is ParsedResponse & { data: CloseApplicationRPCResponse['params'] } {
-        return this.isResponseType(response, 'close_application');
-    }
-
-    /**
-     * Type guard for GetAppDefinitionRPCResponse
-     */
-    static isGetAppDefinitionResponse(response: ParsedResponse): response is ParsedResponse & { data: GetAppDefinitionRPCResponse['params'] } {
-        return this.isResponseType(response, 'get_app_definition');
-    }
-
-    /**
-     * Type guard for GetAppSessionsRPCResponse
-     */
-    static isGetAppSessionsResponse(response: ParsedResponse): response is ParsedResponse & { data: GetAppSessionsRPCResponse['params'] } {
-        return this.isResponseType(response, 'get_app_sessions');
-    }
-
-    /**
-     * Type guard for ResizeChannelRPCResponse
-     */
-    static isResizeChannelResponse(response: ParsedResponse): response is ParsedResponse & { data: ResizeChannelRPCResponse['params'] } {
-        return this.isResponseType(response, 'resize_channel');
-    }
-
-    /**
-     * Type guard for CloseChannelRPCResponse
-     */
-    static isCloseChannelResponse(response: ParsedResponse): response is ParsedResponse & { data: CloseChannelRPCResponse['params'] } {
-        return this.isResponseType(response, 'close_channel');
-    }
-
-    /**
-     * Type guard for GetChannelsRPCResponse
-     */
-    static isGetChannelsResponse(response: ParsedResponse): response is ParsedResponse & { data: GetChannelsRPCResponse['params'] } {
-        return this.isResponseType(response, 'get_channels');
-    }
-
-    /**
-     * Type guard for GetRPCHistoryRPCResponse
-     */
-    static isGetRPCHistoryResponse(response: ParsedResponse): response is ParsedResponse & { data: GetRPCHistoryRPCResponse['params'] } {
-        return this.isResponseType(response, 'get_rpc_history');
-    }
-
-    /**
-     * Type guard for GetAssetsRPCResponse
-     */
-    static isGetAssetsResponse(response: ParsedResponse): response is ParsedResponse & { data: GetAssetsRPCResponse['params'] } {
-        return this.isResponseType(response, 'get_assets');
     }
 
     /**

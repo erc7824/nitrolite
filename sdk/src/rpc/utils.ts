@@ -7,13 +7,12 @@ import {
     RPCMethod,
     RPCParamsByMethod,
     RPCResponse,
-    AppDefinition,
     GetConfigRPCParams,
     GetLedgerBalancesRPCParams,
     GetLedgerEntriesRPCParams,
-    CreateApplicationRPCParams,
+    CreateAppSessionRPCParams,
     SubmitStateRPCParams,
-    CloseApplicationRPCParams,
+    CloseAppSessionRPCParams,
     GetAppDefinitionRPCParams,
     GetAppSessionsRPCParams,
     ResizeChannelRPCParams,
@@ -177,19 +176,22 @@ export function parseRPCResponse(response: string): RPCResponse {
             throw new Error('Invalid RPC response format');
         }
 
-        return {
-            method: parsed.res[1] as RPCMethod,
+        const method = parsed.res[1] as keyof RPCParamsByMethod;
+        const responseObj = {
+            method: method as RPCMethod,
             requestId: parsed.res[0],
             timestamp: parsed.res[3],
             signatures: parsed.sig || [],
-            params: parseRPCParameters(parsed.res[1], parsed.res[2]),
-        };
+            params: parseRPCParameters(method, parsed.res[2]),
+        } as RPCResponse;
+
+        return responseObj;
     } catch (e) {
         throw new Error(`Failed to parse RPC response: ${e}`);
     }
 }
 
-function parseRPCParameters<M extends RPCMethod>(method: M, params: Array<any>): RPCParamsByMethod[M] {
+function parseRPCParameters<M extends keyof RPCParamsByMethod>(method: M, params: Array<any>): RPCParamsByMethod[M] {
     switch (method) {
         case RPCMethod.AuthChallenge:
             return {
@@ -215,24 +217,24 @@ function parseRPCParameters<M extends RPCMethod>(method: M, params: Array<any>):
             return extractRPCParameter<GetLedgerBalancesRPCParams[]>(params, 'balances') as RPCParamsByMethod[M];
         case RPCMethod.GetLedgerEntries:
             return extractRPCParameter<GetLedgerEntriesRPCParams[]>(params, 'entries') as RPCParamsByMethod[M];
-        case RPCMethod.CreateApplication:
+        case RPCMethod.CreateAppSession:
             return {
                 app_session_id: extractRPCParameter<Hex>(params, 'app_session_id'),
                 version: extractRPCParameter<number>(params, 'version'),
                 status: extractRPCParameter<string>(params, 'status'),
-            } as CreateApplicationRPCParams as RPCParamsByMethod[M];
+            } as CreateAppSessionRPCParams as RPCParamsByMethod[M];
         case RPCMethod.SubmitState:
             return {
                 app_session_id: extractRPCParameter<Hex>(params, 'app_session_id'),
                 version: extractRPCParameter<number>(params, 'version'),
                 status: extractRPCParameter<string>(params, 'status'),
             } as SubmitStateRPCParams as RPCParamsByMethod[M];
-        case RPCMethod.CloseApplication:
+        case RPCMethod.CloseAppSession:
             return {
                 app_session_id: extractRPCParameter<Hex>(params, 'app_session_id'),
                 version: extractRPCParameter<number>(params, 'version'),
                 status: extractRPCParameter<string>(params, 'status'),
-            } as CloseApplicationRPCParams as RPCParamsByMethod[M];
+            } as CloseAppSessionRPCParams as RPCParamsByMethod[M];
         case RPCMethod.GetAppDefinition:
             return extractRPCParameter<GetAppDefinitionRPCParams>(params, 'definition') as RPCParamsByMethod[M];
         case RPCMethod.GetAppSessions:

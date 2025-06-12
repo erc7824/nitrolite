@@ -13,10 +13,10 @@ export type Timestamp = number;
 export type AccountID = Hex;
 
 /** Represents the data payload within a request message: [requestId, method, params, timestamp?]. */
-export type RequestData = [RequestID, Method, any[], Timestamp?];
+export type RequestData = [RequestID, RPCMethod, any[], Timestamp?];
 
 /** Represents the data payload within a successful response message: [requestId, method, result, timestamp?]. */
-export type ResponseData = [RequestID, Method, any[], Timestamp?];
+export type ResponseData = [RequestID, RPCMethod, any[], Timestamp?];
 
 /** Represents a single allowance for an asset, used in application sessions.
  * This structure defines the symbol of the asset and the amount that is allowed to be spent.
@@ -140,7 +140,7 @@ export interface AuthRequest {
 }
 
 /**
- * Defines the parameters required for the 'create_application' RPC method.
+ * Defines the parameters required for the 'create_app_session' RPC method.
  */
 export interface CreateAppSessionRequest {
     /** The detailed definition of the application being created.
@@ -318,16 +318,18 @@ export enum RPCMethod {
     GetConfig = 'get_config',
     GetLedgerBalances = 'get_ledger_balances',
     GetLedgerEntries = 'get_ledger_entries',
-    CreateApplication = 'create_application',
+    CreateAppSession = 'create_app_session',
     SubmitState = 'submit_state',
-    CloseApplication = 'close_application',
+    CloseAppSession = 'close_application',
     GetAppDefinition = 'get_app_definition',
     GetAppSessions = 'get_app_sessions',
     ResizeChannel = 'resize_channel',
     CloseChannel = 'close_channel',
     GetChannels = 'get_channels',
     GetRPCHistory = 'get_rpc_history',
-    GetAssets = 'get_assets'
+    GetAssets = 'get_assets',
+    Ping = 'ping',
+    Message = 'message'
 }
 
 /**
@@ -390,9 +392,9 @@ export interface GetLedgerEntriesRPCParams {
 }
 
 /**
- * Represents the parameters for the 'create_application' RPC method.
+ * Represents the parameters for the 'create_app_session' RPC method.
  */
-export interface CreateApplicationRPCParams {
+export interface CreateAppSessionRPCParams {
     app_session_id: Hex;
     version: number;
     status: string;
@@ -410,7 +412,7 @@ export interface SubmitStateRPCParams {
 /**
  * Represents the parameters for the 'close_application' RPC method.
  */
-export interface CloseApplicationRPCParams {
+export interface CloseAppSessionRPCParams {
     app_session_id: Hex;
     version: number;
     status: string;
@@ -583,11 +585,11 @@ export interface GetLedgerEntriesRPCResponse extends GenericRPCResponse {
 }
 
 /**
- * Represents the response structure for the 'create_application' RPC method.
+ * Represents the response structure for the 'create_app_session' RPC method.
  */
-export interface CreateApplicationRPCResponse extends GenericRPCResponse {
-    method: RPCMethod.CreateApplication;
-    params: CreateApplicationRPCParams;
+export interface CreateAppSessionRPCResponse extends GenericRPCResponse {
+    method: RPCMethod.CreateAppSession;
+    params: CreateAppSessionRPCParams;
 }
 
 /**
@@ -601,9 +603,9 @@ export interface SubmitStateRPCResponse extends GenericRPCResponse {
 /**
  * Represents the response structure for the 'close_application' RPC method.
  */
-export interface CloseApplicationRPCResponse extends GenericRPCResponse {
-    method: RPCMethod.CloseApplication;
-    params: CloseApplicationRPCParams;
+export interface CloseAppSessionRPCResponse extends GenericRPCResponse {
+    method: RPCMethod.CloseAppSession;
+    params: CloseAppSessionRPCParams;
 }
 
 /**
@@ -673,9 +675,9 @@ export type RPCResponse =
     | GetConfigRPCResponse
     | GetLedgerBalancesRPCResponse
     | GetLedgerEntriesRPCResponse
-    | CreateApplicationRPCResponse
+    | CreateAppSessionRPCResponse
     | SubmitStateRPCResponse
-    | CloseApplicationRPCResponse
+    | CloseAppSessionRPCResponse
     | GetAppDefinitionRPCResponse
     | GetAppSessionsRPCResponse
     | ResizeChannelRPCResponse
@@ -694,9 +696,9 @@ export type RPCParamsByMethod = {
     [RPCMethod.GetConfig]: GetConfigRPCParams;
     [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRPCParams[];
     [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRPCParams[];
-    [RPCMethod.CreateApplication]: CreateApplicationRPCParams;
+    [RPCMethod.CreateAppSession]: CreateAppSessionRPCParams;
     [RPCMethod.SubmitState]: SubmitStateRPCParams;
-    [RPCMethod.CloseApplication]: CloseApplicationRPCParams;
+    [RPCMethod.CloseAppSession]: CloseAppSessionRPCParams;
     [RPCMethod.GetAppDefinition]: GetAppDefinitionRPCParams;
     [RPCMethod.GetAppSessions]: GetAppSessionsRPCParams[];
     [RPCMethod.ResizeChannel]: ResizeChannelRPCParams;

@@ -50,7 +50,7 @@ describe('API message creators', () => {
         expect(signer).not.toHaveBeenCalled();
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.AuthChallenge, [clientAddress, clientAddress, 'test-app', [], '', '', ''], timestamp],
+            req: [requestId, RPCMethod.AuthRequest, [clientAddress, clientAddress, 'test-app', [], '', '', ''], timestamp],
             sig: [''],
         });
     });

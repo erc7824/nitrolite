@@ -322,6 +322,7 @@ export const EIP712AuthTypes = {
  * Represents the RPC methods used in the Nitrolite protocol.
  */
 export enum RPCMethod {
+    AuthRequest = 'auth_request',
     AuthChallenge = 'auth_challenge',
     AuthVerify = 'auth_verify',
     Error = 'error',
@@ -339,7 +340,6 @@ export enum RPCMethod {
     GetRPCHistory = 'get_rpc_history',
     GetAssets = 'get_assets',
     Message = 'message',
-    AuthRequest = 'auth_request',
     BalanceUpdate = 'bu',
     ChannelsUpdate = 'channels',
     ChannelUpdate = 'cu',

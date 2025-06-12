@@ -14,7 +14,7 @@ interface GenericRPCMessage {
 /**
  * Represents the parameters for the 'auth_challenge' RPC method.
  */
-export interface AuthChallengeRPCParams {
+export interface AuthChallengeRPCResponseParams {
   /** The challenge message to be signed by the client for authentication. */
   challengeMessage: string;
 }
@@ -24,13 +24,13 @@ export interface AuthChallengeRPCParams {
  */
 export interface AuthChallengeRPCResponse extends GenericRPCMessage {
   method: RPCMethod.AuthChallenge;
-  params: AuthChallengeRPCParams;
+  params: AuthChallengeRPCResponseParams;
 }
 
 /**
  * Represents the parameters for the 'auth_verify' RPC method.
  */
-export interface AuthVerifyRPCParams {
+export interface AuthVerifyRPCResponseParams {
   address: Address;
   jwtToken: string;
   sessionKey: Address;
@@ -40,7 +40,7 @@ export interface AuthVerifyRPCParams {
 /**
  * Represents the parameters for the 'error' RPC method.
  */
-export interface ErrorRPCParams {
+export interface ErrorRPCResponseParams {
   /** The error message describing what went wrong. */
   error: string;
 }
@@ -48,7 +48,7 @@ export interface ErrorRPCParams {
 /**
  * Represents the parameters for the 'get_config' RPC method.
  */
-export interface GetConfigRPCParams {
+export interface GetConfigRPCResponseParams {
   /** The Ethereum address of the broker. */
   broker_address: Address;
   /** List of supported networks and their configurations. */
@@ -67,7 +67,7 @@ export interface GetConfigRPCParams {
 /**
  * Represents the parameters for the 'get_ledger_balances' RPC method.
  */
-export interface GetLedgerBalancesRPCParams {
+export interface GetLedgerBalancesRPCResponseParams {
   /** The asset symbol (e.g., "ETH", "USDC"). */
   asset: string;
   /** The balance amount as a string. */
@@ -77,7 +77,7 @@ export interface GetLedgerBalancesRPCParams {
 /**
  * Represents the parameters for the 'get_ledger_entries' RPC method.
  */
-export interface GetLedgerEntriesRPCParams {
+export interface GetLedgerEntriesRPCResponseParams {
   /** Unique identifier for the ledger entry. */
   id: number;
   /** The account identifier associated with the entry. */
@@ -99,7 +99,7 @@ export interface GetLedgerEntriesRPCParams {
 /**
  * Represents the parameters for the 'create_app_session' RPC method.
  */
-export interface CreateAppSessionRPCParams {
+export interface CreateAppSessionRPCResponseParams {
   /** The unique identifier for the application session. */
   app_session_id: Hex;
   /** The version number of the session. */
@@ -111,7 +111,7 @@ export interface CreateAppSessionRPCParams {
 /**
  * Represents the parameters for the 'submit_state' RPC method.
  */
-export interface SubmitStateRPCParams {
+export interface SubmitStateRPCResponseParams {
   /** The unique identifier for the application session. */
   app_session_id: Hex;
   /** The version number of the session. */
@@ -123,7 +123,7 @@ export interface SubmitStateRPCParams {
 /**
  * Represents the parameters for the 'close_app_session' RPC method.
  */
-export interface CloseAppSessionRPCParams {
+export interface CloseAppSessionRPCResponseParams {
   /** The unique identifier for the application session. */
   app_session_id: Hex;
   /** The version number of the session. */
@@ -135,12 +135,12 @@ export interface CloseAppSessionRPCParams {
 /**
  * Represents the parameters for the 'get_app_definition' RPC method.
  */
-export interface GetAppDefinitionRPCParams extends AppDefinition { }
+export interface GetAppDefinitionRPCResponseParams extends AppDefinition { }
 
 /**
  * Represents the parameters for the 'get_app_sessions' RPC method.
  */
-export interface GetAppSessionsRPCParams {
+export interface GetAppSessionsRPCResponseParams {
   /** The unique identifier for the application session. */
   app_session_id: Hex;
   /** The current status of the channel (e.g., "open", "closed"). */
@@ -168,7 +168,7 @@ export interface GetAppSessionsRPCParams {
 /**
  * Represents the parameters for the 'resize_channel' RPC method.
  */
-export interface ResizeChannelRPCParams {
+export interface ResizeChannelRPCResponseParams {
   /** The unique identifier for the channel. */
   channel_id: Hex;
   /** The encoded state data for the channel. */
@@ -202,7 +202,7 @@ export interface ResizeChannelRPCParams {
 /**
  * Represents the parameters for the 'close_channel' RPC method.
  */
-export interface CloseChannelRPCParams {
+export interface CloseChannelRPCResponseParams {
   /** The unique identifier for the channel. */
   channel_id: Hex;
   /** The intent type for the state update. */
@@ -236,7 +236,7 @@ export interface CloseChannelRPCParams {
 /**
  * Represents the parameters for the 'get_channels' RPC method.
  */
-export interface GetChannelsRPCParams {
+export interface GetChannelsRPCResponseParams {
   /** The unique identifier for the channel. */
   channel_id: Hex;
   /** The Ethereum address of the participant. */
@@ -268,7 +268,7 @@ export interface GetChannelsRPCParams {
 /**
  * Represents the parameters for the 'get_rpc_history' RPC method.
  */
-export interface GetRPCHistoryRPCParams {
+export interface GetRPCHistoryRPCResponseParams {
   /** Unique identifier for the RPC entry. */
   id: number;
   /** The Ethereum address of the sender. */
@@ -292,7 +292,7 @@ export interface GetRPCHistoryRPCParams {
 /**
  * Represents the parameters for the 'get_assets' RPC method.
  */
-export interface GetAssetsRPCParams {
+export interface GetAssetsRPCResponseParams {
   /** The token contract address. */
   token: Address;
   /** The chain ID where the asset exists. */
@@ -308,7 +308,7 @@ export interface GetAssetsRPCParams {
  */
 export interface ErrorRPCResponse extends GenericRPCMessage {
   method: RPCMethod.Error;
-  params: ErrorRPCParams;
+  params: ErrorRPCResponseParams;
 }
 
 /**
@@ -316,7 +316,7 @@ export interface ErrorRPCResponse extends GenericRPCMessage {
  */
 export interface GetConfigRPCResponse extends GenericRPCMessage {
   method: RPCMethod.GetConfig;
-  params: GetConfigRPCParams;
+  params: GetConfigRPCResponseParams;
 }
 
 /**
@@ -324,7 +324,7 @@ export interface GetConfigRPCResponse extends GenericRPCMessage {
  */
 export interface GetLedgerBalancesRPCResponse extends GenericRPCMessage {
   method: RPCMethod.GetLedgerBalances;
-  params: GetLedgerBalancesRPCParams[];
+  params: GetLedgerBalancesRPCResponseParams[];
 }
 
 /**
@@ -332,7 +332,7 @@ export interface GetLedgerBalancesRPCResponse extends GenericRPCMessage {
  */
 export interface GetLedgerEntriesRPCResponse extends GenericRPCMessage {
   method: RPCMethod.GetLedgerEntries;
-  params: GetLedgerEntriesRPCParams[];
+  params: GetLedgerEntriesRPCResponseParams[];
 }
 
 /**
@@ -340,7 +340,7 @@ export interface GetLedgerEntriesRPCResponse extends GenericRPCMessage {
  */
 export interface CreateAppSessionRPCResponse extends GenericRPCMessage {
   method: RPCMethod.CreateAppSession;
-  params: CreateAppSessionRPCParams;
+  params: CreateAppSessionRPCResponseParams;
 }
 
 /**
@@ -348,7 +348,7 @@ export interface CreateAppSessionRPCResponse extends GenericRPCMessage {
  */
 export interface SubmitStateRPCResponse extends GenericRPCMessage {
   method: RPCMethod.SubmitState;
-  params: SubmitStateRPCParams;
+  params: SubmitStateRPCResponseParams;
 }
 
 /**
@@ -356,7 +356,7 @@ export interface SubmitStateRPCResponse extends GenericRPCMessage {
  */
 export interface CloseAppSessionRPCResponse extends GenericRPCMessage {
   method: RPCMethod.CloseAppSession;
-  params: CloseAppSessionRPCParams;
+  params: CloseAppSessionRPCResponseParams;
 }
 
 /**
@@ -364,7 +364,7 @@ export interface CloseAppSessionRPCResponse extends GenericRPCMessage {
  */
 export interface GetAppDefinitionRPCResponse extends GenericRPCMessage {
   method: RPCMethod.GetAppDefinition;
-  params: GetAppDefinitionRPCParams;
+  params: GetAppDefinitionRPCResponseParams;
 }
 
 /**
@@ -372,7 +372,7 @@ export interface GetAppDefinitionRPCResponse extends GenericRPCMessage {
  */
 export interface GetAppSessionsRPCResponse extends GenericRPCMessage {
   method: RPCMethod.GetAppSessions;
-  params: GetAppSessionsRPCParams[];
+  params: GetAppSessionsRPCResponseParams[];
 }
 
 /**
@@ -380,7 +380,7 @@ export interface GetAppSessionsRPCResponse extends GenericRPCMessage {
  */
 export interface ResizeChannelRPCResponse extends GenericRPCMessage {
   method: RPCMethod.ResizeChannel;
-  params: ResizeChannelRPCParams;
+  params: ResizeChannelRPCResponseParams;
 }
 
 /**
@@ -388,7 +388,7 @@ export interface ResizeChannelRPCResponse extends GenericRPCMessage {
  */
 export interface CloseChannelRPCResponse extends GenericRPCMessage {
   method: RPCMethod.CloseChannel;
-  params: CloseChannelRPCParams;
+  params: CloseChannelRPCResponseParams;
 }
 
 /**
@@ -396,7 +396,7 @@ export interface CloseChannelRPCResponse extends GenericRPCMessage {
  */
 export interface GetChannelsRPCResponse extends GenericRPCMessage {
   method: RPCMethod.GetChannels;
-  params: GetChannelsRPCParams[];
+  params: GetChannelsRPCResponseParams[];
 }
 
 /**
@@ -404,7 +404,7 @@ export interface GetChannelsRPCResponse extends GenericRPCMessage {
  */
 export interface GetRPCHistoryRPCResponse extends GenericRPCMessage {
   method: RPCMethod.GetRPCHistory;
-  params: GetRPCHistoryRPCParams[];
+  params: GetRPCHistoryRPCResponseParams[];
 }
 
 /**
@@ -412,7 +412,7 @@ export interface GetRPCHistoryRPCResponse extends GenericRPCMessage {
  */
 export interface GetAssetsRPCResponse extends GenericRPCMessage {
   method: RPCMethod.GetAssets;
-  params: GetAssetsRPCParams[];
+  params: GetAssetsRPCResponseParams[];
 }
 
 /**
@@ -420,7 +420,7 @@ export interface GetAssetsRPCResponse extends GenericRPCMessage {
  */
 export interface AuthVerifyRPCResponse extends GenericRPCMessage {
   method: RPCMethod.AuthVerify;
-  params: AuthVerifyRPCParams;
+  params: AuthVerifyRPCResponseParams;
 }
 
 /**
@@ -448,21 +448,21 @@ export type RPCResponse =
 /**
  * Maps RPC methods to their corresponding parameter types.
  */
-export type RPCParamsByMethod = {
-  [RPCMethod.AuthChallenge]: AuthChallengeRPCParams;
-  [RPCMethod.AuthVerify]: AuthVerifyRPCParams;
-  [RPCMethod.Error]: ErrorRPCParams;
-  [RPCMethod.GetConfig]: GetConfigRPCParams;
-  [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRPCParams[];
-  [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRPCParams[];
-  [RPCMethod.CreateAppSession]: CreateAppSessionRPCParams;
-  [RPCMethod.SubmitState]: SubmitStateRPCParams;
-  [RPCMethod.CloseAppSession]: CloseAppSessionRPCParams;
-  [RPCMethod.GetAppDefinition]: GetAppDefinitionRPCParams;
-  [RPCMethod.GetAppSessions]: GetAppSessionsRPCParams[];
-  [RPCMethod.ResizeChannel]: ResizeChannelRPCParams;
-  [RPCMethod.CloseChannel]: CloseChannelRPCParams;
-  [RPCMethod.GetChannels]: GetChannelsRPCParams[];
-  [RPCMethod.GetRPCHistory]: GetRPCHistoryRPCParams[];
-  [RPCMethod.GetAssets]: GetAssetsRPCParams[];
+export type RPCResponseParamsByMethod = {
+  [RPCMethod.AuthChallenge]: AuthChallengeRPCResponseParams;
+  [RPCMethod.AuthVerify]: AuthVerifyRPCResponseParams;
+  [RPCMethod.Error]: ErrorRPCResponseParams;
+  [RPCMethod.GetConfig]: GetConfigRPCResponseParams;
+  [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRPCResponseParams[];
+  [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRPCResponseParams[];
+  [RPCMethod.CreateAppSession]: CreateAppSessionRPCResponseParams;
+  [RPCMethod.SubmitState]: SubmitStateRPCResponseParams;
+  [RPCMethod.CloseAppSession]: CloseAppSessionRPCResponseParams;
+  [RPCMethod.GetAppDefinition]: GetAppDefinitionRPCResponseParams;
+  [RPCMethod.GetAppSessions]: GetAppSessionsRPCResponseParams[];
+  [RPCMethod.ResizeChannel]: ResizeChannelRPCResponseParams;
+  [RPCMethod.CloseChannel]: CloseChannelRPCResponseParams;
+  [RPCMethod.GetChannels]: GetChannelsRPCResponseParams[];
+  [RPCMethod.GetRPCHistory]: GetRPCHistoryRPCResponseParams[];
+  [RPCMethod.GetAssets]: GetAssetsRPCResponseParams[];
 };

@@ -312,3 +312,24 @@ export type RPCRequest =
   | GetChannelsRPCRequest
   | GetRPCHistoryRPCRequest
   | GetAssetsRPCRequest;
+
+/**
+ * Maps RPC methods to their corresponding request parameter types.
+ */
+export type RPCRequestParamsByMethod = {
+  [RPCMethod.AuthChallenge]: AuthChallengeRPCRequestParams;
+  [RPCMethod.AuthVerify]: AuthVerifyRPCRequestParams;
+  [RPCMethod.GetConfig]: GetConfigRPCRequestParams;
+  [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRPCRequestParams;
+  [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRPCRequestParams;
+  [RPCMethod.CreateAppSession]: CreateAppSessionRPCRequestParams;
+  [RPCMethod.SubmitState]: SubmitStateRPCRequestParams;
+  [RPCMethod.CloseAppSession]: CloseAppSessionRPCRequestParams;
+  [RPCMethod.GetAppDefinition]: GetAppDefinitionRPCRequestParams;
+  [RPCMethod.GetAppSessions]: GetAppSessionsRPCRequestParams;
+  [RPCMethod.ResizeChannel]: ResizeChannelRPCRequestParams;
+  [RPCMethod.CloseChannel]: CloseChannelRPCRequestParams;
+  [RPCMethod.GetChannels]: GetChannelsRPCRequestParams;
+  [RPCMethod.GetRPCHistory]: GetRPCHistoryRPCRequestParams;
+  [RPCMethod.GetAssets]: GetAssetsRPCRequestParams;
+};

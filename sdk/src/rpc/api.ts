@@ -446,7 +446,7 @@ export function createEIP712AuthMessageSigner(
         }
 
         const method = payload[1];
-        if (method === 'error' || !Object.values(RPCMethod).includes(method as RPCMethod)) {
+        if (method === RPCMethod.Error || !Object.values(RPCMethod).includes(method as RPCMethod)) {
             throw new Error(`Invalid method: ${method}`);
         }
 

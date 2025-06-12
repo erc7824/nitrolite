@@ -19,7 +19,7 @@ export type RequestData = [RequestID, RPCMethod, any[], Timestamp?];
 export type ResponseData = [RequestID, RPCMethod, any[], Timestamp?];
 
 /** Represents the status of a channel. */
-export enum ChannelStatus {
+export enum RPCChannelStatus {
     Joining = 'joining',
     Open = 'open',
     Closed = 'closed',

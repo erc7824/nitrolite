@@ -147,7 +147,7 @@ export class NitroliteRPC {
             isValid: true,
             isError,
             requestId,
-            method,
+            method: method as RPCMethod,
             data,
             sid,
             timestamp,

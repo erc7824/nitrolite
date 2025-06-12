@@ -15,7 +15,7 @@ import {
     AuthChallengeRPCResponse,
     RequestData,
     RPCMethod,
-    ChannelStatus,
+    RPCChannelStatus,
     ResponsePayload,
 } from './types';
 import { NitroliteRPC } from './nitrolite';
@@ -378,7 +378,7 @@ export async function createResizeChannelMessage(
 export async function createGetChannelsMessage(
     signer: MessageSigner,
     participant?: Address,
-    status?: ChannelStatus,
+    status?: RPCChannelStatus,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {

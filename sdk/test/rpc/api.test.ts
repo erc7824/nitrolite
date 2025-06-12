@@ -23,7 +23,7 @@ import {
     AuthRequest,
     AuthChallengeRPCResponse,
     RPCMethod,
-    ChannelStatus,
+    RPCChannelStatus,
 } from '../../src/rpc/types';
 
 describe('API message creators', () => {
@@ -244,16 +244,16 @@ describe('API message creators', () => {
     });
 
     test('createGetChannelsMessage', async () => {
-        const msgStr = await createGetChannelsMessage(signer, '0x0123124124124131', ChannelStatus.Open, requestId, timestamp);
+        const msgStr = await createGetChannelsMessage(signer, '0x0123124124124131', RPCChannelStatus.Open, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([
             requestId,
             RPCMethod.GetChannels,
-            [{ participant: '0x0123124124124131', status: ChannelStatus.Open }],
+            [{ participant: '0x0123124124124131', status: RPCChannelStatus.Open }],
             timestamp,
         ]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetChannels, [{ participant: '0x0123124124124131', status: ChannelStatus.Open }], timestamp],
+            req: [requestId, RPCMethod.GetChannels, [{ participant: '0x0123124124124131', status: RPCChannelStatus.Open }], timestamp],
             sig: ['0xsig'],
         });
     });

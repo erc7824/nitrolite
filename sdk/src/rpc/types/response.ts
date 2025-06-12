@@ -1,5 +1,5 @@
 import { Address, Hex } from 'viem';
-import { RPCMethod, RequestID, Timestamp, AppDefinition, ChannelStatus } from '.';
+import { RPCMethod, RequestID, Timestamp, AppDefinition, RPCChannelStatus } from '.';
 
 /**
  * Represents a generic RPC message structure that includes common fields.
@@ -105,7 +105,7 @@ export interface CreateAppSessionRPCResponseParams {
   /** The version number of the session. */
   version: number;
   /** The current status of the channel (e.g., "open", "closed"). */
-  status: ChannelStatus;
+  status: RPCChannelStatus;
 }
 
 /**
@@ -117,7 +117,7 @@ export interface SubmitStateRPCResponseParams {
   /** The version number of the session. */
   version: number;
   /** The current status of the channel (e.g., "open", "closed"). */
-  status: ChannelStatus;
+  status: RPCChannelStatus;
 }
 
 /**
@@ -129,7 +129,7 @@ export interface CloseAppSessionRPCResponseParams {
   /** The version number of the session. */
   version: number;
   /** The current status of the channel (e.g., "open", "closed"). */
-  status: ChannelStatus;
+  status: RPCChannelStatus;
 }
 
 /**
@@ -144,7 +144,7 @@ export interface GetAppSessionsRPCResponseParams {
   /** The unique identifier for the application session. */
   app_session_id: Hex;
   /** The current status of the channel (e.g., "open", "closed"). */
-  status: ChannelStatus;
+  status: RPCChannelStatus;
   /** List of participant Ethereum addresses. */
   participants: Address[];
   /** The protocol identifier for the application. */
@@ -242,7 +242,7 @@ export interface GetChannelsRPCResponseParams {
   /** The Ethereum address of the participant. */
   participant: Address;
   /** The current status of the channel (e.g., "open", "closed"). */
-  status: ChannelStatus;
+  status: RPCChannelStatus;
   /** The token contract address. */
   token: Address;
   /** The wallet address associated with the channel. */
@@ -489,7 +489,7 @@ export interface ChannelUpdateRPCResponseParams {
   /** The Ethereum address of the participant. */
   participant: Address;
   /** The current status of the channel (e.g., "open", "closed"). */
-  status: ChannelStatus;
+  status: RPCChannelStatus;
   /** The token contract address. */
   token: Address;
   /** The total amount in the channel as a string. */

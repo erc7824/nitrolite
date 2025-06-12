@@ -1,5 +1,5 @@
 import { Address, Hex } from 'viem';
-import { RPCMethod, RequestID, Timestamp, AppDefinition, AppSessionAllocation, ChannelStatus } from '.';
+import { RPCMethod, RequestID, Timestamp, AppDefinition, AppSessionAllocation, RPCChannelStatus as RPCChannelStatus } from '.';
 
 /**
  * Represents a generic RPC message structure that includes common fields.
@@ -191,7 +191,7 @@ export interface GetAppSessionsRPCRequestParams {
   /** Optional participant address to filter application sessions. If not provided, returns all sessions. */
   participant?: Address;
   /** Optional status to filter application sessions (e.g., "open", "closed"). If not provided, returns sessions of all statuses. */
-  status?: ChannelStatus;
+  status?: RPCChannelStatus;
 }
 
 /**
@@ -249,7 +249,7 @@ export interface GetChannelsRPCRequestParams {
   /** Optional participant address to filter channels. If not provided, returns all channels. */
   participant?: Address;
   /** Optional status to filter channels (e.g., "open", "closed"). If not provided, returns channels of all statuses. */
-  status?: ChannelStatus;
+  status?: RPCChannelStatus;
 }
 
 /**

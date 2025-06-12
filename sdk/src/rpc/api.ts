@@ -457,10 +457,6 @@ export function createEIP712AuthMessageSigner(
         }
 
         const method = payload[1];
-        if (method === RPCMethod.Error || !Object.values(RPCMethod).includes(method as RPCMethod)) {
-            throw new Error(`Invalid method: ${method}`);
-        }
-
         let challengeUUID: string = '';
         if (method === RPCMethod.AuthChallenge) {
             challengeUUID = payload[2][0].challengeMessage;

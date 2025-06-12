@@ -71,6 +71,7 @@ export class NitroliteRPC {
      * @returns A ParsedResponse object containing the extracted data and validation status.
      */
     static parseResponse(rawMessage: string | object): ParsedResponse {
+        // TODO: either merge or replace it with parseRPCResponse from utils.ts
         let message: any;
 
         try {

@@ -1,5 +1,10 @@
 import { Hex, stringToHex } from 'viem';
-import { NitroliteRPCMessage, RPCMethod, RPCResponseParamsByMethod, RPCResponse } from './types';
+import {
+    NitroliteRPCMessage,
+    RPCMethod,
+    RPCResponseParamsByMethod,
+    RPCResponse,
+} from './types';
 
 /**
  * Get the current time in milliseconds
@@ -166,11 +171,11 @@ export function parseRPCResponse(response: string): RPCResponse {
 
         return responseObj;
     } catch (e) {
-        throw new Error(`Failed to parse RPC response: ${e}`);
+        throw new Error(`Failed to parse RPC response: ${e instanceof Error ? e.message : e}`);
     }
 }
 
-function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(method: M, params: Array<any>): RPCResponseParamsByMethod[M][] {
+function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(_: M, params: Array<any>): RPCResponseParamsByMethod[M][] {
     const result: RPCResponseParamsByMethod[M][] = [];
 
     if (Array.isArray(params) && params.length > 0) {

@@ -293,12 +293,91 @@ export interface GetAssetsRPCRequest extends GenericRPCMessage {
 }
 
 /**
+ * Represents the request parameters for the 'auth_request' RPC method.
+ */
+export interface AuthRequestRPCRequestParams {
+  /** The Ethereum address of the wallet being authorized. */
+  address: Address;
+  /** The session key address associated with the authentication attempt. */
+  sessionKey: Address;
+  /** The name of the application being authorized. */
+  appName: string;
+  /** The allowances for the connection. */
+  allowances: {
+    /** The asset symbol (e.g., "ETH", "USDC"). */
+    asset: string;
+    /** The amount allowed as a string. */
+    amount: string;
+  }[];
+  /** The expiration timestamp for the authorization. */
+  expire: string;
+  /** The scope of the authorization. */
+  scope: string;
+  /** The application address being authorized. */
+  applicationAddress: Address;
+}
+
+/**
+ * Represents the request structure for the 'auth_request' RPC method.
+ */
+export interface AuthRequestRPCRequest extends GenericRPCMessage {
+  method: RPCMethod.AuthRequest;
+  params: AuthRequestRPCRequestParams;
+}
+
+/**
+ * Represents the request parameters for the 'message' RPC method.
+ */
+export interface MessageRPCRequestParams {
+  // Message parameters are handled by the virtual application
+}
+
+/**
+ * Represents the request structure for the 'message' RPC method.
+ */
+export interface MessageRPCRequest extends GenericRPCMessage {
+  method: RPCMethod.Message;
+  params: MessageRPCRequestParams;
+}
+
+/**
+ * Represents the request parameters for the 'ping' RPC method.
+ */
+export interface PingRPCRequestParams {
+  // No parameters needed for ping
+}
+
+/**
+ * Represents the request structure for the 'ping' RPC method.
+ */
+export interface PingRPCRequest extends GenericRPCMessage {
+  method: RPCMethod.Ping;
+  params: PingRPCRequestParams;
+}
+
+/**
+ * Represents the request parameters for the 'pong' RPC method.
+ */
+export interface PongRPCRequestParams {
+  // No parameters needed for pong
+}
+
+/**
+ * Represents the request structure for the 'pong' RPC method.
+ */
+export interface PongRPCRequest extends GenericRPCMessage {
+  method: RPCMethod.Pong;
+  params: PongRPCRequestParams;
+}
+
+/**
  * Union type for all possible RPC request types.
  * This allows for type-safe handling of different request structures.
  */
 export type RPCRequest =
   | AuthChallengeRPCRequest
   | AuthVerifyRPCRequest
+  | AuthRequestRPCRequest
   | GetConfigRPCRequest
   | GetLedgerBalancesRPCRequest
   | GetLedgerEntriesRPCRequest
@@ -311,7 +390,10 @@ export type RPCRequest =
   | CloseChannelRPCRequest
   | GetChannelsRPCRequest
   | GetRPCHistoryRPCRequest
-  | GetAssetsRPCRequest;
+  | GetAssetsRPCRequest
+  | PingRPCRequest
+  | PongRPCRequest
+  | MessageRPCRequest;
 
 /**
  * Maps RPC methods to their corresponding request parameter types.
@@ -319,6 +401,7 @@ export type RPCRequest =
 export type RPCRequestParamsByMethod = {
   [RPCMethod.AuthChallenge]: AuthChallengeRPCRequestParams;
   [RPCMethod.AuthVerify]: AuthVerifyRPCRequestParams;
+  [RPCMethod.AuthRequest]: AuthRequestRPCRequestParams;
   [RPCMethod.GetConfig]: GetConfigRPCRequestParams;
   [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRPCRequestParams;
   [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRPCRequestParams;
@@ -332,4 +415,7 @@ export type RPCRequestParamsByMethod = {
   [RPCMethod.GetChannels]: GetChannelsRPCRequestParams;
   [RPCMethod.GetRPCHistory]: GetRPCHistoryRPCRequestParams;
   [RPCMethod.GetAssets]: GetAssetsRPCRequestParams;
+  [RPCMethod.Ping]: PingRPCRequestParams;
+  [RPCMethod.Pong]: PongRPCRequestParams;
+  [RPCMethod.Message]: MessageRPCRequestParams;
 };

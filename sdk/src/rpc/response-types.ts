@@ -424,12 +424,138 @@ export interface AuthVerifyRPCResponse extends GenericRPCMessage {
 }
 
 /**
+ * Represents the parameters for the 'auth_request' RPC method.
+ */
+export interface AuthRequestRPCResponseParams {
+  /** The challenge message to be signed by the client for authentication. */
+  challengeMessage: string;
+}
+
+/**
+ * Represents the response structure for the 'auth_request' RPC method.
+ */
+export interface AuthRequestRPCResponse extends GenericRPCMessage {
+  method: RPCMethod.AuthRequest;
+  params: AuthRequestRPCResponseParams;
+}
+
+/**
+ * Represents the response parameters for the 'message' RPC method.
+ */
+export interface MessageRPCResponseParams {
+  // Message response parameters are handled by the application
+}
+
+/**
+ * Represents the response structure for the 'message' RPC method.
+ */
+export interface MessageRPCResponse extends GenericRPCMessage {
+  method: RPCMethod.Message;
+  params: MessageRPCResponseParams;
+}
+
+/**
+ * Represents the parameters for the 'balance_update' RPC method.
+ */
+export interface BalanceUpdateRPCResponseParams {
+  /** The asset symbol (e.g., "ETH", "USDC"). */
+  asset: string;
+  /** The balance amount as a string. */
+  amount: string;
+}
+
+/**
+ * Represents the response structure for the 'balance_update' RPC method.
+ */
+export interface BalanceUpdateRPCResponse extends GenericRPCMessage {
+  method: RPCMethod.BalanceUpdate;
+  params: BalanceUpdateRPCResponseParams[];
+}
+
+/**
+ * Represents the response structure for the 'channels_update' RPC method.
+ */
+export interface ChannelsUpdateRPCResponse extends GenericRPCMessage {
+  method: RPCMethod.ChannelsUpdate;
+  params: ChannelUpdateRPCResponseParams[];
+}
+
+/**
+ * Represents the parameters for the 'channel_update' RPC method.
+ */
+export interface ChannelUpdateRPCResponseParams {
+  /** The unique identifier for the channel. */
+  channel_id: Hex;
+  /** The Ethereum address of the participant. */
+  participant: Address;
+  /** The current status of the channel (e.g., "open", "closed"). */
+  status: ChannelStatus;
+  /** The token contract address. */
+  token: Address;
+  /** The total amount in the channel as a string. */
+  amount: string;
+  /** The chain ID where the channel exists. */
+  chain_id: number;
+  /** The adjudicator contract address. */
+  adjudicator: Address;
+  /** The challenge period in seconds. */
+  challenge: number;
+  /** The nonce value for the channel. */
+  nonce: number;
+  /** The version number of the channel. */
+  version: number;
+  /** The timestamp when the channel was created. */
+  created_at: string;
+  /** The timestamp when the channel was last updated. */
+  updated_at: string;
+}
+
+/**
+ * Represents the response structure for the 'channel_update' RPC method.
+ */
+export interface ChannelUpdateRPCResponse extends GenericRPCMessage {
+  method: RPCMethod.ChannelUpdate;
+  params: ChannelUpdateRPCResponseParams;
+}
+
+/**
+ * Represents the parameters for the 'ping' RPC method.
+ */
+export interface PingRPCResponseParams {
+  // No parameters needed for ping
+}
+
+/**
+ * Represents the response structure for the 'ping' RPC method.
+ */
+export interface PingRPCResponse extends GenericRPCMessage {
+  method: RPCMethod.Ping;
+  params: PingRPCResponseParams;
+}
+
+/**
+ * Represents the parameters for the 'pong' RPC method.
+ */
+export interface PongRPCResponseParams {
+  // No parameters needed for pong
+}
+
+/**
+ * Represents the response structure for the 'pong' RPC method.
+ */
+export interface PongRPCResponse extends GenericRPCMessage {
+  method: RPCMethod.Pong;
+  params: PongRPCResponseParams;
+}
+
+/**
  * Union type for all possible RPC response types.
  * This allows for type-safe handling of different response structures.
  */
 export type RPCResponse =
   | AuthChallengeRPCResponse
   | AuthVerifyRPCResponse
+  | AuthRequestRPCResponse
   | ErrorRPCResponse
   | GetConfigRPCResponse
   | GetLedgerBalancesRPCResponse
@@ -443,7 +569,13 @@ export type RPCResponse =
   | CloseChannelRPCResponse
   | GetChannelsRPCResponse
   | GetRPCHistoryRPCResponse
-  | GetAssetsRPCResponse;
+  | GetAssetsRPCResponse
+  | PingRPCResponse
+  | PongRPCResponse
+  | MessageRPCResponse
+  | BalanceUpdateRPCResponse
+  | ChannelsUpdateRPCResponse
+  | ChannelUpdateRPCResponse;
 
 /**
  * Maps RPC methods to their corresponding parameter types.
@@ -451,6 +583,7 @@ export type RPCResponse =
 export type RPCResponseParamsByMethod = {
   [RPCMethod.AuthChallenge]: AuthChallengeRPCResponseParams;
   [RPCMethod.AuthVerify]: AuthVerifyRPCResponseParams;
+  [RPCMethod.AuthRequest]: AuthRequestRPCResponseParams;
   [RPCMethod.Error]: ErrorRPCResponseParams;
   [RPCMethod.GetConfig]: GetConfigRPCResponseParams;
   [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRPCResponseParams[];
@@ -465,4 +598,10 @@ export type RPCResponseParamsByMethod = {
   [RPCMethod.GetChannels]: GetChannelsRPCResponseParams[];
   [RPCMethod.GetRPCHistory]: GetRPCHistoryRPCResponseParams[];
   [RPCMethod.GetAssets]: GetAssetsRPCResponseParams[];
+  [RPCMethod.Ping]: PingRPCResponseParams;
+  [RPCMethod.Pong]: PongRPCResponseParams;
+  [RPCMethod.Message]: MessageRPCResponseParams;
+  [RPCMethod.BalanceUpdate]: BalanceUpdateRPCResponseParams[];
+  [RPCMethod.ChannelsUpdate]: ChannelUpdateRPCResponseParams[];
+  [RPCMethod.ChannelUpdate]: ChannelUpdateRPCResponseParams;
 };

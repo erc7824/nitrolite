@@ -141,8 +141,9 @@ Clearnode requires the following environment variables to be properly configured
 | `POLYGON_INFURA_URL` | Polygon RPC endpoint URL | At least one network required | - |
 | `POLYGON_CUSTODY_CONTRACT_ADDRESS` | Polygon custody contract address | Required if using Polygon | - |
 | `POLYGON_ADJUDICATOR_ADDRESS` | Polygon adjudicator contract address | Required if using Polygon | - |
+| `POLYGON_BALANCE_CHECKER_ADDRESS` | Polygon balance checker contract address | Required if using Polygon | - |
 
-Multiple networks can be added. For each supported network (POLYGON, ETH_SEPOLIA, CELO, BASE, WORLD_CHAIN, LOCALNET), you can specify the corresponding INFURA_URL, CUSTODY_CONTRACT_ADDRESS, and ADJUDICATOR_ADDRESS environment variables.
+Multiple networks can be added. For each supported network (POLYGON, ETH_SEPOLIA, CELO, BASE, WORLD_CHAIN, LOCALNET), you can specify the corresponding INFURA_URL, CUSTODY_CONTRACT_ADDRESS, ADJUDICATOR_ADDRESS, and BALANCE_CHECKER_ADDRESS environment variables.
 
 ## Running with Docker
 

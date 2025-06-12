@@ -101,7 +101,7 @@ export class NitroliteRPC {
 
         if (
             typeof requestId !== 'number' ||
-            (typeof method !== 'string' && typeof method !== typeof RPCMethod) ||
+            (typeof method !== typeof RPCMethod) ||
             !Array.isArray(dataPayload) ||
             typeof timestamp !== 'number'
         ) {

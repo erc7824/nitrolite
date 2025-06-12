@@ -11,7 +11,6 @@ import {
     parseEther,
     Account,
     type Address,
-    type Hash,
     type PublicClient,
     type TestClient,
     type WalletClient,

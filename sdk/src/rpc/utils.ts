@@ -28,7 +28,7 @@ import {
     MessageRPCResponseParams,
     BalanceUpdateRPCResponseParams,
     ChannelUpdateRPCResponseParams,
-} from './response-types';
+} from './types/response';
 
 /**
  * Get the current time in milliseconds

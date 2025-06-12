@@ -1,7 +1,7 @@
 import { Address, Hex } from 'viem';
 
-export * from './request-types';
-export * from './response-types';
+export * from './request';
+export * from './response';
 
 /** Type alias for Request ID (uint64) */
 export type RequestID = number;

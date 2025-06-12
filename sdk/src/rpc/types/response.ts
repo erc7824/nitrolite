@@ -1,5 +1,5 @@
 import { Address, Hex } from 'viem';
-import { RPCMethod, RequestID, Timestamp, AppDefinition, ChannelStatus } from './types';
+import { RPCMethod, RequestID, Timestamp, AppDefinition, ChannelStatus } from '.';
 
 /**
  * Represents a generic RPC message structure that includes common fields.

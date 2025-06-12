@@ -138,25 +138,6 @@ export interface AppDefinition {
     nonce?: number;
 }
 
-/**
- * Defines the parameters required for the 'auth_request' RPC method.
- */
-export interface AuthRequest {
-    /** The Ethereum address of the wallet being authorized. */
-    wallet: Address;
-    /** The public address of the application that is being authorized. */
-    participant: Address;
-    /** The scope of the authorization, defining what permissions are granted (e.g., "app.create", "ledger.readonly"). */
-    scope?: string;
-    /** The name of the application being authorized. */
-    app_name: string;
-    /** The public address of the application that is being authorized. */
-    application?: Address;
-    /** The expiration timestamp for the authorization, in seconds since the Unix epoch. */
-    expire?: string;
-    /** An array of allowances, each defining an asset and the amount that can be spent. */
-    allowances: Allowance[];
-}
 
 /**
  * Defines the parameters required for the 'create_app_session' RPC method.
@@ -189,16 +170,6 @@ export interface CloseAppSessionRequest {
     app_session_id: Hex;
     /** The final allocation distribution among participants upon closing the application. Order corresponds to the participants array in the application's definition. */
     allocations: AppSessionAllocation[];
-}
-
-/**
- * Defines the parameters required for the 'update_allocation' RPC method.
- */
-export interface ResizeChannel {
-    channel_id: Hex; // The unique identifier of the channel to be resized.
-    resize_amount?: bigint; // How much user wants to deposit or withdraw from a token-network specific channel.
-    allocate_amount?: bigint; // How much more token user wants to allocate to this token-network specific channel from his unified balance.
-    funds_destination: Hex; // The address where the resized funds will be sent.
 }
 
 /**

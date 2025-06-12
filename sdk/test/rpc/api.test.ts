@@ -22,6 +22,8 @@ import {
     MessageSigner,
     AuthRequest,
     AuthChallengeRPCResponse,
+    RPCMethod,
+    ChannelStatus,
 } from '../../src/rpc/types';
 
 describe('API message creators', () => {
@@ -48,7 +50,7 @@ describe('API message creators', () => {
         expect(signer).not.toHaveBeenCalled();
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'auth_request', [clientAddress, clientAddress, 'test-app', [], '', '', ''], timestamp],
+            req: [requestId, RPCMethod.AuthChallenge, [clientAddress, clientAddress, 'test-app', [], '', '', ''], timestamp],
             sig: [''],
         });
     });
@@ -56,17 +58,17 @@ describe('API message creators', () => {
     test('createAuthVerifyMessageFromChallenge', async () => {
         const challenge = 'challenge123';
         const msgStr = await createAuthVerifyMessageFromChallenge(signer, challenge, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, 'auth_verify', [[{ challenge }]], timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.AuthVerify, [[{ challenge }]], timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'auth_verify', [[{ challenge }]], timestamp],
+            req: [requestId, RPCMethod.AuthVerify, [[{ challenge }]], timestamp],
             sig: ['0xsig'],
         });
     });
 
     describe('createAuthVerifyMessage', () => {
         const rawResponse: AuthChallengeRPCResponse = {
-            method: 'auth_challenge',
+            method: RPCMethod.AuthChallenge,
             requestId: 999,
             timestamp: 200,
             params: {
@@ -77,10 +79,10 @@ describe('API message creators', () => {
 
         test('successful challenge flow', async () => {
             const msgStr = await createAuthVerifyMessage(signer, rawResponse, requestId, timestamp);
-            expect(signer).toHaveBeenCalledWith([requestId, 'auth_verify', [{ challenge: 'msg' }], timestamp]);
+            expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.AuthVerify, [{ challenge: 'msg' }], timestamp]);
             const parsed = JSON.parse(msgStr);
             expect(parsed).toEqual({
-                req: [requestId, 'auth_verify', [{ challenge: 'msg' }], timestamp],
+                req: [requestId, RPCMethod.AuthVerify, [{ challenge: 'msg' }], timestamp],
                 sig: ['0xsig'],
             });
         });
@@ -88,20 +90,20 @@ describe('API message creators', () => {
 
     test('createPingMessage', async () => {
         const msgStr = await createPingMessage(signer, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, 'ping', [], timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Ping, [], timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'ping', [], timestamp],
+            req: [requestId, RPCMethod.Ping, [], timestamp],
             sig: ['0xsig'],
         });
     });
 
     test('createGetConfigMessage', async () => {
         const msgStr = await createGetConfigMessage(signer, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, 'get_config', [], timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetConfig, [], timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'get_config', [], timestamp],
+            req: [requestId, RPCMethod.GetConfig, [], timestamp],
             sig: ['0xsig'],
         });
     });
@@ -110,10 +112,10 @@ describe('API message creators', () => {
         const participant = '0x01231241241241' as Address;
         const ledgerParams = [{ participant }];
         const msgStr = await createGetLedgerBalancesMessage(signer, participant, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, 'get_ledger_balances', ledgerParams, timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerBalances, ledgerParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'get_ledger_balances', ledgerParams, timestamp],
+            req: [requestId, RPCMethod.GetLedgerBalances, ledgerParams, timestamp],
             sig: ['0xsig'],
         });
     });
@@ -121,10 +123,10 @@ describe('API message creators', () => {
     test('createGetAppDefinitionMessage', async () => {
         const appParams = [{ app_session_id: appId }];
         const msgStr = await createGetAppDefinitionMessage(signer, appId, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, 'get_app_definition', appParams, timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetAppDefinition, appParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'get_app_definition', appParams, timestamp],
+            req: [requestId, RPCMethod.GetAppDefinition, appParams, timestamp],
             sig: ['0xsig'],
         });
     });
@@ -156,10 +158,10 @@ describe('API message creators', () => {
         ];
         // @ts-ignore
         const msgStr = await createAppSessionMessage(signer, params, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, 'create_app_session', params, timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.CreateAppSession, params, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'create_app_session', params, timestamp],
+            req: [requestId, RPCMethod.CreateAppSession, params, timestamp],
             sig: ['0xsig'],
         });
     });
@@ -168,10 +170,10 @@ describe('API message creators', () => {
         const closeParams = [{ app_session_id: appId, allocation: [] }];
         // @ts-ignore
         const msgStr = await createCloseAppSessionMessage(signer, closeParams, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, 'close_app_session', closeParams, timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.CloseAppSession, closeParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'close_app_session', closeParams, timestamp],
+            req: [requestId, RPCMethod.CloseAppSession, closeParams, timestamp],
             sig: ['0xsig'],
         });
     });
@@ -179,10 +181,10 @@ describe('API message creators', () => {
     test('createApplicationMessage', async () => {
         const messageParams = ['hello'];
         const msgStr = await createApplicationMessage(signer, appId, messageParams, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, 'message', messageParams, timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Message, messageParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'message', messageParams, timestamp],
+            req: [requestId, RPCMethod.Message, messageParams, timestamp],
             sid: appId,
             sig: ['0xsig'],
         });
@@ -192,7 +194,7 @@ describe('API message creators', () => {
         const msgStr = await createCloseChannelMessage(signer, channelId, fundDestination, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([
             requestId,
-            'close_channel',
+            RPCMethod.CloseChannel,
             [{ channel_id: channelId, funds_destination: fundDestination }],
             timestamp,
         ]);
@@ -200,7 +202,7 @@ describe('API message creators', () => {
         expect(parsed).toEqual({
             req: [
                 requestId,
-                'close_channel',
+                RPCMethod.CloseChannel,
                 [{ channel_id: channelId, funds_destination: fundDestination }],
                 timestamp,
             ],
@@ -214,7 +216,7 @@ describe('API message creators', () => {
         expect(signer).not.toHaveBeenCalled();
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'auth_verify', [{ jwt: jwtToken }], timestamp],
+            req: [requestId, RPCMethod.AuthVerify, [{ jwt: jwtToken }], timestamp],
             sig: undefined,
         });
     });
@@ -233,25 +235,25 @@ describe('API message creators', () => {
             },
         ];
         const msgStr = await createResizeChannelMessage(signer, resizeParams, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, 'resize_channel', resizeParams, timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.ResizeChannel, resizeParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'resize_channel', resizeParams, timestamp],
+            req: [requestId, RPCMethod.ResizeChannel, resizeParams, timestamp],
             sig: ['0xsig'],
         });
     });
 
     test('createGetChannelsMessage', async () => {
-        const msgStr = await createGetChannelsMessage(signer, '0x0123124124124131', requestId, timestamp);
+        const msgStr = await createGetChannelsMessage(signer, '0x0123124124124131', ChannelStatus.Open, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([
             requestId,
-            'get_channels',
-            [{ participant: '0x0123124124124131' }],
+            RPCMethod.GetChannels,
+            [{ participant: '0x0123124124124131', status: ChannelStatus.Open }],
             timestamp,
         ]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, 'get_channels', [{ participant: '0x0123124124124131' }], timestamp],
+            req: [requestId, RPCMethod.GetChannels, [{ participant: '0x0123124124124131', status: ChannelStatus.Open }], timestamp],
             sig: ['0xsig'],
         });
     });

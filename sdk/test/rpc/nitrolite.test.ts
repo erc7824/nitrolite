@@ -8,6 +8,7 @@ import {
     MultiMessageVerifier,
     RequestData,
     ResponsePayload,
+    RPCMethod,
 } from '../../src/rpc/types';
 
 describe('NitroliteRPC', () => {
@@ -20,7 +21,7 @@ describe('NitroliteRPC', () => {
     describe('createRequest', () => {
         test('should create a valid request message', () => {
             const requestId = 12345;
-            const method = 'test_method';
+            const method = RPCMethod.Ping;
             const params = ['param1', 'param2'];
             const timestamp = 1619876543210;
 
@@ -33,11 +34,11 @@ describe('NitroliteRPC', () => {
 
         test('should use default values when not provided', () => {
             jest.spyOn(global.Date, 'now').mockReturnValue(1619876543210);
-            const result = NitroliteRPC.createRequest(undefined, 'test_method');
+            const result = NitroliteRPC.createRequest(undefined, RPCMethod.Ping);
 
             expect(result.req).toBeDefined();
             expect(result.req![0]).toBeGreaterThan(0);
-            expect(result.req![1]).toBe('test_method');
+            expect(result.req![1]).toBe(RPCMethod.Ping);
             expect(result.req![2]).toEqual([]);
             expect(result.req![3]).toBe(1619876543210);
         });
@@ -46,7 +47,7 @@ describe('NitroliteRPC', () => {
     describe('createAppRequest', () => {
         test('should create a valid application request message', () => {
             const requestId = 12345;
-            const method = 'test_method';
+            const method = RPCMethod.Ping;
             const params = ['param1', 'param2'];
             const timestamp = 1619876543210;
             const accountId = '0xaccountId' as Hex;
@@ -63,7 +64,7 @@ describe('NitroliteRPC', () => {
     describe('parseResponse', () => {
         test('should parse a valid response message string', () => {
             const responseStr = JSON.stringify({
-                res: [12345, 'test_method', ['result1', 'result2'], 1619876543210],
+                res: [12345, RPCMethod.Ping, ['result1', 'result2'], 1619876543210],
             });
 
             const result = NitroliteRPC.parseResponse(responseStr);
@@ -72,7 +73,7 @@ describe('NitroliteRPC', () => {
                 isValid: true,
                 isError: false,
                 requestId: 12345,
-                method: 'test_method',
+                method: RPCMethod.Ping,
                 data: ['result1', 'result2'],
                 timestamp: 1619876543210,
             });
@@ -80,7 +81,7 @@ describe('NitroliteRPC', () => {
 
         test('should parse a valid response message object', () => {
             const responseObj = {
-                res: [12345, 'test_method', ['result1', 'result2'], 1619876543210],
+                res: [12345, RPCMethod.Ping, ['result1', 'result2'], 1619876543210],
             };
 
             const result = NitroliteRPC.parseResponse(responseObj);
@@ -89,7 +90,7 @@ describe('NitroliteRPC', () => {
                 isValid: true,
                 isError: false,
                 requestId: 12345,
-                method: 'test_method',
+                method: RPCMethod.Ping,
                 data: ['result1', 'result2'],
                 timestamp: 1619876543210,
             });
@@ -97,7 +98,7 @@ describe('NitroliteRPC', () => {
 
         test('should parse a valid response message with sid field', () => {
             const responseObj = {
-                res: [12345, 'test_method', ['result1', 'result2'], 1619876543210],
+                res: [12345, RPCMethod.Ping, ['result1', 'result2'], 1619876543210],
                 sid: '0xaccountId' as Hex,
             };
 
@@ -107,7 +108,7 @@ describe('NitroliteRPC', () => {
                 isValid: true,
                 isError: false,
                 requestId: 12345,
-                method: 'test_method',
+                method: RPCMethod.Ping,
                 data: ['result1', 'result2'],
                 sid: '0xaccountId',
                 timestamp: 1619876543210,
@@ -177,14 +178,14 @@ describe('NitroliteRPC', () => {
                 .fn<(data: RequestData | ResponsePayload) => Promise<Hex>>()
                 .mockResolvedValue('0xsignature' as Hex);
             const request: NitroliteRPCMessage = {
-                req: [12345, 'test_method', ['param1', 'param2'], 1619876543210],
+                req: [12345, RPCMethod.Ping, ['param1', 'param2'], 1619876543210],
             };
 
             const result = await NitroliteRPC.signRequestMessage(request, mockSigner);
 
             expect(mockSigner).toHaveBeenCalledWith(request.req);
             expect(result).toEqual({
-                req: [12345, 'test_method', ['param1', 'param2'], 1619876543210],
+                req: [12345, RPCMethod.Ping, ['param1', 'param2'], 1619876543210],
                 sig: ['0xsignature'],
             });
             expect(result).toBe(request);
@@ -204,7 +205,7 @@ describe('NitroliteRPC', () => {
         test('should verify a correctly signed message', async () => {
             const mockVerifier = jest.fn<SingleMessageVerifier>().mockResolvedValue(true);
             const message: NitroliteRPCMessage = {
-                req: [12345, 'test_method', ['param1', 'param2'], 1619876543210],
+                req: [12345, RPCMethod.Ping, ['param1', 'param2'], 1619876543210],
                 sig: ['0xsignature' as Hex],
             };
             const expectedSigner = '0xsigner' as Address;
@@ -218,7 +219,7 @@ describe('NitroliteRPC', () => {
         test('should return false for message with no signatures', async () => {
             const mockVerifier = jest.fn<SingleMessageVerifier>();
             const message: NitroliteRPCMessage = {
-                req: [12345, 'test_method', ['param1', 'param2'], 1619876543210],
+                req: [12345, RPCMethod.Ping, ['param1', 'param2'], 1619876543210],
             };
             const expectedSigner = '0xsigner' as Address;
 
@@ -233,7 +234,7 @@ describe('NitroliteRPC', () => {
                 throw new Error('Verification error');
             });
             const message: NitroliteRPCMessage = {
-                req: [12345, 'test_method', ['param1', 'param2'], 1619876543210],
+                req: [12345, RPCMethod.Ping, ['param1', 'param2'], 1619876543210],
                 sig: ['0xsignature' as Hex],
             };
             const expectedSigner = '0xsigner' as Address;
@@ -247,7 +248,7 @@ describe('NitroliteRPC', () => {
         test('should verify a response message', async () => {
             const mockVerifier = jest.fn<SingleMessageVerifier>().mockResolvedValue(true);
             const message: NitroliteRPCMessage = {
-                res: [12345, 'test_method', ['result1', 'result2'], 1619876543210],
+                res: [12345, RPCMethod.Ping, ['result1', 'result2'], 1619876543210],
                 sig: ['0xsignature' as Hex],
             };
             const expectedSigner = '0xsigner' as Address;
@@ -262,7 +263,7 @@ describe('NitroliteRPC', () => {
             console.warn = jest.fn();
             const mockVerifier = jest.fn<SingleMessageVerifier>().mockResolvedValue(true);
             const message: NitroliteRPCMessage = {
-                req: [12345, 'test_method', ['param1', 'param2'], 1619876543210],
+                req: [12345, RPCMethod.Ping, ['param1', 'param2'], 1619876543210],
                 sig: ['0xsignature1' as Hex, '0xsignature2' as Hex],
             };
             const expectedSigner = '0xsigner' as Address;
@@ -279,7 +280,7 @@ describe('NitroliteRPC', () => {
         test('should verify multiple signatures correctly', async () => {
             const mockVerifier = jest.fn<MultiMessageVerifier>().mockResolvedValue(true);
             const message: NitroliteRPCMessage = {
-                req: [12345, 'test_method', ['param1', 'param2'], 1619876543210],
+                req: [12345, RPCMethod.Ping, ['param1', 'param2'], 1619876543210],
                 sig: ['0xsig1' as Hex, '0xsig2' as Hex],
             };
             const expectedSigners = ['0xsigner1' as Address, '0xsigner2' as Address];
@@ -293,7 +294,7 @@ describe('NitroliteRPC', () => {
         test('should return false for message with no signatures', async () => {
             const mockVerifier = jest.fn<MultiMessageVerifier>();
             const message: NitroliteRPCMessage = {
-                req: [12345, 'test_method', ['param1', 'param2'], 1619876543210],
+                req: [12345, RPCMethod.Ping, ['param1', 'param2'], 1619876543210],
             };
             const expectedSigners = ['0xsigner1' as Address, '0xsigner2' as Address];
 
@@ -308,7 +309,7 @@ describe('NitroliteRPC', () => {
                 throw new Error('Verification error');
             });
             const message: NitroliteRPCMessage = {
-                req: [12345, 'test_method', ['param1', 'param2'], 1619876543210],
+                req: [12345, RPCMethod.Ping, ['param1', 'param2'], 1619876543210],
                 sig: ['0xsig1' as Hex, '0xsig2' as Hex],
             };
             const expectedSigners = ['0xsigner1' as Address, '0xsigner2' as Address];

@@ -4,8 +4,6 @@ import {
     getTestEnvironment,
     resetTestEnvironment,
     deployContract,
-    getAccountBalance,
-    mineBlock,
     getContractArtifacts,
     getDeployedContractAddresses,
     TEST_CONSTANTS,

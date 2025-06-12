@@ -1,34 +1,10 @@
-import { Address, Hex, stringToHex } from 'viem';
+import { Hex, stringToHex } from 'viem';
 import {
     NitroliteRPCMessage,
     RPCMethod,
     RPCResponseParamsByMethod,
     RPCResponse,
 } from './types';
-import {
-    AuthChallengeResponseParams,
-    AuthVerifyResponseParams,
-    ErrorResponseParams,
-    GetConfigResponseParams,
-    GetLedgerBalancesResponseParams,
-    GetLedgerEntriesResponseParams,
-    CreateAppSessionResponseParams,
-    SubmitStateResponseParams,
-    CloseAppSessionResponseParams,
-    GetAppDefinitionResponseParams,
-    GetAppSessionsResponseParams,
-    ResizeChannelResponseParams,
-    CloseChannelResponseParams,
-    GetChannelsResponseParams,
-    GetRPCHistoryResponseParams,
-    GetAssetsResponseParams,
-    AuthRequestResponseParams,
-    PingResponseParams,
-    PongResponseParams,
-    MessageResponseParams,
-    BalanceUpdateResponseParams,
-    ChannelUpdateResponseParams,
-} from './types/response';
 
 /**
  * Get the current time in milliseconds
@@ -195,11 +171,11 @@ export function parseRPCResponse(response: string): RPCResponse {
 
         return responseObj;
     } catch (e) {
-        throw new Error(`Failed to parse RPC response: ${e}`);
+        throw new Error(`Failed to parse RPC response: ${e instanceof Error ? e.message : e}`);
     }
 }
 
-function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(method: M, params: Array<any>): RPCResponseParamsByMethod[M][] {
+function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(_: M, params: Array<any>): RPCResponseParamsByMethod[M][] {
     const result: RPCResponseParamsByMethod[M][] = [];
 
     if (Array.isArray(params) && params.length > 0) {

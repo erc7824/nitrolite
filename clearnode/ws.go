@@ -370,7 +370,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 				continue
 			}
 		case "create_app_session":
-			rpcResponse, handlerErr = HandleCreateApplication(policy, &msg, h.db)
+			rpcResponse, handlerErr = HandleCreateApplication(&msg, h.db)
 			if handlerErr != nil {
 				logger.Warn("error handling create_app_session", "error", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to create application: "+handlerErr.Error())
@@ -881,6 +881,12 @@ func HandleAuthVerify(ctx context.Context, conn *websocket.Conn, rpc *RPCMessage
 	claims, jwtToken, err := authManager.GenerateJWT(challenge.Address, challenge.SessionKey, "", "", challenge.Allowances)
 	if err != nil {
 		logger.Error("failed to generate JWT token", "error", err)
+		return nil, authMethod, err
+	}
+
+	err = AddPolicy(db, &claims.Policy)
+	if err != nil {
+		logger.Error("failed to add policy in db", "error", err)
 		return nil, authMethod, err
 	}
 

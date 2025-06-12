@@ -33,7 +33,7 @@ func setupTestSqlite(t testing.TB) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(uniqueDSN), &gorm.Config{})
 	require.NoError(t, err)
 
-	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{})
+	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &DBPolicy{})
 	require.NoError(t, err)
 
 	return db
@@ -70,7 +70,7 @@ func setupTestPostgres(ctx context.Context, t testing.TB) (*gorm.DB, testcontain
 	db, err := gorm.Open(postgres.Open(url), &gorm.Config{})
 	require.NoError(t, err)
 
-	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{})
+	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &DBPolicy{})
 	require.NoError(t, err)
 
 	return db, postgresContainer
@@ -1298,6 +1298,22 @@ func TestHandleCreateVirtualApp(t *testing.T) {
 		require.NoError(t, db.Create(&SignerWallet{
 			Signer: p, Wallet: p,
 		}).Error)
+
+		policy := &DBPolicy{
+			Wallet:      p,
+			Participant: p,
+			Scope:       "app.create",
+			Application: "test-proto",
+			Used:        false,
+			Allowances: []DBAllowance{
+				{
+					Asset:  "usdc",
+					Amount: decimal.NewFromInt(200),
+				},
+			},
+			ExpiresAt: time.Now().Add(24 * time.Hour),
+		}
+		require.NoError(t, db.Create(policy).Error)
 	}
 
 	require.NoError(t, GetWalletLedger(db, addrA).Record(addrA, "usdc", decimal.NewFromInt(100)))
@@ -1342,7 +1358,7 @@ func TestHandleCreateVirtualApp(t *testing.T) {
 	rpcReq.Sig = []string{hexutil.Encode(sigA), hexutil.Encode(sigB)}
 
 	// Call handler
-	resp, err := HandleCreateApplication(nil, rpcReq, db)
+	resp, err := HandleCreateApplication(rpcReq, db)
 	require.NoError(t, err)
 
 	assert.Equal(t, "create_app_session", resp.Res.Method)
@@ -1367,6 +1383,11 @@ func TestHandleCreateVirtualApp(t *testing.T) {
 	vBalB, _ := GetWalletLedger(db, addrB).Balance(appResp.AppSessionID, "usdc")
 	assert.Equal(t, decimal.NewFromInt(100).String(), vBalA.String())
 	assert.Equal(t, decimal.NewFromInt(200).String(), vBalB.String())
+
+	// Policies have been used
+	var policies []DBPolicy
+	require.NoError(t, db.Where("wallet IN ? AND used = ?", []string{addrA, addrB}, false).Find(&policies).Error)
+	assert.Len(t, policies, 0, "Policies should be marked as used after app creation")
 }
 
 // TestHandleSubmitState tests the submit state into a virtual app handler functionality

@@ -614,11 +614,11 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
 	if channel == nil {
-		return nil, fmt.Errorf("channel not found")
+		return nil, fmt.Errorf("channel with id %s not found", params.ChannelID)
 	}
 
 	if channel.Status != ChannelStatusOpen {
-		return nil, fmt.Errorf("channel must be open to resize, current status: %s", channel.Status)
+		return nil, fmt.Errorf("channel %s must be open to resize, current status: %s", channel.ChannelID, channel.Status)
 	}
 
 	if err := verifySigner(rpc, channel.Wallet); err != nil {
@@ -732,11 +732,11 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
 	if channel == nil {
-		return nil, fmt.Errorf("channel not found")
+		return nil, fmt.Errorf("channel with id %s not found", params.ChannelID)
 	}
 
 	if channel.Status != ChannelStatusOpen {
-		return nil, fmt.Errorf("channel must be open to close, current status: %s", channel.Status)
+		return nil, fmt.Errorf("channel %s must be open to close, current status: %s", channel.ChannelID, channel.Status)
 	}
 
 	if err := verifySigner(rpc, channel.Wallet); err != nil {

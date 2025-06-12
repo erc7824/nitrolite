@@ -1754,7 +1754,7 @@ func TestHandleResizeChannel(t *testing.T) {
 
 		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "channel not found")
+		assert.Contains(t, err.Error(), "channel with id 0xNonExistentChannel not found")
 	})
 
 	t.Run("ErrorChannelClosed", func(t *testing.T) {
@@ -1806,7 +1806,7 @@ func TestHandleResizeChannel(t *testing.T) {
 
 		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "channel must be open to resize")
+		assert.Contains(t, err.Error(), "channel 0xChanClosed must be open to resize, current status: closed")
 	})
 
 	t.Run("ErrorChannelJoining", func(t *testing.T) {
@@ -1858,7 +1858,7 @@ func TestHandleResizeChannel(t *testing.T) {
 
 		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "channel must be open to resize")
+		assert.Contains(t, err.Error(), "channel 0xChanJoining must be open to resize, current status: joining")
 		assert.Contains(t, err.Error(), "joining")
 	})
 

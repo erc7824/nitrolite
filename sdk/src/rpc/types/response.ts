@@ -16,7 +16,7 @@ interface GenericRPCMessage {
  */
 export interface AuthChallengeResponseParams {
     /** The challenge message to be signed by the client for authentication. */
-    challengeMessage: string;
+    challenge_message: string;
 }
 
 /**
@@ -24,7 +24,7 @@ export interface AuthChallengeResponseParams {
  */
 export interface AuthChallengeResponse extends GenericRPCMessage {
     method: RPCMethod.AuthChallenge;
-    params: AuthChallengeResponseParams;
+    params: AuthChallengeResponseParams[];
 }
 
 /**
@@ -308,7 +308,7 @@ export interface GetAssetsResponseParams {
  */
 export interface ErrorResponse extends GenericRPCMessage {
     method: RPCMethod.Error;
-    params: ErrorResponseParams;
+    params: ErrorResponseParams[];
 }
 
 /**
@@ -316,7 +316,7 @@ export interface ErrorResponse extends GenericRPCMessage {
  */
 export interface GetConfigResponse extends GenericRPCMessage {
     method: RPCMethod.GetConfig;
-    params: GetConfigResponseParams;
+    params: GetConfigResponseParams[];
 }
 
 /**
@@ -340,7 +340,7 @@ export interface GetLedgerEntriesResponse extends GenericRPCMessage {
  */
 export interface CreateAppSessionResponse extends GenericRPCMessage {
     method: RPCMethod.CreateAppSession;
-    params: CreateAppSessionResponseParams;
+    params: CreateAppSessionResponseParams[];
 }
 
 /**
@@ -348,7 +348,7 @@ export interface CreateAppSessionResponse extends GenericRPCMessage {
  */
 export interface SubmitStateResponse extends GenericRPCMessage {
     method: RPCMethod.SubmitState;
-    params: SubmitStateResponseParams;
+    params: SubmitStateResponseParams[];
 }
 
 /**
@@ -356,7 +356,7 @@ export interface SubmitStateResponse extends GenericRPCMessage {
  */
 export interface CloseAppSessionResponse extends GenericRPCMessage {
     method: RPCMethod.CloseAppSession;
-    params: CloseAppSessionResponseParams;
+    params: CloseAppSessionResponseParams[];
 }
 
 /**
@@ -364,7 +364,7 @@ export interface CloseAppSessionResponse extends GenericRPCMessage {
  */
 export interface GetAppDefinitionResponse extends GenericRPCMessage {
     method: RPCMethod.GetAppDefinition;
-    params: GetAppDefinitionResponseParams;
+    params: GetAppDefinitionResponseParams[];
 }
 
 /**
@@ -380,7 +380,7 @@ export interface GetAppSessionsResponse extends GenericRPCMessage {
  */
 export interface ResizeChannelResponse extends GenericRPCMessage {
     method: RPCMethod.ResizeChannel;
-    params: ResizeChannelResponseParams;
+    params: ResizeChannelResponseParams[];
 }
 
 /**
@@ -388,7 +388,7 @@ export interface ResizeChannelResponse extends GenericRPCMessage {
  */
 export interface CloseChannelResponse extends GenericRPCMessage {
     method: RPCMethod.CloseChannel;
-    params: CloseChannelResponseParams;
+    params: CloseChannelResponseParams[];
 }
 
 /**
@@ -420,7 +420,7 @@ export interface GetAssetsResponse extends GenericRPCMessage {
  */
 export interface AuthVerifyResponse extends GenericRPCMessage {
     method: RPCMethod.AuthVerify;
-    params: AuthVerifyResponseParams;
+    params: AuthVerifyResponseParams[];
 }
 
 /**
@@ -428,7 +428,7 @@ export interface AuthVerifyResponse extends GenericRPCMessage {
  */
 export interface AuthRequestResponseParams {
     /** The challenge message to be signed by the client for authentication. */
-    challengeMessage: string;
+    challenge_message: string;
 }
 
 /**
@@ -436,7 +436,7 @@ export interface AuthRequestResponseParams {
  */
 export interface AuthRequestResponse extends GenericRPCMessage {
     method: RPCMethod.AuthRequest;
-    params: AuthRequestResponseParams;
+    params: AuthRequestResponseParams[];
 }
 
 /**
@@ -451,7 +451,7 @@ export interface MessageResponseParams {
  */
 export interface MessageResponse extends GenericRPCMessage {
     method: RPCMethod.Message;
-    params: MessageResponseParams;
+    params: MessageResponseParams[];
 }
 
 /**
@@ -515,7 +515,7 @@ export interface ChannelUpdateResponseParams {
  */
 export interface ChannelUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.ChannelUpdate;
-    params: ChannelUpdateResponseParams;
+    params: ChannelUpdateResponseParams[];
 }
 
 /**
@@ -530,7 +530,7 @@ export interface PingResponseParams {
  */
 export interface PingResponse extends GenericRPCMessage {
     method: RPCMethod.Ping;
-    params: PingResponseParams;
+    params: PingResponseParams[];
 }
 
 /**
@@ -545,7 +545,7 @@ export interface PongResponseParams {
  */
 export interface PongResponse extends GenericRPCMessage {
     method: RPCMethod.Pong;
-    params: PongResponseParams;
+    params: PongResponseParams[];
 }
 
 /**

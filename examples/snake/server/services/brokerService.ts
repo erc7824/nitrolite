@@ -84,7 +84,7 @@ export function connectToBroker(): void {
                 requestId: message.res?.[0],
                 isAuthenticated
             });
-            handleBrokerMessage(message);
+            handleBrokerMessage(data.toString());
         } catch (error) {
             console.error("Error parsing message from broker:", error);
         }
@@ -172,7 +172,6 @@ async function authenticateWithBroker(): Promise<void> {
                             chain: polygon,
                             transport: http()
                         });
-
                         if (!walletClient) {
                             throw new Error('No wallet client available for EIP-712 signing');
                         }
@@ -181,7 +180,7 @@ async function authenticateWithBroker(): Promise<void> {
                         // @ts-ignore
                         const eip712SigningFunction = createEIP712AuthMessageSigner(walletClient, {
                             scope: authMessage.scope,
-                            application: authMessage.appName,
+                            application: walletClient.account.address,
                             participant: authMessage.address,
                             expire: authMessage.expire,
                             allowances: authMessage.allowances.map((allowance) => ({
@@ -322,7 +321,7 @@ async function authenticateWithBroker(): Promise<void> {
 }
 
 // Handles messages received from the broker
-export function handleBrokerMessage(raw: any): void {
+export function handleBrokerMessage(raw: string): void {
     try {
         console.log("Received message from broker:", raw);
         const message = parseRPCResponse(raw);

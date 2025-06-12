@@ -82,21 +82,24 @@ export async function getTestEnvironment(): Promise<TestEnvironment> {
         deployer: privateKeyToAccount(TEST_PRIVATE_KEYS.deployer),
     };
 
+    // Get RPC URL from environment or use default
+    const rpcUrl = process.env.ANVIL_RPC_URL || 'http://127.0.0.1:8545';
+    
     // Create viem clients
     const publicClient = createPublicClient({
         chain: anvil,
-        transport: http('http://127.0.0.1:8545'),
+        transport: http(rpcUrl),
     });
 
     const testClient = createTestClient({
         chain: anvil,
-        transport: http('http://127.0.0.1:8545'),
+        transport: http(rpcUrl),
         mode: 'anvil',
     });
 
     const walletClient = createWalletClient({
         chain: anvil,
-        transport: http('http://127.0.0.1:8545'),
+        transport: http(rpcUrl),
         account: accounts.deployer, // This wallet will be mostly used for deploying contracts
     });
 
@@ -185,14 +188,39 @@ export function getContractArtifacts() {
     };
 }
 
+// Get deployed contract addresses from environment variables
+export function getDeployedContractAddresses(): {
+    custody?: Address;
+    adjudicator?: Address;
+    token?: Address;
+} {
+    const addresses: any = {};
+    
+    if (process.env.CUSTODY_CONTRACT_ADDRESS) {
+        addresses.custody = process.env.CUSTODY_CONTRACT_ADDRESS as Address;
+    }
+    
+    if (process.env.ADJUDICATOR_CONTRACT_ADDRESS) {
+        addresses.adjudicator = process.env.ADJUDICATOR_CONTRACT_ADDRESS as Address;
+    }
+    
+    if (process.env.TEST_TOKEN_CONTRACT_ADDRESS) {
+        addresses.token = process.env.TEST_TOKEN_CONTRACT_ADDRESS as Address;
+    }
+    
+    return addresses;
+}
+
 // Utility function to create a wallet client for a specific account
 export function createWalletClientForAccount(
     testEnv: TestEnvironment,
     account: Account,
 ): WalletClient<any, any, Account> {
+    const rpcUrl = process.env.ANVIL_RPC_URL || 'http://127.0.0.1:8545';
+    
     return createWalletClient({
         chain: anvil,
-        transport: http('http://127.0.0.1:8545'),
+        transport: http(rpcUrl),
         account,
     }) as WalletClient<any, any, Account>;
 }

@@ -116,26 +116,33 @@ func (suite *IntegrationTestSuite) setupAccounts() {
 	suite.deployerAuth.GasPrice = big.NewInt(DefaultGasPrice)
 }
 
-// deployContracts deploys the necessary contracts for testing
+// deployContracts gets the deployed contract addresses from environment variables
 func (suite *IntegrationTestSuite) deployContracts() {
-	// Note: In a real implementation, this would deploy the actual contracts
-	// For now, we'll use placeholder addresses that would be deployed by the CI
-
-	// These addresses would be set by the deployment script or environment
+	// Get contract addresses from environment variables set by deployment script
 	custodyAddrStr := os.Getenv("CUSTODY_CONTRACT_ADDRESS")
 	if custodyAddrStr != "" {
 		suite.custodyAddr = common.HexToAddress(custodyAddrStr)
+		suite.T().Logf("Using Custody contract at: %s", custodyAddrStr)
 	} else {
-		// Deploy mock contract or use default address
+		// Use placeholder address if not deployed
 		suite.custodyAddr = common.HexToAddress("0x0000000000000000000000000000000000000001")
+		suite.T().Logf("Using placeholder Custody address: %s", suite.custodyAddr.Hex())
 	}
 
 	adjudicatorAddrStr := os.Getenv("ADJUDICATOR_CONTRACT_ADDRESS")
 	if adjudicatorAddrStr != "" {
 		suite.adjudicatorAddr = common.HexToAddress(adjudicatorAddrStr)
+		suite.T().Logf("Using Adjudicator contract at: %s", adjudicatorAddrStr)
 	} else {
-		// Deploy mock contract or use default address
+		// Use placeholder address if not deployed
 		suite.adjudicatorAddr = common.HexToAddress("0x0000000000000000000000000000000000000002")
+		suite.T().Logf("Using placeholder Adjudicator address: %s", suite.adjudicatorAddr.Hex())
+	}
+
+	// Log token address if available
+	tokenAddrStr := os.Getenv("TEST_TOKEN_CONTRACT_ADDRESS")
+	if tokenAddrStr != "" {
+		suite.T().Logf("Test Token contract available at: %s", tokenAddrStr)
 	}
 }
 

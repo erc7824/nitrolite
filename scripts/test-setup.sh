@@ -120,9 +120,71 @@ deploy_contracts() {
         --rpc-url http://$ANVIL_HOST:$ANVIL_PORT \
         --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
         --broadcast \
-        --legacy 2>/dev/null || {
-        print_warning "Contract deployment failed or script not found. Tests will use mock contracts."
+        --legacy || {
+        print_error "Contract deployment failed!"
+        return 1
     }
+    
+    # Extract deployed addresses from forge broadcast output
+    print_status "Extracting deployed contract addresses..."
+    
+    # Get the latest broadcast file
+    BROADCAST_DIR="broadcast/Deploy.s.sol/31337"
+    if [ -d "$BROADCAST_DIR" ]; then
+        LATEST_RUN=$(ls -t "$BROADCAST_DIR"/run-*.json | head -1)
+        if [ -f "$LATEST_RUN" ]; then
+            print_status "Found deployment data in: $LATEST_RUN"
+            
+            # Extract addresses using multiple methods for robustness
+            CUSTODY_ADDR=$(jq -r '.transactions[] | select(.contractName == "Custody" and .transactionType == "CREATE2") | .contractAddress' "$LATEST_RUN" 2>/dev/null)
+            ADJUDICATOR_ADDR=$(jq -r '.transactions[] | select(.contractName == "Dummy" and .transactionType == "CREATE2") | .contractAddress' "$LATEST_RUN" 2>/dev/null)
+            TOKEN_ADDR=$(jq -r '.transactions[] | select(.contractName == "TestERC20" and .transactionType == "CREATE2") | .contractAddress' "$LATEST_RUN" 2>/dev/null)
+            
+            # Fallback: try different JSON structure
+            if [ -z "$CUSTODY_ADDR" ] || [ "$CUSTODY_ADDR" = "null" ]; then
+                CUSTODY_ADDR=$(jq -r '.transactions[] | select(.transactionType == "CREATE") | .contractAddress' "$LATEST_RUN" 2>/dev/null | head -1)
+            fi
+            if [ -z "$ADJUDICATOR_ADDR" ] || [ "$ADJUDICATOR_ADDR" = "null" ]; then
+                ADJUDICATOR_ADDR=$(jq -r '.transactions[] | select(.transactionType == "CREATE") | .contractAddress' "$LATEST_RUN" 2>/dev/null | sed -n '2p')
+            fi
+            if [ -z "$TOKEN_ADDR" ] || [ "$TOKEN_ADDR" = "null" ]; then
+                TOKEN_ADDR=$(jq -r '.transactions[] | select(.transactionType == "CREATE") | .contractAddress' "$LATEST_RUN" 2>/dev/null | sed -n '3p')
+            fi
+            
+            # Set environment variables
+            export CUSTODY_CONTRACT_ADDRESS="$CUSTODY_ADDR"
+            export ADJUDICATOR_CONTRACT_ADDRESS="$ADJUDICATOR_ADDR"
+            export TEST_TOKEN_CONTRACT_ADDRESS="$TOKEN_ADDR"
+        fi
+    fi
+    
+    # Fallback to deterministic addresses if extraction failed
+    if [ -z "$CUSTODY_CONTRACT_ADDRESS" ] || [ "$CUSTODY_CONTRACT_ADDRESS" = "null" ]; then
+        print_warning "Could not extract contract addresses from deployment, using deterministic addresses"
+        export CUSTODY_CONTRACT_ADDRESS="0x5FbDB2315678afecb367f032d93F642f64180aa3"
+        export ADJUDICATOR_CONTRACT_ADDRESS="0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+        export TEST_TOKEN_CONTRACT_ADDRESS="0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+    fi
+    
+    # Set RPC URLs
+    export ANVIL_RPC_URL="http://$ANVIL_HOST:$ANVIL_PORT"
+    export ETH_RPC_URL="http://$ANVIL_HOST:$ANVIL_PORT"
+    
+    # Save addresses to a file for easy access
+    cat > contract_addresses.test.env << EOF
+ANVIL_RPC_URL=$ANVIL_RPC_URL
+ETH_RPC_URL=$ETH_RPC_URL
+CUSTODY_CONTRACT_ADDRESS=$CUSTODY_CONTRACT_ADDRESS
+ADJUDICATOR_CONTRACT_ADDRESS=$ADJUDICATOR_CONTRACT_ADDRESS
+TEST_TOKEN_CONTRACT_ADDRESS=$TEST_TOKEN_CONTRACT_ADDRESS
+EOF
+    
+    print_success "Contract addresses saved to contract_addresses.test.env"
+    print_status "📋 Deployed Contract Addresses:"
+    print_status "   Custody: $CUSTODY_CONTRACT_ADDRESS"
+    print_status "   Adjudicator: $ADJUDICATOR_CONTRACT_ADDRESS"
+    print_status "   Test Token: $TEST_TOKEN_CONTRACT_ADDRESS"
+    print_status "   RPC URL: $ANVIL_RPC_URL"
     
     cd - >/dev/null
     print_success "Contract deployment completed"
@@ -144,7 +206,11 @@ run_sdk_tests() {
     
     # Run integration tests
     print_status "Running integration tests..."
-    ENV_RPC_URL="http://$ANVIL_HOST:$ANVIL_PORT" npm run test:integration
+    ANVIL_RPC_URL="http://$ANVIL_HOST:$ANVIL_PORT" \
+    CUSTODY_CONTRACT_ADDRESS="$CUSTODY_CONTRACT_ADDRESS" \
+    ADJUDICATOR_CONTRACT_ADDRESS="$ADJUDICATOR_CONTRACT_ADDRESS" \
+    TEST_TOKEN_CONTRACT_ADDRESS="$TEST_TOKEN_CONTRACT_ADDRESS" \
+    npm run test:integration
     
     cd - >/dev/null
     print_success "SDK tests completed"
@@ -168,7 +234,11 @@ run_go_tests() {
     
     # Run tests
     print_status "Running Go integration tests..."
-    ETH_RPC_URL="http://$ANVIL_HOST:$ANVIL_PORT" go test -v -race ./pkg/testing/...
+    ETH_RPC_URL="http://$ANVIL_HOST:$ANVIL_PORT" \
+    CUSTODY_CONTRACT_ADDRESS="$CUSTODY_CONTRACT_ADDRESS" \
+    ADJUDICATOR_CONTRACT_ADDRESS="$ADJUDICATOR_CONTRACT_ADDRESS" \
+    TEST_TOKEN_CONTRACT_ADDRESS="$TEST_TOKEN_CONTRACT_ADDRESS" \
+    go test -v -race ./pkg/testing/...
     
     cd - >/dev/null
     print_success "Go tests completed"
@@ -226,6 +296,31 @@ main() {
     print_success "All tests completed successfully! 🎉"
 }
 
+# Function to display contract addresses for FE/BE integration
+show_addresses() {
+    if [ -f "contract_addresses.test.env" ]; then
+        print_success "Contract addresses for FE/BE integration tests:"
+        echo ""
+        echo "🔗 Add these to your .env file or export them:"
+        echo ""
+        cat contract_addresses.test.env
+        echo ""
+        echo "📋 Or source the file directly:"
+        echo "   source contract_addresses.test.env"
+        echo ""
+        echo "🌐 Frontend usage example:"
+        echo "   NEXT_PUBLIC_ANVIL_RPC_URL=$ANVIL_RPC_URL"
+        echo "   NEXT_PUBLIC_CUSTODY_ADDRESS=$CUSTODY_CONTRACT_ADDRESS"
+        echo ""
+        echo "🔧 Backend usage example:"
+        echo "   export ETH_RPC_URL=$ETH_RPC_URL"
+        echo "   export CUSTODY_CONTRACT_ADDRESS=$CUSTODY_CONTRACT_ADDRESS"
+    else
+        print_error "No contract addresses found. Run deployment first:"
+        echo "   $0 deploy"
+    fi
+}
+
 # Parse command line arguments
 case "${1:-}" in
     "start-anvil")
@@ -241,6 +336,9 @@ case "${1:-}" in
     "go-tests")
         run_go_tests
         ;;
+    "addresses"|"addr"|"contracts")
+        show_addresses
+        ;;
     "cleanup")
         cleanup
         ;;
@@ -252,6 +350,7 @@ case "${1:-}" in
         echo "  deploy       Deploy contracts"
         echo "  sdk-tests    Run SDK tests"
         echo "  go-tests     Run Go tests"
+        echo "  addresses    Show deployed contract addresses"
         echo "  cleanup      Stop Anvil and cleanup"
         echo "  help         Show this help"
         echo ""

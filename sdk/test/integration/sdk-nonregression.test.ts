@@ -7,6 +7,7 @@ import {
     getAccountBalance,
     mineBlock,
     getContractArtifacts,
+    getDeployedContractAddresses,
     TEST_CONSTANTS,
     TestEnvironment,
     createWalletClientForAccount,
@@ -36,24 +37,36 @@ describe('SDK Non-Regression Tests', () => {
         snapshotId = await testEnv.testClient.snapshot();
         console.log(`Snapshot created with ID: ${snapshotId}`);
 
-        // Deploy contracts
-        const artifacts = getContractArtifacts();
-        testEnv.deployedContracts.custody = await deployContract(
-            testEnv,
-            artifacts.custody.abi,
-            artifacts.custody.bytecode,
-        );
-        testEnv.deployedContracts.adjudicator = await deployContract(
-            testEnv,
-            artifacts.adjudicator.abi,
-            artifacts.adjudicator.bytecode,
-        );
-        testEnv.deployedContracts.token = await deployContract(testEnv, artifacts.token.abi, artifacts.token.bytecode, [
-            'Nitrolite Token',
-            'NTL',
-            18,
-            `${2n**256n - 1n}`, // Max supply for testing
-        ]);
+        // Check if contract addresses are provided via environment variables
+        const deployedAddresses = getDeployedContractAddresses();
+        
+        if (deployedAddresses.custody && deployedAddresses.adjudicator && deployedAddresses.token) {
+            // Use pre-deployed contracts
+            console.log('Using pre-deployed contracts from environment variables');
+            testEnv.deployedContracts.custody = deployedAddresses.custody;
+            testEnv.deployedContracts.adjudicator = deployedAddresses.adjudicator;
+            testEnv.deployedContracts.token = deployedAddresses.token;
+        } else {
+            // Deploy contracts manually
+            console.log('Deploying contracts manually for testing');
+            const artifacts = getContractArtifacts();
+            testEnv.deployedContracts.custody = await deployContract(
+                testEnv,
+                artifacts.custody.abi,
+                artifacts.custody.bytecode,
+            );
+            testEnv.deployedContracts.adjudicator = await deployContract(
+                testEnv,
+                artifacts.adjudicator.abi,
+                artifacts.adjudicator.bytecode,
+            );
+            testEnv.deployedContracts.token = await deployContract(testEnv, artifacts.token.abi, artifacts.token.bytecode, [
+                'Nitrolite Token',
+                'NTL',
+                18,
+                `${2n**256n - 1n}`, // Max supply for testing
+            ]);
+        }
 
         tokenAddress = testEnv.deployedContracts.token;
 

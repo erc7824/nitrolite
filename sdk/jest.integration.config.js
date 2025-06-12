@@ -15,7 +15,7 @@ module.exports = {
     verbose: true,
     setupFilesAfterEnv: ['<rootDir>/test/integration/setup.ts'],
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-    moduleNameMapping: {
+    moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',
     },
     testPathIgnorePatterns: ['/node_modules/', '/dist/', '/build/'],

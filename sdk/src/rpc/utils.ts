@@ -1,5 +1,34 @@
 import { Address, Hex, stringToHex } from 'viem';
-import { NitroliteRPCMessage, RPCResponse } from './types';
+import {
+    NitroliteRPCMessage,
+    RPCMethod,
+    RPCResponseParamsByMethod,
+    RPCResponse,
+} from './types';
+import {
+    AuthChallengeRPCResponseParams,
+    AuthVerifyRPCResponseParams,
+    ErrorRPCResponseParams,
+    GetConfigRPCResponseParams,
+    GetLedgerBalancesRPCResponseParams,
+    GetLedgerEntriesRPCResponseParams,
+    CreateAppSessionRPCResponseParams,
+    SubmitStateRPCResponseParams,
+    CloseAppSessionRPCResponseParams,
+    GetAppDefinitionRPCResponseParams,
+    GetAppSessionsRPCResponseParams,
+    ResizeChannelRPCResponseParams,
+    CloseChannelRPCResponseParams,
+    GetChannelsRPCResponseParams,
+    GetRPCHistoryRPCResponseParams,
+    GetAssetsRPCResponseParams,
+    AuthRequestRPCResponseParams,
+    PingRPCResponseParams,
+    PongRPCResponseParams,
+    MessageRPCResponseParams,
+    BalanceUpdateRPCResponseParams,
+    ChannelUpdateRPCResponseParams,
+} from './types/response';
 
 /**
  * Get the current time in milliseconds
@@ -155,52 +184,120 @@ export function parseRPCResponse(response: string): RPCResponse {
             throw new Error('Invalid RPC response format');
         }
 
-        switch (parsed.res[1]) {
-            case 'auth_challenge':
-                return {
-                    method: 'auth_challenge',
-                    requestId: parsed.res[0],
-                    timestamp: parsed.res[3],
-                    params: {
-                        challengeMessage: extractRPCParameter(parsed.res, 'challenge_message'),
-                    },
-                    signatures: parsed.sig,
-                };
-            case 'auth_verify':
-                return {
-                    method: 'auth_verify',
-                    requestId: parsed.res[0],
-                    timestamp: parsed.res[3],
-                    params: {
-                        address: extractRPCParameter(parsed.res, 'address'),
-                        jwtToken: extractRPCParameter(parsed.res, 'jwt_token'),
-                        sessionKey: extractRPCParameter(parsed.res, 'session_key'),
-                        success: extractRPCParameter(parsed.res, 'success'),
-                    },
-                    signatures: parsed.sig,
-                };
-            case 'error':
-                return {
-                    method: 'error',
-                    requestId: parsed.res[0],
-                    timestamp: parsed.res[3],
-                    params: {
-                        error: extractRPCParameter(parsed.res, 'error'),
-                    },
-                    signatures: parsed.sig,
-                };
-            default:
-                throw new Error(`Unknown method: ${parsed.res[1]}`);
-        }
+        const method = parsed.res[1] as keyof RPCResponseParamsByMethod;
+        const responseObj = {
+            method: method as RPCMethod,
+            requestId: parsed.res[0],
+            timestamp: parsed.res[3],
+            signatures: parsed.sig || [],
+            params: parseRPCParameters(method, parsed.res[2]),
+        } as RPCResponse;
+
+        return responseObj;
     } catch (e) {
         throw new Error(`Failed to parse RPC response: ${e}`);
     }
 }
 
+function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(method: M, params: Array<any>): RPCResponseParamsByMethod[M] {
+    switch (method) {
+        case RPCMethod.AuthChallenge:
+            return {
+                challengeMessage: extractRPCParameter<string>(params, 'challenge_message'),
+            } as AuthChallengeRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.AuthVerify:
+            return {
+                address: extractRPCParameter<Address>(params, 'address'),
+                jwtToken: extractRPCParameter<string>(params, 'jwt_token'),
+                sessionKey: extractRPCParameter<string>(params, 'session_key') as Hex,
+                success: extractRPCParameter<boolean>(params, 'success'),
+            } as AuthVerifyRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.AuthRequest:
+            return {
+                challengeMessage: extractRPCParameter<string>(params, 'challenge_message'),
+            } as AuthRequestRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.Error:
+            return {
+                error: extractRPCParameter<string>(params, 'error'),
+            } as ErrorRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.GetConfig:
+            return {
+                broker_address: extractRPCParameter<Address>(params, 'broker_address'),
+                networks: extractRPCParameter<GetConfigRPCResponseParams['networks']>(params, 'networks'),
+            } as GetConfigRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.GetLedgerBalances:
+            return extractRPCParameter<GetLedgerBalancesRPCResponseParams[]>(params, 'balances') as RPCResponseParamsByMethod[M];
+        case RPCMethod.GetLedgerEntries:
+            return extractRPCParameter<GetLedgerEntriesRPCResponseParams[]>(params, 'entries') as RPCResponseParamsByMethod[M];
+        case RPCMethod.CreateAppSession:
+            return {
+                app_session_id: extractRPCParameter<Hex>(params, 'app_session_id'),
+                version: extractRPCParameter<number>(params, 'version'),
+                status: extractRPCParameter<string>(params, 'status'),
+            } as CreateAppSessionRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.SubmitState:
+            return {
+                app_session_id: extractRPCParameter<Hex>(params, 'app_session_id'),
+                version: extractRPCParameter<number>(params, 'version'),
+                status: extractRPCParameter<string>(params, 'status'),
+            } as SubmitStateRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.CloseAppSession:
+            return {
+                app_session_id: extractRPCParameter<Hex>(params, 'app_session_id'),
+                version: extractRPCParameter<number>(params, 'version'),
+                status: extractRPCParameter<string>(params, 'status'),
+            } as CloseAppSessionRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.GetAppDefinition:
+            return extractRPCParameter<GetAppDefinitionRPCResponseParams>(params, 'definition') as RPCResponseParamsByMethod[M];
+        case RPCMethod.GetAppSessions:
+            return extractRPCParameter<GetAppSessionsRPCResponseParams[]>(params, 'sessions') as RPCResponseParamsByMethod[M];
+        case RPCMethod.ResizeChannel:
+            return {
+                channel_id: extractRPCParameter<Hex>(params, 'channel_id'),
+                intent: extractRPCParameter<number>(params, 'intent'),
+                version: extractRPCParameter<number>(params, 'version'),
+                state_data: extractRPCParameter<string>(params, 'state_data'),
+                allocations: extractRPCParameter<ResizeChannelRPCResponseParams['allocations']>(params, 'allocations'),
+                state_hash: extractRPCParameter<string>(params, 'state_hash'),
+                server_signature: extractRPCParameter<ResizeChannelRPCResponseParams['server_signature']>(params, 'server_signature'),
+            } as ResizeChannelRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.CloseChannel:
+            return {
+                channel_id: extractRPCParameter<Hex>(params, 'channel_id'),
+                intent: extractRPCParameter<number>(params, 'intent'),
+                version: extractRPCParameter<number>(params, 'version'),
+                state_data: extractRPCParameter<string>(params, 'state_data'),
+                allocations: extractRPCParameter<CloseChannelRPCResponseParams['allocations']>(params, 'allocations'),
+                state_hash: extractRPCParameter<string>(params, 'state_hash'),
+                server_signature: extractRPCParameter<CloseChannelRPCResponseParams['server_signature']>(params, 'server_signature'),
+            } as CloseChannelRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.GetChannels:
+            return extractRPCParameter<GetChannelsRPCResponseParams[]>(params, 'channels') as RPCResponseParamsByMethod[M];
+        case RPCMethod.GetRPCHistory:
+            return extractRPCParameter<GetRPCHistoryRPCResponseParams[]>(params, 'history') as RPCResponseParamsByMethod[M];
+        case RPCMethod.GetAssets:
+            return extractRPCParameter<GetAssetsRPCResponseParams[]>(params, 'assets') as RPCResponseParamsByMethod[M];
+        case RPCMethod.Ping:
+            return {} as PingRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.Pong:
+            return {} as PongRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.Message:
+            return {} as MessageRPCResponseParams as RPCResponseParamsByMethod[M];
+        case RPCMethod.BalanceUpdate:
+            return extractRPCParameter<BalanceUpdateRPCResponseParams[]>(params, 'balances') as RPCResponseParamsByMethod[M];
+        case RPCMethod.ChannelsUpdate:
+            return extractRPCParameter<ChannelUpdateRPCResponseParams[]>(params, 'channels') as RPCResponseParamsByMethod[M];
+        case RPCMethod.ChannelUpdate:
+            return extractRPCParameter<ChannelUpdateRPCResponseParams>(params, 'channel') as RPCResponseParamsByMethod[M];
+        default:
+            throw new Error(`Unsupported RPC method: ${method}`);
+    }
+}
+
 function extractRPCParameter<T>(res: Array<any>, key: string): T {
-    if (Array.isArray(res[2])) {
-        return res[2]?.[0]?.[key];
+    if (Array.isArray(res)) {
+        return res[0]?.[key];
     }
 
-    return res[2]?.[key];
+    return res[key];
 }

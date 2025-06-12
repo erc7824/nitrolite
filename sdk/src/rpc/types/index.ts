@@ -1,10 +1,10 @@
 import { Address, Hex } from 'viem';
 
+export * from './request';
+export * from './response';
+
 /** Type alias for Request ID (uint64) */
 export type RequestID = number;
-
-/** Type alias for Method (string) */
-export type Method = string;
 
 /** Type alias for Timestamp (uint64) */
 export type Timestamp = number;
@@ -13,10 +13,17 @@ export type Timestamp = number;
 export type AccountID = Hex;
 
 /** Represents the data payload within a request message: [requestId, method, params, timestamp?]. */
-export type RequestData = [RequestID, Method, any[], Timestamp?];
+export type RequestData = [RequestID, RPCMethod, any[], Timestamp?];
 
 /** Represents the data payload within a successful response message: [requestId, method, result, timestamp?]. */
-export type ResponseData = [RequestID, Method, any[], Timestamp?];
+export type ResponseData = [RequestID, RPCMethod, any[], Timestamp?];
+
+/** Represents the status of a channel. */
+export enum RPCChannelStatus {
+    Joining = 'joining',
+    Open = 'open',
+    Closed = 'closed',
+};
 
 /** Represents a single allowance for an asset, used in application sessions.
  * This structure defines the symbol of the asset and the amount that is allowed to be spent.
@@ -33,8 +40,11 @@ export type Allowance = {
  * It includes the participant's address, the asset (usdc, usdt, etc) being allocated, and the amount.
  */
 export type AppSessionAllocation = {
+    /** The Ethereum address of the participant receiving the allocation. */
     participant: Address;
+    /** The symbol of the asset being allocated (e.g., "USDC", "USDT"). */
     asset: string;
+    /** The amount of the asset being allocated. Must be a positive number. */
     amount: string;
 };
 
@@ -42,6 +52,7 @@ export type AppSessionAllocation = {
  * Represents the structure of an error object within an error response payload.
  */
 export interface NitroliteRPCErrorDetail {
+    /** The error message describing what went wrong. */
     error: string;
 }
 
@@ -61,7 +72,7 @@ export interface NitroliteRPCMessage {
     req?: RequestData;
     /** Contains the response or error payload if this is a response message. */
     res?: ResponsePayload;
-    /** Optional cryptographic signature(s). */
+    /** Optional cryptographic signature(s) for message authentication. */
     sig?: Hex[] | [''];
 }
 
@@ -86,13 +97,12 @@ export interface ParsedResponse {
     isValid: boolean;
     /** If isValid is false, contains a description of the parsing or validation error. */
     error?: string;
-    // Removed originalMessage field
     /** Indicates if the parsed response represents an error (method === "error"). Undefined if isValid is false. */
     isError?: boolean;
     /** The Request ID from the response payload. Undefined if structure is invalid. */
     requestId?: RequestID;
     /** The method name from the response payload. Undefined if structure is invalid. */
-    method?: Method;
+    method?: RPCMethod;
     /** The extracted data payload (result array for success, error detail object for error). Undefined if structure is invalid or error payload malformed. */
     data?: any[] | NitroliteRPCErrorDetail;
     /** The Application Session ID from the message envelope. Undefined if structure is invalid. */
@@ -105,17 +115,17 @@ export interface ParsedResponse {
  * Defines the structure of an application definition used when creating an application.
  */
 export interface AppDefinition {
-    /** The protocol identifier or name for the application logic. */
+    /** The protocol identifier or name for the application logic (e.g., "NitroRPC/0.2"). */
     protocol: string;
-    /** An array of participant addresses (Ethereum addresses) involved in the application. */
+    /** An array of participant addresses (Ethereum addresses) involved in the application. Must have at least 2 participants. */
     participants: Hex[];
     /** An array representing the relative weights or stakes of participants, often used for dispute resolution or allocation calculations. Order corresponds to the participants array. */
     weights: number[];
     /** The number of participants required to reach consensus or approve state updates. */
     quorum: number;
-    /** A parameter related to the challenge period or mechanism within the application's protocol. */
+    /** A parameter related to the challenge period or mechanism within the application's protocol, in seconds. */
     challenge: number;
-    /** A unique number used once, often for preventing replay attacks or ensuring uniqueness of the application instance. */
+    /** A unique number used once, often for preventing replay attacks or ensuring uniqueness of the application instance. Must be non-zero. */
     nonce?: number;
 }
 
@@ -123,24 +133,24 @@ export interface AppDefinition {
  * Defines the parameters required for the 'auth_request' RPC method.
  */
 export interface AuthRequest {
-    /** Unique challenge identifier, typically a UUID or similar unique string. */
+    /** The Ethereum address of the wallet being authorized. */
     wallet: Address;
     /** The public address of the application that is being authorized. */
     participant: Address;
     /** The scope of the authorization, defining what permissions are granted (e.g., "app.create", "ledger.readonly"). */
     scope?: string;
-    /** The public address of the application that is being authorized. */
+    /** The name of the application being authorized. */
     app_name: string;
-    /** Application public address. */
+    /** The public address of the application that is being authorized. */
     application?: Address;
-    /** The expiration timestamp for the authorization, typically in seconds since the Unix epoch. */
+    /** The expiration timestamp for the authorization, in seconds since the Unix epoch. */
     expire?: string;
     /** An array of allowances, each defining an asset and the amount that can be spent. */
     allowances: Allowance[];
 }
 
 /**
- * Defines the parameters required for the 'create_application' RPC method.
+ * Defines the parameters required for the 'create_app_session' RPC method.
  */
 export interface CreateAppSessionRequest {
     /** The detailed definition of the application being created.
@@ -163,7 +173,7 @@ export interface CreateAppSessionRequest {
 }
 
 /**
- * Defines the parameters required for the 'close_application' RPC method.
+ * Defines the parameters required for the 'close_app_session' RPC method.
  */
 export interface CloseAppSessionRequest {
     /** The unique identifier of the application session to be closed. */
@@ -309,50 +319,30 @@ export const EIP712AuthTypes = {
 };
 
 /**
- * Represents a generic RPC response structure that includes common fields.
- * This interface is extended by specific RPC response types.
+ * Represents the RPC methods used in the Nitrolite protocol.
  */
-interface GenericRPCResponse {
-    requestId: RequestID;
-    timestamp?: Timestamp;
-    signatures?: Hex[];
+export enum RPCMethod {
+    AuthRequest = 'auth_request',
+    AuthChallenge = 'auth_challenge',
+    AuthVerify = 'auth_verify',
+    Error = 'error',
+    GetConfig = 'get_config',
+    GetLedgerBalances = 'get_ledger_balances',
+    GetLedgerEntries = 'get_ledger_entries',
+    CreateAppSession = 'create_app_session',
+    SubmitState = 'submit_state',
+    CloseAppSession = 'close_app_session',
+    GetAppDefinition = 'get_app_definition',
+    GetAppSessions = 'get_app_sessions',
+    ResizeChannel = 'resize_channel',
+    CloseChannel = 'close_channel',
+    GetChannels = 'get_channels',
+    GetRPCHistory = 'get_rpc_history',
+    GetAssets = 'get_assets',
+    Message = 'message',
+    BalanceUpdate = 'bu',
+    ChannelsUpdate = 'channels',
+    ChannelUpdate = 'cu',
+    Ping = 'ping',
+    Pong = 'pong'
 }
-
-/**
- * Represents the response structure for the 'auth_challenge'
- */
-export interface AuthChallengeRPCResponse extends GenericRPCResponse {
-    method: 'auth_challenge';
-    params: {
-        challengeMessage: string;
-    };
-}
-
-/**
- * Represents the response structure for the 'auth_verify'
- */
-export interface AuthVerifyRPCResponse extends GenericRPCResponse {
-    method: 'auth_verify';
-    params: {
-        address: Address;
-        jwtToken: string;
-        sessionKey: Address;
-        success: boolean;
-    };
-}
-
-/**
- * Represents the response structure for an error response.
- */
-export interface ErrorRPCResponse extends GenericRPCResponse {
-    method: 'error';
-    params: {
-        error: string;
-    };
-}
-
-/**
- * Union type for all possible RPC response types.
- * This allows for type-safe handling of different response structures.
- */
-export type RPCResponse = AuthChallengeRPCResponse | AuthVerifyRPCResponse | ErrorRPCResponse;

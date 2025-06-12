@@ -3,13 +3,14 @@ import {
     NitroliteRPCMessage,
     RequestData,
     NitroliteRPCErrorDetail,
-    AccountID,
     MessageSigner,
     SingleMessageVerifier,
     MultiMessageVerifier,
-    ParsedResponse, // Assuming ParsedResponse type is defined (without originalMessage)
+    ParsedResponse,
     ResponsePayload,
     ApplicationRPCMessage,
+    RPCResponse,
+    RPCMethod,
 } from './types';
 import { getCurrentTimestamp, generateRequestId } from './utils';
 
@@ -29,13 +30,12 @@ export class NitroliteRPC {
      */
     static createRequest(
         requestId: number = generateRequestId(),
-        method: string,
+        method: RPCMethod,
         params: any[] = [],
         timestamp: number = getCurrentTimestamp(),
     ): NitroliteRPCMessage {
         const requestData: RequestData = [requestId, method, params, timestamp];
         const message: NitroliteRPCMessage = { req: requestData };
-
         return message;
     }
 
@@ -51,14 +51,13 @@ export class NitroliteRPC {
      */
     static createAppRequest(
         requestId: number = generateRequestId(),
-        method: string,
+        method: RPCMethod,
         params: any[] = [],
         timestamp: number = getCurrentTimestamp(),
         sid: Hex,
     ): ApplicationRPCMessage {
         const requestData: RequestData = [requestId, method, params, timestamp];
         const message: ApplicationRPCMessage = { req: requestData, sid };
-
         return message;
     }
 
@@ -103,7 +102,8 @@ export class NitroliteRPC {
 
         if (
             typeof requestId !== 'number' ||
-            typeof method !== 'string' ||
+            (typeof method !== 'string') ||
+            !Object.values(RPCMethod).includes(method as RPCMethod) ||
             !Array.isArray(dataPayload) ||
             typeof timestamp !== 'number'
         ) {
@@ -119,10 +119,11 @@ export class NitroliteRPC {
 
         let data: any[] | NitroliteRPCErrorDetail;
         let isError = false;
-        if (method === 'error') {
+
+        if (method === RPCMethod.Error) {
             isError = true;
             if (
-                dataPayload.length > 0 &&
+                dataPayload.length === 1 &&
                 typeof dataPayload[0] === 'object' &&
                 dataPayload[0] !== null &&
                 'error' in dataPayload[0]
@@ -144,13 +145,23 @@ export class NitroliteRPC {
 
         return {
             isValid: true,
-            isError: isError,
-            requestId: requestId,
-            method: method,
-            data: data,
-            sid: sid,
-            timestamp: timestamp,
+            isError,
+            requestId,
+            method: method as RPCMethod,
+            data,
+            sid,
+            timestamp,
         };
+    }
+
+    /**
+     * Type guard to check if a response is a specific RPC response type.
+     * @param response - The response to check
+     * @param method - The method name to check against
+     * @returns True if the response is of the specified type
+     */
+    static isResponseType<T extends RPCResponse>(response: ParsedResponse, method: T['method']): response is ParsedResponse & { data: T['params'] } {
+        return response.isValid && !response.isError && response.method === method;
     }
 
     /**
@@ -164,7 +175,7 @@ export class NitroliteRPC {
     private static getMessagePayload(message: NitroliteRPCMessage): RequestData | ResponsePayload {
         if (message.req) return message.req;
         if (message.res) return message.res;
-        throw new Error("Invalid message: must contain 'req' or 'res' field to define payload.");
+        throw new Error("Message must contain either 'req' or 'res' field");
     }
 
     /**
@@ -182,7 +193,6 @@ export class NitroliteRPC {
             throw new Error("signRequestMessage can only sign request messages containing 'req'.");
         }
         const payload = this.getMessagePayload(message);
-
         const signature = await signer(payload);
         message.sig = [signature];
         return message;

@@ -11,13 +11,13 @@ import {MockERC20} from "../mocks/MockERC20.sol";
 
 import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
 import {Channel, State, Allocation, Signature, StateIntent} from "../../src/interfaces/Types.sol";
-import {Consensus} from "../../src/adjudicators/Consensus.sol";
+import {ConsensusTransition} from "../../src/adjudicators/ConsensusTransition.sol";
 import {Utils} from "../../src/Utils.sol";
 
-contract ConsensusTest is Test {
+contract ConsensusTransitionTest is Test {
     using ECDSA for bytes32;
 
-    Consensus public adjudicator;
+    ConsensusTransition public adjudicator;
 
     // Test accounts
     address public host;
@@ -35,7 +35,7 @@ contract ConsensusTest is Test {
 
     function setUp() public {
         // Deploy the adjudicator contract
-        adjudicator = new Consensus();
+        adjudicator = new ConsensusTransition();
 
         // Generate private keys and addresses for the participants
         hostPrivateKey = 0x1;

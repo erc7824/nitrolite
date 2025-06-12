@@ -40,6 +40,17 @@ export interface Channel {
 }
 
 /**
+ * Channel status enum - represents the various states a channel can be in
+ */
+export enum ChannelStatus {
+    VOID, // Channel was not created, State.version must be 0
+    INITIAL, // Channel is created and in funding process, State.version must be 0
+    ACTIVE, // Channel fully funded and operational, State.version is greater than 0
+    DISPUTE, // Challenge period is active
+    FINAL // Final state, channel can be closed
+}
+
+/**
  * Channel status enum - matches the StateIntent enum in the contract
  */
 export enum StateIntent {
@@ -47,6 +58,17 @@ export enum StateIntent {
     INITIALIZE = 1, // Initial funding state
     RESIZE = 2, // Resize state
     FINALIZE = 3, // Final closing state
+}
+
+/**
+ * Channel data structure - contains all information about a channel
+ */
+export interface ChannelData {
+    channel: Channel; // Channel configuration
+    status: ChannelStatus; // Current status of the channel
+    wallets: [Address, Address]; // List of participant wallet addresses
+    challengeExpiry: bigint; // Timestamp when the challenge period ends
+    lastValidState: State; // Last valid state of the channel recorded on-chain
 }
 
 /**
@@ -167,12 +189,4 @@ export interface CheckpointChannelParams {
     channelId: ChannelId;
     candidateState: State;
     proofStates?: State[];
-}
-
-/**
- * Information about an account's funds in the custody contract.
- */
-export interface AccountInfo {
-    available: bigint;
-    channelCount: bigint;
 }

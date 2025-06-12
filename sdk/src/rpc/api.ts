@@ -1,4 +1,4 @@
-import { Address, Hex, WalletClient } from 'viem';
+import { Address, encodeAbiParameters, Hex, keccak256, WalletClient } from 'viem';
 import {
     MessageSigner,
     AccountID,
@@ -15,6 +15,7 @@ import {
     AuthChallengeRPCResponse,
     RequestData,
     Method,
+    ChallengeStateSigner,
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';

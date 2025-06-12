@@ -4,10 +4,15 @@ import { ContractAddresses } from '../abis';
 import * as Errors from '../errors';
 import { NitroliteTransactionPreparer, PreparerDependencies } from './prepare';
 import { Erc20Service, NitroliteService, waitForTransaction } from './services';
-import { _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from './state';
 import {
-    AccountInfo,
+    _prepareAndSignChallengeState,
+    _prepareAndSignFinalState,
+    _prepareAndSignInitialState,
+    _prepareAndSignResizeState,
+} from './state';
+import {
     ChallengeChannelParams,
+    ChannelData,
     ChannelId,
     CheckpointChannelParams,
     CloseChannelParams,
@@ -142,20 +147,51 @@ export class NitroliteClient {
 
     /**
      * Deposits tokens and creates a new channel in a single operation.
+     * Approves the custody contract to spend the tokens if necessary.
      * @param tokenAddress The address of the token to deposit and use for the channel.
      * @param depositAmount The amount of tokens to deposit.
      * @param params Parameters for channel creation. See {@link CreateChannelParams}.
-     * @returns An object containing the channel ID, initial state, deposit transaction hash, and create channel transaction hash.
+     * @returns An object containing the channel ID, initial state, and the transaction hash.
      */
     async depositAndCreateChannel(
         tokenAddress: Address,
         depositAmount: bigint,
         params: CreateChannelParams,
-    ): Promise<{ channelId: ChannelId; initialState: State; depositTxHash: Hash; createChannelTxHash: Hash }> {
-        const depositTxHash = await this.deposit(tokenAddress, depositAmount);
-        const { channelId, initialState, txHash } = await this.createChannel(tokenAddress, params);
+    ): Promise<{ channelId: ChannelId; initialState: State; txHash: Hash }> {
+        try {
+            const owner = this.account.address;
+            const spender = this.addresses.custody;
+            const { channel, initialState, channelId } = await _prepareAndSignInitialState(
+                tokenAddress,
+                this.sharedDeps,
+                params,
+            );
 
-        return { channelId, initialState, depositTxHash: depositTxHash, createChannelTxHash: txHash };
+            if (tokenAddress !== zeroAddress) {
+                const allowance = await this.erc20Service.getTokenAllowance(tokenAddress, owner, spender);
+                if (allowance < depositAmount) {
+                    try {
+                        // approve only the required amount, so that `approved == depositAmount`
+                        const hash = await this.erc20Service.approve(tokenAddress, spender, depositAmount - allowance);
+                        await waitForTransaction(this.publicClient, hash);
+                    } catch (err) {
+                        const error = new Errors.TokenError('Failed to approve tokens for deposit');
+                        throw error;
+                    }
+                }
+            }
+
+            const txHash = await this.nitroliteService.depositAndCreateChannel(
+                tokenAddress,
+                depositAmount,
+                channel,
+                initialState,
+            );
+
+            return { channelId, initialState, txHash };
+        } catch (err) {
+            throw new Errors.ContractCallError('Failed to execute depositAndCreateChannel on contract', err as Error);
+        }
     }
 
     /**
@@ -188,9 +224,10 @@ export class NitroliteClient {
      */
     async challengeChannel(params: ChallengeChannelParams): Promise<Hash> {
         const { channelId, candidateState, proofStates = [] } = params;
+        const { challengerSig } = await _prepareAndSignChallengeState(this.sharedDeps, params);
 
         try {
-            return await this.nitroliteService.challenge(channelId, candidateState, proofStates);
+            return await this.nitroliteService.challenge(channelId, candidateState, proofStates, challengerSig);
         } catch (err) {
             throw new Errors.ContractCallError('Failed to execute challengeChannel on contract', err as Error);
         }
@@ -247,9 +284,9 @@ export class NitroliteClient {
      * Retrieves a list of channel IDs associated with a specific account.
      * @returns An array of Channel IDs.
      */
-    async getAccountChannels(): Promise<ChannelId[]> {
+    async getOpenChannels(): Promise<ChannelId[]> {
         try {
-            return await this.nitroliteService.getAccountChannels(this.account.address);
+            return await this.nitroliteService.getOpenChannels(this.account.address);
         } catch (err) {
             throw err;
         }
@@ -260,9 +297,48 @@ export class NitroliteClient {
      * @param tokenAddress The address of the token to query.
      * @returns Account info including available, locked amounts and channel count.
      */
-    async getAccountInfo(tokenAddress: Address): Promise<AccountInfo> {
+    async getAccountBalance(tokenAddress: Address): Promise<bigint>;
+    async getAccountBalance(tokenAddress: Address[]): Promise<bigint[]>;
+    async getAccountBalance(tokenAddress: Address | Address[]): Promise<bigint | bigint[]> {
         try {
-            return await this.nitroliteService.getAccountInfo(this.account.address, tokenAddress);
+            if (Array.isArray(tokenAddress)) {
+                return await this.nitroliteService.getAccountBalance(this.account.address, tokenAddress);
+            } else {
+                return await this.nitroliteService.getAccountBalance(this.account.address, tokenAddress);
+            }
+        } catch (err) {
+            throw err;
+        }
+    }
+
+    /**
+     * Retrieves the balances of all channels for a specific channel ID.
+     * @param channelId The ID of the channel to query.
+     * @param tokenAddress The address of the token to query balances for.
+     * @returns An array of balances for the specified channel and token.
+     */
+    async getChannelBalance(channelId: ChannelId, tokenAddress: Address): Promise<bigint>;
+    async getChannelBalance(channelId: ChannelId, tokenAddress: Address[]): Promise<bigint[]>;
+    async getChannelBalance(channelId: ChannelId, tokenAddress: Address | Address[]): Promise<bigint | bigint[]> {
+        try {
+            if (Array.isArray(tokenAddress)) {
+                return await this.nitroliteService.getChannelBalance(channelId, tokenAddress);
+            } else {
+                return await this.nitroliteService.getChannelBalance(channelId, tokenAddress);
+            }
+        } catch (err) {
+            throw err;
+        }
+    }
+
+    /**
+     * Retrieves detailed channel data for a specific channel ID.
+     * @param channelId The ID of the channel to query.
+     * @returns An object containing channel data including participants, adjudicator, challenge duration, and allocations.
+     */
+    async getChannelData(channelId: ChannelId): Promise<ChannelData> {
+        try {
+            return await this.nitroliteService.getChannelData(channelId);
         } catch (err) {
             throw err;
         }

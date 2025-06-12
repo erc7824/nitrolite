@@ -1,20 +1,13 @@
-import { 
-    Account, 
-    Address, 
-    PublicClient, 
-    WalletClient, 
-    Hash, 
-    zeroAddress
-} from 'viem';
+import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress } from 'viem';
 import { custodyAbi } from '../../abis/generated';
 import { ContractAddresses } from '../../abis';
 import { Errors } from '../../errors';
-import { Channel, ChannelId, Signature, State } from '../types';
+import { Channel, ChannelData, ChannelId, Signature, State } from '../types';
 
 /**
  * Type utility to properly type the request object from simulateContract
  * This ensures type safety when passing the request to writeContract
- * 
+ *
  * The SimulateContractReturnType['request'] contains all necessary parameters
  * for writeContract, but viem's complex union types make direct compatibility challenging.
  * We use a more practical approach with proper type comments explaining the safety.
@@ -24,7 +17,7 @@ type PreparedContractRequest = any;
 /**
  * Type-safe wrapper for writeContract calls using prepared requests.
  * This function handles the type compatibility between simulateContract result and writeContract params.
- * 
+ *
  * @param walletClient - The wallet client to use for writing
  * @param request - The prepared request from simulateContract
  * @param account - The account to use for the transaction
@@ -33,14 +26,14 @@ type PreparedContractRequest = any;
 const executeWriteContract = async (
     walletClient: WalletClient,
     request: PreparedContractRequest,
-    account: Account | Address
+    account: Account | Address,
 ): Promise<Hash> => {
     // The request from simulateContract contains all required parameters for writeContract.
     // We safely spread the request and add the account. This is type-safe because:
     // 1. simulateContract validates the contract call against the ABI
     // 2. The returned request contains the exact parameters needed by writeContract
     // 3. We only add the account parameter which is required by writeContract
-    // 
+    //
     // Note: Type assertion is necessary due to viem's complex union types for transaction parameters.
     // The runtime behavior is correct - simulateContract returns compatible parameters for writeContract.
     return walletClient.writeContract({
@@ -115,7 +108,7 @@ export class NitroliteService {
 
     /**
      * Converts State type to format expected by generated ABI
-     * REQUIRED: 
+     * REQUIRED:
      * - StateIntent enum -> number conversion
      * - Mutable arrays -> readonly arrays
      * - Proper type constraints for viem compatibility
@@ -159,6 +152,39 @@ export class NitroliteService {
     }
 
     /**
+     * Converts contract Channel result to SDK Channel type
+     */
+    private convertChannelFromContract(contractChannel: any): Channel {
+        return {
+            participants: [...contractChannel.participants],
+            adjudicator: contractChannel.adjudicator,
+            challenge: contractChannel.challenge,
+            nonce: contractChannel.nonce,
+        };
+    }
+
+    /**
+     * Converts contract State result to SDK State type
+     */
+    private convertStateFromContract(contractState: any): State {
+        return {
+            intent: contractState.intent,
+            version: contractState.version,
+            data: contractState.data,
+            allocations: contractState.allocations.map((alloc: any) => ({
+                destination: alloc.destination,
+                token: alloc.token,
+                amount: alloc.amount,
+            })),
+            sigs: contractState.sigs.map((sig: any) => ({
+                v: sig.v,
+                r: sig.r,
+                s: sig.s,
+            })),
+        };
+    }
+
+    /**
      * Prepares the request data for a deposit transaction.
      * Useful for batching multiple calls in a single UserOperation.
      * @param tokenAddress Address of the token (use zeroAddress for ETH).
@@ -168,13 +194,14 @@ export class NitroliteService {
     async prepareDeposit(tokenAddress: Address, amount: bigint): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareDeposit';
+        const accountAddress = typeof account === 'string' ? account : account.address;
 
         try {
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: 'deposit',
-                args: [tokenAddress, amount],
+                args: [accountAddress, tokenAddress, amount],
                 account: account,
                 value: tokenAddress === zeroAddress ? amount : 0n,
             });
@@ -263,6 +290,75 @@ export class NitroliteService {
     }
 
     /**
+     * Prepares the request data for depositing funds and creating a new channel in one operation.
+     * Useful for batching multiple calls in a single UserOperation.
+     * @param tokenAddress Address of the token (use zeroAddress for ETH).
+     * @param amount Amount to deposit.
+     * @param channel Channel configuration. See {@link Channel} for details.
+     * @param initial Initial state. See {@link State} for details.
+     * @returns The prepared transaction request object.
+     */
+    async prepareDepositAndCreateChannel(
+        tokenAddress: Address,
+        amount: bigint,
+        channel: Channel,
+        initial: State,
+    ): Promise<PreparedContractRequest> {
+        const account = this.ensureAccount();
+        const operationName = 'prepareDepositAndCreateChannel';
+        const accountAddress = typeof account === 'string' ? account : account.address;
+
+        try {
+            const abiChannel = this.convertChannelForABI(channel);
+            const abiState = this.convertStateForABI(initial);
+
+            const { request } = await this.publicClient.simulateContract({
+                address: this.custodyAddress,
+                abi: custodyAbi,
+                functionName: 'depositAndCreate',
+                args: [tokenAddress, amount, abiChannel, abiState],
+                account: account,
+                value: tokenAddress === zeroAddress ? amount : 0n,
+            });
+
+            return request;
+        } catch (error: any) {
+            if (error instanceof Errors.NitroliteError) throw error;
+            throw new Errors.ContractCallError(operationName, error, { tokenAddress, amount, channel, initial });
+        }
+    }
+
+    /**
+     * Deposits tokens or ETH and creates a new channel in one operation.
+     * This method simulates and executes the transaction directly.
+     * You do not need to call `prepareDepositAndCreateChannel` separately unless batching operations.
+     * @param tokenAddress Address of the token (use zeroAddress for ETH).
+     * @param amount Amount to deposit.
+     * @param channel Channel configuration. See {@link Channel} for details.
+     * @param initial Initial state. See {@link State} for details.
+     * @returns Transaction hash.
+     * @error Throws ContractCallError | TransactionError
+     */
+    async depositAndCreateChannel(
+        tokenAddress: Address,
+        amount: bigint,
+        channel: Channel,
+        initial: State,
+    ): Promise<Hash> {
+        const walletClient = this.ensureWalletClient();
+        const account = this.ensureAccount();
+        const operationName = 'depositAndCreateChannel';
+
+        try {
+            const request = await this.prepareDepositAndCreateChannel(tokenAddress, amount, channel, initial);
+            return await executeWriteContract(walletClient, request, account);
+        } catch (error: any) {
+            if (error instanceof Errors.NitroliteError) throw error;
+            throw new Errors.TransactionError(operationName, error, { tokenAddress, amount, channel, initial });
+        }
+    }
+
+    /**
      * Prepares the request data for joining an existing channel.
      * Useful for batching multiple calls in a single UserOperation.
      * @param channelId ID of the channel.
@@ -270,11 +366,7 @@ export class NitroliteService {
      * @param sig Participant signature.
      * @returns The prepared transaction request object.
      */
-    async prepareJoinChannel(
-        channelId: ChannelId,
-        index: bigint,
-        sig: Signature,
-    ): Promise<PreparedContractRequest> {
+    async prepareJoinChannel(channelId: ChannelId, index: bigint, sig: Signature): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareJoinChannel';
 
@@ -385,12 +477,14 @@ export class NitroliteService {
      * @param channelId Channel ID.
      * @param candidate State being challenged. See {@link State} for details.
      * @param proofs Supporting proofs. See {@link State} for details.
+     * @param challengerSig Challenger signature. See {@link Signature} for details.
      * @returns The prepared transaction request object.
      */
     async prepareChallenge(
         channelId: ChannelId,
         candidate: State,
         proofs: State[] = [],
+        challengerSig: Signature,
     ): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareChallenge';
@@ -398,12 +492,13 @@ export class NitroliteService {
         try {
             const abiCandidate = this.convertStateForABI(candidate);
             const abiProofs = proofs.map((proof) => this.convertStateForABI(proof));
+            const challengerSigABI = this.convertSignatureForABI(challengerSig);
 
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: 'challenge',
-                args: [channelId, abiCandidate, abiProofs],
+                args: [channelId, abiCandidate, abiProofs, challengerSigABI],
                 account: account,
             });
 
@@ -424,13 +519,18 @@ export class NitroliteService {
      * @returns Transaction hash.
      * @error Throws ContractCallError | TransactionError
      */
-    async challenge(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<Hash> {
+    async challenge(
+        channelId: ChannelId,
+        candidate: State,
+        proofs: State[] = [],
+        challengerSig: Signature,
+    ): Promise<Hash> {
         const walletClient = this.ensureWalletClient();
         const account = this.ensureAccount();
         const operationName = 'challenge';
 
         try {
-            const request = await this.prepareChallenge(channelId, candidate, proofs);
+            const request = await this.prepareChallenge(channelId, candidate, proofs, challengerSig);
             return await executeWriteContract(walletClient, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
@@ -505,11 +605,7 @@ export class NitroliteService {
      * @param proofs Supporting proofs. See {@link State} for details.
      * @returns The prepared transaction request object.
      */
-    async prepareClose(
-        channelId: ChannelId,
-        candidate: State,
-        proofs: State[] = [],
-    ): Promise<PreparedContractRequest> {
+    async prepareClose(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareClose';
 
@@ -607,56 +703,153 @@ export class NitroliteService {
     }
 
     /**
-     * Get the list of channels for a given account
-     * @param account Address of the account
-     * @returns List of channel IDs
+     * Get the list of open channels for specified accounts
+     * @param account Address or addresses of the accounts
+     * @returns Matrix of Channel IDs, where each sub-array corresponds to an account
      * @error Throws ContractReadError if the read operation fails
      */
-    async getAccountChannels(account: Address): Promise<ChannelId[]> {
-        const functionName = 'getAccountChannels';
+    async getOpenChannels(account: Address): Promise<ChannelId[]>;
+    async getOpenChannels(account: Address[]): Promise<ChannelId[][]>;
+    async getOpenChannels(account: Address | Address[]): Promise<ChannelId[] | ChannelId[][]> {
+        const functionName = 'getOpenChannels';
+
+        const accountsArg = Array.isArray(account) ? account : [account];
+        if (accountsArg.length === 0) {
+            throw new Errors.MissingParameterError('accounts');
+        }
 
         try {
             const result = await this.publicClient.readContract({
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: functionName,
-                args: [account],
+                args: [accountsArg],
             });
 
-            return result as ChannelId[];
+            if (Array.isArray(account)) {
+                return result as ChannelId[][];
+            } else {
+                return result[0] as ChannelId[];
+            }
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
-            throw new Errors.ContractReadError(functionName, error, { account });
+            throw new Errors.ContractReadError(functionName, error, { accountsArg });
         }
     }
 
     /**
-     * Get account balance information for a specific token.
-     * @param user The address of the user.
-     * @param token The address of the token.
-     * @returns An object containing available balance, locked balance, and channel count.
-     * @error Throws ContractReadError if the read operation fails.
+     * Get balances for specified accounts and tokens
+     * @param user Address or addresses of the accounts
+     * @param token Address or addresses of the tokens (use zeroAddress for ETH)
+     * @returns Matrix of balances, where each sub-array corresponds to an account and token
+     * @error Throws ContractReadError if the read operation fails
      */
-    async getAccountInfo(user: Address, token: Address): Promise<{ available: bigint; channelCount: bigint }> {
-        const functionName = 'getAccountInfo';
+    async getAccountBalance(user: Address, token: Address): Promise<bigint>;
+    async getAccountBalance(user: Address, token: Address[]): Promise<bigint[]>;
+    async getAccountBalance(user: Address[], token: Address): Promise<bigint[]>;
+    async getAccountBalance(user: Address[], token: Address[]): Promise<bigint[][]>;
+    async getAccountBalance(
+        user: Address | Address[],
+        token: Address | Address[],
+    ): Promise<bigint | bigint[] | bigint[][]> {
+        const functionName = 'getAccountsBalances';
+
+        const usersArg = Array.isArray(user) ? user : [user];
+        const tokensArg = Array.isArray(token) ? token : [token];
+        if (usersArg.length === 0 || tokensArg.length === 0) {
+            throw new Errors.MissingParameterError('users or tokens');
+        }
 
         try {
             const result = await this.publicClient.readContract({
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: functionName,
-                args: [user, token],
+                args: [usersArg, tokensArg],
             });
 
-            const [available, channelCount] = result as [bigint, bigint];
+            if (Array.isArray(token)) {
+                if (Array.isArray(user)) {
+                    return result as bigint[][];
+                } else {
+                    return result[0] as bigint[];
+                }
+            } else {
+                if (Array.isArray(user)) {
+                    return result[0] as bigint[];
+                } else {
+                    return result[0][0] as bigint;
+                }
+            }
+        } catch (error: any) {
+            if (error instanceof Errors.NitroliteError) throw error;
+            throw new Errors.ContractReadError(functionName, error, { usersArg, tokensArg });
+        }
+    }
+
+    /**
+     * Get the balances for a specific channel and token or tokens.
+     * @param channelId ID of the channel to retrieve balances for.
+     * @param token Address or addresses of the tokens (use zeroAddress for ETH).
+     * @returns Array of balances for the specified tokens.
+     * @error Throws ContractReadError if the read operation fails.
+     */
+    async getChannelBalance(channelId: ChannelId, token: Address): Promise<bigint>;
+    async getChannelBalance(channelId: ChannelId, token: Address[]): Promise<bigint[]>;
+    async getChannelBalance(channelId: ChannelId, token: Address | Address[]): Promise<bigint | bigint[]> {
+        const functionName = 'getChannelBalances';
+
+        const tokensArg = Array.isArray(token) ? token : [token];
+        if (tokensArg.length === 0) {
+            throw new Errors.MissingParameterError('tokens');
+        }
+
+        try {
+            const result = await this.publicClient.readContract({
+                address: this.custodyAddress,
+                abi: custodyAbi,
+                functionName: functionName,
+                args: [channelId, tokensArg],
+            });
+
+            if (Array.isArray(token)) {
+                return result as bigint[];
+            } else {
+                return result[0] as bigint;
+            }
+        } catch (error: any) {
+            if (error instanceof Errors.NitroliteError) throw error;
+            throw new Errors.ContractReadError(functionName, error, { channelId, tokensArg });
+        }
+    }
+
+    /**
+     * Get channel data for a specific channel ID.
+     * @param channelId ID of the channel to retrieve data for.
+     * @returns ChannelData object containing participants and adjudicator address.
+     * @error Throws ContractReadError if the read operation fails.
+     */
+    async getChannelData(channelId: ChannelId): Promise<ChannelData> {
+        const functionName = 'getChannelData';
+
+        try {
+            const result = await this.publicClient.readContract({
+                address: this.custodyAddress,
+                abi: custodyAbi,
+                functionName: functionName,
+                args: [channelId],
+            });
 
             return {
-                available: available,
-                channelCount: channelCount,
+                channel: this.convertChannelFromContract(result[0]),
+                status: result[1],
+                wallets: result[2] as [Address, Address],
+                challengeExpiry: result[3],
+                lastValidState: this.convertStateFromContract(result[4]),
             };
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
-            throw new Errors.ContractReadError(functionName, error, { user, token });
+            throw new Errors.ContractReadError(functionName, error, { channelId });
         }
     }
 }

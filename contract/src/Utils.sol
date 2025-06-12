@@ -47,7 +47,7 @@ library Utils {
      */
     function recoverSigner(bytes32 stateHash, Signature memory sig) internal pure returns (address) {
         // Verify the signature directly on the stateHash without using EIP-191
-        return stateHash.recover(sig.v, sig.r, sig.s);
+        return ECDSA.recover(stateHash, sig.v, sig.r, sig.s);
     }
 
     /**
@@ -58,9 +58,18 @@ library Utils {
      * @return True if the signature is valid, false otherwise
      */
     function verifySignature(bytes32 stateHash, Signature memory sig, address signer) internal pure returns (bool) {
-        // Verify the signature directly on the stateHash without using EIP-191
-        address recoveredSigner = ECDSA.recover(stateHash, sig.v, sig.r, sig.s);
+        address recoveredSigner = recoverSigner(stateHash, sig);
         return recoveredSigner == signer;
+    }
+
+    /**
+     * @notice Compares two states for equality
+     * @param a The first state to compare
+     * @param b The second state to compare
+     * @return True if the states are equal, false otherwise
+     */
+    function statesAreEqual(State memory a, State memory b) internal pure returns (bool) {
+        return keccak256(abi.encode(a)) == keccak256(abi.encode(b));
     }
 
     /**

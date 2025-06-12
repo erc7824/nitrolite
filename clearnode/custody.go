@@ -449,35 +449,35 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 		return
 	}
 
-	brokerAddr := c.signer.GetAddress()
-	for _, asset := range assets {
-		// Create a call opts with the provided context
-		callOpts := &bind.CallOpts{
-			Context: ctx,
-		}
+	callOpts := &bind.CallOpts{
+		Context: ctx,
+	}
 
+	brokerAddr := c.signer.GetAddress()
+	// TODO: refactor to select with GetAccountsBalances in one query
+	// Use balanceChecker to get Balances for erc20 tokens in one query
+	for _, asset := range assets {
 		logger.Debug("fetching account info", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "broker", brokerAddr.Hex())
-		// Call getAccountInfo on the custody contract
+		// Call GetAccountsBalances on the custody contract
 		tokenAddr := common.HexToAddress(asset.Token)
-		info, err := c.custody.GetAccountInfo(callOpts, brokerAddr, tokenAddr)
+		info, err := c.custody.GetAccountsBalances(callOpts, []common.Address{brokerAddr}, []common.Address{tokenAddr})
 		if err != nil {
 			logger.Error("failed to get account info", "network", c.chainID, "token", asset.Token, "error", err)
 			continue
 		}
 
-		availableBalance := decimal.NewFromBigInt(info.Available, -int32(asset.Decimals))
+		if len(info) == 0 || len(info[0]) == 0 {
+			logger.Warn("no account info found", "network", c.chainID, "token", asset.Token)
+			continue
+		}
+
+		availableBalance := decimal.NewFromBigInt(info[0][0], -int32(asset.Decimals))
 
 		metrics.BrokerBalanceAvailable.With(prometheus.Labels{
 			"network": fmt.Sprintf("%d", c.chainID),
 			"token":   asset.Token,
 			"asset":   asset.Symbol,
 		}).Set(availableBalance.InexactFloat64())
-
-		metrics.BrokerChannelCount.With(prometheus.Labels{
-			"network": fmt.Sprintf("%d", c.chainID),
-		}).Set(float64(info.ChannelCount.Int64()))
-
-		logger.Info("updated contract balance metrics", "network", c.chainID, "available", availableBalance.String(), "channels", info.ChannelCount.String())
 
 		// Fetch broker wallet balances
 		walletBalance := decimal.Zero
@@ -511,6 +511,24 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			"asset":   asset.Symbol,
 		}).Set(walletBalance.InexactFloat64())
 
-		logger.Info("updated erc20 balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "balance", walletBalance.String())
+		logger.Debug("updated erc20 balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "balance", walletBalance.String())
 	}
+
+	openChannelsInfo, err := c.custody.GetOpenChannels(callOpts, []common.Address{brokerAddr})
+
+	if err != nil {
+		logger.Error("failed to get open channels", "network", c.chainID, "broker", brokerAddr, "error", err)
+		return
+	}
+
+	if len(openChannelsInfo) == 0 {
+		logger.Warn("no open channels found", "network", c.chainID, "broker", brokerAddr)
+		return
+	}
+
+	metrics.BrokerChannelCount.With(prometheus.Labels{
+		"network": fmt.Sprintf("%d", c.chainID),
+	}).Set(float64(len(openChannelsInfo[0])))
+
+	logger.Debug("updated contract total open channels metric", "network", c.chainID, "channels", len(openChannelsInfo[0]))
 }

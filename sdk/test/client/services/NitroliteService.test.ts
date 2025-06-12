@@ -19,6 +19,7 @@ describe('NitroliteService', () => {
     const participantSig = '0xsig' as unknown as Signature;
     const candidateState = {} as State;
     const proofs = [{} as State];
+    const challengerSig = '0xchallengerSig' as unknown as Signature;
     const newChannelConfig = {} as Channel;
     const newDepositState = {} as State;
 
@@ -72,6 +73,13 @@ describe('NitroliteService', () => {
             fn: 'create',
         },
         {
+            prepareName: 'prepareDepositAndCreateChannel',
+            execName: 'depositAndCreateChannel',
+            prepare: () => service.prepareDepositAndCreateChannel(custodyAddress, 123n, channelConfig, initialState),
+            exec: () => service.depositAndCreateChannel(custodyAddress, 123n, channelConfig, initialState),
+            fn: 'depositAndCreate',
+        },
+        {
             prepareName: 'prepareJoinChannel',
             execName: 'joinChannel',
             prepare: () => service.prepareJoinChannel(channelId, participantIndex, participantSig),
@@ -88,8 +96,8 @@ describe('NitroliteService', () => {
         {
             prepareName: 'prepareChallenge',
             execName: 'challenge',
-            prepare: () => service.prepareChallenge(channelId, candidateState, proofs),
-            exec: () => service.challenge(channelId, candidateState, proofs),
+            prepare: () => service.prepareChallenge(channelId, candidateState, proofs, challengerSig),
+            exec: () => service.challenge(channelId, candidateState, proofs, challengerSig),
             fn: 'challenge',
         },
         {
@@ -168,41 +176,124 @@ describe('NitroliteService', () => {
         });
     }
 
-    describe('getAccountChannels', () => {
+    describe('getOpenChannels', () => {
         test('success', async () => {
             const arr = ['0xA', '0xB'];
-            (mockPublicClient.readContract as any).mockResolvedValue(arr);
-            const out = await service.getAccountChannels(account);
+            (mockPublicClient.readContract as any).mockResolvedValue([arr]);
+            const out = await service.getOpenChannels(account);
             expect(out).toEqual(arr);
             expect(mockPublicClient.readContract).toHaveBeenCalledWith({
                 address: custodyAddress,
                 abi: CustodyAbi,
-                functionName: 'getAccountChannels',
-                args: [account],
+                functionName: 'getOpenChannels',
+                args: [[account]],
             });
         });
         test('ContractReadError', async () => {
             (mockPublicClient.readContract as any).mockRejectedValue(new Error('fail'));
-            await expect(service.getAccountChannels(account)).rejects.toThrow(Errors.ContractReadError);
+            await expect(service.getOpenChannels(account)).rejects.toThrow(Errors.ContractReadError);
         });
     });
 
-    describe('getAccountInfo', () => {
+    describe('getAccountBalance', () => {
+        const tokens = ['0xtok1', '0xtok2'] as Address[];
         test('success', async () => {
-            const data = [1n, 3n] as [bigint, bigint];
+            const data = [[1n, 3n]] as bigint[][];
             (mockPublicClient.readContract as any).mockResolvedValue(data);
-            const info = await service.getAccountInfo(account, custodyAddress);
-            expect(info).toEqual({ available: 1n, channelCount: 3n });
+            const info = await service.getAccountBalance(account, tokens);
+            expect(info).toEqual([1n, 3n]);
             expect(mockPublicClient.readContract).toHaveBeenCalledWith({
                 address: custodyAddress,
                 abi: CustodyAbi,
-                functionName: 'getAccountInfo',
-                args: [account, custodyAddress],
+                functionName: 'getAccountsBalances',
+                args: [[account], tokens],
             });
         });
         test('ContractReadError', async () => {
             (mockPublicClient.readContract as any).mockRejectedValue(new Error('err'));
-            await expect(service.getAccountInfo(account, custodyAddress)).rejects.toThrow(Errors.ContractReadError);
+            await expect(service.getAccountBalance(account, tokens)).rejects.toThrow(Errors.ContractReadError);
+        });
+    });
+
+    describe('getChannelBalance', () => {
+        const tokens = ['0xtok1', '0xtok2'] as Address[];
+        test('success', async () => {
+            const data = [[1n, 3n]] as bigint[][];
+            (mockPublicClient.readContract as any).mockResolvedValue(data);
+            const info = await service.getChannelBalance(channelId, tokens);
+            expect(info).toEqual(data);
+            expect(mockPublicClient.readContract).toHaveBeenCalledWith({
+                address: custodyAddress,
+                abi: CustodyAbi,
+                functionName: 'getChannelBalances',
+                args: [channelId, tokens],
+            });
+        });
+        test('ContractReadError', async () => {
+            (mockPublicClient.readContract as any).mockRejectedValue(new Error('err'));
+            await expect(service.getChannelBalance(channelId, tokens)).rejects.toThrow(Errors.ContractReadError);
+        });
+    });
+
+    describe('getChannelData', () => {
+        test('success', async () => {
+            // Mock contract returns a tuple array matching the actual contract structure
+            const contractResult = [
+                // result[0] - channel
+                {
+                    participants: ['0xabc', '0xdef'] as readonly Address[],
+                    adjudicator: '0x123' as Address,
+                    challenge: 100n,
+                    nonce: 1n,
+                },
+                // result[1] - status
+                0, // ChannelStatus.INITIAL
+                // result[2] - wallets
+                ['0xabc', '0xdef'] as readonly Address[],
+                // result[3] - challengeExpiry
+                1234567890n,
+                // result[4] - lastValidState
+                {
+                    intent: 0,
+                    version: 1n,
+                    data: '0x123' as Hex,
+                    allocations: [] as readonly any[],
+                    sigs: [] as readonly any[],
+                },
+            ];
+
+            const expectedResult = {
+                channel: {
+                    participants: ['0xabc', '0xdef'],
+                    adjudicator: '0x123',
+                    challenge: 100n,
+                    nonce: 1n,
+                },
+                status: 0,
+                wallets: ['0xabc', '0xdef'],
+                challengeExpiry: 1234567890n,
+                lastValidState: {
+                    intent: 0,
+                    version: 1n,
+                    data: '0x123',
+                    allocations: [],
+                    sigs: [],
+                },
+            };
+
+            (mockPublicClient.readContract as any).mockResolvedValue(contractResult);
+            const res = await service.getChannelData(channelId);
+            expect(res).toEqual(expectedResult);
+            expect(mockPublicClient.readContract).toHaveBeenCalledWith({
+                address: custodyAddress,
+                abi: CustodyAbi,
+                functionName: 'getChannelData',
+                args: [channelId],
+            });
+        });
+        test('ContractReadError', async () => {
+            (mockPublicClient.readContract as any).mockRejectedValue(new Error('fail'));
+            await expect(service.getChannelData(channelId)).rejects.toThrow(Errors.ContractReadError);
         });
     });
 });

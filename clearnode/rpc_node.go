@@ -59,7 +59,7 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	n.connHub.Set(&RPCConnection{
 		ConnectionID: connectionID,
 		WriteSink:    messageSink,
-		Storage:      make(map[string]any),
+		Storage:      NewSafeStorage(),
 	})
 
 	defer func() {
@@ -68,9 +68,10 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	readMesages := func() error {
+	read_loop:
 		for {
 			rpcConn := n.connHub.Get(connectionID)
-			if conn == nil {
+			if rpcConn == nil {
 				n.logger.Error("connection not found in hub", "connectionID", connectionID)
 				return fmt.Errorf("connection not found in hub for ID %s", connectionID)
 			}
@@ -117,8 +118,9 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 			for _, handlersId := range methodRoute {
 				handlers, exists := n.handlerChain[handlersId]
 				if !exists || len(handlers) == 0 {
-					n.logger.Fatal("no handlers found for id", "id", handlersId)
-					return fmt.Errorf("no handlers found for id %s", handlersId)
+					n.logger.Error("no handlers found for id", "id", handlersId)
+					n.sendErrorResponse(rpcConn, msg.Req.RequestID, fmt.Sprintf("unknown method: %s", msg.Req.Method))
+					continue read_loop
 				}
 
 				routeHandlers = append(routeHandlers, handlers...)
@@ -191,7 +193,7 @@ type RPCContext struct {
 	UserID  string
 	Signer  *Signer
 	Message RPCMessage
-	Storage map[string]any
+	Storage *SafeStorage
 
 	handlers []RPCHandler
 }
@@ -270,10 +272,10 @@ func (wn *RPCNode) Handle(method string, handler RPCHandler) {
 
 func (wn *RPCNode) handle(method string, handler RPCHandler) {
 	if method == "" {
-		wn.logger.Fatal("Websocket method cannot be empty")
+		panic("Websocket method cannot be empty")
 	}
 	if handler == nil {
-		wn.logger.Fatal("Websocket handler cannot be nil", "method", method)
+		panic(fmt.Sprintf("Websocket handler cannot be nil for method %s", method))
 	}
 
 	wn.handlerChain[method] = []RPCHandler{handler}
@@ -285,7 +287,7 @@ func (wn *RPCNode) Use(middleware RPCHandler) {
 
 func (wn *RPCNode) use(groupId string, middleware RPCHandler) {
 	if middleware == nil {
-		wn.logger.Fatal("Websocket middleware handler cannot be nil for group")
+		panic("Websocket middleware handler cannot be nil for group")
 	}
 
 	if _, exists := wn.handlerChain[groupId]; !exists {
@@ -347,7 +349,7 @@ type RPCConnection struct {
 	ConnectionID string
 	UserID       string
 	WriteSink    chan<- []byte
-	Storage      map[string]any
+	Storage      *SafeStorage
 }
 
 type rpcConnectionHub struct {
@@ -412,4 +414,29 @@ func (hub *rpcConnectionHub) Publish(userID string, message []byte) {
 	}
 
 	conn.WriteSink <- message
+}
+
+type SafeStorage struct {
+	mu      sync.RWMutex
+	storage map[string]any
+}
+
+func NewSafeStorage() *SafeStorage {
+	return &SafeStorage{
+		storage: make(map[string]any),
+	}
+}
+
+func (s *SafeStorage) Set(key string, value any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.storage[key] = value
+}
+
+func (s *SafeStorage) Get(key string) (any, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.storage[key], s.storage[key] != nil
 }

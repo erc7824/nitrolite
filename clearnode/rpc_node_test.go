@@ -39,7 +39,7 @@ func TestRPCNode(t *testing.T) {
 			logger.Debug("executing handler", "method", method)
 
 			var prevMethod string
-			if prevMethodVal, ok := c.Storage[previousExecMethodKey]; ok {
+			if prevMethodVal, ok := c.Storage.Get(previousExecMethodKey); ok {
 				prevMethod, ok = prevMethodVal.(string)
 				if !ok {
 					prevMethod = "non_string"
@@ -47,35 +47,36 @@ func TestRPCNode(t *testing.T) {
 			}
 
 			var rootMwValue, groupAMwValue, groupBMwValue bool
-			if rootMwVal, ok := c.Storage[rootMwKey]; ok {
+			if rootMwVal, ok := c.Storage.Get(rootMwKey); ok {
 				rootMwValue, ok = rootMwVal.(bool)
 				if !ok {
 					rootMwValue = false
 				}
 			}
-			if groupMwVal, ok := c.Storage[groupAMwKey]; ok {
+			if groupMwVal, ok := c.Storage.Get(groupAMwKey); ok {
 				groupAMwValue, ok = groupMwVal.(bool)
 				if !ok {
 					groupAMwValue = false
 				}
 			}
-			if groupMwVal, ok := c.Storage[groupBMwKey]; ok {
+			if groupMwVal, ok := c.Storage.Get(groupBMwKey); ok {
 				groupBMwValue, ok = groupMwVal.(bool)
 				if !ok {
 					groupBMwValue = false
 				}
 			}
 			c.Succeed(prevMethod, method, rootMwValue, groupAMwValue, groupBMwValue)
-			c.Storage[previousExecMethodKey] = method
+			c.Storage.Set(previousExecMethodKey, method)
 		}
 	}
 
 	// 2) Add one middleware and one handler to the root
 	node.Use(func(c *RPCContext) {
 		logger.Debug("executing root middleware")
-		c.Storage[rootMwKey] = true
-		c.Storage[groupAMwKey] = false // Reset group A middleware state
-		c.Storage[groupBMwKey] = false // Reset group B middleware state
+
+		c.Storage.Set(rootMwKey, true)
+		c.Storage.Set(groupAMwKey, false) // Reset group A middleware state
+		c.Storage.Set(groupBMwKey, false) // Reset group B middleware state
 		c.Next()
 	})
 
@@ -86,8 +87,8 @@ func TestRPCNode(t *testing.T) {
 
 	testGroupA.Use(func(c *RPCContext) {
 		logger.Debug("executing group A middleware")
-		c.Storage[groupAMwKey] = true
-		c.Storage[groupBMwKey] = false
+		c.Storage.Set(groupAMwKey, true)
+		c.Storage.Set(groupBMwKey, false)
 		c.Next()
 	})
 
@@ -96,7 +97,7 @@ func TestRPCNode(t *testing.T) {
 	testGroupB := testGroupA.NewGroup("testGroupB")
 	testGroupB.Use(func(c *RPCContext) {
 		logger.Debug("executing group B middleware")
-		c.Storage[groupBMwKey] = true
+		c.Storage.Set(groupBMwKey, true)
 		c.Next()
 	})
 

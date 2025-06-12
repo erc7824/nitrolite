@@ -3,9 +3,12 @@ package main
 import (
 	"testing"
 	"time"
+
+	"github.com/go-playground/validator/v10"
 )
 
 func TestRPCMessageValidate(t *testing.T) {
+	validate := validator.New()
 	rpcMsg := &RPCMessage{
 		Req: &RPCData{
 			RequestID: 1,

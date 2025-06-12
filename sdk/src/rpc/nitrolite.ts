@@ -102,7 +102,8 @@ export class NitroliteRPC {
 
         if (
             typeof requestId !== 'number' ||
-            (typeof method !== typeof RPCMethod) ||
+            (typeof method !== 'string') ||
+            !Object.values(RPCMethod).includes(method as RPCMethod) ||
             !Array.isArray(dataPayload) ||
             typeof timestamp !== 'number'
         ) {
@@ -118,7 +119,8 @@ export class NitroliteRPC {
 
         let data: any[] | NitroliteRPCErrorDetail;
         let isError = false;
-        if (method === 'error') {
+
+        if (method === RPCMethod.Error) {
             isError = true;
             if (
                 dataPayload.length === 1 &&

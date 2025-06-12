@@ -20,15 +20,14 @@ import {
 } from '../../../src/rpc/api';
 import {
     CreateAppSessionRequest,
-    ResizeChannel,
     MessageSigner,
-    AuthRequest,
-    AuthChallengeRPCResponse,
+    AuthChallengeResponse,
     RPCMethod,
     RPCChannelStatus,
     RequestData,
     TransferAllocation,
 } from '../../../src/rpc/types';
+import { ResizeChannelRequestParams, AuthRequestParams } from '../../src/rpc/types/request';
 
 describe('API message creators', () => {
     const signer: MessageSigner = jest.fn(async () => '0xsig' as Hex);
@@ -44,11 +43,14 @@ describe('API message creators', () => {
     });
 
     test('createAuthRequestMessage', async () => {
-        const authRequest: AuthRequest = {
-            wallet: clientAddress,
-            participant: clientAddress,
-            app_name: 'test-app',
+        const authRequest: AuthRequestParams = {
+            address: clientAddress,
+            sessionKey: clientAddress,
+            appName: 'test-app',
             allowances: [],
+            expire: '',
+            scope: '',
+            applicationAddress: clientAddress
         };
         const msgStr = await createAuthRequestMessage(authRequest, requestId, timestamp);
         expect(signer).not.toHaveBeenCalled();
@@ -57,7 +59,7 @@ describe('API message creators', () => {
             req: [
                 requestId,
                 RPCMethod.AuthRequest,
-                [clientAddress, clientAddress, 'test-app', [], '', '', ''],
+                [clientAddress, clientAddress, 'test-app', [], '', '', clientAddress],
                 timestamp,
             ],
             sig: [''],
@@ -76,7 +78,7 @@ describe('API message creators', () => {
     });
 
     describe('createAuthVerifyMessage', () => {
-        const rawResponse: AuthChallengeRPCResponse = {
+        const rawResponse: AuthChallengeResponse = {
             method: RPCMethod.AuthChallenge,
             requestId: 999,
             timestamp: 200,
@@ -231,23 +233,20 @@ describe('API message creators', () => {
     });
 
     test('createResizeChannelMessage', async () => {
-        const resizeParams: ResizeChannel[] = [
-            {
-                channel_id: channelId,
-                allocations: [
-                    {
-                        participant: clientAddress,
-                        asset: 'usdc',
-                        amount: '100.0',
-                    },
-                ],
-            },
-        ];
+        const resizeParams: ResizeChannelRequestParams[] = [{
+            channel_id: channelId,
+            funds_destination: fundDestination,
+            resize_amount: 1000n,
+        }];
+        const resizeParamsExpected = resizeParams.map(param => ({
+            ...param,
+            resize_amount: param.resize_amount?.toString()
+        }));
         const msgStr = await createResizeChannelMessage(signer, resizeParams, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.ResizeChannel, resizeParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.ResizeChannel, resizeParams, timestamp],
+            req: [requestId, RPCMethod.ResizeChannel, resizeParamsExpected, timestamp],
             sig: ['0xsig'],
         });
     });

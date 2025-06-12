@@ -2,72 +2,58 @@ name: 'Setup Blockchain Environment'
 description: 'Install Foundry, start Anvil, and deploy contracts for testing'
 
 outputs:
-  custody-address:
-    description: 'Deployed Custody contract address'
-    value: ${{ steps.deploy.outputs.custody-address }}
-  adjudicator-address:
-    description: 'Deployed Adjudicator contract address'  
-    value: ${{ steps.deploy.outputs.adjudicator-address }}
-  token-address:
-    description: 'Deployed Test Token contract address'
-    value: ${{ steps.deploy.outputs.token-address }}
+    custody-address:
+        description: 'Deployed Custody contract address'
+        value: ${{ steps.setup.outputs.custody-address }}
+    adjudicator-address:
+        description: 'Deployed Adjudicator contract address'
+        value: ${{ steps.setup.outputs.adjudicator-address }}
+    token-address:
+        description: 'Deployed Test Token contract address'
+        value: ${{ steps.setup.outputs.token-address }}
 
 runs:
-  using: 'composite'
-  steps:
-    - name: Install Foundry
-      uses: foundry-rs/foundry-toolchain@v1
-      with:
-        version: nightly
-    
-    - name: Install jq for JSON parsing
-      run: sudo apt-get update && sudo apt-get install -y jq
-      shell: bash
-    
-    - name: Build contracts
-      working-directory: ./contract
-      run: |
-        forge install
-        forge build
-      shell: bash
-    
-    - name: Start Anvil
-      run: |
-        anvil --port 8545 --host 0.0.0.0 --accounts 10 --balance 10000 --gas-limit 12000000 --gas-price 20000000000 --block-time 1 &
-        echo "Waiting for Anvil to start..."
-        for i in {1..30}; do
-          if curl -s -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' http://localhost:8545 >/dev/null 2>&1; then
-            echo "Anvil is running"
-            break
-          fi
-          echo "Waiting... ($i/30)"
-          sleep 1
-        done
-      shell: bash
-    
-    - name: Deploy contracts to local network
-      id: deploy
-      working-directory: ./contract
-      run: |
-        forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast --json > deployment.json
-        
-        # Extract contract addresses and export as environment variables
-        if [ -f deployment.json ]; then
-          CUSTODY_ADDR=$(jq -r '.transactions[] | select(.transactionType == "CREATE") | select(.contractName == "Custody") | .contractAddress' deployment.json 2>/dev/null || echo "")
-          ADJUDICATOR_ADDR=$(jq -r '.transactions[] | select(.transactionType == "CREATE") | select(.contractName == "Dummy") | .contractAddress' deployment.json 2>/dev/null || echo "")
-          TOKEN_ADDR=$(jq -r '.transactions[] | select(.transactionType == "CREATE") | select(.contractName == "TestERC20") | .contractAddress' deployment.json 2>/dev/null || echo "")
-          
-          echo "CUSTODY_CONTRACT_ADDRESS=$CUSTODY_ADDR" >> $GITHUB_ENV
-          echo "ADJUDICATOR_CONTRACT_ADDRESS=$ADJUDICATOR_ADDR" >> $GITHUB_ENV
-          echo "TEST_TOKEN_CONTRACT_ADDRESS=$TOKEN_ADDR" >> $GITHUB_ENV
-          
-          echo "custody-address=$CUSTODY_ADDR" >> $GITHUB_OUTPUT
-          echo "adjudicator-address=$ADJUDICATOR_ADDR" >> $GITHUB_OUTPUT
-          echo "token-address=$TOKEN_ADDR" >> $GITHUB_OUTPUT
-          
-          echo "Deployed contract addresses:"
-          echo "Custody: $CUSTODY_ADDR"
-          echo "Adjudicator: $ADJUDICATOR_ADDR"
-          echo "Token: $TOKEN_ADDR"
-        fi
-      shell: bash
+    using: 'composite'
+    steps:
+        - name: Install Foundry
+          uses: foundry-rs/foundry-toolchain@v1
+          with:
+              version: nightly
+
+        - name: Install jq for JSON parsing
+          run: sudo apt-get update && sudo apt-get install -y jq
+          shell: bash
+
+        - name: Start Anvil and Deploy Contracts
+          id: setup
+          run: |
+              # Make the script executable
+              chmod +x ./scripts/test-setup.sh
+              
+              # Start Anvil
+              ./scripts/test-setup.sh start-anvil
+              
+              # Deploy contracts
+              ./scripts/test-setup.sh deploy
+              
+              # Extract addresses from the generated file
+              if [ -f "./contract/contract_addresses.test.env" ]; then
+                # Source the file to get the variables
+                source ./contract/contract_addresses.test.env
+                
+                # Set GitHub Action outputs
+                echo "custody-address=${CUSTODY_CONTRACT_ADDRESS}" >> $GITHUB_OUTPUT
+                echo "adjudicator-address=${ADJUDICATOR_CONTRACT_ADDRESS}" >> $GITHUB_OUTPUT
+                echo "token-address=${TEST_TOKEN_CONTRACT_ADDRESS}" >> $GITHUB_OUTPUT
+                
+                # Log the addresses for debugging
+                echo "Deployed Contract Addresses:"
+                echo "  Custody: ${CUSTODY_CONTRACT_ADDRESS}"
+                echo "  Adjudicator: ${ADJUDICATOR_CONTRACT_ADDRESS}"
+                echo "  Test Token: ${TEST_TOKEN_CONTRACT_ADDRESS}"
+                echo "  RPC URL: ${ANVIL_RPC_URL}"
+              else
+                echo "ERROR: contract_addresses.test.env file not found"
+                exit 1
+              fi
+          shell: bash

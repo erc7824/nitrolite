@@ -18,7 +18,7 @@ import { ethers } from 'ethers';
 
 // Import SDK modules to test
 import { NitroliteClient } from '../../src/client';
-import { CreateChannelParams, AccountInfo } from '../../src/client/types';
+import { CreateChannelParams } from '../../src/client/types';
 
 describe('SDK Non-Regression Tests', () => {
     let testEnv: TestEnvironment;
@@ -156,11 +156,10 @@ describe('SDK Non-Regression Tests', () => {
             expect(client.account.address).toBe(alice.address);
         });
 
-        test('should get account info', async () => {
-            const accountInfo: AccountInfo = await client.getAccountInfo(tokenAddress);
-            expect(accountInfo).toBeDefined();
-            expect(accountInfo.available).toBeGreaterThanOrEqual(0n);
-            expect(accountInfo.channelCount).toBeGreaterThanOrEqual(0n);
+        test('should get account balance', async () => {
+            const accountBalance = await client.getAccountBalance(tokenAddress);
+            expect(accountBalance).toBeDefined();
+            expect(accountBalance).toBeGreaterThanOrEqual(0n);
         });
 
         test('should get token balance', async () => {
@@ -176,7 +175,10 @@ describe('SDK Non-Regression Tests', () => {
 
     describe('Deposit Operations', () => {
       test('should deposit ETH successfully', async () => {
+        // First approve tokens before depositing
         const depositAmount = parseEther('10');
+        await client.approveTokens(tokenAddress, depositAmount);
+        
         const txHash = await client.deposit(tokenAddress, depositAmount);
 
         expect(txHash).toBeDefined();
@@ -200,6 +202,11 @@ describe('SDK Non-Regression Tests', () => {
 
     describe('State Channel Operations', () => {
       test('should create state channel', async () => {
+        // First approve and deposit tokens to have sufficient balance
+        const depositAmount = parseEther('20');
+        await client.approveTokens(tokenAddress, depositAmount);
+        await client.deposit(tokenAddress, depositAmount);
+        
         const channelParams: CreateChannelParams = {
           initialAllocationAmounts: [parseEther('5'), parseEther('5')],
           stateData: '0x',
@@ -215,6 +222,9 @@ describe('SDK Non-Regression Tests', () => {
 
       test('should deposit and create channel in one operation', async () => {
         const depositAmount = parseEther('10');
+        // First approve tokens before deposit and create
+        await client.approveTokens(tokenAddress, depositAmount);
+        
         const channelParams: CreateChannelParams = {
           initialAllocationAmounts: [parseEther('5'), parseEther('5')],
           stateData: '0x',
@@ -225,8 +235,7 @@ describe('SDK Non-Regression Tests', () => {
         expect(result).toBeDefined();
         expect(result.channelId).toBeDefined();
         expect(result.initialState).toBeDefined();
-        expect(result.depositTxHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
-        expect(result.createChannelTxHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
+        expect(result.txHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
       });
 
       test('should validate channel parameters', async () => {
@@ -255,6 +264,10 @@ describe('SDK Non-Regression Tests', () => {
 
     describe('Transaction Processing', () => {
       test('should handle withdrawal', async () => {
+        const depositAmount = parseEther('2');
+        await client.approveTokens(tokenAddress, depositAmount);
+        await client.deposit(tokenAddress, depositAmount);
+        
         const withdrawAmount = parseEther('0.5');
         const txHash = await client.withdrawal(tokenAddress, withdrawAmount);
 
@@ -262,9 +275,57 @@ describe('SDK Non-Regression Tests', () => {
         expect(txHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
       });
 
-      test('should get account channels', async () => {
-        const channels = await client.getAccountChannels();
+      test('should get open channels', async () => {
+        const channels = await client.getOpenChannels();
         expect(Array.isArray(channels)).toBe(true);
+      });
+
+      test('should test account balance with multiple tokens', async () => {
+        // Test single token
+        const singleBalance = await client.getAccountBalance(tokenAddress);
+        expect(singleBalance).toBeGreaterThanOrEqual(0n);
+
+        // Test multiple tokens
+        const multipleBalances = await client.getAccountBalance([tokenAddress]);
+        expect(Array.isArray(multipleBalances)).toBe(true);
+        expect(multipleBalances.length).toBe(1);
+        expect(multipleBalances[0]).toBeGreaterThanOrEqual(0n);
+      });
+
+      test('should get channel balance and data after channel creation', async () => {
+        const depositAmount = parseEther('10');
+        await client.approveTokens(tokenAddress, depositAmount);
+        await client.deposit(tokenAddress, depositAmount);
+        
+        // Then create a channel to test with
+        const channelParams: CreateChannelParams = {
+          initialAllocationAmounts: [parseEther('2'), parseEther('2')],
+          stateData: '0x',
+        };
+
+        const channelResult = await client.createChannel(tokenAddress, channelParams);
+        const channelId = channelResult.channelId;
+
+        // Test single token balance for channel
+        const singleChannelBalance = await client.getChannelBalance(channelId, tokenAddress);
+        expect(singleChannelBalance).toBeGreaterThanOrEqual(0n);
+
+        // Test multiple token balances for channel
+        const multipleChannelBalances = await client.getChannelBalance(channelId, [tokenAddress]);
+        expect(Array.isArray(multipleChannelBalances)).toBe(true);
+        expect(multipleChannelBalances.length).toBe(1);
+        expect(multipleChannelBalances[0]).toBeGreaterThanOrEqual(0n);
+
+        // Test getting channel data
+        const channelData = await client.getChannelData(channelId);
+        expect(channelData).toBeDefined();
+        expect(channelData.channel).toBeDefined();
+        expect(channelData.status).toBeDefined();
+        expect(channelData.wallets).toBeDefined();
+        expect(Array.isArray(channelData.wallets)).toBe(true);
+        expect(channelData.wallets.length).toBe(2);
+        expect(channelData.challengeExpiry).toBeDefined();
+        expect(channelData.lastValidState).toBeDefined();
       });
 
       test('should estimate gas for operations', async () => {
@@ -301,6 +362,9 @@ describe('SDK Non-Regression Tests', () => {
 
     describe('Performance Tests', () => {
       test('should handle multiple deposits efficiently', async () => {
+        const totalAmount = parseEther('1'); // 5 * 0.1 + buffer
+        await client.approveTokens(tokenAddress, totalAmount);
+        
         const startTime = Date.now();
 
         const depositPromises = Array.from({ length: 5 }, () =>
@@ -320,10 +384,10 @@ describe('SDK Non-Regression Tests', () => {
 
       test('should maintain performance under concurrent operations', async () => {
         const operations = [
-          () => client.getAccountInfo(tokenAddress),
+          () => client.getAccountBalance(tokenAddress),
           () => client.getTokenBalance(tokenAddress),
           () => client.getTokenAllowance(tokenAddress),
-          () => client.getAccountChannels(),
+          () => client.getOpenChannels(),
         ];
 
         const startTime = Date.now();

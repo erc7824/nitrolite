@@ -31,13 +31,14 @@ jobs:
           cache-dependency-path: '${{ inputs.project-path }}/go.sum'
 
       - name: Setup blockchain environment
+        id: blockchain
         uses: ./.github/actions/setup-blockchain
 
       - name: Test
         run: go test -v ./...
         working-directory: ${{ inputs.project-path }}
         env:
-          ETH_RPC_URL: http://localhost:8545
-          CUSTODY_CONTRACT_ADDRESS: ${{ env.CUSTODY_CONTRACT_ADDRESS }}
-          ADJUDICATOR_CONTRACT_ADDRESS: ${{ env.ADJUDICATOR_CONTRACT_ADDRESS }}
-          TEST_TOKEN_CONTRACT_ADDRESS: ${{ env.TEST_TOKEN_CONTRACT_ADDRESS }}
+          ETH_RPC_URL: http://127.0.0.1:8545
+          CUSTODY_CONTRACT_ADDRESS: ${{ steps.blockchain.outputs.custody-address }}
+          ADJUDICATOR_CONTRACT_ADDRESS: ${{ steps.blockchain.outputs.adjudicator-address }}
+          TEST_TOKEN_CONTRACT_ADDRESS: ${{ steps.blockchain.outputs.token-address }}

@@ -266,7 +266,7 @@ function parseRPCParameters<M extends keyof RPCParamsByMethod>(method: M, params
         case RPCMethod.GetAssets:
             return extractRPCParameter<GetAssetsRPCParams[]>(params, 'assets') as RPCParamsByMethod[M];
         default:
-            throw new Error(`Unknown method for parameter extraction: ${method}`);
+            throw new Error(`Unsupported RPC method: ${method}`);
     }
 }
 

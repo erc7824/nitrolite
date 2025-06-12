@@ -3,9 +3,6 @@ import { Address, Hex } from 'viem';
 /** Type alias for Request ID (uint64) */
 export type RequestID = number;
 
-/** Type alias for Method (string) */
-export type Method = string;
-
 /** Type alias for Timestamp (uint64) */
 export type Timestamp = number;
 
@@ -17,6 +14,13 @@ export type RequestData = [RequestID, RPCMethod, any[], Timestamp?];
 
 /** Represents the data payload within a successful response message: [requestId, method, result, timestamp?]. */
 export type ResponseData = [RequestID, RPCMethod, any[], Timestamp?];
+
+/** Represents the status of a channel. */
+export enum ChannelStatus {
+    Joining = 'joining',
+    Open = 'open',
+    Closed = 'closed',
+};
 
 /** Represents a single allowance for an asset, used in application sessions.
  * This structure defines the symbol of the asset and the amount that is allowed to be spent.
@@ -92,7 +96,7 @@ export interface ParsedResponse {
     /** The Request ID from the response payload. Undefined if structure is invalid. */
     requestId?: RequestID;
     /** The method name from the response payload. Undefined if structure is invalid. */
-    method?: Method;
+    method?: RPCMethod;
     /** The extracted data payload (result array for success, error detail object for error). Undefined if structure is invalid or error payload malformed. */
     data?: any[] | NitroliteRPCErrorDetail;
     /** The Application Session ID from the message envelope. Undefined if structure is invalid. */
@@ -163,7 +167,7 @@ export interface CreateAppSessionRequest {
 }
 
 /**
- * Defines the parameters required for the 'close_application' RPC method.
+ * Defines the parameters required for the 'close_app_session' RPC method.
  */
 export interface CloseAppSessionRequest {
     /** The unique identifier of the application session to be closed. */
@@ -320,7 +324,7 @@ export enum RPCMethod {
     GetLedgerEntries = 'get_ledger_entries',
     CreateAppSession = 'create_app_session',
     SubmitState = 'submit_state',
-    CloseAppSession = 'close_application',
+    CloseAppSession = 'close_app_session',
     GetAppDefinition = 'get_app_definition',
     GetAppSessions = 'get_app_sessions',
     ResizeChannel = 'resize_channel',
@@ -397,7 +401,7 @@ export interface GetLedgerEntriesRPCParams {
 export interface CreateAppSessionRPCParams {
     app_session_id: Hex;
     version: number;
-    status: string;
+    status: ChannelStatus;
 }
 
 /**
@@ -406,16 +410,16 @@ export interface CreateAppSessionRPCParams {
 export interface SubmitStateRPCParams {
     app_session_id: Hex;
     version: number;
-    status: string;
+    status: ChannelStatus;
 }
 
 /**
- * Represents the parameters for the 'close_application' RPC method.
+ * Represents the parameters for the 'close_app_session' RPC method.
  */
 export interface CloseAppSessionRPCParams {
     app_session_id: Hex;
     version: number;
-    status: string;
+    status: ChannelStatus;
 }
 
 /**
@@ -428,7 +432,7 @@ export interface GetAppDefinitionRPCParams extends AppDefinition { }
  */
 export interface GetAppSessionsRPCParams {
     app_session_id: Hex;
-    status: string;
+    status: ChannelStatus;
     participants: Address[];
     protocol: string;
     challenge: number;
@@ -488,7 +492,7 @@ export interface CloseChannelRPCParams {
 export interface GetChannelsRPCParams {
     channel_id: Hex;
     participant: Address;
-    status: string;
+    status: ChannelStatus;
     token: Address;
     wallet: Address;
     amount: string;
@@ -601,7 +605,7 @@ export interface SubmitStateRPCResponse extends GenericRPCResponse {
 }
 
 /**
- * Represents the response structure for the 'close_application' RPC method.
+ * Represents the response structure for the 'close_app_session' RPC method.
  */
 export interface CloseAppSessionRPCResponse extends GenericRPCResponse {
     method: RPCMethod.CloseAppSession;

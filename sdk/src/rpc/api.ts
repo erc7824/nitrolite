@@ -15,7 +15,8 @@ import {
     AuthChallengeRPCResponse,
     RequestData,
     RPCMethod,
-    RPCParamsByMethod,
+    ChannelStatus,
+    ResponsePayload,
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
@@ -45,9 +46,7 @@ export async function createAuthRequestMessage(
         params.application ?? '',
     ];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.AuthChallenge, paramsArray, timestamp);
-
     request.sig = [''];
-
     return JSON.stringify(request);
 }
 
@@ -373,14 +372,13 @@ export async function createResizeChannelMessage(
 export async function createGetChannelsMessage(
     signer: MessageSigner,
     participant?: Address,
-    status?: string,
+    status?: ChannelStatus,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
     const params = [{ participant, status }];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetChannels, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-
     return JSON.stringify(signedRequest);
 }
 
@@ -439,7 +437,7 @@ export function createEIP712AuthMessageSigner(
     partialMessage: PartialEIP712AuthMessage,
     domain: EIP712AuthDomain,
 ): MessageSigner {
-    return async (data: RequestData): Promise<Hex> => {
+    return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
         // TODO: perhaps it would be better to pass full EIP712AuthMessage instead of parsing part of it
         // out of untyped data
         const address = walletClient.account?.address;
@@ -447,12 +445,16 @@ export function createEIP712AuthMessageSigner(
             throw new Error('Wallet client is not connected or does not have an account.');
         }
 
-        const method = data[1] as keyof RPCParamsByMethod;
+        const method = payload[1];
+        if (method === 'error' || !Object.values(RPCMethod).includes(method as RPCMethod)) {
+            throw new Error(`Invalid method: ${method}`);
+        }
+
         let challengeUUID: string = '';
         if (method === RPCMethod.AuthChallenge) {
-            challengeUUID = data[2][0].challengeMessage;
+            challengeUUID = payload[2][0].challengeMessage;
         } else if (method === RPCMethod.AuthVerify) {
-            challengeUUID = data[2][0].challenge;
+            challengeUUID = payload[2][0].challenge;
         } else {
             throw new Error(`Expected '${RPCMethod.AuthChallenge}' or '${RPCMethod.AuthVerify}' method, but received '${method}'`);
         }

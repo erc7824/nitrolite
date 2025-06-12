@@ -11,8 +11,7 @@ import {Channel, State, Allocation, Signature, ChannelStatus, StateIntent, Amoun
 
 contract DeployScript is Script {
     bytes32 public constant CUSTODY_SALT = keccak256("NITROLITE_CUSTODY_V1");
-    bytes32 public constant ADJUDICATOR_SALT =
-        keccak256("NITROLITE_ADJUDICATOR_V1");
+    bytes32 public constant ADJUDICATOR_SALT = keccak256("NITROLITE_ADJUDICATOR_V1");
     bytes32 public constant TOKEN_SALT = keccak256("NITROLITE_TEST_TOKEN_V1");
 
     Custody public custody;
@@ -86,61 +85,26 @@ contract DeployScript is Script {
         testToken.mint(bob, initialBalance);
         testToken.mint(charlie, initialBalance);
 
-        console.log(
-            "Minted",
-            initialBalance / 10 ** 18,
-            "tokens to test accounts"
-        );
+        console.log("Minted", initialBalance / 10 ** 18, "tokens to test accounts");
     }
 
     function getDeploymentAddresses()
         external
         view
-        returns (
-            address predictedCustody,
-            address predictedAdjudicator,
-            address predictedToken
-        )
+        returns (address predictedCustody, address predictedAdjudicator, address predictedToken)
     {
-        predictedCustody = computeCreate2AddressCustom(
-            CUSTODY_SALT,
-            keccak256(type(Custody).creationCode)
-        );
+        predictedCustody = computeCreate2AddressCustom(CUSTODY_SALT, keccak256(type(Custody).creationCode));
 
-        predictedAdjudicator = computeCreate2AddressCustom(
-            ADJUDICATOR_SALT,
-            keccak256(type(Dummy).creationCode)
-        );
+        predictedAdjudicator = computeCreate2AddressCustom(ADJUDICATOR_SALT, keccak256(type(Dummy).creationCode));
 
         bytes memory tokenCreationCode = abi.encodePacked(
-            type(TestERC20).creationCode,
-            abi.encode("Nitrolite Test Token", "NTL", 18, type(uint256).max)
+            type(TestERC20).creationCode, abi.encode("Nitrolite Test Token", "NTL", 18, type(uint256).max)
         );
 
-        predictedToken = computeCreate2AddressCustom(
-            TOKEN_SALT,
-            keccak256(tokenCreationCode)
-        );
+        predictedToken = computeCreate2AddressCustom(TOKEN_SALT, keccak256(tokenCreationCode));
     }
 
-    function computeCreate2AddressCustom(
-        bytes32 salt,
-        bytes32 bytecodeHash
-    ) internal view returns (address) {
-        return
-            address(
-                uint160(
-                    uint256(
-                        keccak256(
-                            abi.encodePacked(
-                                bytes1(0xff),
-                                address(this),
-                                salt,
-                                bytecodeHash
-                            )
-                        )
-                    )
-                )
-            );
+    function computeCreate2AddressCustom(bytes32 salt, bytes32 bytecodeHash) internal view returns (address) {
+        return address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, bytecodeHash)))));
     }
 }

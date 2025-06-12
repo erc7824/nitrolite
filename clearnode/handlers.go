@@ -613,6 +613,13 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 	if err != nil {
 		return nil, fmt.Errorf("failed to find channel: %w", err)
 	}
+	if channel == nil {
+		return nil, fmt.Errorf("channel with id %s not found", params.ChannelID)
+	}
+
+	if channel.Status != ChannelStatusOpen {
+		return nil, fmt.Errorf("channel %s must be open to resize, current status: %s", channel.ChannelID, channel.Status)
+	}
 
 	if err := verifySigner(rpc, channel.Wallet); err != nil {
 		return nil, err
@@ -628,6 +635,11 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 	}
 	if params.AllocateAmount == nil {
 		params.AllocateAmount = big.NewInt(0)
+	}
+
+	// Prevent no-op resize operations
+	if params.ResizeAmount.Cmp(big.NewInt(0)) == 0 && params.AllocateAmount.Cmp(big.NewInt(0)) == 0 {
+		return nil, fmt.Errorf("resize operation requires non-zero ResizeAmount or AllocateAmount")
 	}
 
 	ledger := GetWalletLedger(db, channel.Wallet)
@@ -718,6 +730,13 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 	channel, err := GetChannelByID(db, params.ChannelID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find channel: %w", err)
+	}
+	if channel == nil {
+		return nil, fmt.Errorf("channel with id %s not found", params.ChannelID)
+	}
+
+	if channel.Status != ChannelStatusOpen {
+		return nil, fmt.Errorf("channel %s must be open to close, current status: %s", channel.ChannelID, channel.Status)
 	}
 
 	if err := verifySigner(rpc, channel.Wallet); err != nil {

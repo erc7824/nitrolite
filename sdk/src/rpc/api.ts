@@ -1,4 +1,4 @@
-import { Address, encodeAbiParameters, Hex, keccak256, WalletClient } from 'viem';
+import { Address, Hex, WalletClient } from 'viem';
 import {
     MessageSigner,
     AccountID,
@@ -35,7 +35,7 @@ export async function createAuthRequestMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const allowances = Object.values(params.allowances || {}).map((v) => [v.symbol, v.amount]);
+    const allowances = Object.values(params.allowances || {}).map((v) => [v.asset, v.amount]);
     const paramsArray = [
         params.wallet,
         params.participant,

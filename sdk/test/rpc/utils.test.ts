@@ -305,8 +305,8 @@ describe('RPC Utils', () => {
         test('should parse auth_verify response', () => {
             const params: AuthVerifyResponseParams = {
                 address: '0x1234567890123456789012345678901234567890',
-                jwtToken: 'test-jwt-token',
-                sessionKey: '0x1234567890123456789012345678901234567890',
+                jwt_token: 'test-jwt-token',
+                session_key: '0x1234567890123456789012345678901234567890',
                 success: true
             };
 

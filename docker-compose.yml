@@ -2,7 +2,22 @@ version: '3.8'
 
 services:
   # TODO: add a frontend client to manage channels.
-  
+  database:
+    image: postgres:17.2
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      retries: 5
+      start_period: 10s
+
   anvil:
     image: ghcr.io/foundry-rs/foundry:v1.2.2
     container_name: anvil
@@ -32,35 +47,6 @@ services:
         forge create --broadcast --optimizer-runs 1000000 --via-ir ./test/mocks/FlagAdjudicator.sol:FlagAdjudicator --rpc-url http://anvil:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --constructor-args true &&
       "
 
-  db-init:
-    image: alpine:3.19.1
-    volumes:
-      - ./clearnode:/app
-    working_dir: /app
-    command: >
-      sh -c "
-        apk add --no-cache sqlite &&
-        echo 'Checking database...' &&
-        
-        # Check if token already exists
-        TOKEN_EXISTS=$(sqlite3 ./dev.db \"SELECT COUNT(*) FROM assets WHERE token = '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512' AND chain_id = 1337;\") &&
-        
-        if [ \"$TOKEN_EXISTS\" -eq \"0\" ]; then
-          echo 'Seeding database with tokens...' &&
-          sqlite3 ./dev.db \"
-            -- Add USDC on local development network (ChainID 1337) - using the ERC20 test token deployed address
-            INSERT INTO assets (token, chain_id, symbol, decimals) 
-            VALUES ('0xe7f1725e7734ce288f8367e1bb143e90bb3f0512', 1337, 'USDC', 6);
-          \" &&
-          echo 'Database seeded with tokens successfully'
-        else
-          echo 'Database already seeded, skipping'
-        fi
-      "
-    depends_on:
-      contract-deployer:
-        condition: service_completed_successfully
-
   clearnode:
     platform: linux/amd64
     image: ghcr.io/erc7824/nitrolite/clearnode:0.0.1-rc.28
@@ -68,13 +54,18 @@ services:
       - "8000:8000"
       - "4242:4242"
     depends_on:
-      db-init:
-        condition: service_completed_successfully
+      database:
+        condition: service_healthy
     environment:
       - BROKER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
       - LOCALNET_CUSTODY_CONTRACT_ADDRESS=0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE
       - LOCALNET_INFURA_URL=ws://anvil:8545
-      - CLEARNODE_DATABASE_URL=file:./dev.db
+      - CLEARNODE_DATABASE_URL=postgresql://postgres:postgres@database:5432/postgres?sslmode=disable
     volumes:
       - ./clearnode/dev.db:/dev.db
     restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+

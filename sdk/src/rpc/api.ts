@@ -39,13 +39,13 @@ export async function createAuthRequestMessage(
 ): Promise<string> {
     const allowances = Object.values(params.allowances || {}).map((v) => [v.symbol, v.amount]);
     const paramsArray = [
-        params.address,
-        params.sessionKey,
-        params.appName,
+        params.wallet,
+        params.participant,
+        params.app_name,
         allowances,
         params.expire ?? '',
         params.scope ?? '',
-        params.applicationAddress ?? '',
+        params.application ?? '',
     ];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.AuthRequest, paramsArray, timestamp);
     request.sig = [''];

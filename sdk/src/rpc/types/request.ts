@@ -293,11 +293,11 @@ export interface GetAssetsRequest extends GenericRPCMessage {
  */
 export interface AuthRequestParams {
     /** The Ethereum address of the wallet being authorized. */
-    address: Address;
+    wallet: Address;
     /** The session key address associated with the authentication attempt. */
-    sessionKey: Address;
+    participant: Address;
     /** The name of the application being authorized. */
-    appName: string;
+    app_name: string;
     /** The allowances for the connection. */
     allowances: Allowance[];
     /** The expiration timestamp for the authorization. */
@@ -305,7 +305,7 @@ export interface AuthRequestParams {
     /** The scope of the authorization. */
     scope: string;
     /** The application address being authorized. */
-    applicationAddress: Address;
+    application: Address;
 }
 
 /**

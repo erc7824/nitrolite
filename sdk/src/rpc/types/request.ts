@@ -1,5 +1,5 @@
 import { Address, Hex } from 'viem';
-import { RPCMethod, RequestID, Timestamp, AppDefinition, AppSessionAllocation, RPCChannelStatus as RPCChannelStatus } from '.';
+import { RPCMethod, RequestID, Timestamp, AppDefinition, AppSessionAllocation, RPCChannelStatus as RPCChannelStatus, Allowance } from '.';
 
 /**
  * Represents a generic RPC message structure that includes common fields.
@@ -14,7 +14,7 @@ interface GenericRPCMessage {
 /**
  * Represents the request parameters for the 'auth_challenge' RPC method.
  */
-export interface AuthChallengeRPCRequestParams {
+export interface AuthChallengeRequestParams {
   /** The challenge message to be signed by the client for authentication. */
   challengeMessage: string;
 }
@@ -22,37 +22,33 @@ export interface AuthChallengeRPCRequestParams {
 /**
  * Represents the request structure for the 'auth_challenge' RPC method.
  */
-export interface AuthChallengeRPCRequest extends GenericRPCMessage {
+export interface AuthChallengeRequest extends GenericRPCMessage {
   method: RPCMethod.AuthChallenge;
-  params: AuthChallengeRPCRequestParams;
+  params: AuthChallengeRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'auth_verify' RPC method.
  */
-export interface AuthVerifyRPCRequestParams {
-  /** The Ethereum address of the client attempting to authenticate. */
-  address: Address;
+export interface AuthVerifyRequestParams {
+  /** The challenge token received from auth_challenge response. Used to verify the client's signature and prevent replay attacks. */
+  challenge: string,
   /** JSON Web Token for authentication, if provided. */
-  jwtToken: string;
-  /** The session key address associated with the authentication attempt. */
-  sessionKey: Address;
-  /** Indicates whether the authentication attempt was successful. */
-  success: boolean;
+  jwt: string;
 }
 
 /**
  * Represents the request structure for the 'auth_verify' RPC method.
  */
-export interface AuthVerifyRPCRequest extends GenericRPCMessage {
+export interface AuthVerifyRequest extends GenericRPCMessage {
   method: RPCMethod.AuthVerify;
-  params: AuthVerifyRPCRequestParams;
+  params: AuthVerifyRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'get_config' RPC method.
  */
-export interface GetConfigRPCRequestParams {
+export interface GetConfigRequestParams {
   /** The Ethereum address of the broker. */
   broker_address: Address;
   /** List of supported networks and their configurations. */
@@ -71,15 +67,15 @@ export interface GetConfigRPCRequestParams {
 /**
  * Represents the request structure for the 'get_config' RPC method.
  */
-export interface GetConfigRPCRequest extends GenericRPCMessage {
+export interface GetConfigRequest extends GenericRPCMessage {
   method: RPCMethod.GetConfig;
-  params: GetConfigRPCRequestParams;
+  params: GetConfigRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'get_ledger_balances' RPC method.
  */
-export interface GetLedgerBalancesRPCRequestParams {
+export interface GetLedgerBalancesRequestParams {
   /** Optional participant address to filter balances. If not provided, uses the authenticated wallet address. */
   participant?: Address;
   /** Optional account ID to filter balances. If provided, overrides the participant address. */
@@ -89,15 +85,15 @@ export interface GetLedgerBalancesRPCRequestParams {
 /**
  * Represents the request structure for the 'get_ledger_balances' RPC method.
  */
-export interface GetLedgerBalancesRPCRequest extends GenericRPCMessage {
+export interface GetLedgerBalancesRequest extends GenericRPCMessage {
   method: RPCMethod.GetLedgerBalances;
-  params: GetLedgerBalancesRPCRequestParams;
+  params: GetLedgerBalancesRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'get_ledger_entries' RPC method.
  */
-export interface GetLedgerEntriesRPCRequestParams {
+export interface GetLedgerEntriesRequestParams {
   /** Optional account ID to filter ledger entries. */
   account_id?: string;
   /** Optional asset symbol to filter ledger entries. */
@@ -109,15 +105,15 @@ export interface GetLedgerEntriesRPCRequestParams {
 /**
  * Represents the request structure for the 'get_ledger_entries' RPC method.
  */
-export interface GetLedgerEntriesRPCRequest extends GenericRPCMessage {
+export interface GetLedgerEntriesRequest extends GenericRPCMessage {
   method: RPCMethod.GetLedgerEntries;
-  params: GetLedgerEntriesRPCRequestParams;
+  params: GetLedgerEntriesRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'create_app_session' RPC method.
  */
-export interface CreateAppSessionRPCRequestParams {
+export interface CreateAppSessionRequestParams {
   /** The detailed definition of the application being created, including protocol, participants, weights, and quorum. */
   definition: AppDefinition;
   /** The initial allocation distribution among participants. Each participant must have sufficient balance for their allocation. */
@@ -127,15 +123,15 @@ export interface CreateAppSessionRPCRequestParams {
 /**
  * Represents the request structure for the 'create_app_session' RPC method.
  */
-export interface CreateAppSessionRPCRequest extends GenericRPCMessage {
+export interface CreateAppSessionRequest extends GenericRPCMessage {
   method: RPCMethod.CreateAppSession;
-  params: CreateAppSessionRPCRequestParams;
+  params: CreateAppSessionRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'submit_state' RPC method.
  */
-export interface SubmitStateRPCRequestParams {
+export interface SubmitStateRequestParams {
   /** The unique identifier of the application session to update. */
   app_session_id: Hex;
   /** The new allocation distribution among participants. Must include all participants and maintain total balance. */
@@ -145,15 +141,15 @@ export interface SubmitStateRPCRequestParams {
 /**
  * Represents the request structure for the 'submit_state' RPC method.
  */
-export interface SubmitStateRPCRequest extends GenericRPCMessage {
+export interface SubmitStateRequest extends GenericRPCMessage {
   method: RPCMethod.SubmitState;
-  params: SubmitStateRPCRequestParams;
+  params: SubmitStateRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'close_app_session' RPC method.
  */
-export interface CloseAppSessionRPCRequestParams {
+export interface CloseAppSessionRequestParams {
   /** The unique identifier of the application session to close. */
   app_session_id: Hex;
   /** The final allocation distribution among participants upon closing. Must include all participants and maintain total balance. */
@@ -163,15 +159,15 @@ export interface CloseAppSessionRPCRequestParams {
 /**
  * Represents the request structure for the 'close_app_session' RPC method.
  */
-export interface CloseAppSessionRPCRequest extends GenericRPCMessage {
+export interface CloseAppSessionRequest extends GenericRPCMessage {
   method: RPCMethod.CloseAppSession;
-  params: CloseAppSessionRPCRequestParams;
+  params: CloseAppSessionRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'get_app_definition' RPC method.
  */
-export interface GetAppDefinitionRPCRequestParams {
+export interface GetAppDefinitionRequestParams {
   /** The unique identifier of the application session to retrieve. */
   app_session_id: Hex;
 }
@@ -179,15 +175,15 @@ export interface GetAppDefinitionRPCRequestParams {
 /**
  * Represents the request structure for the 'get_app_definition' RPC method.
  */
-export interface GetAppDefinitionRPCRequest extends GenericRPCMessage {
+export interface GetAppDefinitionRequest extends GenericRPCMessage {
   method: RPCMethod.GetAppDefinition;
-  params: GetAppDefinitionRPCRequestParams;
+  params: GetAppDefinitionRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'get_app_sessions' RPC method.
  */
-export interface GetAppSessionsRPCRequestParams {
+export interface GetAppSessionsRequestParams {
   /** Optional participant address to filter application sessions. If not provided, returns all sessions. */
   participant?: Address;
   /** Optional status to filter application sessions (e.g., "open", "closed"). If not provided, returns sessions of all statuses. */
@@ -197,15 +193,15 @@ export interface GetAppSessionsRPCRequestParams {
 /**
  * Represents the request structure for the 'get_app_sessions' RPC method.
  */
-export interface GetAppSessionsRPCRequest extends GenericRPCMessage {
+export interface GetAppSessionsRequest extends GenericRPCMessage {
   method: RPCMethod.GetAppSessions;
-  params: GetAppSessionsRPCRequestParams;
+  params: GetAppSessionsRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'resize_channel' RPC method.
  */
-export interface ResizeChannelRPCRequestParams {
+export interface ResizeChannelRequestParams {
   /** The unique identifier of the channel to resize. */
   channel_id: Hex;
   /** Optional amount to resize the channel by (can be positive or negative). Must be provided if allocate_amount is not. */
@@ -219,15 +215,15 @@ export interface ResizeChannelRPCRequestParams {
 /**
  * Represents the request structure for the 'resize_channel' RPC method.
  */
-export interface ResizeChannelRPCRequest extends GenericRPCMessage {
+export interface ResizeChannelRequest extends GenericRPCMessage {
   method: RPCMethod.ResizeChannel;
-  params: ResizeChannelRPCRequestParams;
+  params: ResizeChannelRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'close_channel' RPC method.
  */
-export interface CloseChannelRPCRequestParams {
+export interface CloseChannelRequestParams {
   /** The unique identifier of the channel to close. */
   channel_id: Hex;
   /** The address where the channel funds will be sent upon closing. */
@@ -237,15 +233,15 @@ export interface CloseChannelRPCRequestParams {
 /**
  * Represents the request structure for the 'close_channel' RPC method.
  */
-export interface CloseChannelRPCRequest extends GenericRPCMessage {
+export interface CloseChannelRequest extends GenericRPCMessage {
   method: RPCMethod.CloseChannel;
-  params: CloseChannelRPCRequestParams;
+  params: CloseChannelRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'get_channels' RPC method.
  */
-export interface GetChannelsRPCRequestParams {
+export interface GetChannelsRequestParams {
   /** Optional participant address to filter channels. If not provided, returns all channels. */
   participant?: Address;
   /** Optional status to filter channels (e.g., "open", "closed"). If not provided, returns channels of all statuses. */
@@ -255,15 +251,15 @@ export interface GetChannelsRPCRequestParams {
 /**
  * Represents the request structure for the 'get_channels' RPC method.
  */
-export interface GetChannelsRPCRequest extends GenericRPCMessage {
+export interface GetChannelsRequest extends GenericRPCMessage {
   method: RPCMethod.GetChannels;
-  params: GetChannelsRPCRequestParams;
+  params: GetChannelsRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'get_rpc_history' RPC method.
  */
-export interface GetRPCHistoryRPCRequestParams {
+export interface GetRPCHistoryRequestParams {
   /** The participant address to retrieve RPC history for. Must be the authenticated wallet address. */
   participant: Address;
 }
@@ -271,15 +267,15 @@ export interface GetRPCHistoryRPCRequestParams {
 /**
  * Represents the request structure for the 'get_rpc_history' RPC method.
  */
-export interface GetRPCHistoryRPCRequest extends GenericRPCMessage {
+export interface GetRPCHistoryRequest extends GenericRPCMessage {
   method: RPCMethod.GetRPCHistory;
-  params: GetRPCHistoryRPCRequestParams;
+  params: GetRPCHistoryRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'get_assets' RPC method.
  */
-export interface GetAssetsRPCRequestParams {
+export interface GetAssetsRequestParams {
   /** Optional chain ID to filter assets by network. If not provided, returns assets from all networks. */
   chain_id?: number;
 }
@@ -287,87 +283,82 @@ export interface GetAssetsRPCRequestParams {
 /**
  * Represents the request structure for the 'get_assets' RPC method.
  */
-export interface GetAssetsRPCRequest extends GenericRPCMessage {
+export interface GetAssetsRequest extends GenericRPCMessage {
   method: RPCMethod.GetAssets;
-  params: GetAssetsRPCRequestParams;
+  params: GetAssetsRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'auth_request' RPC method.
  */
-export interface AuthRequestRPCRequestParams {
+export interface AuthRequestParams {
   /** The Ethereum address of the wallet being authorized. */
-  address: Address;
+  wallet: Address;
   /** The session key address associated with the authentication attempt. */
-  sessionKey: Address;
+  participant: Address;
   /** The name of the application being authorized. */
-  appName: string;
+  app_name: string;
   /** The allowances for the connection. */
-  allowances: {
-    /** The asset symbol (e.g., "ETH", "USDC"). */
-    asset: string;
-    /** The amount allowed as a string. */
-    amount: string;
-  }[];
+  allowances: Allowance[];
   /** The expiration timestamp for the authorization. */
   expire: string;
   /** The scope of the authorization. */
   scope: string;
   /** The application address being authorized. */
-  applicationAddress: Address;
+  application: Address;
 }
 
 /**
  * Represents the request structure for the 'auth_request' RPC method.
  */
-export interface AuthRequestRPCRequest extends GenericRPCMessage {
+export interface AuthRequest extends GenericRPCMessage {
   method: RPCMethod.AuthRequest;
-  params: AuthRequestRPCRequestParams;
+  params: AuthRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'message' RPC method.
  */
-export interface MessageRPCRequestParams {
+export interface MessageRequestParams {
   // Message parameters are handled by the virtual application
 }
 
 /**
  * Represents the request structure for the 'message' RPC method.
  */
-export interface MessageRPCRequest extends GenericRPCMessage {
+export interface MessageRequest extends GenericRPCMessage {
   method: RPCMethod.Message;
-  params: MessageRPCRequestParams;
+  params: MessageRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'ping' RPC method.
  */
-export interface PingRPCRequestParams {
+export interface PingRequestParams {
   // No parameters needed for ping
 }
 
 /**
  * Represents the request structure for the 'ping' RPC method.
  */
-export interface PingRPCRequest extends GenericRPCMessage {
+export interface PingRequest extends GenericRPCMessage {
   method: RPCMethod.Ping;
-  params: PingRPCRequestParams;
+  params: PingRequestParams;
 }
 
 /**
  * Represents the request parameters for the 'pong' RPC method.
  */
-export interface PongRPCRequestParams {
+export interface PongRequestParams {
   // No parameters needed for pong
 }
 
 /**
  * Represents the request structure for the 'pong' RPC method.
  */
-export interface PongRPCRequest extends GenericRPCMessage {
+export interface PongRequest extends GenericRPCMessage {
   method: RPCMethod.Pong;
-  params: PongRPCRequestParams;
+  params: PongRequestParams;
 }
 
 /**
@@ -375,47 +366,47 @@ export interface PongRPCRequest extends GenericRPCMessage {
  * This allows for type-safe handling of different request structures.
  */
 export type RPCRequest =
-  | AuthChallengeRPCRequest
-  | AuthVerifyRPCRequest
-  | AuthRequestRPCRequest
-  | GetConfigRPCRequest
-  | GetLedgerBalancesRPCRequest
-  | GetLedgerEntriesRPCRequest
-  | CreateAppSessionRPCRequest
-  | SubmitStateRPCRequest
-  | CloseAppSessionRPCRequest
-  | GetAppDefinitionRPCRequest
-  | GetAppSessionsRPCRequest
-  | ResizeChannelRPCRequest
-  | CloseChannelRPCRequest
-  | GetChannelsRPCRequest
-  | GetRPCHistoryRPCRequest
-  | GetAssetsRPCRequest
-  | PingRPCRequest
-  | PongRPCRequest
-  | MessageRPCRequest;
+  | AuthChallengeRequest
+  | AuthVerifyRequest
+  | AuthRequest
+  | GetConfigRequest
+  | GetLedgerBalancesRequest
+  | GetLedgerEntriesRequest
+  | CreateAppSessionRequest
+  | SubmitStateRequest
+  | CloseAppSessionRequest
+  | GetAppDefinitionRequest
+  | GetAppSessionsRequest
+  | ResizeChannelRequest
+  | CloseChannelRequest
+  | GetChannelsRequest
+  | GetRPCHistoryRequest
+  | GetAssetsRequest
+  | PingRequest
+  | PongRequest
+  | MessageRequest;
 
 /**
  * Maps RPC methods to their corresponding request parameter types.
  */
 export type RPCRequestParamsByMethod = {
-  [RPCMethod.AuthChallenge]: AuthChallengeRPCRequestParams;
-  [RPCMethod.AuthVerify]: AuthVerifyRPCRequestParams;
-  [RPCMethod.AuthRequest]: AuthRequestRPCRequestParams;
-  [RPCMethod.GetConfig]: GetConfigRPCRequestParams;
-  [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRPCRequestParams;
-  [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRPCRequestParams;
-  [RPCMethod.CreateAppSession]: CreateAppSessionRPCRequestParams;
-  [RPCMethod.SubmitState]: SubmitStateRPCRequestParams;
-  [RPCMethod.CloseAppSession]: CloseAppSessionRPCRequestParams;
-  [RPCMethod.GetAppDefinition]: GetAppDefinitionRPCRequestParams;
-  [RPCMethod.GetAppSessions]: GetAppSessionsRPCRequestParams;
-  [RPCMethod.ResizeChannel]: ResizeChannelRPCRequestParams;
-  [RPCMethod.CloseChannel]: CloseChannelRPCRequestParams;
-  [RPCMethod.GetChannels]: GetChannelsRPCRequestParams;
-  [RPCMethod.GetRPCHistory]: GetRPCHistoryRPCRequestParams;
-  [RPCMethod.GetAssets]: GetAssetsRPCRequestParams;
-  [RPCMethod.Ping]: PingRPCRequestParams;
-  [RPCMethod.Pong]: PongRPCRequestParams;
-  [RPCMethod.Message]: MessageRPCRequestParams;
+  [RPCMethod.AuthChallenge]: AuthChallengeRequestParams;
+  [RPCMethod.AuthVerify]: AuthVerifyRequestParams;
+  [RPCMethod.AuthRequest]: AuthRequestParams;
+  [RPCMethod.GetConfig]: GetConfigRequestParams;
+  [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRequestParams;
+  [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRequestParams;
+  [RPCMethod.CreateAppSession]: CreateAppSessionRequestParams;
+  [RPCMethod.SubmitState]: SubmitStateRequestParams;
+  [RPCMethod.CloseAppSession]: CloseAppSessionRequestParams;
+  [RPCMethod.GetAppDefinition]: GetAppDefinitionRequestParams;
+  [RPCMethod.GetAppSessions]: GetAppSessionsRequestParams;
+  [RPCMethod.ResizeChannel]: ResizeChannelRequestParams;
+  [RPCMethod.CloseChannel]: CloseChannelRequestParams;
+  [RPCMethod.GetChannels]: GetChannelsRequestParams;
+  [RPCMethod.GetRPCHistory]: GetRPCHistoryRequestParams;
+  [RPCMethod.GetAssets]: GetAssetsRequestParams;
+  [RPCMethod.Ping]: PingRequestParams;
+  [RPCMethod.Pong]: PongRequestParams;
+  [RPCMethod.Message]: MessageRequestParams;
 };

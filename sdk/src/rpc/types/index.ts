@@ -38,7 +38,7 @@ export type AssetAllocation = {
  */
 export type Allowance = {
     /** The symbol of the asset (e.g., "USDC", "USDT"). */
-    symbol: string;
+    asset: string;
     /** The amount of the asset that is allowed to be spent. */
     amount: string;
 };

@@ -194,10 +194,12 @@ export async function createGetLedgerEntriesMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [{
-        account_id: accountId,
-        ...(asset ? { asset } : {})
-    }];
+    const params = [
+        {
+            account_id: accountId,
+            ...(asset ? { asset } : {}),
+        },
+    ];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetLedgerEntries, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
@@ -243,10 +245,12 @@ export async function createGetAppSessionsMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [{
-        participant,
-        ...(status ? { status } : {})
-    }];
+    const params = [
+        {
+            participant,
+            ...(status ? { status } : {}),
+        },
+    ];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetAppSessions, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
@@ -382,10 +386,12 @@ export async function createGetChannelsMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [{
-        ...(participant ? { participant } : {}),
-        ...(status ? { status } : {})
-    }];
+    const params = [
+        {
+            ...(participant ? { participant } : {}),
+            ...(status ? { status } : {}),
+        },
+    ];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetChannels, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
     return JSON.stringify(signedRequest);
@@ -425,9 +431,11 @@ export async function createGetAssetsMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [{
-        ...(chainId ? { chain_id: chainId } : {})
-    }];
+    const params = [
+        {
+            ...(chainId ? { chain_id: chainId } : {}),
+        },
+    ];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetAssets, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
@@ -463,7 +471,9 @@ export function createEIP712AuthMessageSigner(
         } else if (method === RPCMethod.AuthVerify) {
             challengeUUID = payload[2][0].challenge;
         } else {
-            throw new Error(`Expected '${RPCMethod.AuthChallenge}' or '${RPCMethod.AuthVerify}' method, but received '${method}'`);
+            throw new Error(
+                `Expected '${RPCMethod.AuthChallenge}' or '${RPCMethod.AuthVerify}' method, but received '${method}'`,
+            );
         }
 
         const message: EIP712AuthMessage = {
@@ -472,9 +482,7 @@ export function createEIP712AuthMessageSigner(
             wallet: address as Address,
         };
 
-        const untypedMessage: Record<string, unknown> = Object.fromEntries(
-            Object.entries(message)
-        );
+        const untypedMessage: Record<string, unknown> = Object.fromEntries(Object.entries(message));
 
         try {
             // Sign with EIP-712

@@ -102,7 +102,7 @@ export class NitroliteRPC {
 
         if (
             typeof requestId !== 'number' ||
-            (typeof method !== 'string') ||
+            typeof method !== 'string' ||
             !Object.values(RPCMethod).includes(method as RPCMethod) ||
             !Array.isArray(dataPayload) ||
             typeof timestamp !== 'number'
@@ -160,7 +160,10 @@ export class NitroliteRPC {
      * @param method - The method name to check against
      * @returns True if the response is of the specified type
      */
-    static isResponseType<T extends RPCResponse>(response: ParsedResponse, method: T['method']): response is ParsedResponse & { data: T['params'] } {
+    static isResponseType<T extends RPCResponse>(
+        response: ParsedResponse,
+        method: T['method'],
+    ): response is ParsedResponse & { data: T['params'] } {
         return response.isValid && !response.isError && response.method === method;
     }
 

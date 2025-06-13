@@ -1,10 +1,5 @@
 import { Address, Hex, stringToHex } from 'viem';
-import {
-    NitroliteRPCMessage,
-    RPCMethod,
-    RPCResponseParamsByMethod,
-    RPCResponse,
-} from './types';
+import { NitroliteRPCMessage, RPCMethod, RPCResponseParamsByMethod, RPCResponse } from './types';
 import {
     AuthChallengeRPCResponseParams,
     AuthVerifyRPCResponseParams,
@@ -199,7 +194,10 @@ export function parseRPCResponse(response: string): RPCResponse {
     }
 }
 
-function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(method: M, params: Array<any>): RPCResponseParamsByMethod[M] {
+function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(
+    method: M,
+    params: Array<any>,
+): RPCResponseParamsByMethod[M] {
     switch (method) {
         case RPCMethod.AuthChallenge:
             return {
@@ -226,9 +224,9 @@ function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(method: M
                 networks: extractRPCParameter<GetConfigRPCResponseParams['networks']>(params, 'networks'),
             } as GetConfigRPCResponseParams as RPCResponseParamsByMethod[M];
         case RPCMethod.GetLedgerBalances:
-            return extractRPCParameter<GetLedgerBalancesRPCResponseParams[]>(params, 'balances') as RPCResponseParamsByMethod[M];
+            return params as RPCResponseParamsByMethod[M];
         case RPCMethod.GetLedgerEntries:
-            return extractRPCParameter<GetLedgerEntriesRPCResponseParams[]>(params, 'entries') as RPCResponseParamsByMethod[M];
+            return params as RPCResponseParamsByMethod[M];
         case RPCMethod.CreateAppSession:
             return {
                 app_session_id: extractRPCParameter<Hex>(params, 'app_session_id'),
@@ -248,9 +246,12 @@ function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(method: M
                 status: extractRPCParameter<string>(params, 'status'),
             } as CloseAppSessionRPCResponseParams as RPCResponseParamsByMethod[M];
         case RPCMethod.GetAppDefinition:
-            return extractRPCParameter<GetAppDefinitionRPCResponseParams>(params, 'definition') as RPCResponseParamsByMethod[M];
+            return extractRPCParameter<GetAppDefinitionRPCResponseParams>(
+                params,
+                'definition',
+            ) as RPCResponseParamsByMethod[M];
         case RPCMethod.GetAppSessions:
-            return extractRPCParameter<GetAppSessionsRPCResponseParams[]>(params, 'sessions') as RPCResponseParamsByMethod[M];
+            return params as RPCResponseParamsByMethod[M];
         case RPCMethod.ResizeChannel:
             return {
                 channel_id: extractRPCParameter<Hex>(params, 'channel_id'),
@@ -259,7 +260,10 @@ function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(method: M
                 state_data: extractRPCParameter<string>(params, 'state_data'),
                 allocations: extractRPCParameter<ResizeChannelRPCResponseParams['allocations']>(params, 'allocations'),
                 state_hash: extractRPCParameter<string>(params, 'state_hash'),
-                server_signature: extractRPCParameter<ResizeChannelRPCResponseParams['server_signature']>(params, 'server_signature'),
+                server_signature: extractRPCParameter<ResizeChannelRPCResponseParams['server_signature']>(
+                    params,
+                    'server_signature',
+                ),
             } as ResizeChannelRPCResponseParams as RPCResponseParamsByMethod[M];
         case RPCMethod.CloseChannel:
             return {
@@ -269,14 +273,17 @@ function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(method: M
                 state_data: extractRPCParameter<string>(params, 'state_data'),
                 allocations: extractRPCParameter<CloseChannelRPCResponseParams['allocations']>(params, 'allocations'),
                 state_hash: extractRPCParameter<string>(params, 'state_hash'),
-                server_signature: extractRPCParameter<CloseChannelRPCResponseParams['server_signature']>(params, 'server_signature'),
+                server_signature: extractRPCParameter<CloseChannelRPCResponseParams['server_signature']>(
+                    params,
+                    'server_signature',
+                ),
             } as CloseChannelRPCResponseParams as RPCResponseParamsByMethod[M];
         case RPCMethod.GetChannels:
-            return extractRPCParameter<GetChannelsRPCResponseParams[]>(params, 'channels') as RPCResponseParamsByMethod[M];
+            return params as RPCResponseParamsByMethod[M];
         case RPCMethod.GetRPCHistory:
-            return extractRPCParameter<GetRPCHistoryRPCResponseParams[]>(params, 'history') as RPCResponseParamsByMethod[M];
+            return params as RPCResponseParamsByMethod[M];
         case RPCMethod.GetAssets:
-            return extractRPCParameter<GetAssetsRPCResponseParams[]>(params, 'assets') as RPCResponseParamsByMethod[M];
+            return params as RPCResponseParamsByMethod[M];
         case RPCMethod.Ping:
             return {} as PingRPCResponseParams as RPCResponseParamsByMethod[M];
         case RPCMethod.Pong:
@@ -284,11 +291,11 @@ function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(method: M
         case RPCMethod.Message:
             return {} as MessageRPCResponseParams as RPCResponseParamsByMethod[M];
         case RPCMethod.BalanceUpdate:
-            return extractRPCParameter<BalanceUpdateRPCResponseParams[]>(params, 'balances') as RPCResponseParamsByMethod[M];
+            return params as RPCResponseParamsByMethod[M];
         case RPCMethod.ChannelsUpdate:
-            return extractRPCParameter<ChannelUpdateRPCResponseParams[]>(params, 'channels') as RPCResponseParamsByMethod[M];
+            return params as RPCResponseParamsByMethod[M];
         case RPCMethod.ChannelUpdate:
-            return extractRPCParameter<ChannelUpdateRPCResponseParams>(params, 'channel') as RPCResponseParamsByMethod[M];
+            return params as RPCResponseParamsByMethod[M];
         default:
             throw new Error(`Unsupported RPC method: ${method}`);
     }

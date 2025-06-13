@@ -23,7 +23,7 @@ export enum RPCChannelStatus {
     Joining = 'joining',
     Open = 'open',
     Closed = 'closed',
-};
+}
 
 /** Represents a single allowance for an asset, used in application sessions.
  * This structure defines the symbol of the asset and the amount that is allowed to be spent.
@@ -344,5 +344,5 @@ export enum RPCMethod {
     ChannelsUpdate = 'channels',
     ChannelUpdate = 'cu',
     Ping = 'ping',
-    Pong = 'pong'
+    Pong = 'pong',
 }

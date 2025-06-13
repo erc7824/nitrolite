@@ -127,12 +127,12 @@ async function authenticateWithBroker(): Promise<void> {
     const expire = String(Math.floor(Date.now() / 1000) + 24 * 60 * 60);
 
     const authMessage: AuthRequestParams = {
-        address: serverAddress,
-        sessionKey: serverAddress,
-        appName: 'Snake Game',
+        wallet: serverAddress,
+        participant: serverAddress,
+        app_name: 'Snake Game',
         expire: expire,
         scope: 'snake-game',
-        applicationAddress: serverAddress,
+        application: serverAddress,
         allowances: [{
             symbol: 'usdc',
             amount: '0',
@@ -181,7 +181,7 @@ async function authenticateWithBroker(): Promise<void> {
                         const eip712SigningFunction = createEIP712AuthMessageSigner(walletClient, {
                             scope: authMessage.scope,
                             application: walletClient.account.address,
-                            participant: authMessage.address,
+                            participant: authMessage.wallet,
                             expire: authMessage.expire,
                             allowances: authMessage.allowances.map((allowance) => ({
                                 asset: allowance.symbol,
@@ -218,9 +218,9 @@ async function authenticateWithBroker(): Promise<void> {
                     console.log("Authentication successful");
 
                     // If response contains a JWT token, store it
-                    if (message.params.jwtToken) {
-                        console.log('JWT token received:', message.params.jwtToken);
-                        jwtToken = message.params.jwtToken;
+                    if (message.params[0].jwt_token) {
+                        console.log('JWT token received:', message.params[0].jwt_token);
+                        jwtToken = message.params[0].jwt_token;
                     }
 
                     isAuthenticated = true;
@@ -229,8 +229,8 @@ async function authenticateWithBroker(): Promise<void> {
                 }
                 // Check for error responses
                 else if (message.method === "error") {
-                    const errorMsg = message.params.error || 'Authentication failed';
-                    console.error('Authentication failed:', errorMsg);
+                    const errorMsg = message.params[0].error || 'Authentication failed';
+                    console.error('Authentication failed:', message, errorMsg);
 
                     // Check if this is a JWT authentication failure and fallback to signer auth
                     const errorString = String(errorMsg).toLowerCase();

@@ -32,8 +32,8 @@ export interface AuthChallengeResponse extends GenericRPCMessage {
  */
 export interface AuthVerifyResponseParams {
     address: Address;
-    jwtToken: string;
-    sessionKey: Address;
+    jwt_token: string;
+    session_key: Address;
     success: boolean;
 }
 

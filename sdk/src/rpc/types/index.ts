@@ -25,28 +25,15 @@ export enum RPCChannelStatus {
     Closed = 'closed',
 };
 
-/** Represents a single allowance for an asset, used in application sessions.
- * This structure defines the symbol of the asset and the amount that is allowed to be spent.
+/**
+ * Represents a generic RPC message structure that includes common fields.
+ * This interface is extended by specific RPC request and response types.
  */
-export type Allowance = {
-    /** The symbol of the asset (e.g., "USDC", "USDT"). */
-    asset: string;
-    /** The amount of the asset that is allowed to be spent. */
-    amount: string;
-};
-
-/** Represents the allocation of assets within an application session.
- * This structure is used to define the initial allocation of assets among participants.
- * It includes the participant's address, the asset (usdc, usdt, etc) being allocated, and the amount.
- */
-export type AppSessionAllocation = {
-    /** The Ethereum address of the participant receiving the allocation. */
-    participant: Address;
-    /** The symbol of the asset being allocated (e.g., "USDC", "USDT"). */
-    asset: string;
-    /** The amount of the asset being allocated. Must be a positive number. */
-    amount: string;
-};
+export interface GenericRPCMessage {
+    requestId: RequestID;
+    timestamp?: Timestamp;
+    signatures?: Hex[];
+}
 
 /**
  * Represents the structure of an error object within an error response payload.
@@ -127,40 +114,6 @@ export interface AppDefinition {
     challenge: number;
     /** A unique number used once, often for preventing replay attacks or ensuring uniqueness of the application instance. Must be non-zero. */
     nonce?: number;
-}
-
-
-/**
- * Defines the parameters required for the 'create_app_session' RPC method.
- */
-export interface CreateAppSessionRequest {
-    /** The detailed definition of the application being created.
-     * Example:
-     * {
-        "protocol": "NitroRPC/0.2",
-        "participants": [
-            "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
-            "0x00112233445566778899AaBbCcDdEeFf00112233"
-        ],
-        "weights": [100, 0],
-        "quorum": 100,
-        "challenge": 86400,
-        "nonce": 1
-        }
-    */
-    definition: AppDefinition;
-    /** The initial allocation distribution among participants. Order corresponds to the participants array in the definition. */
-    allocations: AppSessionAllocation[];
-}
-
-/**
- * Defines the parameters required for the 'close_app_session' RPC method.
- */
-export interface CloseAppSessionRequest {
-    /** The unique identifier of the application session to be closed. */
-    app_session_id: Hex;
-    /** The final allocation distribution among participants upon closing the application. Order corresponds to the participants array in the application's definition. */
-    allocations: AppSessionAllocation[];
 }
 
 /**

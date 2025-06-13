@@ -1,15 +1,5 @@
 import { Address, Hex } from 'viem';
-import { RPCMethod, RequestID, Timestamp, AppDefinition, AppSessionAllocation, RPCChannelStatus as RPCChannelStatus, Allowance, TransferAllocation } from '.';
-
-/**
- * Represents a generic RPC message structure that includes common fields.
- * This interface is extended by specific RPC request and response types.
- */
-interface GenericRPCMessage {
-    requestId: RequestID;
-    timestamp?: Timestamp;
-    signatures?: Hex[];
-}
+import { RPCMethod, GenericRPCMessage, AppDefinition, RPCChannelStatus, TransferAllocation } from '.';
 
 /**
  * Represents the request parameters for the 'auth_challenge' RPC method.
@@ -74,7 +64,7 @@ export interface GetLedgerBalancesRequestParams {
  */
 export interface GetLedgerBalancesRequest extends GenericRPCMessage {
     method: RPCMethod.GetLedgerBalances;
-    params: GetLedgerBalancesRequestParams[];
+    params: [GetLedgerBalancesRequestParams];
 }
 
 /**
@@ -94,8 +84,21 @@ export interface GetLedgerEntriesRequestParams {
  */
 export interface GetLedgerEntriesRequest extends GenericRPCMessage {
     method: RPCMethod.GetLedgerEntries;
-    params: GetLedgerEntriesRequestParams[];
+    params: [GetLedgerEntriesRequestParams];
 }
+
+/** Represents the allocation of assets within an application session.
+ * This structure is used to define allocation of assets among participants.
+ * It includes the participant's address, the asset (usdc, usdt, etc) being allocated, and the amount.
+ */
+export type AppSessionAllocation = {
+  /** The Ethereum address of the participant receiving the allocation. */
+  participant: Address;
+  /** The symbol of the asset being allocated (e.g., "USDC", "USDT"). */
+  asset: string;
+  /** The amount of the asset being allocated. Must be a positive number. */
+  amount: string;
+};
 
 /**
  * Represents the request parameters for the 'create_app_session' RPC method.
@@ -112,7 +115,7 @@ export interface CreateAppSessionRequestParams {
  */
 export interface CreateAppSessionRequest extends GenericRPCMessage {
     method: RPCMethod.CreateAppSession;
-    params: CreateAppSessionRequestParams[];
+    params: [CreateAppSessionRequestParams];
 }
 
 /**
@@ -130,7 +133,7 @@ export interface SubmitStateRequestParams {
  */
 export interface SubmitStateRequest extends GenericRPCMessage {
     method: RPCMethod.SubmitState;
-    params: SubmitStateRequestParams[];
+    params: [SubmitStateRequestParams];
 }
 
 /**
@@ -148,7 +151,7 @@ export interface CloseAppSessionRequestParams {
  */
 export interface CloseAppSessionRequest extends GenericRPCMessage {
     method: RPCMethod.CloseAppSession;
-    params: CloseAppSessionRequestParams[];
+    params: [CloseAppSessionRequestParams];
 }
 
 /**
@@ -164,7 +167,7 @@ export interface GetAppDefinitionRequestParams {
  */
 export interface GetAppDefinitionRequest extends GenericRPCMessage {
     method: RPCMethod.GetAppDefinition;
-    params: GetAppDefinitionRequestParams[];
+    params: [GetAppDefinitionRequestParams];
 }
 
 /**
@@ -182,7 +185,7 @@ export interface GetAppSessionsRequestParams {
  */
 export interface GetAppSessionsRequest extends GenericRPCMessage {
     method: RPCMethod.GetAppSessions;
-    params: GetAppSessionsRequestParams[];
+    params: [GetAppSessionsRequestParams];
 }
 
 /**
@@ -204,7 +207,7 @@ export type ResizeChannelRequestParams = {
  */
 export interface ResizeChannelRequest extends GenericRPCMessage {
     method: RPCMethod.ResizeChannel;
-    params: ResizeChannelRequestParams[];
+    params: [ResizeChannelRequestParams];
 }
 
 /**
@@ -222,7 +225,7 @@ export interface CloseChannelRequestParams {
  */
 export interface CloseChannelRequest extends GenericRPCMessage {
     method: RPCMethod.CloseChannel;
-    params: CloseChannelRequestParams[];
+    params: [CloseChannelRequestParams];
 }
 
 /**
@@ -240,7 +243,7 @@ export interface GetChannelsRequestParams {
  */
 export interface GetChannelsRequest extends GenericRPCMessage {
     method: RPCMethod.GetChannels;
-    params: GetChannelsRequestParams[];
+    params: [GetChannelsRequestParams];
 }
 
 /**
@@ -264,8 +267,18 @@ export interface GetAssetsRequestParams {
  */
 export interface GetAssetsRequest extends GenericRPCMessage {
     method: RPCMethod.GetAssets;
-    params: GetAssetsRequestParams[];
+    params: [GetAssetsRequestParams];
 }
+
+/** Represents a single allowance for an asset, used in application sessions.
+ * This structure defines the symbol of the asset and the amount that is allowed to be spent.
+ */
+export type Allowance = {
+  /** The symbol of the asset (e.g., "USDC", "USDT"). */
+  asset: string;
+  /** The amount of the asset that is allowed to be spent. */
+  amount: string;
+};
 
 /**
  * Represents the request parameters for the 'auth_request' RPC method.

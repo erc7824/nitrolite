@@ -44,13 +44,13 @@ describe('API message creators', () => {
 
     test('createAuthRequestMessage', async () => {
         const authRequest: AuthRequestParams = {
-            address: clientAddress,
-            sessionKey: clientAddress,
-            appName: 'test-app',
+            wallet: clientAddress,
+            participant: clientAddress,
+            app_name: 'test-app',
             allowances: [],
             expire: '',
             scope: '',
-            applicationAddress: clientAddress
+            application: clientAddress
         };
         const msgStr = await createAuthRequestMessage(authRequest, requestId, timestamp);
         expect(signer).not.toHaveBeenCalled();

@@ -134,7 +134,7 @@ async function authenticateWithBroker(): Promise<void> {
         scope: 'snake-game',
         application: serverAddress,
         allowances: [{
-            symbol: 'usdc',
+            asset: 'usdc',
             amount: '0',
         }],
     };
@@ -184,7 +184,7 @@ async function authenticateWithBroker(): Promise<void> {
                             participant: authMessage.wallet,
                             expire: authMessage.expire,
                             allowances: authMessage.allowances.map((allowance) => ({
-                                asset: allowance.symbol,
+                                asset: allowance.asset,
                                 amount: allowance.amount.toString(),
                             })),
                         }, getAuthDomain());

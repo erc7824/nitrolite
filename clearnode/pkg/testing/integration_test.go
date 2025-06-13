@@ -24,6 +24,7 @@ const (
 	DefaultGasPrice    = 20000000000 // 20 gwei
 	TestTimeout        = 30 * time.Second
 	BlockConfirmations = 1
+	DefaultChainID     = 31337 // Anvil/Hardhat default, can be overridden
 
 	// Test account private keys (same as in SDK tests for consistency)
 	AlicePrivateKey    = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
@@ -35,6 +36,7 @@ const (
 type IntegrationTestSuite struct {
 	suite.Suite
 	client          *ethclient.Client
+	chainID         *big.Int
 	aliceAuth       *bind.TransactOpts
 	bobAuth         *bind.TransactOpts
 	deployerAuth    *bind.TransactOpts
@@ -59,6 +61,9 @@ func (suite *IntegrationTestSuite) SetupSuite() {
 
 	// Create context with timeout
 	suite.ctx, suite.cancel = context.WithTimeout(context.Background(), TestTimeout)
+
+	// Determine chain ID (fetch from client or environment variable)
+	suite.setupChainID()
 
 	// Setup test accounts
 	suite.setupAccounts()
@@ -87,6 +92,31 @@ func (suite *IntegrationTestSuite) TearDownTest() {
 	// Cleanup any test-specific resources if needed
 }
 
+// setupChainID determines the chain ID to use for tests
+func (suite *IntegrationTestSuite) setupChainID() {
+	// First, try to get chain ID from environment variable
+	if chainIDStr := os.Getenv("CHAIN_ID"); chainIDStr != "" {
+		if chainID, ok := new(big.Int).SetString(chainIDStr, 10); ok {
+			suite.chainID = chainID
+			suite.T().Logf("Using chain ID from environment: %s", chainID.String())
+			return
+		}
+		suite.T().Logf("Warning: Invalid CHAIN_ID environment variable '%s', falling back to client query", chainIDStr)
+	}
+
+	// Try to fetch chain ID from the connected client
+	chainID, err := suite.client.ChainID(suite.ctx)
+	if err == nil {
+		suite.chainID = chainID
+		suite.T().Logf("Using chain ID from client: %s", chainID.String())
+		return
+	}
+
+	// Fallback to default chain ID
+	suite.chainID = big.NewInt(DefaultChainID)
+	suite.T().Logf("Warning: Failed to get chain ID from client (%v), using default: %s", err, suite.chainID.String())
+}
+
 // setupAccounts initializes the test accounts
 func (suite *IntegrationTestSuite) setupAccounts() {
 	var err error
@@ -94,7 +124,7 @@ func (suite *IntegrationTestSuite) setupAccounts() {
 	// Alice account
 	alicePrivKey, err := crypto.HexToECDSA(AlicePrivateKey[2:]) // Remove 0x prefix
 	require.NoError(suite.T(), err, "Failed to parse Alice private key")
-	suite.aliceAuth, err = bind.NewKeyedTransactorWithChainID(alicePrivKey, big.NewInt(31337))
+	suite.aliceAuth, err = bind.NewKeyedTransactorWithChainID(alicePrivKey, suite.chainID)
 	require.NoError(suite.T(), err, "Failed to create Alice auth")
 	suite.aliceAuth.GasLimit = DefaultGasLimit
 	suite.aliceAuth.GasPrice = big.NewInt(DefaultGasPrice)
@@ -102,7 +132,7 @@ func (suite *IntegrationTestSuite) setupAccounts() {
 	// Bob account
 	bobPrivKey, err := crypto.HexToECDSA(BobPrivateKey[2:])
 	require.NoError(suite.T(), err, "Failed to parse Bob private key")
-	suite.bobAuth, err = bind.NewKeyedTransactorWithChainID(bobPrivKey, big.NewInt(31337))
+	suite.bobAuth, err = bind.NewKeyedTransactorWithChainID(bobPrivKey, suite.chainID)
 	require.NoError(suite.T(), err, "Failed to create Bob auth")
 	suite.bobAuth.GasLimit = DefaultGasLimit
 	suite.bobAuth.GasPrice = big.NewInt(DefaultGasPrice)
@@ -110,7 +140,7 @@ func (suite *IntegrationTestSuite) setupAccounts() {
 	// Deployer account
 	deployerPrivKey, err := crypto.HexToECDSA(DeployerPrivateKey[2:])
 	require.NoError(suite.T(), err, "Failed to parse deployer private key")
-	suite.deployerAuth, err = bind.NewKeyedTransactorWithChainID(deployerPrivKey, big.NewInt(31337))
+	suite.deployerAuth, err = bind.NewKeyedTransactorWithChainID(deployerPrivKey, suite.chainID)
 	require.NoError(suite.T(), err, "Failed to create deployer auth")
 	suite.deployerAuth.GasLimit = DefaultGasLimit
 	suite.deployerAuth.GasPrice = big.NewInt(DefaultGasPrice)
@@ -151,7 +181,7 @@ func (suite *IntegrationTestSuite) TestClientConnection() {
 	// Test basic client connection
 	chainID, err := suite.client.ChainID(suite.ctx)
 	require.NoError(suite.T(), err, "Failed to get chain ID")
-	assert.Equal(suite.T(), int64(31337), chainID.Int64(), "Unexpected chain ID")
+	assert.Equal(suite.T(), suite.chainID.Int64(), chainID.Int64(), "Chain ID mismatch between client and expected")
 
 	// Test block number retrieval
 	blockNumber, err := suite.client.BlockNumber(suite.ctx)
@@ -202,7 +232,7 @@ func (suite *IntegrationTestSuite) TestTransactionSending() {
 	alicePrivKey, err := crypto.HexToECDSA(AlicePrivateKey[2:])
 	require.NoError(suite.T(), err, "Failed to parse Alice private key")
 
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(31337)), alicePrivKey)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(suite.chainID), alicePrivKey)
 	require.NoError(suite.T(), err, "Failed to sign transaction")
 
 	// Send transaction

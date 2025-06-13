@@ -1,44 +1,47 @@
 name: Test Go Project
 
 on:
-  workflow_call:
-    inputs:
-      project-path:
-        description: 'Path to the Go project directory'
-        required: false
-        type: string
-        default: 'clearnode'
-      project-name:
-        description: 'Human-readable name for the project'
-        required: false
-        type: string
-        default: 'Go Project'
+    workflow_call:
+        inputs:
+            project-path:
+                description: 'Path to the Go project directory'
+                required: false
+                type: string
+                default: 'clearnode'
+            project-name:
+                description: 'Human-readable name for the project'
+                required: false
+                type: string
+                default: 'Go Project'
 
 jobs:
-  test:
-    name: Test ${{ inputs.project-name }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
+    test:
+        name: Test ${{ inputs.project-name }}
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: '${{ inputs.project-path }}/go.mod'
-          cache: true
-          cache-dependency-path: '${{ inputs.project-path }}/go.sum'
+            - name: Set up Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version-file: '${{ inputs.project-path }}/go.mod'
+                  cache: true
+                  cache-dependency-path: '${{ inputs.project-path }}/go.sum'
 
-      - name: Setup blockchain environment
-        id: blockchain
-        uses: ./.github/actions/setup-blockchain
+            - name: Setup blockchain environment
+              id: blockchain
+              uses: ./.github/actions/setup-blockchain
 
-      - name: Test
-        run: go test -v ./...
-        working-directory: ${{ inputs.project-path }}
-        env:
-          ETH_RPC_URL: http://127.0.0.1:8545
-          CUSTODY_CONTRACT_ADDRESS: ${{ steps.blockchain.outputs.custody-address }}
-          ADJUDICATOR_CONTRACT_ADDRESS: ${{ steps.blockchain.outputs.adjudicator-address }}
-          TEST_TOKEN_CONTRACT_ADDRESS: ${{ steps.blockchain.outputs.token-address }}
+            - name: Test
+              run: go test -v ./...
+              working-directory: ${{ inputs.project-path }}
+              env:
+                  ETH_RPC_URL: http://127.0.0.1:8545
+                  CUSTODY_CONTRACT_ADDRESS:
+                      ${{ steps.blockchain.outputs.custody-address }}
+                  ADJUDICATOR_CONTRACT_ADDRESS:
+                      ${{ steps.blockchain.outputs.adjudicator-address }}
+                  TEST_TOKEN_CONTRACT_ADDRESS:
+                      ${{ steps.blockchain.outputs.token-address }}

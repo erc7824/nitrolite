@@ -474,7 +474,7 @@ export interface BalanceUpdateResponse extends GenericRPCMessage {
  */
 export interface ChannelsUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.ChannelsUpdate;
-    params: [ChannelUpdateResponseParams[]];
+    params: ChannelUpdateResponseParams[];
 }
 
 /**

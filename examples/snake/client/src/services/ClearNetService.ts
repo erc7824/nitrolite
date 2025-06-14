@@ -1,6 +1,8 @@
 import {
     createGetLedgerBalancesMessage,
     createPingMessage,
+    parseRPCResponse,
+    RPCMethod,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, CHAIN_ID } from "../config";
 import { createEthersSigner, generateKeyPair } from "../crypto";
@@ -17,7 +19,7 @@ class ClearNetService {
     private wsConnection: WebSocket | null = null;
     private readonly wsUrl = BROKER_WS_URL;
     private pendingRequests = new Map<
-        string,
+        number,
         {
             resolve: (value: any) => void;
             reject: (reason: Error) => void;
@@ -132,8 +134,7 @@ class ClearNetService {
 
                 this.wsConnection.onmessage = (event) => {
                     try {
-                        const message = JSON.parse(event.data);
-                        this.handleWebSocketMessage(message);
+                        this.handleWebSocketMessage(event.data.toString());
                     } catch (error) {
                         console.error("Error parsing WebSocket message:", error);
                     }
@@ -232,24 +233,28 @@ class ClearNetService {
         return this.authenticationInProgress;
     }
 
-    private async handleWebSocketMessage(message: any): Promise<void> {
-        console.log("Received WebSocket message:", message);
+    private async handleWebSocketMessage(raw: string): Promise<void> {
+        console.log("Received WebSocket message:", raw);
+
+        const message = parseRPCResponse(raw);
+        console.log("Parsed message:", message);
 
         // Check if it's a response to a pending request
-        if (message.id && this.pendingRequests.has(message.id)) {
-            const { resolve, reject, timeout } = this.pendingRequests.get(message.id)!;
+        if (message.requestId && this.pendingRequests.has(message.requestId)) {
+            const { resolve, reject, timeout } = this.pendingRequests.get(message.requestId)!;
             clearTimeout(timeout);
-            this.pendingRequests.delete(message.id);
+            this.pendingRequests.delete(message.requestId);
 
-            if (message.error) {
-                reject(new Error(message.error.message || "Unknown error"));
+            if (message.method === RPCMethod.Error) {
+                reject(new Error(message.params[0].error || "Unknown error"));
             } else {
-                resolve(message.result || message.res?.[2]);
+                resolve(message.params);
             }
             return;
         }
-        if (message.res[1] === "channels") {
-            const channel = message.res[2][0].find((ch: any) => {
+        if (message.method === RPCMethod.ChannelsUpdate) {
+            console.log('[ClearNetService] Received channels update:', message);
+            const channel = message.params.find((ch: any) => {
                 return ch.chain_id === CHAIN_ID && ch.status === "open";
             });
             console.log('[ClearNetService] Received new active channel:', channel);
@@ -258,7 +263,7 @@ class ClearNetService {
                 console.log('[ClearNetService] Active channel updated:', this.activeChannel);
             }
         }
-        if (message.res[1] === "ping") {
+        if (message.method === RPCMethod.Ping) {
             const keyPair = await this.getOrCreateKeyPair();
             const signer = createEthersSigner(keyPair.privateKey);
             const message = await createPingMessage(signer.sign);

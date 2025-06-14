@@ -21,7 +21,7 @@ import {
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
-import { ResizeChannelRequestParams } from './types/request';
+import { CloseAppSessionRequestParams, CreateAppSessionRequestParams, ResizeChannelRequestParams } from './types/request';
 
 /**
  * Creates the signed, stringified message body for an 'auth_request'.
@@ -270,7 +270,7 @@ export async function createGetAppSessionsMessage(
  */
 export async function createAppSessionMessage(
     signer: MessageSigner,
-    params: CreateAppSessionRequest[],
+    params: CreateAppSessionRequestParams[],
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
@@ -293,7 +293,7 @@ export async function createAppSessionMessage(
  */
 export async function createCloseAppSessionMessage(
     signer: MessageSigner,
-    params: CloseAppSessionRequest[],
+    params: CloseAppSessionRequestParams[],
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {

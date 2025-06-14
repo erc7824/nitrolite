@@ -11,13 +11,14 @@ import {
     AppDefinition,
     NitroliteRPC,
     createGetLedgerBalancesMessage,
-    CreateAppSessionRequest,
     createCloseAppSessionMessage,
-    CloseAppSessionRequest,
     parseRPCResponse,
     RPCResponse,
     AuthRequestParams,
     RPCMethod,
+    CloseAppSessionRequestParams,
+    createAppSessionMessage,
+    CreateAppSessionRequestParams,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
@@ -336,7 +337,7 @@ export function handleBrokerMessage(raw: string): void {
             }
             return;
         } else if (message.method === RPCMethod.Error) {
-            console.log("Received error from broker:", message.params.error);
+            console.log("Received error from broker:", message.params[0].error);
 
             // Check if it's a response to a pending request
             if (!message.requestId) {
@@ -347,12 +348,12 @@ export function handleBrokerMessage(raw: string): void {
                 const { reject, timeout } = pendingRequest;
                 clearTimeout(timeout);
                 clearPendingRequest(message.requestId.toString());
-                reject(new Error(message.params.error));
+                reject(new Error(message.params[0].error));
             }
             return;
-        } else if (message.method === RPCMethod.GetChannels) {
+        } else if (message.method === RPCMethod.GetChannels || message.method === RPCMethod.ChannelsUpdate) {
             console.log("Received get_channels from broker:", message.params);
-            if (message.params.length === 0) {
+            if (message.params[0].length === 0) {
                 throw new Error("No channels found. Please open a channel at apps.yellow.com");
             }
 
@@ -517,7 +518,6 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
         signerAddress: signer.address
     });
 
-    const requestId = Date.now();
     const appDefinition: AppDefinition = {
         protocol: DEFAULT_PROTOCOL,
         participants,
@@ -526,7 +526,7 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
         challenge: 0,
         nonce: Date.now(),
     };
-    const params: CreateAppSessionRequest[] = [{
+    const params: CreateAppSessionRequestParams[] = [{
         definition: appDefinition,
         allocations: participants.map((participant, index) => ({
             participant,
@@ -534,13 +534,9 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
             amount: index < 2 ? "0.00001" : "0", // Players get 0.00001, server gets 0
         }))
     }]
-    const timestamp = Date.now();
 
     // Create the request with properly formatted parameters
-    const request: { req: [number, string, CreateAppSessionRequest[], number] } = {
-        req: [requestId, "create_app_session", params, timestamp],
-    };
-
+    const request = await createAppSessionMessage(signer.sign, params);
     console.log("[createAppSession] Sending request:", request);
     const result = await sendToBroker(request);
     const appId = result.app_session_id || (typeof result[0] === "object" ? result[0].app_session_id : null);
@@ -590,7 +586,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
     }
 
     // Create close message and sign with server
-    const params: CloseAppSessionRequest[] = [{
+    const params: CloseAppSessionRequestParams[] = [{
         app_session_id: appId,
         allocations: [participantA, participantB, signer.address].map((participant, index) => ({
             participant,

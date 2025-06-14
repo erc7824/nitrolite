@@ -294,6 +294,7 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 	}
 	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
 
+	fmt.Printf("allocations: %+v\n", params.Allocations)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsNegative() {
@@ -315,6 +316,8 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 			if err != nil {
 				return fmt.Errorf("failed to check participant balance: %w", err)
 			}
+			fmt.Printf("balance: %+v\n", balance)
+			fmt.Printf("alloc amount: %v\n", alloc.Amount)
 
 			if alloc.Amount.GreaterThan(balance) {
 				return fmt.Errorf("insufficient funds: %s for asset %s", alloc.ParticipantWallet, alloc.AssetSymbol)

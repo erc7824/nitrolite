@@ -21,9 +21,7 @@ import {
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
-import {
-    CloseAppSessionRequestParams,
-    CreateAppSessionRequestParams,
+import { CloseAppSessionRequestParams, CreateAppSessionRequestParams,
     ResizeChannelRequestParams,
 } from './types/request';
 

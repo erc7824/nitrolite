@@ -6,7 +6,6 @@ import { ethers } from 'ethers';
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 20;
 const INITIAL_SNAKE_LENGTH = 3;
-const GAME_SPEED = 200; // ms between moves
 
 /**
  * @typedef {Object} Position
@@ -45,7 +44,7 @@ const GAME_SPEED = 200; // ms between moves
  */
 function createInitialSnake(startX, startY, direction) {
   const body = [];
-  
+
   // Create snake segments based on direction
   for (let i = 0; i < INITIAL_SNAKE_LENGTH; i++) {
     switch (direction) {

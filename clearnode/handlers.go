@@ -28,6 +28,7 @@ type AppDefinition struct {
 type CreateAppSessionParams struct {
 	Definition  AppDefinition   `json:"definition"`
 	Allocations []AppAllocation `json:"allocations"`
+	SessionData string  `json:"sessiondata"`
 }
 
 type SubmitStateParams struct {
@@ -334,6 +335,7 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 			Status:             ChannelStatusOpen,
 			Challenge:          params.Definition.Challenge,
 			Weights:            params.Definition.Weights,
+			SessionData:	    params.Definition.SessionData,
 			Quorum:             params.Definition.Quorum,
 			Nonce:              params.Definition.Nonce,
 			Version:            1,
@@ -588,6 +590,7 @@ func HandleGetAppSessions(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 			Protocol:           session.Protocol,
 			Challenge:          session.Challenge,
 			Weights:            session.Weights,
+			SessionData:	    session.SessionData,
 			Quorum:             session.Quorum,
 			Version:            session.Version,
 			Nonce:              session.Nonce,

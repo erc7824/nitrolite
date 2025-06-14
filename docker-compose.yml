@@ -61,8 +61,6 @@ services:
       - LOCALNET_CUSTODY_CONTRACT_ADDRESS=0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE
       - LOCALNET_INFURA_URL=ws://anvil:8545
       - CLEARNODE_DATABASE_URL=postgresql://postgres:postgres@database:5432/postgres?sslmode=disable
-    volumes:
-      - ./clearnode/dev.db:/dev.db
     restart: unless-stopped
 
 volumes:

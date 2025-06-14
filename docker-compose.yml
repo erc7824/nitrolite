@@ -5,9 +5,9 @@ services:
   database:
     image: postgres:17.2
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
     ports:
       - "5432:5432"
     volumes:
@@ -47,6 +47,43 @@ services:
         forge create --broadcast --optimizer-runs 1000000 --via-ir ./test/mocks/FlagAdjudicator.sol:FlagAdjudicator --rpc-url http://anvil:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --constructor-args true &&
       "
 
+  db-init:
+    image: postgres:17.2
+    environment:
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATABASE: ${POSTGRES_DB:-postgres}
+      PGHOST: database
+      PGPORT: 5432
+    command: >
+      sh -c "
+        echo 'Waiting for database to be ready...' &&
+        until pg_isready -h database -p 5432 -U ${POSTGRES_USER:-postgres}; do
+          echo 'Waiting for database connection...'
+          sleep 2
+        done &&
+        echo 'Checking database...' &&
+        
+        # Check if token already exists
+        TOKEN_EXISTS=$$(psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -t -c \"SELECT COUNT(*) FROM assets WHERE token = '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512' AND chain_id = 1337;\" | xargs) &&
+        
+        if [ \"$$TOKEN_EXISTS\" -eq \"0\" ]; then
+          echo 'Seeding database with tokens...' &&
+          psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c \"
+            INSERT INTO assets (token, chain_id, symbol, decimals) 
+            VALUES ('0xe7f1725e7734ce288f8367e1bb143e90bb3f0512', 1337, 'USDC', 6);
+          \" &&
+          echo 'Database seeded with tokens successfully'
+        else
+          echo 'Database already seeded, skipping'
+        fi
+      "
+    depends_on:
+      database:
+        condition: service_healthy
+      contract-deployer:
+        condition: service_completed_successfully
+
   clearnode:
     platform: linux/amd64
     image: ghcr.io/erc7824/nitrolite/clearnode:0.0.1-rc.28
@@ -60,7 +97,7 @@ services:
       - BROKER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
       - LOCALNET_CUSTODY_CONTRACT_ADDRESS=0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE
       - LOCALNET_INFURA_URL=ws://anvil:8545
-      - CLEARNODE_DATABASE_URL=postgresql://postgres:postgres@database:5432/postgres?sslmode=disable
+      - CLEARNODE_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-postgres}?sslmode=disable
     restart: unless-stopped
 
 volumes:

@@ -136,6 +136,7 @@ func TestHandleGetAppDefinition_Success(t *testing.T) {
 		ParticipantWallets: []string{"0xA", "0xB"},
 		Protocol:           "proto",
 		Weights:            []int64{10, 20},
+		SessionData:	    "test-SessionData",
 		Quorum:             15,
 		Challenge:          30,
 		Nonce:              99,
@@ -158,6 +159,7 @@ func TestHandleGetAppDefinition_Success(t *testing.T) {
 	assert.Equal(t, session.Protocol, def.Protocol)
 	assert.EqualValues(t, session.ParticipantWallets, def.ParticipantWallets)
 	assert.EqualValues(t, session.Weights, def.Weights)
+	assert.Equal(t, session.SessionData, def.SessionData)
 	assert.Equal(t, session.Quorum, def.Quorum)
 	assert.Equal(t, session.Challenge, def.Challenge)
 	assert.Equal(t, session.Nonce, def.Nonce)
@@ -742,6 +744,7 @@ func TestHandleGetAppSessions(t *testing.T) {
 			Protocol:           "test-app-1",
 			Challenge:          60,
 			Weights:            []int64{50, 50},
+			SessionData:	    "test-SessionData-1",
 			Quorum:             75,
 			Nonce:              1,
 			Version:            1,
@@ -753,6 +756,7 @@ func TestHandleGetAppSessions(t *testing.T) {
 			Protocol:           "test-app-2",
 			Challenge:          120,
 			Weights:            []int64{30, 70},
+			SessionData:	    "test-SessionData-2",
 			Quorum:             80,
 			Nonce:              2,
 			Version:            2,
@@ -764,6 +768,7 @@ func TestHandleGetAppSessions(t *testing.T) {
 			Protocol:           "test-app-3",
 			Challenge:          90,
 			Weights:            []int64{40, 60},
+			SessionData:	    "test-SessionData-3",
 			Quorum:             60,
 			Nonce:              3,
 			Version:            3,

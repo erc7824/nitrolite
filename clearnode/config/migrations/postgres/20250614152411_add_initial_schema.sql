@@ -30,7 +30,7 @@ CREATE TABLE ledger (
     account_id VARCHAR NOT NULL,
     account_type BIGINT NOT NULL,
     asset_symbol VARCHAR NOT NULL,
-    wallet VARCHAR NOT NULL,
+    wallet VARCHAR NOT NULL, 
     credit DECIMAL(64,18) NOT NULL,
     debit DECIMAL(64,18)NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -45,6 +45,7 @@ CREATE TABLE app_sessions (
     nonce BIGINT NOT NULL,
     participants TEXT[] NOT NULL,
     weights INTEGER[],
+    session_data VARCHAR,
     quorum BIGINT DEFAULT 100,
     version BIGINT DEFAULT 1,
     status VARCHAR NOT NULL,

@@ -20,13 +20,15 @@ import (
 )
 
 var (
-	custodyAbi *abi.ABI
+	custodyAbi        *abi.ABI
+	balanceCheckerAbi *abi.ABI
 )
 
 // Custody implements the BlockchainClient interface using the Custody contract
 type Custody struct {
 	client             *ethclient.Client
 	custody            *nitrolite.Custody
+	balanceChecker     *nitrolite.BalanceChecker
 	db                 *gorm.DB
 	custodyAddr        common.Address
 	transactOpts       *bind.TransactOpts
@@ -39,8 +41,7 @@ type Custody struct {
 }
 
 // NewCustody initializes the Ethereum client and custody contract wrapper.
-func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr, adjudicatorAddr string, chain uint32, logger Logger) (*Custody, error) {
-	custodyAddress := common.HexToAddress(custodyAddressStr)
+func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr, adjudicatorAddr, balanceCheckerAddr string, chain uint32, logger Logger) (*Custody, error) {
 	client, err := ethclient.Dial(infuraURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Ethereum node: %w", err)
@@ -59,7 +60,13 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 	auth.GasPrice = big.NewInt(30000000000) // 20 gwei.
 	auth.GasLimit = uint64(3000000)
 
+	custodyAddress := common.HexToAddress(custodyAddressStr)
 	custody, err := nitrolite.NewCustody(custodyAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bind custody contract: %w", err)
+	}
+
+	balanceChecker, err := nitrolite.NewBalanceChecker(common.HexToAddress(balanceCheckerAddr), client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bind custody contract: %w", err)
 	}
@@ -67,6 +74,7 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 	return &Custody{
 		client:             client,
 		custody:            custody,
+		balanceChecker:     balanceChecker,
 		db:                 db,
 		custodyAddr:        custodyAddress,
 		transactOpts:       auth,
@@ -449,86 +457,74 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 		return
 	}
 
-	callOpts := &bind.CallOpts{
-		Context: ctx,
+	callOpts := &bind.CallOpts{Context: ctx}
+	brokerAddr := c.signer.GetAddress()
+
+	var tokenAddrs []common.Address
+	for _, asset := range assets {
+		tokenAddrs = append(tokenAddrs, common.HexToAddress(asset.Token))
+	}
+	availInfo, err := c.custody.GetAccountsBalances(callOpts, []common.Address{brokerAddr}, tokenAddrs)
+	if err != nil {
+		logger.Error("failed to get batch account info", "network", c.chainID, "error", err)
+		return
+	}
+	if len(availInfo) == 0 {
+		logger.Warn("batch account info is empty", "network", c.chainID)
+	} else if len(availInfo[0]) != len(assets) {
+		logger.Warn("unexpected batch account info length", "network", c.chainID,
+			"expected", len(assets), "got", len(availInfo[0]))
 	}
 
-	brokerAddr := c.signer.GetAddress()
-	// TODO: refactor to select with GetAccountsBalances in one query
-	// Use balanceChecker to get Balances for erc20 tokens in one query
-	for _, asset := range assets {
-		logger.Debug("fetching account info", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "broker", brokerAddr.Hex())
-		// Call GetAccountsBalances on the custody contract
-		tokenAddr := common.HexToAddress(asset.Token)
-		info, err := c.custody.GetAccountsBalances(callOpts, []common.Address{brokerAddr}, []common.Address{tokenAddr})
-		if err != nil {
-			logger.Error("failed to get account info", "network", c.chainID, "token", asset.Token, "error", err)
-			continue
+	walletBalances, err := c.balanceChecker.Balances(callOpts, []common.Address{brokerAddr}, tokenAddrs)
+	if err != nil {
+		logger.Error("failed to get wallet balances", "network", c.chainID, "error", err)
+		return
+	}
+	if len(walletBalances) != len(assets) {
+		logger.Warn("unexpected wallet balances length", "network", c.chainID,
+			"expected", len(assets), "got", len(walletBalances))
+	}
+
+	// Get the native token balance
+	nativeBalance, err := c.client.BalanceAt(ctx, brokerAddr, nil)
+	if err != nil {
+		logger.Error("failed to get native asset balance", "network", c.chainID, "error", err)
+		return
+	}
+	walletBalances = append(walletBalances, nativeBalance)
+
+	for i, asset := range assets {
+		var available decimal.Decimal
+		if len(availInfo) > 0 && i < len(availInfo[0]) {
+			available = decimal.NewFromBigInt(availInfo[0][i], -int32(asset.Decimals))
+			metrics.BrokerBalanceAvailable.With(prometheus.Labels{
+				"network": fmt.Sprintf("%d", c.chainID),
+				"token":   asset.Token,
+				"asset":   asset.Symbol,
+			}).Set(available.InexactFloat64())
 		}
 
-		if len(info) == 0 || len(info[0]) == 0 {
-			logger.Warn("no account info found", "network", c.chainID, "token", asset.Token)
-			continue
-		}
-
-		availableBalance := decimal.NewFromBigInt(info[0][0], -int32(asset.Decimals))
-
-		metrics.BrokerBalanceAvailable.With(prometheus.Labels{
-			"network": fmt.Sprintf("%d", c.chainID),
-			"token":   asset.Token,
-			"asset":   asset.Symbol,
-		}).Set(availableBalance.InexactFloat64())
-
-		// Fetch broker wallet balances
-		walletBalance := decimal.Zero
-
-		if asset.Token == "0x0000000000000000000000000000000000000000" {
-			walletBalanceRaw, err := c.client.BalanceAt(context.TODO(), brokerAddr, nil)
-			if err != nil {
-				logger.Error("failed to get base_asset balance", "network", c.chainID, "token", asset.Token, "error", err)
-				continue
-			}
-			walletBalance = decimal.NewFromBigInt(walletBalanceRaw, -int32(asset.Decimals))
-
-		} else {
-			caller, err := nitrolite.NewErc20(tokenAddr, c.client)
-			if err != nil {
-				logger.Error("failed to initialize erc20 caller", "network", c.chainID, "token", asset.Token, "error", err)
-				continue
-			}
-
-			walletBalanceRaw, err := caller.BalanceOf(callOpts, brokerAddr)
-			if err != nil {
-				logger.Error("failed to get erc20 balance", "network", c.chainID, "token", asset.Token, "error", err)
-				continue
-			}
-			walletBalance = decimal.NewFromBigInt(walletBalanceRaw, -int32(asset.Decimals))
-		}
-
+		walletBalance := decimal.NewFromBigInt(walletBalances[i], -int32(asset.Decimals))
 		metrics.BrokerWalletBalance.With(prometheus.Labels{
 			"network": fmt.Sprintf("%d", c.chainID),
 			"token":   asset.Token,
 			"asset":   asset.Symbol,
 		}).Set(walletBalance.InexactFloat64())
 
-		logger.Debug("updated erc20 balance metrics", "network", c.chainID, "token", asset.Token, "asset", asset.Symbol, "balance", walletBalance.String())
+		logger.Debug("metrics updated", "network", c.chainID, "token", asset.Token, "contract_balance", available.String(), "wallet_balance", walletBalance.String())
 	}
 
-	openChannelsInfo, err := c.custody.GetOpenChannels(callOpts, []common.Address{brokerAddr})
-
+	openChannels, err := c.custody.GetOpenChannels(callOpts, []common.Address{brokerAddr})
 	if err != nil {
 		logger.Error("failed to get open channels", "network", c.chainID, "broker", brokerAddr, "error", err)
 		return
 	}
-
-	if len(openChannelsInfo) == 0 {
+	if len(openChannels) == 0 {
 		logger.Warn("no open channels found", "network", c.chainID, "broker", brokerAddr)
 		return
 	}
-
-	metrics.BrokerChannelCount.With(prometheus.Labels{
-		"network": fmt.Sprintf("%d", c.chainID),
-	}).Set(float64(len(openChannelsInfo[0])))
-
-	logger.Debug("updated contract total open channels metric", "network", c.chainID, "channels", len(openChannelsInfo[0]))
+	count := len(openChannels[0])
+	metrics.BrokerChannelCount.With(prometheus.Labels{"network": fmt.Sprintf("%d", c.chainID)}).Set(float64(count))
+	logger.Debug("open channels metric updated", "network", c.chainID, "channels", count)
 }

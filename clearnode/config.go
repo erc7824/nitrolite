@@ -26,11 +26,12 @@ var knownNetworks = map[string]uint32{
 
 // NetworkConfig represents configuration for a blockchain network
 type NetworkConfig struct {
-	Name               string
-	ChainID            uint32
-	InfuraURL          string
-	CustodyAddress     string
-	AdjudicatorAddress string
+	Name                  string
+	ChainID               uint32
+	InfuraURL             string
+	CustodyAddress        string
+	AdjudicatorAddress    string
+	BalanceCHeckerAddress string // TODO: add balance checker method into our smart contract
 }
 
 // Config represents the overall application configuration
@@ -100,6 +101,7 @@ func LoadConfig(logger Logger) (*Config, error) {
 		infuraURL := ""
 		custodyAddress := ""
 		adjudicatorAddress := ""
+		balanceCheckerAddress := ""
 
 		// Look for matching environment variables
 		for _, env := range envs {
@@ -117,18 +119,21 @@ func LoadConfig(logger Logger) (*Config, error) {
 				custodyAddress = value
 			} else if strings.HasPrefix(key, network+"_ADJUDICATOR_ADDRESS") {
 				adjudicatorAddress = value
+			} else if strings.HasPrefix(key, network+"_BALANCE_CHECKER_ADDRESS") {
+				balanceCheckerAddress = value
 			}
 		}
 
 		// Only add network if both required variables are present
-		if infuraURL != "" && custodyAddress != "" {
+		if infuraURL != "" && custodyAddress != "" && adjudicatorAddress != "" && balanceCheckerAddress != "" {
 			networkLower := strings.ToLower(network)
 			config.networks[networkLower] = &NetworkConfig{
-				Name:               networkLower,
-				ChainID:            chainID,
-				InfuraURL:          infuraURL,
-				CustodyAddress:     custodyAddress,
-				AdjudicatorAddress: adjudicatorAddress,
+				Name:                  networkLower,
+				ChainID:               chainID,
+				InfuraURL:             infuraURL,
+				CustodyAddress:        custodyAddress,
+				AdjudicatorAddress:    adjudicatorAddress,
+				BalanceCHeckerAddress: balanceCheckerAddress,
 			}
 		}
 	}

@@ -13,7 +13,7 @@ module.exports = {
     testTimeout: 30000, // 30 seconds for integration tests
     maxWorkers: 1, // Run tests sequentially for integration testing
     verbose: true,
-    setupFilesAfterEnv: ['<rootDir>/test/integration/setup.ts'],
+    // setupFilesAfterEnv removed - each test file handles its own setup now
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/src/$1',

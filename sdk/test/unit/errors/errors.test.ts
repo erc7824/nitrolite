@@ -22,7 +22,7 @@ import Errors, {
     InvalidStateTransitionError,
     StateNotFoundError,
     ChannelNotFoundError,
-} from '../src/errors';
+} from '../../../src/errors';
 import { Address } from 'viem';
 
 describe('Error classes', () => {

@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { NitroliteErrorCode } from '../../src/rpc/types';
+import { NitroliteErrorCode } from '../../../src/rpc/types';
 
 describe('NitroliteErrorCode enum', () => {
     const entries: Array<[keyof typeof NitroliteErrorCode, number]> = [

@@ -15,7 +15,7 @@ import {
     createCloseChannelMessage,
     createResizeChannelMessage,
     createGetChannelsMessage,
-} from '../../src/rpc/api';
+} from '../../../src/rpc/api';
 import {
     CreateAppSessionRequest,
     ResizeChannel,
@@ -24,7 +24,7 @@ import {
     AuthChallengeRPCResponse,
     RPCMethod,
     RPCChannelStatus,
-} from '../../src/rpc/types';
+} from '../../../src/rpc/types';
 
 describe('API message creators', () => {
     const signer: MessageSigner = jest.fn(async () => '0xsig' as Hex);
@@ -50,7 +50,12 @@ describe('API message creators', () => {
         expect(signer).not.toHaveBeenCalled();
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.AuthRequest, [clientAddress, clientAddress, 'test-app', [], '', '', ''], timestamp],
+            req: [
+                requestId,
+                RPCMethod.AuthRequest,
+                [clientAddress, clientAddress, 'test-app', [], '', '', ''],
+                timestamp,
+            ],
             sig: [''],
         });
     });
@@ -244,7 +249,13 @@ describe('API message creators', () => {
     });
 
     test('createGetChannelsMessage', async () => {
-        const msgStr = await createGetChannelsMessage(signer, '0x0123124124124131', RPCChannelStatus.Open, requestId, timestamp);
+        const msgStr = await createGetChannelsMessage(
+            signer,
+            '0x0123124124124131',
+            RPCChannelStatus.Open,
+            requestId,
+            timestamp,
+        );
         expect(signer).toHaveBeenCalledWith([
             requestId,
             RPCMethod.GetChannels,
@@ -253,7 +264,12 @@ describe('API message creators', () => {
         ]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetChannels, [{ participant: '0x0123124124124131', status: RPCChannelStatus.Open }], timestamp],
+            req: [
+                requestId,
+                RPCMethod.GetChannels,
+                [{ participant: '0x0123124124124131', status: RPCChannelStatus.Open }],
+                timestamp,
+            ],
             sig: ['0xsig'],
         });
     });

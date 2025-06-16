@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { Erc20Service } from '../../../src/client/services/Erc20Service';
-import { Errors } from '../../../src/errors';
+import { Erc20Service } from '../../../../src/client/services/Erc20Service';
+import { Errors } from '../../../../src/errors';
 import { Address, SimulateContractReturnType } from 'viem';
 
 describe('Erc20Service', () => {

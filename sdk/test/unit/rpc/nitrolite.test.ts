@@ -1,6 +1,6 @@
 import { describe, test, expect, jest } from '@jest/globals';
 import { Address, Hex } from 'viem';
-import { NitroliteRPC } from '../../src/rpc/nitrolite';
+import { NitroliteRPC } from '../../../src/rpc/nitrolite';
 import {
     NitroliteRPCMessage,
     MessageSigner,
@@ -9,7 +9,7 @@ import {
     RequestData,
     ResponsePayload,
     RPCMethod,
-} from '../../src/rpc/types';
+} from '../../../src/rpc/types';
 
 describe('NitroliteRPC', () => {
     beforeAll(() => {

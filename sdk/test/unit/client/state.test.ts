@@ -3,13 +3,13 @@
  */
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import { Hex } from 'viem';
-import { _prepareAndSignInitialState, _prepareAndSignFinalState } from '../../src/client/state';
-import * as utils from '../../src/utils';
-import { Errors } from '../../src/errors';
-import { StateIntent } from '../../src/client/types';
+import { _prepareAndSignInitialState, _prepareAndSignFinalState } from '../../../src/client/state';
+import * as utils from '../../../src/utils';
+import { Errors } from '../../../src/errors';
+import { StateIntent } from '../../../src/client/types';
 
 // Mock utils
-jest.mock('../../src/utils', () => ({
+jest.mock('../../../src/utils', () => ({
     generateChannelNonce: jest.fn(() => 999n),
     getChannelId: jest.fn(() => 'cid' as any),
     getStateHash: jest.fn(() => 'hsh'),
@@ -45,7 +45,11 @@ describe('_prepareAndSignInitialState', () => {
             initialAllocationAmounts: [10n, 20n],
             stateData: 'customData',
         };
-        const { channel, initialState, channelId } = await _prepareAndSignInitialState(tokenAddress, deps, params as any);
+        const { channel, initialState, channelId } = await _prepareAndSignInitialState(
+            tokenAddress,
+            deps,
+            params as any,
+        );
 
         // Channel fields
         expect(utils.generateChannelNonce).toHaveBeenCalledWith(deps.account.address);

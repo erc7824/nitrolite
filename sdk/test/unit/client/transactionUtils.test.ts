@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import type { PublicClient, Hash, TransactionReceipt } from 'viem';
-import { waitForTransaction } from '../../src/client/services/transactionUtils';
-import Errors from '../../src/errors';
+import { waitForTransaction } from '../../../src/client/services/transactionUtils';
+import Errors from '../../../src/errors';
 
 describe('waitForTransaction', () => {
     const hash = '0xdeadbeef' as Hash;

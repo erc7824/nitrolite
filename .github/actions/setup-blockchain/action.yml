@@ -2,58 +2,58 @@ name: 'Setup Blockchain Environment'
 description: 'Install Foundry, start Anvil, and deploy contracts for testing'
 
 outputs:
-    custody-address:
-        description: 'Deployed Custody contract address'
-        value: ${{ steps.setup.outputs.custody-address }}
-    adjudicator-address:
-        description: 'Deployed Adjudicator contract address'
-        value: ${{ steps.setup.outputs.adjudicator-address }}
-    token-address:
-        description: 'Deployed Test Token contract address'
-        value: ${{ steps.setup.outputs.token-address }}
+  custody-address:
+    description: 'Deployed Custody contract address'
+    value: ${{ steps.setup.outputs.custody-address }}
+  adjudicator-address:
+    description: 'Deployed Adjudicator contract address'
+    value: ${{ steps.setup.outputs.adjudicator-address }}
+  token-address:
+    description: 'Deployed Test Token contract address'
+    value: ${{ steps.setup.outputs.token-address }}
 
 runs:
-    using: 'composite'
-    steps:
-        - name: Install Foundry
-          uses: foundry-rs/foundry-toolchain@v1
-          with:
-              version: nightly
+  using: 'composite'
+  steps:
+  - name: Install Foundry
+    uses: foundry-rs/foundry-toolchain@v1
+    with:
+      version: nightly
 
-        - name: Install jq for JSON parsing
-          run: sudo apt-get update && sudo apt-get install -y jq
-          shell: bash
+  - name: Install jq for JSON parsing
+    run: sudo apt-get update && sudo apt-get install -y jq
+    shell: bash
 
-        - name: Start Anvil and Deploy Contracts
-          id: setup
-          run: |
-              # Make the script executable
-              chmod +x ./scripts/test-setup.sh
-              
-              # Start Anvil
-              ./scripts/test-setup.sh start-anvil
-              
-              # Deploy contracts
-              ./scripts/test-setup.sh deploy
-              
-              # Extract addresses from the generated file
-              if [ -f "./contract/contract_addresses.test.env" ]; then
-                # Source the file to get the variables
-                source ./contract/contract_addresses.test.env
-                
-                # Set GitHub Action outputs
-                echo "custody-address=${CUSTODY_CONTRACT_ADDRESS}" >> $GITHUB_OUTPUT
-                echo "adjudicator-address=${ADJUDICATOR_CONTRACT_ADDRESS}" >> $GITHUB_OUTPUT
-                echo "token-address=${TEST_TOKEN_CONTRACT_ADDRESS}" >> $GITHUB_OUTPUT
-                
-                # Log the addresses for debugging
-                echo "Deployed Contract Addresses:"
-                echo "  Custody: ${CUSTODY_CONTRACT_ADDRESS}"
-                echo "  Adjudicator: ${ADJUDICATOR_CONTRACT_ADDRESS}"
-                echo "  Test Token: ${TEST_TOKEN_CONTRACT_ADDRESS}"
-                echo "  RPC URL: ${ANVIL_RPC_URL}"
-              else
-                echo "ERROR: contract_addresses.test.env file not found"
-                exit 1
-              fi
-          shell: bash
+  - name: Start Anvil and Deploy Contracts
+    id: setup
+    run: |
+      # Make the script executable
+      chmod +x ./scripts/test-setup.sh
+
+      # Start Anvil
+      ./scripts/test-setup.sh start-anvil
+
+      # Deploy contracts
+      ./scripts/test-setup.sh deploy
+
+      # Extract addresses from the generated file
+      if [ -f "./contract/contract_addresses.test.env" ]; then
+        # Source the file to get the variables
+        source ./contract/contract_addresses.test.env
+        
+        # Set GitHub Action outputs
+        echo "custody-address=${CUSTODY_CONTRACT_ADDRESS}" >> $GITHUB_OUTPUT
+        echo "adjudicator-address=${ADJUDICATOR_CONTRACT_ADDRESS}" >> $GITHUB_OUTPUT
+        echo "token-address=${TEST_TOKEN_CONTRACT_ADDRESS}" >> $GITHUB_OUTPUT
+        
+        # Log the addresses for debugging
+        echo "Deployed Contract Addresses:"
+        echo "  Custody: ${CUSTODY_CONTRACT_ADDRESS}"
+        echo "  Adjudicator: ${ADJUDICATOR_CONTRACT_ADDRESS}"
+        echo "  Test Token: ${TEST_TOKEN_CONTRACT_ADDRESS}"
+        echo "  RPC URL: ${ANVIL_RPC_URL}"
+      else
+        echo "ERROR: contract_addresses.test.env file not found"
+        exit 1
+      fi
+    shell: bash

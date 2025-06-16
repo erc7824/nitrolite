@@ -363,6 +363,38 @@ func (c *Custody) handleBlockChainEvent(ctx context.Context, l types.Log) {
 		c.sendBalanceUpdate(channel.Wallet)
 		c.sendChannelUpdate(channel)
 
+	case custodyAbi.Events["Challenged"].ID:
+		ev, err := c.custody.ParseChallenged(l)
+		if err != nil {
+			logger.Warn("error parsing event", "error", err)
+			return
+		}
+		channelID := common.Hash(ev.ChannelId).Hex()
+		logger.Debug("parsed event", "channelId", channelID)
+
+		var channel Channel
+		err = c.db.Transaction(func(tx *gorm.DB) error {
+			result := tx.Where("channel_id = ?", channelID).First(&channel)
+			if result.Error != nil {
+				return fmt.Errorf("error finding channel: %w", result.Error)
+			}
+
+			channel.Status = ChannelStatusChallenged
+			channel.UpdatedAt = time.Now()
+			channel.Version++
+			if err := tx.Save(&channel).Error; err != nil {
+				return fmt.Errorf("error saving channel in database: %w", err)
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			logger.Error("failed to update channel", "channelId", channelID, "error", err)
+			return
+		}
+		logger.Info("challenged channel", "channelId", channelID)
+
 	case custodyAbi.Events["Resized"].ID:
 		ev, err := c.custody.ParseResized(l)
 		if err != nil {
@@ -374,8 +406,7 @@ func (c *Custody) handleBlockChainEvent(ctx context.Context, l types.Log) {
 
 		var channel Channel
 		err = c.db.Transaction(func(tx *gorm.DB) error {
-			channelID := common.BytesToHash(ev.ChannelId[:]).Hex()
-			result := c.db.Where("channel_id = ?", channelID).First(&channel)
+			result := tx.Where("channel_id = ?", channelID).First(&channel)
 			if result.Error != nil {
 				return fmt.Errorf("error finding channel: %w", result.Error)
 			}
@@ -388,7 +419,7 @@ func (c *Custody) handleBlockChainEvent(ctx context.Context, l types.Log) {
 			channel.Amount = uint64(newAmount)
 			channel.UpdatedAt = time.Now()
 			channel.Version++
-			if err := c.db.Save(&channel).Error; err != nil {
+			if err := tx.Save(&channel).Error; err != nil {
 				return fmt.Errorf("error saving channel in database: %w", err)
 			}
 

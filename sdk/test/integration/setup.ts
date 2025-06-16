@@ -14,13 +14,15 @@ import {
     type PublicClient,
     type TestClient,
     type WalletClient,
+    type Transport,
+    type Chain,
     Quantity,
 } from 'viem';
 import { anvil } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { DummyArtifacts } from './artifacts/dummy';
 import { CustodyArtifacts } from './artifacts/custody';
-import { TestERC20 } from './artifacts/testERC20';
+import { TestERC20Artifacts } from './artifacts/testERC20';
 
 export interface TestEnvironment {
     evm: any;
@@ -83,7 +85,7 @@ export async function getTestEnvironment(): Promise<TestEnvironment> {
 
     // Get RPC URL from environment or use default
     const rpcUrl = process.env.ANVIL_RPC_URL || 'http://127.0.0.1:8545';
-    
+
     // Create viem clients
     const publicClient = createPublicClient({
         chain: anvil,
@@ -137,9 +139,9 @@ export async function fundAccountWithNative(testEnv: TestEnvironment, address: A
 
 export async function fundAccountWithERC20(testEnv: TestEnvironment, address: Address, amount: bigint): Promise<void> {
     await testEnv.walletClient.writeContract({
-        abi: TestERC20.abi,
+        abi: TestERC20Artifacts.abi,
         functionName: 'mint',
-        address: testEnv.deployedContracts.token,
+        address: testEnv.deployedContracts.token as Address,
         chain: anvil,
         account: testEnv.accounts.deployer,
         args: [address, amount],
@@ -178,12 +180,11 @@ export async function mineBlock(testEnv: TestEnvironment): Promise<void> {
 }
 
 export function getContractArtifacts() {
-    // TODO: Mock contract artifacts - in a real implementation, these would be loaded
-    // from the actual compiled contracts
+    // Auto-generated contract artifacts from compiled contracts
     return {
         custody: CustodyArtifacts,
         adjudicator: DummyArtifacts,
-        token: TestERC20,
+        token: TestERC20Artifacts,
     };
 }
 
@@ -194,19 +195,19 @@ export function getDeployedContractAddresses(): {
     token?: Address;
 } {
     const addresses: any = {};
-    
+
     if (process.env.CUSTODY_CONTRACT_ADDRESS) {
         addresses.custody = process.env.CUSTODY_CONTRACT_ADDRESS as Address;
     }
-    
+
     if (process.env.ADJUDICATOR_CONTRACT_ADDRESS) {
         addresses.adjudicator = process.env.ADJUDICATOR_CONTRACT_ADDRESS as Address;
     }
-    
+
     if (process.env.TEST_TOKEN_CONTRACT_ADDRESS) {
         addresses.token = process.env.TEST_TOKEN_CONTRACT_ADDRESS as Address;
     }
-    
+
     return addresses;
 }
 
@@ -214,12 +215,12 @@ export function getDeployedContractAddresses(): {
 export function createWalletClientForAccount(
     testEnv: TestEnvironment,
     account: Account,
-): WalletClient<any, any, Account> {
+): WalletClient<Transport, Chain, Account> {
     const rpcUrl = process.env.ANVIL_RPC_URL || 'http://127.0.0.1:8545';
-    
+
     return createWalletClient({
         chain: anvil,
         transport: http(rpcUrl),
         account,
-    }) as WalletClient<any, any, Account>;
+    });
 }

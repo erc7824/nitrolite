@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
-import { NitroliteClient } from '../../src/client/index';
-import { Errors } from '../../src/errors';
+import { NitroliteClient } from '../../../src/client/index';
+import { Errors } from '../../../src/errors';
 import { Address, Hash, Hex } from 'viem';
-import * as stateModule from '../../src/client/state';
-import { Allocation, Channel, ChannelId, ChannelStatus, StateIntent } from '../../src/client/types';
+import * as stateModule from '../../../src/client/state';
+import { Allocation, Channel, ChannelId, ChannelStatus, StateIntent } from '../../../src/client/types';
 
 describe('NitroliteClient', () => {
     let client: NitroliteClient;
@@ -14,9 +14,9 @@ describe('NitroliteClient', () => {
     const mockSignMessage = jest.fn(() =>
         Promise.resolve(
             '0x' +
-            '1234567890abcdef'.repeat(8) + // 128 hex chars
-            '1b' // v = 27
-        )
+                '1234567890abcdef'.repeat(8) + // 128 hex chars
+                '1b', // v = 27
+        ),
     );
     const mockWalletClient = {
         account: mockAccount,
@@ -130,8 +130,16 @@ describe('NitroliteClient', () => {
                 data: '0x00' as Hex,
                 intent: StateIntent.INITIALIZE,
                 allocations: [
-                    { destination: '0x1234567890123456789012345678901234567890' as Hex, token: '0x0', amount: 1n } as Allocation,
-                    { destination: '0x2345678901234567890123456789012345678901' as Hex, token: '0x0', amount: 2n } as Allocation,
+                    {
+                        destination: '0x1234567890123456789012345678901234567890' as Hex,
+                        token: '0x0',
+                        amount: 1n,
+                    } as Allocation,
+                    {
+                        destination: '0x2345678901234567890123456789012345678901' as Hex,
+                        token: '0x0',
+                        amount: 2n,
+                    } as Allocation,
                 ] as [Allocation, Allocation],
                 version: 0n,
                 sigs: [],
@@ -232,8 +240,16 @@ describe('NitroliteClient', () => {
                     version: 1n,
                     data: '0x00' as Hex,
                     allocations: [
-                        { destination: '0x1234567890123456789012345678901234567890' as Hex, token: tokenAddress, amount: 1n },
-                        { destination: '0x2345678901234567890123456789012345678901' as Hex, token: tokenAddress, amount: 2n },
+                        {
+                            destination: '0x1234567890123456789012345678901234567890' as Hex,
+                            token: tokenAddress,
+                            amount: 1n,
+                        },
+                        {
+                            destination: '0x2345678901234567890123456789012345678901' as Hex,
+                            token: tokenAddress,
+                            amount: 2n,
+                        },
                     ],
                     sigs: [],
                 },
@@ -257,8 +273,16 @@ describe('NitroliteClient', () => {
                     version: 1n,
                     data: '0x00' as Hex,
                     allocations: [
-                        { destination: '0x1234567890123456789012345678901234567890' as Hex, token: tokenAddress, amount: 1n },
-                        { destination: '0x2345678901234567890123456789012345678901' as Hex, token: tokenAddress, amount: 2n },
+                        {
+                            destination: '0x1234567890123456789012345678901234567890' as Hex,
+                            token: tokenAddress,
+                            amount: 1n,
+                        },
+                        {
+                            destination: '0x2345678901234567890123456789012345678901' as Hex,
+                            token: tokenAddress,
+                            amount: 2n,
+                        },
                     ],
                     sigs: [],
                 },
@@ -286,15 +310,22 @@ describe('NitroliteClient', () => {
                 } as any,
             });
             expect(stateModule._prepareAndSignFinalState).toHaveBeenCalledWith(expect.anything(), expect.any(Object));
-            expect(mockNitroService.close).toHaveBeenCalledWith('0x0000000000000000000000000000000000000000000000000000000000000001', {} as any);
+            expect(mockNitroService.close).toHaveBeenCalledWith(
+                '0x0000000000000000000000000000000000000000000000000000000000000001',
+                {} as any,
+            );
             expect(tx).toBe('0xCLS');
         });
 
         test('failure throws ContractCallError', async () => {
             jest.spyOn(stateModule, '_prepareAndSignFinalState').mockRejectedValue(new Error('fail'));
-            await expect(client.closeChannel({ finalState: { channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex } as any } as any)).rejects.toThrow(
-                Errors.ContractCallError,
-            );
+            await expect(
+                client.closeChannel({
+                    finalState: {
+                        channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
+                    } as any,
+                } as any),
+            ).rejects.toThrow(Errors.ContractCallError);
         });
     });
 

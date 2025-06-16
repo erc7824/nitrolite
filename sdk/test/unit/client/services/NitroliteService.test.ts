@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import { Address, Hex, SimulateContractReturnType, zeroAddress } from 'viem';
-import { NitroliteService } from '../../../src/client/services/NitroliteService';
-import { Errors } from '../../../src/errors';
-import { CustodyAbi, ContractAddresses } from '../../../src/abis';
-import { Channel, ChannelId, Signature, State } from '../../../src/client/types';
+import { NitroliteService } from '../../../../src/client/services/NitroliteService';
+import { Errors } from '../../../../src/errors';
+import { CustodyAbi, ContractAddresses } from '../../../../src/abis';
+import { Channel, ChannelId, Signature, State } from '../../../../src/client/types';
 
 describe('NitroliteService', () => {
     const custodyAddress = '0x0000000000000000000000000000000000000001' as Address;

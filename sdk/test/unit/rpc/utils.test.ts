@@ -11,8 +11,8 @@ import {
     toBytes,
     isValidResponseTimestamp,
     isValidResponseRequestId,
-} from '../../src/rpc/utils';
-import { NitroliteRPCMessage } from '../../src/rpc/types';
+} from '../../../src/rpc/utils';
+import { NitroliteRPCMessage } from '../../../src/rpc/types';
 
 describe('RPC Utils', () => {
     describe('getCurrentTimestamp', () => {

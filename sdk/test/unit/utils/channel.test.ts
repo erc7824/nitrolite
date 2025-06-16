@@ -1,7 +1,7 @@
 import { describe, test, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { getChannelId, generateChannelNonce } from '../../src/utils/channel';
+import { getChannelId, generateChannelNonce } from '../../../src/utils/channel';
 import { encodeAbiParameters, keccak256, Address } from 'viem';
-import type { Channel } from '../../src/client/types';
+import type { Channel } from '../../../src/client/types';
 
 jest.mock('viem', () => ({
     encodeAbiParameters: jest.fn(() => '0xdeadbeef'),

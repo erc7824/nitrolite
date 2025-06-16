@@ -1,6 +1,6 @@
 import { describe, test, expect, jest } from '@jest/globals';
-import { getStateHash, signState, removeQuotesFromRS, verifySignature } from '../../src/utils/state';
-import { type State, type Signature, type Allocation, StateIntent } from '../../src/client/types';
+import { getStateHash, signState, removeQuotesFromRS, verifySignature } from '../../../src/utils/state';
+import { type State, type Signature, type Allocation, StateIntent } from '../../../src/client/types';
 import { Hex, Address, recoverMessageAddress, parseSignature, encodeAbiParameters, keccak256 } from 'viem';
 
 jest.mock('viem', () => ({
@@ -74,7 +74,9 @@ describe('signState', () => {
         // @ts-ignore
         viemMock.parseSignature.mockReturnValueOnce({ r: '0xr', s: '0xs' });
         // @ts-ignore
-        await expect(signState(fakeHash, signer)).rejects.toThrow(/Invalid signature format: missing v or yParity value/);
+        await expect(signState(fakeHash, signer)).rejects.toThrow(
+            /Invalid signature format: missing v or yParity value/,
+        );
     });
 
     test('throws on signer error', async () => {

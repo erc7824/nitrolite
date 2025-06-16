@@ -310,6 +310,14 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 				walletAddress = wallet
 			}
 
+			challenged, err := getChannelsByWallet(tx, walletAddress, string(ChannelStatusChallenged))
+			if err != nil {
+				return fmt.Errorf("failed to check challenged channels for %s: %w", walletAddress, err)
+			}
+			if len(challenged) > 0 {
+				return fmt.Errorf("participant %s has challenged channels, cannot create application session", walletAddress)
+			}
+
 			ledger := GetWalletLedger(tx, walletAddress)
 			balance, err := ledger.Balance(walletAddress, alloc.AssetSymbol)
 			if err != nil {
@@ -618,7 +626,7 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 	}
 
 	if channel.Status != ChannelStatusOpen {
-		return nil, fmt.Errorf("channel %s must be open to resize, current status: %s", channel.ChannelID, channel.Status)
+		return nil, fmt.Errorf("channel %s must be open and not in challenge to resize, current status: %s", channel.ChannelID, channel.Status)
 	}
 
 	if err := verifySigner(rpc, channel.Wallet); err != nil {
@@ -736,7 +744,7 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 	}
 
 	if channel.Status != ChannelStatusOpen {
-		return nil, fmt.Errorf("channel %s must be open to close, current status: %s", channel.ChannelID, channel.Status)
+		return nil, fmt.Errorf("channel %s must be open and not in challenge to close, current status: %s", channel.ChannelID, channel.Status)
 	}
 
 	if err := verifySigner(rpc, channel.Wallet); err != nil {

@@ -12,9 +12,10 @@ import (
 type ChannelStatus string
 
 var (
-	ChannelStatusJoining ChannelStatus = "joining"
-	ChannelStatusOpen    ChannelStatus = "open"
-	ChannelStatusClosed  ChannelStatus = "closed"
+	ChannelStatusJoining    ChannelStatus = "joining"
+	ChannelStatusOpen       ChannelStatus = "open"
+	ChannelStatusClosed     ChannelStatus = "closed"
+	ChannelStatusChallenged ChannelStatus = "challenged"
 )
 
 // Channel represents a state channel between participants

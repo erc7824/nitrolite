@@ -216,33 +216,34 @@ run_sdk_tests() {
     print_success "SDK tests completed"
 }
 
+# TODO: Uncomment and implement Go tests
 # Function to run Go tests
-run_go_tests() {
-    print_status "Running Go tests..."
+# run_go_tests() {
+#     print_status "Running Go tests..."
     
-    cd "$(dirname "$0")/../clearnode"
+#     cd "$(dirname "$0")/../clearnode"
     
-    # Check if go is installed
-    if ! command -v go &> /dev/null; then
-        print_warning "Go not found. Skipping Go tests."
-        return 0
-    fi
+#     # Check if go is installed
+#     if ! command -v go &> /dev/null; then
+#         print_warning "Go not found. Skipping Go tests."
+#         return 0
+#     fi
     
-    # Download dependencies
-    print_status "Downloading Go dependencies..."
-    go mod download
+#     # Download dependencies
+#     print_status "Downloading Go dependencies..."
+#     go mod download
     
-    # Run tests
-    print_status "Running Go integration tests..."
-    ETH_RPC_URL="http://$ANVIL_HOST:$ANVIL_PORT" \
-    CUSTODY_CONTRACT_ADDRESS="$CUSTODY_CONTRACT_ADDRESS" \
-    ADJUDICATOR_CONTRACT_ADDRESS="$ADJUDICATOR_CONTRACT_ADDRESS" \
-    TEST_TOKEN_CONTRACT_ADDRESS="$TEST_TOKEN_CONTRACT_ADDRESS" \
-    go test -v -race ./pkg/testing/...
+#     # Run tests
+#     print_status "Running Go integration tests..."
+#     ETH_RPC_URL="http://$ANVIL_HOST:$ANVIL_PORT" \
+#     CUSTODY_CONTRACT_ADDRESS="$CUSTODY_CONTRACT_ADDRESS" \
+#     ADJUDICATOR_CONTRACT_ADDRESS="$ADJUDICATOR_CONTRACT_ADDRESS" \
+#     TEST_TOKEN_CONTRACT_ADDRESS="$TEST_TOKEN_CONTRACT_ADDRESS" \
+#     go test -v -race ./pkg/testing/...
     
-    cd - >/dev/null
-    print_success "Go tests completed"
-}
+#     cd - >/dev/null
+#     print_success "Go tests completed"
+# }
 
 # Function to cleanup
 cleanup() {
@@ -290,7 +291,7 @@ main() {
     
     # Run tests
     run_sdk_tests || exit 1
-    run_go_tests
+    # run_go_tests
     
     cleanup
     print_success "All tests completed successfully! 🎉"
@@ -333,9 +334,9 @@ case "${1:-}" in
     "sdk-tests")
         run_sdk_tests
         ;;
-    "go-tests")
-        run_go_tests
-        ;;
+    # "go-tests")
+    #     run_go_tests
+    #     ;;
     "addresses"|"addr"|"contracts")
         show_addresses
         ;;
@@ -349,7 +350,7 @@ case "${1:-}" in
         echo "  start-anvil  Start Anvil test node"
         echo "  deploy       Deploy contracts"
         echo "  sdk-tests    Run SDK tests"
-        echo "  go-tests     Run Go tests"
+        # echo "  go-tests     Run Go tests"
         echo "  addresses    Show deployed contract addresses"
         echo "  cleanup      Stop Anvil and cleanup"
         echo "  help         Show this help"

@@ -65,7 +65,7 @@ func TestRPCNode(t *testing.T) {
 					groupBMwValue = false
 				}
 			}
-			c.Succeed(prevMethod, method, rootMwValue, groupAMwValue, groupBMwValue)
+			c.Succeed(method, prevMethod, method, rootMwValue, groupAMwValue, groupBMwValue)
 			c.Storage.Set(previousExecMethodKey, method)
 		}
 	}

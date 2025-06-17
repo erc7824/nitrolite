@@ -40,7 +40,7 @@ func NewRPCNode(signer *Signer, logger Logger) *RPCNode {
 		routes:       make(map[string][]string),
 		signer:       signer,
 		connHub:      newRPCConnectionHub(),
-		logger:       logger,
+		logger:       logger.NewSystem("rpc-node"),
 	}
 }
 
@@ -64,7 +64,13 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		n.connHub.Remove(connectionID)
-		n.logger.Info("connection closed", "connectionID", connectionID)
+
+		userID := ""
+		if rpcConn := n.connHub.Get(connectionID); rpcConn != nil {
+			userID = rpcConn.UserID
+		}
+
+		n.logger.Info("connection closed", "connectionID", connectionID, "userID", userID)
 	}()
 
 	readMesages := func() error {
@@ -89,8 +95,10 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					n.logger.Error("WebSocket connection closed with unexpected reason", "error", err)
 				} else {
-					n.logger.Error("failed to read message", "error", err)
+					err = nil
 				}
+
+				close(rpcConn.WriteSink)
 				return err
 			}
 
@@ -208,10 +216,10 @@ func (c *RPCContext) Next() {
 	handler(c)
 }
 
-func (c *RPCContext) Succeed(params ...any) {
+func (c *RPCContext) Succeed(method string, params ...any) {
 	c.Message.Res = &RPCData{
 		RequestID: c.Message.Req.RequestID,
-		Method:    c.Message.Req.Method,
+		Method:    method,
 		Params:    params,
 		Timestamp: uint64(time.Now().UnixMilli()),
 	}

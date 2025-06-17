@@ -1,4 +1,5 @@
-import { Address, encodeAbiParameters, Hex, keccak256, WalletClient } from 'viem';
+import { Address, Hex, keccak256, stringToBytes, WalletClient } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import {
     MessageSigner,
     AccountID,
@@ -20,7 +21,6 @@ import {
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
-import { ethers } from 'ethers';
 
 /**
  * Creates the signed, stringified message body for an 'auth_request'.
@@ -509,18 +509,13 @@ export function createEIP712AuthMessageSigner(
  * @param privateKey - The private key to use for ECDSA signing.
  * @returns A MessageSigner function that signs the payload using ECDSA.
  */
-export function createECDSAMessageSigner(privateKey: string): MessageSigner {
-    const wallet = new ethers.Wallet(privateKey);
-
+export function createECDSAMessageSigner(privateKey: Hex): MessageSigner {
     return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
         try {
-            const messageBytes = ethers.utils.arrayify(ethers.utils.id(JSON.stringify(payload)));
+            const messageBytes = keccak256(stringToBytes(JSON.stringify(payload)));
+            const flatSignature = await privateKeyToAccount(privateKey).sign({hash: messageBytes});
 
-            const flatSignature = await wallet._signingKey().signDigest(messageBytes);
-
-            const signature = ethers.utils.joinSignature(flatSignature);
-
-            return signature as Hex;
+            return flatSignature as Hex;
         } catch (error) {
             console.error('ECDSA signing failed:', error);
             throw new Error(`EIP-712  signing failed: ${error}`);

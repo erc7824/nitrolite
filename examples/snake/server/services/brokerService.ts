@@ -353,7 +353,7 @@ export function handleBrokerMessage(raw: string): void {
             return;
         } else if (message.method === RPCMethod.GetChannels || message.method === RPCMethod.ChannelsUpdate) {
             console.log("Received get_channels from broker:", message.params);
-            if (message.params[0].length === 0) {
+            if (message.params.length === 0) {
                 throw new Error("No channels found. Please open a channel at apps.yellow.com");
             }
 

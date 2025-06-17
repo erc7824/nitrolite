@@ -310,12 +310,8 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 				walletAddress = wallet
 			}
 
-			challenged, err := getChannelsByWallet(tx, walletAddress, string(ChannelStatusChallenged))
-			if err != nil {
-				return fmt.Errorf("failed to check challenged channels for %s: %w", walletAddress, err)
-			}
-			if len(challenged) > 0 {
-				return fmt.Errorf("participant %s has challenged channels, cannot create application session", walletAddress)
+			if err := checkChallengedChannels(tx, walletAddress); err != nil {
+				return err
 			}
 
 			ledger := GetWalletLedger(tx, walletAddress)
@@ -625,8 +621,12 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 		return nil, fmt.Errorf("channel with id %s not found", params.ChannelID)
 	}
 
+	if err = checkChallengedChannels(db, channel.Wallet); err != nil {
+		return nil, err
+	}
+
 	if channel.Status != ChannelStatusOpen {
-		return nil, fmt.Errorf("channel %s must be open and not in challenge to resize, current status: %s", channel.ChannelID, channel.Status)
+		return nil, fmt.Errorf("channel %s must be open to resize, current status: %s", channel.ChannelID, channel.Status)
 	}
 
 	if err := verifySigner(rpc, channel.Wallet); err != nil {
@@ -743,8 +743,12 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 		return nil, fmt.Errorf("channel with id %s not found", params.ChannelID)
 	}
 
+	if err = checkChallengedChannels(db, channel.Wallet); err != nil {
+		return nil, err
+	}
+
 	if channel.Status != ChannelStatusOpen {
-		return nil, fmt.Errorf("channel %s must be open and not in challenge to close, current status: %s", channel.ChannelID, channel.Status)
+		return nil, fmt.Errorf("channel %s must be open to close, current status: %s", channel.ChannelID, channel.Status)
 	}
 
 	if err := verifySigner(rpc, channel.Wallet); err != nil {
@@ -984,6 +988,17 @@ func verifySigner(rpc *RPCMessage, channelWallet string) error {
 	}
 	if recovered != channelWallet {
 		return errors.New("invalid signature")
+	}
+	return nil
+}
+
+func checkChallengedChannels(tx *gorm.DB, wallet string) error {
+	challengedChannels, err := getChannelsByWallet(tx, wallet, string(ChannelStatusChallenged))
+	if err != nil {
+		return fmt.Errorf("failed to check challenged channels: %w", err)
+	}
+	if len(challengedChannels) > 0 {
+		return fmt.Errorf("participant %s has challenged channels, cannot execute operation", wallet)
 	}
 	return nil
 }

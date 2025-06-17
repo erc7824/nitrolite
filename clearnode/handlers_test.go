@@ -1432,7 +1432,7 @@ func TestHandleCreateAppSession(t *testing.T) {
 		// Call handler
 		_, err = HandleCreateApplication(nil, rpcReq, db)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "has challenged channels, cannot")
+		assert.Contains(t, err.Error(), "has challenged channels")
 	})
 }
 
@@ -1875,7 +1875,7 @@ func TestHandleResizeChannel(t *testing.T) {
 
 		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "channel 0xChanClosed must be open and not in challenge to resize, current status: closed")
+		assert.Contains(t, err.Error(), "channel 0xChanClosed must be open to resize, current status: closed")
 	})
 
 	t.Run("ErrorChannelJoining", func(t *testing.T) {
@@ -1927,8 +1927,71 @@ func TestHandleResizeChannel(t *testing.T) {
 
 		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "channel 0xChanJoining must be open and not in challenge to resize, current status: joining")
+		assert.Contains(t, err.Error(), "channel 0xChanJoining must be open to resize, current status: joining")
 		assert.Contains(t, err.Error(), "joining")
+	})
+
+	t.Run("ErrorOtherChallengedChannel", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		asset := Asset{Token: "0xToken", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		require.NoError(t, db.Create(&Channel{
+			ChannelID:   "0xChanChallenged",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusChallenged,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      1000,
+			Version:     1,
+		}).Error)
+
+		ch := Channel{
+			ChannelID:   "0xChan",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      1000,
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			AllocateAmount:   big.NewInt(100),
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(resizeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 10,
+				Method:    "resize_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "has challenged channels")
 	})
 
 	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
@@ -2533,76 +2596,155 @@ func TestHandleResizeChannel(t *testing.T) {
 
 // TestHandleCloseChannel tests the close channel handler functionality
 func TestHandleCloseChannel(t *testing.T) {
-	rawKey, err := crypto.GenerateKey()
-	require.NoError(t, err)
-	signer := Signer{privateKey: rawKey}
-	addr := signer.GetAddress().Hex()
+	t.Run("SuccessfulCloseChannel", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
 
-	// Setup test DB
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
+		// Setup test DB
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
 
-	// Create asset
-	asset := Asset{Token: "0xTokenClose", ChainID: 137, Symbol: "usdc", Decimals: 6}
-	require.NoError(t, db.Create(&asset).Error)
+		// Create asset
+		asset := Asset{Token: "0xTokenClose", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
 
-	// Create channel with amount 500
-	initialAmount := uint64(500)
-	ch := Channel{
-		ChannelID:   "0xChanClose",
-		Participant: addr,
-		Wallet:      addr,
-		Status:      ChannelStatusOpen,
-		Token:       asset.Token,
-		ChainID:     137,
-		Amount:      initialAmount,
-		Version:     2,
-	}
-	require.NoError(t, db.Create(&ch).Error)
+		// Create channel with amount 500
+		initialAmount := uint64(500)
+		ch := Channel{
+			ChannelID:   "0xChanClose",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      initialAmount,
+			Version:     2,
+		}
+		require.NoError(t, db.Create(&ch).Error)
 
-	// Fund participant ledger so that raw units match channel.Amount
-	require.NoError(t, GetWalletLedger(db, addr).Record(
-		addr,
-		"usdc",
-		decimal.NewFromBigInt(big.NewInt(int64(initialAmount)), -int32(asset.Decimals)),
-	))
+		// Fund participant ledger so that raw units match channel.Amount
+		require.NoError(t, GetWalletLedger(db, addr).Record(
+			addr,
+			"usdc",
+			decimal.NewFromBigInt(big.NewInt(int64(initialAmount)), -int32(asset.Decimals)),
+		))
 
-	// Prepare close params
-	closeParams := CloseChannelParams{
-		ChannelID:        ch.ChannelID,
-		FundsDestination: addr,
-	}
-	paramsBytes, _ := json.Marshal(closeParams)
+		// Prepare close params
+		closeParams := CloseChannelParams{
+			ChannelID:        ch.ChannelID,
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(closeParams)
 
-	rpcReq := &RPCMessage{
-		Req: &RPCData{
-			RequestID: 10,
-			Method:    "close_channel",
-			Params:    []any{json.RawMessage(paramsBytes)},
-			Timestamp: uint64(time.Now().Unix()),
-		},
-	}
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 10,
+				Method:    "close_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
 
-	// Sign request
-	rawReq, err := json.Marshal(rpcReq.Req)
-	require.NoError(t, err)
-	rpcReq.Req.rawBytes = rawReq
-	sig, err := signer.Sign(rawReq)
-	require.NoError(t, err)
-	rpcReq.Sig = []string{hexutil.Encode(sig)}
+		// Sign request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
 
-	// Call handler
-	resp, err := HandleCloseChannel(nil, rpcReq, db, &signer)
-	require.NoError(t, err)
+		// Call handler
+		resp, err := HandleCloseChannel(nil, rpcReq, db, &signer)
+		require.NoError(t, err)
 
-	// Validate response
-	assert.Equal(t, "close_channel", resp.Res.Method)
-	resObj, ok := resp.Res.Params[0].(CloseChannelResponse)
-	require.True(t, ok, "Response should be CloseChannelResponse")
-	assert.Equal(t, ch.ChannelID, resObj.ChannelID)
-	assert.Equal(t, ch.Version+1, resObj.Version)
+		// Validate response
+		assert.Equal(t, "close_channel", resp.Res.Method)
+		resObj, ok := resp.Res.Params[0].(CloseChannelResponse)
+		require.True(t, ok, "Response should be CloseChannelResponse")
+		assert.Equal(t, ch.ChannelID, resObj.ChannelID)
+		assert.Equal(t, ch.Version+1, resObj.Version)
 
-	// Final allocation should send full balance to destination
-	assert.Equal(t, 0, resObj.FinalAllocations[0].Amount.Cmp(new(big.Int).SetUint64(initialAmount)), "Primary allocation mismatch")
-	assert.Equal(t, 0, resObj.FinalAllocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		// Final allocation should send full balance to destination
+		assert.Equal(t, 0, resObj.FinalAllocations[0].Amount.Cmp(new(big.Int).SetUint64(initialAmount)), "Primary allocation mismatch")
+		assert.Equal(t, 0, resObj.FinalAllocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+	})
+	t.Run("ErrorOtherChallengedChannel", func(t *testing.T) {
+		rawKey, err := crypto.GenerateKey()
+		require.NoError(t, err)
+		signer := Signer{privateKey: rawKey}
+		addr := signer.GetAddress().Hex()
+
+		// Setup test DB
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		// Create asset
+		asset := Asset{Token: "0xTokenClose", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		// Create channel with amount 500
+		initialAmount := uint64(500)
+
+		// Seed other challenged channel
+		require.NoError(t, db.Create(&Channel{
+			ChannelID:   "0xChanChallenged",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusChallenged,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      initialAmount,
+			Version:     2,
+		}).Error)
+
+		ch := Channel{
+			ChannelID:   "0xChanClose",
+			Participant: addr,
+			Wallet:      addr,
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			Amount:      initialAmount,
+			Version:     2,
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		// Fund participant ledger so that raw units match channel.Amount
+		require.NoError(t, GetWalletLedger(db, addr).Record(
+			addr,
+			"usdc",
+			decimal.NewFromBigInt(big.NewInt(int64(initialAmount)), -int32(asset.Decimals)),
+		))
+
+		// Prepare close params
+		closeParams := CloseChannelParams{
+			ChannelID:        ch.ChannelID,
+			FundsDestination: addr,
+		}
+		paramsBytes, _ := json.Marshal(closeParams)
+
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 10,
+				Method:    "close_channel",
+				Params:    []any{json.RawMessage(paramsBytes)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		}
+
+		// Sign request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+		sig, err := signer.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(sig)}
+
+		// Call handler
+		_, err = HandleCloseChannel(nil, rpcReq, db, &signer)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "has challenged channels")
+	})
 }

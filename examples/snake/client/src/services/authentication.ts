@@ -150,9 +150,9 @@ export async function authenticate(
                             application: authMessage.application,
                             participant: authMessage.participant,
                             expire: authMessage.expire,
-                            allowances: authMessage.allowances.map((allowance) => ({
-                                asset: allowance.asset,
-                                amount: allowance.amount.toString(),
+                            allowances: authMessage.allowances.map(({ asset, amount }: { asset: string, amount: any }) => ({
+                                asset,
+                                amount: amount.toString(),
                             })),
                         }, getAuthDomain());
 

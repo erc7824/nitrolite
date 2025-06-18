@@ -14,6 +14,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	rpcNodeGroupHandlerPrefix = "group."
+	rpcNodeGroupRoot          = "root"
+)
+
 type RPCNode struct {
 	upgrader websocket.Upgrader
 
@@ -24,6 +29,11 @@ type RPCNode struct {
 	signer  *Signer
 	connHub *rpcConnectionHub
 	logger  Logger
+
+	onConnectHandlers       []func(send SendRPCMessageFunc)
+	onDisconnectHandlers    []func(userID string)
+	onMessageSentHandlers   []func()
+	onAuthenticatedHandlers []func(userID string, send SendRPCMessageFunc)
 }
 
 func NewRPCNode(signer *Signer, logger Logger) *RPCNode {
@@ -35,12 +45,19 @@ func NewRPCNode(signer *Signer, logger Logger) *RPCNode {
 				return true // Allow all origins for simplicity
 			},
 		},
-		groupId:      "root",
+
+		groupId:      rpcNodeGroupHandlerPrefix + rpcNodeGroupRoot,
 		handlerChain: make(map[string][]RPCHandler),
 		routes:       make(map[string][]string),
-		signer:       signer,
-		connHub:      newRPCConnectionHub(),
-		logger:       logger.NewSystem("rpc-node"),
+
+		signer:  signer,
+		connHub: newRPCConnectionHub(),
+		logger:  logger.NewSystem("rpc-node"),
+
+		onConnectHandlers:       []func(send SendRPCMessageFunc){},
+		onDisconnectHandlers:    []func(userID string){},
+		onMessageSentHandlers:   []func(){},
+		onAuthenticatedHandlers: []func(userID string, send SendRPCMessageFunc){},
 	}
 }
 
@@ -62,6 +79,10 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 		Storage:      NewSafeStorage(),
 	})
 
+	for _, handler := range n.onConnectHandlers {
+		handler(n.getSendMessageFunc(messageSink))
+	}
+
 	defer func() {
 		n.connHub.Remove(connectionID)
 
@@ -70,10 +91,31 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 			userID = rpcConn.UserID
 		}
 
+		for _, handler := range n.onDisconnectHandlers {
+			handler(userID)
+		}
+
 		n.logger.Info("connection closed", "connectionID", connectionID, "userID", userID)
 	}()
 
 	readMesages := func() error {
+		authHandlerExecuted := false
+		handleAuthenticated := func(userID string) {
+			if authHandlerExecuted {
+				return
+			}
+			authHandlerExecuted = true
+
+			for _, handler := range n.onAuthenticatedHandlers {
+				handler(userID, n.getSendMessageFunc(messageSink))
+			}
+		}
+		processContext := func(c *RPCContext) {
+			if c.UserID != "" {
+				handleAuthenticated(c.UserID)
+			}
+		}
+
 	read_loop:
 		for {
 			rpcConn := n.connHub.Get(connectionID)
@@ -147,6 +189,7 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				Storage:  rpcConn.Storage,
 			}
 			ctx.Next() // Start processing the handlers
+			processContext(ctx)
 
 			responseBytes, err := ctx.GetRawResponse()
 			if err != nil {
@@ -182,6 +225,10 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				n.logger.Error("error closing writer for response", "error", err)
 				continue
 			}
+
+			for _, handler := range n.onMessageSentHandlers {
+				handler()
+			}
 		}
 
 		return nil
@@ -195,6 +242,7 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 }
 
 type RPCHandler func(c *RPCContext)
+type SendRPCMessageFunc func(method string, params ...any)
 
 type RPCContext struct {
 	Context context.Context
@@ -265,9 +313,29 @@ func prepareRawRPCResponse(signer *Signer, data *RPCData) ([]byte, error) {
 	return resMessageBytes, nil
 }
 
+func prepareRawNotification(signer *Signer, method string, params ...any) ([]byte, error) {
+	if params == nil {
+		params = []any{}
+	}
+
+	data := &RPCData{
+		RequestID: uint64(time.Now().UnixMilli()),
+		Method:    method,
+		Params:    params,
+		Timestamp: uint64(time.Now().UnixMilli()),
+	}
+
+	responseBytes, err := prepareRawRPCResponse(signer, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return responseBytes, nil
+}
+
 func (wn *RPCNode) NewGroup(name string) *RPCHandlerGroup {
 	return &RPCHandlerGroup{
-		groupId:     name,
+		groupId:     rpcNodeGroupHandlerPrefix + name,
 		routePrefix: []string{wn.groupId},
 		root:        wn,
 	}
@@ -303,6 +371,49 @@ func (wn *RPCNode) use(groupId string, middleware RPCHandler) {
 	}
 
 	wn.handlerChain[groupId] = append(wn.handlerChain[groupId], middleware)
+}
+
+func (wn *RPCNode) OnConnect(handler func(send SendRPCMessageFunc)) {
+	wn.onConnectHandlers = append(wn.onConnectHandlers, handler)
+}
+
+func (wn *RPCNode) OnDisconnect(handler func(userID string)) {
+	wn.onDisconnectHandlers = append(wn.onDisconnectHandlers, handler)
+}
+
+func (wn *RPCNode) OnMessageSent(handler func()) {
+	wn.onMessageSentHandlers = append(wn.onMessageSentHandlers, handler)
+}
+
+func (wn *RPCNode) OnAuthenticated(handler func(userID string, send SendRPCMessageFunc)) {
+	wn.onAuthenticatedHandlers = append(wn.onAuthenticatedHandlers, handler)
+}
+
+func (wn *RPCNode) Notify(userID, method string, params ...any) {
+	message, err := prepareRawNotification(wn.signer, method, params...)
+	if err != nil {
+		wn.logger.Error("failed to prepare notification message", "error", err, "userID", userID, "method", method)
+		return
+	}
+
+	wn.connHub.Publish(userID, message)
+}
+
+func (wn *RPCNode) getSendMessageFunc(writeSink chan<- []byte) SendRPCMessageFunc {
+	return func(method string, params ...any) {
+		message, err := prepareRawNotification(wn.signer, method, params...)
+		if err != nil {
+			wn.logger.Error("failed to prepare notification message", "error", err, "method", method)
+			return
+		}
+
+		if writeSink == nil {
+			wn.logger.Error("write sink is nil, cannot send message", "method", method)
+			return
+		}
+
+		writeSink <- message
+	}
 }
 
 func (wn *RPCNode) sendErrorResponse(conn *RPCConnection, requestID uint64, message string) {

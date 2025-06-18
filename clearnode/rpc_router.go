@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"math/big"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -42,6 +44,11 @@ func NewRPCRouter(
 		lg:       logger.NewSystem("rpc-router"),
 	}
 
+	r.Node.OnConnect(r.HandleConnect)
+	r.Node.OnDisconnect(r.HandleDisconnect)
+	r.Node.OnAuthenticated(r.HandleAuthenticated)
+	r.Node.OnMessageSent(r.HandleMessageSent)
+
 	r.Node.Use(r.LoggerMiddleware)
 	r.Node.Handle("ping", r.HandlePing)
 	r.Node.Handle("get_config", r.HandleGetConfig)
@@ -63,31 +70,7 @@ func NewRPCRouter(
 	return r
 }
 
-// TODO:
-// ON_CONNECT
-// // Send assets immediately upon connection (before authentication)
-// h.sendAssets(conn)
-
-// // Increment connection metrics
-// h.metrics.ConnectionsTotal.Inc()
-// h.metrics.ConnectedClients.Inc()
-
-// ON_AUTHENTICATE
-// // Send initial balance and channels information in form of balance and channel updates
-// channels, err := getChannelsByWallet(h.db, walletAddress, string(ChannelStatusOpen))
-// if err != nil {
-// 	logger.Error("error retrieving channels for participant", "error", err)
-// }
-
-// h.sendChannelsUpdate(walletAddress, channels)
-// h.sendBalanceUpdate(walletAddress)
-
-// ON_MESSAGE_SENT
-// h.metrics.MessageSent.Inc()
-
-// ON_DISCONNECT
-// h.metrics.ConnectedClients.Dec()
-
+// TODO: Implement message forwarding logic
 // ON_FORWARD
 // if msg.AppSessionID != "" {
 // 	if err := forwardMessage(ctx, &msg, messageBytes, walletAddress, h); err != nil {
@@ -96,6 +79,75 @@ func NewRPCRouter(
 // 	}
 // 	continue
 // }
+
+func (r *RPCRouter) HandleConnect(send SendRPCMessageFunc) {
+	// Increment connection metrics
+	r.Metrics.ConnectionsTotal.Inc()
+	r.Metrics.ConnectedClients.Inc()
+
+	// Get all assets from the database
+	assets, err := GetAllAssets(r.DB, nil)
+	if err != nil {
+		r.lg.Error("failed to get all assets", "error", err)
+		return
+	}
+
+	// Convert to AssetResponse format
+	response := make([]AssetResponse, 0, len(assets))
+	for _, asset := range assets {
+		response = append(response, AssetResponse(asset))
+	}
+
+	send("assets", response)
+}
+
+func (r *RPCRouter) HandleDisconnect(userID string) {
+	// Decrement connection metrics
+	r.Metrics.ConnectedClients.Dec()
+}
+
+func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) {
+	walletAddress := userID
+
+	channels, err := getChannelsByWallet(r.DB, walletAddress, string(ChannelStatusOpen))
+	if err != nil {
+		r.lg.Error("error retrieving channels for participant", "error", err)
+	}
+
+	resp := []ChannelResponse{}
+	for _, ch := range channels {
+		resp = append(resp, ChannelResponse{
+			ChannelID:   ch.ChannelID,
+			Participant: ch.Participant,
+			Status:      ch.Status,
+			Token:       ch.Token,
+			Amount:      big.NewInt(int64(ch.Amount)),
+			ChainID:     ch.ChainID,
+			Adjudicator: ch.Adjudicator,
+			Challenge:   ch.Challenge,
+			Nonce:       ch.Nonce,
+			Version:     ch.Version,
+			CreatedAt:   ch.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:   ch.UpdatedAt.Format(time.RFC3339),
+		})
+	}
+
+	// Send channel updates
+	send("channels", resp)
+
+	// Send initial balances
+	balances, err := GetWalletLedger(r.DB, walletAddress).GetBalances(walletAddress)
+	if err != nil {
+		r.lg.Error("error getting balances", "sender", walletAddress, "error", err)
+		return
+	}
+	send("bu", balances)
+}
+
+func (r *RPCRouter) HandleMessageSent() {
+	// Increment sent message counter
+	r.Metrics.MessageSent.Inc()
+}
 
 func (r *RPCRouter) LoggerMiddleware(c *RPCContext) {
 	logger := r.lg.With("requestID", c.Message.Req.RequestID)

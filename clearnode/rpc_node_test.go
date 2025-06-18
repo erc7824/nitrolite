@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,6 +32,34 @@ func TestRPCNode(t *testing.T) {
 	groupBMwKey := "group_b_mw_executed"
 	groupMethodB := "group.test2"
 	previousExecMethodKey := "previous_exec_method"
+	authMethod := "auth.test"
+
+	onConnectMethod := "on_connect.test"
+	onConnectCounts := 0
+	node.OnConnect(func(send SendRPCMessageFunc) {
+		onConnectCounts++
+		send(onConnectMethod, onConnectCounts)
+	})
+
+	onDisconnectCounts := 0
+	disconnectedUserID := ""
+	node.OnDisconnect(func(userID string) {
+		onDisconnectCounts++
+		disconnectedUserID = userID
+	})
+
+	onAuthenticatedMethod := "on_authenticated.test"
+	onAuthenticatedCounts := 0
+	authenticatedUserID := "user.test"
+	node.OnAuthenticated(func(userID string, send SendRPCMessageFunc) {
+		onAuthenticatedCounts++
+		send(onAuthenticatedMethod, onAuthenticatedCounts, userID)
+	})
+
+	onMessageSentCounts := 0
+	node.OnMessageSent(func() {
+		onMessageSentCounts++
+	})
 
 	createDummyHandler := func(method string) func(c *RPCContext) {
 		return func(c *RPCContext) {
@@ -65,12 +92,12 @@ func TestRPCNode(t *testing.T) {
 					groupBMwValue = false
 				}
 			}
-			c.Succeed(method, prevMethod, method, rootMwValue, groupAMwValue, groupBMwValue)
+			c.Succeed(method, c.UserID, prevMethod, rootMwValue, groupAMwValue, groupBMwValue)
 			c.Storage.Set(previousExecMethodKey, method)
 		}
 	}
 
-	// 2) Add one middleware and one handler to the root
+	// 2) Add one middleware and 2 handlers to the root
 	node.Use(func(c *RPCContext) {
 		logger.Debug("executing root middleware")
 
@@ -81,6 +108,11 @@ func TestRPCNode(t *testing.T) {
 	})
 
 	node.Handle(rootMethod, createDummyHandler(rootMethod))
+	node.Handle(authMethod, func(c *RPCContext) {
+		logger.Debug("executing auth handler")
+		c.Succeed(authMethod, authenticatedUserID)
+		c.UserID = authenticatedUserID // Simulate authenticated user
+	})
 
 	// 3) Add 2 groups with 2 middlewares and 2 handlers
 	testGroupA := node.NewGroup("testGroupA")
@@ -117,6 +149,15 @@ func TestRPCNode(t *testing.T) {
 	require.NoError(t, err)
 	defer conn.Close()
 
+	// Receive message
+	receive := func(t *testing.T) *RPCMessage {
+		var respMsg RPCMessage
+		err = conn.ReadJSON(&respMsg)
+		require.NoError(t, err)
+
+		return &respMsg
+	}
+
 	// Helper function to send request and receive response
 	sendAndReceive := func(t *testing.T, RequestID uint64, method string, params ...interface{}) *RPCMessage {
 		if params == nil {
@@ -139,14 +180,20 @@ func TestRPCNode(t *testing.T) {
 		err = conn.WriteJSON(reqMsg)
 		require.NoError(t, err)
 
-		// Read response
-		var respMsg RPCMessage
-		err = conn.ReadJSON(&respMsg)
-		require.NoError(t, err)
-
-		fmt.Printf("Received response: %+v\n", respMsg.Res.Params)
-		return &respMsg
+		return receive(t)
 	}
+
+	// Test connect
+	t.Run("connect", func(t *testing.T) {
+		resp := receive(t)
+
+		require.NotNil(t, resp.Res)
+		assert.Equal(t, onConnectMethod, resp.Res.Method)
+		assert.Len(t, resp.Res.Params, 1)
+		assert.Len(t, resp.Sig, 1)
+		assert.Equal(t, 1, onConnectCounts)     // on connect counts
+		assert.Equal(t, 1, onMessageSentCounts) // number of messages sent
+	})
 
 	// Test root handler
 	t.Run("root handler", func(t *testing.T) {
@@ -156,11 +203,35 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, rootMethod, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 5)
 		assert.Len(t, resp.Sig, 1)
-		assert.Equal(t, "", resp.Res.Params[0])         // previous method empty
-		assert.Equal(t, rootMethod, resp.Res.Params[1]) // this method
-		assert.Equal(t, true, resp.Res.Params[2])       // root middleware executed
-		assert.Equal(t, false, resp.Res.Params[3])      // group A middleware not executed
-		assert.Equal(t, false, resp.Res.Params[4])      // group B middleware not executed
+		assert.Equal(t, "", resp.Res.Params[0])    // not authenticated
+		assert.Equal(t, "", resp.Res.Params[1])    // previous dummy method empty
+		assert.Equal(t, true, resp.Res.Params[2])  // root middleware executed
+		assert.Equal(t, false, resp.Res.Params[3]) // group A middleware not executed
+		assert.Equal(t, false, resp.Res.Params[4]) // group B middleware not executed
+		assert.Equal(t, 2, onMessageSentCounts)    // number of messages sent
+	})
+
+	// Test auth handler
+	t.Run("auth handler", func(t *testing.T) {
+		resp := sendAndReceive(t, 1, authMethod)
+
+		require.NotNil(t, resp.Res)
+		assert.Equal(t, authMethod, resp.Res.Method)
+		assert.Len(t, resp.Res.Params, 1)
+		assert.Len(t, resp.Sig, 1)
+		assert.Equal(t, authenticatedUserID, resp.Res.Params[0]) // authenticated user ID
+		assert.Equal(t, 4, onMessageSentCounts)                  // number of messages sent
+
+		// on authenticated method executed
+		resp = receive(t)
+
+		require.NotNil(t, resp.Res)
+		assert.Equal(t, onAuthenticatedMethod, resp.Res.Method)
+		assert.Len(t, resp.Res.Params, 2)
+		assert.Len(t, resp.Sig, 1)
+		assert.Equal(t, 1, onAuthenticatedCounts)                // on authenticated counts
+		assert.Equal(t, authenticatedUserID, resp.Res.Params[1]) // authenticated user ID
+		assert.Equal(t, 4, onMessageSentCounts)                  // number of messages sent
 	})
 
 	// Test group handler 1
@@ -171,11 +242,12 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, groupMethodA, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 5)
 		assert.Len(t, resp.Sig, 1)
-		assert.Equal(t, rootMethod, resp.Res.Params[0])   // previous method empty
-		assert.Equal(t, groupMethodA, resp.Res.Params[1]) // this method
-		assert.Equal(t, true, resp.Res.Params[2])         // root middleware executed
-		assert.Equal(t, true, resp.Res.Params[3])         // group A middleware executed
-		assert.Equal(t, false, resp.Res.Params[4])        // group B middleware not executed
+		assert.Equal(t, authenticatedUserID, resp.Res.Params[0]) // this method
+		assert.Equal(t, rootMethod, resp.Res.Params[1])          // previous dummy method root
+		assert.Equal(t, true, resp.Res.Params[2])                // root middleware executed
+		assert.Equal(t, true, resp.Res.Params[3])                // group A middleware executed
+		assert.Equal(t, false, resp.Res.Params[4])               // group B middleware not executed
+		assert.Equal(t, 5, onMessageSentCounts)                  // number of messages sent
 	})
 
 	// Test group handler 2
@@ -186,11 +258,12 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, groupMethodB, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 5)
 		assert.Len(t, resp.Sig, 1)
-		assert.Equal(t, groupMethodA, resp.Res.Params[0]) // previous method empty
-		assert.Equal(t, groupMethodB, resp.Res.Params[1]) // this method
-		assert.Equal(t, true, resp.Res.Params[2])         // root middleware executed
-		assert.Equal(t, true, resp.Res.Params[3])         // group A middleware executed
-		assert.Equal(t, true, resp.Res.Params[4])         // group B middleware executed
+		assert.Equal(t, authenticatedUserID, resp.Res.Params[0]) // this method
+		assert.Equal(t, groupMethodA, resp.Res.Params[1])        // previous dummy method root
+		assert.Equal(t, true, resp.Res.Params[2])                // root middleware executed
+		assert.Equal(t, true, resp.Res.Params[3])                // group A middleware executed
+		assert.Equal(t, true, resp.Res.Params[4])                // group B middleware executed
+		assert.Equal(t, 6, onMessageSentCounts)                  // number of messages sent
 	})
 
 	// Test unknown method
@@ -201,6 +274,7 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, "error", resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 1)
 		assert.Contains(t, resp.Res.Params[0], "unknown method")
+		assert.Equal(t, 7, onMessageSentCounts) // number of messages sent
 	})
 
 	// Test invalid message format
@@ -217,5 +291,19 @@ func TestRPCNode(t *testing.T) {
 		require.NotNil(t, respMsg.Res)
 		assert.Equal(t, "error", respMsg.Res.Method)
 		assert.Contains(t, respMsg.Res.Params[0], "invalid message format")
+		assert.Equal(t, 8, onMessageSentCounts) // number of messages sent
+	})
+
+	// Test disconnect
+	t.Run("disconnect", func(t *testing.T) {
+		// Close the connection
+		err = conn.Close()
+		require.NoError(t, err)
+		time.Sleep(100 * time.Millisecond) // Give some time for the disconnect handler to be called
+
+		// Verify onDisconnect handler was called
+		assert.Equal(t, 1, onDisconnectCounts)                   // number of disconnects
+		assert.Equal(t, authenticatedUserID, disconnectedUserID) // disconnected user ID
+		assert.Equal(t, 8, onMessageSentCounts)                  // number of messages sent
 	})
 }

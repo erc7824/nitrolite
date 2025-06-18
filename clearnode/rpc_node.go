@@ -103,12 +103,11 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 
 	// Cleanup function executed when connection closes
 	defer func() {
-		n.connHub.Remove(connectionID)
-
 		userID := ""
 		if rpcConn := n.connHub.Get(connectionID); rpcConn != nil {
 			userID = rpcConn.UserID
 		}
+		n.connHub.Remove(connectionID)
 
 		for _, handler := range n.onDisconnectHandlers {
 			handler(userID)
@@ -131,7 +130,7 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				handler(userID, n.getSendMessageFunc(messageSink))
 			}
 		}
-		processContext := func(c *RPCContext) {
+		postProcessContext := func(c *RPCContext) {
 			if c.UserID != "" {
 				handleAuthenticated(c.UserID)
 			}
@@ -210,7 +209,6 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				Storage:  rpcConn.Storage,
 			}
 			ctx.Next() // Start processing the handlers
-			processContext(ctx)
 
 			responseBytes, err := ctx.GetRawResponse()
 			if err != nil {
@@ -218,6 +216,8 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			rpcConn.WriteSink <- responseBytes
+
+			postProcessContext(ctx)
 
 			n.connHub.Set(&RPCConnection{
 				ConnectionID: rpcConn.ConnectionID,

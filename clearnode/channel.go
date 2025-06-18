@@ -14,6 +14,8 @@ type ChannelStatus string
 var (
 	ChannelStatusJoining    ChannelStatus = "joining"
 	ChannelStatusOpen       ChannelStatus = "open"
+	ChannelStatusResizing   ChannelStatus = "resizing"
+	ChannelStatusClosing    ChannelStatus = "closing"
 	ChannelStatusClosed     ChannelStatus = "closed"
 	ChannelStatusChallenged ChannelStatus = "challenged"
 )
@@ -79,11 +81,19 @@ func GetChannelByID(tx *gorm.DB, channelID string) (*Channel, error) {
 }
 
 // getChannelsByWallet finds all channels for a wallet
-func getChannelsByWallet(tx *gorm.DB, wallet string, status string) ([]Channel, error) {
+func getChannelsByWallet(tx *gorm.DB, wallet string, statuses ...string) ([]Channel, error) {
 	var channels []Channel
 	q := tx.Where("wallet = ?", wallet)
-	if status != "" {
-		q = q.Where("status = ?", status)
+
+	var filtered []string
+	for _, status := range statuses {
+		if status != "" {
+			filtered = append(filtered, status)
+		}
+	}
+
+	if len(filtered) != 0 {
+		q = q.Where("status IN (?)", filtered)
 	}
 
 	if err := q.Order("created_at DESC").Find(&channels).Error; err != nil {

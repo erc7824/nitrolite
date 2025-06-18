@@ -312,7 +312,8 @@ func HandleTransfer(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, 
 			fromWallet = wallet
 		}
 
-		if err := checkChallengedChannels(tx, fromWallet); err != nil {
+		_, err := checkProcessingOperations(tx, fromWallet)
+		if err != nil {
 			return err
 		}
 
@@ -399,7 +400,8 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 				walletAddress = wallet
 			}
 
-			if err := checkChallengedChannels(tx, walletAddress); err != nil {
+			_, err := checkProcessingOperations(tx, walletAddress)
+			if err != nil {
 				return err
 			}
 
@@ -703,116 +705,135 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 		return nil, err
 	}
 
-	channel, err := GetChannelByID(db, params.ChannelID)
+	var resp ResizeChannelResponse
+	err := db.Transaction(func(tx *gorm.DB) error {
+		channel, err := GetChannelByID(tx, params.ChannelID)
+		if err != nil {
+			return fmt.Errorf("failed to find channel: %w", err)
+		}
+		if channel == nil {
+			return fmt.Errorf("channel with id %s not found", params.ChannelID)
+		}
+
+		if channel.Status != ChannelStatusOpen && channel.Status != ChannelStatusResizing { // Allow to re-request resize payload
+			return fmt.Errorf("channel %s must be open to resize, current status: %s", channel.ChannelID, channel.Status)
+		}
+
+		operations, err := checkProcessingOperations(tx, channel.Wallet)
+		if err != nil {
+			if operations == 1 && channel.Status == ChannelStatusResizing {
+				// Allow to re-request payload even if user have already triggerrer the operation
+			} else {
+				return err
+			}
+		}
+
+		if err := verifySigner(rpc, channel.Wallet); err != nil {
+			return err
+		}
+
+		asset, err := GetAssetByToken(tx, channel.Token, channel.ChainID)
+		if err != nil {
+			return fmt.Errorf("failed to find asset: %w", err)
+		}
+
+		if params.ResizeAmount == nil {
+			params.ResizeAmount = big.NewInt(0)
+		}
+		if params.AllocateAmount == nil {
+			params.AllocateAmount = big.NewInt(0)
+		}
+
+		// Prevent no-op resize operations
+		if params.ResizeAmount.Cmp(big.NewInt(0)) == 0 && params.AllocateAmount.Cmp(big.NewInt(0)) == 0 {
+			return fmt.Errorf("resize operation requires non-zero ResizeAmount or AllocateAmount")
+		}
+
+		ledger := GetWalletLedger(tx, channel.Wallet)
+		balance, err := ledger.Balance(channel.Wallet, asset.Symbol)
+		if err != nil {
+			return fmt.Errorf("failed to check participant balance: %w", err)
+		}
+
+		rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
+		newChannelAmount := new(big.Int).Add(new(big.Int).SetUint64(channel.Amount), params.AllocateAmount)
+
+		if rawBalance.Cmp(newChannelAmount) < 0 {
+			return errors.New("channel amount exceeds ledger balance. resize down this channel first")
+		}
+		newChannelAmount.Add(newChannelAmount, params.ResizeAmount)
+		if newChannelAmount.Cmp(big.NewInt(0)) < 0 {
+			return errors.New("new channel amount must be positive")
+		}
+
+		allocations := []nitrolite.Allocation{
+			{
+				Destination: common.HexToAddress(params.FundsDestination),
+				Token:       common.HexToAddress(channel.Token),
+				Amount:      newChannelAmount,
+			},
+			{
+				Destination: signer.GetAddress(),
+				Token:       common.HexToAddress(channel.Token),
+				Amount:      big.NewInt(0),
+			},
+		}
+
+		resizeAmounts := []*big.Int{params.ResizeAmount, params.AllocateAmount}
+
+		intentionType, err := abi.NewType("int256[]", "", nil)
+		if err != nil {
+			return fmt.Errorf("failed to create ABI type for intentions: %w", err)
+		}
+		intentionArgs := abi.Arguments{{Type: intentionType}}
+		encodedIntentions, err := intentionArgs.Pack(resizeAmounts)
+		if err != nil {
+			return fmt.Errorf("failed to pack intentions: %w", err)
+		}
+
+		// Encode & sign the new state
+		channelIDHash := common.HexToHash(channel.ChannelID)
+		encodedState, err := nitrolite.EncodeState(channelIDHash, nitrolite.IntentRESIZE, big.NewInt(int64(channel.Version)+1), encodedIntentions, allocations)
+		if err != nil {
+			return fmt.Errorf("failed to encode state hash: %w", err)
+		}
+		stateHash := crypto.Keccak256Hash(encodedState).Hex()
+		sig, err := signer.NitroSign(encodedState)
+		if err != nil {
+			return fmt.Errorf("failed to sign state: %w", err)
+		}
+
+		channel.Status = ChannelStatusResizing
+		channel.UpdatedAt = time.Now()
+		if err := tx.Save(&channel).Error; err != nil {
+			return fmt.Errorf("failed to resize channel: %w", err)
+		}
+
+		resp = ResizeChannelResponse{
+			ChannelID: channel.ChannelID,
+			Intent:    uint8(nitrolite.IntentRESIZE),
+			Version:   channel.Version + 1,
+			StateData: hexutil.Encode(encodedIntentions),
+			StateHash: stateHash,
+			Signature: Signature{
+				V: sig.V,
+				R: hexutil.Encode(sig.R[:]),
+				S: hexutil.Encode(sig.S[:]),
+			},
+		}
+
+		for _, alloc := range allocations {
+			resp.Allocations = append(resp.Allocations, Allocation{
+				Participant:  alloc.Destination.Hex(),
+				TokenAddress: alloc.Token.Hex(),
+				Amount:       alloc.Amount,
+			})
+		}
+
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to find channel: %w", err)
-	}
-	if channel == nil {
-		return nil, fmt.Errorf("channel with id %s not found", params.ChannelID)
-	}
-
-	if err = checkChallengedChannels(db, channel.Wallet); err != nil {
-		return nil, err
-	}
-
-	if channel.Status != ChannelStatusOpen {
-		return nil, fmt.Errorf("channel %s must be open to resize, current status: %s", channel.ChannelID, channel.Status)
-	}
-
-	if err := verifySigner(rpc, channel.Wallet); err != nil {
-		return nil, err
-	}
-
-	asset, err := GetAssetByToken(db, channel.Token, channel.ChainID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find asset: %w", err)
-	}
-
-	if params.ResizeAmount == nil {
-		params.ResizeAmount = big.NewInt(0)
-	}
-	if params.AllocateAmount == nil {
-		params.AllocateAmount = big.NewInt(0)
-	}
-
-	// Prevent no-op resize operations
-	if params.ResizeAmount.Cmp(big.NewInt(0)) == 0 && params.AllocateAmount.Cmp(big.NewInt(0)) == 0 {
-		return nil, fmt.Errorf("resize operation requires non-zero ResizeAmount or AllocateAmount")
-	}
-
-	ledger := GetWalletLedger(db, channel.Wallet)
-	balance, err := ledger.Balance(channel.Wallet, asset.Symbol)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check participant balance: %w", err)
-	}
-
-	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
-	newChannelAmount := new(big.Int).Add(new(big.Int).SetUint64(channel.Amount), params.AllocateAmount)
-
-	if rawBalance.Cmp(newChannelAmount) < 0 {
-		return nil, errors.New("insufficient unified balance")
-	}
-	newChannelAmount.Add(newChannelAmount, params.ResizeAmount)
-	if newChannelAmount.Cmp(big.NewInt(0)) < 0 {
-		return nil, errors.New("new channel amount must be positive")
-	}
-
-	allocations := []nitrolite.Allocation{
-		{
-			Destination: common.HexToAddress(params.FundsDestination),
-			Token:       common.HexToAddress(channel.Token),
-			Amount:      newChannelAmount,
-		},
-		{
-			Destination: signer.GetAddress(),
-			Token:       common.HexToAddress(channel.Token),
-			Amount:      big.NewInt(0),
-		},
-	}
-
-	resizeAmounts := []*big.Int{params.ResizeAmount, params.AllocateAmount}
-
-	intentionType, err := abi.NewType("int256[]", "", nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create ABI type for intentions: %w", err)
-	}
-	intentionArgs := abi.Arguments{{Type: intentionType}}
-	encodedIntentions, err := intentionArgs.Pack(resizeAmounts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to pack intentions: %w", err)
-	}
-
-	// 6) Encode & sign the new state
-	channelIDHash := common.HexToHash(channel.ChannelID)
-	encodedState, err := nitrolite.EncodeState(channelIDHash, nitrolite.IntentRESIZE, big.NewInt(int64(channel.Version)+1), encodedIntentions, allocations)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode state hash: %w", err)
-	}
-	stateHash := crypto.Keccak256Hash(encodedState).Hex()
-	sig, err := signer.NitroSign(encodedState)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign state: %w", err)
-	}
-
-	resp := ResizeChannelResponse{
-		ChannelID: channel.ChannelID,
-		Intent:    uint8(nitrolite.IntentRESIZE),
-		Version:   channel.Version + 1,
-		StateData: hexutil.Encode(encodedIntentions),
-		StateHash: stateHash,
-		Signature: Signature{
-			V: sig.V,
-			R: hexutil.Encode(sig.R[:]),
-			S: hexutil.Encode(sig.S[:]),
-		},
-	}
-
-	for _, alloc := range allocations {
-		resp.Allocations = append(resp.Allocations, Allocation{
-			Participant:  alloc.Destination.Hex(),
-			TokenAddress: alloc.Token.Hex(),
-			Amount:       alloc.Amount,
-		})
+		return nil, fmt.Errorf("failed to resize channel: %w", err)
 	}
 
 	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{resp}), nil
@@ -825,93 +846,112 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 		return nil, err
 	}
 
-	channel, err := GetChannelByID(db, params.ChannelID)
+	var resp CloseChannelResponse
+	err := db.Transaction(func(tx *gorm.DB) error {
+		channel, err := GetChannelByID(tx, params.ChannelID)
+		if err != nil {
+			return fmt.Errorf("failed to find channel: %w", err)
+		}
+		if channel == nil {
+			return fmt.Errorf("channel with id %s not found", params.ChannelID)
+		}
+
+		if channel.Status != ChannelStatusOpen && channel.Status != ChannelStatusClosing {
+			return fmt.Errorf("channel %s must be open to close, current status: %s", channel.ChannelID, channel.Status)
+		}
+
+		operations, err := checkProcessingOperations(tx, channel.Wallet)
+		if err != nil {
+			if operations == 1 && channel.Status == ChannelStatusClosing {
+				// Allow to re-request payload even if user have already triggerrer the operation
+			} else {
+				return err
+			}
+		}
+
+		if err := verifySigner(rpc, channel.Wallet); err != nil {
+			return err
+		}
+
+		asset, err := GetAssetByToken(tx, channel.Token, channel.ChainID)
+		if err != nil {
+			return fmt.Errorf("failed to find asset: %w", err)
+		}
+
+		ledger := GetWalletLedger(tx, channel.Wallet)
+		balance, err := ledger.Balance(channel.Wallet, asset.Symbol)
+		if err != nil {
+			return fmt.Errorf("failed to check participant balance: %w", err)
+		}
+		if balance.IsNegative() {
+			return fmt.Errorf("insufficient funds for participant: %s", channel.Token)
+		}
+
+		rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
+		channelAmount := new(big.Int).SetUint64(channel.Amount)
+		if channelAmount.Cmp(rawBalance) < 0 {
+			return errors.New("resize this channel first")
+		}
+
+		allocations := []nitrolite.Allocation{
+			{
+				Destination: common.HexToAddress(params.FundsDestination),
+				Token:       common.HexToAddress(channel.Token),
+				Amount:      rawBalance,
+			},
+			{
+				Destination: signer.GetAddress(),
+				Token:       common.HexToAddress(channel.Token),
+				Amount:      new(big.Int).Sub(channelAmount, rawBalance),
+			},
+		}
+
+		stateDataHex := "0x"
+		stateDataBytes, err := hexutil.Decode(stateDataHex)
+		if err != nil {
+			return fmt.Errorf("failed to decode state data: %w", err)
+		}
+		encodedState, err := nitrolite.EncodeState(common.HexToHash(channel.ChannelID), nitrolite.IntentFINALIZE, big.NewInt(int64(channel.Version)+1), stateDataBytes, allocations)
+		if err != nil {
+			return fmt.Errorf("failed to encode state hash: %w", err)
+		}
+		stateHash := crypto.Keccak256Hash(encodedState).Hex()
+		sig, err := signer.NitroSign(encodedState)
+		if err != nil {
+			return fmt.Errorf("failed to sign state: %w", err)
+		}
+
+		channel.Status = ChannelStatusClosing
+		channel.UpdatedAt = time.Now()
+		if err := tx.Save(&channel).Error; err != nil {
+			return fmt.Errorf("failed to close channel: %w", err)
+		}
+
+		resp = CloseChannelResponse{
+			ChannelID: channel.ChannelID,
+			Intent:    uint8(nitrolite.IntentFINALIZE),
+			Version:   channel.Version + 1,
+			StateData: stateDataHex,
+			StateHash: stateHash,
+			Signature: Signature{
+				V: sig.V,
+				R: hexutil.Encode(sig.R[:]),
+				S: hexutil.Encode(sig.S[:]),
+			},
+		}
+
+		for _, alloc := range allocations {
+			resp.FinalAllocations = append(resp.FinalAllocations, Allocation{
+				Participant:  alloc.Destination.Hex(),
+				TokenAddress: alloc.Token.Hex(),
+				Amount:       alloc.Amount,
+			})
+		}
+
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to find channel: %w", err)
-	}
-	if channel == nil {
-		return nil, fmt.Errorf("channel with id %s not found", params.ChannelID)
-	}
-
-	if err = checkChallengedChannels(db, channel.Wallet); err != nil {
-		return nil, err
-	}
-
-	if channel.Status != ChannelStatusOpen {
-		return nil, fmt.Errorf("channel %s must be open to close, current status: %s", channel.ChannelID, channel.Status)
-	}
-
-	if err := verifySigner(rpc, channel.Wallet); err != nil {
-		return nil, err
-	}
-
-	asset, err := GetAssetByToken(db, channel.Token, channel.ChainID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find asset: %w", err)
-	}
-
-	ledger := GetWalletLedger(db, channel.Wallet)
-	balance, err := ledger.Balance(channel.Wallet, asset.Symbol)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check participant balance: %w", err)
-	}
-	if balance.IsNegative() {
-		return nil, fmt.Errorf("insufficient funds for participant: %s", channel.Token)
-	}
-
-	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
-	channelAmount := new(big.Int).SetUint64(channel.Amount)
-	if channelAmount.Cmp(rawBalance) < 0 {
-		return nil, errors.New("resize this channel first")
-	}
-
-	allocations := []nitrolite.Allocation{
-		{
-			Destination: common.HexToAddress(params.FundsDestination),
-			Token:       common.HexToAddress(channel.Token),
-			Amount:      rawBalance,
-		},
-		{
-			Destination: signer.GetAddress(),
-			Token:       common.HexToAddress(channel.Token),
-			Amount:      new(big.Int).Sub(channelAmount, rawBalance),
-		},
-	}
-
-	stateDataHex := "0x"
-	stateDataBytes, err := hexutil.Decode(stateDataHex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode state data: %w", err)
-	}
-	encodedState, err := nitrolite.EncodeState(common.HexToHash(channel.ChannelID), nitrolite.IntentFINALIZE, big.NewInt(int64(channel.Version)+1), stateDataBytes, allocations)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode state hash: %w", err)
-	}
-	stateHash := crypto.Keccak256Hash(encodedState).Hex()
-	sig, err := signer.NitroSign(encodedState)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign state: %w", err)
-	}
-
-	resp := CloseChannelResponse{
-		ChannelID: channel.ChannelID,
-		Intent:    uint8(nitrolite.IntentFINALIZE),
-		Version:   channel.Version + 1,
-		StateData: stateDataHex,
-		StateHash: stateHash,
-		Signature: Signature{
-			V: sig.V,
-			R: hexutil.Encode(sig.R[:]),
-			S: hexutil.Encode(sig.S[:]),
-		},
-	}
-
-	for _, alloc := range allocations {
-		resp.FinalAllocations = append(resp.FinalAllocations, Allocation{
-			Participant:  alloc.Destination.Hex(),
-			TokenAddress: alloc.Token.Hex(),
-			Amount:       alloc.Amount,
-		})
+		return nil, fmt.Errorf("failed to close channel: %w", err)
 	}
 
 	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{resp}), nil
@@ -1082,13 +1122,17 @@ func verifySigner(rpc *RPCMessage, channelWallet string) error {
 	return nil
 }
 
-func checkChallengedChannels(tx *gorm.DB, wallet string) error {
-	challengedChannels, err := getChannelsByWallet(tx, wallet, string(ChannelStatusChallenged))
+func checkProcessingOperations(tx *gorm.DB, wallet string) (int, error) {
+	channelsInProcess, err := getChannelsByWallet(tx, wallet,
+		string(ChannelStatusJoining),
+		string(ChannelStatusClosing),
+		string(ChannelStatusChallenged),
+		string(ChannelStatusResizing))
 	if err != nil {
-		return fmt.Errorf("failed to check challenged channels: %w", err)
+		return 0, fmt.Errorf("failed to check channels: %w", err)
 	}
-	if len(challengedChannels) > 0 {
-		return fmt.Errorf("participant %s has challenged channels, cannot execute operation", wallet)
+	if len(channelsInProcess) > 0 {
+		return len(channelsInProcess), fmt.Errorf("%s has blockchain operations in process, cannot execute operation", wallet)
 	}
-	return nil
+	return 0, nil
 }

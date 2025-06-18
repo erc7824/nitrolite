@@ -380,6 +380,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			newAmount += change.Int64()
 		}
 
+		channel.Status = ChannelStatusOpen
 		channel.Amount = uint64(newAmount)
 		channel.UpdatedAt = time.Now()
 		channel.Version++

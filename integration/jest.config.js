@@ -1,0 +1,16 @@
+/** @type {import('ts-jest').JestConfigWithTsJest} */
+module.exports = {
+    preset: 'ts-jest',
+    testEnvironment: 'node',
+    roots: ['<rootDir>/tests'],
+    testMatch: ['./**/*.test.ts'],
+    transform: {
+        '^.+\\.ts$': 'ts-jest',
+    },
+    testTimeout: 10000, // 10 seconds for unit tests (should be fast)
+    maxWorkers: '50%', // Can run unit tests in parallel
+    modulePaths: ['<rootDir>/common'],
+    moduleNameMapper: {
+        '^@/(.*)$': '<rootDir>/common/$1',
+    },
+};

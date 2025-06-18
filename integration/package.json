@@ -1,0 +1,21 @@
+{
+  "name": "nitrolite-integration-tests",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "@erc7824/nitrolite": "file:../sdk",
+    "ethers": "5.7.2",
+    "viem": "^2.31.3",
+    "ws": "^8.18.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.3",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.3.0"
+  }
+}

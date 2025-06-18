@@ -159,10 +159,38 @@ func (r *RPCRouter) HandleAuthVerify(c *RPCContext) {
 }
 
 func (r *RPCRouter) AuthMiddleware(c *RPCContext) {
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+
 	// Get policy from storage
 	policy, ok := c.Storage.Get(ConnectionStoragePolicyKey)
 	if !ok || policy == nil || c.UserID == "" {
 		c.Fail("authentication required")
+		return
+	}
+
+	// Cast to Policy type
+	p, ok := policy.(*Policy)
+	if !ok {
+		logger.Error("invalid policy type in storage", "type", fmt.Sprintf("%T", policy))
+		c.Fail("invalid policy type in storage")
+		return
+	}
+
+	// Check if session is still valid
+	if !r.AuthManager.ValidateSession(p.Participant) {
+		logger.Debug("session expired", "signerAddress", p.Participant)
+		c.Fail("session expired, please re-authenticate")
+		return
+	}
+
+	// Update session activity timestamp
+	r.AuthManager.UpdateSession(p.Participant)
+
+	if err := ValidateTimestamp(req.Timestamp, r.Config.msgExpiryTime); err != nil {
+		logger.Debug("invalid message timestamp", "error", err)
+		c.Fail("invalid message timestamp")
 		return
 	}
 

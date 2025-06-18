@@ -30,6 +30,23 @@ type CreateAppSessionParams struct {
 	Allocations []AppAllocation `json:"allocations"`
 }
 
+type Transfer struct {
+	Destination string               `json:"destination"`
+	Allocations []TransferAllocation `json:"allocations"`
+}
+
+type TransferAllocation struct {
+	AssetSymbol string          `json:"asset"`
+	Amount      decimal.Decimal `json:"amount"`
+}
+
+type TransferResponse struct {
+	From        string               `json:"from"`
+	To          string               `json:"to"`
+	Allocations []TransferAllocation `json:"allocations"`
+	CreatedAt   time.Time            `json:"created_at"`
+}
+
 type SubmitStateParams struct {
 	AppSessionID string          `json:"app_session_id"`
 	Allocations  []AppAllocation `json:"allocations"`
@@ -266,6 +283,66 @@ func HandleGetLedgerEntries(rpc *RPCMessage, walletAddress string, db *gorm.DB) 
 	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{resp}), nil
 }
 
+// HandleTransfer unified balance funds to the specified account
+func HandleTransfer(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+	var params Transfer
+	if err := parseParams(rpc.Req.Params, &params); err != nil {
+		return nil, err
+	}
+	if params.Destination == "" || params.Destination == policy.Wallet {
+		return nil, errors.New("invalid destination")
+	}
+
+	// Allow only ledger accounts as destination at the current stage. In the future we'll unlock application accounts.
+	if !common.IsHexAddress(params.Destination) {
+		return nil, fmt.Errorf("invalid destination account: %s", params.Destination)
+	}
+
+	if len(params.Allocations) == 0 {
+		return nil, errors.New("empty allocations")
+	}
+
+	if err := verifySigner(rpc, policy.Wallet); err != nil {
+		return nil, err
+	}
+
+	fromWallet := policy.Wallet
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if wallet := GetWalletBySigner(policy.Wallet); wallet != "" {
+			fromWallet = wallet
+		}
+
+		if err := checkChallengedChannels(tx, fromWallet); err != nil {
+			return err
+		}
+
+		for _, alloc := range params.Allocations {
+			if alloc.Amount.IsZero() {
+				return fmt.Errorf("invalid allocation: zero amount")
+			}
+			ledger := GetWalletLedger(tx, fromWallet)
+			if err := ledger.Transfer(fromWallet, params.Destination, alloc.AssetSymbol, alloc.Amount); err != nil {
+				return fmt.Errorf("failed to transfer funds: %w", err)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{
+		&TransferResponse{
+			From:        fromWallet,
+			To:          params.Destination,
+			Allocations: params.Allocations,
+			CreatedAt:   time.Now(),
+		},
+	}), nil
+}
+
 // HandleCreateApplication creates a virtual application between participants
 func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var params CreateAppSessionParams
@@ -296,9 +373,6 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 
 	err = db.Transaction(func(tx *gorm.DB) error {
 		for _, alloc := range params.Allocations {
-			if alloc.Amount.IsNegative() {
-				return fmt.Errorf("invalid allocation: negative amount")
-			}
 			if alloc.Amount.IsPositive() {
 				if _, ok := rpcSigners[alloc.ParticipantWallet]; !ok {
 					return fmt.Errorf("missing signature for participant %s", alloc.ParticipantWallet)
@@ -315,19 +389,8 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 			}
 
 			ledger := GetWalletLedger(tx, walletAddress)
-			balance, err := ledger.Balance(walletAddress, alloc.AssetSymbol)
-			if err != nil {
-				return fmt.Errorf("failed to check participant balance: %w", err)
-			}
-
-			if alloc.Amount.GreaterThan(balance) {
-				return fmt.Errorf("insufficient funds: %s for asset %s", alloc.ParticipantWallet, alloc.AssetSymbol)
-			}
-			if err := ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
-				return fmt.Errorf("failed to debit participant: %w", err)
-			}
-			if err := ledger.Record(appSessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return fmt.Errorf("failed to credit virtual app: %w", err)
+			if err := ledger.Transfer(walletAddress, appSessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
+				return fmt.Errorf("failed to transfer funds: %w", err)
 			}
 		}
 

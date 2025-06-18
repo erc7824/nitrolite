@@ -1629,6 +1629,420 @@ func TestHandleCloseVirtualApp(t *testing.T) {
 }
 
 // TestHandleResizeChannel tests the resize channel handler functionality
+func TestHandleTransfer(t *testing.T) {
+	// Create signers
+	senderKey, _ := crypto.GenerateKey()
+	senderSigner := Signer{privateKey: senderKey}
+	senderAddr := senderSigner.GetAddress().Hex()
+	recipientAddr := "0x" + strings.Repeat("1", 40) // Valid ethereum address with 1s
+
+	t.Run("SuccessfulTransfer", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: senderAddr, Wallet: senderAddr,
+		}).Error)
+
+		// Fund sender's account
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "eth", decimal.NewFromInt(5)))
+
+		// Create transfer parameters
+		transferParams := Transfer{
+			Destination: recipientAddr,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+				{AssetSymbol: "eth", Amount: decimal.NewFromInt(2)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 42,
+				Method:    "transfer",
+				Params:    []any{transferParams},
+				Timestamp: ts,
+			},
+		}
+
+		// Marshal and sign the request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+
+		signed, err := senderSigner.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(signed)}
+
+		// Call handler
+		policy := &Policy{Wallet: senderAddr}
+		resp, err := HandleTransfer(policy, rpcReq, db)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+
+		// Verify response
+		assert.Equal(t, "transfer", resp.Res.Method)
+		assert.Equal(t, uint64(42), resp.Res.RequestID)
+		
+		// Verify response structure
+		transferResp, ok := resp.Res.Params[0].(*TransferResponse)
+		require.True(t, ok, "Response should be a TransferResponse")
+		assert.Equal(t, senderAddr, transferResp.From)
+		assert.Equal(t, recipientAddr, transferResp.To)
+		assert.False(t, transferResp.CreatedAt.IsZero(), "CreatedAt should be set")
+
+		// Check balances were updated correctly
+		// Sender should have 500 USDC and 3 ETH left
+		senderUSDC, err := GetWalletLedger(db, senderAddr).Balance(senderAddr, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(500).String(), senderUSDC.String())
+
+		senderETH, err := GetWalletLedger(db, senderAddr).Balance(senderAddr, "eth")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(3).String(), senderETH.String())
+
+		// Recipient should have 500 USDC and 2 ETH
+		recipientUSDC, err := GetWalletLedger(db, senderAddr).Balance(recipientAddr, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(500).String(), recipientUSDC.String())
+
+		recipientETH, err := GetWalletLedger(db, senderAddr).Balance(recipientAddr, "eth")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(2).String(), recipientETH.String())
+	})
+
+	t.Run("ErrorInvalidDestinationAddress", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: senderAddr, Wallet: senderAddr,
+		}).Error)
+
+		// Fund sender's account
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+
+		// Create transfer with invalid destination
+		transferParams := Transfer{
+			Destination: "not-a-valid-address",
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 43,
+				Method:    "transfer",
+				Params:    []any{transferParams},
+				Timestamp: ts,
+			},
+		}
+
+		// Marshal and sign the request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+
+		signed, err := senderSigner.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(signed)}
+
+		// Call handler
+		policy := &Policy{Wallet: senderAddr}
+		_, err = HandleTransfer(policy, rpcReq, db)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid destination account")
+	})
+
+	t.Run("ErrorTransferToSelf", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: senderAddr, Wallet: senderAddr,
+		}).Error)
+
+		// Fund sender's account
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+
+		// Create transfer to self
+		transferParams := Transfer{
+			Destination: senderAddr,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 44,
+				Method:    "transfer",
+				Params:    []any{transferParams},
+				Timestamp: ts,
+			},
+		}
+
+		// Marshal and sign the request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+
+		signed, err := senderSigner.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(signed)}
+
+		// Call handler
+		policy := &Policy{Wallet: senderAddr}
+		_, err = HandleTransfer(policy, rpcReq, db)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid destination")
+	})
+
+	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: senderAddr, Wallet: senderAddr,
+		}).Error)
+
+		// Fund sender's account with a small amount
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(100)))
+
+		// Create transfer for more than available
+		transferParams := Transfer{
+			Destination: recipientAddr,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 45,
+				Method:    "transfer",
+				Params:    []any{transferParams},
+				Timestamp: ts,
+			},
+		}
+
+		// Marshal and sign the request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+
+		signed, err := senderSigner.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(signed)}
+
+		// Call handler
+		policy := &Policy{Wallet: senderAddr}
+		_, err = HandleTransfer(policy, rpcReq, db)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "insufficient funds")
+	})
+
+	t.Run("ErrorEmptyAllocations", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: senderAddr, Wallet: senderAddr,
+		}).Error)
+
+		// Create transfer with empty allocations
+		transferParams := Transfer{
+			Destination: recipientAddr,
+			Allocations: []TransferAllocation{},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 46,
+				Method:    "transfer",
+				Params:    []any{transferParams},
+				Timestamp: ts,
+			},
+		}
+
+		// Marshal and sign the request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+
+		signed, err := senderSigner.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(signed)}
+
+		// Call handler
+		policy := &Policy{Wallet: senderAddr}
+		_, err = HandleTransfer(policy, rpcReq, db)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "empty allocations")
+	})
+
+	t.Run("ErrorZeroAmount", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: senderAddr, Wallet: senderAddr,
+		}).Error)
+
+		// Fund sender's account
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+
+		// Create transfer with zero amount
+		transferParams := Transfer{
+			Destination: recipientAddr,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 49,
+				Method:    "transfer",
+				Params:    []any{transferParams},
+				Timestamp: ts,
+			},
+		}
+
+		// Marshal and sign the request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+
+		signed, err := senderSigner.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(signed)}
+
+		// Call handler
+		policy := &Policy{Wallet: senderAddr}
+		_, err = HandleTransfer(policy, rpcReq, db)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid allocation: zero amount")
+	})
+
+	t.Run("ErrorNegativeAmount", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: senderAddr, Wallet: senderAddr,
+		}).Error)
+
+		// Fund sender's account
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+
+		// Create transfer with negative amount
+		transferParams := Transfer{
+			Destination: recipientAddr,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(-500)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 47,
+				Method:    "transfer",
+				Params:    []any{transferParams},
+				Timestamp: ts,
+			},
+		}
+
+		// Marshal and sign the request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+
+		signed, err := senderSigner.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(signed)}
+
+		// Call handler
+		policy := &Policy{Wallet: senderAddr}
+		_, err = HandleTransfer(policy, rpcReq, db)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to transfer funds: invalid transfer")
+	})
+
+	t.Run("ErrorInvalidSignature", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: senderAddr, Wallet: senderAddr,
+		}).Error)
+
+		// Fund sender's account
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+
+		// Create transfer parameters
+		transferParams := Transfer{
+			Destination: recipientAddr,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 48,
+				Method:    "transfer",
+				Params:    []any{transferParams},
+				Timestamp: ts,
+			},
+		}
+
+		// Marshal the request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+
+		// Sign with a different key
+		wrongKey, _ := crypto.GenerateKey()
+		wrongSigner := Signer{privateKey: wrongKey}
+		signed, err := wrongSigner.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(signed)}
+
+		// Call handler
+		policy := &Policy{Wallet: senderAddr}
+		_, err = HandleTransfer(policy, rpcReq, db)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid signature")
+	})
+}
+
 func TestHandleResizeChannel(t *testing.T) {
 	t.Run("SuccessfulAllocation", func(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()

@@ -16,6 +16,7 @@
 | `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Public |
 | `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
 | `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
+| `transfer` | Transfers funds from user's unified balance to another account | Private |
 | `create_app_session` | Creates a new virtual application on a ledger | Private |
 | `submit_state` | Submits an intermediate state into a virtual application | Private |
 | `close_app_session` | Closes a virtual application | Private |
@@ -230,6 +231,57 @@ To get balance in a specific virtual app session, specify `app_session_id` as ac
       "amount": "0.5"
     }
   ]], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+### Transfer Funds
+
+This method allows a user to transfer assets from their unified balance to another account. The user must have sufficient funds for each asset being transferred. The operation will fail if any of the specified assets have insufficient funds.
+
+CAUTION: Invalid destination address may result in loss of funds.
+Currently, `Transfer` supports ledger account of another user as destination (wallet address is identifier).
+
+**Request:**
+
+```json
+{
+  "req": [1, "transfer", [{
+    "destination": "0x9876543210abcdef...",
+    "allocations": [
+      {
+        "asset": "usdc",
+        "amount": "50.0"
+      },
+      {
+        "asset": "eth",
+        "amount": "0.1"
+      }
+    ]
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "transfer", [{
+    "from": "0x1234567890abcdef...",
+    "to": "0x9876543210abcdef...",
+    "allocations": [
+      {
+        "asset": "usdc",
+        "amount": "50.0"
+      },
+      {
+        "asset": "eth",
+        "amount": "0.1"
+      }
+    ],
+    "created_at": "2023-05-01T12:00:00Z"
+  }], 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```

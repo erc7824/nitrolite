@@ -15,6 +15,7 @@ import {
     createCloseChannelMessage,
     createResizeChannelMessage,
     createGetChannelsMessage,
+    createECDSAMessageSigner,
 } from '../../../src/rpc/api';
 import {
     CreateAppSessionRequest,
@@ -24,6 +25,7 @@ import {
     AuthChallengeRPCResponse,
     RPCMethod,
     RPCChannelStatus,
+    RequestData,
 } from '../../../src/rpc/types';
 
 describe('API message creators', () => {
@@ -273,4 +275,13 @@ describe('API message creators', () => {
             sig: ['0xsig'],
         });
     });
+
+    test('createECDSAMessageSigner', async () => {
+        const privateKey = '0xb482c8fa261c29eaaa646703948e2cc2a2ff54411cc42d8fce9a161035dfb3dc';
+        const payload = [42, 'ping', [4337, 7702], 20] as RequestData;
+        const signer = createECDSAMessageSigner(privateKey);
+        const signature = await signer(payload);
+        expect(signature).toBeDefined();
+        expect(signature).toEqual('0x3704ad0add5fc4b66c56abf9c6b02910170f0cacdf7011cc21804cc164dcd1c14827bfe374da0a60231088ac34bcbfc3874b5544189151059374964313b2a1a91b');
+    })
 });

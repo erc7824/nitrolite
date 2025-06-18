@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"math/big"
 	"sync/atomic"
 	"time"
 
@@ -17,6 +18,26 @@ import (
 const (
 	maxBackOffCount = 5
 )
+
+type Ethereum interface {
+	CodeAt(ctx context.Context, contract common.Address, blockNumber *big.Int) ([]byte, error)
+	CallContract(ctx context.Context, call ethereum.CallMsg, blockNumber *big.Int) ([]byte, error)
+	PendingCodeAt(ctx context.Context, contract common.Address) ([]byte, error)
+	PendingCallContract(ctx context.Context, call ethereum.CallMsg) ([]byte, error)
+	PendingNonceAt(ctx context.Context, account common.Address) (uint64, error)
+	SuggestGasPrice(ctx context.Context) (*big.Int, error)
+	SuggestGasTipCap(ctx context.Context) (*big.Int, error)
+	EstimateGas(ctx context.Context, call ethereum.CallMsg) (gas uint64, err error)
+	SendTransaction(ctx context.Context, tx *types.Transaction) error
+	FilterLogs(ctx context.Context, query ethereum.FilterQuery) ([]types.Log, error)
+	SubscribeFilterLogs(ctx context.Context, query ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error)
+	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
+	SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error)
+	TransactionByHash(ctx context.Context, txHash common.Hash) (*types.Transaction, bool, error)
+	BlockNumber(ctx context.Context) (uint64, error)
+	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
+	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
+}
 
 func init() {
 	log.SetAllLoggers(log.LevelDebug)

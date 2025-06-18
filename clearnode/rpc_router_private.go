@@ -70,6 +70,10 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 				walletAddress = wallet
 			}
 
+			if err := checkChallengedChannels(tx, walletAddress); err != nil {
+				return err
+			}
+
 			ledger := GetWalletLedger(tx, walletAddress)
 			balance, err := ledger.Balance(walletAddress, alloc.AssetSymbol)
 			if err != nil {
@@ -310,6 +314,21 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 		c.Fail(fmt.Sprintf("failed to find channel: %s", params.ChannelID))
 		return
 	}
+	if channel == nil {
+		c.Fail(fmt.Sprintf("channel %s not found", params.ChannelID))
+		return
+	}
+
+	if err = checkChallengedChannels(r.DB, channel.Wallet); err != nil {
+		logger.Error("failed to check challenged channels", "error", err)
+		c.Fail("failed to check challenged channels")
+		return
+	}
+
+	if channel.Status != ChannelStatusOpen {
+		c.Fail(fmt.Sprintf("channel %s is not open: %s", params.ChannelID, channel.Status))
+		return
+	}
 
 	if err := verifySigner(&c.Message, channel.Wallet); err != nil {
 		logger.Error("failed to verify signer", "error", err)
@@ -329,6 +348,12 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 	}
 	if params.AllocateAmount == nil {
 		params.AllocateAmount = big.NewInt(0)
+	}
+
+	// Prevent no-op resize operations
+	if params.ResizeAmount.Cmp(big.NewInt(0)) == 0 && params.AllocateAmount.Cmp(big.NewInt(0)) == 0 {
+		c.Fail("resize operation requires non-zero ResizeAmount or AllocateAmount")
+		return
 	}
 
 	ledger := GetWalletLedger(r.DB, channel.Wallet)
@@ -436,6 +461,21 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)
 		c.Fail("failed to find channel")
+		return
+	}
+	if channel == nil {
+		c.Fail(fmt.Sprintf("channel %s not found", params.ChannelID))
+		return
+	}
+
+	if err = checkChallengedChannels(r.DB, channel.Wallet); err != nil {
+		logger.Error("failed to check challenged channels", "error", err)
+		c.Fail("failed to check challenged channels")
+		return
+	}
+
+	if channel.Status != ChannelStatusOpen {
+		c.Fail(fmt.Sprintf("channel %s is not open: %s", params.ChannelID, channel.Status))
 		return
 	}
 

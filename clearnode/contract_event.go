@@ -3,13 +3,12 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"reflect"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/nitrolite"
-	"github.com/ethereum/go-ethereum/core/types"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 var ErrEventHasAlreadyBeenProcessed = errors.New("contract event has already been processed")
@@ -31,68 +30,28 @@ func (ContractEvent) TableName() string {
 }
 
 func StoreContractEvent(tx *gorm.DB, event *ContractEvent) error {
-	// Skip if the event has already been processed
-	return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(event).Error
+	return tx.Create(event).Error
 }
 
-func MarshalCustodyResized(event nitrolite.CustodyResized) ([]byte, error) {
-	eventCopy := event
-	eventCopy.Raw = types.Log{}
-
-	encodedData, err := json.Marshal(eventCopy)
-	if err != nil {
-		return nil, err
+func MarshalEvent[T any](event T) ([]byte, error) {
+	val := reflect.ValueOf(event)
+	if val.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("input must be a struct, but got %T", event)
 	}
 
-	return encodedData, nil
-}
+	copyVal := reflect.New(val.Type()).Elem()
+	copyVal.Set(val)
 
-func MarshalCustodyChallenged(event nitrolite.CustodyChallenged) ([]byte, error) {
-	eventCopy := event
-	eventCopy.Raw = types.Log{}
-
-	encodedData, err := json.Marshal(eventCopy)
-	if err != nil {
-		return nil, err
+	// This is equivalent to `eventCopy.Raw = types.Log{}`.
+	rawField := copyVal.FieldByName("Raw")
+	if rawField.IsValid() {
+		if !rawField.CanSet() {
+			return nil, fmt.Errorf("cannot set 'Raw' field on type %s", val.Type())
+		}
+		zeroValue := reflect.Zero(rawField.Type())
+		rawField.Set(zeroValue)
 	}
-
-	return encodedData, nil
-}
-
-func MarshalCustodyClosed(event nitrolite.CustodyClosed) ([]byte, error) {
-	eventCopy := event
-	eventCopy.Raw = types.Log{}
-
-	encodedData, err := json.Marshal(eventCopy)
-	if err != nil {
-		return nil, err
-	}
-
-	return encodedData, nil
-}
-
-func MarshalCustodyJoined(event nitrolite.CustodyJoined) ([]byte, error) {
-	eventCopy := event
-	eventCopy.Raw = types.Log{}
-
-	encodedData, err := json.Marshal(eventCopy)
-	if err != nil {
-		return nil, err
-	}
-
-	return encodedData, nil
-}
-
-func MarshalCustodyCreated(event nitrolite.CustodyCreated) ([]byte, error) {
-	eventCopy := event
-	eventCopy.Raw = types.Log{}
-
-	encodedData, err := json.Marshal(eventCopy)
-	if err != nil {
-		return nil, err
-	}
-
-	return encodedData, nil
+	return json.Marshal(copyVal.Interface())
 }
 
 func GetLatestContractEvent(db *gorm.DB, contractAddress string, networkID uint32) (*ContractEvent, error) {

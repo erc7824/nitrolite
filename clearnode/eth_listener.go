@@ -70,6 +70,7 @@ func listenEvents(
 	client bind.ContractBackend,
 	contractAddress common.Address,
 	chainID uint32,
+	blockStep uint64,
 	lastBlock uint64,
 	lastIndex uint32,
 	handler LogHandler,
@@ -109,6 +110,7 @@ func listenEvents(
 					contractAddress,
 					chainID,
 					header.Number.Uint64(),
+					blockStep,
 					lastBlock,
 					lastIndex,
 					&backOffCount,
@@ -158,13 +160,13 @@ func ReconcileBlockRange(
 	contractAddress common.Address,
 	chainID uint32,
 	currentBlock uint64,
+	blockStep uint64,
 	lastBlock uint64,
 	lastIndex uint32,
 	backOffCount *atomic.Uint64,
 	historicalCh chan types.Log,
 	logger Logger,
 ) {
-	const blockStep = 10000
 	startBlock := lastBlock
 	endBlock := startBlock + blockStep
 

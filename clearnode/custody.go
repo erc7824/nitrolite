@@ -35,13 +35,14 @@ type Custody struct {
 	chainID            uint32
 	signer             *Signer
 	adjudicatorAddress common.Address
+	blockStep          uint64
 	sendBalanceUpdate  func(string)
 	sendChannelUpdate  func(Channel)
 	logger             Logger
 }
 
 // NewCustody initializes the Ethereum client and custody contract wrapper.
-func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr, adjudicatorAddr, balanceCheckerAddr string, chain uint32, logger Logger) (*Custody, error) {
+func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr, adjudicatorAddr, balanceCheckerAddr string, chain uint32, blockStep uint64, logger Logger) (*Custody, error) {
 	client, err := ethclient.Dial(infuraURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Ethereum node: %w", err)
@@ -83,6 +84,7 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 		adjudicatorAddress: common.HexToAddress(adjudicatorAddr),
 		sendBalanceUpdate:  sendBalanceUpdate,
 		sendChannelUpdate:  sendChannelUpdate,
+		blockStep:          blockStep,
 		logger:             logger.NewSystem("custody").With("chainID", chainID.Int64()).With("custodyAddress", custodyAddressStr),
 	}, nil
 }
@@ -102,7 +104,7 @@ func (c *Custody) ListenEvents(ctx context.Context) {
 		lastIndex = ev.LogIndex
 	}
 
-	listenEvents(ctx, c.client, c.custodyAddr, c.chainID, lastBlock, lastIndex, c.handleBlockChainEvent, c.logger)
+	listenEvents(ctx, c.client, c.custodyAddr, c.chainID, c.blockStep, lastBlock, lastIndex, c.handleBlockChainEvent, c.logger)
 }
 
 // Join calls the join method on the custody contract
@@ -243,7 +245,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 	var ch Channel
 	err = c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
-		eventData, err := MarshalCustodyCreated(*ev)
+		eventData, err := MarshalEvent(*ev)
 		if err != nil {
 			return err
 		}
@@ -324,7 +326,7 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
-		eventData, err := MarshalCustodyJoined(*ev)
+		eventData, err := MarshalEvent(*ev)
 		if err != nil {
 			return err
 		}
@@ -399,7 +401,7 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
-		eventData, err := MarshalCustodyChallenged(*ev)
+		eventData, err := MarshalEvent(*ev)
 		if err != nil {
 			return err
 		}
@@ -452,7 +454,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
-		eventData, err := MarshalCustodyResized(*ev)
+		eventData, err := MarshalEvent(*ev)
 		if err != nil {
 			return err
 		}
@@ -552,7 +554,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
-		eventData, err := MarshalCustodyClosed(*ev)
+		eventData, err := MarshalEvent(*ev)
 		if err != nil {
 			return err
 		}

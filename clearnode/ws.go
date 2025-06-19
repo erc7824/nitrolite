@@ -22,20 +22,22 @@ var validate = validator.New()
 
 // UnifiedWSHandler manages WebSocket connections with authentication
 type UnifiedWSHandler struct {
-	signer        *Signer
-	db            *gorm.DB
-	upgrader      websocket.Upgrader
-	connections   map[string]*websocket.Conn
-	connectionsMu sync.RWMutex
-	authManager   *AuthManager
-	metrics       *Metrics
-	rpcStore      *RPCStore
-	config        *Config
-	logger        Logger
+	signer            *Signer
+	appSessionService *AppSessionService
+	db                *gorm.DB
+	upgrader          websocket.Upgrader
+	connections       map[string]*websocket.Conn
+	connectionsMu     sync.RWMutex
+	authManager       *AuthManager
+	metrics           *Metrics
+	rpcStore          *RPCStore
+	config            *Config
+	logger            Logger
 }
 
 func NewUnifiedWSHandler(
 	signer *Signer,
+	appSessionService *AppSessionService,
 	db *gorm.DB,
 	metrics *Metrics,
 	rpcStore *RPCStore,
@@ -49,8 +51,9 @@ func NewUnifiedWSHandler(
 	}
 
 	return &UnifiedWSHandler{
-		signer: signer,
-		db:     db,
+		signer:            signer,
+		db:                db,
+		appSessionService: appSessionService,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -133,7 +136,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			case "get_app_definition":
 				rpcResponse, handlerErr = HandleGetAppDefinition(&rpcMsg, h.db)
 			case "get_app_sessions":
-				rpcResponse, handlerErr = HandleGetAppSessions(&rpcMsg, h.db)
+				rpcResponse, handlerErr = HandleGetAppSessions(&rpcMsg, h.appSessionService)
 			case "get_channels":
 				rpcResponse, handlerErr = HandleGetChannels(&rpcMsg, h.db)
 			case "get_ledger_entries":
@@ -356,7 +359,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 				continue
 			}
 		case "get_app_sessions":
-			rpcResponse, handlerErr = HandleGetAppSessions(&msg, h.db)
+			rpcResponse, handlerErr = HandleGetAppSessions(&msg, h.appSessionService)
 			if handlerErr != nil {
 				logger.Error("error handling get_app_sessions", "error", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get app sessions: "+handlerErr.Error())
@@ -379,7 +382,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			h.sendBalanceUpdate(walletAddress)
 			recordHistory = true
 		case "create_app_session":
-			rpcResponse, handlerErr = HandleCreateApplication(policy, &msg, h.db)
+			rpcResponse, handlerErr = HandleCreateApplication(policy, &msg, h.appSessionService)
 			if handlerErr != nil {
 				logger.Warn("error handling create_app_session", "error", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to create application: "+handlerErr.Error())
@@ -388,7 +391,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			h.sendBalanceUpdate(walletAddress)
 			recordHistory = true
 		case "submit_state":
-			rpcResponse, handlerErr = HandleSubmitState(policy, &msg, h.db)
+			rpcResponse, handlerErr = HandleSubmitState(policy, &msg, h.appSessionService)
 			if handlerErr != nil {
 				logger.Warn("Error handling submit_state", "error", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to update application state: "+handlerErr.Error())
@@ -397,7 +400,7 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 			h.sendBalanceUpdate(walletAddress)
 			recordHistory = true
 		case "close_app_session":
-			rpcResponse, handlerErr = HandleCloseApplication(policy, &msg, h.db)
+			rpcResponse, handlerErr = HandleCloseApplication(policy, &msg, h.appSessionService)
 			if handlerErr != nil {
 				logger.Warn("Error handling close_app_session", "error", handlerErr)
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to close application: "+handlerErr.Error())

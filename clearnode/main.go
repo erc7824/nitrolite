@@ -46,9 +46,11 @@ func main() {
 	// Map to store custody clients for later reference
 	custodyClients := make(map[string]*Custody)
 
+	appSessionService := NewAppSessionService(db)
+
 	wsListenAddr := ":8000"
 	wsEndpoint := "/ws"
-	unifiedWSHandler, err := NewUnifiedWSHandler(signer, db, metrics, rpcStore, config, logger)
+	unifiedWSHandler, err := NewUnifiedWSHandler(signer, appSessionService, db, metrics, rpcStore, config, logger)
 	if err != nil {
 		logger.Fatal("failed to initialize WebSocket handler", "error", err)
 	}

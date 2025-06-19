@@ -269,7 +269,7 @@ export async function createAppSessionWithSignatures(roomId) {
 
           if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleAppSessionResponse);
-            reject(new Error(`Error: requestId ${message.requestId}: ${message.params}`));
+            reject(new Error(`Error: ${message.params[0].error}`));
           }
         } catch (error) {
           logger.error('Error handling app session response:', error);
@@ -346,9 +346,6 @@ export async function createAppSession(roomId, participantA, participantB) {
       throw new Error('Token address not set in environment variables');
     }
 
-    // Define the deposit amount (use '0' for free games or actual amount for paid games)
-    const amount = '0'; // Set this to the appropriate amount if needed
-
     // Create app definition
     const appDefinition = {
       protocol: "app_aura_nitrolite_v0",
@@ -416,7 +413,7 @@ export async function createAppSession(roomId, participantA, participantB) {
           // Also check for error responses
           if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleAppSessionResponse);
-            reject(new Error(`Error: requestId ${message.requestId}: ${message.params}`));
+            reject(new Error(`Error: ${message.params[0].error}`));
           }
         } catch (error) {
           logger.error('Error handling app session response:', error);
@@ -610,7 +607,7 @@ export async function closeAppSession(roomId, allocations) {
           // Also check for error responses
           if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleCloseSessionResponse);
-            reject(new Error(`Error: requestId ${message.requestId}: ${message.params}`));
+            reject(new Error(`Error: ${message.params[0].error}`));
           }
         } catch (error) {
           logger.error('Error handling close session response:', error);

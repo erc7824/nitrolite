@@ -352,7 +352,7 @@ export interface PongRequest extends GenericRPCMessage {
 /**
  * Represents the request parameters for the 'transfer' RPC method.
  */
-export interface TransferRPCRequestParams {
+export interface TransferRequestParams {
     /** The destination address to transfer assets to. */
     destination: Address;
     /** The assets and amounts to transfer. */
@@ -362,10 +362,11 @@ export interface TransferRPCRequestParams {
 /**
  * Represents the request structure for the 'transfer' RPC method.
  */
-export interface TransferRPCRequest extends GenericRPCMessage {
+export interface TransferRequest extends GenericRPCMessage {
     method: RPCMethod.Transfer;
-    params: TransferRPCRequestParams;
+    params: TransferRequestParams;
 }
+export type TransferRPCRequestParams = TransferRequestParams; // for backward compatibility
 
 /**
  * Union type for all possible RPC request types.
@@ -391,7 +392,7 @@ export type RPCRequest =
   | PingRequest
   | PongRequest
   | MessageRequest
-  | TransferRPCRequest;
+  | TransferRequest;
 
 /**
  * Maps RPC methods to their corresponding request parameter types.
@@ -416,5 +417,5 @@ export type RPCRequestParamsByMethod = {
     [RPCMethod.Ping]: [];
     [RPCMethod.Pong]: [];
     [RPCMethod.Message]: any[];
-    [RPCMethod.Transfer]: TransferRPCRequestParams;
+    [RPCMethod.Transfer]: TransferRequestParams;
 };

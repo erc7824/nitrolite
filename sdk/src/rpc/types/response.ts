@@ -24,7 +24,7 @@ export interface AuthChallengeResponse extends GenericRPCMessage {
 export interface AuthVerifyResponseParams {
     address: Address;
     /** Available only if challenge auth method was used in {@link AuthVerifyRequestParams} during the call to {@link RPCMethod.AuthRequest} */
-  jwt_token?: string;
+    jwt_token?: string;
     session_key: Address;
     success: boolean;
 }

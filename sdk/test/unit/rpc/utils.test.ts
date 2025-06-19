@@ -13,13 +13,11 @@ import {
     isValidResponseRequestId,
     parseRPCResponse,
 } from '../../../src/rpc/utils';
-import { NitroliteRPCMessage, RPCMethod, RPCChannelStatus } from '../../src/rpc/types';
+import { NitroliteRPCMessage, RPCMethod, RPCChannelStatus } from '../../../src/rpc/types';
 import {
-    AuthChallengeResponseParams,
     AuthVerifyResponseParams,
     GetConfigResponseParams,
     GetLedgerBalancesResponseParams,
-    GetLedgerEntriesResponseParams,
     CreateAppSessionResponseParams,
     SubmitStateResponseParams,
     CloseAppSessionResponseParams,
@@ -30,9 +28,6 @@ import {
     GetChannelsResponseParams,
     GetRPCHistoryResponseParams,
     GetAssetsResponseParams,
-    PingResponseParams,
-    PongResponseParams,
-    MessageResponseParams,
     BalanceUpdateResponseParams,
     ChannelUpdateResponseParams,
 } from '../../../src/rpc/types/response';

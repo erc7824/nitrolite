@@ -1,4 +1,4 @@
-import { parseRPCResponse, RPCMethod } from '@erc7824/nitrolite';
+import { parseRPCResponse, RPCChannelStatus, RPCMethod } from '@erc7824/nitrolite';
 import { WebSocket } from 'ws';
 
 export class TestWebSocket {
@@ -92,41 +92,92 @@ export class TestWebSocket {
     }
 }
 
-export const PongPredicate = (data: string): boolean => {
-    try {
-        const parsedData = parseRPCResponse(data);
-        if (parsedData.method === RPCMethod.Pong) {
-            return true;
+export const getPongPredicate = () => {
+    return (data: string): boolean => {
+        try {
+            const parsedData = parseRPCResponse(data);
+            if (parsedData.method === RPCMethod.Pong) {
+                return true;
+            }
+        } catch (error) {
+            console.error('Error parsing data for PongPredicate:', error);
         }
-    } catch (error) {
-        console.error('Error parsing data for PongPredicate:', error);
-    }
 
-    return false;
+        return false;
+    };
 };
 
-export const AuthChallengePredicate = (data: string): boolean => {
-    try {
-        const parsedData = parseRPCResponse(data);
-        if (parsedData.method === RPCMethod.AuthChallenge) {
-            return true;
+export const getAuthChallengePredicate = () => {
+    return (data: string): boolean => {
+        try {
+            const parsedData = parseRPCResponse(data);
+            if (parsedData.method === RPCMethod.AuthChallenge) {
+                return true;
+            }
+        } catch (error) {
+            console.error('Error parsing data for AuthChallengePredicate:', error);
         }
-    } catch (error) {
-        console.error('Error parsing data for AuthChallengePredicate:', error);
-    }
 
-    return false;
+        return false;
+    };
 };
 
-export const AuthVerifyPredicate = (data: string): boolean => {
-    try {
-        const parsedData = parseRPCResponse(data);
-        if (parsedData.method === RPCMethod.AuthVerify) {
-            return true;
+export const getAuthVerifyPredicate = () => {
+    return (data: string): boolean => {
+        try {
+            const parsedData = parseRPCResponse(data);
+            if (parsedData.method === RPCMethod.AuthVerify) {
+                return true;
+            }
+        } catch (error) {
+            console.error('Error parsing data for AuthVerifyPredicate:', error);
         }
-    } catch (error) {
-        console.error('Error parsing data for AuthVerifyPredicate:', error);
-    }
 
-    return false;
+        return false;
+    };
+};
+
+export const getChannelUpdatePredicateWithStatus = (status: RPCChannelStatus) => {
+    return (data: string): boolean => {
+        try {
+            const parsedData = parseRPCResponse(data);
+            if (parsedData.method === RPCMethod.ChannelUpdate && parsedData.params[0].status === status) {
+                return true;
+            }
+        } catch (error) {
+            console.error('Error parsing data for ChannelUpdatePredicate:', error);
+        }
+
+        return false;
+    };
+};
+
+export const getCloseChannelPredicate = () => {
+    return (data: string): boolean => {
+        try {
+            const parsedData = parseRPCResponse(data);
+            if (parsedData.method === RPCMethod.CloseChannel) {
+                return true;
+            }
+        } catch (error) {
+            console.error('Error parsing data for ChannelUpdatePredicate:', error);
+        }
+
+        return false;
+    };
+};
+
+export const getResizeChannelPredicate = () => {
+    return (data: string): boolean => {
+        try {
+            const parsedData = parseRPCResponse(data);
+            if (parsedData.method === RPCMethod.ResizeChannel) {
+                return true;
+            }
+        } catch (error) {
+            console.error('Error parsing data for ResizeChannelPredicate:', error);
+        }
+
+        return false;
+    };
 };

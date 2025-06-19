@@ -1,43 +1,50 @@
-import { Address, createWalletClient, defineChain, Hex, http, WalletClient } from 'viem';
+import { Address, createWalletClient, Hex, http, keccak256, stringToBytes } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { localhost } from 'viem/chains';
-import { CONFIG } from './setup';
-import { createEIP712AuthMessageSigner, MessageSigner, RequestData, ResponsePayload } from '@erc7824/nitrolite';
+import { chain } from './setup';
 import { ethers } from 'ethers';
+import { createECDSAMessageSigner } from '@erc7824/nitrolite';
 
 export class Identity {
     public walletClient = null;
+    public stateWalletClient = null;
     public walletAddress: Address;
     public sessionAddress: Address;
+    public messageSigner = null;
 
-    constructor(privateWalletPrivateKey: Hex, private sessionPrivateKey: Hex) {
+    constructor(privateWalletPrivateKey: Hex, sessionPrivateKey: Hex) {
         const walletAccount = privateKeyToAccount(privateWalletPrivateKey);
+        this.walletAddress = walletAccount.address;
 
         this.walletClient = createWalletClient({
             account: walletAccount,
-            chain: defineChain({ ...localhost, id: CONFIG.CHAIN_ID }),
+            chain,
             transport: http(),
         });
 
-        this.walletAddress = walletAccount.address;
-
         const sessionAccount = privateKeyToAccount(sessionPrivateKey);
         this.sessionAddress = sessionAccount.address;
-    }
 
-    getMessageSigner(): MessageSigner {
-        return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
-            try {
-                const wallet = new ethers.Wallet(this.sessionPrivateKey);
-                const messageBytes = ethers.utils.arrayify(ethers.utils.id(JSON.stringify(payload)));
-                const flatSignature = await wallet._signingKey().signDigest(messageBytes);
+        this.stateWalletClient = {
+            ...this.walletClient,
+            account: {
+                address: this.sessionAddress,
+            },
+            signMessage: async ({ message: { raw } }: { message: { raw: string } }) => {
+                // const messageBytes = keccak256(stringToBytes(JSON.stringify(raw)));
+                // const flatSignature = await sessionAccount.sign({ hash: messageBytes });
+
+                // return flatSignature as Hex;
+
+                const wallet = new ethers.Wallet(sessionPrivateKey);
+
+                const flatSignature = await wallet._signingKey().signDigest(raw);
+
                 const signature = ethers.utils.joinSignature(flatSignature);
 
                 return signature as Hex;
-            } catch (error) {
-                console.error('Error signing message:', error);
-                throw error;
-            }
+            },
         };
+
+        this.messageSigner = createECDSAMessageSigner(sessionPrivateKey);
     }
 }

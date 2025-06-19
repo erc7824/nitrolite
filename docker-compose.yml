@@ -24,7 +24,7 @@ services:
     ports:
       - "8545:8545"
     entrypoint: ["anvil"] 
-    command: ["--host","0.0.0.0","--chain-id","31337","--accounts","15","--balance","300"]
+    command: ["--host","0.0.0.0","--chain-id","31337","--accounts","15","--balance","30000"]
     healthcheck:
       test: ["CMD", "cast", "block-number", "--rpc-url", "http://localhost:8545"]
       interval: 5s
@@ -48,7 +48,8 @@ services:
         forge clean &&
         (forge script script/DeployCustody.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string)" 58808 "$${DEPLOYER_MNEMONIC}" | grep "Deployed") &&
         (forge script script/DeployDummyAdjudicator.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string)" 35305 "$${DEPLOYER_MNEMONIC}" | grep "Deployed") &&
-        (forge script script/DeployAndFundERC20.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string,string,uint8,string)" 77360 "USD Coin" "USDC" 6 "$${DEPLOYER_MNEMONIC}" | grep "Deployed")
+        (forge script script/DeployAndFundERC20.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string,string,uint8,string)" 77360 "USD Coin" "USDC" 6 "$${DEPLOYER_MNEMONIC}" | grep "Deployed") &&
+        (forge script script/DeployBalanceChecker.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string)" 53231 "$${DEPLOYER_MNEMONIC}" | grep "Deployed")
       '
 
   db-init:
@@ -122,17 +123,23 @@ services:
 
   clearnode:
     platform: linux/amd64
-    image: ghcr.io/erc7824/nitrolite/clearnode:0.0.1-rc.28
+    build:
+      context: ./clearnode
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
       - "4242:4242"
     depends_on:
       database:
         condition: service_healthy
+      contract-deployer:
+        condition: service_completed_successfully
     environment:
       BROKER_PRIVATE_KEY: ${BROKER_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
-      LOCALNET_CUSTODY_CONTRACT_ADDRESS: ${LOCALNET_CUSTODY_CONTRACT_ADDRESS:-0x8658501c98C3738026c4e5c361c6C3fa95DfB255}
-      LOCALNET_INFURA_URL: ws://anvil:8545
+      ANVIL_CUSTODY_CONTRACT_ADDRESS: ${ANVIL_CUSTODY_CONTRACT_ADDRESS:-0x8658501c98C3738026c4e5c361c6C3fa95DfB255}
+      ANVIL_ADJUDICATOR_ADDRESS: ${ANVIL_ADJUDICATOR_ADDRESS:-0xcbbc03a873c11beeFA8D99477E830be48d8Ae6D7}
+      ANVIL_BALANCE_CHECKER_ADDRESS: ${ANVIL_BALANCE_CHECKER_ADDRESS:-0x730dB3A1D3Ca47e7BaEb260c24C74ED4378726Bc}
+      ANVIL_INFURA_URL: ws://anvil:8545
       CLEARNODE_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-postgres}?sslmode=disable
     restart: unless-stopped
 

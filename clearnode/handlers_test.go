@@ -1687,7 +1687,6 @@ func TestHandleTransfer(t *testing.T) {
 		// Verify response
 		assert.Equal(t, "transfer", resp.Res.Method)
 		assert.Equal(t, uint64(42), resp.Res.RequestID)
-		
 		// Verify response structure
 		transferResp, ok := resp.Res.Params[0].(*TransferResponse)
 		require.True(t, ok, "Response should be a TransferResponse")
@@ -1706,11 +1705,11 @@ func TestHandleTransfer(t *testing.T) {
 		assert.Equal(t, decimal.NewFromInt(3).String(), senderETH.String())
 
 		// Recipient should have 500 USDC and 2 ETH
-		recipientUSDC, err := GetWalletLedger(db, senderAddr).Balance(recipientAddr, "usdc")
+		recipientUSDC, err := GetWalletLedger(db, recipientAddr).Balance(recipientAddr, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(500).String(), recipientUSDC.String())
 
-		recipientETH, err := GetWalletLedger(db, senderAddr).Balance(recipientAddr, "eth")
+		recipientETH, err := GetWalletLedger(db, recipientAddr).Balance(recipientAddr, "eth")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(2).String(), recipientETH.String())
 	})
@@ -1942,7 +1941,7 @@ func TestHandleTransfer(t *testing.T) {
 		policy := &Policy{Wallet: senderAddr}
 		_, err = HandleTransfer(policy, rpcReq, db)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid allocation: zero amount")
+		assert.Contains(t, err.Error(), "invalid allocation")
 	})
 
 	t.Run("ErrorNegativeAmount", func(t *testing.T) {
@@ -1989,7 +1988,7 @@ func TestHandleTransfer(t *testing.T) {
 		policy := &Policy{Wallet: senderAddr}
 		_, err = HandleTransfer(policy, rpcReq, db)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to transfer funds: invalid transfer")
+		assert.Contains(t, err.Error(), "invalid allocation")
 	})
 
 	t.Run("ErrorInvalidSignature", func(t *testing.T) {

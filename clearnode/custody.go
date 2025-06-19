@@ -409,16 +409,26 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			return fmt.Errorf("error finding channel: %w", result.Error)
 		}
 
-		newAmount := int64(channel.Amount)
+		newAmount := new(big.Int).SetUint64(channel.Amount)
 		for _, change := range ev.DeltaAllocations {
-			newAmount += change.Int64()
+			newAmount.Add(newAmount, change)
 		}
 
-		channel.Amount = uint64(newAmount)
+		if newAmount.Sign() < 0 {
+			// TODO: what do we do in this case?
+			logger.Error("invalid resize, channel balance cannot be negative", "channelId", channelID)
+			return fmt.Errorf("invalid resize, channel balance cannot be negative: %s", newAmount.String())
+		}
+
+		channel.Amount = newAmount.Uint64()
 		channel.UpdatedAt = time.Now()
 		channel.Version++
 		if err := tx.Save(&channel).Error; err != nil {
 			return fmt.Errorf("error saving channel in database: %w", err)
+		}
+
+		if len(ev.DeltaAllocations) == 0 {
+			return nil
 		}
 
 		resizeAmount := ev.DeltaAllocations[0] // Participant deposits or withdraws.
@@ -507,7 +517,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		if err := ledger.Record(channel.Wallet, asset.Symbol, tokenAmount.Neg()); err != nil {
 			return fmt.Errorf("error recording balance update for participant: %w", err)
 		}
-		ledger = GetWalletLedger(tx, channel.Wallet)
+
 		if err := ledger.Record(channelID, asset.Symbol, tokenAmount); err != nil {
 			log.Printf("[Closed] Error recording balance update for wallet: %v", err)
 			return err

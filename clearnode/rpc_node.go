@@ -21,6 +21,10 @@ const (
 	rpcNodeGroupRoot = "root"
 )
 
+var (
+	defaultRPCMessageWriteDuration = 5 * time.Second // Default timeout for writing messages to WebSocket
+)
+
 // RPCNode is a WebSocket-based RPC server that handles incoming connections,
 // routes messages to registered handlers and signs all responses.
 // It supports middleware chains and handler groups for organizing endpoints.
@@ -215,7 +219,7 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				n.logger.Error("failed to prepare response", "error", err, "method", msg.Req.Method)
 				continue
 			}
-			rpcConn.WriteSink <- responseBytes
+			writeRPCMessageWithTimeout(rpcConn.WriteSink, responseBytes)
 
 			postProcessContext(ctx)
 
@@ -483,7 +487,7 @@ func (wn *RPCNode) getSendMessageFunc(writeSink chan<- []byte) SendRPCMessageFun
 			return
 		}
 
-		writeSink <- message
+		writeRPCMessageWithTimeout(writeSink, message)
 	}
 }
 
@@ -511,7 +515,7 @@ func (wn *RPCNode) sendErrorResponse(conn *RPCConnection, requestID uint64, mess
 		return
 	}
 
-	conn.WriteSink <- responseBytes
+	writeRPCMessageWithTimeout(conn.WriteSink, responseBytes)
 }
 
 // RPCHandlerGroup represents a collection of handlers with shared middleware.
@@ -596,8 +600,8 @@ func (hub *rpcConnectionHub) Set(conn *RPCConnection) {
 // Get retrieves a connection by its connection ID.
 // Returns nil if the connection doesn't exist.
 func (hub *rpcConnectionHub) Get(connID string) *RPCConnection {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
+	hub.mu.RLock()
+	defer hub.mu.RUnlock()
 
 	conn, ok := hub.connections[connID]
 	if !ok {
@@ -636,7 +640,7 @@ func (hub *rpcConnectionHub) Publish(userID string, message []byte) {
 		return
 	}
 
-	conn.WriteSink <- message
+	writeRPCMessageWithTimeout(conn.WriteSink, message)
 }
 
 // SafeStorage provides thread-safe key-value storage for connection-specific data.
@@ -671,4 +675,14 @@ func (s *SafeStorage) Get(key string) (any, bool) {
 	defer s.mu.RUnlock()
 
 	return s.storage[key], s.storage[key] != nil
+}
+
+func writeRPCMessageWithTimeout(writeSink chan<- []byte, message []byte) {
+	select {
+	case <-time.After(defaultRPCMessageWriteDuration):
+		// TODO: implement retry mechanism
+		return
+	case writeSink <- message:
+		return
+	}
 }

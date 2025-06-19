@@ -61,24 +61,17 @@ func NewRPCRouter(
 	privGroup := r.Node.NewGroup("private")
 	privGroup.Use(r.AuthMiddleware)
 	privGroup.Use(r.HistoryMiddleware)
-	privGroup.Handle("create_app_session", r.HandleCreateApplication)
-	privGroup.Handle("submit_state", r.HandleSubmitState)
-	privGroup.Handle("close_app_session", r.HandleCloseApplication)
 	privGroup.Handle("resize_channel", r.HandleResizeChannel)
 	privGroup.Handle("close_channel", r.HandleCloseChannel)
 
+	appSessionGroup := privGroup.NewGroup("app_session")
+	appSessionGroup.Use(r.BalanceUpdateMiddleware)
+	appSessionGroup.Handle("create_app_session", r.HandleCreateApplication)
+	appSessionGroup.Handle("submit_state", r.HandleSubmitState)
+	appSessionGroup.Handle("close_app_session", r.HandleCloseApplication)
+
 	return r
 }
-
-// TODO: Implement message forwarding logic
-// ON_FORWARD
-// if msg.AppSessionID != "" {
-// 	if err := forwardMessage(ctx, &msg, messageBytes, walletAddress, h); err != nil {
-// 		h.sendErrorResponse(walletAddress, nil, conn, "Failed to forward message: "+err.Error())
-// 		continue
-// 	}
-// 	continue
-// }
 
 func (r *RPCRouter) HandleConnect(send SendRPCMessageFunc) {
 	// Increment connection metrics
@@ -156,6 +149,8 @@ func (r *RPCRouter) LoggerMiddleware(c *RPCContext) {
 	logger.Info("handling RPC request",
 		"method", c.Message.Req.Method,
 		"userID", c.UserID)
+
+	c.Next()
 }
 
 func (r *RPCRouter) MetricsMiddleware(c *RPCContext) {

@@ -316,8 +316,8 @@ func HandleTransfer(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, 
 		if err != nil {
 			return err
 		}
-		if operations > 0 {
-			return fmt.Errorf("%s has blockchain operations in process, cannot execute operation", fromWallet)
+		if len(operations) > 0 {
+			return fmt.Errorf("complete blockchain operations first: %s channelID: %s", operations[0].Status, operations[0].ChannelID)
 		}
 
 		for _, alloc := range params.Allocations {
@@ -407,8 +407,8 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 			if err != nil {
 				return err
 			}
-			if operations > 0 {
-				return fmt.Errorf("%s has blockchain operations in process, cannot execute operation", walletAddress)
+			if len(operations) > 0 {
+				return fmt.Errorf("complete blockchain operations first: %s channelID: %s", operations[0].Status, operations[0].ChannelID)
 			}
 
 			ledger := GetWalletLedger(tx, walletAddress)
@@ -730,8 +730,8 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 			return err
 		}
 		// Allow to re-request payload even if user have already triggerrer the operation
-		if operations > 1 || (operations == 1 && channel.Status != ChannelStatusResizing) {
-			return fmt.Errorf("%s has blockchain operations in process, cannot execute operation", channel.Wallet)
+		if len(operations) > 1 || (len(operations) == 1 && channel.Status != ChannelStatusResizing) {
+			return fmt.Errorf("complete blockchain operations first: %s channelID: %s", operations[0].Status, operations[0].ChannelID)
 		}
 
 		if err := verifySigner(rpc, channel.Wallet); err != nil {
@@ -871,8 +871,8 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 			return err
 		}
 		// Allow to re-request payload even if user have already triggerrer the operation
-		if operations > 1 || (operations == 1 && channel.Status != ChannelStatusClosing) {
-			return fmt.Errorf("%s has blockchain operations in process, cannot execute operation", channel.Wallet)
+		if len(operations) > 1 || (len(operations) == 1 && channel.Status != ChannelStatusClosing) {
+			return fmt.Errorf("complete blockchain operations first: %s channelID: %s", operations[0].Status, operations[0].ChannelID)
 		}
 
 		if err := verifySigner(rpc, channel.Wallet); err != nil {
@@ -1128,14 +1128,14 @@ func verifySigner(rpc *RPCMessage, channelWallet string) error {
 	return nil
 }
 
-func checkProcessingOperations(tx *gorm.DB, wallet string) (int, error) {
+func checkProcessingOperations(tx *gorm.DB, wallet string) ([]Channel, error) {
 	channelsInProcess, err := getChannelsByWallet(tx, wallet,
 		string(ChannelStatusJoining),
 		string(ChannelStatusClosing),
 		string(ChannelStatusChallenged),
 		string(ChannelStatusResizing))
 	if err != nil {
-		return 0, fmt.Errorf("failed to check channels: %w", err)
+		return []Channel{}, fmt.Errorf("failed to check channels: %w", err)
 	}
-	return len(channelsInProcess), nil
+	return channelsInProcess, nil
 }

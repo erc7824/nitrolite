@@ -8,6 +8,7 @@ export interface AuthChallengeResponseParams {
     /** The challenge message to be signed by the client for authentication. */
     challenge_message: string;
 }
+export type AuthChallengeRPCResponseParams = AuthChallengeResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'auth_challenge' RPC method.
@@ -27,6 +28,7 @@ export interface AuthVerifyResponseParams {
     session_key: Address;
     success: boolean;
 }
+export type AuthVerifyRPCResponseParams = AuthVerifyResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'error' RPC method.
@@ -35,6 +37,7 @@ export interface ErrorResponseParams {
     /** The error message describing what went wrong. */
     error: string;
 }
+export type ErrorRPCResponseParams = ErrorResponseParams; // for backward compatibility
 
 /**
  * Represents the network information for the 'get_config' RPC method.
@@ -59,6 +62,7 @@ export interface GetConfigResponseParams {
   /** List of supported networks and their configurations. */
   networks: NetworkInfo[];
 }
+export type GetConfigRPCResponseParams = GetConfigResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'get_ledger_balances' RPC method.
@@ -69,6 +73,7 @@ export interface GetLedgerBalancesResponseParams {
     /** The balance amount as a string. */
     amount: string;
 }
+export type GetLedgerBalancesRPCResponseParams = GetLedgerBalancesResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'get_ledger_entries' RPC method.
@@ -91,6 +96,7 @@ export interface GetLedgerEntriesResponseParams {
     /** The timestamp when the entry was created. */
     created_at: string;
 }
+export type GetLedgerEntriesRPCResponseParams = GetLedgerEntriesResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'create_app_session' RPC method.
@@ -103,6 +109,7 @@ export interface CreateAppSessionResponseParams {
     /** The current status of the channel (e.g., "open", "closed"). */
     status: RPCChannelStatus;
 }
+export type CreateAppSessionRPCResponseParams = CreateAppSessionResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'submit_state' RPC method.
@@ -115,6 +122,7 @@ export interface SubmitStateResponseParams {
     /** The current status of the channel (e.g., "open", "closed"). */
     status: RPCChannelStatus;
 }
+export type SubmitStateRPCResponseParams = SubmitStateResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'close_app_session' RPC method.
@@ -127,6 +135,7 @@ export interface CloseAppSessionResponseParams {
     /** The current status of the channel (e.g., "open", "closed"). */
     status: RPCChannelStatus;
 }
+export type CloseAppSessionRPCResponseParams = CloseAppSessionResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'get_app_definition' RPC method.
@@ -145,6 +154,7 @@ export interface GetAppDefinitionResponseParams extends AppDefinition {
   /** A unique nonce value for the application session to prevent replay attacks. */
   nonce: number;
 }
+export type GetAppDefinitionRPCResponseParams = GetAppDefinitionResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'get_app_sessions' RPC method.
@@ -173,6 +183,7 @@ export interface GetAppSessionsResponseParams {
     /** The timestamp when the session was last updated. */
     updated_at: string;
 }
+export type GetAppSessionsRPCResponseParams = GetAppSessionsResponseParams; // for backward compatibility
 
 export interface ServerSignature {
   /** The recovery value of the signature. */
@@ -209,6 +220,7 @@ export interface ResizeChannelResponseParams {
     /** The server's signature for the state update. */
     server_signature: ServerSignature;
 }
+export type ResizeChannelRPCResponseParams = ResizeChannelResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'close_channel' RPC method.
@@ -229,6 +241,7 @@ export interface CloseChannelResponseParams {
     /** The server's signature for the state update. */
     server_signature: ServerSignature;
 }
+export type CloseChannelRPCResponseParams = CloseChannelResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'get_channels' RPC method.
@@ -261,6 +274,7 @@ export interface GetChannelsResponseParams {
     /** The timestamp when the channel was last updated. */
     updated_at: string;
 }
+export type GetChannelsRPCResponseParams = GetChannelsResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'get_rpc_history' RPC method.
@@ -285,6 +299,7 @@ export interface GetRPCHistoryResponseParams {
     /** The JSON string of the response. */
     response: string;
 }
+export type GetRPCHistoryRPCResponseParams = GetRPCHistoryResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'get_assets' RPC method.
@@ -299,6 +314,7 @@ export interface GetAssetsResponseParams {
     /** The number of decimal places for the asset. */
     decimals: number;
 }
+export type GetAssetsRPCResponseParams = GetAssetsResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for an error response.
@@ -427,6 +443,7 @@ export interface AuthRequestResponseParams {
     /** The challenge message to be signed by the client for authentication. */
     challenge_message: string;
 }
+export type AuthRequestRPCResponseParams = AuthRequestResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'auth_request' RPC method.
@@ -442,6 +459,7 @@ export interface AuthRequestResponse extends GenericRPCMessage {
 export interface MessageResponseParams {
     // Message response parameters are handled by the application
 }
+export type MessageRPCResponseParams = MessageResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'message' RPC method.
@@ -460,6 +478,7 @@ export interface BalanceUpdateResponseParams {
     /** The balance amount as a string. */
     amount: string;
 }
+export type BalanceUpdateRPCResponseParams = BalanceUpdateResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'balance_update' RPC method.
@@ -506,6 +525,7 @@ export interface ChannelUpdateResponseParams {
     /** The timestamp when the channel was last updated. */
     updated_at: string;
 }
+export type ChannelUpdateRPCResponseParams = ChannelUpdateResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'channel_update' RPC method.
@@ -521,6 +541,7 @@ export interface ChannelUpdateResponse extends GenericRPCMessage {
 export interface PingResponseParams {
     // No parameters needed for ping
 }
+export type PingRPCResponseParams = PingResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'ping' RPC method.
@@ -536,6 +557,7 @@ export interface PingResponse extends GenericRPCMessage {
 export interface PongResponseParams {
     // No parameters needed for pong
 }
+export type PongRPCResponseParams = PongResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'pong' RPC method.

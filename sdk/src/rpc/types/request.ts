@@ -8,6 +8,7 @@ export interface AuthChallengeRequestParams {
     /** The challenge message to be signed by the client for authentication. */
     challenge_message: string;
 }
+export type AuthChallengeRPCRequestParams = AuthChallengeRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'auth_challenge' RPC method.
@@ -32,6 +33,7 @@ export type AuthVerifyRequestParams =
     challenge: string;
     jwt?: never;
   };
+export type AuthVerifyRPCRequestParams = AuthVerifyRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'auth_verify' RPC method.
@@ -58,6 +60,7 @@ export interface GetLedgerBalancesRequestParams {
     /** Optional account ID to filter balances. If provided, overrides the participant address. */
     account_id?: string;
 }
+export type GetLedgerBalancesRPCRequestParams = GetLedgerBalancesRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'get_ledger_balances' RPC method.
@@ -78,6 +81,7 @@ export interface GetLedgerEntriesRequestParams {
     /** Optional wallet address to filter ledger entries. If provided, overrides the authenticated wallet. */
     wallet?: Address;
 }
+export type GetLedgerEntriesRPCRequestParams = GetLedgerEntriesRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'get_ledger_entries' RPC method.
@@ -109,6 +113,7 @@ export interface CreateAppSessionRequestParams {
     /** The initial allocation distribution among participants. Each participant must have sufficient balance for their allocation. */
     allocations: AppSessionAllocation[];
 }
+export type CreateAppSessionRPCRequestParams = CreateAppSessionRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'create_app_session' RPC method.
@@ -127,6 +132,7 @@ export interface SubmitStateRequestParams {
     /** The new allocation distribution among participants. Must include all participants and maintain total balance. */
     allocations: AppSessionAllocation[];
 }
+export type SubmitStateRPCRequestParams = SubmitStateRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'submit_state' RPC method.
@@ -145,6 +151,7 @@ export interface CloseAppSessionRequestParams {
     /** The final allocation distribution among participants upon closing. Must include all participants and maintain total balance. */
     allocations: AppSessionAllocation[];
 }
+export type CloseAppSessionRPCRequestParams = CloseAppSessionRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'close_app_session' RPC method.
@@ -161,6 +168,7 @@ export interface GetAppDefinitionRequestParams {
     /** The unique identifier of the application session to retrieve. */
     app_session_id: Hex;
 }
+export type GetAppDefinitionRPCRequestParams = GetAppDefinitionRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'get_app_definition' RPC method.
@@ -179,6 +187,7 @@ export interface GetAppSessionsRequestParams {
     /** The status to filter application sessions (e.g., "open", "closed"). */
     status: RPCChannelStatus;
 }
+export type GetAppSessionsRPCRequestParams = GetAppSessionsRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'get_app_sessions' RPC method.
@@ -201,6 +210,7 @@ export type ResizeChannelRequestParams = {
     /** The address where the resized funds will be sent. */
     funds_destination: Address;
 };
+export type ResizeChannelRPCRequestParams = ResizeChannelRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'resize_channel' RPC method.
@@ -219,6 +229,7 @@ export interface CloseChannelRequestParams {
     /** The address where the channel funds will be sent upon closing. */
     funds_destination: Address;
 }
+export type CloseChannelRPCRequestParams = CloseChannelRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'close_channel' RPC method.
@@ -237,6 +248,7 @@ export interface GetChannelsRequestParams {
     /** The status to filter channels (e.g., "open", "closed"). */
     status: RPCChannelStatus;
 }
+export type GetChannelsRPCRequestParams = GetChannelsRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'get_channels' RPC method.
@@ -261,6 +273,7 @@ export interface GetAssetsRequestParams {
     /** Optional chain ID to filter assets by network. If not provided, returns assets from all networks. */
     chain_id?: number;
 }
+export type GetAssetsRPCRequestParams = GetAssetsRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'get_assets' RPC method.
@@ -299,6 +312,7 @@ export interface AuthRequestParams {
     /** The application address being authorized. */
     application: Address;
 }
+export type AuthRequestRPCRequestParams = AuthRequestParams; // for backward compatibility
 
 /**
  * Represents the request structure for the 'auth_request' RPC method.

@@ -14,6 +14,23 @@ import (
 	"gorm.io/gorm"
 )
 
+func (r *RPCRouter) BalanceUpdateMiddleware(c *RPCContext) {
+	logger := LoggerFromContext(c.Context)
+	walletAddress := c.UserID
+
+	c.Next()
+
+	// Send new balances
+	balances, err := GetWalletLedger(r.DB, walletAddress).GetBalances(walletAddress)
+	if err != nil {
+		logger.Error("error getting balances", "sender", walletAddress, "error", err)
+		return
+	}
+	r.Node.Notify(c.UserID, "bu", balances)
+
+	// TODO: notify other participants
+}
+
 // HandleCreateApplication creates a virtual application between participants
 func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 	ctx := c.Context

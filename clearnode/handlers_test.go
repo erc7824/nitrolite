@@ -1432,7 +1432,7 @@ func TestHandleCreateAppSession(t *testing.T) {
 		// Call handler
 		_, err = HandleCreateApplication(nil, rpcReq, db)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "has challenged channels")
+		assert.Contains(t, err.Error(), "complete blockchain operations first: challenged channelID: 0xChannelA")
 	})
 }
 
@@ -1687,6 +1687,7 @@ func TestHandleTransfer(t *testing.T) {
 		// Verify response
 		assert.Equal(t, "transfer", resp.Res.Method)
 		assert.Equal(t, uint64(42), resp.Res.RequestID)
+
 		// Verify response structure
 		transferResp, ok := resp.Res.Params[0].(*TransferResponse)
 		require.True(t, ok, "Response should be a TransferResponse")
@@ -2040,6 +2041,64 @@ func TestHandleTransfer(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid signature")
 	})
+	t.Run("ErrorResizingChannel", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		token := "0xTokenXYZ"
+		for i, p := range []string{senderAddr, recipientAddr} {
+			ch := &Channel{
+				ChannelID:   fmt.Sprintf("0xChannel%c", 'A'+i),
+				Wallet:      p,
+				Participant: p,
+				Status:      ChannelStatusResizing,
+				Token:       token,
+				Nonce:       1,
+			}
+			require.NoError(t, db.Create(ch).Error)
+			require.NoError(t, db.Create(&SignerWallet{
+				Signer: p, Wallet: p,
+			}).Error)
+		}
+
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "eth", decimal.NewFromInt(5)))
+
+		// Create transfer parameters
+		transferParams := Transfer{
+			Destination: recipientAddr,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+				{AssetSymbol: "eth", Amount: decimal.NewFromInt(2)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		rpcReq := &RPCMessage{
+			Req: &RPCData{
+				RequestID: 42,
+				Method:    "transfer",
+				Params:    []any{transferParams},
+				Timestamp: ts,
+			},
+		}
+
+		// Marshal and sign the request
+		rawReq, err := json.Marshal(rpcReq.Req)
+		require.NoError(t, err)
+		rpcReq.Req.rawBytes = rawReq
+
+		signed, err := senderSigner.Sign(rawReq)
+		require.NoError(t, err)
+		rpcReq.Sig = []string{hexutil.Encode(signed)}
+
+		// Call handler
+		policy := &Policy{Wallet: senderAddr}
+		_, err = HandleTransfer(policy, rpcReq, db)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "complete blockchain operations first: resizing channelID: 0xChannelA")
+	})
 }
 
 func TestHandleResizeChannel(t *testing.T) {
@@ -2126,7 +2185,7 @@ func TestHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
 		assert.Equal(t, initialAmount, unchangedChannel.Amount) // Should remain unchanged
 		assert.Equal(t, ch.Version, unchangedChannel.Version)   // Should remain unchanged
-		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
+		assert.Equal(t, ChannelStatusResizing, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(addr, "usdc")
@@ -2404,7 +2463,7 @@ func TestHandleResizeChannel(t *testing.T) {
 
 		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "has challenged channels")
+		assert.Contains(t, err.Error(), "complete blockchain operations first: challenged channelID: 0xChanChallenged")
 	})
 
 	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
@@ -2461,7 +2520,7 @@ func TestHandleResizeChannel(t *testing.T) {
 
 		_, err = HandleResizeChannel(nil, rpcReq, db, &signer)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "insufficient unified balance")
+		assert.Contains(t, err.Error(), "channel amount exceeds ledger balance. resize down this channel first")
 	})
 
 	t.Run("ErrorZeroAmounts", func(t *testing.T) {
@@ -2907,7 +2966,7 @@ func TestHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
 		assert.Equal(t, initialAmount, unchangedChannel.Amount) // Should remain unchanged
 		assert.Equal(t, ch.Version, unchangedChannel.Version)   // Should remain unchanged
-		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
+		assert.Equal(t, ChannelStatusResizing, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(addr, "usdc")
@@ -2998,7 +3057,7 @@ func TestHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
 		assert.Equal(t, initialAmount, unchangedChannel.Amount) // Should remain unchanged
 		assert.Equal(t, ch.Version, unchangedChannel.Version)   // Should remain unchanged
-		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
+		assert.Equal(t, ChannelStatusResizing, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(addr, "usdc")
@@ -3158,6 +3217,6 @@ func TestHandleCloseChannel(t *testing.T) {
 		// Call handler
 		_, err = HandleCloseChannel(nil, rpcReq, db, &signer)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "has challenged channels")
+		assert.Contains(t, err.Error(), "failed to close channel: complete blockchain operations first: challenged channelID: 0xChanChallenged")
 	})
 }

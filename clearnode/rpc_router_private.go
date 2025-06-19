@@ -31,6 +31,41 @@ func (r *RPCRouter) BalanceUpdateMiddleware(c *RPCContext) {
 	// TODO: notify other participants
 }
 
+// HandleGetLedgerBalances returns a list of participants and their balances for a ledger account
+func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+	walletAddress := c.UserID
+
+	var account string
+	if len(req.Params) > 0 {
+		if paramsJSON, err := json.Marshal(req.Params[0]); err == nil {
+			var params map[string]string
+			if err := json.Unmarshal(paramsJSON, &params); err == nil {
+				account = params["participant"]
+				if id, ok := params["account_id"]; ok {
+					account = id
+				}
+			}
+		}
+	}
+
+	if account == "" {
+		account = walletAddress
+	}
+
+	ledger := GetWalletLedger(r.DB, walletAddress)
+	balances, err := ledger.GetBalances(account)
+	if err != nil {
+		logger.Error("failed to get ledger balances", "error", err)
+		c.Fail("failed to get ledger balances")
+		return
+	}
+
+	c.Succeed(req.Method, balances)
+}
+
 // HandleCreateApplication creates a virtual application between participants
 func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 	ctx := c.Context

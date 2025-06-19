@@ -312,9 +312,12 @@ func HandleTransfer(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, 
 			fromWallet = wallet
 		}
 
-		_, err := checkProcessingOperations(tx, fromWallet)
+		operations, err := checkProcessingOperations(tx, fromWallet)
 		if err != nil {
 			return err
+		}
+		if operations > 0 {
+			return fmt.Errorf("%s has blockchain operations in process, cannot execute operation", fromWallet)
 		}
 
 		for _, alloc := range params.Allocations {
@@ -400,9 +403,12 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 				walletAddress = wallet
 			}
 
-			_, err := checkProcessingOperations(tx, walletAddress)
+			operations, err := checkProcessingOperations(tx, walletAddress)
 			if err != nil {
 				return err
+			}
+			if operations > 0 {
+				return fmt.Errorf("%s has blockchain operations in process, cannot execute operation", walletAddress)
 			}
 
 			ledger := GetWalletLedger(tx, walletAddress)
@@ -721,11 +727,11 @@ func HandleResizeChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *S
 
 		operations, err := checkProcessingOperations(tx, channel.Wallet)
 		if err != nil {
-			if operations == 1 && channel.Status == ChannelStatusResizing {
-				// Allow to re-request payload even if user have already triggerrer the operation
-			} else {
-				return err
-			}
+			return err
+		}
+		// Allow to re-request payload even if user have already triggerrer the operation
+		if operations > 1 || (operations == 1 && channel.Status != ChannelStatusResizing) {
+			return fmt.Errorf("%s has blockchain operations in process, cannot execute operation", channel.Wallet)
 		}
 
 		if err := verifySigner(rpc, channel.Wallet); err != nil {
@@ -862,11 +868,11 @@ func HandleCloseChannel(policy *Policy, rpc *RPCMessage, db *gorm.DB, signer *Si
 
 		operations, err := checkProcessingOperations(tx, channel.Wallet)
 		if err != nil {
-			if operations == 1 && channel.Status == ChannelStatusClosing {
-				// Allow to re-request payload even if user have already triggerrer the operation
-			} else {
-				return err
-			}
+			return err
+		}
+		// Allow to re-request payload even if user have already triggerrer the operation
+		if operations > 1 || (operations == 1 && channel.Status != ChannelStatusClosing) {
+			return fmt.Errorf("%s has blockchain operations in process, cannot execute operation", channel.Wallet)
 		}
 
 		if err := verifySigner(rpc, channel.Wallet); err != nil {
@@ -1131,8 +1137,5 @@ func checkProcessingOperations(tx *gorm.DB, wallet string) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to check channels: %w", err)
 	}
-	if len(channelsInProcess) > 0 {
-		return len(channelsInProcess), fmt.Errorf("%s has blockchain operations in process, cannot execute operation", wallet)
-	}
-	return 0, nil
+	return len(channelsInProcess), nil
 }

@@ -1,6 +1,6 @@
 import { Identity } from '@/identity';
 import { CONFIG } from '@/setup';
-import { AuthChallengePredicate, AuthVerifyPredicate, TestWebSocket } from '@/ws';
+import { getAuthChallengePredicate, getAuthVerifyPredicate, TestWebSocket } from '@/ws';
 import {
     Allowance,
     AuthChallengeRPCResponse,
@@ -20,7 +20,7 @@ describe('Clearnode Authentication', () => {
         ws.close();
     });
 
-    const identity = new Identity(CONFIG.IDENTITIES[0].walletPrivateKey, CONFIG.IDENTITIES[0].sessionPrivateKey);
+    const identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);
 
     const authRequestParams: AuthRequest = {
         wallet: identity.walletAddress,
@@ -57,7 +57,7 @@ describe('Clearnode Authentication', () => {
         await ws.connect();
 
         const msg = await createAuthRequestMessage(authRequestParams);
-        const response = await ws.sendAndWaitForResponse(msg, AuthChallengePredicate, 1000);
+        const response = await ws.sendAndWaitForResponse(msg, getAuthChallengePredicate(), 1000);
         expect(response).toBeDefined();
 
         parsedChallengeResponse = parseRPCResponse(response) as AuthChallengeRPCResponse;
@@ -79,7 +79,7 @@ describe('Clearnode Authentication', () => {
 
     it('should verify identity with EIP712 signature from challenge response', async () => {
         const msg = await createAuthVerifyMessage(eip712MessageSigner, parsedChallengeResponse);
-        const response = await ws.sendAndWaitForResponse(msg, AuthVerifyPredicate, 1000);
+        const response = await ws.sendAndWaitForResponse(msg, getAuthVerifyPredicate(), 1000);
         expect(response).toBeDefined();
 
         const parsedAuthVerifyResponse = parseRPCResponse(response) as AuthVerifyRPCResponse;
@@ -99,7 +99,7 @@ describe('Clearnode Authentication', () => {
         await ws.connect();
 
         const msg = await createAuthVerifyMessageWithJWT(jwtToken);
-        const response = await ws.sendAndWaitForResponse(msg, AuthVerifyPredicate, 1000);
+        const response = await ws.sendAndWaitForResponse(msg, getAuthVerifyPredicate(), 1000);
         expect(response).toBeDefined();
 
         const parsedAuthVerifyResponse = parseRPCResponse(response) as AuthVerifyRPCResponse;

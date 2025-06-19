@@ -1,5 +1,5 @@
 import { CONFIG } from '@/setup';
-import { PongPredicate, TestWebSocket } from '@/ws';
+import { getPongPredicate, TestWebSocket } from '@/ws';
 
 describe('Clearnode Connection', () => {
     let ws: TestWebSocket;
@@ -16,7 +16,7 @@ describe('Clearnode Connection', () => {
         await ws.connect();
 
         const msg = JSON.stringify({ req: [0, 'ping', [], Date.now()], sig: [] });
-        const response = await ws.sendAndWaitForResponse(msg, PongPredicate, 1000);
+        const response = await ws.sendAndWaitForResponse(msg, getPongPredicate(), 1000);
 
         expect(response).toBeDefined();
     });

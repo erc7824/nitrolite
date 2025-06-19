@@ -245,26 +245,8 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 	var ch Channel
 	err = c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
-		eventData, err := MarshalEvent(*ev)
-		if err != nil {
-			return err
-		}
-
-		contractEvent := &ContractEvent{
-			ID:              0,
-			ContractAddress: c.custodyAddr.Hex(),
-			ChainID:         c.chainID,
-			Name:            "created",
-			BlockNumber:     ev.Raw.BlockNumber,
-			TransactionHash: ev.Raw.TxHash.Hex(),
-			LogIndex:        uint32(ev.Raw.Index),
-			Data:            eventData,
-			CreatedAt:       time.Time{},
-		}
-
-		err = StoreContractEvent(tx, contractEvent)
-		if err != nil {
-			return err
+		if err := c.saveContractEvent(tx, "created", *ev, ev.Raw); err != nil {
+			return fmt.Errorf("failed to save created event: %w", err)
 		}
 
 		ch, err = CreateChannel(
@@ -326,25 +308,7 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
-		eventData, err := MarshalEvent(*ev)
-		if err != nil {
-			return err
-		}
-
-		contractEvent := &ContractEvent{
-			ID:              0,
-			ContractAddress: c.custodyAddr.Hex(),
-			ChainID:         c.chainID,
-			Name:            "joined",
-			BlockNumber:     ev.Raw.BlockNumber,
-			TransactionHash: ev.Raw.TxHash.Hex(),
-			LogIndex:        uint32(ev.Raw.Index),
-			Data:            eventData,
-			CreatedAt:       time.Time{},
-		}
-
-		err = StoreContractEvent(tx, contractEvent)
-		if err != nil {
+		if err := c.saveContractEvent(tx, "joined", *ev, ev.Raw); err != nil {
 			return err
 		}
 
@@ -401,26 +365,8 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
-		eventData, err := MarshalEvent(*ev)
-		if err != nil {
-			return err
-		}
-
-		contractEvent := &ContractEvent{
-			ID:              0,
-			ContractAddress: c.custodyAddr.Hex(),
-			ChainID:         c.chainID,
-			Name:            "challenged",
-			BlockNumber:     ev.Raw.BlockNumber,
-			TransactionHash: ev.Raw.TxHash.Hex(),
-			LogIndex:        uint32(ev.Raw.Index),
-			Data:            eventData,
-			CreatedAt:       time.Time{},
-		}
-
-		err = StoreContractEvent(tx, contractEvent)
-		if err != nil {
-			return err
+		if err := c.saveContractEvent(tx, "challenged", *ev, ev.Raw); err != nil {
+			return fmt.Errorf("failed to save challenged event: %w", err)
 		}
 
 		result := tx.Where("channel_id = ?", channelID).First(&channel)
@@ -454,26 +400,8 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
-		eventData, err := MarshalEvent(*ev)
-		if err != nil {
-			return err
-		}
-
-		contractEvent := &ContractEvent{
-			ID:              0,
-			ContractAddress: c.custodyAddr.Hex(),
-			ChainID:         c.chainID,
-			Name:            "resized",
-			BlockNumber:     ev.Raw.BlockNumber,
-			TransactionHash: ev.Raw.TxHash.Hex(),
-			LogIndex:        uint32(ev.Raw.Index),
-			Data:            eventData,
-			CreatedAt:       time.Time{},
-		}
-
-		err = StoreContractEvent(tx, contractEvent)
-		if err != nil {
-			return err
+		if err := c.saveContractEvent(tx, "resized", *ev, ev.Raw); err != nil {
+			return fmt.Errorf("failed to save resized event: %w", err)
 		}
 
 		result := tx.Where("channel_id = ?", channelID).First(&channel)
@@ -554,26 +482,8 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
-		eventData, err := MarshalEvent(*ev)
-		if err != nil {
-			return err
-		}
-
-		contractEvent := &ContractEvent{
-			ID:              0,
-			ContractAddress: c.custodyAddr.Hex(),
-			ChainID:         c.chainID,
-			Name:            "closed",
-			BlockNumber:     ev.Raw.BlockNumber,
-			TransactionHash: ev.Raw.TxHash.Hex(),
-			LogIndex:        uint32(ev.Raw.Index),
-			Data:            eventData,
-			CreatedAt:       time.Time{},
-		}
-
-		err = StoreContractEvent(tx, contractEvent)
-		if err != nil {
-			return err
+		if err := c.saveContractEvent(tx, "closed", *ev, ev.Raw); err != nil {
+			return fmt.Errorf("failed to save closed event: %w", err)
 		}
 
 		result := tx.Where("channel_id = ?", channelID).First(&channel)
@@ -607,7 +517,6 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 			return err
 		}
 
-		// Update the channel status to "closed"
 		channel.Status = ChannelStatusClosed
 		channel.Amount = 0
 		channel.UpdatedAt = time.Now()
@@ -707,4 +616,24 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 	count := len(openChannels[0])
 	metrics.BrokerChannelCount.With(prometheus.Labels{"network": fmt.Sprintf("%d", c.chainID)}).Set(float64(count))
 	logger.Debug("open channels metric updated", "network", c.chainID, "channels", count)
+}
+
+func (c *Custody) saveContractEvent(tx *gorm.DB, name string, event any, rawLog types.Log) error {
+	eventData, err := MarshalEvent(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event data for %s: %w", name, err)
+	}
+
+	contractEvent := &ContractEvent{
+		ContractAddress: c.custodyAddr.Hex(),
+		ChainID:         c.chainID,
+		Name:            name,
+		BlockNumber:     rawLog.BlockNumber,
+		TransactionHash: rawLog.TxHash.Hex(),
+		LogIndex:        uint32(rawLog.Index),
+		Data:            eventData,
+		CreatedAt:       time.Now(),
+	}
+
+	return StoreContractEvent(tx, contractEvent)
 }

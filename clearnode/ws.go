@@ -369,6 +369,15 @@ func (h *UnifiedWSHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to get channels: "+handlerErr.Error())
 				continue
 			}
+		case "transfer":
+			rpcResponse, handlerErr = HandleTransfer(policy, &msg, h.db)
+			if handlerErr != nil {
+				logger.Warn("error handling transfer", "error", handlerErr)
+				h.sendErrorResponse(walletAddress, &msg, conn, "Failed to transfer: "+handlerErr.Error())
+				continue
+			}
+			h.sendBalanceUpdate(walletAddress)
+			recordHistory = true
 		case "create_app_session":
 			rpcResponse, handlerErr = HandleCreateApplication(policy, &msg, h.db)
 			if handlerErr != nil {

@@ -276,7 +276,7 @@ export async function createAppSessionWithSignatures(roomId) {
 
           if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleAppSessionResponse);
-            reject(new Error(`Error ${message.method}: ${message.params[0]}`));
+            reject(new Error(`Error: ${message.params[0].error}`));
           }
         } catch (error) {
           logger.error('Error handling app session response:', error);
@@ -422,7 +422,7 @@ export async function createAppSession(roomId, participantA, participantB, betAm
           // Also check for error responses
           if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleAppSessionResponse);
-            reject(new Error(`Error ${message.method}: ${message.params[0]}`));
+            reject(new Error(`Error: ${message.params[0].error}`));
           }
         } catch (error) {
           logger.error('Error handling app session response:', error);
@@ -639,7 +639,7 @@ export async function closeAppSession(roomId, allocations) {
           // Also check for error responses
           if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleCloseSessionResponse);
-            reject(new Error(`Error ${message.method}: ${message.params[0]}`));
+            reject(new Error(`Error: ${message.params[0].error}`));
           }
         } catch (error) {
           logger.error('Error handling close session response:', error);

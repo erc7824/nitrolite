@@ -340,7 +340,7 @@ export class NitroliteRPCClient {
             if (message.method === RPCMethod.Error) {
                 if (this.pendingRequests.has(requestId)) {
                     const { reject } = this.pendingRequests.get(requestId);
-                    reject(new Error(`Error: requestId ${message.requestId}: ${message.params}`));
+                    reject(new Error(`Error: ${message.params[0].error}`));
                     this.pendingRequests.delete(requestId);
                 }
             }

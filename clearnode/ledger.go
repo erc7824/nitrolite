@@ -55,30 +55,6 @@ func (l *WalletLedger) Record(accountID string, assetSymbol string, amount decim
 	return l.db.Create(entry).Error
 }
 
-func (l *WalletLedger) Transfer(fromAccountID, toAccountID, assetSymbol string, amount decimal.Decimal) error {
-	balance, err := l.Balance(l.wallet, assetSymbol)
-	if err != nil {
-		return fmt.Errorf("failed to check participant balance: %w", err)
-	}
-
-	if amount.GreaterThan(balance) {
-		return fmt.Errorf("insufficient funds: %s for asset %s", l.wallet, assetSymbol)
-	}
-
-	if amount.IsNegative() || balance.IsNegative() {
-		return fmt.Errorf("invalid transfer")
-	}
-
-	if err = l.Record(fromAccountID, assetSymbol, amount.Neg()); err != nil {
-		return fmt.Errorf("failed to debit source account: %w", err)
-	}
-	if err = l.Record(toAccountID, assetSymbol, amount); err != nil {
-		return fmt.Errorf("failed to credit destination account: %w", err)
-	}
-
-	return nil
-}
-
 func (l *WalletLedger) Balance(accountID string, assetSymbol string) (decimal.Decimal, error) {
 	type result struct {
 		Balance decimal.Decimal `gorm:"column:balance"`

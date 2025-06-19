@@ -317,12 +317,25 @@ func HandleTransfer(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, 
 		}
 
 		for _, alloc := range params.Allocations {
-			if alloc.Amount.IsZero() {
-				return fmt.Errorf("invalid allocation: zero amount")
+			if alloc.Amount.IsZero() || alloc.Amount.IsNegative() {
+				return fmt.Errorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 			ledger := GetWalletLedger(tx, fromWallet)
-			if err := ledger.Transfer(fromWallet, params.Destination, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return fmt.Errorf("failed to transfer funds: %w", err)
+			balance, err := ledger.Balance(fromWallet, alloc.AssetSymbol)
+			if err != nil {
+				return fmt.Errorf("failed to check participant balance: %w", err)
+			}
+
+			if alloc.Amount.GreaterThan(balance) {
+				return fmt.Errorf("insufficient funds: %s for asset %s", fromWallet, alloc.AssetSymbol)
+			}
+
+			if err = ledger.Record(fromWallet, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
+				return fmt.Errorf("failed to debit source account: %w", err)
+			}
+			ledger = GetWalletLedger(tx, params.Destination)
+			if err = ledger.Record(params.Destination, alloc.AssetSymbol, alloc.Amount); err != nil {
+				return fmt.Errorf("failed to credit destination account: %w", err)
 			}
 		}
 
@@ -378,7 +391,9 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 					return fmt.Errorf("missing signature for participant %s", alloc.ParticipantWallet)
 				}
 			}
-
+			if alloc.Amount.IsNegative() {
+				return fmt.Errorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+			}
 			walletAddress := alloc.ParticipantWallet
 			if wallet := GetWalletBySigner(alloc.ParticipantWallet); wallet != "" {
 				walletAddress = wallet
@@ -389,8 +404,20 @@ func HandleCreateApplication(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 			}
 
 			ledger := GetWalletLedger(tx, walletAddress)
-			if err := ledger.Transfer(walletAddress, appSessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return fmt.Errorf("failed to transfer funds: %w", err)
+			balance, err := ledger.Balance(walletAddress, alloc.AssetSymbol)
+			if err != nil {
+				return fmt.Errorf("failed to check participant balance: %w", err)
+			}
+
+			if alloc.Amount.GreaterThan(balance) {
+				return fmt.Errorf("insufficient funds: %s for asset %s", walletAddress, alloc.AssetSymbol)
+			}
+
+			if err = ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
+				return fmt.Errorf("failed to debit source account: %w", err)
+			}
+			if err = ledger.Record(appSessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
+				return fmt.Errorf("failed to credit destination account: %w", err)
 			}
 		}
 

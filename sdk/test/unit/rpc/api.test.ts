@@ -15,6 +15,7 @@ import {
     createCloseChannelMessage,
     createResizeChannelMessage,
     createGetChannelsMessage,
+    createTransferMessage,
     createECDSAMessageSigner,
 } from '../../../src/rpc/api';
 import {
@@ -26,6 +27,7 @@ import {
     RPCMethod,
     RPCChannelStatus,
     RequestData,
+    TransferAllocation,
 } from '../../../src/rpc/types';
 
 describe('API message creators', () => {
@@ -272,6 +274,28 @@ describe('API message creators', () => {
                 [{ participant: '0x0123124124124131', status: RPCChannelStatus.Open }],
                 timestamp,
             ],
+            sig: ['0xsig'],
+        });
+    });
+
+    test('createTransferMessage', async () => {
+        const destination = '0x1234567890123456789012345678901234567890' as Address;
+        const allocations: TransferAllocation[] = [
+            {
+                asset: 'USDC',
+                amount: '100.5',
+            },
+            {
+                asset: 'ETH',
+                amount: '0.25',
+            },
+        ];
+        const transferParams = [{ destination, allocations }];
+        const msgStr = await createTransferMessage(signer, destination, allocations, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Transfer, transferParams, timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, RPCMethod.Transfer, transferParams, timestamp],
             sig: ['0xsig'],
         });
     });

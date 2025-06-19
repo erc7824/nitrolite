@@ -1,5 +1,5 @@
 import { Address, Hex } from 'viem';
-import { RPCMethod, RequestID, Timestamp, AppDefinition, RPCChannelStatus } from '.';
+import { RPCMethod, RequestID, Timestamp, AppDefinition, RPCChannelStatus, TransferAllocation } from '.';
 
 /**
  * Represents a generic RPC message structure that includes common fields.
@@ -549,6 +549,28 @@ export interface PongRPCResponse extends GenericRPCMessage {
 }
 
 /**
+ * Represents the parameters for the 'transfer' RPC method.
+ */
+export interface TransferRPCResponseParams {
+    /** The source address from which assets were transferred. */
+    from: Address;
+    /** The destination address to which assets were transferred. */
+    to: Address;
+    /** The assets and amounts that were transferred. */
+    allocations: TransferAllocation[];
+    /** The timestamp when the transfer was created. */
+    created_at: string;
+}
+
+/**
+ * Represents the response structure for the 'transfer' RPC method.
+ */
+export interface TransferRPCResponse extends GenericRPCMessage {
+    method: RPCMethod.Transfer;
+    params: TransferRPCResponseParams;
+}
+
+/**
  * Union type for all possible RPC response types.
  * This allows for type-safe handling of different response structures.
  */
@@ -575,7 +597,8 @@ export type RPCResponse =
     | MessageRPCResponse
     | BalanceUpdateRPCResponse
     | ChannelsUpdateRPCResponse
-    | ChannelUpdateRPCResponse;
+    | ChannelUpdateRPCResponse
+    | TransferRPCResponse;
 
 /**
  * Maps RPC methods to their corresponding parameter types.
@@ -604,4 +627,5 @@ export type RPCResponseParamsByMethod = {
     [RPCMethod.BalanceUpdate]: BalanceUpdateRPCResponseParams[];
     [RPCMethod.ChannelsUpdate]: ChannelUpdateRPCResponseParams[];
     [RPCMethod.ChannelUpdate]: ChannelUpdateRPCResponseParams;
+    [RPCMethod.Transfer]: TransferRPCResponseParams;
 };

@@ -25,6 +25,14 @@ export enum RPCChannelStatus {
     Closed = 'closed',
 }
 
+/** Base type for asset allocations with common asset and amount fields. */
+export type AssetAllocation = {
+    /** The symbol of the asset (e.g., "USDC", "USDT", "ETH"). */
+    asset: string;
+    /** The amount of the asset. Must be a positive number. */
+    amount: string;
+};
+
 /** Represents a single allowance for an asset, used in application sessions.
  * This structure defines the symbol of the asset and the amount that is allowed to be spent.
  */
@@ -39,14 +47,15 @@ export type Allowance = {
  * This structure is used to define the initial allocation of assets among participants.
  * It includes the participant's address, the asset (usdc, usdt, etc) being allocated, and the amount.
  */
-export type AppSessionAllocation = {
+export type AppSessionAllocation = AssetAllocation & {
     /** The Ethereum address of the participant receiving the allocation. */
     participant: Address;
-    /** The symbol of the asset being allocated (e.g., "USDC", "USDT"). */
-    asset: string;
-    /** The amount of the asset being allocated. Must be a positive number. */
-    amount: string;
 };
+
+/** Represents the allocation of assets for a transfer.
+ * This structure is used to define the asset and amount being transferred.
+ */
+export type TransferAllocation = AssetAllocation;
 
 /**
  * Represents the structure of an error object within an error response payload.
@@ -345,4 +354,5 @@ export enum RPCMethod {
     ChannelUpdate = 'cu',
     Ping = 'ping',
     Pong = 'pong',
+    Transfer = 'transfer',
 }

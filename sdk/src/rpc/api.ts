@@ -18,6 +18,7 @@ import {
     RPCMethod,
     RPCChannelStatus,
     ResponsePayload,
+    TransferAllocation,
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
@@ -438,6 +439,30 @@ export async function createGetAssetsMessage(
         },
     ];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetAssets, params, timestamp);
+    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+
+    return JSON.stringify(signedRequest);
+}
+
+/**
+ * Creates the signed, stringified message body for a 'transfer' request.
+ *
+ * @param signer - The function to sign the request payload.
+ * @param destination - The destination address to transfer assets to.
+ * @param allocations - The assets and amounts to transfer.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ */
+export async function createTransferMessage(
+    signer: MessageSigner,
+    destination: Address,
+    allocations: TransferAllocation[],
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const params = [{ destination, allocations }];
+    const request = NitroliteRPC.createRequest(requestId, RPCMethod.Transfer, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);

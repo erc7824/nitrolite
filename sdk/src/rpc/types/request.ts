@@ -5,6 +5,7 @@ import {
     Timestamp,
     AppDefinition,
     AppSessionAllocation,
+    TransferAllocation,
     RPCChannelStatus as RPCChannelStatus,
 } from '.';
 
@@ -378,6 +379,24 @@ export interface PongRPCRequest extends GenericRPCMessage {
 }
 
 /**
+ * Represents the request parameters for the 'transfer' RPC method.
+ */
+export interface TransferRPCRequestParams {
+    /** The destination address to transfer assets to. */
+    destination: Address;
+    /** The assets and amounts to transfer. */
+    allocations: TransferAllocation[];
+}
+
+/**
+ * Represents the request structure for the 'transfer' RPC method.
+ */
+export interface TransferRPCRequest extends GenericRPCMessage {
+    method: RPCMethod.Transfer;
+    params: TransferRPCRequestParams;
+}
+
+/**
  * Union type for all possible RPC request types.
  * This allows for type-safe handling of different request structures.
  */
@@ -400,7 +419,8 @@ export type RPCRequest =
     | GetAssetsRPCRequest
     | PingRPCRequest
     | PongRPCRequest
-    | MessageRPCRequest;
+    | MessageRPCRequest
+    | TransferRPCRequest;
 
 /**
  * Maps RPC methods to their corresponding request parameter types.
@@ -425,4 +445,5 @@ export type RPCRequestParamsByMethod = {
     [RPCMethod.Ping]: PingRPCRequestParams;
     [RPCMethod.Pong]: PongRPCRequestParams;
     [RPCMethod.Message]: MessageRPCRequestParams;
+    [RPCMethod.Transfer]: TransferRPCRequestParams;
 };

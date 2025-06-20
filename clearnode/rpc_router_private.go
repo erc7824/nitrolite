@@ -7,13 +7,14 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+
+	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 )
 
 type Transfer struct {
@@ -36,15 +37,18 @@ type TransferResponse struct {
 type CreateAppSessionParams struct {
 	Definition  AppDefinition   `json:"definition"`
 	Allocations []AppAllocation `json:"allocations"`
+	SessionData string          `json:"session_data"`
 }
 
 type SubmitStateParams struct {
 	AppSessionID string          `json:"app_session_id"`
 	Allocations  []AppAllocation `json:"allocations"`
+	SessionData  string          `json:"session_data"`
 }
 
 type CloseAppSessionParams struct {
 	AppSessionID string          `json:"app_session_id"`
+	SessionData  string          `json:"session_data"`
 	Allocations  []AppAllocation `json:"allocations"`
 }
 
@@ -58,6 +62,7 @@ type AppSessionResponse struct {
 	AppSessionID       string   `json:"app_session_id"`
 	Status             string   `json:"status"`
 	ParticipantWallets []string `json:"participants"`
+	SessionData        string   `json:"session_data"`
 	Protocol           string   `json:"protocol"`
 	Challenge          uint64   `json:"challenge"`
 	Weights            []int64  `json:"weights"`
@@ -347,6 +352,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 			Status:             ChannelStatusOpen,
 			Challenge:          params.Definition.Challenge,
 			Weights:            params.Definition.Weights,
+			SessionData:        params.SessionData,
 			Quorum:             params.Definition.Quorum,
 			Nonce:              params.Definition.Nonce,
 			Version:            1,
@@ -361,6 +367,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: appSessionID,
+		SessionData:  params.SessionData,
 		Version:      1,
 		Status:       string(ChannelStatusOpen),
 	})
@@ -434,9 +441,9 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 		}
 
 		newVersion = appSession.Version + 1
-
 		return tx.Model(&appSession).Updates(map[string]any{
-			"version": newVersion,
+			"session_data": params.SessionData,
+			"version":      newVersion,
 		}).Error
 	})
 
@@ -448,6 +455,7 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: params.AppSessionID,
+		SessionData:  params.SessionData,
 		Version:      newVersion,
 		Status:       string(ChannelStatusOpen),
 	})
@@ -476,7 +484,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 		return
 	}
 
-	var newVersion uint64
+	var finalVersion uint64
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
 		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
 		if err != nil {
@@ -520,11 +528,11 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 			return err
 		}
 
-		newVersion = appSession.Version + 1
-
+		finalVersion = appSession.Version + 1
 		return tx.Model(&appSession).Updates(map[string]any{
-			"status":  ChannelStatusClosed,
-			"version": newVersion,
+			"status":       ChannelStatusClosed,
+			"session_data": params.SessionData,
+			"version":      finalVersion,
 		}).Error
 	})
 
@@ -536,7 +544,8 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: params.AppSessionID,
-		Version:      newVersion,
+		SessionData:  params.SessionData,
+		Version:      finalVersion,
 		Status:       string(ChannelStatusClosed),
 	})
 }

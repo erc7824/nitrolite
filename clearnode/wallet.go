@@ -50,8 +50,31 @@ func AddSigner(db *gorm.DB, wallet, signer string) error {
 	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
-		var existingSigner SignerWallet
 
+		// Before adding a new signer, we need to ensure that the relationship is valid.
+		// 1. A wallet address can't be used as a signer for another wallet.
+		// 2. An address can't be used as a wallet if it is already a signer for another wallet.
+		// 3. A signer can only be associated with one wallet.
+
+		// A wallet address can't be used as a signer for another wallet.
+		var count int64
+		if err := tx.Model(&SignerWallet{}).Where("wallet = ?", signer).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return fmt.Errorf("cannot use a wallet as a signer")
+		}
+
+		// Address can't be used as a wallet if it is already a signer for another wallet.
+		if err := tx.Model(&SignerWallet{}).Where("signer = ?", wallet).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return fmt.Errorf("wallet is already in use as a signer")
+		}
+
+		// Signer cannot be used for another wallet if it already exists.
+		var existingSigner SignerWallet
 		err := tx.Where("signer = ?", signer).First(&existingSigner).Error
 		switch {
 		case err == nil:

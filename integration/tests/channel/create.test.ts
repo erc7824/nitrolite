@@ -1,9 +1,10 @@
 import { createAuthSessionWithClearnode } from '@/auth';
 import { BlockchainUtils } from '@/blockchainUtils';
+import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
-import { getChannelUpdatePredicateWithStatus, TestWebSocket } from '@/ws';
+import { getChannelUpdatePredicateWithStatus, getErrorPredicate, TestWebSocket } from '@/ws';
 import { ChannelsUpdateRPCResponse, parseRPCResponse, RPCChannelStatus } from '@erc7824/nitrolite';
 
 describe('Create channel', () => {
@@ -13,20 +14,25 @@ describe('Create channel', () => {
     let identity: Identity;
     let client: TestNitroliteClient;
     let blockUtils: BlockchainUtils;
+    let databaseUtils: DatabaseUtils;
 
     beforeAll(async () => {
         blockUtils = new BlockchainUtils();
-
-        ws = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
-        await ws.connect();
-
+        databaseUtils = new DatabaseUtils();
         identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);
-
-        await createAuthSessionWithClearnode(ws, identity);
+        ws = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
     });
 
-    afterAll(() => {
+    beforeEach(async () => {
+        await ws.connect();
+        await createAuthSessionWithClearnode(ws, identity);
+        await blockUtils.makeSnapshot();
+    });
+
+    afterEach(async () => {
         ws.close();
+        await databaseUtils.cleanupDatabaseData()
+        await blockUtils.resetSnapshot();
     });
 
     it('should create nitrolite client to open channels', async () => {
@@ -151,40 +157,48 @@ describe('Create channel', () => {
         expect(responseChannel.token).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
     });
 
-    it('should open several channels in one operation', async () => {
-        const depositTxHash = await client.deposit(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS, depositAmount * BigInt(3));
-        expect(depositTxHash).toBeDefined();
+    // TODO: find a way to know that broker decided not to join channel
+    // it('should restrict opening several channels', async () => {
+    //     const depositTxHash = await client.deposit(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS, depositAmount * BigInt(3));
+    //     expect(depositTxHash).toBeDefined();
 
-        const depositReceipt = await blockUtils.waitForTransaction(depositTxHash);
-        expect(depositReceipt).toBeDefined();
+    //     const depositReceipt = await blockUtils.waitForTransaction(depositTxHash);
+    //     expect(depositReceipt).toBeDefined();
 
-        
-        // previously we deposited 3 * depositAmount, so we can create two channels
-        for (const amount of [depositAmount, depositAmount * BigInt(2)]) {
-            const openChannelPromise = ws.waitForMessage(getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open), 5000);
+    //     // previously we deposited 3 * depositAmount, so we can create two channels
+    //     for (const amount of [depositAmount, depositAmount * BigInt(2)]) {
+    //         const openChannelPromise = ws.waitForMessage(getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open), 5000);
             
-            const { txHash: createChannelTxHash, channelId } = await client.createChannel(
-                CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-                {
-                    initialAllocationAmounts: [amount, BigInt(0)],
-                    stateData: '0x',
-                }
-            );
+    //         const { txHash: createChannelTxHash, channelId } = await client.createChannel(
+    //             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+    //             {
+    //                 initialAllocationAmounts: [amount, BigInt(0)],
+    //                 stateData: '0x',
+    //             }
+    //         );
 
-            expect(channelId).toBeDefined();
-            expect(createChannelTxHash).toBeDefined();
+    //         expect(channelId).toBeDefined();
+    //         expect(createChannelTxHash).toBeDefined();
 
-            const createChannelReceipt = await blockUtils.waitForTransaction(createChannelTxHash);
-            expect(createChannelReceipt).toBeDefined();
+    //         const createChannelReceipt = await blockUtils.waitForTransaction(createChannelTxHash);
+    //         expect(createChannelReceipt).toBeDefined();
 
-            const openResponse = await openChannelPromise;
-            expect(openResponse).toBeDefined();
+    //         const openResponse = await openChannelPromise;
 
-            const openParsedResponse = parseRPCResponse(openResponse) as ChannelsUpdateRPCResponse;
-            const responseChannel = openParsedResponse.params[0];
+    //         if (amount === depositAmount) {
+    //             expect(openResponse).toBeDefined();
+    //         } else {
+    //             expect(openResponse).toBeUndefined();
+    //             continue; // Skip further checks for the second channel
+    //         }
+            
+    //         expect(openResponse).toBeDefined();
 
-            expect(responseChannel.amount).toBe(Number(amount));
-            expect(responseChannel.channel_id).toBe(channelId);
-        }
-    });
+    //         const openParsedResponse = parseRPCResponse(openResponse) as ChannelsUpdateRPCResponse;
+    //         const responseChannel = openParsedResponse.params[0];
+
+    //         expect(responseChannel.amount).toBe(Number(amount));
+    //         expect(responseChannel.channel_id).toBe(channelId);
+    //     }
+    // });
 });

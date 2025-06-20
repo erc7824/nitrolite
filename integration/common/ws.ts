@@ -181,3 +181,18 @@ export const getResizeChannelPredicate = () => {
         return false;
     };
 };
+
+export const getErrorPredicate = () => {
+    return (data: string): boolean => {
+        try {
+            const parsedData = parseRPCResponse(data);
+            if (parsedData.method === RPCMethod.Error) {
+                return true;
+            }
+        } catch (error) {
+            console.error('Error parsing data for ErrorPredicate:', error);
+        }
+
+        return false;
+    };
+}

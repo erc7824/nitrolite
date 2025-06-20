@@ -22,6 +22,13 @@ export const CONFIG = {
         USDC_TOKEN_ADDRESS: '0xbD24c53072b9693A35642412227043Ffa5fac382' as Address,
     },
     DEFAULT_CHALLENGE_TIMEOUT: 3600,
+
+
+    DATABASE_NAME: 'postgres',
+    DATABASE_USER: 'postgres',
+    DATABASE_PASSWORD: 'postgres',
+    DATABASE_HOST: 'localhost',
+    DATABASE_PORT: 5432,
 };
 
 export const chain = defineChain({ ...localhost, id: CONFIG.CHAIN_ID });

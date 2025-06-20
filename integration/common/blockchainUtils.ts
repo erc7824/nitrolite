@@ -6,16 +6,25 @@ import {
     Address,
     erc20Abi,
     formatUnits,
+    createTestClient,
 } from 'viem';
 import { chain } from './setup';
 
 export class BlockchainUtils {
     private client = null;
+    private testClient = null;
+    private lastSnapshotId: string | null = null;
 
     constructor() {
         this.client = createPublicClient({
             chain,
             transport: http(),
+        });
+
+        this.testClient = createTestClient({
+            chain,
+            transport: http(),
+            mode: 'anvil',
         });
     }
 
@@ -80,6 +89,30 @@ export class BlockchainUtils {
             };
         } catch (error) {
             throw new Error(`Error getting ERC20 balance: ${error.message}`);
+        }
+    }
+
+    async makeSnapshot(): Promise<string> {
+        try {
+            const snapshotId = await this.testClient.snapshot();
+            this.lastSnapshotId = snapshotId;
+
+            return snapshotId;
+        } catch (error) {
+            throw new Error(`Error making snapshot: ${error.message}`);
+        }
+    }
+
+    async resetSnapshot(snapshotId?: string): Promise<void> {
+        try {
+            if (!snapshotId && !this.lastSnapshotId) {
+                throw new Error('No snapshot ID provided and no last snapshot available');
+            }
+
+            snapshotId = snapshotId || this.lastSnapshotId!;
+            await this.testClient.revert({ id: snapshotId });
+        } catch (error) {
+            throw new Error(`Error resetting snapshot: ${error.message}`);
         }
     }
 }

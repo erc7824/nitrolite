@@ -1,15 +1,15 @@
 import { createAuthSessionWithClearnode } from '@/auth';
 import { BlockchainUtils } from '@/blockchainUtils';
+import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
-import { getCloseChannelPredicate, getResizeChannelPredicate, TestWebSocket } from '@/ws';
+import { getCloseChannelPredicate, TestWebSocket } from '@/ws';
 import {
     Allocation,
+    CloseChannelRPCResponse,
     createCloseChannelMessage,
-    createResizeChannelMessage,
     parseRPCResponse,
-    ResizeChannelRPCResponse,
 } from '@erc7824/nitrolite';
 import { Address, Hex } from 'viem';
 
@@ -20,20 +20,25 @@ describe('Close channel', () => {
     let identity: Identity;
     let client: TestNitroliteClient;
     let blockUtils: BlockchainUtils;
+    let databaseUtils: DatabaseUtils;
 
     beforeAll(async () => {
         blockUtils = new BlockchainUtils();
-
-        ws = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
-        await ws.connect();
-
+        databaseUtils = new DatabaseUtils();
         identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);
-
-        await createAuthSessionWithClearnode(ws, identity);
+        ws = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
     });
 
-    afterAll(() => {
+    beforeEach(async () => {
+        await ws.connect();
+        await createAuthSessionWithClearnode(ws, identity);
+        await blockUtils.makeSnapshot();
+    });
+
+    afterEach(async () => {
         ws.close();
+        await databaseUtils.cleanupDatabaseData();
+        await blockUtils.resetSnapshot();
     });
 
     it('should create nitrolite client to close channels', async () => {
@@ -46,76 +51,72 @@ describe('Close channel', () => {
     });
 
     it('should close channel and withdraw funds', async () => {
+        const preFundBalance = await blockUtils.getErc20Balance(
+            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            identity.walletAddress
+        );
+
         const { params } = await client.createAndWaitForChannel(ws, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount,
         });
 
-        const resizeMessage = await createResizeChannelMessage(identity.messageSigner, [
-            {
-                channel_id: params.channel_id,
-                // @ts-ignore
-                resize_amount: Number(-depositAmount),
-                // @ts-ignore
-                allocate_amount: 0,
-                funds_destination: identity.walletAddress,
-            },
-        ]);
-        const resizeResponse = await ws.sendAndWaitForResponse(resizeMessage, getResizeChannelPredicate(), 1000);
-        expect(resizeResponse).toBeDefined();
+        const postFundBalance = await blockUtils.getErc20Balance(
+            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            identity.walletAddress
+        );
 
-        const resizeParsedResponse = parseRPCResponse(resizeResponse) as ResizeChannelRPCResponse;
-
-        console.log(resizeParsedResponse);
-
-        const resizeTxHash = await client.resizeChannel({
-            resizeState: {
-                channelId: resizeParsedResponse.params.channel_id,
-                stateData: resizeParsedResponse.params.state_data as Hex,
-                // @ts-ignore
-                allocations: resizeParsedResponse.params.allocations.map((a) => ({
-                    destination: a.destination as Address,
-                    token: a.token as Address,
-                    amount: a.amount,
-                })) as [Allocation, Allocation],
-                // @ts-ignore
-                version: resizeParsedResponse.params.version,
-                intent: resizeParsedResponse.params.intent,
-                serverSignature: {
-                    v: +resizeParsedResponse.params.server_signature.v,
-                    r: resizeParsedResponse.params.server_signature.r as Hex,
-                    s: resizeParsedResponse.params.server_signature.s as Hex,
-                },
-            },
-            proofStates: [],
-        });
-
-        const resizeReceipt = await blockUtils.waitForTransaction(resizeTxHash);
-        expect(resizeReceipt).toBeDefined();
+        expect(postFundBalance.rawBalance).toBe(preFundBalance.rawBalance - depositAmount);
 
         const msg = await createCloseChannelMessage(identity.messageSigner, params.channel_id, identity.walletAddress);
-        const response = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
-        expect(response).toBeDefined();
+        const closeResponse = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
+        expect(closeResponse).toBeDefined();
 
-        console.log(response);
+        const parsedCloseResponse = parseRPCResponse(closeResponse) as CloseChannelRPCResponse;
 
-        // client.closeChannel({
-        //     finalState: {
-        //         channelId: params.channel_id,
-        //         stateData: '0x',
-        //         allocations: initialState.allocations as [Allocation, Allocation],
-        //         version: initialState.version,
-        //         serverSignature: initialState.,
-        //     },
-        // });
+        const closeChannelTxHash = await client.closeChannel({
+            finalState: {
+                channelId: parsedCloseResponse.params.channel_id,
+                stateData: parsedCloseResponse.params.state_data as Hex,
+                allocations: [
+                    {
+                        destination: parsedCloseResponse.params.allocations[0].destination as Address,
+                        token: parsedCloseResponse.params.allocations[0].token as Address,
+                        amount: BigInt(parsedCloseResponse.params.allocations[0].amount),
+                    },
+                    {
+                        destination: parsedCloseResponse.params.allocations[1].destination as Address,
+                        token: parsedCloseResponse.params.allocations[1].token as Address,
+                        amount: BigInt(parsedCloseResponse.params.allocations[1].amount),
+                    },
+                ] as [Allocation, Allocation],
+                version: BigInt(parsedCloseResponse.params.version),
+                serverSignature: {
+                    v: +parsedCloseResponse.params.server_signature.v,
+                    r: parsedCloseResponse.params.server_signature.r as Hex,
+                    s: parsedCloseResponse.params.server_signature.s as Hex,
+                },
+            },
+            stateData: parsedCloseResponse.params.state_data as Hex,
+        });
+        expect(closeChannelTxHash).toBeDefined();
 
-        // stateData?: Hex;
-        // finalState: {
-        //     channelId: ChannelId;
-        //     stateData: Hex;
-        //     allocations: [Allocation, Allocation];
-        //     version: bigint;
-        //     serverSignature: Signature;
-        // };
+        const closeReceipt = await blockUtils.waitForTransaction(closeChannelTxHash);
+        expect(closeReceipt).toBeDefined();
+
+        // Close should not change wallet balance
+        expect(postFundBalance.rawBalance).toBe(preFundBalance.rawBalance - depositAmount);
+
+        const withdrawalTxHash = await client.withdrawal(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS, depositAmount);
+        expect(withdrawalTxHash).toBeDefined();
+
+        const withdrawalReceipt = await blockUtils.waitForTransaction(withdrawalTxHash);
+        expect(withdrawalReceipt).toBeDefined();
+
+        const postWithdrawalBalance = await blockUtils.getErc20Balance(
+            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            identity.walletAddress
+        );
+        expect(postWithdrawalBalance.rawBalance).toBe(preFundBalance.rawBalance);
     });
 });

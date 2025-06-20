@@ -604,7 +604,7 @@ Only an open channel can be closed. In case the user does not agree with the fin
 }
 ```
 
-In the request, you must specify funds destination. After the channel is closed, funds become available to withdraw from the smart contract for the specified address.
+In the request, the user must specify funds destination. After the channel is closed, funds become available to withdraw from the smart contract for the specified address.
 
 **Response:**
 

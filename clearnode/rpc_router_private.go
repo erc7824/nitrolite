@@ -42,8 +42,8 @@ type CreateAppSessionParams struct {
 
 type SubmitStateParams struct {
 	AppSessionID string          `json:"app_session_id"`
-	SessionData  string          `json:"session_data"`
 	Allocations  []AppAllocation `json:"allocations"`
+	SessionData  string          `json:"session_data"`
 }
 
 type CloseAppSessionParams struct {
@@ -368,9 +368,9 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: appSessionID,
 		SessionData:  params.SessionData,
-			Version:      1,
-			Status:       string(ChannelStatusOpen),
-		})
+		Version:      1,
+		Status:       string(ChannelStatusOpen),
+	})
 }
 
 // HandleSubmitState updates funds allocations distribution a virtual app session
@@ -456,9 +456,9 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: params.AppSessionID,
 		SessionData:  params.SessionData,
-			Version:      newVersion,
-			Status:       string(ChannelStatusOpen),
-		})
+		Version:      newVersion,
+		Status:       string(ChannelStatusOpen),
+	})
 }
 
 // HandleCloseApplication closes a virtual app session and redistributes funds to participants
@@ -544,6 +544,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: params.AppSessionID,
+		SessionData:  params.SessionData,
 		Version:      finalVersion,
 		Status:       string(ChannelStatusClosed),
 	})

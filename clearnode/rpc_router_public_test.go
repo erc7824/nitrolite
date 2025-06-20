@@ -659,6 +659,7 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 		{
 			SessionID:          "0xSession1",
 			ParticipantWallets: []string{participantAddr, "0xParticipant2"},
+			SessionData:        `{"key":"value"}`,
 			Status:             ChannelStatusOpen,
 			Protocol:           "test-app-1",
 			Challenge:          60,
@@ -670,6 +671,7 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 		{
 			SessionID:          "0xSession2",
 			ParticipantWallets: []string{participantAddr, "0xParticipant3"},
+			SessionData:        `{"key":"value"}`,
 			Status:             ChannelStatusClosed,
 			Protocol:           "test-app-2",
 			Challenge:          120,
@@ -681,6 +683,7 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 		{
 			SessionID:          "0xSession3",
 			ParticipantWallets: []string{"0xParticipant4", "0xParticipant5"},
+			SessionData:        `{"key":"value"}`,
 			Status:             ChannelStatusOpen,
 			Protocol:           "test-app-3",
 			Challenge:          90,
@@ -770,6 +773,7 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 	assert.Len(t, sessionResponses2, 1, "Should return 1 open app session")
 	assert.Equal(t, "0xSession1", sessionResponses2[0].AppSessionID, "Should be Session1")
 	assert.Equal(t, string(ChannelStatusOpen), sessionResponses2[0].Status)
+	assert.Equal(t, `{"key":"value"}`, sessionResponses2[0].SessionData, "Session data should match")
 
 	// Case 3: No participant (all sessions)
 	c = &RPCContext{
@@ -1093,3 +1097,4 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 		assert.Equal(t, participant1, entry.Participant)
 	}
 }
+

@@ -789,7 +789,7 @@ func TestHandleGetAppSessions(t *testing.T) {
 		Sig: []string{"dummy-signature"},
 	}
 
-	resp1, err := HandleGetAppSessions(rpcRequest1, db)
+	resp1, err := HandleGetAppSessions(rpcRequest1, NewAppSessionService(db))
 	require.NoError(t, err)
 	assert.NotNil(t, resp1)
 
@@ -832,7 +832,7 @@ func TestHandleGetAppSessions(t *testing.T) {
 		Sig: []string{"dummy-signature"},
 	}
 
-	resp2, err := HandleGetAppSessions(rpcRequest2, db)
+	resp2, err := HandleGetAppSessions(rpcRequest2, NewAppSessionService(db))
 	require.NoError(t, err)
 	assert.NotNil(t, resp2)
 
@@ -853,7 +853,7 @@ func TestHandleGetAppSessions(t *testing.T) {
 		Sig: []string{"dummy-signature"},
 	}
 
-	resp3, err := HandleGetAppSessions(rpcRequest3, db)
+	resp3, err := HandleGetAppSessions(rpcRequest3, NewAppSessionService(db))
 	require.NoError(t, err)
 	require.NotNil(t, resp3)
 
@@ -884,7 +884,7 @@ func TestHandleGetAppSessions(t *testing.T) {
 		Sig: []string{"dummy-signature"},
 	}
 
-	openStatusResponse, err := HandleGetAppSessions(openStatusRequest, db)
+	openStatusResponse, err := HandleGetAppSessions(openStatusRequest, NewAppSessionService(db))
 	require.NoError(t, err)
 	require.NotNil(t, openStatusResponse)
 
@@ -1341,8 +1341,9 @@ func TestHandleCreateAppSession(t *testing.T) {
 		require.NoError(t, err)
 		rpcReq.Sig = []string{hexutil.Encode(sigA), hexutil.Encode(sigB)}
 
+		appSesionService := NewAppSessionService(db)
 		// Call handler
-		resp, err := HandleCreateApplication(nil, rpcReq, db)
+		resp, err := HandleCreateApplication(nil, rpcReq, appSesionService)
 		require.NoError(t, err)
 
 		assert.Equal(t, "create_app_session", resp.Res.Method)
@@ -1430,7 +1431,8 @@ func TestHandleCreateAppSession(t *testing.T) {
 		rpcReq.Sig = []string{hexutil.Encode(sigA), hexutil.Encode(sigB)}
 
 		// Call handler
-		_, err = HandleCreateApplication(nil, rpcReq, db)
+		_, err = HandleCreateApplication(nil, rpcReq, NewAppSessionService(db))
+
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has challenged channels")
 	})
@@ -1509,7 +1511,7 @@ func TestHandleSubmitState(t *testing.T) {
 		req.Sig = []string{hexutil.Encode(sigBytes)}
 
 		// Call handler
-		resp, err := HandleSubmitState(nil, req, db)
+		resp, err := HandleSubmitState(nil, req, NewAppSessionService(db))
 		require.NoError(t, err)
 		assert.Equal(t, "submit_state", resp.Res.Method)
 		appResp, ok := resp.Res.Params[0].(*AppSessionResponse)
@@ -1602,7 +1604,8 @@ func TestHandleCloseVirtualApp(t *testing.T) {
 	req.Sig = []string{hexutil.Encode(sigBytes)}
 
 	// Call handler
-	resp, err := HandleCloseApplication(nil, req, db)
+	appSesionService := NewAppSessionService(db)
+	resp, err := HandleCloseApplication(nil, req, appSesionService)
 	require.NoError(t, err)
 	assert.Equal(t, "close_app_session", resp.Res.Method)
 	appResp, ok := resp.Res.Params[0].(*AppSessionResponse)

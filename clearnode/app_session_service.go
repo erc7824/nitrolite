@@ -1,0 +1,297 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/shopspring/decimal"
+	"gorm.io/gorm"
+)
+
+// AppSessionService handles the business logic for app sessions.
+type AppSessionService struct {
+	db *gorm.DB
+}
+
+// NewAppSessionService creates a new AppSessionService.
+func NewAppSessionService(db *gorm.DB) *AppSessionService {
+	return &AppSessionService{db: db}
+}
+
+func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}) (*AppSession, error) {
+	if len(params.Definition.ParticipantWallets) < 2 {
+		return nil, errors.New("invalid number of participants")
+	}
+	if len(params.Definition.Weights) != len(params.Definition.ParticipantWallets) {
+		return nil, errors.New("number of weights must be equal to participants")
+	}
+	if params.Definition.Nonce == 0 {
+		return nil, errors.New("nonce is zero or not provided")
+	}
+
+	// Generate a unique ID for the virtual application
+	appBytes, err := json.Marshal(params.Definition)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate app session ID: %w", err)
+	}
+	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
+
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		for _, alloc := range params.Allocations {
+			if alloc.Amount.IsPositive() {
+				if _, ok := rpcSigners[alloc.ParticipantWallet]; !ok {
+					return fmt.Errorf("missing signature for participant %s", alloc.ParticipantWallet)
+				}
+			}
+			if alloc.Amount.IsNegative() {
+				return fmt.Errorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+			}
+			walletAddress := alloc.ParticipantWallet
+			if wallet := GetWalletBySigner(alloc.ParticipantWallet); wallet != "" {
+				walletAddress = wallet
+			}
+
+			if err := checkChallengedChannels(tx, walletAddress); err != nil {
+				return err
+			}
+
+			ledger := GetWalletLedger(tx, walletAddress)
+			balance, err := ledger.Balance(walletAddress, alloc.AssetSymbol)
+			if err != nil {
+				return fmt.Errorf("failed to check participant balance: %w", err)
+			}
+
+			if alloc.Amount.GreaterThan(balance) {
+				return fmt.Errorf("insufficient funds: %s for asset %s", walletAddress, alloc.AssetSymbol)
+			}
+
+			if err = ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
+				return fmt.Errorf("failed to debit source account: %w", err)
+			}
+			if err = ledger.Record(appSessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
+				return fmt.Errorf("failed to credit destination account: %w", err)
+			}
+		}
+
+		return tx.Create(&AppSession{
+			Protocol:           params.Definition.Protocol,
+			SessionID:          appSessionID,
+			ParticipantWallets: params.Definition.ParticipantWallets,
+			Status:             ChannelStatusOpen,
+			Challenge:          params.Definition.Challenge,
+			Weights:            params.Definition.Weights,
+			Quorum:             params.Definition.Quorum,
+			Nonce:              params.Definition.Nonce,
+			Version:            1,
+		}).Error
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &AppSession{SessionID: appSessionID, Version: 1, Status: ChannelStatusOpen}, nil
+}
+
+func (s *AppSessionService) SubmitState(params *SubmitStateParams, rpcSigners map[string]struct{}) (uint64, error) {
+	var newVersion uint64
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
+		if err != nil {
+			return err
+		}
+
+		appSessionBalance, err := getAppSessionBalances(tx, appSession.SessionID)
+		if err != nil {
+			return err
+		}
+
+		allocationSum := map[string]decimal.Decimal{}
+		for _, alloc := range params.Allocations {
+			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
+			if walletAddress == "" {
+				walletAddress = alloc.ParticipantWallet
+			}
+
+			if _, ok := participantWeights[walletAddress]; !ok {
+				return fmt.Errorf("allocation to non-participant %s", walletAddress)
+			}
+
+			ledger := GetWalletLedger(tx, walletAddress)
+			balance, err := ledger.Balance(appSession.SessionID, alloc.AssetSymbol)
+			if err != nil {
+				return fmt.Errorf("failed to get participant balance: %w", err)
+			}
+
+			// Reset participant allocation in app session to the new amount
+			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, balance.Neg()); err != nil {
+				return fmt.Errorf("failed to debit session: %w", err)
+			}
+			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
+				return fmt.Errorf("failed to credit participant: %w", err)
+			}
+
+			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
+		}
+
+		if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
+			return err
+		}
+
+		newVersion = appSession.Version + 1
+
+		return tx.Model(&appSession).Updates(map[string]any{
+			"version": newVersion,
+		}).Error
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return newVersion, nil
+}
+
+// CloseApplication closes a virtual app session and redistributes funds to participants
+func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcSigners map[string]struct{}) (uint64, error) {
+	if params.AppSessionID == "" || len(params.Allocations) == 0 {
+		return 0, errors.New("missing required parameters: app_id or allocations")
+	}
+
+	var newVersion uint64
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
+		if err != nil {
+			return err
+		}
+
+		appSessionBalance, err := getAppSessionBalances(tx, appSession.SessionID)
+		if err != nil {
+			return err
+		}
+
+		allocationSum := map[string]decimal.Decimal{}
+		for _, alloc := range params.Allocations {
+			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
+			if walletAddress == "" {
+				walletAddress = alloc.ParticipantWallet
+			}
+
+			if _, ok := participantWeights[walletAddress]; !ok {
+				return fmt.Errorf("allocation to non-participant %s", walletAddress)
+			}
+
+			ledger := GetWalletLedger(tx, walletAddress)
+			balance, err := ledger.Balance(appSession.SessionID, alloc.AssetSymbol)
+			if err != nil {
+				return fmt.Errorf("failed to get participant balance: %w", err)
+			}
+
+			// Debit session, credit participant
+			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, balance.Neg()); err != nil {
+				return fmt.Errorf("failed to debit session: %w", err)
+			}
+			if err := ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
+				return fmt.Errorf("failed to credit participant: %w", err)
+			}
+
+			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
+		}
+
+		if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
+			return err
+		}
+
+		newVersion = appSession.Version + 1
+
+		return tx.Model(&appSession).Updates(map[string]any{
+			"status":  ChannelStatusClosed,
+			"version": newVersion,
+		}).Error
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return newVersion, nil
+}
+
+// getAppSessions finds all app sessions
+// If participantWallet is specified, it returns only sessions for that participant
+// If participantWallet is empty, it returns all sessions
+func (s *AppSessionService) GetAppSessions(participantWallet string, status string) ([]AppSession, error) {
+	var sessions []AppSession
+	query := s.db.WithContext(context.TODO())
+
+	if participantWallet != "" {
+		switch s.db.Dialector.Name() {
+		case "postgres":
+			query = query.Where("? = ANY(participants)", participantWallet)
+		case "sqlite":
+			query = query.Where("instr(participants, ?) > 0", participantWallet)
+		default:
+			return nil, fmt.Errorf("unsupported database driver: %s", s.db.Dialector.Name())
+		}
+	}
+
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	query = query.Order("updated_at DESC")
+	if err := query.Find(&sessions).Error; err != nil {
+		return nil, err
+	}
+
+	return sessions, nil
+}
+
+func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {
+	for asset, bal := range appSessionBalance {
+		if alloc, ok := allocationSum[asset]; !ok || !bal.Equal(alloc) {
+			return fmt.Errorf("asset %s not fully redistributed", asset)
+		}
+	}
+	for asset := range allocationSum {
+		if _, ok := appSessionBalance[asset]; !ok {
+			return fmt.Errorf("allocation references unknown asset %s", asset)
+		}
+	}
+	return nil
+}
+
+// verifyQuorum loads an open AppSession, verifies signatures meet quorum
+func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct{}) (AppSession, map[string]int64, error) {
+	var session AppSession
+	if err := tx.Where("session_id = ? AND status = ?", appSessionID, ChannelStatusOpen).
+		Order("nonce DESC").First(&session).Error; err != nil {
+		return AppSession{}, nil, fmt.Errorf("virtual app not found or not open: %w", err)
+	}
+
+	participantWeights := make(map[string]int64, len(session.ParticipantWallets))
+	for i, addr := range session.ParticipantWallets {
+		participantWeights[addr] = session.Weights[i]
+	}
+
+	var totalWeight int64
+	for wallet := range rpcSigners {
+		weight, ok := participantWeights[wallet]
+		if !ok {
+			return AppSession{}, nil, fmt.Errorf("signature from unknown participant wallet %s", wallet)
+		}
+		if weight <= 0 {
+			return AppSession{}, nil, fmt.Errorf("zero weight for signer %s", wallet)
+		}
+		totalWeight += weight
+	}
+
+	if totalWeight < int64(session.Quorum) {
+		return AppSession{}, nil, fmt.Errorf("quorum not met: %d / %d", totalWeight, session.Quorum)
+	}
+
+	return session, participantWeights, nil
+}

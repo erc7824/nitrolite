@@ -4,9 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+// AuthResponse represents the server's challenge response
+type AuthResponse struct {
+	ChallengeMessage uuid.UUID `json:"challenge_message"` // The message to sign
+}
+
+// AuthVerifyParams represents parameters for completing authentication
+type AuthVerifyParams struct {
+	Challenge uuid.UUID `json:"challenge"` // The challenge token
+	JWT       string    `json:"jwt"`       // Optional JWT to use for logging in
+}
 
 func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 	ctx := c.Context
@@ -262,4 +275,47 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig string, authPar
 		"jwt_token":   jwtToken,
 		"success":     true,
 	}, ""
+}
+
+func ValidateTimestamp(ts uint64, expirySeconds int) error {
+	if ts < 1_000_000_000_000 || ts > 9_999_999_999_999 {
+		return fmt.Errorf("invalid timestamp %d: must be 13-digit Unix ms", ts)
+	}
+	t := time.UnixMilli(int64(ts)).UTC()
+	if time.Since(t) > time.Duration(expirySeconds)*time.Second {
+		return fmt.Errorf("timestamp expired: %s older than %d s", t.Format(time.RFC3339Nano), expirySeconds)
+	}
+	return nil
+}
+
+func parseAllowances(rawAllowances any) ([]Allowance, error) {
+	outerSlice, ok := rawAllowances.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("input is not a list of allowances")
+	}
+
+	result := make([]Allowance, len(outerSlice))
+
+	for i, item := range outerSlice {
+		innerSlice, ok := item.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("allowance at index %d is not a list", i)
+		}
+		if len(innerSlice) != 2 {
+			return nil, fmt.Errorf("allowance at index %d must have exactly 2 elements (asset, amount)", i)
+		}
+
+		asset, ok1 := innerSlice[0].(string)
+		amount, ok2 := innerSlice[1].(string)
+		if !ok1 || !ok2 {
+			return nil, fmt.Errorf("allowance at index %d has non-string asset or amount", i)
+		}
+
+		result[i] = Allowance{
+			Asset:  asset,
+			Amount: amount,
+		}
+	}
+
+	return result, nil
 }

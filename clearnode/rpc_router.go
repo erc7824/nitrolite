@@ -66,6 +66,7 @@ func NewRPCRouter(
 
 	appSessionGroup := privGroup.NewGroup("app_session")
 	appSessionGroup.Use(r.BalanceUpdateMiddleware)
+	// appSessionGroup.Handle("transfer", r.HandleTransfer)
 	appSessionGroup.Handle("create_app_session", r.HandleCreateApplication)
 	appSessionGroup.Handle("submit_state", r.HandleSubmitState)
 	appSessionGroup.Handle("close_app_session", r.HandleCloseApplication)
@@ -166,6 +167,18 @@ func (r *RPCRouter) MetricsMiddleware(c *RPCContext) {
 	}
 
 	r.Metrics.RPCRequests.WithLabelValues(reqMethod, status).Inc()
+}
+
+type RPCEntry struct {
+	ID        uint     `json:"id"`
+	Sender    string   `json:"sender"`
+	ReqID     uint64   `json:"req_id"`
+	Method    string   `json:"method"`
+	Params    string   `json:"params"`
+	Timestamp uint64   `json:"timestamp"`
+	ReqSig    []string `json:"req_sig"`
+	Result    string   `json:"response"`
+	ResSig    []string `json:"res_sig"`
 }
 
 func (r *RPCRouter) HistoryMiddleware(c *RPCContext) {

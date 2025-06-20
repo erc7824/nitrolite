@@ -16,6 +16,123 @@ import (
 	"gorm.io/gorm"
 )
 
+type Transfer struct {
+	Destination string               `json:"destination"`
+	Allocations []TransferAllocation `json:"allocations"`
+}
+
+type TransferAllocation struct {
+	AssetSymbol string          `json:"asset"`
+	Amount      decimal.Decimal `json:"amount"`
+}
+
+type TransferResponse struct {
+	From        string               `json:"from"`
+	To          string               `json:"to"`
+	Allocations []TransferAllocation `json:"allocations"`
+	CreatedAt   time.Time            `json:"created_at"`
+}
+
+type CreateAppSessionParams struct {
+	Definition  AppDefinition   `json:"definition"`
+	Allocations []AppAllocation `json:"allocations"`
+}
+
+type SubmitStateParams struct {
+	AppSessionID string          `json:"app_session_id"`
+	Allocations  []AppAllocation `json:"allocations"`
+}
+
+type CloseAppSessionParams struct {
+	AppSessionID string          `json:"app_session_id"`
+	Allocations  []AppAllocation `json:"allocations"`
+}
+
+type AppAllocation struct {
+	ParticipantWallet string          `json:"participant"`
+	AssetSymbol       string          `json:"asset"`
+	Amount            decimal.Decimal `json:"amount"`
+}
+
+type AppSessionResponse struct {
+	AppSessionID       string   `json:"app_session_id"`
+	Status             string   `json:"status"`
+	ParticipantWallets []string `json:"participants"`
+	Protocol           string   `json:"protocol"`
+	Challenge          uint64   `json:"challenge"`
+	Weights            []int64  `json:"weights"`
+	Quorum             uint64   `json:"quorum"`
+	Version            uint64   `json:"version"`
+	Nonce              uint64   `json:"nonce"`
+	CreatedAt          string   `json:"created_at"`
+	UpdatedAt          string   `json:"updated_at"`
+}
+
+type ResizeChannelParams struct {
+	ChannelID        string   `json:"channel_id"                          validate:"required"`
+	AllocateAmount   *big.Int `json:"allocate_amount,omitempty"           validate:"required_without=ResizeAmount"`
+	ResizeAmount     *big.Int `json:"resize_amount,omitempty"             validate:"required_without=AllocateAmount"`
+	FundsDestination string   `json:"funds_destination"                   validate:"required"`
+}
+
+type ResizeChannelResponse struct {
+	ChannelID   string       `json:"channel_id"`
+	StateData   string       `json:"state_data"`
+	Intent      uint8        `json:"intent"`
+	Version     uint64       `json:"version"`
+	Allocations []Allocation `json:"allocations"`
+	StateHash   string       `json:"state_hash"`
+	Signature   Signature    `json:"server_signature"`
+}
+
+type Allocation struct {
+	Participant  string   `json:"destination"`
+	TokenAddress string   `json:"token"`
+	Amount       *big.Int `json:"amount,string"`
+}
+
+type CloseChannelParams struct {
+	ChannelID        string `json:"channel_id"`
+	FundsDestination string `json:"funds_destination"`
+}
+
+type CloseChannelResponse struct {
+	ChannelID        string       `json:"channel_id"`
+	Intent           uint8        `json:"intent"`
+	Version          uint64       `json:"version"`
+	StateData        string       `json:"state_data"`
+	FinalAllocations []Allocation `json:"allocations"`
+	StateHash        string       `json:"state_hash"`
+	Signature        Signature    `json:"server_signature"`
+}
+
+type ChannelResponse struct {
+	ChannelID   string        `json:"channel_id"`
+	Participant string        `json:"participant"`
+	Status      ChannelStatus `json:"status"`
+	Token       string        `json:"token"`
+	Wallet      string        `json:"wallet"`
+	Amount      *big.Int      `json:"amount"` // Total amount in the channel (user + broker)
+	ChainID     uint32        `json:"chain_id"`
+	Adjudicator string        `json:"adjudicator"`
+	Challenge   uint64        `json:"challenge"`
+	Nonce       uint64        `json:"nonce"`
+	Version     uint64        `json:"version"`
+	CreatedAt   string        `json:"created_at"`
+	UpdatedAt   string        `json:"updated_at"`
+}
+
+type Signature struct {
+	V uint8  `json:"v,string"`
+	R string `json:"r,string"`
+	S string `json:"s,string"`
+}
+
+type Balance struct {
+	Asset  string          `json:"asset"`
+	Amount decimal.Decimal `json:"amount"`
+}
+
 func (r *RPCRouter) BalanceUpdateMiddleware(c *RPCContext) {
 	logger := LoggerFromContext(c.Context)
 	walletAddress := c.UserID
@@ -693,4 +810,77 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, resp)
+}
+
+func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {
+	for asset, bal := range appSessionBalance {
+		if alloc, ok := allocationSum[asset]; !ok || !bal.Equal(alloc) {
+			return fmt.Errorf("asset %s not fully redistributed", asset)
+		}
+	}
+	for asset := range allocationSum {
+		if _, ok := appSessionBalance[asset]; !ok {
+			return fmt.Errorf("allocation references unknown asset %s", asset)
+		}
+	}
+	return nil
+}
+
+func parseParams(params []any, unmarshalTo any) error {
+	if len(params) == 0 {
+		return errors.New("missing parameters")
+	}
+	paramsJSON, err := json.Marshal(params[0])
+	if err != nil {
+		return fmt.Errorf("failed to parse parameters: %w", err)
+	}
+	return json.Unmarshal(paramsJSON, &unmarshalTo)
+}
+
+// getWallets retrieves the set of wallet addresses (keys) from RPC request signers.
+func getWallets(rpc *RPCMessage) (map[string]struct{}, error) {
+	rpcSigners, err := rpc.GetRequestSignersMap()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]struct{})
+	for addr := range rpcSigners {
+		walletAddress := GetWalletBySigner(addr)
+		if walletAddress != "" {
+			result[walletAddress] = struct{}{}
+		} else {
+			result[addr] = struct{}{}
+		}
+	}
+	return result, nil
+}
+
+// verifySigner checks that the recovered signer matches the channel's wallet.
+func verifySigner(rpc *RPCMessage, channelWallet string) error {
+	if len(rpc.Sig) < 1 {
+		return errors.New("missing participant signature")
+	}
+	recovered, err := RecoverAddress(rpc.Req.rawBytes, rpc.Sig[0])
+	if err != nil {
+		return err
+	}
+	if mapped := GetWalletBySigner(recovered); mapped != "" {
+		recovered = mapped
+	}
+	if recovered != channelWallet {
+		return errors.New("invalid signature")
+	}
+	return nil
+}
+
+func checkChallengedChannels(tx *gorm.DB, wallet string) error {
+	challengedChannels, err := getChannelsByWallet(tx, wallet, string(ChannelStatusChallenged))
+	if err != nil {
+		return fmt.Errorf("failed to check challenged channels: %w", err)
+	}
+	if len(challengedChannels) > 0 {
+		return fmt.Errorf("participant %s has challenged channels, cannot execute operation", wallet)
+	}
+	return nil
 }

@@ -9,10 +9,13 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"golang.org/x/sync/errgroup"
 )
+
+var validate = validator.New()
 
 const (
 	// rpcNodeGroupHandlerPrefix is the prefix used for all handler group IDs

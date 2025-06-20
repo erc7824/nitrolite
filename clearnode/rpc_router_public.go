@@ -4,7 +4,48 @@ import (
 	"encoding/json"
 	"math/big"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
+
+type AssetResponse struct {
+	Token    string `json:"token"`
+	ChainID  uint32 `json:"chain_id"`
+	Symbol   string `json:"symbol"`
+	Decimals uint8  `json:"decimals"`
+}
+
+type AppDefinition struct {
+	Protocol           string   `json:"protocol"`
+	ParticipantWallets []string `json:"participants"`
+	Weights            []int64  `json:"weights"` // Signature weight for each participant.
+	Quorum             uint64   `json:"quorum"`
+	Challenge          uint64   `json:"challenge"`
+	Nonce              uint64   `json:"nonce"`
+}
+
+type LedgerEntryResponse struct {
+	ID          uint            `json:"id"`
+	AccountID   string          `json:"account_id"`
+	AccountType AccountType     `json:"account_type"`
+	Asset       string          `json:"asset"`
+	Participant string          `json:"participant"`
+	Credit      decimal.Decimal `json:"credit"`
+	Debit       decimal.Decimal `json:"debit"`
+	CreatedAt   time.Time       `json:"created_at"`
+}
+
+type NetworkInfo struct {
+	Name               string `json:"name"`
+	ChainID            uint32 `json:"chain_id"`
+	CustodyAddress     string `json:"custody_address"`
+	AdjudicatorAddress string `json:"adjudicator_address"`
+}
+
+type BrokerConfig struct {
+	BrokerAddress string        `json:"broker_address"`
+	Networks      []NetworkInfo `json:"networks"`
+}
 
 // HandleGetConfig returns the broker configuration
 func (r *RPCRouter) HandleGetConfig(c *RPCContext) {

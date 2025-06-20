@@ -38,10 +38,69 @@ func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 	// Track auth request metrics
 	r.Metrics.AuthRequests.Inc()
 
+	// Parse the parameters
 	var authParams AuthRequestParams
-	if err := parseParams(req.Params, &authParams); err != nil {
-		c.Fail(err.Error())
+	// TODO: change params format to a single object and use the commented code below
+	// if err := parseParams(req.Params, &authParams); err != nil {
+	// 	c.Fail(err.Error())
+	// 	return
+	// }
+
+	if len(req.Params) < 7 {
+		c.Fail("invalid parameters: expected 7 parameters")
 		return
+	}
+
+	addr, ok := req.Params[0].(string)
+	if !ok || addr == "" {
+		c.Fail(fmt.Sprintf("invalid address: %v", req.Params[0]))
+		return
+	}
+
+	sessionKey, ok := req.Params[1].(string)
+	if !ok || sessionKey == "" {
+		c.Fail(fmt.Sprintf("invalid session key: %v", req.Params[1]))
+		return
+	}
+
+	appName, ok := req.Params[2].(string)
+	if !ok || appName == "" {
+		c.Fail(fmt.Sprintf("invalid application name: %v", req.Params[2]))
+		return
+	}
+
+	rawAllowances := req.Params[3]
+	allowances, err := parseAllowances(rawAllowances)
+	if err != nil {
+		c.Fail(fmt.Sprintf("invalid allowances: %s", err.Error()))
+		return
+	}
+
+	expire, ok := req.Params[4].(string)
+	if !ok {
+		c.Fail(fmt.Sprintf("invalid expiration time: %v", req.Params[4]))
+		return
+	}
+
+	scope, ok := req.Params[5].(string)
+	if !ok {
+		c.Fail(fmt.Sprintf("invalid scope: %v", req.Params[5]))
+		return
+	}
+
+	applicationAddress, ok := req.Params[6].(string)
+	if !ok {
+		c.Fail(fmt.Sprintf("invalid application address: %v", req.Params[6]))
+	}
+
+	authParams = AuthRequestParams{
+		Address:            addr,
+		SessionKey:         sessionKey,
+		AppName:            appName,
+		Allowances:         allowances,
+		Expire:             expire,
+		Scope:              scope,
+		ApplicationAddress: applicationAddress,
 	}
 
 	logger.Debug("incoming auth request",

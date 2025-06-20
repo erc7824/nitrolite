@@ -211,7 +211,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 	}
 
 	// Check if there is already existing open channel with the broker
-	existingOpenChannel, err := CheckExistingChannels(c.db, participantSigner, tokenAddress, c.chainID)
+	existingOpenChannel, err := CheckExistingChannels(c.db, wallet, tokenAddress, c.chainID)
 	if err != nil {
 		logger.Error("error checking channels in database", "error", err)
 		return

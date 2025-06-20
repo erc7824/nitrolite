@@ -85,9 +85,14 @@ func (am *AuthManager) GenerateChallenge(
 	if !strings.HasPrefix(address, "0x") {
 		address = "0x" + address
 	}
+	fmt.Println(1)
 
 	// Create challenge with expiration
 	now := time.Now()
+	challengeTTL := am.challengeTTL
+	fmt.Println(1.1)
+	expireAt := now.Add(challengeTTL)
+	fmt.Println(1.5)
 	challenge := &Challenge{
 		Token:              uuid.New(),
 		Address:            address,
@@ -98,20 +103,26 @@ func (am *AuthManager) GenerateChallenge(
 		Expire:             expire,
 		ApplicationAddress: applicationAddress,
 		CreatedAt:          now,
-		ExpiresAt:          now.Add(am.challengeTTL),
+		ExpiresAt:          expireAt,
 		Completed:          false,
 	}
+	fmt.Println(2)
+
+	time.Sleep(time.Second) // Simulate some processing delay
 
 	// Store challenge
 	am.challengesMu.Lock()
 	defer am.challengesMu.Unlock()
+	fmt.Println(3)
 
 	// Enforce max challenge limit (basic DoS protection)
 	if len(am.challenges) >= am.maxChallenges {
 		return uuid.UUID{}, errors.New("too many pending challenges")
 	}
+	fmt.Println(4)
 
 	am.challenges[challenge.Token] = challenge
+	fmt.Println(5)
 
 	return challenge.Token, nil
 }

@@ -103,6 +103,7 @@ func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 		return
 	}
 
+	logger.Warn("auth challenge generated")
 	// Create challenge response
 	challengeRes := AuthResponse{
 		ChallengeMessage: token,

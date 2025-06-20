@@ -202,10 +202,6 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 
 				routeHandlers = append(routeHandlers, handlers...)
 			}
-			n.logger.Info("processing message",
-				"requestID", msg.Req.RequestID,
-				"method", msg.Req.Method,
-				"route", methodRoute)
 
 			ctx := &RPCContext{
 				Context:  context.Background(),
@@ -216,6 +212,10 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				Storage:  rpcConn.Storage,
 			}
 			ctx.Next() // Start processing the handlers
+			n.logger.Info("processed message",
+				"requestID", msg.Req.RequestID,
+				"method", msg.Req.Method,
+				"route", methodRoute)
 
 			responseBytes, err := ctx.GetRawResponse()
 			if err != nil {

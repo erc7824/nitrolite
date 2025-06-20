@@ -46,16 +46,26 @@ func main() {
 	// Map to store custody clients for later reference
 	custodyClients := make(map[string]*Custody)
 
-	wsListenAddr := ":8000"
-	wsEndpoint := "/ws"
-	unifiedWSHandler, err := NewUnifiedWSHandler(signer, db, metrics, rpcStore, config, logger)
+	authManager, err := NewAuthManager(signer.GetPrivateKey())
 	if err != nil {
-		logger.Fatal("failed to initialize WebSocket handler", "error", err)
+		logger.Fatal("failed to initialize auth manager", "error", err)
 	}
-	http.HandleFunc(wsEndpoint, unifiedWSHandler.HandleConnection)
+
+	rpcNode := NewRPCNode(signer, logger)
+	rpcRouter := NewRPCRouter(rpcNode, config, signer, db, authManager, metrics, rpcStore, logger)
+
+	rpcListenAddr := ":8000"
+	rpcListenEndpoint := "/ws"
+	rpcMux := http.NewServeMux()
+	rpcMux.HandleFunc(rpcListenEndpoint, rpcNode.HandleConnection)
+
+	rpcServer := &http.Server{
+		Addr:    rpcListenAddr,
+		Handler: rpcMux,
+	}
 
 	for name, network := range config.networks {
-		client, err := NewCustody(signer, db, unifiedWSHandler.sendBalanceUpdate, unifiedWSHandler.sendChannelUpdate, network.InfuraURL, network.CustodyAddress, network.AdjudicatorAddress, network.BalanceCHeckerAddress, network.ChainID, network.BlockStep, logger)
+		client, err := NewCustody(signer, db, rpcRouter.SendBalanceUpdate, rpcRouter.SendChannelUpdate, network.InfuraURL, network.CustodyAddress, network.AdjudicatorAddress, network.BalanceCHeckerAddress, network.ChainID, network.BlockStep, logger)
 		if err != nil {
 			logger.Warn("failed to initialize blockchain client", "network", name, "error", err)
 			continue
@@ -88,9 +98,9 @@ func main() {
 
 	// Start the main HTTP server.
 	go func() {
-		logger.Info("WebSocket server available", "listenAddr", wsListenAddr, "endpoint", wsEndpoint)
-		if err := http.ListenAndServe(wsListenAddr, nil); err != nil {
-			logger.Fatal("WebSocket server failure", "error", err)
+		logger.Info("RPC server available", "listenAddr", rpcListenAddr, "endpoint", rpcListenEndpoint)
+		if err := rpcServer.ListenAndServe(); err != nil {
+			logger.Fatal("RPC server failure", "error", err)
 		}
 	}()
 
@@ -108,6 +118,12 @@ func main() {
 		logger.Error("failed to shut down metrics server", "error", err)
 	}
 
-	unifiedWSHandler.CloseAllConnections()
+	// Shutdown RPC server
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := rpcServer.Shutdown(ctx); err != nil {
+		logger.Error("failed to shut down metrics server", "error", err)
+	}
+
 	logger.Info("shutdown complete")
 }

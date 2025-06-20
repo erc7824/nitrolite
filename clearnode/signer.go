@@ -13,6 +13,12 @@ import (
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
+// Allowance represents allowances for connection
+type Allowance struct {
+	Asset  string `json:"asset"`
+	Amount string `json:"amount"`
+}
+
 // Signer handles signing operations using a private key
 type Signer struct {
 	privateKey *ecdsa.PrivateKey

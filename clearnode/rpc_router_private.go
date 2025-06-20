@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -66,6 +68,79 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 	c.Succeed(req.Method, balances)
 }
 
+// HandleTransfer unified balance funds to the specified account
+func HandleRPCRouterTransfer(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+	var params Transfer
+	if err := parseParams(rpc.Req.Params, &params); err != nil {
+		return nil, err
+	}
+	if params.Destination == "" || params.Destination == policy.Wallet {
+		return nil, errors.New("invalid destination")
+	}
+
+	// Allow only ledger accounts as destination at the current stage. In the future we'll unlock application accounts.
+	if !common.IsHexAddress(params.Destination) {
+		return nil, fmt.Errorf("invalid destination account: %s", params.Destination)
+	}
+
+	if len(params.Allocations) == 0 {
+		return nil, errors.New("empty allocations")
+	}
+
+	if err := verifySigner(rpc, policy.Wallet); err != nil {
+		return nil, err
+	}
+
+	fromWallet := policy.Wallet
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if wallet := GetWalletBySigner(policy.Wallet); wallet != "" {
+			fromWallet = wallet
+		}
+
+		if err := checkChallengedChannels(tx, fromWallet); err != nil {
+			return err
+		}
+
+		for _, alloc := range params.Allocations {
+			if alloc.Amount.IsZero() || alloc.Amount.IsNegative() {
+				return fmt.Errorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+			}
+			ledger := GetWalletLedger(tx, fromWallet)
+			balance, err := ledger.Balance(fromWallet, alloc.AssetSymbol)
+			if err != nil {
+				return fmt.Errorf("failed to check participant balance: %w", err)
+			}
+
+			if alloc.Amount.GreaterThan(balance) {
+				return fmt.Errorf("insufficient funds: %s for asset %s", fromWallet, alloc.AssetSymbol)
+			}
+
+			if err = ledger.Record(fromWallet, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
+				return fmt.Errorf("failed to debit source account: %w", err)
+			}
+			ledger = GetWalletLedger(tx, params.Destination)
+			if err = ledger.Record(params.Destination, alloc.AssetSymbol, alloc.Amount); err != nil {
+				return fmt.Errorf("failed to credit destination account: %w", err)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{
+		&TransferResponse{
+			From:        fromWallet,
+			To:          params.Destination,
+			Allocations: params.Allocations,
+			CreatedAt:   time.Now(),
+		},
+	}), nil
+}
+
 // HandleCreateApplication creates a virtual application between participants
 func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 	ctx := c.Context
@@ -108,15 +183,14 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
 		for _, alloc := range params.Allocations {
-			if alloc.Amount.IsNegative() {
-				return fmt.Errorf("invalid allocation: negative amount")
-			}
 			if alloc.Amount.IsPositive() {
 				if _, ok := rpcSigners[alloc.ParticipantWallet]; !ok {
 					return fmt.Errorf("missing signature for participant %s", alloc.ParticipantWallet)
 				}
 			}
-
+			if alloc.Amount.IsNegative() {
+				return fmt.Errorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+			}
 			walletAddress := alloc.ParticipantWallet
 			if wallet := GetWalletBySigner(alloc.ParticipantWallet); wallet != "" {
 				walletAddress = wallet
@@ -133,13 +207,13 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 			}
 
 			if alloc.Amount.GreaterThan(balance) {
-				return fmt.Errorf("insufficient funds: %s for asset %s", alloc.ParticipantWallet, alloc.AssetSymbol)
+				return fmt.Errorf("insufficient funds: %s for asset %s", walletAddress, alloc.AssetSymbol)
 			}
 			if err := ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
-				return fmt.Errorf("failed to debit participant: %w", err)
+				return fmt.Errorf("failed to debit source account: %w", err)
 			}
 			if err := ledger.Record(appSessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return fmt.Errorf("failed to credit virtual app: %w", err)
+				return fmt.Errorf("failed to credit destination account: %w", err)
 			}
 		}
 
@@ -158,7 +232,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 
 	if err != nil {
 		logger.Error("failed to create application session", "error", err)
-		c.Fail("failed to create application session")
+		c.Fail(err.Error())
 		return
 	}
 
@@ -373,7 +447,7 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 
 	if err = checkChallengedChannels(r.DB, channel.Wallet); err != nil {
 		logger.Error("failed to check challenged channels", "error", err)
-		c.Fail("failed to check challenged channels")
+		c.Fail(err.Error())
 		return
 	}
 
@@ -522,7 +596,7 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 
 	if err = checkChallengedChannels(r.DB, channel.Wallet); err != nil {
 		logger.Error("failed to check challenged channels", "error", err)
-		c.Fail("failed to check challenged channels")
+		c.Fail(err.Error())
 		return
 	}
 

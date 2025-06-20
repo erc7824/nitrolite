@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -836,4 +837,259 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 	assert.True(t, openSessionIDs["0xSession1"], "Should include Session1")
 	assert.True(t, openSessionIDs["0xSession3"], "Should include Session3")
 	assert.False(t, openSessionIDs["0xSession2"], "Should not include Session2")
+}
+
+func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
+	router, cleanup := setupTestRPCRouter(t)
+	defer cleanup()
+
+	participant1 := "0xParticipant1"
+	participant2 := "0xParticipant2"
+
+	ledger1 := GetWalletLedger(router.DB, participant1)
+	testData1 := []struct {
+		asset  string
+		amount decimal.Decimal
+	}{
+		{"usdc", decimal.NewFromInt(100)},
+		{"usdc", decimal.NewFromInt(200)},
+		{"usdc", decimal.NewFromInt(-50)},
+		{"eth", decimal.NewFromFloat(1.5)},
+		{"eth", decimal.NewFromFloat(-0.5)},
+	}
+	for _, data := range testData1 {
+		err := ledger1.Record(participant1, data.asset, data.amount)
+		require.NoError(t, err)
+	}
+
+	ledger2 := GetWalletLedger(router.DB, participant2)
+	testData2 := []struct {
+		asset  string
+		amount decimal.Decimal
+	}{
+		{"usdc", decimal.NewFromInt(300)},
+		{"btc", decimal.NewFromFloat(0.05)},
+	}
+	for _, data := range testData2 {
+		err := ledger2.Record(participant2, data.asset, data.amount)
+		require.NoError(t, err)
+	}
+
+	// Case 1: Filter by account_id only
+	params1 := map[string]string{"account_id": participant1}
+	paramsJSON1, err := json.Marshal(params1)
+	require.NoError(t, err)
+
+	c := &RPCContext{
+		Context: context.TODO(),
+		Message: RPCMessage{
+			Req: &RPCData{
+				RequestID: 1,
+				Method:    "get_ledger_entries",
+				Params:    []any{json.RawMessage(paramsJSON1)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+			Sig: []string{"dummy-signature"},
+		},
+	}
+
+	// Call handler
+	router.HandleGetLedgerEntries(c)
+	res := c.Message.Res
+	require.NotNil(t, res)
+
+	assert.Equal(t, "get_ledger_entries", res.Method)
+	assert.Equal(t, uint64(1), res.RequestID)
+	require.Len(t, res.Params, 1, "Response should contain an array of Entry objects")
+
+	entries1, ok := res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries1, 5, "Should return all 5 entries for participant1")
+
+	assetCounts := map[string]int{}
+	for _, entry := range entries1 {
+		assetCounts[entry.Asset]++
+		assert.Equal(t, participant1, entry.AccountID)
+		assert.Equal(t, participant1, entry.Participant)
+	}
+	assert.Equal(t, 3, assetCounts["usdc"], "Should have 3 USDC entries")
+	assert.Equal(t, 2, assetCounts["eth"], "Should have 2 ETH entries")
+
+	// Case 2: Filter by account_id and asset
+	params2 := map[string]string{"account_id": participant1, "asset": "usdc"}
+	paramsJSON2, err := json.Marshal(params2)
+	require.NoError(t, err)
+
+	c = &RPCContext{
+		Context: context.TODO(),
+		Message: RPCMessage{
+			Req: &RPCData{
+				RequestID: 2,
+				Method:    "get_ledger_entries",
+				Params:    []any{json.RawMessage(paramsJSON2)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+			Sig: []string{"dummy-signature"},
+		},
+	}
+
+	// Call handler
+	router.HandleGetLedgerEntries(c)
+	res = c.Message.Res
+	require.NotNil(t, res)
+
+	entries2, ok := res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries2, 3, "Should return 3 USDC entries for participant1")
+
+	for _, entry := range entries2 {
+		assert.Equal(t, "usdc", entry.Asset)
+		assert.Equal(t, participant1, entry.AccountID)
+		assert.Equal(t, participant1, entry.Participant)
+	}
+
+	// Case 3: Filter by wallet only
+	params3 := map[string]string{"wallet": participant2}
+	paramsJSON3, err := json.Marshal(params3)
+	require.NoError(t, err)
+
+	c = &RPCContext{
+		Context: context.TODO(),
+		Message: RPCMessage{
+			Req: &RPCData{
+				RequestID: 3,
+				Method:    "get_ledger_entries",
+				Params:    []any{json.RawMessage(paramsJSON3)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+			Sig: []string{"dummy-signature"},
+		},
+	}
+
+	// Call handler
+	router.HandleGetLedgerEntries(c)
+	res = c.Message.Res
+	require.NotNil(t, res)
+
+	entries3, ok := res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries3, 2, "Should return all 2 entries for participant2")
+
+	for _, entry := range entries3 {
+		assert.Equal(t, participant2, entry.Participant)
+	}
+
+	// Case 4: Filter by wallet and asset
+	params4 := map[string]string{"wallet": participant2, "asset": "usdc"}
+	paramsJSON4, err := json.Marshal(params4)
+	require.NoError(t, err)
+
+	c = &RPCContext{
+		Context: context.TODO(),
+		Message: RPCMessage{
+			Req: &RPCData{
+				RequestID: 4,
+				Method:    "get_ledger_entries",
+				Params:    []any{json.RawMessage(paramsJSON4)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+			Sig: []string{"dummy-signature"},
+		},
+	}
+
+	// Call handler
+	router.HandleGetLedgerEntries(c)
+	res = c.Message.Res
+	require.NotNil(t, res)
+
+	entries4, ok := res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries4, 1, "Should return 1 entry for participant2 with usdc")
+	assert.Equal(t, "usdc", entries4[0].Asset)
+	assert.Equal(t, participant2, entries4[0].Participant)
+
+	// Case 5: Filter by account_id and wallet (no overlap)
+	params5 := map[string]string{"account_id": participant1, "wallet": participant2}
+	paramsJSON5, err := json.Marshal(params5)
+	require.NoError(t, err)
+
+	c = &RPCContext{
+		Context: context.TODO(),
+		Message: RPCMessage{
+			Req: &RPCData{
+				RequestID: 5,
+				Method:    "get_ledger_entries",
+				Params:    []any{json.RawMessage(paramsJSON5)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+			Sig: []string{"dummy-signature"},
+		},
+	}
+
+	// Call handler
+	router.HandleGetLedgerEntries(c)
+	res = c.Message.Res
+	require.NotNil(t, res)
+
+	entries5, ok := res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries5, 0, "Should return 0 entries when account_id and wallet don't match")
+
+	// Case 6: No filters (all entries)
+	c = &RPCContext{
+		Context: context.TODO(),
+		Message: RPCMessage{
+			Req: &RPCData{
+				RequestID: 6,
+				Method:    "get_ledger_entries",
+				Params:    []any{map[string]string{}}, // Empty map
+				Timestamp: uint64(time.Now().Unix()),
+			},
+			Sig: []string{"dummy-signature"},
+		},
+	}
+
+	// Call handler
+	router.HandleGetLedgerEntries(c)
+	res = c.Message.Res
+	require.NotNil(t, res)
+
+	entries6, ok := res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries6, 7, "Should return all 7 entries")
+
+	foundParticipants := make(map[string]bool)
+	for _, entry := range entries6 {
+		foundParticipants[entry.Participant] = true
+	}
+	assert.True(t, foundParticipants[participant1], "Should include entries for participant1")
+	assert.True(t, foundParticipants[participant2], "Should include entries for participant2")
+
+	// Case 7: Default wallet provided
+	c = &RPCContext{
+		Context: context.TODO(),
+		UserID:  participant1,
+		Message: RPCMessage{
+			Req: &RPCData{
+				RequestID: 7,
+				Method:    "get_ledger_entries",
+				Params:    []any{map[string]string{}},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+			Sig: []string{"dummy-signature"},
+		},
+	}
+
+	// Call handler
+	router.HandleGetLedgerEntries(c)
+	res = c.Message.Res
+	require.NotNil(t, res)
+
+	entries7, ok := res.Params[0].([]LedgerEntryResponse)
+	require.True(t, ok, "Response parameter should be a slice of Entry")
+	assert.Len(t, entries7, 5, "Should return 5 entries for default wallet participant1")
+
+	for _, entry := range entries7 {
+		assert.Equal(t, participant1, entry.Participant)
+	}
 }

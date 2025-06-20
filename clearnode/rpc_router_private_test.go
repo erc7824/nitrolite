@@ -161,7 +161,8 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 	recipientAddr := "0x" + strings.Repeat("1", 40) // Valid ethereum address with 1s
 
 	t.Run("SuccessfulTransfer", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
 		defer cleanup()
 
 		// Setup signer wallet relation
@@ -184,35 +185,39 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Create RPC request
 		ts := uint64(time.Now().Unix())
-		rpcReq := &RPCMessage{
-			Req: &RPCData{
-				RequestID: 42,
-				Method:    "transfer",
-				Params:    []any{transferParams},
-				Timestamp: ts,
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  senderAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 42,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
 			},
 		}
 
-		// Marshal and sign the request
-		rawReq, err := json.Marshal(rpcReq.Req)
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
 		require.NoError(t, err)
-		rpcReq.Req.rawBytes = rawReq
+		c.Message.Req.rawBytes = rawReq
 
-		signed, err := senderSigner.Sign(rawReq)
+		// 2) Sign rawReq directly
+		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		rpcReq.Sig = []string{hexutil.Encode(signed)}
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
 
 		// Call handler
-		policy := &Policy{Wallet: senderAddr}
-		resp, err := HandleTransfer(policy, rpcReq, db)
-		require.NoError(t, err)
-		require.NotNil(t, resp)
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
 
 		// Verify response
-		assert.Equal(t, "transfer", resp.Res.Method)
-		assert.Equal(t, uint64(42), resp.Res.RequestID)
+		assert.Equal(t, "transfer", res.Method)
+		assert.Equal(t, uint64(42), res.RequestID)
 		// Verify response structure
-		transferResp, ok := resp.Res.Params[0].(*TransferResponse)
+		transferResp, ok := res.Params[0].(TransferResponse)
 		require.True(t, ok, "Response should be a TransferResponse")
 		assert.Equal(t, senderAddr, transferResp.From)
 		assert.Equal(t, recipientAddr, transferResp.To)
@@ -239,7 +244,8 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 	})
 
 	t.Run("ErrorInvalidDestinationAddress", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
 		defer cleanup()
 
 		// Setup signer wallet relation
@@ -260,33 +266,42 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Create RPC request
 		ts := uint64(time.Now().Unix())
-		rpcReq := &RPCMessage{
-			Req: &RPCData{
-				RequestID: 43,
-				Method:    "transfer",
-				Params:    []any{transferParams},
-				Timestamp: ts,
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  senderAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 43,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
 			},
 		}
 
-		// Marshal and sign the request
-		rawReq, err := json.Marshal(rpcReq.Req)
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
 		require.NoError(t, err)
-		rpcReq.Req.rawBytes = rawReq
+		c.Message.Req.rawBytes = rawReq
 
-		signed, err := senderSigner.Sign(rawReq)
+		// 2) Sign rawReq directly
+		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		rpcReq.Sig = []string{hexutil.Encode(signed)}
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
 
 		// Call handler
-		policy := &Policy{Wallet: senderAddr}
-		_, err = HandleTransfer(policy, rpcReq, db)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid destination account")
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		assert.Equal(t, "error", res.Method)
+		require.Len(t, res.Params, 1)
+		assert.Contains(t, res.Params[0], "invalid destination account")
 	})
 
 	t.Run("ErrorTransferToSelf", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
 		defer cleanup()
 
 		// Setup signer wallet relation
@@ -307,33 +322,42 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Create RPC request
 		ts := uint64(time.Now().Unix())
-		rpcReq := &RPCMessage{
-			Req: &RPCData{
-				RequestID: 44,
-				Method:    "transfer",
-				Params:    []any{transferParams},
-				Timestamp: ts,
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  senderAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 44,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
 			},
 		}
 
-		// Marshal and sign the request
-		rawReq, err := json.Marshal(rpcReq.Req)
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
 		require.NoError(t, err)
-		rpcReq.Req.rawBytes = rawReq
+		c.Message.Req.rawBytes = rawReq
 
-		signed, err := senderSigner.Sign(rawReq)
+		// 2) Sign rawReq directly
+		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		rpcReq.Sig = []string{hexutil.Encode(signed)}
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
 
 		// Call handler
-		policy := &Policy{Wallet: senderAddr}
-		_, err = HandleTransfer(policy, rpcReq, db)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid destination")
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		assert.Equal(t, "error", res.Method)
+		require.Len(t, res.Params, 1)
+		assert.Contains(t, res.Params[0], "invalid destination")
 	})
 
 	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
 		defer cleanup()
 
 		// Setup signer wallet relation
@@ -354,33 +378,42 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Create RPC request
 		ts := uint64(time.Now().Unix())
-		rpcReq := &RPCMessage{
-			Req: &RPCData{
-				RequestID: 45,
-				Method:    "transfer",
-				Params:    []any{transferParams},
-				Timestamp: ts,
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  senderAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 45,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
 			},
 		}
 
-		// Marshal and sign the request
-		rawReq, err := json.Marshal(rpcReq.Req)
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
 		require.NoError(t, err)
-		rpcReq.Req.rawBytes = rawReq
+		c.Message.Req.rawBytes = rawReq
 
-		signed, err := senderSigner.Sign(rawReq)
+		// 2) Sign rawReq directly
+		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		rpcReq.Sig = []string{hexutil.Encode(signed)}
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
 
 		// Call handler
-		policy := &Policy{Wallet: senderAddr}
-		_, err = HandleTransfer(policy, rpcReq, db)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "insufficient funds")
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		assert.Equal(t, "error", res.Method)
+		require.Len(t, res.Params, 1)
+		assert.Contains(t, res.Params[0], "insufficient funds")
 	})
 
 	t.Run("ErrorEmptyAllocations", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
 		defer cleanup()
 
 		// Setup signer wallet relation
@@ -396,33 +429,42 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Create RPC request
 		ts := uint64(time.Now().Unix())
-		rpcReq := &RPCMessage{
-			Req: &RPCData{
-				RequestID: 46,
-				Method:    "transfer",
-				Params:    []any{transferParams},
-				Timestamp: ts,
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  senderAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 46,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
 			},
 		}
 
-		// Marshal and sign the request
-		rawReq, err := json.Marshal(rpcReq.Req)
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
 		require.NoError(t, err)
-		rpcReq.Req.rawBytes = rawReq
+		c.Message.Req.rawBytes = rawReq
 
-		signed, err := senderSigner.Sign(rawReq)
+		// 2) Sign rawReq directly
+		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		rpcReq.Sig = []string{hexutil.Encode(signed)}
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
 
 		// Call handler
-		policy := &Policy{Wallet: senderAddr}
-		_, err = HandleTransfer(policy, rpcReq, db)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "empty allocations")
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		assert.Equal(t, "error", res.Method)
+		require.Len(t, res.Params, 1)
+		assert.Contains(t, res.Params[0], "empty allocations")
 	})
 
 	t.Run("ErrorZeroAmount", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
 		defer cleanup()
 
 		// Setup signer wallet relation
@@ -443,33 +485,42 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Create RPC request
 		ts := uint64(time.Now().Unix())
-		rpcReq := &RPCMessage{
-			Req: &RPCData{
-				RequestID: 49,
-				Method:    "transfer",
-				Params:    []any{transferParams},
-				Timestamp: ts,
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  senderAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 49,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
 			},
 		}
 
-		// Marshal and sign the request
-		rawReq, err := json.Marshal(rpcReq.Req)
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
 		require.NoError(t, err)
-		rpcReq.Req.rawBytes = rawReq
+		c.Message.Req.rawBytes = rawReq
 
-		signed, err := senderSigner.Sign(rawReq)
+		// 2) Sign rawReq directly
+		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		rpcReq.Sig = []string{hexutil.Encode(signed)}
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
 
 		// Call handler
-		policy := &Policy{Wallet: senderAddr}
-		_, err = HandleTransfer(policy, rpcReq, db)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid allocation")
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		assert.Equal(t, "error", res.Method)
+		require.Len(t, res.Params, 1)
+		assert.Contains(t, res.Params[0], "invalid allocation")
 	})
 
 	t.Run("ErrorNegativeAmount", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
 		defer cleanup()
 
 		// Setup signer wallet relation
@@ -490,33 +541,42 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Create RPC request
 		ts := uint64(time.Now().Unix())
-		rpcReq := &RPCMessage{
-			Req: &RPCData{
-				RequestID: 47,
-				Method:    "transfer",
-				Params:    []any{transferParams},
-				Timestamp: ts,
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  senderAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 47,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
 			},
 		}
 
-		// Marshal and sign the request
-		rawReq, err := json.Marshal(rpcReq.Req)
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
 		require.NoError(t, err)
-		rpcReq.Req.rawBytes = rawReq
+		c.Message.Req.rawBytes = rawReq
 
-		signed, err := senderSigner.Sign(rawReq)
+		// 2) Sign rawReq directly
+		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		rpcReq.Sig = []string{hexutil.Encode(signed)}
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
 
 		// Call handler
-		policy := &Policy{Wallet: senderAddr}
-		_, err = HandleTransfer(policy, rpcReq, db)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid allocation")
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		assert.Equal(t, "error", res.Method)
+		require.Len(t, res.Params, 1)
+		assert.Contains(t, res.Params[0], "invalid allocation")
 	})
 
 	t.Run("ErrorInvalidSignature", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
 		defer cleanup()
 
 		// Setup signer wallet relation
@@ -537,32 +597,39 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Create RPC request
 		ts := uint64(time.Now().Unix())
-		rpcReq := &RPCMessage{
-			Req: &RPCData{
-				RequestID: 48,
-				Method:    "transfer",
-				Params:    []any{transferParams},
-				Timestamp: ts,
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  senderAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 48,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
 			},
 		}
 
-		// Marshal the request
-		rawReq, err := json.Marshal(rpcReq.Req)
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
 		require.NoError(t, err)
-		rpcReq.Req.rawBytes = rawReq
+		c.Message.Req.rawBytes = rawReq
 
-		// Sign with a different key
+		// 2) Sign rawReq with wrong key
 		wrongKey, _ := crypto.GenerateKey()
 		wrongSigner := Signer{privateKey: wrongKey}
-		signed, err := wrongSigner.Sign(rawReq)
+		sigBytes, err := wrongSigner.Sign(rawReq)
 		require.NoError(t, err)
-		rpcReq.Sig = []string{hexutil.Encode(signed)}
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
 
 		// Call handler
-		policy := &Policy{Wallet: senderAddr}
-		_, err = HandleTransfer(policy, rpcReq, db)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid signature")
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		assert.Equal(t, "error", res.Method)
+		require.Len(t, res.Params, 1)
+		assert.Contains(t, res.Params[0], "invalid signature")
 	})
 }
 

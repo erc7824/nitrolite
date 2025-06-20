@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,6 +26,8 @@ func TestRPCNode(t *testing.T) {
 	node := NewRPCNode(signer, logger)
 	require.NotNil(t, node)
 
+	mu := sync.Mutex{}
+
 	rootMwKey := "root_mw_executed"
 	rootMethod := "root.test"
 	groupAMwKey := "group_a_mw_executed"
@@ -37,6 +40,9 @@ func TestRPCNode(t *testing.T) {
 	onConnectMethod := "on_connect.test"
 	onConnectCounts := 0
 	node.OnConnect(func(send SendRPCMessageFunc) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		onConnectCounts++
 		send(onConnectMethod, onConnectCounts)
 	})
@@ -44,6 +50,9 @@ func TestRPCNode(t *testing.T) {
 	onDisconnectCounts := 0
 	disconnectedUserID := ""
 	node.OnDisconnect(func(userID string) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		onDisconnectCounts++
 		disconnectedUserID = userID
 	})
@@ -52,17 +61,26 @@ func TestRPCNode(t *testing.T) {
 	onAuthenticatedCounts := 0
 	authenticatedUserID := "user.test"
 	node.OnAuthenticated(func(userID string, send SendRPCMessageFunc) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		onAuthenticatedCounts++
 		send(onAuthenticatedMethod, onAuthenticatedCounts, userID)
 	})
 
 	onMessageSentCounts := 0
 	node.OnMessageSent(func() {
+		mu.Lock()
+		defer mu.Unlock()
+
 		onMessageSentCounts++
 	})
 
 	createDummyHandler := func(method string) func(c *RPCContext) {
 		return func(c *RPCContext) {
+			mu.Lock()
+			defer mu.Unlock()
+
 			logger.Debug("executing handler", "method", method)
 
 			var prevMethod string
@@ -187,6 +205,9 @@ func TestRPCNode(t *testing.T) {
 	t.Run("connect", func(t *testing.T) {
 		resp := receive(t)
 
+		mu.Lock()
+		defer mu.Unlock()
+
 		require.NotNil(t, resp.Res)
 		assert.Equal(t, onConnectMethod, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 1)
@@ -198,6 +219,9 @@ func TestRPCNode(t *testing.T) {
 	// Test root handler
 	t.Run("root handler", func(t *testing.T) {
 		resp := sendAndReceive(t, 1, rootMethod)
+
+		mu.Lock()
+		defer mu.Unlock()
 
 		require.NotNil(t, resp.Res)
 		assert.Equal(t, rootMethod, resp.Res.Method)
@@ -215,16 +239,22 @@ func TestRPCNode(t *testing.T) {
 	t.Run("auth handler", func(t *testing.T) {
 		resp := sendAndReceive(t, 1, authMethod)
 
+		// So we definitely receive both authMethod and onAuthenticatedMethod
+		time.Sleep(100 * time.Millisecond)
+
+		mu.Lock()
 		require.NotNil(t, resp.Res)
 		assert.Equal(t, authMethod, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 1)
 		assert.Len(t, resp.Sig, 1)
 		assert.Equal(t, authenticatedUserID, resp.Res.Params[0]) // authenticated user ID
 		assert.Equal(t, 4, onMessageSentCounts)                  // number of messages sent
+		mu.Unlock()
 
 		// on authenticated method executed
 		resp = receive(t)
 
+		mu.Lock()
 		require.NotNil(t, resp.Res)
 		assert.Equal(t, onAuthenticatedMethod, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 2)
@@ -232,11 +262,15 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, 1, onAuthenticatedCounts)                // on authenticated counts
 		assert.Equal(t, authenticatedUserID, resp.Res.Params[1]) // authenticated user ID
 		assert.Equal(t, 4, onMessageSentCounts)                  // number of messages sent
+		mu.Unlock()
 	})
 
 	// Test group handler 1
 	t.Run("group handler 1", func(t *testing.T) {
 		resp := sendAndReceive(t, 2, groupMethodA)
+
+		mu.Lock()
+		defer mu.Unlock()
 
 		require.NotNil(t, resp.Res)
 		assert.Equal(t, groupMethodA, resp.Res.Method)
@@ -254,6 +288,9 @@ func TestRPCNode(t *testing.T) {
 	t.Run("group handler 2", func(t *testing.T) {
 		resp := sendAndReceive(t, 3, groupMethodB)
 
+		mu.Lock()
+		defer mu.Unlock()
+
 		require.NotNil(t, resp.Res)
 		assert.Equal(t, groupMethodB, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 5)
@@ -269,6 +306,9 @@ func TestRPCNode(t *testing.T) {
 	// Test unknown method
 	t.Run("unknown method", func(t *testing.T) {
 		resp := sendAndReceive(t, 4, "unknown.method")
+
+		mu.Lock()
+		defer mu.Unlock()
 
 		require.NotNil(t, resp.Res)
 		assert.Equal(t, "error", resp.Res.Method)
@@ -288,6 +328,9 @@ func TestRPCNode(t *testing.T) {
 		err = conn.ReadJSON(&respMsg)
 		require.NoError(t, err)
 
+		mu.Lock()
+		defer mu.Unlock()
+
 		require.NotNil(t, respMsg.Res)
 		assert.Equal(t, "error", respMsg.Res.Method)
 		assert.Contains(t, respMsg.Res.Params[0], "invalid message format")
@@ -300,6 +343,9 @@ func TestRPCNode(t *testing.T) {
 		err = conn.Close()
 		require.NoError(t, err)
 		time.Sleep(100 * time.Millisecond) // Give some time for the disconnect handler to be called
+
+		mu.Lock()
+		defer mu.Unlock()
 
 		// Verify onDisconnect handler was called
 		assert.Equal(t, 1, onDisconnectCounts)                   // number of disconnects

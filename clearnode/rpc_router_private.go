@@ -186,31 +186,37 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 }
 
 // HandleTransfer unified balance funds to the specified account
-func HandleRPCRouterTransfer(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
+func (r *RPCRouter) HandleTransfer(c *RPCContext) {
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+
 	var params Transfer
-	if err := parseParams(rpc.Req.Params, &params); err != nil {
-		return nil, err
-	}
-	if params.Destination == "" || params.Destination == policy.Wallet {
-		return nil, errors.New("invalid destination")
+	if err := parseParams(req.Params, &params); err != nil {
+		c.Fail(err.Error())
+		return
 	}
 
 	// Allow only ledger accounts as destination at the current stage. In the future we'll unlock application accounts.
-	if !common.IsHexAddress(params.Destination) {
-		return nil, fmt.Errorf("invalid destination account: %s", params.Destination)
+	if params.Destination == "" || params.Destination == c.UserID || !common.IsHexAddress(params.Destination) {
+		c.Fail(fmt.Sprintf("invalid destination account: %s", params.Destination))
+		return
 	}
 
 	if len(params.Allocations) == 0 {
-		return nil, errors.New("empty allocations")
+		c.Fail("empty allocations")
+		return
 	}
 
-	if err := verifySigner(rpc, policy.Wallet); err != nil {
-		return nil, err
+	if err := verifySigner(&c.Message, c.UserID); err != nil {
+		logger.Error("failed to verify signer", "error", err)
+		c.Fail(err.Error())
+		return
 	}
 
-	fromWallet := policy.Wallet
-	err := db.Transaction(func(tx *gorm.DB) error {
-		if wallet := GetWalletBySigner(policy.Wallet); wallet != "" {
+	fromWallet := c.UserID
+	err := r.DB.Transaction(func(tx *gorm.DB) error {
+		if wallet := GetWalletBySigner(fromWallet); wallet != "" {
 			fromWallet = wallet
 		}
 
@@ -245,17 +251,17 @@ func HandleRPCRouterTransfer(policy *Policy, rpc *RPCMessage, db *gorm.DB) (*RPC
 	})
 
 	if err != nil {
-		return nil, err
+		logger.Error("failed to process transfer", "error", err)
+		c.Fail(err.Error())
+		return
 	}
 
-	return CreateResponse(rpc.Req.RequestID, rpc.Req.Method, []any{
-		&TransferResponse{
-			From:        fromWallet,
-			To:          params.Destination,
-			Allocations: params.Allocations,
-			CreatedAt:   time.Now(),
-		},
-	}), nil
+	c.Succeed(req.Method, TransferResponse{
+		From:        fromWallet,
+		To:          params.Destination,
+		Allocations: params.Allocations,
+		CreatedAt:   time.Now(),
+	})
 }
 
 // HandleCreateApplication creates a virtual application between participants

@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+
+	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 )
 
 type GetLedgerBalancesParams struct {
@@ -36,15 +38,18 @@ type TransferResponse struct {
 type CreateAppSessionParams struct {
 	Definition  AppDefinition   `json:"definition"`
 	Allocations []AppAllocation `json:"allocations"`
+	SessionData string          `json:"session_data"`
 }
 
 type SubmitStateParams struct {
 	AppSessionID string          `json:"app_session_id"`
+	SessionData  string          `json:"session_data"`
 	Allocations  []AppAllocation `json:"allocations"`
 }
 
 type CloseAppSessionParams struct {
 	AppSessionID string          `json:"app_session_id"`
+	SessionData  string          `json:"session_data"`
 	Allocations  []AppAllocation `json:"allocations"`
 }
 
@@ -58,6 +63,7 @@ type AppSessionResponse struct {
 	AppSessionID       string   `json:"app_session_id"`
 	Status             string   `json:"status"`
 	ParticipantWallets []string `json:"participants"`
+	SessionData        string   `json:"session_data"`
 	Protocol           string   `json:"protocol"`
 	Challenge          uint64   `json:"challenge"`
 	Weights            []int64  `json:"weights"`
@@ -295,6 +301,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: appSession.SessionID,
+		SessionData:  params.SessionData,
 		Version:      appSession.Version,
 		Status:       string(ChannelStatusOpen),
 	})
@@ -337,6 +344,7 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: params.AppSessionID,
+		SessionData:  params.SessionData,
 		Version:      newVersion,
 		Status:       string(ChannelStatusOpen),
 	})
@@ -367,7 +375,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 		return
 	}
 
-	newVersion, err := r.AppSessionService.CloseApplication(&params, rpcSigners)
+	finalVersion, err := r.AppSessionService.CloseApplication(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to close application session", "error", err)
 		c.Fail(err.Error())
@@ -376,13 +384,13 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: params.AppSessionID,
-		Version:      newVersion,
+		Version:      finalVersion,
 		Status:       string(ChannelStatusClosed),
 	})
 	logger.Info("application session closed",
 		"userID", c.UserID,
 		"sessionID", params.AppSessionID,
-		"newVersion", newVersion,
+		"newVersion", finalVersion,
 		"allocations", params.Allocations,
 	)
 }

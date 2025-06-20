@@ -15,6 +15,7 @@ type AppSession struct {
 	Nonce              uint64         `gorm:"column:nonce;not null"`
 	ParticipantWallets pq.StringArray `gorm:"type:text[];column:participants;not null"`
 	Weights            pq.Int64Array  `gorm:"type:integer[];column:weights"`
+	SessionData        string         `gorm:"column:session_data;type:text;not null"`
 	Quorum             uint64         `gorm:"column:quorum;default:100"`
 	Version            uint64         `gorm:"column:version;default:1"`
 	Status             ChannelStatus  `gorm:"column:status;not null"`

@@ -506,7 +506,7 @@ Participants must agree on signature weights and a quorum that would be required
 ### Submit State
 
 Submits an intermediate state into a virtual application and redistributes funds in an app session.
-To submits an intermediate state, participants must reach the signature quorum that they agreed on when creating the app session.
+To submit an intermediate state, participants must reach the signature quorum that they agreed on when creating the app session.
 This means that the sum of the weights of signers must reach the specified threshold in the app definition.
 
 **Request:**

@@ -590,7 +590,7 @@ This means that the sum of the weights of signers must reach the specified thres
 ### Close Channel
 
 To close a channel, the user must request the final state signed by the broker and then submit it to the smart contract.
-Only an open channel can be closed. In case the user does not agree with the final state provided by the broker, he can call the `challenge` method directly on the smart contract. 
+Only an open channel can be closed. In case the user does not agree with the final state provided by the broker, they can call the `challenge` method directly on the smart contract. 
 
 **Request:**
 

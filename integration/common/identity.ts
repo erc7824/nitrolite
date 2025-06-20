@@ -11,8 +11,8 @@ export class Identity {
     public sessionAddress: Address;
     public messageSigner = null;
 
-    constructor(privateWalletPrivateKey: Hex, sessionPrivateKey: Hex) {
-        const walletAccount = privateKeyToAccount(privateWalletPrivateKey);
+    constructor(walletPrivateKey: Hex, sessionPrivateKey: Hex) {
+        const walletAccount = privateKeyToAccount(walletPrivateKey);
         this.walletAddress = walletAccount.address;
 
         this.walletClient = createWalletClient({

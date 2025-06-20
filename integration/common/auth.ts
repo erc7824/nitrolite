@@ -10,8 +10,12 @@ import {
 import { Identity } from './identity';
 import { getAuthChallengePredicate, getAuthVerifyPredicate, TestWebSocket } from './ws';
 
-export const createAuthSessionWithClearnode = async (ws: TestWebSocket, identity: Identity) => {
-    const authRequestParams: AuthRequest = {
+export const createAuthSessionWithClearnode = async (
+    ws: TestWebSocket,
+    identity: Identity,
+    authRequestParams?: AuthRequest
+) => {
+    authRequestParams = authRequestParams || {
         wallet: identity.walletAddress,
         participant: identity.sessionAddress,
         app_name: 'Test Domain',
@@ -34,7 +38,7 @@ export const createAuthSessionWithClearnode = async (ws: TestWebSocket, identity
             })),
         },
         {
-            name: 'Test Domain',
+            name: authRequestParams.app_name,
         }
     );
 

@@ -74,6 +74,11 @@ export class TestWebSocket {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
             throw new Error('WebSocket is not open. Cannot send message.');
         }
+
+        if (this.debugMode) {
+            console.log('Sending message:', message);
+        }
+
         this.socket.send(message);
     }
 
@@ -195,4 +200,49 @@ export const getErrorPredicate = () => {
 
         return false;
     };
-}
+};
+
+export const getGetLedgerBalancesPredicate = () => {
+    return (data: string): boolean => {
+        try {
+            const parsedData = parseRPCResponse(data);
+            if (parsedData.method === RPCMethod.GetLedgerBalances) {
+                return true;
+            }
+        } catch (error) {
+            console.error('Error parsing data for GetLedgerBalancesPredicate:', error);
+        }
+
+        return false;
+    };
+};
+
+export const getCreateAppSessionPredicate = () => {
+    return (data: string): boolean => {
+        try {
+            const parsedData = parseRPCResponse(data);
+            if (parsedData.method === RPCMethod.CreateAppSession) {
+                return true;
+            }
+        } catch (error) {
+            console.error('Error parsing data for CreateAppSessionPredicate:', error);
+        }
+
+        return false;
+    };
+};
+
+export const getCloseAppSessionPredicate = () => {
+    return (data: string): boolean => {
+        try {
+            const parsedData = parseRPCResponse(data);
+            if (parsedData.method === RPCMethod.CloseAppSession) {
+                return true;
+            }
+        } catch (error) {
+            console.error('Error parsing data for CloseAppSessionPredicate:', error);
+        }
+
+        return false;
+    };
+};

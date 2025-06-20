@@ -3,14 +3,24 @@ import { localhost } from 'viem/chains';
 
 export const CONFIG = {
     CLEARNODE_URL: 'ws://localhost:8000/ws',
-    DEBUG_MODE: false,
+    DEBUG_MODE: true,
 
     IDENTITIES: [
         {
             // 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
             WALLET_PK: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as Hex,
-            // 0xf24b3419C0f9aB9cCD9447340232FA4763F1718c
-            SESSION_PK: '0x6ad7995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as Hex,
+            //
+            SESSION_PK: '0x60d7995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as Hex,
+            // 0xf8b647090e60c576FA341B66ae78dC112eF094E2
+            APP_SESSION_PK: '0x71e8995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as Hex,
+        },
+        {
+            // 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+            WALLET_PK: '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a' as Hex,
+            // 
+            SESSION_PK: '0x6ef5111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a' as Hex,
+            // 0x9265cF9A5Fe3eF3DD20c9318b64C9108Ef3c0255
+            APP_SESSION_PK: '0x7f06111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a' as Hex,
         },
     ],
 
@@ -22,7 +32,6 @@ export const CONFIG = {
         USDC_TOKEN_ADDRESS: '0xbD24c53072b9693A35642412227043Ffa5fac382' as Address,
     },
     DEFAULT_CHALLENGE_TIMEOUT: 3600,
-
 
     DATABASE_NAME: 'postgres',
     DATABASE_USER: 'postgres',

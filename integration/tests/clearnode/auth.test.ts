@@ -1,3 +1,4 @@
+import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { CONFIG } from '@/setup';
 import { getAuthChallengePredicate, getAuthVerifyPredicate, TestWebSocket } from '@/ws';
@@ -18,6 +19,8 @@ describe('Clearnode Authentication', () => {
 
     afterAll(() => {
         ws.close();
+        const databaseUtils = new DatabaseUtils();
+        databaseUtils.cleanupDatabaseData();
     });
 
     const identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);

@@ -226,6 +226,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 		return
 	}
 
+	// TODO: update response format accordingly to create struct
 	resp := make([]AppSessionResponse, len(sessions))
 	for i, session := range sessions {
 		resp[i] = AppSessionResponse{

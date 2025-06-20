@@ -164,7 +164,10 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 	}
 
 	if params.AccountID == "" {
-		params.AccountID = walletAddress
+		params.AccountID = params.Participant
+		if params.AccountID == "" {
+			params.AccountID = walletAddress
+		}
 	}
 
 	ledger := GetWalletLedger(r.DB, walletAddress)

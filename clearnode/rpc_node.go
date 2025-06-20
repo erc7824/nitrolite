@@ -12,7 +12,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"golang.org/x/sync/errgroup"
 )
 
 var validate = validator.New()
@@ -95,7 +94,6 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	errorGroup, parentCtx := errgroup.WithContext(r.Context())
 	connectionID := uuid.NewString()
 	messageSink := make(chan []byte, 10)
 	n.connHub.Set(&RPCConnection{
@@ -125,7 +123,9 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 
 	// readMesages handles incoming messages from the WebSocket connection.
 	// It validates messages, routes them to appropriate handlers, and manages authentication.
-	readMesages := func() error {
+	readMesages := func(ctx context.Context, abortOthers context.CancelFunc) {
+		defer abortOthers() // Stop other goroutines when done
+
 		authHandlerExecuted := false
 		handleAuthenticated := func(userID string) {
 			if authHandlerExecuted {
@@ -148,14 +148,13 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 			rpcConn := n.connHub.Get(connectionID)
 			if rpcConn == nil {
 				n.logger.Error("connection not found in hub", "connectionID", connectionID)
-				return fmt.Errorf("connection not found in hub for ID %s", connectionID)
+				return
 			}
 
 			select {
-			case <-parentCtx.Done():
+			case <-ctx.Done():
 				n.logger.Info("context done, stopping message processing")
-				close(rpcConn.WriteSink)
-				return nil
+				return
 			default:
 			}
 
@@ -164,11 +163,9 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					n.logger.Error("WebSocket connection closed with unexpected reason", "error", err)
 				} else {
-					err = nil
+					n.logger.Debug("WebSocket connection closed, finishing read loop", "error", err)
 				}
-
-				close(rpcConn.WriteSink)
-				return err
+				return
 			}
 
 			var msg RPCMessage
@@ -237,38 +234,44 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 
 	// writeMessages handles outgoing messages to the WebSocket connection.
 	// It reads from the message sink channel and writes to the WebSocket.
-	writeMessages := func() error {
-		for messageBytes := range messageSink {
-			w, err := conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				n.logger.Error("error getting writer for response", "error", err)
-				continue
-			}
+	writeMessages := func(ctx context.Context, abortOthers context.CancelFunc) {
+		defer abortOthers() // Stop other goroutines
 
-			if _, err := w.Write(messageBytes); err != nil {
-				n.logger.Error("error writing response", "error", err)
-				w.Close()
-				continue
-			}
+		for {
+			select {
+			case <-ctx.Done():
+				n.logger.Info("context done, stopping message writing")
+				return
+			case messageBytes := <-messageSink:
+				w, err := conn.NextWriter(websocket.TextMessage)
+				if err != nil {
+					n.logger.Error("error getting writer for response", "error", err)
+					continue
+				}
 
-			if err := w.Close(); err != nil {
-				n.logger.Error("error closing writer for response", "error", err)
-				continue
-			}
+				if _, err := w.Write(messageBytes); err != nil {
+					n.logger.Error("error writing response", "error", err)
+					w.Close()
+					continue
+				}
 
-			for _, handler := range n.onMessageSentHandlers {
-				handler()
+				if err := w.Close(); err != nil {
+					n.logger.Error("error closing writer for response", "error", err)
+					continue
+				}
+
+				for _, handler := range n.onMessageSentHandlers {
+					handler()
+				}
 			}
 		}
-
-		return nil
 	}
 
-	errorGroup.Go(readMesages)
-	errorGroup.Go(writeMessages)
-	if err := errorGroup.Wait(); err != nil && parentCtx.Err() == nil {
-		n.logger.Error("error in WebSocket message handling", "error", err)
-	}
+	parentCtx, abortConn := context.WithCancel(r.Context())
+	go readMesages(parentCtx, abortConn)
+	go writeMessages(parentCtx, abortConn)
+	<-parentCtx.Done()
+	close(messageSink) // Close the message sink channel
 }
 
 // RPCHandler is a function that processes an RPC request.

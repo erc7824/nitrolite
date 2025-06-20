@@ -32,6 +32,7 @@ type NetworkConfig struct {
 	CustodyAddress        string
 	AdjudicatorAddress    string
 	BalanceCHeckerAddress string // TODO: add balance checker method into our smart contract
+	BlockStep             uint64
 }
 
 // Config represents the overall application configuration
@@ -102,6 +103,7 @@ func LoadConfig(logger Logger) (*Config, error) {
 		custodyAddress := ""
 		adjudicatorAddress := ""
 		balanceCheckerAddress := ""
+		blockStep := uint64(10000) // Default block step for reconcile
 
 		// Look for matching environment variables
 		for _, env := range envs {
@@ -121,6 +123,12 @@ func LoadConfig(logger Logger) (*Config, error) {
 				adjudicatorAddress = value
 			} else if strings.HasPrefix(key, network+"_BALANCE_CHECKER_ADDRESS") {
 				balanceCheckerAddress = value
+			} else if strings.HasPrefix(key, network+"_BLOCK_STEP") {
+				if step, err := strconv.ParseUint(value, 10, 64); err == nil && step > 0 {
+					blockStep = step
+				} else {
+					logger.Warn("Invalid BLOCK_STEP value", "network", network, "value", value)
+				}
 			}
 		}
 
@@ -134,6 +142,7 @@ func LoadConfig(logger Logger) (*Config, error) {
 				CustodyAddress:        custodyAddress,
 				AdjudicatorAddress:    adjudicatorAddress,
 				BalanceCHeckerAddress: balanceCheckerAddress,
+				BlockStep:             blockStep,
 			}
 		}
 	}

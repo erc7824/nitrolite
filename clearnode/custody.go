@@ -35,13 +35,14 @@ type Custody struct {
 	chainID            uint32
 	signer             *Signer
 	adjudicatorAddress common.Address
+	blockStep          uint64
 	sendBalanceUpdate  func(string)
 	sendChannelUpdate  func(Channel)
 	logger             Logger
 }
 
 // NewCustody initializes the Ethereum client and custody contract wrapper.
-func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr, adjudicatorAddr, balanceCheckerAddr string, chain uint32, logger Logger) (*Custody, error) {
+func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr, adjudicatorAddr, balanceCheckerAddr string, chain uint32, blockStep uint64, logger Logger) (*Custody, error) {
 	client, err := ethclient.Dial(infuraURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Ethereum node: %w", err)
@@ -83,14 +84,27 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 		adjudicatorAddress: common.HexToAddress(adjudicatorAddr),
 		sendBalanceUpdate:  sendBalanceUpdate,
 		sendChannelUpdate:  sendChannelUpdate,
+		blockStep:          blockStep,
 		logger:             logger.NewSystem("custody").With("chainID", chainID.Int64()).With("custodyAddress", custodyAddressStr),
 	}, nil
 }
 
 // ListenEvents initializes event listening for the custody contract
 func (c *Custody) ListenEvents(ctx context.Context) {
-	// TODO: store processed events in a database
-	listenEvents(ctx, c.client, c.custodyAddr, c.chainID, 0, c.handleBlockChainEvent, c.logger)
+	ev, err := GetLatestContractEvent(c.db, c.custodyAddr.Hex(), c.chainID)
+	if err != nil {
+		c.logger.Error("failed to get latest contract event", "error", err)
+		return
+	}
+
+	var lastBlock uint64
+	var lastIndex uint32
+	if ev != nil {
+		lastBlock = ev.BlockNumber
+		lastIndex = ev.LogIndex
+	}
+
+	listenEvents(ctx, c.client, c.custodyAddr, c.chainID, c.blockStep, lastBlock, lastIndex, c.handleBlockChainEvent, c.logger)
 }
 
 // Join calls the join method on the custody contract
@@ -230,6 +244,11 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 
 	var ch Channel
 	err = c.db.Transaction(func(tx *gorm.DB) error {
+		// Save event in DB
+		if err := c.saveContractEvent(tx, "created", *ev, ev.Raw); err != nil {
+			return fmt.Errorf("failed to save created event: %w", err)
+		}
+
 		ch, err = CreateChannel(
 			tx,
 			channelID,
@@ -288,6 +307,11 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
+		// Save event in DB
+		if err := c.saveContractEvent(tx, "joined", *ev, ev.Raw); err != nil {
+			return err
+		}
+
 		result := tx.Where("channel_id = ?", channelID).First(&channel)
 		if result.Error != nil {
 			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -340,6 +364,11 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
+		// Save event in DB
+		if err := c.saveContractEvent(tx, "challenged", *ev, ev.Raw); err != nil {
+			return fmt.Errorf("failed to save challenged event: %w", err)
+		}
+
 		result := tx.Where("channel_id = ?", channelID).First(&channel)
 		if result.Error != nil {
 			return fmt.Errorf("error finding channel: %w", result.Error)
@@ -370,21 +399,36 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
+		// Save event in DB
+		if err := c.saveContractEvent(tx, "resized", *ev, ev.Raw); err != nil {
+			return fmt.Errorf("failed to save resized event: %w", err)
+		}
+
 		result := tx.Where("channel_id = ?", channelID).First(&channel)
 		if result.Error != nil {
 			return fmt.Errorf("error finding channel: %w", result.Error)
 		}
 
-		newAmount := int64(channel.Amount)
+		newAmount := new(big.Int).SetUint64(channel.Amount)
 		for _, change := range ev.DeltaAllocations {
-			newAmount += change.Int64()
+			newAmount.Add(newAmount, change)
 		}
 
-		channel.Amount = uint64(newAmount)
+		if newAmount.Sign() < 0 {
+			// TODO: what do we do in this case?
+			logger.Error("invalid resize, channel balance cannot be negative", "channelId", channelID)
+			return fmt.Errorf("invalid resize, channel balance cannot be negative: %s", newAmount.String())
+		}
+
+		channel.Amount = newAmount.Uint64()
 		channel.UpdatedAt = time.Now()
 		channel.Version++
 		if err := tx.Save(&channel).Error; err != nil {
 			return fmt.Errorf("error saving channel in database: %w", err)
+		}
+
+		if len(ev.DeltaAllocations) == 0 {
+			return nil
 		}
 
 		resizeAmount := ev.DeltaAllocations[0] // Participant deposits or withdraws.
@@ -447,6 +491,11 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
+		// Save event in DB
+		if err := c.saveContractEvent(tx, "closed", *ev, ev.Raw); err != nil {
+			return fmt.Errorf("failed to save closed event: %w", err)
+		}
+
 		result := tx.Where("channel_id = ?", channelID).First(&channel)
 		if result.Error != nil {
 			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -468,7 +517,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		if err := ledger.Record(channel.Wallet, asset.Symbol, tokenAmount.Neg()); err != nil {
 			return fmt.Errorf("error recording balance update for participant: %w", err)
 		}
-		ledger = GetWalletLedger(tx, channel.Wallet)
+
 		if err := ledger.Record(channelID, asset.Symbol, tokenAmount); err != nil {
 			log.Printf("[Closed] Error recording balance update for wallet: %v", err)
 			return err
@@ -478,7 +527,6 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 			return err
 		}
 
-		// Update the channel status to "closed"
 		channel.Status = ChannelStatusClosed
 		channel.Amount = 0
 		channel.UpdatedAt = time.Now()
@@ -578,4 +626,24 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 	count := len(openChannels[0])
 	metrics.BrokerChannelCount.With(prometheus.Labels{"network": fmt.Sprintf("%d", c.chainID)}).Set(float64(count))
 	logger.Debug("open channels metric updated", "network", c.chainID, "channels", count)
+}
+
+func (c *Custody) saveContractEvent(tx *gorm.DB, name string, event any, rawLog types.Log) error {
+	eventData, err := MarshalEvent(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event data for %s: %w", name, err)
+	}
+
+	contractEvent := &ContractEvent{
+		ContractAddress: c.custodyAddr.Hex(),
+		ChainID:         c.chainID,
+		Name:            name,
+		BlockNumber:     rawLog.BlockNumber,
+		TransactionHash: rawLog.TxHash.Hex(),
+		LogIndex:        uint32(rawLog.Index),
+		Data:            eventData,
+		CreatedAt:       time.Now(),
+	}
+
+	return StoreContractEvent(tx, contractEvent)
 }

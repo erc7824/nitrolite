@@ -456,7 +456,7 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
 ### Create Virtual Application
 
 Creates a virtual application between participants.
-Participants must agree on signature weights and a quorum that would be required to submit an intermediate state or close an app session. The create app session request must be signed by all participants with non-zero allocations.
+Participants must agree on signature weights and a quorum; this quorum is required to submit an intermediate state or close an app session. The create app session request must be signed by all participants with non-zero allocations.
 
 **Request:**
 

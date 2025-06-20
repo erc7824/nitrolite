@@ -232,6 +232,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 			AppSessionID:       session.SessionID,
 			Status:             string(session.Status),
 			ParticipantWallets: session.ParticipantWallets,
+			SessionData:        session.SessionData,
 			Protocol:           session.Protocol,
 			Challenge:          session.Challenge,
 			Weights:            session.Weights,

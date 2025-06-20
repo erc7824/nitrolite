@@ -9,8 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
-
-	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 )
 
 type GetLedgerBalancesParams struct {
@@ -43,8 +41,8 @@ type CreateAppSessionParams struct {
 
 type SubmitStateParams struct {
 	AppSessionID string          `json:"app_session_id"`
-	SessionData  string          `json:"session_data"`
 	Allocations  []AppAllocation `json:"allocations"`
+	SessionData  string          `json:"session_data"`
 }
 
 type CloseAppSessionParams struct {
@@ -384,6 +382,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: params.AppSessionID,
+		SessionData:  params.SessionData,
 		Version:      finalVersion,
 		Status:       string(ChannelStatusClosed),
 	})

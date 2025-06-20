@@ -66,7 +66,7 @@ func NewRPCRouter(
 
 	appSessionGroup := privGroup.NewGroup("app_session")
 	appSessionGroup.Use(r.BalanceUpdateMiddleware)
-	// appSessionGroup.Handle("transfer", r.HandleTransfer)
+	appSessionGroup.Handle("transfer", r.HandleTransfer)
 	appSessionGroup.Handle("create_app_session", r.HandleCreateApplication)
 	appSessionGroup.Handle("submit_state", r.HandleSubmitState)
 	appSessionGroup.Handle("close_app_session", r.HandleCloseApplication)

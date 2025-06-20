@@ -456,6 +456,7 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
 ### Create Virtual Application
 
 Creates a virtual application between participants.
+Participants must agree on signature weights and a quorum; this quorum is required to submit an intermediate state or close an app session. The create app session request must be signed by all participants with non-zero allocations.
 
 **Request:**
 
@@ -505,6 +506,8 @@ Creates a virtual application between participants.
 ### Submit State
 
 Submits an intermediate state into a virtual application and redistributes funds in an app session.
+To submit an intermediate state, participants must reach the signature quorum that they agreed on when creating the app session.
+This means that the sum of the weights of signers must reach the specified threshold in the app definition.
 
 **Request:**
 
@@ -545,6 +548,8 @@ Submits an intermediate state into a virtual application and redistributes funds
 ### Close Virtual Application
 
 Closes a virtual application and redistributes funds.
+To close the app session, participants must reach the signature quorum that they agreed on when creating the app session.
+This means that the sum of the weights of signers must reach the specified threshold in the app definition.
 
 **Request:**
 
@@ -584,7 +589,8 @@ Closes a virtual application and redistributes funds.
 
 ### Close Channel
 
-Closes a channel between a participant and the broker.
+To close a channel, the user must request the final state signed by the broker and then submit it to the smart contract.
+Only an open channel can be closed. In case the user does not agree with the final state provided by the broker, they can call the `challenge` method directly on the smart contract. 
 
 **Request:**
 
@@ -598,18 +604,20 @@ Closes a channel between a participant and the broker.
 }
 ```
 
+In the request, the user must specify funds destination. After the channel is closed, funds become available to withdraw from the smart contract for the specified address.
+
 **Response:**
 
 ```json
 {
   "res": [1, "close_channel", [{
     "channel_id": "0x4567890123abcdef...",
-    "intent": 3, // IntentFINALIZE
+    "intent": 3, // IntentFINALIZE - constant magic number for closing channel
     "version": 123,
     "state_data": "0x0000000000000000000000000000000000000000000000000000000000001ec7",
     "allocations": [
       {
-        "destination": "0x1234567890abcdef...",
+        "destination": "0x1234567890abcdef...", // Provided funds address
         "token": "0xeeee567890abcdef...",
         "amount": "50000"
       },

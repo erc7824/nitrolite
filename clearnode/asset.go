@@ -27,13 +27,15 @@ func GetAssetByToken(db *gorm.DB, tokenAddress string, chainID uint32) (Asset, e
 }
 
 // GetAllAssets returns all supported assets. If chainID is provided, it filters assets by that chain ID
-func GetAllAssets(db *gorm.DB, chainID *uint32) ([]Asset, error) {
+func GetAllAssets(db *gorm.DB, chainID *uint32, params *PaginationParams) ([]Asset, error) {
 	var assets []Asset
 	query := db.Model(&Asset{})
 
 	if chainID != nil {
 		query = query.Where("chain_id = ?", *chainID)
 	}
+
+	query = paginate(params)(query)
 
 	err := query.Order("chain_id, symbol").Find(&assets).Error
 	return assets, err

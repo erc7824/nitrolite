@@ -658,7 +658,7 @@ func (h *UnifiedWSHandler) sendChannelUpdate(channel Channel) {
 
 // sendAssetsUpdate sends all assets to the client immediately upon connection
 func (h *UnifiedWSHandler) sendAssets(conn *websocket.Conn) {
-	assets, err := GetAllAssets(h.db, nil) // Get all assets without chain filter
+	assets, err := GetAllAssets(h.db, nil, nil) // Get all assets without chain filter
 	if err != nil {
 		h.logger.Error("error getting assets", "error", err)
 		return

@@ -911,6 +911,7 @@ func HandleGetRPCHistory(policy *Policy, rpc *RPCMessage, store *RPCStore) (*RPC
 // HandleGetAssets returns all supported assets
 func HandleGetAssets(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 	var chainID *uint32
+	var page, pageSize *int32
 
 	if len(rpc.Req.Params) > 0 {
 		if paramsJSON, err := json.Marshal(rpc.Req.Params[0]); err == nil {
@@ -922,11 +923,23 @@ func HandleGetAssets(rpc *RPCMessage, db *gorm.DB) (*RPCMessage, error) {
 						chainID = &chainIDUint
 					}
 				}
+				if p, ok := params["page"]; ok {
+					if pageFloat, ok := p.(float64); ok {
+						pageInt := int32(pageFloat)
+						page = &pageInt
+					}
+				}
+				if ps, ok := params["page_size"]; ok {
+					if pageSizeFloat, ok := ps.(float64); ok {
+						pageSizeInt := int32(pageSizeFloat)
+						pageSize = &pageSizeInt
+					}
+				}
 			}
 		}
 	}
 
-	assets, err := GetAllAssets(db, chainID)
+	assets, err := GetAllAssets(db, chainID, validatePaginationParams(page, pageSize))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve assets: %w", err)
 	}
@@ -1001,4 +1014,47 @@ func checkChallengedChannels(tx *gorm.DB, wallet string) error {
 		return fmt.Errorf("participant %s has challenged channels, cannot execute operation", wallet)
 	}
 	return nil
+}
+
+const (
+	DefaultPage     = 1
+	DefaultPageSize = 10
+	MaxPageSize     = 100
+)
+
+type PaginationParams struct {
+	Page     uint32
+	PageSize uint32
+}
+
+func validatePaginationParams(page, pageSize *int32) *PaginationParams {
+	var page_, pageSize_ uint32 = uint32(*page), uint32(*pageSize)
+
+	if page == nil || *page < 1 {
+		page_ = DefaultPage
+	}
+
+	if pageSize == nil || *pageSize < 1 {
+		pageSize_ = DefaultPageSize
+	} else if *pageSize > MaxPageSize {
+		pageSize_ = MaxPageSize
+	}
+
+	return &PaginationParams{
+		Page:     page_,
+		PageSize: pageSize_,
+	}
+}
+
+func paginate(params *PaginationParams) func(db *gorm.DB) *gorm.DB {
+	if params == nil {
+		return func(db *gorm.DB) *gorm.DB {
+			return db
+		}
+	}
+
+	offset := (params.Page - 1) * params.PageSize
+	return func(db *gorm.DB) *gorm.DB {
+		return db.Offset(int(offset)).Limit(int(params.PageSize))
+	}
 }

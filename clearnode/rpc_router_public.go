@@ -48,7 +48,7 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 		}
 	}
 
-	assets, err := GetAllAssets(r.DB, chainID)
+	assets, err := GetAllAssets(r.DB, chainID, nil)
 	if err != nil {
 		logger.Error("failed to get assets", "error", err)
 		c.Fail("failed to get assets")

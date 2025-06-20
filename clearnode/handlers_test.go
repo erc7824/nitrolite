@@ -345,7 +345,7 @@ func TestAssetsForWebSocketConnection(t *testing.T) {
 		require.NoError(t, db.Create(&a).Error)
 	}
 
-	assets, err := GetAllAssets(db, nil)
+	assets, err := GetAllAssets(db, nil, nil)
 	require.NoError(t, err)
 	assert.Len(t, assets, 2, "Should have 2 assets in database")
 

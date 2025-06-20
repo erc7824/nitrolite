@@ -98,9 +98,9 @@ func (r *RPCRouter) HandleConnect(send SendRPCMessageFunc) {
 	}
 
 	// Convert to AssetResponse format
-	response := make([]AssetResponse, 0, len(assets))
+	response := make([]GetAssetsResponse, 0, len(assets))
 	for _, asset := range assets {
-		response = append(response, AssetResponse(asset))
+		response = append(response, GetAssetsResponse(asset))
 	}
 
 	send("assets", response)

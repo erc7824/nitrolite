@@ -2,13 +2,22 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+type AuthRequestParams struct {
+	Address            string      `json:"address"`             // The wallet address requesting authentication
+	SessionKey         string      `json:"session_key"`         // The session key for the authentication
+	AppName            string      `json:"app_name"`            // The name of the application requesting authentication
+	Allowances         []Allowance `json:"allowances"`          // Allowances for the application
+	Expire             string      `json:"expire"`              // Expiration time for the authentication
+	Scope              string      `json:"scope"`               // Scope of the authentication
+	ApplicationAddress string      `json:"application_address"` // The address of the application requesting authentication
+}
 
 // AuthResponse represents the server's challenge response
 type AuthResponse struct {
@@ -29,73 +38,30 @@ func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 	// Track auth request metrics
 	r.Metrics.AuthRequests.Inc()
 
-	// Parse the parameters
-	if len(req.Params) < 7 {
-		c.Fail("invalid parameters: expected 7 parameters")
-		return
-	}
-
-	addr, ok := req.Params[0].(string)
-	if !ok || addr == "" {
-		c.Fail(fmt.Sprintf("invalid address: %v", req.Params[0]))
-		return
-	}
-
-	sessionKey, ok := req.Params[1].(string)
-	if !ok || sessionKey == "" {
-		c.Fail(fmt.Sprintf("invalid session key: %v", req.Params[1]))
-		return
-	}
-
-	appName, ok := req.Params[2].(string)
-	if !ok || appName == "" {
-		c.Fail(fmt.Sprintf("invalid application name: %v", req.Params[2]))
-		return
-	}
-
-	rawAllowances := req.Params[3]
-	allowances, err := parseAllowances(rawAllowances)
-	if err != nil {
-		c.Fail(fmt.Sprintf("invalid allowances: %s", err.Error()))
-		return
-	}
-
-	expire, ok := req.Params[4].(string)
-	if !ok {
-		c.Fail(fmt.Sprintf("invalid expiration time: %v", req.Params[4]))
-		return
-	}
-
-	scope, ok := req.Params[5].(string)
-	if !ok {
-		c.Fail(fmt.Sprintf("invalid scope: %v", req.Params[5]))
-		return
-	}
-
-	applicationAddress, ok := req.Params[6].(string)
-	if !ok {
-		c.Fail(fmt.Sprintf("invalid application address: %v", req.Params[6]))
+	var authParams AuthRequestParams
+	if err := parseParams(req.Params, &authParams); err != nil {
+		c.Fail(err.Error())
 		return
 	}
 
 	logger.Debug("incoming auth request",
-		"addr", addr,
-		"sessionKey", sessionKey,
-		"appName", appName,
-		"rawAllowances", rawAllowances,
-		"scope", scope,
-		"expire", expire,
-		"applicationAddress", applicationAddress)
+		"addr", authParams.Address,
+		"sessionKey", authParams.SessionKey,
+		"appName", authParams.AppName,
+		"rawAllowances", authParams.Allowances,
+		"scope", authParams.Scope,
+		"expire", authParams.Expire,
+		"applicationAddress", authParams.ApplicationAddress)
 
 	// Generate a challenge for this address
 	token, err := r.AuthManager.GenerateChallenge(
-		addr,
-		sessionKey,
-		appName,
-		allowances,
-		scope,
-		expire,
-		applicationAddress,
+		authParams.Address,
+		authParams.SessionKey,
+		authParams.AppName,
+		authParams.Allowances,
+		authParams.Scope,
+		authParams.Expire,
+		authParams.ApplicationAddress,
 	)
 	if err != nil {
 		logger.Error("failed to generate challenge", "error", err)
@@ -116,20 +82,9 @@ func (r *RPCRouter) HandleAuthVerify(c *RPCContext) {
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
 
-	if len(req.Params) < 1 {
-		c.Fail("invalid parameters: expected at least 1 parameter")
-		return
-	}
-
-	paramsJSON, err := json.Marshal(req.Params[0])
-	if err != nil {
-		c.Fail(fmt.Sprintf("invalid parameters format: %s", err.Error()))
-		return
-	}
-
 	var authParams AuthVerifyParams
-	if err := json.Unmarshal(paramsJSON, &authParams); err != nil {
-		c.Fail(fmt.Sprintf("failed to parse auth parameters: %s", err.Error()))
+	if err := parseParams(req.Params, &authParams); err != nil {
+		c.Fail(err.Error())
 		return
 	}
 

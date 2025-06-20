@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,7 +11,12 @@ import (
 	"gorm.io/gorm"
 )
 
-type Transfer struct {
+type GetLedgerBalancesParams struct {
+	Participant string `json:"participant,omitempty"` // Optional participant address to filter balances
+	AccountID   string `json:"account_id,omitempty"`  // Optional account ID to filter balances
+}
+
+type TransferParams struct {
 	Destination string               `json:"destination"`
 	Allocations []TransferAllocation `json:"allocations"`
 }
@@ -153,25 +157,18 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 	req := c.Message.Req
 	walletAddress := c.UserID
 
-	var account string
-	if len(req.Params) > 0 {
-		if paramsJSON, err := json.Marshal(req.Params[0]); err == nil {
-			var params map[string]string
-			if err := json.Unmarshal(paramsJSON, &params); err == nil {
-				account = params["participant"]
-				if id, ok := params["account_id"]; ok {
-					account = id
-				}
-			}
-		}
+	var params GetLedgerBalancesParams
+	if err := parseParams(req.Params, &params); err != nil {
+		c.Fail(err.Error())
+		return
 	}
 
-	if account == "" {
-		account = walletAddress
+	if params.AccountID == "" {
+		params.AccountID = walletAddress
 	}
 
 	ledger := GetWalletLedger(r.DB, walletAddress)
-	balances, err := ledger.GetBalances(account)
+	balances, err := ledger.GetBalances(params.AccountID)
 	if err != nil {
 		logger.Error("failed to get ledger balances", "error", err)
 		c.Fail("failed to get ledger balances")
@@ -179,7 +176,7 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, balances)
-	logger.Info("ledger balances retrieved", "userID", c.UserID, "accountID", account)
+	logger.Info("ledger balances retrieved", "userID", c.UserID, "accountID", params.AccountID)
 }
 
 // HandleTransfer unified balance funds to the specified account
@@ -188,7 +185,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
 
-	var params Transfer
+	var params TransferParams
 	if err := parseParams(req.Params, &params); err != nil {
 		c.Fail(err.Error())
 		return
@@ -470,17 +467,6 @@ func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decim
 		}
 	}
 	return nil
-}
-
-func parseParams(params []any, unmarshalTo any) error {
-	if len(params) == 0 {
-		return errors.New("missing parameters")
-	}
-	paramsJSON, err := json.Marshal(params[0])
-	if err != nil {
-		return fmt.Errorf("failed to parse parameters: %w", err)
-	}
-	return json.Unmarshal(paramsJSON, &unmarshalTo)
 }
 
 // getWallets retrieves the set of wallet addresses (keys) from RPC request signers.

@@ -1,18 +1,25 @@
 package main
 
 import (
-	"encoding/json"
 	"math/big"
 	"time"
 
 	"github.com/shopspring/decimal"
 )
 
-type AssetResponse struct {
+type GetAssetsParams struct {
+	ChainID *uint32 `json:"chain_id,omitempty"` // Optional chain ID to filter assets
+}
+
+type GetAssetsResponse struct {
 	Token    string `json:"token"`
 	ChainID  uint32 `json:"chain_id"`
 	Symbol   string `json:"symbol"`
 	Decimals uint8  `json:"decimals"`
+}
+
+type GetAppDefinitionParams struct {
+	AppSessionID string `json:"app_session_id"` // The application session ID to get the definition for
 }
 
 type AppDefinition struct {
@@ -22,6 +29,22 @@ type AppDefinition struct {
 	Quorum             uint64   `json:"quorum"`
 	Challenge          uint64   `json:"challenge"`
 	Nonce              uint64   `json:"nonce"`
+}
+
+type GetAppSessionParams struct {
+	Participant string `json:"participant,omitempty"` // Optional participant wallet to filter sessions
+	Status      string `json:"status,omitempty"`      // Optional status to filter sessions
+}
+
+type GetChannelsParams struct {
+	Participant string `json:"participant,omitempty"` // Optional participant wallet to filter channels
+	Status      string `json:"status,omitempty"`      // Optional status to filter channels
+}
+
+type GetLedgerEntriesParams struct {
+	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter entries
+	Asset     string `json:"asset,omitempty"`      // Optional asset to filter entries
+	Wallet    string `json:"wallet,omitempty"`     // Optional wallet address to filter entries
 }
 
 type LedgerEntryResponse struct {
@@ -74,35 +97,26 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
 
-	var chainID *uint32
-	if len(req.Params) > 0 {
-		if paramsJSON, err := json.Marshal(req.Params[0]); err == nil {
-			var params map[string]interface{}
-			if err := json.Unmarshal(paramsJSON, &params); err == nil {
-				if cid, ok := params["chain_id"]; ok {
-					if chainIDFloat, ok := cid.(float64); ok {
-						chainIDUint := uint32(chainIDFloat)
-						chainID = &chainIDUint
-					}
-				}
-			}
-		}
+	var params GetAssetsParams
+	if err := parseOptionalParams(req.Params, &params); err != nil {
+		c.Fail(err.Error())
+		return
 	}
 
-	assets, err := GetAllAssets(r.DB, chainID)
+	assets, err := GetAllAssets(r.DB, params.ChainID)
 	if err != nil {
 		logger.Error("failed to get assets", "error", err)
 		c.Fail("failed to get assets")
 		return
 	}
 
-	resp := make([]AssetResponse, 0, len(assets))
+	resp := make([]GetAssetsResponse, 0, len(assets))
 	for _, asset := range assets {
-		resp = append(resp, AssetResponse(asset))
+		resp = append(resp, GetAssetsResponse(asset))
 	}
 
 	c.Succeed(req.Method, resp)
-	logger.Info("assets retrieved", "chainID", chainID)
+	logger.Info("assets retrieved", "chainID", params.ChainID)
 }
 
 // HandleGetAppDefinition returns the application definition for a ledger account
@@ -111,24 +125,15 @@ func (r *RPCRouter) HandleGetAppDefinition(c *RPCContext) {
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
 
-	var sessionID string
-	if len(req.Params) > 0 {
-		if paramsJSON, err := json.Marshal(req.Params[0]); err == nil {
-			var params map[string]string
-			if err := json.Unmarshal(paramsJSON, &params); err == nil {
-				sessionID = params["app_session_id"]
-			}
-		}
-	}
-
-	if sessionID == "" {
-		c.Fail("missing account ID")
+	var params GetAppDefinitionParams
+	if err := parseParams(req.Params, &params); err != nil {
+		c.Fail(err.Error())
 		return
 	}
 
 	var vApp AppSession
-	if err := r.DB.Where("session_id = ?", sessionID).First(&vApp).Error; err != nil {
-		logger.Error("failed to get application session", "sessionID", sessionID, "error", err)
+	if err := r.DB.Where("session_id = ?", params.AppSessionID).First(&vApp).Error; err != nil {
+		logger.Error("failed to get application session", "sessionID", params.AppSessionID, "error", err)
 		c.Fail("failed to get application session")
 		return
 	}
@@ -141,7 +146,7 @@ func (r *RPCRouter) HandleGetAppDefinition(c *RPCContext) {
 		Challenge:          vApp.Challenge,
 		Nonce:              vApp.Nonce,
 	})
-	logger.Info("application definition retrieved", "sessionID", sessionID)
+	logger.Info("application definition retrieved", "sessionID", params.AppSessionID)
 }
 
 // HandleGetAppSessions returns a list of app sessions
@@ -150,18 +155,13 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
 
-	var participant, status string
-	if len(req.Params) > 0 {
-		if paramsJSON, err := json.Marshal(req.Params[0]); err == nil {
-			var params map[string]string
-			if err := json.Unmarshal(paramsJSON, &params); err == nil {
-				participant = params["participant"]
-				status = params["status"]
-			}
-		}
+	var params GetAppSessionParams
+	if err := parseOptionalParams(req.Params, &params); err != nil {
+		c.Fail(err.Error())
+		return
 	}
 
-	sessions, err := r.AppSessionService.GetAppSessions(participant, status)
+	sessions, err := r.AppSessionService.GetAppSessions(params.Participant, params.Status)
 	if err != nil {
 		logger.Error("failed to get application sessions", "error", err)
 		c.Fail("failed to get application sessions")
@@ -186,7 +186,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, resp)
-	logger.Info("application sessions retrieved", "participant", participant, "status", status)
+	logger.Info("application sessions retrieved", "participant", params.Participant, "status", params.Status)
 }
 
 // HandleGetChannels returns a list of channels for a given account
@@ -195,28 +195,23 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
 
-	var participant, status string
-	if len(req.Params) > 0 {
-		if paramsJSON, err := json.Marshal(req.Params[0]); err == nil {
-			var params map[string]string
-			if err := json.Unmarshal(paramsJSON, &params); err == nil {
-				participant = params["participant"]
-				status = params["status"]
-			}
-		}
+	var params GetChannelsParams
+	if err := parseOptionalParams(req.Params, &params); err != nil {
+		c.Fail(err.Error())
+		return
 	}
 
 	var channels []Channel
 	var err error
 
-	if participant == "" {
+	if params.Participant == "" {
 		query := r.DB
-		if status != "" {
-			query = query.Where("status = ?", status)
+		if params.Status != "" {
+			query = query.Where("status = ?", params.Status)
 		}
 		err = query.Order("created_at DESC").Find(&channels).Error
 	} else {
-		channels, err = getChannelsByWallet(r.DB, participant, status)
+		channels, err = getChannelsByWallet(r.DB, params.Participant, params.Status)
 	}
 	if err != nil {
 		logger.Error("failed to get channels", "error", err)
@@ -244,7 +239,7 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, response)
-	logger.Info("channels retrieved", "participant", participant, "status", status)
+	logger.Info("channels retrieved", "participant", params.Participant, "status", params.Status)
 }
 
 // HandleGetLedgerEntries returns ledger entries for an account
@@ -253,27 +248,19 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
 
-	var accountID, asset, wallet string
-	if len(req.Params) > 0 {
-		if paramsJSON, err := json.Marshal(req.Params[0]); err == nil {
-			var params map[string]string
-			if err := json.Unmarshal(paramsJSON, &params); err == nil {
-				accountID = params["account_id"]
-				asset = params["asset"]
-				if w, ok := params["wallet"]; ok {
-					wallet = w
-				}
-			}
-		}
+	var params GetLedgerEntriesParams
+	if err := parseOptionalParams(req.Params, &params); err != nil {
+		c.Fail(err.Error())
+		return
 	}
 
 	walletAddress := c.UserID
-	if wallet != "" {
-		walletAddress = wallet
+	if params.Wallet != "" {
+		walletAddress = params.Wallet
 	}
 
 	ledger := GetWalletLedger(r.DB, walletAddress)
-	entries, err := ledger.GetEntries(accountID, asset)
+	entries, err := ledger.GetEntries(params.AccountID, params.Asset)
 	if err != nil {
 		logger.Error("failed to get ledger entries", "error", err)
 		c.Fail("failed to get ledger entries")
@@ -295,5 +282,5 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, resp)
-	logger.Info("ledger entries retrieved", "accountID", accountID, "asset", asset, "wallet", walletAddress)
+	logger.Info("ledger entries retrieved", "accountID", params.AccountID, "asset", params.Asset, "wallet", walletAddress)
 }

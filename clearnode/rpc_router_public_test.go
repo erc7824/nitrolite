@@ -86,7 +86,7 @@ func TestRPCRouterHandleGetAppDefinition_MissingID(t *testing.T) {
 
 	assert.Equal(t, "error", res.Method)
 	require.Len(t, res.Params, 1)
-	assert.Contains(t, res.Params[0], "missing account ID")
+	assert.Contains(t, res.Params[0], "missing parameters")
 }
 
 func TestRPCRouterHandleGetAppDefinition_NotFound(t *testing.T) {
@@ -526,7 +526,7 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 	assert.Equal(t, uint64(1), res.RequestID)
 	require.Len(t, res.Params, 1, "Response should contain an array of AssetResponse")
 
-	assets1, ok := res.Params[0].([]AssetResponse)
+	assets1, ok := res.Params[0].([]GetAssetsResponse)
 	require.True(t, ok, "Response parameter should be a slice of AssetResponse")
 	assert.Len(t, assets1, 4, "Should return all 4 assets")
 
@@ -576,7 +576,7 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 	assert.Equal(t, "get_assets", res.Method)
 	assert.Equal(t, uint64(2), res.RequestID)
 
-	assets2, ok := res.Params[0].([]AssetResponse)
+	assets2, ok := res.Params[0].([]GetAssetsResponse)
 	require.True(t, ok, "Response parameter should be a slice of AssetResponse")
 	assert.Len(t, assets2, 2, "Should return 2 Polygon assets")
 
@@ -612,7 +612,7 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 	res = c.Message.Res
 	require.NotNil(t, res)
 
-	assets3, ok := res.Params[0].([]AssetResponse)
+	assets3, ok := res.Params[0].([]GetAssetsResponse)
 	require.True(t, ok, "Response parameter should be a slice of AssetResponse")
 	assert.Len(t, assets3, 1, "Should return 1 Celo asset")
 	assert.Equal(t, "celo", assets3[0].Symbol)
@@ -641,7 +641,7 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 	res = c.Message.Res
 	require.NotNil(t, res)
 
-	assets4, ok := res.Params[0].([]AssetResponse)
+	assets4, ok := res.Params[0].([]GetAssetsResponse)
 	require.True(t, ok, "Response parameter should be a slice of AssetResponse")
 	assert.Len(t, assets4, 0, "Should return 0 assets for chain_id=1")
 }

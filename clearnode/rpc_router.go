@@ -56,6 +56,8 @@ func NewRPCRouter(
 	r.Node.Handle("get_assets", r.HandleGetAssets)
 	r.Node.Handle("get_app_definition", r.HandleGetAppDefinition)
 	r.Node.Handle("get_app_sessions", r.HandleGetAppSessions)
+	r.Node.Handle("get_ledger_entries", r.HandleGetLedgerEntries)
+	r.Node.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
 	r.Node.Handle("auth_request", r.HandleAuthRequest)
 	r.Node.Handle("auth_verify", r.HandleAuthVerify)
 

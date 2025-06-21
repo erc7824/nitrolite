@@ -35,13 +35,14 @@ func NewRPCRouter(
 	logger Logger,
 ) *RPCRouter {
 	r := &RPCRouter{
-		Node:     node,
-		Config:   conf,
-		Signer:   signer,
-		DB:       db,
-		Metrics:  metrics,
-		RPCStore: rpcStore,
-		lg:       logger.NewSystem("rpc-router"),
+		Node:        node,
+		Config:      conf,
+		Signer:      signer,
+		DB:          db,
+		AuthManager: authManager,
+		Metrics:     metrics,
+		RPCStore:    rpcStore,
+		lg:          logger.NewSystem("rpc-router"),
 	}
 
 	r.Node.OnConnect(r.HandleConnect)

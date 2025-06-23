@@ -8,6 +8,7 @@ import (
 )
 
 type GetAssetsParams struct {
+	PaginationParams
 	ChainID *uint32 `json:"chain_id,omitempty"` // Optional chain ID to filter assets
 }
 
@@ -91,6 +92,8 @@ func (r *RPCRouter) HandleGetConfig(c *RPCContext) {
 	c.Succeed(c.Message.Req.Method, brokerConfig)
 }
 
+const defaultGetAssetsPageSize = 10
+
 // HandleGetAssets returns all supported assets
 func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 	ctx := c.Context
@@ -103,7 +106,9 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 		return
 	}
 
-	assets, err := GetAllAssets(r.DB, params.ChainID)
+	params.PaginationParams.Normalize(defaultGetAssetsPageSize)
+
+	assets, err := GetAllAssets(r.DB, params.ChainID, &params.PaginationParams)
 	if err != nil {
 		logger.Error("failed to get assets", "error", err)
 		c.Fail("failed to get assets")

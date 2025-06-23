@@ -145,7 +145,7 @@ func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[stri
 
 			// Update metrics for each custody client
 			for _, client := range custodyClients {
-				assets, err := GetAllAssets(db, &client.chainID)
+				assets, err := GetAllAssets(db, &client.chainID, nil)
 				if err != nil {
 					logger.Error("failed to retrieve assets", "err", err)
 					continue

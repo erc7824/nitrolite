@@ -1,7 +1,7 @@
 import { Hex } from 'viem';
 import { ethers } from 'ethers';
 import dotenv from 'dotenv';
-import { createAppSessionMessage, AppDefinition, MessageSigner, CreateAppSessionRequestParams } from '@erc7824/nitrolite';
+import { createAppSessionMessage, AppDefinition, CreateAppSessionRequest, MessageSigner } from '@erc7824/nitrolite';
 import { SERVER_PRIVATE_KEY } from '../config/index.ts';
 import { DEFAULT_PROTOCOL, sendToBroker } from './brokerService.ts';
 
@@ -19,7 +19,7 @@ interface AppSession {
 }
 
 interface PendingAppSession {
-  appSessionData: CreateAppSessionRequestParams[];
+  appSessionData: CreateAppSessionRequest[];
   appDefinition: AppDefinition;
   participantA: Hex;
   participantB: Hex;
@@ -48,7 +48,7 @@ export const serverSigner: MessageSigner = async (payload: any): Promise<Hex> =>
  * Generate app session message for multi-signature collection
  */
 export async function generateAppSessionMessage(roomId: string, participantA: Hex, participantB: Hex): Promise<{
-  appSessionData: CreateAppSessionRequestParams[];
+  appSessionData: CreateAppSessionRequest[];
   appDefinition: AppDefinition;
   participants: Hex[];
   requestToSign: any;
@@ -87,7 +87,7 @@ export async function generateAppSessionMessage(roomId: string, participantA: He
       nonce: nonce,
     };
 
-    const appSessionData: CreateAppSessionRequestParams[] = [{
+    const appSessionData: CreateAppSessionRequest[] = [{
       definition: appDefinition,
       allocations: [
         {
@@ -289,7 +289,7 @@ export function getAppSession(roomId: string): AppSession | null {
  * Get existing pending app session message for a room
  */
 export function getPendingAppSessionMessage(roomId: string): {
-  appSessionData: CreateAppSessionRequestParams[];
+  appSessionData: CreateAppSessionRequest[];
   appDefinition: AppDefinition;
   participants: Hex[];
   requestToSign: any;

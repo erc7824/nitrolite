@@ -146,9 +146,7 @@ export function NitroliteClientWrapper({ children }: NitroliteClientWrapperProps
 
                 // Create the Nitrolite client
                 const client = new NitroliteClient({
-                    // @ts-ignore
                     publicClient,
-                    // @ts-ignore
                     walletClient,
                     // @ts-ignore
                     stateWalletClient: stateWalletClient,

@@ -18,7 +18,7 @@ import {
   serverWallet
 } from './appSessionService.ts';
 import { Hex } from 'viem';
-import { CloseAppSessionRequestParams, createCloseAppSessionMessage } from '@erc7824/nitrolite';
+import { CloseAppSessionRequest, createCloseAppSessionMessage } from '@erc7824/nitrolite';
 
 // Global reference to the WebSocket server
 let webSocketServer: WebSocketServer;
@@ -477,7 +477,7 @@ async function handleFinalizeGame(data: any): Promise<void> {
 
   try {
     // Create close message and sign with server
-    const params: CloseAppSessionRequestParams[] = [{
+    const params: CloseAppSessionRequest[] = [{
       app_session_id: room.appId,
       allocations: [
         {

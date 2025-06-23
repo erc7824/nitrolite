@@ -18,14 +18,6 @@ class ClearNetService {
     private activeChannel: Hex | null = null;
     private wsConnection: WebSocket | null = null;
     private readonly wsUrl = BROKER_WS_URL;
-    private pendingRequests = new Map<
-        number,
-        {
-            resolve: (value: any) => void;
-            reject: (reason: Error) => void;
-            timeout: number;
-        }
-    >();
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
     private reconnectDelay = 1000;
@@ -239,19 +231,6 @@ class ClearNetService {
         const message = parseRPCResponse(raw);
         console.log("Parsed message:", message);
 
-        // Check if it's a response to a pending request
-        if (message.requestId && this.pendingRequests.has(message.requestId)) {
-            const { resolve, reject, timeout } = this.pendingRequests.get(message.requestId)!;
-            clearTimeout(timeout);
-            this.pendingRequests.delete(message.requestId);
-
-            if (message.method === RPCMethod.Error) {
-                reject(new Error(message.params[0].error || "Unknown error"));
-            } else {
-                resolve(message.params);
-            }
-            return;
-        }
         if (message.method === RPCMethod.ChannelsUpdate) {
             console.log('[ClearNetService] Received channels update:', message);
             const channel = message.params.find((ch: any) => {
@@ -268,6 +247,9 @@ class ClearNetService {
             const signer = createEthersSigner(keyPair.privateKey);
             const message = await createPingMessage(signer.sign);
             this.wsConnection?.send(message);
+        }
+        if (message.method === RPCMethod.Error) {
+            console.error("WebSocket error message:", message.params[0].error);
         }
     }
 

@@ -192,14 +192,15 @@ func (r *RPCRouter) AuthMiddleware(c *RPCContext) {
 	}
 
 	// Check if session is still valid
-	if !r.AuthManager.ValidateSession(p.Participant) {
-		logger.Debug("session expired", "signerAddress", p.Participant)
+	if !r.AuthManager.ValidateSession(p.Wallet) {
+		// TODO: verify whether we should validate it by wallet instead of participant
+		logger.Debug("session expired", "signerAddress", p.Wallet)
 		c.Fail("session expired, please re-authenticate")
 		return
 	}
 
 	// Update session activity timestamp
-	r.AuthManager.UpdateSession(p.Participant)
+	r.AuthManager.UpdateSession(p.Wallet)
 
 	if err := ValidateTimestamp(req.Timestamp, r.Config.msgExpiryTime); err != nil {
 		logger.Debug("invalid message timestamp", "error", err)

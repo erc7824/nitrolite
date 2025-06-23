@@ -13,13 +13,14 @@ var (
 )
 
 type RPCRouter struct {
-	Node        *RPCNode
-	Config      *Config
-	Signer      *Signer
-	DB          *gorm.DB
-	AuthManager *AuthManager
-	Metrics     *Metrics
-	RPCStore    *RPCStore
+	Node              *RPCNode
+	Config            *Config
+	Signer            *Signer
+	AppSessionService *AppSessionService
+	DB                *gorm.DB
+	AuthManager       *AuthManager
+	Metrics           *Metrics
+	RPCStore          *RPCStore
 
 	lg Logger
 }
@@ -28,6 +29,7 @@ func NewRPCRouter(
 	node *RPCNode,
 	conf *Config,
 	signer *Signer,
+	appSessionService *AppSessionService,
 	db *gorm.DB,
 	authManager *AuthManager,
 	metrics *Metrics,
@@ -35,14 +37,15 @@ func NewRPCRouter(
 	logger Logger,
 ) *RPCRouter {
 	r := &RPCRouter{
-		Node:        node,
-		Config:      conf,
-		Signer:      signer,
-		DB:          db,
-		AuthManager: authManager,
-		Metrics:     metrics,
-		RPCStore:    rpcStore,
-		lg:          logger.NewSystem("rpc-router"),
+		Node:              node,
+		Config:            conf,
+		Signer:            signer,
+		AppSessionService: appSessionService,
+		DB:                db,
+		AuthManager:       authManager,
+		Metrics:           metrics,
+		RPCStore:          rpcStore,
+		lg:                logger.NewSystem("rpc-router"),
 	}
 
 	r.Node.OnConnect(r.HandleConnect)

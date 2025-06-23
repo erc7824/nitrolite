@@ -99,7 +99,7 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 	req := c.Message.Req
 
 	var params GetAssetsParams
-	if err := parseOptionalParams(req.Params, &params); err != nil {
+	if err := parseParams(req.Params, &params); err != nil {
 		c.Fail(err.Error())
 		return
 	}
@@ -132,6 +132,10 @@ func (r *RPCRouter) HandleGetAppDefinition(c *RPCContext) {
 		c.Fail(err.Error())
 		return
 	}
+	if params.AppSessionID == "" {
+		c.Fail("missing account ID")
+		return
+	}
 
 	var vApp AppSession
 	if err := r.DB.Where("session_id = ?", params.AppSessionID).First(&vApp).Error; err != nil {
@@ -158,7 +162,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 	req := c.Message.Req
 
 	var params GetAppSessionParams
-	if err := parseOptionalParams(req.Params, &params); err != nil {
+	if err := parseParams(req.Params, &params); err != nil {
 		c.Fail(err.Error())
 		return
 	}
@@ -198,7 +202,7 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 	req := c.Message.Req
 
 	var params GetChannelsParams
-	if err := parseOptionalParams(req.Params, &params); err != nil {
+	if err := parseParams(req.Params, &params); err != nil {
 		c.Fail(err.Error())
 		return
 	}
@@ -251,7 +255,7 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 	req := c.Message.Req
 
 	var params GetLedgerEntriesParams
-	if err := parseOptionalParams(req.Params, &params); err != nil {
+	if err := parseParams(req.Params, &params); err != nil {
 		c.Fail(err.Error())
 		return
 	}

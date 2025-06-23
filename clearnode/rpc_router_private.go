@@ -576,10 +576,6 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 		c.Fail(err.Error())
 		return
 	}
-	if err := validate.Struct(&params); err != nil {
-		c.Fail(err.Error())
-		return
-	}
 
 	channel, err := GetChannelByID(r.DB, params.ChannelID)
 	if err != nil {

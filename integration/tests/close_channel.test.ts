@@ -41,6 +41,10 @@ describe('Close channel', () => {
         await blockUtils.resetSnapshot();
     });
 
+    afterAll(() => {
+        databaseUtils.close();
+    });
+
     it('should create nitrolite client to close channels', async () => {
         client = new TestNitroliteClient(identity);
 
@@ -72,32 +76,32 @@ describe('Close channel', () => {
         const closeResponse = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();
 
-        const parsedCloseResponse = parseRPCResponse(closeResponse) as CloseChannelRPCResponse;
+        const closeParsedResponse = parseRPCResponse(closeResponse) as CloseChannelRPCResponse;
 
         const closeChannelTxHash = await client.closeChannel({
             finalState: {
-                channelId: parsedCloseResponse.params.channel_id,
-                stateData: parsedCloseResponse.params.state_data as Hex,
+                channelId: closeParsedResponse.params.channel_id,
+                stateData: closeParsedResponse.params.state_data as Hex,
                 allocations: [
                     {
-                        destination: parsedCloseResponse.params.allocations[0].destination as Address,
-                        token: parsedCloseResponse.params.allocations[0].token as Address,
-                        amount: BigInt(parsedCloseResponse.params.allocations[0].amount),
+                        destination: closeParsedResponse.params.allocations[0].destination as Address,
+                        token: closeParsedResponse.params.allocations[0].token as Address,
+                        amount: BigInt(closeParsedResponse.params.allocations[0].amount),
                     },
                     {
-                        destination: parsedCloseResponse.params.allocations[1].destination as Address,
-                        token: parsedCloseResponse.params.allocations[1].token as Address,
-                        amount: BigInt(parsedCloseResponse.params.allocations[1].amount),
+                        destination: closeParsedResponse.params.allocations[1].destination as Address,
+                        token: closeParsedResponse.params.allocations[1].token as Address,
+                        amount: BigInt(closeParsedResponse.params.allocations[1].amount),
                     },
                 ] as [Allocation, Allocation],
-                version: BigInt(parsedCloseResponse.params.version),
+                version: BigInt(closeParsedResponse.params.version),
                 serverSignature: {
-                    v: +parsedCloseResponse.params.server_signature.v,
-                    r: parsedCloseResponse.params.server_signature.r as Hex,
-                    s: parsedCloseResponse.params.server_signature.s as Hex,
+                    v: +closeParsedResponse.params.server_signature.v,
+                    r: closeParsedResponse.params.server_signature.r as Hex,
+                    s: closeParsedResponse.params.server_signature.s as Hex,
                 },
             },
-            stateData: parsedCloseResponse.params.state_data as Hex,
+            stateData: closeParsedResponse.params.state_data as Hex,
         });
         expect(closeChannelTxHash).toBeDefined();
 

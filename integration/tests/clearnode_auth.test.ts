@@ -21,6 +21,7 @@ describe('Clearnode Authentication', () => {
         ws.close();
         const databaseUtils = new DatabaseUtils();
         databaseUtils.cleanupDatabaseData();
+        databaseUtils.close();
     });
 
     const identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);

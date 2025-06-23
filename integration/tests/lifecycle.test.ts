@@ -43,7 +43,8 @@ describe('Close channel', () => {
     let blockUtils: BlockchainUtils;
     let databaseUtils: DatabaseUtils;
 
-    let prevLedgerBalance: bigint;
+    let channelId: Hex;
+    let cpChannelId: Hex;
     let appSessionId: string;
 
     beforeAll(async () => {
@@ -75,6 +76,7 @@ describe('Close channel', () => {
     afterAll(async () => {
         ws.close();
         appWS.close();
+        cpWS.close();
 
         await databaseUtils.cleanupDatabaseData();
         await blockUtils.resetSnapshot();
@@ -83,15 +85,19 @@ describe('Close channel', () => {
     });
 
     it('should create and init two channels', async () => {
-        await client.createAndWaitForChannel(ws, {
+        const { params } = await client.createAndWaitForChannel(ws, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount * BigInt(10),
         });
 
-        await cpClient.createAndWaitForChannel(cpWS, {
+        channelId = params.channel_id;
+
+        const { params: cpParams } = await cpClient.createAndWaitForChannel(cpWS, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount * BigInt(10),
         });
+
+        cpChannelId = cpParams.channel_id;
     });
 
     it('should create app session with allowance for participant to deposit', async () => {
@@ -132,14 +138,12 @@ describe('Close channel', () => {
             (decimalDepositAmount * BigInt(10)).toString()
         );
         expect(getLedgerBalancesParsedResponse.params[0][0].asset).toBe('USDC');
-
-        prevLedgerBalance = BigInt(getLedgerBalancesParsedResponse.params[0][0].amount);
     });
 
     it('should create app session', async () => {
         const definition: AppDefinition = {
             protocol: 'nitroliterpc',
-            participants: [appIdentity.sessionAddress, appCPIdentity.sessionAddress],
+            participants: [appIdentity.walletAddress, appCPIdentity.walletAddress],
             weights: [100, 0],
             quorum: 100,
             challenge: 0,
@@ -184,12 +188,7 @@ describe('Close channel', () => {
     });
 
     it('should close app session', async () => {
-        console.log(appIdentity.sessionAddress, appIdentity.walletAddress);
-        console.log(appCPIdentity.sessionAddress, appCPIdentity.walletAddress);
-
-        const messageSigner = createECDSAMessageSigner('0x00464fbf8bf177853db88134d2416cc611b99d33429d0924a185e6574fcae777');
-
-        const closeAppSessionMsg = await createCloseAppSessionMessage(messageSigner, [
+        const closeAppSessionMsg = await createCloseAppSessionMessage(appIdentity.messageSigner, [
             {
                 app_session_id: appSessionId as Hex,
                 allocations: [
@@ -206,7 +205,6 @@ describe('Close channel', () => {
                 ],
             },
         ]);
-        console.log(closeAppSessionMsg);
 
         const closeAppSessionResponse = await appWS.sendAndWaitForResponse(
             closeAppSessionMsg,
@@ -218,6 +216,38 @@ describe('Close channel', () => {
         const closeAppSessionParsedResponse = parseRPCResponse(closeAppSessionResponse) as CloseAppSessionRPCResponse;
         expect(closeAppSessionParsedResponse).toBeDefined();
 
-        console.log(closeAppSessionParsedResponse);
+        expect(closeAppSessionParsedResponse.params.app_session_id).toBe(appSessionId);
+        expect(closeAppSessionParsedResponse.params.status).toBe(RPCChannelStatus.Closed);
+        expect(closeAppSessionParsedResponse.params.version).toBe(2);
     });
+
+    it('should update ledger balances', async () => {
+        const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
+            appIdentity.messageSigner,
+            appIdentity.walletAddress
+        );
+        const getLedgerBalancesResponse = await appWS.sendAndWaitForResponse(
+            getLedgerBalancesMsg,
+            getGetLedgerBalancesPredicate(),
+            1000
+        );
+
+        const getLedgerBalancesParsedResponse = parseRPCResponse(
+            getLedgerBalancesResponse
+        ) as GetLedgerBalancesRPCResponse;
+        expect(getLedgerBalancesParsedResponse).toBeDefined();
+        expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
+        expect(getLedgerBalancesParsedResponse.params[0]).toHaveLength(1);
+        expect(getLedgerBalancesParsedResponse.params[0][0].amount).toBe((decimalDepositAmount * BigInt(9)).toString());
+        expect(getLedgerBalancesParsedResponse.params[0][0].asset).toBe('USDC');
+    });
+
+    // TODO: fix multiple ws connection and add resize
+    // it('should close and withdraw both channels', async () => {
+    //     // TODO: connect to ws to overwrite app ws session
+    //     await createAuthSessionWithClearnode(ws, identity);
+
+    //     await client.closeAndWithdrawChannel(ws, channelId);
+    //     await cpClient.closeAndWithdrawChannel(cpWS, cpChannelId);
+    // });
 });

@@ -35,6 +35,10 @@ describe('Create channel', () => {
         await blockUtils.resetSnapshot();
     });
 
+    afterAll(() => {
+        databaseUtils.close();
+    });
+
     it('should create nitrolite client to open channels', async () => {
         client = new TestNitroliteClient(identity);
 

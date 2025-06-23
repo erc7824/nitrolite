@@ -24,8 +24,8 @@ describe('Clearnode Connection', () => {
     it('should handle connection timeout', async () => {
         await ws.connect();
 
-        await expect(ws.waitForMessage((data) => data === 'nonexistent', 500)).rejects.toThrow(
-            'Timeout waiting for message after 500ms'
+        await expect(ws.waitForMessage((data) => data === 'nonexistent', undefined, 500)).rejects.toThrow(
+            'Timeout waiting for message after 500ms. Request ID: N/A'
         );
     });
 });

@@ -1,9 +1,14 @@
-import { parseRPCResponse, RPCChannelStatus, RPCMethod } from '@erc7824/nitrolite';
+import { parseRPCResponse, RPCChannelStatus, RPCMethod, RPCResponse } from '@erc7824/nitrolite';
 import { WebSocket } from 'ws';
+
+interface MessageListener {
+    id: string;
+    callback: (data: string) => void;
+}
 
 export class TestWebSocket {
     private socket: WebSocket | null = null;
-    private messageListeners: ((data: string) => void)[] = [];
+    private messageListeners: MessageListener[] = [];
 
     constructor(private url: string, private debugMode = false) {}
 
@@ -30,7 +35,7 @@ export class TestWebSocket {
 
                 for (const listener of this.messageListeners) {
                     try {
-                        listener(event.toString());
+                        listener.callback(event.toString());
                     } catch (error) {
                         console.error('Error in message listener:', error);
                     }
@@ -51,23 +56,43 @@ export class TestWebSocket {
         });
     }
 
-    waitForMessage(predicate: (data: string) => boolean, timeout = 1000): Promise<string> {
+    waitForMessage(
+        predicate: (data: string, reqId?: number) => boolean,
+        reqId?: number,
+        timeout = 1000
+    ): Promise<string> {
         return new Promise((resolve, reject) => {
+            const listenerId = Math.random().toString(36).substring(2);
+
             const timeoutId = setTimeout(() => {
-                this.messageListeners = this.messageListeners.filter((l) => l !== messageHandler);
-                reject(new Error(`Timeout waiting for message after ${timeout}ms`));
+                this.removeMessageListener(listenerId);
+                reject(new Error(`Timeout waiting for message after ${timeout}ms. Request ID: ${reqId || 'N/A'}`));
             }, timeout);
 
             const messageHandler = (data: string) => {
-                if (predicate(data)) {
+                try {
+                    if (predicate(data, reqId)) {
+                        clearTimeout(timeoutId);
+                        this.removeMessageListener(listenerId);
+                        resolve(data);
+                    }
+                } catch (error) {
                     clearTimeout(timeoutId);
-                    this.messageListeners = this.messageListeners.filter((l) => l !== messageHandler);
-                    resolve(data);
+                    this.removeMessageListener(listenerId);
+                    reject(new Error(`Error in predicate function: ${error.message}`));
                 }
             };
 
-            this.messageListeners.push(messageHandler);
+            this.addMessageListener(listenerId, messageHandler);
         });
+    }
+
+    private addMessageListener(id: string, callback: (data: string) => void): void {
+        this.messageListeners.push({ id, callback });
+    }
+
+    private removeMessageListener(id: string): void {
+        this.messageListeners = this.messageListeners.filter((listener) => listener.id !== id);
     }
 
     send(message: string): void {
@@ -83,7 +108,10 @@ export class TestWebSocket {
     }
 
     sendAndWaitForResponse(message: string, predicate: (data: string) => boolean, timeout = 1000): Promise<any> {
-        const messagePromise = this.waitForMessage(predicate, timeout);
+        const parsedMessage = JSON.parse(message);
+        const reqId = parsedMessage.req[0];
+
+        const messagePromise = this.waitForMessage(predicate, reqId, timeout);
         this.send(message);
         return messagePromise;
     }
@@ -97,152 +125,90 @@ export class TestWebSocket {
     }
 }
 
-export const getPongPredicate = () => {
-    return (data: string): boolean => {
-        try {
-            const parsedData = parseRPCResponse(data);
-            if (parsedData.method === RPCMethod.Pong) {
-                return true;
-            }
-        } catch (error) {
-            console.error('Error parsing data for PongPredicate:', error);
+const genericPredicate = (data: string, condition: (r: RPCResponse) => boolean, reqId?: number) => {
+    try {
+        const parsedData = parseRPCResponse(data);
+        if (condition(parsedData)) {
+            return true;
         }
 
-        return false;
+        if (reqId !== undefined && parsedData.requestId === reqId && parsedData.method === RPCMethod.Error) {
+            throw new Error(`RPC Error: ${parsedData.params.error}`);
+        }
+    } catch (error) {
+        if (error.message.includes('Unsupported RPC method: assets')) {
+            return false; // TODO: Ignore unsupported method errors
+        }
+
+        throw new Error(`Error parsing data: ${error.message}`);
+    }
+
+    return false;
+};
+
+export const getPongPredicate = () => {
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.Pong, reqId);
     };
 };
 
 export const getAuthChallengePredicate = () => {
-    return (data: string): boolean => {
-        try {
-            const parsedData = parseRPCResponse(data);
-            if (parsedData.method === RPCMethod.AuthChallenge) {
-                return true;
-            }
-        } catch (error) {
-            console.error('Error parsing data for AuthChallengePredicate:', error);
-        }
-
-        return false;
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.AuthChallenge, reqId);
     };
 };
 
 export const getAuthVerifyPredicate = () => {
-    return (data: string): boolean => {
-        try {
-            const parsedData = parseRPCResponse(data);
-            if (parsedData.method === RPCMethod.AuthVerify) {
-                return true;
-            }
-        } catch (error) {
-            console.error('Error parsing data for AuthVerifyPredicate:', error);
-        }
-
-        return false;
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.AuthVerify, reqId);
     };
 };
 
 export const getChannelUpdatePredicateWithStatus = (status: RPCChannelStatus) => {
-    return (data: string): boolean => {
-        try {
-            const parsedData = parseRPCResponse(data);
-            if (parsedData.method === RPCMethod.ChannelUpdate && parsedData.params[0].status === status) {
-                return true;
-            }
-        } catch (error) {
-            console.error('Error parsing data for ChannelUpdatePredicate:', error);
-        }
-
-        return false;
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(
+            data,
+            (r) => {
+                return r.method === RPCMethod.ChannelUpdate && r.params[0].status === status;
+            },
+            reqId
+        );
     };
 };
 
 export const getCloseChannelPredicate = () => {
-    return (data: string): boolean => {
-        try {
-            const parsedData = parseRPCResponse(data);
-            if (parsedData.method === RPCMethod.CloseChannel) {
-                return true;
-            }
-        } catch (error) {
-            console.error('Error parsing data for ChannelUpdatePredicate:', error);
-        }
-
-        return false;
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.CloseChannel, reqId);
     };
 };
 
 export const getResizeChannelPredicate = () => {
-    return (data: string): boolean => {
-        try {
-            const parsedData = parseRPCResponse(data);
-            if (parsedData.method === RPCMethod.ResizeChannel) {
-                return true;
-            }
-        } catch (error) {
-            console.error('Error parsing data for ResizeChannelPredicate:', error);
-        }
-
-        return false;
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.ResizeChannel, reqId);
     };
 };
 
 export const getErrorPredicate = () => {
-    return (data: string): boolean => {
-        try {
-            const parsedData = parseRPCResponse(data);
-            if (parsedData.method === RPCMethod.Error) {
-                return true;
-            }
-        } catch (error) {
-            console.error('Error parsing data for ErrorPredicate:', error);
-        }
-
-        return false;
+    return (data: string, _?: number): boolean => {
+        // No need for reqId here, as we are checking for any error response
+        return genericPredicate(data, (r) => r.method === RPCMethod.Error);
     };
 };
 
 export const getGetLedgerBalancesPredicate = () => {
-    return (data: string): boolean => {
-        try {
-            const parsedData = parseRPCResponse(data);
-            if (parsedData.method === RPCMethod.GetLedgerBalances) {
-                return true;
-            }
-        } catch (error) {
-            console.error('Error parsing data for GetLedgerBalancesPredicate:', error);
-        }
-
-        return false;
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.GetLedgerBalances, reqId);
     };
 };
 
 export const getCreateAppSessionPredicate = () => {
-    return (data: string): boolean => {
-        try {
-            const parsedData = parseRPCResponse(data);
-            if (parsedData.method === RPCMethod.CreateAppSession) {
-                return true;
-            }
-        } catch (error) {
-            console.error('Error parsing data for CreateAppSessionPredicate:', error);
-        }
-
-        return false;
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.CreateAppSession, reqId);
     };
 };
 
 export const getCloseAppSessionPredicate = () => {
-    return (data: string): boolean => {
-        try {
-            const parsedData = parseRPCResponse(data);
-            if (parsedData.method === RPCMethod.CloseAppSession) {
-                return true;
-            }
-        } catch (error) {
-            console.error('Error parsing data for CloseAppSessionPredicate:', error);
-        }
-
-        return false;
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.CloseAppSession, reqId);
     };
 };

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"gorm.io/gorm"
@@ -40,23 +39,15 @@ func paginate(params *PaginationParams) func(db *gorm.DB) *gorm.DB {
 }
 
 func parseParams(params []any, unmarshalTo any) error {
-	if len(params) == 0 {
-		return errors.New("missing parameters")
+	if len(params) > 0 {
+		paramsJSON, err := json.Marshal(params[0])
+		if err != nil {
+			return fmt.Errorf("failed to parse parameters: %w", err)
+		}
+		err = json.Unmarshal(paramsJSON, &unmarshalTo)
+		if err != nil {
+			return err
+		}
 	}
-	paramsJSON, err := json.Marshal(params[0])
-	if err != nil {
-		return fmt.Errorf("failed to parse parameters: %w", err)
-	}
-	return json.Unmarshal(paramsJSON, &unmarshalTo)
-}
-
-func parseOptionalParams(params []any, unmarshalTo any) error {
-	if len(params) == 0 {
-		return nil
-	}
-	paramsJSON, err := json.Marshal(params[0])
-	if err != nil {
-		return fmt.Errorf("failed to parse optional parameters: %w", err)
-	}
-	return json.Unmarshal(paramsJSON, &unmarshalTo)
+	return validate.Struct(unmarshalTo)
 }

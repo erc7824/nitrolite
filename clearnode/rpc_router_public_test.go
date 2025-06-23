@@ -86,7 +86,7 @@ func TestRPCRouterHandleGetAppDefinition_MissingID(t *testing.T) {
 
 	assert.Equal(t, "error", res.Method)
 	require.Len(t, res.Params, 1)
-	assert.Contains(t, res.Params[0], "missing parameters")
+	assert.Contains(t, res.Params[0], "missing account ID")
 }
 
 func TestRPCRouterHandleGetAppDefinition_NotFound(t *testing.T) {

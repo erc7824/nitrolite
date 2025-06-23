@@ -393,10 +393,6 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 		c.Fail(err.Error())
 		return
 	}
-	if err := validate.Struct(&params); err != nil {
-		c.Fail(err.Error())
-		return
-	}
 
 	rpcSigners, err := getWallets(&c.Message)
 	if err != nil {

@@ -57,9 +57,10 @@ describe('Create channel', () => {
 
         const joiningChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Joining),
+            undefined,
             5000
         );
-        const openChannelPromise = ws.waitForMessage(getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open), 5000);
+        const openChannelPromise = ws.waitForMessage(getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open), undefined, 5000);
 
         const { channelId, initialState, txHash } = await client.depositAndCreateChannel(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,

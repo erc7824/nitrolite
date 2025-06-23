@@ -26,6 +26,13 @@ jobs:
       project-path: 'sdk'
       project-name: 'SDK'
 
+  test-integration:
+    name: Test (Integration)
+    uses: ./.github/workflows/test-integration.yml
+    with:
+      project-path: 'integration'
+      project-name: 'Integration'
+
   test-examples:
     name: Test Examples Compilation
     uses: ./.github/workflows/build-node-project.yml

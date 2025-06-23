@@ -113,11 +113,11 @@ func ConnectToDB(cnf DatabaseConfig) (*gorm.DB, error) {
 
 func connectToPostgresql(cnf DatabaseConfig) (*gorm.DB, error) {
 	log.Println("connecting to Postgresql")
-	// Create schema if not exists
-	ensurePostgresqlSchema(cnf)
+	// // Create schema if not exists
+	// ensurePostgresqlSchema(cnf)
 
-	// Apply migrations
-	migratePostgres(cnf)
+	// // Apply migrations
+	// migratePostgres(cnf)
 
 	// Connect to db
 	dsn, err := postgresqlDbUrl(cnf)

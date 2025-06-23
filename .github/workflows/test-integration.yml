@@ -1,0 +1,83 @@
+name: Integration Tests
+
+on:
+  workflow_call:
+    inputs:
+      project-path:
+        description: 'Path to the SDK project directory'
+        required: false
+        type: string
+        default: 'integration'
+      project-name:
+        description: 'Human-readable name for the project'
+        required: false
+        type: string
+        default: 'Integration'
+
+jobs:
+  test:
+    name: Test ${{ inputs.project-name }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install contract submodules
+        run: git submodule update --init --recursive
+
+      - name: Prepare contract directory
+        run: |
+          mkdir -p ./contract/out
+          chmod -R 777 ./contract
+          sudo chown -R $(id -u):$(id -g) ./contract
+
+      - name: Setup environment
+        uses: hoverkraft-tech/compose-action@v2.0.1
+        with:
+          compose-file: './docker-compose.yml'
+          down-flags: "--volumes --remove-orphans"
+          up-flags: "--wait"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '${{ inputs.project-path }}/package.json'
+          cache: npm
+          cache-dependency-path: | 
+            **/package-lock.json 
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            **/node_modules
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
+
+      - name: Install SDK dependencies
+        working-directory: ./sdk
+        run: npm ci
+
+      - name: Build SDK
+        working-directory: ./sdk
+        run: npm run build
+
+      - name: Install integration tests dependencies
+        working-directory: ./integration
+        run: npm ci
+
+      - name: Run integration tests 
+        working-directory: ./integration
+        run: npm run test
+
+      - name: Debug docker clearnode
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs clearnode
+
+
+      # - name: Stop and remove containers
+      #   run: docker-compose down
+      #   if: always()

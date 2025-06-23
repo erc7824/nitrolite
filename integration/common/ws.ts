@@ -9,6 +9,7 @@ interface MessageListener {
 export class TestWebSocket {
     private socket: WebSocket | null = null;
     private messageListeners: MessageListener[] = [];
+    private closed = false;
 
     constructor(private url: string, private debugMode = false) {}
 
@@ -19,6 +20,7 @@ export class TestWebSocket {
             }
 
             this.socket = new WebSocket(this.url);
+            this.closed = false;
 
             this.socket.on('open', () => {
                 if (this.debugMode) {
@@ -71,6 +73,12 @@ export class TestWebSocket {
 
             const messageHandler = (data: string) => {
                 try {
+                    if (this.closed) {
+                        clearTimeout(timeoutId);
+                        this.removeMessageListener(listenerId);
+                        return;
+                    }
+
                     if (predicate(data, reqId)) {
                         clearTimeout(timeoutId);
                         this.removeMessageListener(listenerId);
@@ -79,7 +87,7 @@ export class TestWebSocket {
                 } catch (error) {
                     clearTimeout(timeoutId);
                     this.removeMessageListener(listenerId);
-                    reject(new Error(`Error in predicate function: ${error.message}`));
+                    reject(new Error(`Error in predicate function: ${error}`));
                 }
             };
 
@@ -121,6 +129,7 @@ export class TestWebSocket {
             this.socket.close();
             this.socket = null;
             this.messageListeners = [];
+            this.closed = true;
         }
     }
 }
@@ -133,7 +142,7 @@ const genericPredicate = (data: string, condition: (r: RPCResponse) => boolean, 
         }
 
         if (reqId !== undefined && parsedData.requestId === reqId && parsedData.method === RPCMethod.Error) {
-            throw new Error(`RPC Error: ${parsedData.params.error}`);
+            throw new Error(`RPC Error: ${parsedData.params.error || 'Unable to parse: ', parsedData}`);
         }
     } catch (error) {
         if (error.message.includes('Unsupported RPC method: assets')) {

@@ -640,6 +640,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 	signerB := Signer{privateKey: rawB}
 	addrA := signerA.GetAddress().Hex()
 	addrB := signerB.GetAddress().Hex()
+
 	t.Run("SuccessfulCreateAppSession", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB

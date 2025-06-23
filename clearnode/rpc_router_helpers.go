@@ -9,24 +9,13 @@ import (
 )
 
 const (
-	DefaultOffset   = 0
 	DefaultPageSize = 10
 	MaxPageSize     = 100
 )
 
 type PaginationParams struct {
-	Offset   int32 `json:"offset"`
-	PageSize int32 `json:"page_size"`
-}
-
-func (pp *PaginationParams) SetDefaultPageSize(defaultPageSize uint32) {
-	if pp == nil {
-		return
-	}
-
-	if pp.PageSize <= 0 {
-		pp.PageSize = int32(defaultPageSize)
-	}
+	Offset   uint32 `json:"offset,omitempty"`
+	PageSize uint32 `json:"page_size,omitempty"`
 }
 
 func paginate(params *PaginationParams) func(db *gorm.DB) *gorm.DB {
@@ -38,10 +27,6 @@ func paginate(params *PaginationParams) func(db *gorm.DB) *gorm.DB {
 
 	offset := params.Offset
 	pageSize := params.PageSize
-
-	if offset < 0 {
-		offset = DefaultOffset
-	}
 
 	if pageSize <= 0 {
 		pageSize = DefaultPageSize

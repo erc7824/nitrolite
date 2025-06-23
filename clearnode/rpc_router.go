@@ -91,7 +91,7 @@ func (r *RPCRouter) HandleConnect(send SendRPCMessageFunc) {
 	r.Metrics.ConnectedClients.Inc()
 
 	// Get all assets from the database
-	assets, err := GetAllAssets(r.DB, nil, nil)
+	assets, err := GetAllAssets(r.DB, nil)
 	if err != nil {
 		r.lg.Error("failed to get all assets", "error", err)
 		return

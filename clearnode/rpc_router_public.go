@@ -92,8 +92,6 @@ func (r *RPCRouter) HandleGetConfig(c *RPCContext) {
 	c.Succeed(c.Message.Req.Method, brokerConfig)
 }
 
-const defaultGetAssetsPageSize = 10
-
 // HandleGetAssets returns all supported assets
 func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 	ctx := c.Context
@@ -106,7 +104,8 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 		return
 	}
 
-	params.PaginationParams.Normalize(defaultGetAssetsPageSize)
+	var defaultGetAssetsPageSize = uint32(10)
+	params.PaginationParams.SetDefaultPageSize(defaultGetAssetsPageSize)
 
 	assets, err := GetAllAssets(r.DB, params.ChainID, &params.PaginationParams)
 	if err != nil {

@@ -11,14 +11,11 @@ import {
     AppDefinition,
     NitroliteRPC,
     createGetLedgerBalancesMessage,
+    CreateAppSessionRequest,
     createCloseAppSessionMessage,
+    CloseAppSessionRequest,
     parseRPCResponse,
     RPCResponse,
-    AuthRequestParams,
-    RPCMethod,
-    CloseAppSessionRequestParams,
-    createAppSessionMessage,
-    CreateAppSessionRequestParams,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
 import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
@@ -47,7 +44,7 @@ async function getChannels(): Promise<void> {
 
     const signer = createEthersSigner(WALLET_PRIVATE_KEY);
     const params = [{ participant: signer.address }];
-    const request = NitroliteRPC.createRequest(10, RPCMethod.GetChannels, params);
+    const request = NitroliteRPC.createRequest(10, "get_channels", params);
     const getChannelMessage = await NitroliteRPC.signRequestMessage(request, signer.sign);
     brokerWs.send(JSON.stringify(getChannelMessage));
 }
@@ -85,7 +82,7 @@ export function connectToBroker(): void {
                 requestId: message.res?.[0],
                 isAuthenticated
             });
-            handleBrokerMessage(data.toString());
+            handleBrokerMessage(message);
         } catch (error) {
             console.error("Error parsing message from broker:", error);
         }
@@ -127,17 +124,19 @@ async function authenticateWithBroker(): Promise<void> {
 
     const expire = String(Math.floor(Date.now() / 1000) + 24 * 60 * 60);
 
-    const authMessage: AuthRequestParams = {
+    const authMessage = {
         wallet: serverAddress,
         participant: serverAddress,
         app_name: 'Snake Game',
         expire: expire,
         scope: 'snake-game',
         application: serverAddress,
-        allowances: [{
-            asset: 'usdc',
-            amount: '0',
-        }],
+        allowances: [
+            {
+                symbol: 'usdc',
+                amount: '0',
+            },
+        ],
     };
 
     return new Promise(async (resolve, reject) => {
@@ -173,6 +172,7 @@ async function authenticateWithBroker(): Promise<void> {
                             chain: polygon,
                             transport: http()
                         });
+
                         if (!walletClient) {
                             throw new Error('No wallet client available for EIP-712 signing');
                         }
@@ -181,11 +181,11 @@ async function authenticateWithBroker(): Promise<void> {
                         // @ts-ignore
                         const eip712SigningFunction = createEIP712AuthMessageSigner(walletClient, {
                             scope: authMessage.scope,
-                            application: walletClient.account.address,
-                            participant: authMessage.wallet,
+                            application: authMessage.application,
+                            participant: authMessage.participant,
                             expire: authMessage.expire,
                             allowances: authMessage.allowances.map((allowance) => ({
-                                asset: allowance.asset,
+                                asset: allowance.symbol,
                                 amount: allowance.amount.toString(),
                             })),
                         }, getAuthDomain());
@@ -219,9 +219,9 @@ async function authenticateWithBroker(): Promise<void> {
                     console.log("Authentication successful");
 
                     // If response contains a JWT token, store it
-                    if (message.params[0].jwt_token) {
-                        console.log('JWT token received:', message.params[0].jwt_token);
-                        jwtToken = message.params[0].jwt_token;
+                    if (message.params.jwtToken) {
+                        console.log('JWT token received:', message.params.jwtToken);
+                        jwtToken = message.params.jwtToken;
                     }
 
                     isAuthenticated = true;
@@ -230,8 +230,8 @@ async function authenticateWithBroker(): Promise<void> {
                 }
                 // Check for error responses
                 else if (message.method === "error") {
-                    const errorMsg = message.params[0].error || 'Authentication failed';
-                    console.error('Authentication failed:', message, errorMsg);
+                    const errorMsg = message.params.error || 'Authentication failed';
+                    console.error('Authentication failed:', errorMsg);
 
                     // Check if this is a JWT authentication failure and fallback to signer auth
                     const errorString = String(errorMsg).toLowerCase();
@@ -322,63 +322,78 @@ async function authenticateWithBroker(): Promise<void> {
 }
 
 // Handles messages received from the broker
-export function handleBrokerMessage(raw: string): void {
+export function handleBrokerMessage(message: any): void {
     try {
-        console.log("Received message from broker:", raw);
-        const message = parseRPCResponse(raw);
-        console.log("Parsed message:", message);
+        // Log the raw message for debugging
+        console.log("Received message from broker:", message);
+
+        const requestId = message.res[0];
+        const method = message.res[1];
+        const payload = message.res[2];
 
         // Handle ping messages
-        if (message.method === RPCMethod.Ping) {
+        if (method === "ping") {
             console.log("Received ping from broker, sending pong");
             const brokerWs = getBrokerWebSocket();
             if (brokerWs && brokerWs.readyState === WebSocket.OPEN) {
                 brokerWs.send(JSON.stringify({ type: "pong" }));
             }
             return;
-        } else if (message.method === RPCMethod.Error) {
-            console.log("Received error from broker:", message.params[0].error);
+        }
 
-            // Check if it's a response to a pending request
-            if (!message.requestId) {
+        // Handle RPC format (new format with 'res' array)
+        if (message.res && Array.isArray(message.res)) {
+            // Check if it's an error message
+            if (method === "error") {
+                console.log("Received error from broker:", payload);
+
+                // Check if it's a response to a pending request
+                if (typeof requestId === "string" || typeof requestId === "number") {
+                    const pendingRequest = getPendingRequest(requestId.toString());
+                    if (pendingRequest) {
+                        const { reject, timeout } = pendingRequest;
+                        clearTimeout(timeout);
+                        clearPendingRequest(requestId.toString());
+
+                        const errorMessage = payload && payload[0]?.error ? payload[0].error : "Unknown error";
+                        reject(new Error(errorMessage));
+                    }
+                }
                 return;
             }
-            const pendingRequest = getPendingRequest(message.requestId.toString());
-            if (pendingRequest) {
-                const { reject, timeout } = pendingRequest;
-                clearTimeout(timeout);
-                clearPendingRequest(message.requestId.toString());
-                reject(new Error(message.params[0].error));
-            }
-            return;
-        } else if (message.method === RPCMethod.GetChannels || message.method === RPCMethod.ChannelsUpdate) {
-            console.log("Received get_channels from broker:", message.params);
-            if (message.params.length === 0) {
+            else if (method === "get_channels" && payload.length === 0) {
                 throw new Error("No channels found. Please open a channel at apps.yellow.com");
             }
 
             // Handle successful response to a pending request
-            if (!message.requestId) {
-                return;
-            }
-            const pendingRequest = getPendingRequest(message.requestId.toString());
-            if (pendingRequest) {
-                const { resolve, timeout } = pendingRequest;
-                clearTimeout(timeout);
-                clearPendingRequest(message.requestId.toString());
-                resolve(message.params);
-                return;
+            if (typeof requestId === "string" || typeof requestId === "number") {
+                const pendingRequest = getPendingRequest(requestId.toString());
+                if (pendingRequest) {
+                    const { resolve, timeout } = pendingRequest;
+                    clearTimeout(timeout);
+                    clearPendingRequest(requestId.toString());
+
+                    // For successful responses, return the result data (typically in res[2])
+                    const resultData = payload || [];
+                    resolve(resultData.length === 1 ? resultData[0] : resultData);
+                    return;
+                }
             }
         }
 
-        // Catch-all block for any other message types that might be responses to pending requests
-        if (message.requestId) {
-            const pendingRequest = getPendingRequest(message.requestId.toString());
+        // Legacy JSON-RPC response format (should rarely be used with new broker)
+        if (message.id && typeof message.id === "string") {
+            const pendingRequest = getPendingRequest(message.id);
             if (pendingRequest) {
-                const { resolve, timeout } = pendingRequest;
+                const { resolve, reject, timeout } = pendingRequest;
                 clearTimeout(timeout);
-                clearPendingRequest(message.requestId.toString());
-                resolve(message.params || []);
+                clearPendingRequest(message.id);
+
+                if (message.error) {
+                    reject(new Error(message.error.message || "Unknown error"));
+                } else {
+                    resolve(message.result || message);
+                }
                 return;
             }
         }
@@ -518,6 +533,7 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
         signerAddress: signer.address
     });
 
+    const requestId = Date.now();
     const appDefinition: AppDefinition = {
         protocol: DEFAULT_PROTOCOL,
         participants,
@@ -526,7 +542,7 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
         challenge: 0,
         nonce: Date.now(),
     };
-    const params: CreateAppSessionRequestParams[] = [{
+    const params: CreateAppSessionRequest[] = [{
         definition: appDefinition,
         allocations: participants.map((participant, index) => ({
             participant,
@@ -534,9 +550,13 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
             amount: index < 2 ? "0.00001" : "0", // Players get 0.00001, server gets 0
         }))
     }]
+    const timestamp = Date.now();
 
     // Create the request with properly formatted parameters
-    const request = await createAppSessionMessage(signer.sign, params);
+    const request: { req: [number, string, CreateAppSessionRequest[], number] } = {
+        req: [requestId, "create_app_session", params, timestamp],
+    };
+
     console.log("[createAppSession] Sending request:", request);
     const result = await sendToBroker(request);
     const appId = result.app_session_id || (typeof result[0] === "object" ? result[0].app_session_id : null);
@@ -586,7 +606,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
     }
 
     // Create close message and sign with server
-    const params: CloseAppSessionRequestParams[] = [{
+    const params: CloseAppSessionRequest[] = [{
         app_session_id: appId,
         allocations: [participantA, participantB, signer.address].map((participant, index) => ({
             participant,

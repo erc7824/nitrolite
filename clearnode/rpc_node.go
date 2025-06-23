@@ -127,7 +127,8 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	readMessages := func(abortOthers func()) {
-		defer abortOthers() // Stop other goroutines when done
+		defer abortOthers()      // Stop other goroutines when done
+		defer close(processSink) // Close the processing channel when done
 
 		for {
 			_, messageBytes, err := conn.ReadMessage()
@@ -175,8 +176,12 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 			select {
 			case <-ctx.Done():
 				n.logger.Info("context done, stopping message processing")
+				close(writeSink) // Close write sink to stop writing messages
 				return
 			case messageBytes = <-processSink:
+				if messageBytes == nil || len(messageBytes) == 0 {
+					continue read_loop // Skip empty messages
+				}
 			}
 
 			var msg RPCMessage
@@ -255,6 +260,10 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				n.logger.Info("context done, stopping message writing")
 				return
 			case messageBytes := <-writeSink:
+				if messageBytes == nil || len(messageBytes) == 0 {
+					continue // Skip empty messages
+				}
+
 				w, err := conn.NextWriter(websocket.TextMessage)
 				if err != nil {
 					n.logger.Error("error getting writer for response", "error", err)

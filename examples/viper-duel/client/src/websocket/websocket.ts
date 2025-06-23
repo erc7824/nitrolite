@@ -8,6 +8,7 @@ import {
     createAuthVerifyMessageWithJWT,
     createEIP712AuthMessageSigner,
     parseRPCResponse,
+    RPCMethod,
 } from "@erc7824/nitrolite";
 import type { Channel } from "@erc7824/nitrolite";
 import { WalletStore } from "../store";
@@ -293,7 +294,7 @@ export class WebSocketClient {
 
                 try {
                     // Check for challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
-                    if (response.method === "auth_challenge") {
+                    if (response.method === RPCMethod.AuthChallenge) {
                         console.log("Received auth_challenge, preparing EIP-712 auth_verify...");
 
                         try {
@@ -328,20 +329,23 @@ export class WebSocketClient {
                         }
                     }
                     // Check for success response
-                    else if (response.method === "auth_verify" && response.params.success) {
+                    else if (response.method === RPCMethod.AuthVerify) {
+                        if (!response.params[0].success) {
+                            return;
+                        }
                         console.log("Authentication successful");
 
                         // If response contains a JWT token, store it
-                        if (response.params.jwtToken) {
-                            console.log("JWT token received:", response.params.jwtToken);
+                        if (response.params[0].jwt_token) {
+                            console.log("JWT token received:", response.params[0].jwt_token);
                             if (typeof window !== "undefined") {
-                                window.localStorage?.setItem("jwtToken", response.params.jwtToken);
+                                window.localStorage?.setItem("jwtToken", response.params[0].jwt_token);
                             }
                         }
 
                         // Authentication successful
                         const paramsForChannels = [{ participant: ethers.getAddress(privyWalletAddress) as `0x${string}` }];
-                        const getChannelsMessage = NitroliteRPC.createRequest(10, "get_channels", paramsForChannels);
+                        const getChannelsMessage = NitroliteRPC.createRequest(10, RPCMethod.GetChannels, paramsForChannels);
                         const getChannelMessage = await NitroliteRPC.signRequestMessage(getChannelsMessage, this.signer.sign);
                         console.log("getChannelMessage", getChannelMessage);
                         this.ws?.send(JSON.stringify(getChannelMessage));
@@ -350,8 +354,8 @@ export class WebSocketClient {
                         resolve();
                     }
                     // Check for error response
-                    else if (response.method === "error") {
-                        const errorMsg = response.params.error || "Authentication failed";
+                    else if (response.method === RPCMethod.Error) {
+                        const errorMsg = response.params[0].error || "Authentication failed";
                         console.error("Authentication failed:", errorMsg);
                         if (typeof window !== "undefined") {
                             window.localStorage?.removeItem("jwtToken");

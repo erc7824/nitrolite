@@ -2,13 +2,14 @@
  * Nitrolite RPC (WebSocket) client
  * This file handles all WebSocket communication with Nitrolite server
  */
-import { 
-    createAuthRequestMessage, 
-    createAuthVerifyMessage, 
+import {
+    createAuthRequestMessage,
+    createAuthVerifyMessage,
     createEIP712AuthMessageSigner,
-    createPingMessage, 
+    createPingMessage,
     NitroliteRPC,
-    parseRPCResponse
+    parseRPCResponse,
+    RPCMethod
 } from "@erc7824/nitrolite";
 import dotenv from "dotenv";
 import { ethers } from "ethers";
@@ -192,24 +193,24 @@ export class NitroliteRPCClient {
 
             const handleAuthResponse = async (event) => {
                 const data = event.data || event;
-                
+
                 try {
                     const response = parseRPCResponse(data);
 
                     // Check for challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
-                    if (response.method === "auth_challenge") {
+                    if (response.method === RPCMethod.AuthChallenge) {
                         logger.auth("Received auth_challenge, preparing EIP-712 auth_verify...");
                         resetTimeout(); // Reset timeout while we process and send verify
 
                         try {
                             logger.auth("Creating EIP-712 signing function...");
-                            
+
                             // Ensure we have a wallet client for EIP-712 signing
                             if (!this.walletClient) {
                                 logger.auth("Initializing wallet client for EIP-712 signing...");
                                 this.walletClient = await getWalletClient(this.privateKey);
                             }
-                            
+
                             const eip712SigningFunction = createEIP712AuthMessageSigner(
                                 this.walletClient,
                                 {
@@ -241,11 +242,14 @@ export class NitroliteRPCClient {
                         }
                     }
                     // Check for success response
-                    else if (response.method === "auth_verify" && response.params.success) {
+                    else if (response.method === RPCMethod.AuthVerify) {
+                        if (!response.params[0].success) {
+                            return;
+                        }
                         logger.auth("Authentication successful");
 
                         cleanup();
-                        
+
                         // Set status to connected
                         this.setStatus(WSStatus.CONNECTED);
 
@@ -266,8 +270,8 @@ export class NitroliteRPCClient {
                         resolve();
                     }
                     // Check for error response
-                    else if (response.method === "error") {
-                        const errorMsg = response.params.error || "Authentication failed";
+                    else if (response.method === RPCMethod.Error) {
+                        const errorMsg = response.params[0].error || "Authentication failed";
 
                         logger.error("Authentication failed:", errorMsg);
                         cleanup();
@@ -282,7 +286,7 @@ export class NitroliteRPCClient {
                         logger.auth("Ignoring non-auth message during authentication:", error.message);
                         return;
                     }
-                    
+
                     logger.error("Error handling auth response:", error);
                     logger.error("Error stack:", error.stack);
                     cleanup();
@@ -317,37 +321,29 @@ export class NitroliteRPCClient {
         try {
             // Ensure data is properly handled as string
             const rawData = typeof data === "string" ? data : data.toString();
-            const message = JSON.parse(rawData);
+            const message = parseRPCResponse(rawData);
             logger.data("Received message", message);
 
             // Notify callbacks first to allow for authentication handling
             this.onMessageCallbacks.forEach((callback) => callback(message));
+            const requestId = message.requestId;
 
             // Handle response to pending requests
-            if (message.res && Array.isArray(message.res) && message.res.length >= 3) {
-                const requestId = message.res[0];
+            if (message.method === RPCMethod.GetChannels || message.method === RPCMethod.ChannelsUpdate) {
                 if (this.pendingRequests.has(requestId)) {
                     const { resolve } = this.pendingRequests.get(requestId);
-                    resolve(message.res[2]);
+                    resolve(message.params);
                     this.pendingRequests.delete(requestId);
                 }
             }
 
             // Handle errors
-            if (message.err && Array.isArray(message.err) && message.err.length >= 3) {
-                const requestId = message.err[0];
+            if (message.method === RPCMethod.Error) {
                 if (this.pendingRequests.has(requestId)) {
                     const { reject } = this.pendingRequests.get(requestId);
-                    reject(new Error(`Error ${message.err[1]}: ${message.err[2]}`));
+                    reject(new Error(`Error: ${message.params[0].error}`));
                     this.pendingRequests.delete(requestId);
                 }
-            }
-
-            // Handle channel-specific messages
-            if (message.type === "channel_created") {
-                logger.nitro("Channel created successfully");
-                logger.data("Channel data", message.channel);
-                this.channel = message.channel;
             }
         } catch (error) {
             logger.error("Error handling message:", error);
@@ -523,7 +519,7 @@ export async function initializeRPCClient() {
 
         // Initialize wallet client before connecting (needed for authentication)
         rpcClient.walletClient = await getWalletClient(process.env.SERVER_PRIVATE_KEY);
-        
+
         await rpcClient.connect();
 
         logger.system("Checking for existing channels...");

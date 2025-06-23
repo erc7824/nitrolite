@@ -104,10 +104,8 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 		return
 	}
 
-	var defaultGetAssetsPageSize = uint32(10)
-	params.PaginationParams.SetDefaultPageSize(defaultGetAssetsPageSize)
-
-	assets, err := GetAllAssets(r.DB, params.ChainID, &params.PaginationParams)
+	query := paginate(&params.PaginationParams)(r.DB)
+	assets, err := GetAllAssets(query, params.ChainID)
 	if err != nil {
 		logger.Error("failed to get assets", "error", err)
 		c.Fail("failed to get assets")

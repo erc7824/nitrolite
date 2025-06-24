@@ -9,7 +9,8 @@ import (
 
 type GetAssetsParams struct {
 	PaginationParams
-	ChainID *uint32 `json:"chain_id,omitempty"` // Optional chain ID to filter assets
+	Sorting *SortingType `json:"sorting,omitempty"`  // Optional sorting type (asc/desc)
+	ChainID *uint32      `json:"chain_id,omitempty"` // Optional chain ID to filter assets
 }
 
 type GetAssetsResponse struct {
@@ -104,7 +105,8 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 		return
 	}
 
-	query := paginate(&params.PaginationParams)(r.DB)
+	query := applySorting(r.DB, "token", Ascending, params.Sorting)
+	query = paginate(&params.PaginationParams)(query)
 	assets, err := GetAllAssets(query, params.ChainID)
 	if err != nil {
 		logger.Error("failed to get assets", "error", err)

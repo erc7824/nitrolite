@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -36,6 +37,25 @@ func paginate(params *PaginationParams) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		return db.Offset(int(offset)).Limit(int(pageSize))
 	}
+}
+
+type SortingType string
+
+const (
+	Ascending  SortingType = "asc"
+	Descending SortingType = "desc"
+)
+
+func (s SortingType) ToString() string {
+	return strings.ToUpper(string(s))
+}
+
+func applySorting(db *gorm.DB, sortBy string, defaultSorting SortingType, sortType *SortingType) *gorm.DB {
+	if sortType == nil {
+		return db.Order(sortBy + " " + defaultSorting.ToString())
+	}
+
+	return db.Order(sortBy + " " + sortType.ToString())
 }
 
 func parseParams(params []any, unmarshalTo any) error {

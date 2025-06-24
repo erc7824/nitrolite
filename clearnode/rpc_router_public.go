@@ -34,8 +34,10 @@ type AppDefinition struct {
 }
 
 type GetAppSessionParams struct {
-	Participant string `json:"participant,omitempty"` // Optional participant wallet to filter sessions
-	Status      string `json:"status,omitempty"`      // Optional status to filter sessions
+	PaginationParams
+	Sort        *SortType `json:"sort,omitempty"`        // Optional sort type (asc/desc)
+	Participant string    `json:"participant,omitempty"` // Optional participant wallet to filter sessions
+	Status      string    `json:"status,omitempty"`      // Optional status to filter sessions
 }
 
 type GetChannelsParams struct {
@@ -169,7 +171,9 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 		return
 	}
 
-	sessions, err := getAppSessions(r.DB, params.Participant, params.Status)
+	query := applySort(r.DB, "created_at", Descending, params.Sort)
+	query = paginate(&params.PaginationParams)(query)
+	sessions, err := getAppSessions(query, params.Participant, params.Status)
 	if err != nil {
 		logger.Error("failed to get application sessions", "error", err)
 		c.Fail("failed to get application sessions")

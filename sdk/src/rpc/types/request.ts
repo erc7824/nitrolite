@@ -26,12 +26,10 @@ export type AuthVerifyRequestParams =
     | {
           /** JSON Web Token for authentication. */
           jwt: string;
-          challenge?: never;
       }
     | {
           /** The challenge token received from auth_challenge response. Used to verify the client's signature and prevent replay attacks. */
           challenge: string;
-          jwt?: never;
       };
 export type AuthVerifyRPCRequestParams = AuthVerifyRequestParams; // for backward compatibility
 
@@ -75,9 +73,9 @@ export interface GetLedgerBalancesRequest extends GenericRPCMessage {
  */
 export interface GetLedgerEntriesRequestParams {
     /** The account ID to filter ledger entries. */
-    account_id: string;
+    account_id?: string;
     /** The asset symbol to filter ledger entries. */
-    asset: string;
+    asset?: string;
     /** Optional wallet address to filter ledger entries. If provided, overrides the authenticated wallet. */
     wallet?: Address;
 }

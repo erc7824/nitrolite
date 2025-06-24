@@ -566,17 +566,12 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 			assert.Equal(t, uint64(idx), res.RequestID)
 			require.Len(t, res.Params, 1, "Response should contain an array of AssetResponse")
 
-			assets1, ok := res.Params[0].([]GetAssetsResponse)
+			responseAssets, ok := res.Params[0].([]GetAssetsResponse)
 			require.True(t, ok, "Response parameter should be a slice of AssetResponse")
-			assert.Len(t, assets1, len(tc.expectedTokenNames), "Should return expected number of assets")
+			assert.Len(t, responseAssets, len(tc.expectedTokenNames), "Should return expected number of assets")
 
-			foundTokens := make(map[string]bool)
-			for _, asset := range assets1 {
-				foundTokens[asset.Token] = true
-			}
-
-			for _, expectedTokenName := range tc.expectedTokenNames {
-				assert.True(t, foundTokens[expectedTokenName], "Should include token %s", expectedTokenName)
+			for idx, asset := range responseAssets {
+				assert.True(t, asset.Token == tc.expectedTokenNames[idx], "Should include token %s", tc.expectedTokenNames[idx])
 			}
 		})
 	}
@@ -668,18 +663,13 @@ func TestRPCRouterHandleGetAssets_Pagination(t *testing.T) {
 			require.NotNil(t, res)
 
 			require.Len(t, res.Params, 1, "Response should contain an array of AssetResponse")
-			assets, ok := res.Params[0].([]GetAssetsResponse)
+			responseAssets, ok := res.Params[0].([]GetAssetsResponse)
 			require.True(t, ok, "Response parameter should be a slice of AssetResponse")
-			assert.Len(t, assets, len(tc.expectedTokenNames), "Should return expected number of assets")
+			assert.Len(t, responseAssets, len(tc.expectedTokenNames), "Should return expected number of assets")
 
 			// Check token names are included
-			foundTokens := make(map[string]bool)
-			for _, asset := range assets {
-				foundTokens[asset.Token] = true
-			}
-
-			for _, tokenName := range tc.expectedTokenNames {
-				assert.True(t, foundTokens[tokenName], "Should include token %s", tokenName)
+			for idx, asset := range responseAssets {
+				assert.True(t, asset.Token == tc.expectedTokenNames[idx], "Should include token %s", tc.expectedTokenNames[idx])
 			}
 		})
 	}

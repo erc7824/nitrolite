@@ -128,7 +128,7 @@ describe('Create channel', () => {
 
         expect(postBalance.rawBalance).toBe(prevBalance.rawBalance - depositAmount);
 
-        const openChannelPromise = ws.waitForMessage(getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open), 5000);
+        const openChannelPromise = ws.waitForMessage(getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open), undefined, 5000);
 
         const {
             txHash: createChannelTxHash,

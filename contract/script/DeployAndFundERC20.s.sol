@@ -11,17 +11,13 @@ contract DeployAndFundERC20Script is Script {
 
     function setUp() public {}
 
-    function run(
-        uint32 deployerIndex,
-        string memory name,
-        string memory symbol,
-        uint8 decimals,
-        string memory mnemonic
-    ) public {
-        (address gasProvider, ) = deriveRememberKey(mnemonic, 0);
+    function run(uint32 deployerIndex, string memory name, string memory symbol, uint8 decimals, string memory mnemonic)
+        public
+    {
+        (address gasProvider,) = deriveRememberKey(mnemonic, 0);
         vm.startBroadcast(gasProvider);
 
-        (address deployer, ) = deriveRememberKey(mnemonic, deployerIndex);
+        (address deployer,) = deriveRememberKey(mnemonic, deployerIndex);
 
         payable(deployer).transfer(0.1 ether);
 

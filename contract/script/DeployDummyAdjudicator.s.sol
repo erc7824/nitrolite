@@ -10,10 +10,10 @@ contract DeployDummyAdjudicatorScript is Script {
     function setUp() public {}
 
     function run(uint32 deployerIndex, string memory mnemonic) public {
-        (address gasProvider, ) = deriveRememberKey(mnemonic, 0);
+        (address gasProvider,) = deriveRememberKey(mnemonic, 0);
         vm.startBroadcast(gasProvider);
 
-        (address deployer, ) = deriveRememberKey(mnemonic, deployerIndex);
+        (address deployer,) = deriveRememberKey(mnemonic, deployerIndex);
 
         payable(deployer).transfer(0.1 ether);
 

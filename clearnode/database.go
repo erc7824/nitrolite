@@ -113,11 +113,15 @@ func ConnectToDB(cnf DatabaseConfig) (*gorm.DB, error) {
 
 func connectToPostgresql(cnf DatabaseConfig) (*gorm.DB, error) {
 	log.Println("connecting to Postgresql")
-	// // Create schema if not exists
-	// ensurePostgresqlSchema(cnf)
+	// Create schema if not exists
+	if err := ensurePostgresqlSchema(cnf); err != nil {
+		return nil, fmt.Errorf("failed to ensure Postgresql schema: %w", err)
+	}
 
-	// // Apply migrations
-	// migratePostgres(cnf)
+	// Apply migrations
+	if err := migratePostgres(cnf); err != nil {
+		return nil, fmt.Errorf("failed to apply Postgresql migrations: %w", err)
+	}
 
 	// Connect to db
 	dsn, err := postgresqlDbUrl(cnf)
@@ -184,6 +188,11 @@ func postgresqlDbUrl(cnf DatabaseConfig) (string, error) {
 }
 
 func ensurePostgresqlSchema(cnf DatabaseConfig) error {
+	if cnf.Schema == "" {
+		log.Println("No schema specified, skipping schema creation")
+		return nil
+	}
+
 	log.Println("creating schema")
 	dbConf := cnf
 	dbConf.Schema = ""

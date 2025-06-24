@@ -132,6 +132,8 @@ services:
         condition: service_healthy
       contract-deployer:
         condition: service_completed_successfully
+      db-init:
+        condition: service_completed_successfully
     environment:
       BROKER_PRIVATE_KEY: ${BROKER_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
       ANVIL_CUSTODY_CONTRACT_ADDRESS: ${ANVIL_CUSTODY_CONTRACT_ADDRESS:-0x8658501c98C3738026c4e5c361c6C3fa95DfB255}

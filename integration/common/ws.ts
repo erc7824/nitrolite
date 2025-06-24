@@ -31,6 +31,10 @@ export class TestWebSocket {
             });
 
             this.socket.on('message', (event) => {
+                if (this.closed) {
+                    return;
+                }
+
                 if (this.debugMode) {
                     console.log('Message received:', event.toString());
                 }
@@ -45,7 +49,11 @@ export class TestWebSocket {
             });
 
             this.socket.on('error', (error) => {
-                if (this.debugMode) {
+                if (this.closed) {
+                    return;
+                }
+
+                if (this.debugMode && !this.closed) {
                     console.error('WebSocket error:', error);
                 }
 
@@ -142,7 +150,7 @@ const genericPredicate = (data: string, condition: (r: RPCResponse) => boolean, 
         }
 
         if (reqId !== undefined && parsedData.requestId === reqId && parsedData.method === RPCMethod.Error) {
-            throw new Error(`RPC Error: ${parsedData.params.error || 'Unable to parse: ', parsedData}`);
+            throw new Error(`RPC Error: ${parsedData.params.error || 'Unable to parse: ', data}`);
         }
     } catch (error) {
         if (error.message.includes('Unsupported RPC method: assets')) {

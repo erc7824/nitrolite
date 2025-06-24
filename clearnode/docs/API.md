@@ -900,6 +900,7 @@ Retrieves broker configuration information including supported networks.
 ### Get Assets
 
 Retrieves all supported assets. Optionally, you can filter the assets by chain_id.
+Also supports pagination and sorting.
 
 **Request without filter:**
 
@@ -910,12 +911,15 @@ Retrieves all supported assets. Optionally, you can filter the assets by chain_i
 }
 ```
 
-**Request with chain_id filter:**
+**Request with chain_id filter, pagination and sorting:**
 
 ```json
 {
   "req": [1, "get_assets", [{
-    "chain_id": 137
+    "chain_id": 137,
+    "offset": 42,
+    "limit": 10,
+    "sort": "desc"
   }], 1619123456789],
   "sig": []
 }

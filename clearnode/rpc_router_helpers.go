@@ -39,20 +39,20 @@ func paginate(params *PaginationParams) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
-type SortingType string
+type SortType string
 
 const (
-	Ascending  SortingType = "asc"
-	Descending SortingType = "desc"
+	Ascending  SortType = "asc"
+	Descending SortType = "desc"
 )
 
-func (s SortingType) ToString() string {
+func (s SortType) ToString() string {
 	return strings.ToUpper(string(s))
 }
 
-func applySorting(db *gorm.DB, sortBy string, defaultSorting SortingType, sortType *SortingType) *gorm.DB {
+func applySort(db *gorm.DB, sortBy string, defaultSort SortType, sortType *SortType) *gorm.DB {
 	if sortType == nil {
-		return db.Order(sortBy + " " + defaultSorting.ToString())
+		return db.Order(sortBy + " " + defaultSort.ToString())
 	}
 
 	return db.Order(sortBy + " " + sortType.ToString())

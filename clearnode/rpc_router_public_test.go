@@ -816,6 +816,108 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 	}
 }
 
+func TestRPCRouterHandleGetAppSessions_Pagination(t *testing.T) {
+	router, cleanup := setupTestRPCRouter(t)
+	defer cleanup()
+
+	baseTime := time.Now().Add(-24 * time.Hour)
+
+	sessionIDs := []string{
+		"0xSession11", "0xSession10", "0xSession09",
+		"0xSession08", "0xSession07", "0xSession06",
+		"0xSession05", "0xSession04", "0xSession03",
+		"0xSession02", "0xSession01",
+	}
+
+	testSessions := []AppSession{
+		{Nonce: 11, ParticipantWallets: []string{"0xParticipant11"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(10 * time.Hour)},
+		{Nonce: 10, ParticipantWallets: []string{"0xParticipant10"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(9 * time.Hour)},
+		{Nonce: 9, ParticipantWallets: []string{"0xParticipant9"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(8 * time.Hour)},
+		{Nonce: 8, ParticipantWallets: []string{"0xParticipant8"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(7 * time.Hour)},
+		{Nonce: 7, ParticipantWallets: []string{"0xParticipant7"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(6 * time.Hour)},
+		{Nonce: 6, ParticipantWallets: []string{"0xParticipant6"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(5 * time.Hour)},
+		{Nonce: 5, ParticipantWallets: []string{"0xParticipant5"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(4 * time.Hour)},
+		{Nonce: 4, ParticipantWallets: []string{"0xParticipant4"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(3 * time.Hour)},
+		{Nonce: 3, ParticipantWallets: []string{"0xParticipant3"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(2 * time.Hour)},
+		{Nonce: 2, ParticipantWallets: []string{"0xParticipant2"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(1 * time.Hour)},
+		{Nonce: 1, ParticipantWallets: []string{"0xParticipant1"}, Status: ChannelStatusOpen, CreatedAt: baseTime},
+	}
+
+	for i := range testSessions {
+		testSessions[i].SessionID = sessionIDs[i]
+	}
+
+	for _, session := range testSessions {
+		require.NoError(t, router.DB.Create(&session).Error)
+	}
+
+	tcs := []struct {
+		name               string
+		params             map[string]interface{}
+		expectedSessionIDs []string
+	}{
+		{name: "No params",
+			params:             map[string]interface{}{},
+			expectedSessionIDs: sessionIDs[:10], // Default pagination should return first 10 sessions (desc order)
+		},
+		{name: "Offset only",
+			params:             map[string]interface{}{"offset": float64(2)},
+			expectedSessionIDs: sessionIDs[2:11], // Default page_size is 10, total 11, so offset 2 returns 9 sessions
+		},
+		{name: "Page size only",
+			params:             map[string]interface{}{"page_size": float64(5)},
+			expectedSessionIDs: sessionIDs[:5], // Default offset is 0, so page_size 5 returns first 5 sessions
+		},
+		{name: "Offset and page size",
+			params:             map[string]interface{}{"offset": float64(2), "page_size": float64(3)},
+			expectedSessionIDs: sessionIDs[2:5], // Offset 2 with page_size 3 returns 3 sessions
+		},
+		{name: "Pagination with sort",
+			params:             map[string]interface{}{"offset": float64(2), "page_size": float64(3), "sort": "asc"},
+			expectedSessionIDs: []string{"0xSession03", "0xSession04", "0xSession05"}, // Offset 2 with page_size 3 returns Sessions 3 to 5 (asc order)
+		},
+		{name: "Pagination with participant",
+			params:             map[string]interface{}{"participant": "0xNonExistentParticipant", "offset": float64(1), "page_size": float64(2)},
+			expectedSessionIDs: []string{}, // No sessions for non-existent participant
+		},
+	}
+
+	for idx, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			paramsJSON, err := json.Marshal(tc.params)
+			require.NoError(t, err)
+
+			c := &RPCContext{
+				Context: context.TODO(),
+				Message: RPCMessage{
+					Req: &RPCData{
+						RequestID: uint64(idx),
+						Method:    "get_app_sessions",
+						Params:    []any{json.RawMessage(paramsJSON)},
+						Timestamp: uint64(time.Now().Unix()),
+					},
+					Sig: []string{"dummy-signature"},
+				},
+			}
+
+			// Call handler
+			router.HandleGetAppSessions(c)
+			res := c.Message.Res
+			require.NotNil(t, res)
+
+			require.Len(t, res.Params, 1, "Response should contain an array of AppSessionResponse")
+			responseSessions, ok := res.Params[0].([]AppSessionResponse)
+			require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
+			assert.Len(t, responseSessions, len(tc.expectedSessionIDs), "Should return expected number of sessions")
+
+			// Check session IDs are in expected order
+			for idx, session := range responseSessions {
+				assert.True(t, session.AppSessionID == tc.expectedSessionIDs[idx], "Should include session %s", tc.expectedSessionIDs[idx])
+			}
+		})
+	}
+}
+
 func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
 	defer cleanup()

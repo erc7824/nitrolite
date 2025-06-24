@@ -296,6 +296,7 @@ export enum RPCMethod {
     GetChannels = 'get_channels',
     GetRPCHistory = 'get_rpc_history',
     GetAssets = 'get_assets',
+    Assets = 'assets',
     Message = 'message',
     BalanceUpdate = 'bu',
     ChannelsUpdate = 'channels',

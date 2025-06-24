@@ -647,6 +647,7 @@ export type RPCResponseParamsByMethod = {
     [RPCMethod.GetChannels]: GetChannelsResponseParams[];
     [RPCMethod.GetRPCHistory]: GetRPCHistoryResponseParams[];
     [RPCMethod.GetAssets]: GetAssetsResponseParams[];
+    [RPCMethod.Assets]: GetAssetsResponseParams[];
     [RPCMethod.Ping]: PingResponseParams;
     [RPCMethod.Pong]: PongResponseParams;
     [RPCMethod.Message]: MessageResponseParams;

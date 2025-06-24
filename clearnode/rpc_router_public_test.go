@@ -694,6 +694,8 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 	signer := Signer{privateKey: rawKey}
 	participantAddr := signer.GetAddress().Hex()
 
+	// Create sessions with specific creation times to test sorting
+	baseTime := time.Now().Add(-24 * time.Hour)
 	sessions := []AppSession{
 		{
 			SessionID:          "0xSession1",
@@ -705,6 +707,8 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 			Quorum:             75,
 			Nonce:              1,
 			Version:            1,
+			CreatedAt:          baseTime,
+			UpdatedAt:          baseTime,
 		},
 		{
 			SessionID:          "0xSession2",
@@ -716,6 +720,8 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 			Quorum:             80,
 			Nonce:              2,
 			Version:            2,
+			CreatedAt:          baseTime.Add(1 * time.Hour),
+			UpdatedAt:          baseTime.Add(1 * time.Hour),
 		},
 		{
 			SessionID:          "0xSession3",
@@ -727,6 +733,8 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 			Quorum:             60,
 			Nonce:              3,
 			Version:            3,
+			CreatedAt:          baseTime.Add(2 * time.Hour),
+			UpdatedAt:          baseTime.Add(2 * time.Hour),
 		},
 	}
 
@@ -734,148 +742,88 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 		require.NoError(t, router.DB.Create(&session).Error)
 	}
 
-	// Case 1: Get all for participant
-	params1 := map[string]string{"participant": participantAddr}
-	paramsJSON1, err := json.Marshal(params1)
-	require.NoError(t, err)
-
-	c := &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 1,
-				Method:    "get_app_sessions",
-				Params:    []any{json.RawMessage(paramsJSON1)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-			Sig: []string{"dummy-signature"},
+	tcs := []struct {
+		name               string
+		params             map[string]interface{}
+		expectedSessionIDs []string
+	}{
+		{
+			name:               "Get all with no sort (default desc by created_at)",
+			params:             map[string]interface{}{},
+			expectedSessionIDs: []string{"0xSession3", "0xSession2", "0xSession1"},
+		},
+		{
+			name:               "Get all with ascending sort",
+			params:             map[string]interface{}{"sort": "asc"},
+			expectedSessionIDs: []string{"0xSession1", "0xSession2", "0xSession3"},
+		},
+		{
+			name:               "Get all with descending sort",
+			params:             map[string]interface{}{"sort": "desc"},
+			expectedSessionIDs: []string{"0xSession3", "0xSession2", "0xSession1"},
+		},
+		{
+			name:               "Filter by participant",
+			params:             map[string]interface{}{"participant": participantAddr},
+			expectedSessionIDs: []string{"0xSession2", "0xSession1"},
+		},
+		{
+			name:               "Filter by participant with ascending sort",
+			params:             map[string]interface{}{"participant": participantAddr, "sort": "asc"},
+			expectedSessionIDs: []string{"0xSession1", "0xSession2"},
+		},
+		{
+			name:               "Filter by status open",
+			params:             map[string]interface{}{"status": string(ChannelStatusOpen)},
+			expectedSessionIDs: []string{"0xSession3", "0xSession1"},
+		},
+		{
+			name:               "Filter by participant and status open",
+			params:             map[string]interface{}{"participant": participantAddr, "status": string(ChannelStatusOpen)},
+			expectedSessionIDs: []string{"0xSession1"},
+		},
+		{
+			name:               "Filter by status closed",
+			params:             map[string]interface{}{"status": string(ChannelStatusClosed)},
+			expectedSessionIDs: []string{"0xSession2"},
 		},
 	}
 
-	// Call handler
-	router.HandleGetAppSessions(c)
-	res := c.Message.Res
-	require.NotNil(t, res)
+	for idx, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			paramsJSON, err := json.Marshal(tc.params)
+			require.NoError(t, err, "Failed to marshal params")
 
-	assert.Equal(t, "get_app_sessions", res.Method)
-	assert.Equal(t, uint64(1), res.RequestID)
-	require.Len(t, res.Params, 1, "Response should contain an array of AppSessionResponse")
-
-	sessionResponses, ok := res.Params[0].([]AppSessionResponse)
-	require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
-	assert.Len(t, sessionResponses, 2, "Should return 2 app sessions for the participant")
-
-	foundSessions := make(map[string]bool)
-	for _, session := range sessionResponses {
-		foundSessions[session.AppSessionID] = true
-		var orig AppSession
-		for _, s := range sessions {
-			if s.SessionID == session.AppSessionID {
-				orig = s
-				break
+			c := &RPCContext{
+				Context: context.TODO(),
+				Message: RPCMessage{
+					Req: &RPCData{
+						RequestID: uint64(idx),
+						Method:    "get_app_sessions",
+						Params:    []any{json.RawMessage(paramsJSON)},
+						Timestamp: uint64(time.Now().Unix()),
+					},
+					Sig: []string{"dummy-signature"},
+				},
 			}
-		}
-		assert.Equal(t, string(orig.Status), session.Status, "Status should match")
+
+			router.HandleGetAppSessions(c)
+			res := c.Message.Res
+			require.NotNil(t, res)
+
+			assert.Equal(t, "get_app_sessions", res.Method)
+			assert.Equal(t, uint64(idx), res.RequestID)
+			require.Len(t, res.Params, 1, "Response should contain an array of AppSessionResponse")
+
+			sessionResponses, ok := res.Params[0].([]AppSessionResponse)
+			require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
+			assert.Len(t, sessionResponses, len(tc.expectedSessionIDs), "Should return expected number of app sessions")
+
+			for idx, sessionResponse := range sessionResponses {
+				assert.True(t, sessionResponse.AppSessionID == tc.expectedSessionIDs[idx], "Should include session %s", tc.expectedSessionIDs[idx])
+			}
+		})
 	}
-	assert.True(t, foundSessions["0xSession1"], "Should include Session1")
-	assert.True(t, foundSessions["0xSession2"], "Should include Session2")
-	assert.False(t, foundSessions["0xSession3"], "Should not include Session3")
-
-	// Case 2: Filter by status="open"
-	params2 := map[string]string{"participant": participantAddr, "status": string(ChannelStatusOpen)}
-	paramsJSON2, err := json.Marshal(params2)
-	require.NoError(t, err)
-
-	c = &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 2,
-				Method:    "get_app_sessions",
-				Params:    []any{json.RawMessage(paramsJSON2)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-			Sig: []string{"dummy-signature"},
-		},
-	}
-
-	// Call handler
-	router.HandleGetAppSessions(c)
-	res = c.Message.Res
-	require.NotNil(t, res)
-
-	sessionResponses2, ok := res.Params[0].([]AppSessionResponse)
-	require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
-	assert.Len(t, sessionResponses2, 1, "Should return 1 open app session")
-	assert.Equal(t, "0xSession1", sessionResponses2[0].AppSessionID, "Should be Session1")
-	assert.Equal(t, string(ChannelStatusOpen), sessionResponses2[0].Status)
-
-	// Case 3: No participant (all sessions)
-	c = &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 3,
-				Method:    "get_app_sessions",
-				Params:    []any{json.RawMessage(`{}`)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-			Sig: []string{"dummy-signature"},
-		},
-	}
-
-	// Call handler
-	router.HandleGetAppSessions(c)
-	res = c.Message.Res
-	require.NotNil(t, res)
-
-	allSessions, ok := res.Params[0].([]AppSessionResponse)
-	require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
-	assert.Len(t, allSessions, 3, "Should return all 3 app sessions")
-
-	foundSessionIDs := make(map[string]bool)
-	for _, session := range allSessions {
-		foundSessionIDs[session.AppSessionID] = true
-	}
-	assert.True(t, foundSessionIDs["0xSession1"], "Should include Session1")
-	assert.True(t, foundSessionIDs["0xSession2"], "Should include Session2")
-	assert.True(t, foundSessionIDs["0xSession3"], "Should include Session3")
-
-	// Case 4: No participant, status="open"
-	openStatusParams := map[string]string{"status": string(ChannelStatusOpen)}
-	openStatusParamsJSON, err := json.Marshal(openStatusParams)
-	require.NoError(t, err)
-
-	c = &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 4,
-				Method:    "get_app_sessions",
-				Params:    []any{json.RawMessage(openStatusParamsJSON)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-			Sig: []string{"dummy-signature"},
-		},
-	}
-
-	// Call handler
-	router.HandleGetAppSessions(c)
-	res = c.Message.Res
-	require.NotNil(t, res)
-
-	openSessions, ok := res.Params[0].([]AppSessionResponse)
-	require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
-	assert.Len(t, openSessions, 2, "Should return 2 open sessions")
-
-	openSessionIDs := make(map[string]bool)
-	for _, session := range openSessions {
-		openSessionIDs[session.AppSessionID] = true
-		assert.Equal(t, string(ChannelStatusOpen), session.Status, "All sessions should be open")
-	}
-	assert.True(t, openSessionIDs["0xSession1"], "Should include Session1")
-	assert.True(t, openSessionIDs["0xSession3"], "Should include Session3")
-	assert.False(t, openSessionIDs["0xSession2"], "Should not include Session2")
 }
 
 func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {

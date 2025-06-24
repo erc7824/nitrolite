@@ -34,8 +34,10 @@ type AppDefinition struct {
 }
 
 type GetAppSessionParams struct {
-	Participant string `json:"participant,omitempty"` // Optional participant wallet to filter sessions
-	Status      string `json:"status,omitempty"`      // Optional status to filter sessions
+	PaginationParams
+	Sort        *SortType `json:"sort,omitempty"`        // Optional sort type (asc/desc)
+	Participant string    `json:"participant,omitempty"` // Optional participant wallet to filter sessions
+	Status      string    `json:"status,omitempty"`      // Optional status to filter sessions
 }
 
 type GetChannelsParams struct {

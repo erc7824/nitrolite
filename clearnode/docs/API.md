@@ -146,14 +146,29 @@ Retrieves the application definition for a specific ledger account.
 ### Get App Sessions
 
 Lists all virtual applications for a participant sorted by updated_at from the newest to oldest. Optionally, you can filter the results by status (open, closed).
+Also supports pagination and sorting by `created_at`.
 
 **Request:**
 
 ```json
 {
   "req": [1, "get_app_sessions", [{
+    "participant": "0x1234567890abcdef..."
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Request with filtering, pagination, and sorting:**
+
+```json
+{
+  "req": [1, "get_app_sessions", [{
     "participant": "0x1234567890abcdef...",
-    "status": "open"  // Optional: filter by status
+    "status": "open",  // Optional: filter by status
+    "offset": 42, // Optional: pagination offset
+    "page_size": 10, // Optional: number of sessions to return
+    "sort": "asc", // Optional: sort asc or desc
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }

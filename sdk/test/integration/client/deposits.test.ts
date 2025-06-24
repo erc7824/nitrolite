@@ -37,9 +37,22 @@ describe('Deposit Integration Tests', () => {
             testEnv.deployedContracts.token = deployedAddresses.token;
         } else {
             const artifacts = getContractArtifacts();
-            testEnv.deployedContracts.custody = await deployContract(testEnv, artifacts.custody.abi, artifacts.custody.bytecode);
-            testEnv.deployedContracts.adjudicator = await deployContract(testEnv, artifacts.adjudicator.abi, artifacts.adjudicator.bytecode);
-            testEnv.deployedContracts.token = await deployContract(testEnv, artifacts.token.abi, artifacts.token.bytecode, ['Nitrolite Token', 'NTL', 18, `${2n ** 256n - 1n}`]);
+            testEnv.deployedContracts.custody = await deployContract(
+                testEnv,
+                artifacts.custody.abi,
+                artifacts.custody.bytecode,
+            );
+            testEnv.deployedContracts.adjudicator = await deployContract(
+                testEnv,
+                artifacts.adjudicator.abi,
+                artifacts.adjudicator.bytecode,
+            );
+            testEnv.deployedContracts.token = await deployContract(
+                testEnv,
+                artifacts.token.abi,
+                artifacts.token.bytecode,
+                ['Nitrolite Token', 'NTL', 18, `${2n ** 256n - 1n}`],
+            );
         }
 
         tokenAddress = testEnv.deployedContracts.token;

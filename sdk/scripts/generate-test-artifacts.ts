@@ -23,34 +23,34 @@ const contracts: ContractMapping[] = [
         name: 'Custody',
         solidityFile: 'Custody.sol',
         contractName: 'Custody',
-        outputFileName: 'custody.ts'
+        outputFileName: 'custody.ts',
     },
     {
         name: 'Dummy',
-        solidityFile: 'Dummy.sol', 
+        solidityFile: 'Dummy.sol',
         contractName: 'Dummy',
-        outputFileName: 'dummy.ts'
+        outputFileName: 'dummy.ts',
     },
     {
         name: 'TestERC20',
         solidityFile: 'TestERC20.sol',
-        contractName: 'TestERC20', 
-        outputFileName: 'testERC20.ts'
-    }
+        contractName: 'TestERC20',
+        outputFileName: 'testERC20.ts',
+    },
 ];
 
 function generateArtifact(contract: ContractMapping): void {
     const contractPath = path.join(CONTRACTS_OUT_DIR, contract.solidityFile, `${contract.contractName}.json`);
-    
+
     if (!fs.existsSync(contractPath)) {
         console.warn(`Contract file not found: ${contractPath}`);
         return;
     }
 
     const contractJson: ContractJson = JSON.parse(fs.readFileSync(contractPath, 'utf8'));
-    
-    const bytecode = contractJson.bytecode.object.startsWith('0x') 
-        ? contractJson.bytecode.object 
+
+    const bytecode = contractJson.bytecode.object.startsWith('0x')
+        ? contractJson.bytecode.object
         : `0x${contractJson.bytecode.object}`;
 
     const output = `// Auto-generated test artifact. Do not edit manually.
@@ -62,7 +62,7 @@ export const ${contract.name}Artifacts = {
 `;
 
     const outputPath = path.join(TEST_ARTIFACTS_DIR, contract.outputFileName);
-    
+
     // Ensure directory exists
     const dir = path.dirname(outputPath);
     if (!fs.existsSync(dir)) {

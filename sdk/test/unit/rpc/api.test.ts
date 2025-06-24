@@ -50,7 +50,7 @@ describe('API message creators', () => {
             allowances: [],
             expire: '',
             scope: '',
-            application: clientAddress
+            application: clientAddress,
         };
         const msgStr = await createAuthRequestMessage(authRequest, requestId, timestamp);
         expect(signer).not.toHaveBeenCalled();
@@ -82,9 +82,11 @@ describe('API message creators', () => {
             method: RPCMethod.AuthChallenge,
             requestId: 999,
             timestamp: 200,
-            params: [{
-                challenge_message: 'msg',
-            }],
+            params: [
+                {
+                    challenge_message: 'msg',
+                },
+            ],
             signatures: [],
         };
 
@@ -233,14 +235,16 @@ describe('API message creators', () => {
     });
 
     test('createResizeChannelMessage', async () => {
-        const resizeParams: ResizeChannelRequestParams[] = [{
-            channel_id: channelId,
-            funds_destination: fundDestination,
-            resize_amount: 1000n,
-        }];
-        const resizeParamsExpected = resizeParams.map(param => ({
+        const resizeParams: ResizeChannelRequestParams[] = [
+            {
+                channel_id: channelId,
+                funds_destination: fundDestination,
+                resize_amount: 1000n,
+            },
+        ];
+        const resizeParamsExpected = resizeParams.map((param) => ({
             ...param,
-            resize_amount: param.resize_amount?.toString()
+            resize_amount: param.resize_amount?.toString(),
         }));
         const msgStr = await createResizeChannelMessage(signer, resizeParams, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.ResizeChannel, resizeParams, timestamp]);
@@ -305,6 +309,8 @@ describe('API message creators', () => {
         const signer = createECDSAMessageSigner(privateKey);
         const signature = await signer(payload);
         expect(signature).toBeDefined();
-        expect(signature).toEqual('0x3704ad0add5fc4b66c56abf9c6b02910170f0cacdf7011cc21804cc164dcd1c14827bfe374da0a60231088ac34bcbfc3874b5544189151059374964313b2a1a91b');
-    })
+        expect(signature).toEqual(
+            '0x3704ad0add5fc4b66c56abf9c6b02910170f0cacdf7011cc21804cc164dcd1c14827bfe374da0a60231088ac34bcbfc3874b5544189151059374964313b2a1a91b',
+        );
+    });
 });

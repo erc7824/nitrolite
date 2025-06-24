@@ -24,15 +24,15 @@ export interface AuthChallengeRequest extends GenericRPCMessage {
  */
 export type AuthVerifyRequestParams =
     | {
-    /** JSON Web Token for authentication. */
-    jwt: string;
-    challenge?: never;
-  }
-  | {
-    /** The challenge token received from auth_challenge response. Used to verify the client's signature and prevent replay attacks. */
-    challenge: string;
-    jwt?: never;
-  };
+          /** JSON Web Token for authentication. */
+          jwt: string;
+          challenge?: never;
+      }
+    | {
+          /** The challenge token received from auth_challenge response. Used to verify the client's signature and prevent replay attacks. */
+          challenge: string;
+          jwt?: never;
+      };
 export type AuthVerifyRPCRequestParams = AuthVerifyRequestParams; // for backward compatibility
 
 /**
@@ -96,12 +96,12 @@ export interface GetLedgerEntriesRequest extends GenericRPCMessage {
  * It includes the participant's address, the asset (usdc, usdt, etc) being allocated, and the amount.
  */
 export type AppSessionAllocation = {
-  /** The Ethereum address of the participant receiving the allocation. */
-  participant: Address;
-  /** The symbol of the asset being allocated (e.g., "USDC", "USDT"). */
-  asset: string;
-  /** The amount of the asset being allocated. Must be a positive number. */
-  amount: string;
+    /** The Ethereum address of the participant receiving the allocation. */
+    participant: Address;
+    /** The symbol of the asset being allocated (e.g., "USDC", "USDT"). */
+    asset: string;
+    /** The amount of the asset being allocated. Must be a positive number. */
+    amount: string;
 };
 
 /**
@@ -287,10 +287,10 @@ export interface GetAssetsRequest extends GenericRPCMessage {
  * This structure defines the symbol of the asset and the amount that is allowed to be spent.
  */
 export type Allowance = {
-  /** The symbol of the asset (e.g., "USDC", "USDT"). */
-  asset: string;
-  /** The amount of the asset that is allowed to be spent. */
-  amount: string;
+    /** The symbol of the asset (e.g., "USDC", "USDT"). */
+    asset: string;
+    /** The amount of the asset that is allowed to be spent. */
+    amount: string;
 };
 
 /**
@@ -328,7 +328,7 @@ export interface AuthRequest extends GenericRPCMessage {
 export interface MessageRequest extends GenericRPCMessage {
     method: RPCMethod.Message;
     /** The message parameters are handled by the virtual application */
-  params: any[];
+    params: any[];
 }
 
 /**
@@ -337,7 +337,7 @@ export interface MessageRequest extends GenericRPCMessage {
 export interface PingRequest extends GenericRPCMessage {
     method: RPCMethod.Ping;
     /** No parameters needed for ping */
-  params: [];
+    params: [];
 }
 
 /**
@@ -346,7 +346,7 @@ export interface PingRequest extends GenericRPCMessage {
 export interface PongRequest extends GenericRPCMessage {
     method: RPCMethod.Pong;
     /** No parameters needed for pong */
-  params: [];
+    params: [];
 }
 
 /**
@@ -373,26 +373,26 @@ export type TransferRPCRequestParams = TransferRequestParams; // for backward co
  * This allows for type-safe handling of different request structures.
  */
 export type RPCRequest =
-  | AuthChallengeRequest
-  | AuthVerifyRequest
-  | AuthRequest
-  | GetConfigRequest
-  | GetLedgerBalancesRequest
-  | GetLedgerEntriesRequest
-  | CreateAppSessionRequest
-  | SubmitStateRequest
-  | CloseAppSessionRequest
-  | GetAppDefinitionRequest
-  | GetAppSessionsRequest
-  | ResizeChannelRequest
-  | CloseChannelRequest
-  | GetChannelsRequest
-  | GetRPCHistoryRequest
-  | GetAssetsRequest
-  | PingRequest
-  | PongRequest
-  | MessageRequest
-  | TransferRequest;
+    | AuthChallengeRequest
+    | AuthVerifyRequest
+    | AuthRequest
+    | GetConfigRequest
+    | GetLedgerBalancesRequest
+    | GetLedgerEntriesRequest
+    | CreateAppSessionRequest
+    | SubmitStateRequest
+    | CloseAppSessionRequest
+    | GetAppDefinitionRequest
+    | GetAppSessionsRequest
+    | ResizeChannelRequest
+    | CloseChannelRequest
+    | GetChannelsRequest
+    | GetRPCHistoryRequest
+    | GetAssetsRequest
+    | PingRequest
+    | PongRequest
+    | MessageRequest
+    | TransferRequest;
 
 /**
  * Maps RPC methods to their corresponding request parameter types.

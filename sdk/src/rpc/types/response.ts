@@ -1,5 +1,12 @@
 import { Address, Hex } from 'viem';
-import { RPCMethod, GenericRPCMessage, AppDefinition, RPCChannelStatus, AuthVerifyRequestParams, TransferAllocation } from '.';
+import {
+    RPCMethod,
+    GenericRPCMessage,
+    AppDefinition,
+    RPCChannelStatus,
+    AuthVerifyRequestParams,
+    TransferAllocation,
+} from '.';
 
 /**
  * Represents the parameters for the 'auth_challenge' RPC method.
@@ -43,24 +50,24 @@ export type ErrorRPCResponseParams = ErrorResponseParams; // for backward compat
  * Represents the network information for the 'get_config' RPC method.
  */
 export interface NetworkInfo {
-  /** The name of the network (e.g., "Ethereum", "Polygon"). */
-  name: string;
-  /** The chain ID of the network. */
-  chain_id: number;
-  /** The custody contract address for the network. */
-  custody_address: Address;
-  /** The adjudicator contract address for the network. */
-  adjudicator_address: Address;
+    /** The name of the network (e.g., "Ethereum", "Polygon"). */
+    name: string;
+    /** The chain ID of the network. */
+    chain_id: number;
+    /** The custody contract address for the network. */
+    custody_address: Address;
+    /** The adjudicator contract address for the network. */
+    adjudicator_address: Address;
 }
 
 /**
  * Represents the parameters for the 'get_config' RPC method.
  */
 export interface GetConfigResponseParams {
-  /** The Ethereum address of the broker. */
-  broker_address: Address;
-  /** List of supported networks and their configurations. */
-  networks: NetworkInfo[];
+    /** The Ethereum address of the broker. */
+    broker_address: Address;
+    /** List of supported networks and their configurations. */
+    networks: NetworkInfo[];
 }
 export type GetConfigRPCResponseParams = GetConfigResponseParams; // for backward compatibility
 
@@ -141,18 +148,18 @@ export type CloseAppSessionRPCResponseParams = CloseAppSessionResponseParams; //
  * Represents the parameters for the 'get_app_definition' RPC method.
  */
 export interface GetAppDefinitionResponseParams extends AppDefinition {
-  /** The protocol identifier for the application (e.g., "payment", "swap"). */
-  protocol: string;
-  /** List of Ethereum addresses of participants in the application session. */
-  participants: Address[];
-  /** Array of signature weights for each participant, used for quorum calculations. */
-  weights: number[];
-  /** The minimum number of signatures required for state updates. */
-  quorum: number;
-  /** The challenge period in seconds for state updates. */
-  challenge: number;
-  /** A unique nonce value for the application session to prevent replay attacks. */
-  nonce: number;
+    /** The protocol identifier for the application (e.g., "payment", "swap"). */
+    protocol: string;
+    /** List of Ethereum addresses of participants in the application session. */
+    participants: Address[];
+    /** Array of signature weights for each participant, used for quorum calculations. */
+    weights: number[];
+    /** The minimum number of signatures required for state updates. */
+    quorum: number;
+    /** The challenge period in seconds for state updates. */
+    challenge: number;
+    /** A unique nonce value for the application session to prevent replay attacks. */
+    nonce: number;
 }
 export type GetAppDefinitionRPCResponseParams = GetAppDefinitionResponseParams; // for backward compatibility
 
@@ -186,19 +193,19 @@ export interface GetAppSessionsResponseParams {
 export type GetAppSessionsRPCResponseParams = GetAppSessionsResponseParams; // for backward compatibility
 
 export interface ServerSignature {
-  /** The recovery value of the signature. */
-  v: string;
-  r: string;
-  s: string;
+    /** The recovery value of the signature. */
+    v: string;
+    r: string;
+    s: string;
 }
 
 export interface RPCAllocation {
-  /** The destination address for the allocation. */
-  destination: Address;
-  /** The token contract address. */
-  token: Address;
-  /** The amount to allocate as a string. */
-  amount: string;
+    /** The destination address for the allocation. */
+    destination: Address;
+    /** The token contract address. */
+    token: Address;
+    /** The amount to allocate as a string. */
+    amount: string;
 }
 
 /**
@@ -594,30 +601,30 @@ export interface TransferRPCResponse extends GenericRPCMessage {
  * This allows for type-safe handling of different response structures.
  */
 export type RPCResponse =
-  | AuthChallengeResponse
-  | AuthVerifyResponse
-  | AuthRequestResponse
-  | ErrorResponse
-  | GetConfigResponse
-  | GetLedgerBalancesResponse
-  | GetLedgerEntriesResponse
-  | CreateAppSessionResponse
-  | SubmitStateResponse
-  | CloseAppSessionResponse
-  | GetAppDefinitionResponse
-  | GetAppSessionsResponse
-  | ResizeChannelResponse
-  | CloseChannelResponse
-  | GetChannelsResponse
-  | GetRPCHistoryResponse
-  | GetAssetsResponse
-  | PingResponse
-  | PongResponse
-  | MessageResponse
-  | BalanceUpdateResponse
-  | ChannelsUpdateResponse
-  | ChannelUpdateResponse
-  | TransferRPCResponse;
+    | AuthChallengeResponse
+    | AuthVerifyResponse
+    | AuthRequestResponse
+    | ErrorResponse
+    | GetConfigResponse
+    | GetLedgerBalancesResponse
+    | GetLedgerEntriesResponse
+    | CreateAppSessionResponse
+    | SubmitStateResponse
+    | CloseAppSessionResponse
+    | GetAppDefinitionResponse
+    | GetAppSessionsResponse
+    | ResizeChannelResponse
+    | CloseChannelResponse
+    | GetChannelsResponse
+    | GetRPCHistoryResponse
+    | GetAssetsResponse
+    | PingResponse
+    | PongResponse
+    | MessageResponse
+    | BalanceUpdateResponse
+    | ChannelsUpdateResponse
+    | ChannelUpdateResponse
+    | TransferRPCResponse;
 
 /**
  * Maps RPC methods to their corresponding parameter types.

@@ -10,7 +10,7 @@ type PreparedContractRequest = any;
 /**
  * Type-safe wrapper for writeContract calls using prepared requests.
  * This function handles the type compatibility between simulateContract result and writeContract params.
- * 
+ *
  * @param walletClient - The wallet client to use for writing
  * @param request - The prepared request from simulateContract
  * @param account - The account to use for the transaction
@@ -19,14 +19,14 @@ type PreparedContractRequest = any;
 const executeWriteContract = async (
     walletClient: WalletClient,
     request: PreparedContractRequest,
-    account: Account | Address
+    account: Account | Address,
 ): Promise<Hash> => {
     // The request from simulateContract contains all required parameters for writeContract.
     // We safely spread the request and add the account. This is type-safe because:
     // 1. simulateContract validates the contract call against the ABI
     // 2. The returned request contains the exact parameters needed by writeContract
     // 3. We only add the account parameter which is required by writeContract
-    // 
+    //
     // Note: Type assertion is necessary due to viem's complex union types for transaction parameters.
     // The runtime behavior is correct - simulateContract returns compatible parameters for writeContract.
     return walletClient.writeContract({
@@ -132,11 +132,7 @@ export class Erc20Service {
      * @throws {ContractCallError} If simulation fails.
      * @throws {AccountRequiredError} If no account is available for simulation.
      */
-    async prepareApprove(
-        tokenAddress: Address,
-        spender: Address,
-        amount: bigint,
-    ): Promise<PreparedContractRequest> {
+    async prepareApprove(tokenAddress: Address, spender: Address, amount: bigint): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareApprove';
 

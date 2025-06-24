@@ -1,10 +1,5 @@
 import { Hex, stringToHex } from 'viem';
-import {
-    NitroliteRPCMessage,
-    RPCMethod,
-    RPCResponseParamsByMethod,
-    RPCResponse,
-} from './types';
+import { NitroliteRPCMessage, RPCMethod, RPCResponseParamsByMethod, RPCResponse } from './types';
 
 /**
  * Get the current time in milliseconds
@@ -175,7 +170,10 @@ export function parseRPCResponse(response: string): RPCResponse {
     }
 }
 
-function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(_: M, params: Array<any>): RPCResponseParamsByMethod[M][] {
+function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(
+    _: M,
+    params: Array<any>,
+): RPCResponseParamsByMethod[M][] {
     const result: RPCResponseParamsByMethod[M][] = [];
 
     if (Array.isArray(params) && params.length > 0) {

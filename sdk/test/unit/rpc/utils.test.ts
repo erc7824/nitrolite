@@ -229,7 +229,7 @@ describe('RPC Utils', () => {
         test('should parse auth_challenge response', () => {
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.AuthChallenge, [{ challengeMessage: 'test-challenge' }], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -243,12 +243,12 @@ describe('RPC Utils', () => {
         test('should parse get_ledger_balances response with array of balances', () => {
             const balances: GetLedgerBalancesResponseParams[] = [
                 { asset: 'ETH', amount: '1.5' },
-                { asset: 'USDC', amount: '1000' }
+                { asset: 'USDC', amount: '1000' },
             ];
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.GetLedgerBalances, [balances], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -262,17 +262,19 @@ describe('RPC Utils', () => {
         test('should parse get_config response', () => {
             const config: GetConfigResponseParams = {
                 broker_address: '0x1234567890123456789012345678901234567890',
-                networks: [{
-                    name: 'Ethereum',
-                    chain_id: 1,
-                    custody_address: '0x1234567890123456789012345678901234567890',
-                    adjudicator_address: '0x1234567890123456789012345678901234567890'
-                }]
+                networks: [
+                    {
+                        name: 'Ethereum',
+                        chain_id: 1,
+                        custody_address: '0x1234567890123456789012345678901234567890',
+                        adjudicator_address: '0x1234567890123456789012345678901234567890',
+                    },
+                ],
             };
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.GetConfig, [config], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -286,7 +288,7 @@ describe('RPC Utils', () => {
         test('should parse ping response with empty params', () => {
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.Ping, [{}], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -302,12 +304,12 @@ describe('RPC Utils', () => {
                 address: '0x1234567890123456789012345678901234567890',
                 jwt_token: 'test-jwt-token',
                 session_key: '0x1234567890123456789012345678901234567890',
-                success: true
+                success: true,
             };
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.AuthVerify, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -322,12 +324,12 @@ describe('RPC Utils', () => {
             const params: CreateAppSessionResponseParams = {
                 app_session_id: '0x1234567890123456789012345678901234567890',
                 version: 1,
-                status: RPCChannelStatus.Open
+                status: RPCChannelStatus.Open,
             };
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.CreateAppSession, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -342,12 +344,12 @@ describe('RPC Utils', () => {
             const params: SubmitStateResponseParams = {
                 app_session_id: '0x1234567890123456789012345678901234567890',
                 version: 1,
-                status: RPCChannelStatus.Open
+                status: RPCChannelStatus.Open,
             };
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.SubmitState, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -362,12 +364,12 @@ describe('RPC Utils', () => {
             const params: CloseAppSessionResponseParams = {
                 app_session_id: '0x1234567890123456789012345678901234567890',
                 version: 1,
-                status: RPCChannelStatus.Closed
+                status: RPCChannelStatus.Closed,
             };
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.CloseAppSession, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -384,12 +386,12 @@ describe('RPC Utils', () => {
                 participants: ['0x1234567890123456789012345678901234567890'],
                 weights: [1, 1],
                 quorum: 2,
-                challenge: 3600
+                challenge: 3600,
             };
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.GetAppDefinition, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -401,23 +403,25 @@ describe('RPC Utils', () => {
         });
 
         test('should parse get_app_sessions response', () => {
-            const params: GetAppSessionsResponseParams[] = [{
-                app_session_id: '0x1234567890123456789012345678901234567890',
-                status: RPCChannelStatus.Open,
-                participants: ['0x1234567890123456789012345678901234567890'],
-                protocol: 'test-protocol',
-                challenge: 3600,
-                weights: [1, 1],
-                quorum: 2,
-                version: 1,
-                nonce: 1,
-                created_at: '2024-01-01T00:00:00Z',
-                updated_at: '2024-01-01T00:00:00Z'
-            }];
+            const params: GetAppSessionsResponseParams[] = [
+                {
+                    app_session_id: '0x1234567890123456789012345678901234567890',
+                    status: RPCChannelStatus.Open,
+                    participants: ['0x1234567890123456789012345678901234567890'],
+                    protocol: 'test-protocol',
+                    challenge: 3600,
+                    weights: [1, 1],
+                    quorum: 2,
+                    version: 1,
+                    nonce: 1,
+                    created_at: '2024-01-01T00:00:00Z',
+                    updated_at: '2024-01-01T00:00:00Z',
+                },
+            ];
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.GetAppSessions, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -434,22 +438,24 @@ describe('RPC Utils', () => {
                 state_data: 'test-state-data',
                 intent: 1,
                 version: 1,
-                allocations: [{
-                    destination: '0x1234567890123456789012345678901234567890',
-                    token: '0x1234567890123456789012345678901234567890',
-                    amount: '1000'
-                }],
+                allocations: [
+                    {
+                        destination: '0x1234567890123456789012345678901234567890',
+                        token: '0x1234567890123456789012345678901234567890',
+                        amount: '1000',
+                    },
+                ],
                 state_hash: '0x1234567890123456789012345678901234567890',
                 server_signature: {
                     v: '27',
                     r: '0x1234567890123456789012345678901234567890',
-                    s: '0x1234567890123456789012345678901234567890'
-                }
+                    s: '0x1234567890123456789012345678901234567890',
+                },
             };
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.ResizeChannel, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -466,22 +472,24 @@ describe('RPC Utils', () => {
                 intent: 1,
                 version: 1,
                 state_data: 'test-state-data',
-                allocations: [{
-                    destination: '0x1234567890123456789012345678901234567890',
-                    token: '0x1234567890123456789012345678901234567890',
-                    amount: '1000'
-                }],
+                allocations: [
+                    {
+                        destination: '0x1234567890123456789012345678901234567890',
+                        token: '0x1234567890123456789012345678901234567890',
+                        amount: '1000',
+                    },
+                ],
                 state_hash: '0x1234567890123456789012345678901234567890',
                 server_signature: {
                     v: '27',
                     r: '0x1234567890123456789012345678901234567890',
-                    s: '0x1234567890123456789012345678901234567890'
-                }
+                    s: '0x1234567890123456789012345678901234567890',
+                },
             };
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.CloseChannel, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -493,25 +501,27 @@ describe('RPC Utils', () => {
         });
 
         test('should parse get_channels response', () => {
-            const params: GetChannelsResponseParams[] = [{
-                channel_id: '0x1234567890123456789012345678901234567890',
-                participant: '0x1234567890123456789012345678901234567890',
-                status: RPCChannelStatus.Open,
-                token: '0x1234567890123456789012345678901234567890',
-                wallet: '0x1234567890123456789012345678901234567890',
-                amount: '1000',
-                chain_id: 1,
-                adjudicator: '0x1234567890123456789012345678901234567890',
-                challenge: 3600,
-                nonce: 1,
-                version: 1,
-                created_at: '2024-01-01T00:00:00Z',
-                updated_at: '2024-01-01T00:00:00Z'
-            }];
+            const params: GetChannelsResponseParams[] = [
+                {
+                    channel_id: '0x1234567890123456789012345678901234567890',
+                    participant: '0x1234567890123456789012345678901234567890',
+                    status: RPCChannelStatus.Open,
+                    token: '0x1234567890123456789012345678901234567890',
+                    wallet: '0x1234567890123456789012345678901234567890',
+                    amount: '1000',
+                    chain_id: 1,
+                    adjudicator: '0x1234567890123456789012345678901234567890',
+                    challenge: 3600,
+                    nonce: 1,
+                    version: 1,
+                    created_at: '2024-01-01T00:00:00Z',
+                    updated_at: '2024-01-01T00:00:00Z',
+                },
+            ];
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.GetChannels, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -523,21 +533,23 @@ describe('RPC Utils', () => {
         });
 
         test('should parse get_rpc_history response', () => {
-            const params: GetRPCHistoryResponseParams[] = [{
-                id: 1,
-                sender: '0x1234567890123456789012345678901234567890',
-                req_id: 123,
-                method: 'test_method',
-                params: '{"test": "params"}',
-                timestamp: 456,
-                req_sig: ['0x123'],
-                res_sig: ['0x123'],
-                response: '{"test": "response"}'
-            }];
+            const params: GetRPCHistoryResponseParams[] = [
+                {
+                    id: 1,
+                    sender: '0x1234567890123456789012345678901234567890',
+                    req_id: 123,
+                    method: 'test_method',
+                    params: '{"test": "params"}',
+                    timestamp: 456,
+                    req_sig: ['0x123'],
+                    res_sig: ['0x123'],
+                    response: '{"test": "response"}',
+                },
+            ];
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.GetRPCHistory, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -549,16 +561,18 @@ describe('RPC Utils', () => {
         });
 
         test('should parse get_assets response', () => {
-            const params: GetAssetsResponseParams[] = [{
-                token: '0x1234567890123456789012345678901234567890',
-                chain_id: 1,
-                symbol: 'TEST',
-                decimals: 18
-            }];
+            const params: GetAssetsResponseParams[] = [
+                {
+                    token: '0x1234567890123456789012345678901234567890',
+                    chain_id: 1,
+                    symbol: 'TEST',
+                    decimals: 18,
+                },
+            ];
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.GetAssets, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -572,7 +586,7 @@ describe('RPC Utils', () => {
         test('should parse pong response', () => {
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.Pong, [{}], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -586,7 +600,7 @@ describe('RPC Utils', () => {
         test('should parse message response', () => {
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.Message, [{}], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -598,14 +612,16 @@ describe('RPC Utils', () => {
         });
 
         test('should parse balance_update response', () => {
-            const params: BalanceUpdateResponseParams[] = [{
-                asset: 'ETH',
-                amount: '1.5'
-            }];
+            const params: BalanceUpdateResponseParams[] = [
+                {
+                    asset: 'ETH',
+                    amount: '1.5',
+                },
+            ];
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.BalanceUpdate, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -617,24 +633,26 @@ describe('RPC Utils', () => {
         });
 
         test('should parse channels_update response', () => {
-            const params: ChannelUpdateResponseParams[] = [{
-                channel_id: '0x1234567890123456789012345678901234567890',
-                participant: '0x1234567890123456789012345678901234567890',
-                status: RPCChannelStatus.Open,
-                token: '0x1234567890123456789012345678901234567890',
-                amount: '1000',
-                chain_id: 1,
-                adjudicator: '0x1234567890123456789012345678901234567890',
-                challenge: 3600,
-                nonce: 1,
-                version: 1,
-                created_at: '2024-01-01T00:00:00Z',
-                updated_at: '2024-01-01T00:00:00Z'
-            }];
+            const params: ChannelUpdateResponseParams[] = [
+                {
+                    channel_id: '0x1234567890123456789012345678901234567890',
+                    participant: '0x1234567890123456789012345678901234567890',
+                    status: RPCChannelStatus.Open,
+                    token: '0x1234567890123456789012345678901234567890',
+                    amount: '1000',
+                    chain_id: 1,
+                    adjudicator: '0x1234567890123456789012345678901234567890',
+                    challenge: 3600,
+                    nonce: 1,
+                    version: 1,
+                    created_at: '2024-01-01T00:00:00Z',
+                    updated_at: '2024-01-01T00:00:00Z',
+                },
+            ];
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.ChannelsUpdate, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -658,12 +676,12 @@ describe('RPC Utils', () => {
                 nonce: 1,
                 version: 1,
                 created_at: '2024-01-01T00:00:00Z',
-                updated_at: '2024-01-01T00:00:00Z'
+                updated_at: '2024-01-01T00:00:00Z',
             };
 
             const rawResponse = JSON.stringify({
                 res: [123, RPCMethod.ChannelUpdate, [params], 456],
-                sig: ['0x123']
+                sig: ['0x123'],
             });
 
             const result = parseRPCResponse(rawResponse);
@@ -676,7 +694,7 @@ describe('RPC Utils', () => {
 
         test('should throw error for invalid response format', () => {
             const invalidResponse = JSON.stringify({
-                res: [123, RPCMethod.Ping, 456] // Missing timestamp
+                res: [123, RPCMethod.Ping, 456], // Missing timestamp
             });
 
             expect(() => parseRPCResponse(invalidResponse)).toThrow('Invalid RPC response format');

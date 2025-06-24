@@ -11,7 +11,12 @@ import {
 import { ContractAddresses } from '../abis';
 import * as Errors from '../errors';
 import { Erc20Service, NitroliteService } from './services';
-import { _prepareAndSignChallengeState, _prepareAndSignFinalState, _prepareAndSignInitialState, _prepareAndSignResizeState } from './state';
+import {
+    _prepareAndSignChallengeState,
+    _prepareAndSignFinalState,
+    _prepareAndSignInitialState,
+    _prepareAndSignResizeState,
+} from './state';
 import {
     ChallengeChannelParams,
     CheckpointChannelParams,
@@ -151,11 +156,19 @@ export class NitroliteTransactionPreparer {
 
         try {
             const { channel, initialState } = await _prepareAndSignInitialState(tokenAddress, this.deps, params);
-            const depositTx = await this.deps.nitroliteService.prepareDepositAndCreateChannel(tokenAddress, amount, channel, initialState);
+            const depositTx = await this.deps.nitroliteService.prepareDepositAndCreateChannel(
+                tokenAddress,
+                amount,
+                channel,
+                initialState,
+            );
             transactions.push(depositTx);
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
-            throw new Errors.ContractCallError('prepareDepositAndCreateChannel', err as Error, { tokenAddress, amount });
+            throw new Errors.ContractCallError('prepareDepositAndCreateChannel', err as Error, {
+                tokenAddress,
+                amount,
+            });
         }
 
         return transactions;
@@ -194,7 +207,12 @@ export class NitroliteTransactionPreparer {
         const { challengerSig } = await _prepareAndSignChallengeState(this.deps, params);
 
         try {
-            return await this.deps.nitroliteService.prepareChallenge(channelId, candidateState, proofStates, challengerSig);
+            return await this.deps.nitroliteService.prepareChallenge(
+                channelId,
+                candidateState,
+                proofStates,
+                challengerSig,
+            );
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
             throw new Errors.ContractCallError('prepareChallengeChannelTransaction', err as Error, { params });

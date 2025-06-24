@@ -14,20 +14,21 @@ npm install @erc7824/nitrolite
 import { custodyAbi, NitroliteClient } from '@erc7824/nitrolite';
 
 // Initialize client with full type safety
-const client = new NitroliteClient({...config});
+const client = new NitroliteClient({ ...config });
 
 // Deposit funds for state channels
 await client.deposit(tokenAddress, amount);
 
 // Create a state channel
 const { channelId } = await client.createChannel({
-  initialAllocationAmounts: [amount1, amount2]
+    initialAllocationAmounts: [amount1, amount2],
 });
 ```
 
 ## Available Contracts
 
 ### custody
+
 - **Functions:** 10
 - **Events:** 9
 - **Errors:** 18
@@ -40,4 +41,3 @@ const { channelId } = await client.createChannel({
 ✅ **Business Context** - Meaningful descriptions from JSDoc comments
 ✅ **Type Safety** - Full TypeScript support with autocomplete
 ✅ **Zero Maintenance** - Documentation updates automatically
-

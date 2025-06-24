@@ -21,7 +21,11 @@ import {
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
-import { CloseAppSessionRequestParams, CreateAppSessionRequestParams, ResizeChannelRequestParams } from './types/request';
+import {
+    CloseAppSessionRequestParams,
+    CreateAppSessionRequestParams,
+    ResizeChannelRequestParams,
+} from './types/request';
 
 /**
  * Creates the signed, stringified message body for an 'auth_request'.
@@ -368,9 +372,7 @@ export async function createResizeChannelMessage(
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.ResizeChannel, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
-    return JSON.stringify(signedRequest, (_, value) =>
-        typeof value === 'bigint' ? value.toString() : value
-    );
+    return JSON.stringify(signedRequest, (_, value) => (typeof value === 'bigint' ? value.toString() : value));
 }
 
 /**
@@ -540,7 +542,7 @@ export function createECDSAMessageSigner(privateKey: Hex): MessageSigner {
     return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
         try {
             const messageBytes = keccak256(stringToBytes(JSON.stringify(payload)));
-            const flatSignature = await privateKeyToAccount(privateKey).sign({hash: messageBytes});
+            const flatSignature = await privateKeyToAccount(privateKey).sign({ hash: messageBytes });
 
             return flatSignature as Hex;
         } catch (error) {

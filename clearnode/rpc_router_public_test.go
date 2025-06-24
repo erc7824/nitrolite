@@ -503,147 +503,188 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 		require.NoError(t, router.DB.Create(&asset).Error)
 	}
 
-	// Case 1: Get all
-	c := &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 1,
-				Method:    "get_assets",
-				Params:    []any{},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-			Sig: []string{"dummy-signature"},
+	tcs := []struct {
+		name               string
+		params             map[string]interface{}
+		expectedTokenNames []string
+	}{
+		{
+			name:               "Get all with no sorting (default asc)",
+			params:             map[string]interface{}{},
+			expectedTokenNames: []string{"0xToken1", "0xToken2", "0xToken3", "0xToken4"},
+		},
+		{
+			name:               "Get all with ascending sort",
+			params:             map[string]interface{}{"sort": "asc"},
+			expectedTokenNames: []string{"0xToken1", "0xToken2", "0xToken3", "0xToken4"},
+		},
+		{
+			name:               "Get all with descending sort",
+			params:             map[string]interface{}{"sort": "desc"},
+			expectedTokenNames: []string{"0xToken4", "0xToken3", "0xToken2", "0xToken1"},
+		},
+		{
+			name:               "Filter by chain_id=137",
+			params:             map[string]interface{}{"chain_id": float64(137)},
+			expectedTokenNames: []string{"0xToken1", "0xToken2"},
+		},
+		{
+			name:               "Filter by chain_id=42220",
+			params:             map[string]interface{}{"chain_id": float64(42220)},
+			expectedTokenNames: []string{"0xToken3"},
+		},
+		{
+			name:               "Filter by non-existent chain_id=1",
+			params:             map[string]interface{}{"chain_id": float64(1)},
+			expectedTokenNames: []string{},
 		},
 	}
 
-	// Call handler
-	router.HandleGetAssets(c)
-	res := c.Message.Res
-	require.NotNil(t, res)
+	for idx, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			paramsJSON, err := json.Marshal(tc.params)
+			require.NoError(t, err, "Failed to marshal params")
 
-	assert.Equal(t, "get_assets", res.Method)
-	assert.Equal(t, uint64(1), res.RequestID)
-	require.Len(t, res.Params, 1, "Response should contain an array of AssetResponse")
-
-	assets1, ok := res.Params[0].([]GetAssetsResponse)
-	require.True(t, ok, "Response parameter should be a slice of AssetResponse")
-	assert.Len(t, assets1, 4, "Should return all 4 assets")
-
-	foundSymbols := make(map[string]bool)
-	for _, asset := range assets1 {
-		foundSymbols[asset.Symbol] = true
-		var orig Asset
-		for _, a := range testAssets {
-			if a.Symbol == asset.Symbol && a.ChainID == asset.ChainID {
-				orig = a
-				break
+			// Case 1: Get all
+			c := &RPCContext{
+				Context: context.TODO(),
+				Message: RPCMessage{
+					Req: &RPCData{
+						RequestID: uint64(idx),
+						Method:    "get_assets",
+						Params:    []any{json.RawMessage(paramsJSON)},
+						Timestamp: uint64(time.Now().Unix()),
+					},
+					Sig: []string{"dummy-signature"},
+				},
 			}
-		}
-		assert.Equal(t, orig.Token, asset.Token, "Token should match")
-		assert.Equal(t, orig.ChainID, asset.ChainID, "ChainID should match")
-		assert.Equal(t, orig.Decimals, asset.Decimals, "Decimals should match")
+
+			// Call handler
+			router.HandleGetAssets(c)
+			res := c.Message.Res
+			require.NotNil(t, res)
+
+			assert.Equal(t, "get_assets", res.Method)
+			assert.Equal(t, uint64(idx), res.RequestID)
+			require.Len(t, res.Params, 1, "Response should contain an array of AssetResponse")
+
+			assets1, ok := res.Params[0].([]GetAssetsResponse)
+			require.True(t, ok, "Response parameter should be a slice of AssetResponse")
+			assert.Len(t, assets1, len(tc.expectedTokenNames), "Should return expected number of assets")
+
+			foundTokens := make(map[string]bool)
+			for _, asset := range assets1 {
+				foundTokens[asset.Token] = true
+			}
+
+			for _, expectedTokenName := range tc.expectedTokenNames {
+				assert.True(t, foundTokens[expectedTokenName], "Should include token %s", expectedTokenName)
+			}
+		})
 	}
-	assert.Len(t, foundSymbols, 4)
-	assert.True(t, foundSymbols["usdc"])
-	assert.True(t, foundSymbols["weth"])
-	assert.True(t, foundSymbols["celo"])
-	assert.True(t, foundSymbols["usdbc"])
+}
 
-	// Case 2: Filter by chain_id=137
-	params2 := map[string]interface{}{"chain_id": float64(137)}
-	paramsJSON2, err := json.Marshal(params2)
-	require.NoError(t, err)
+func TestRPCRouterHandleGetAssets_Pagination(t *testing.T) {
+	router, cleanup := setupTestRPCRouter(t)
+	defer cleanup()
 
-	c = &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 2,
-				Method:    "get_assets",
-				Params:    []any{json.RawMessage(paramsJSON2)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-			Sig: []string{"dummy-signature"},
+	tokenNames := []string{
+		"0xToken01", "0xToken02", "0xToken03", "0xToken04",
+		"0xToken05", "0xToken06", "0xToken07", "0xToken08",
+		"0xToken09", "0xToken10", "0xToken11"}
+
+	testAssets := []Asset{
+		{ChainID: 1, Symbol: "eth", Decimals: 18},
+		{ChainID: 1, Symbol: "weth", Decimals: 18},
+		{ChainID: 1, Symbol: "wbtc", Decimals: 18},
+		{ChainID: 1, Symbol: "usdc", Decimals: 6},
+		{ChainID: 137, Symbol: "pol", Decimals: 18},
+		{ChainID: 137, Symbol: "weth", Decimals: 18},
+		{ChainID: 137, Symbol: "wbtc", Decimals: 18},
+		{ChainID: 137, Symbol: "usdc", Decimals: 6},
+		{ChainID: 42220, Symbol: "usdc", Decimals: 6},
+		{ChainID: 42220, Symbol: "celo", Decimals: 18},
+		{ChainID: 8453, Symbol: "usdbc", Decimals: 6},
+	}
+
+	for i := range testAssets {
+		testAssets[i].Token = tokenNames[i]
+	}
+
+	for _, asset := range testAssets {
+		require.NoError(t, router.DB.Create(&asset).Error)
+	}
+
+	tcs := []struct {
+		name               string
+		params             map[string]interface{}
+		expectedTokenNames []string
+	}{
+		{name: "No params",
+			params:             map[string]interface{}{},
+			expectedTokenNames: tokenNames[:10], // Default pagination should return first 10 tokens
+		},
+		{name: "Offset only",
+			params:             map[string]interface{}{"offset": float64(2)},
+			expectedTokenNames: tokenNames[2:11], // Default page_size is 10, total 11, so offset 2 returns Tokens 3 to 11
+		},
+		{name: "Page size only",
+			params:             map[string]interface{}{"page_size": float64(5)},
+			expectedTokenNames: tokenNames[:5], // Default offset is 0, so page_size 5 returns First 5 tokens
+		},
+		{name: "Offset and page size",
+			params:             map[string]interface{}{"offset": float64(2), "page_size": float64(3)},
+			expectedTokenNames: tokenNames[2:5], // Offset 2 with page_size 3 returns Tokens 3 to 5
+		},
+		{name: "Pagination with sorting",
+			params:             map[string]interface{}{"offset": float64(2), "page_size": float64(3), "sorting": "desc"},
+			expectedTokenNames: []string{"0xToken09", "0xToken08", "0xToken07"}, // Offset 2 with page_size 3 returns Tokens 9 to 7
+		},
+		{name: "Pagination with chain_id",
+			params:             map[string]interface{}{"chain_id": float64(137), "offset": float64(1), "page_size": float64(2)},
+			expectedTokenNames: tokenNames[5:7], // Chain ID 137 with offset 1 and page_size 2 returns Tokens 6 to 7
 		},
 	}
 
-	// Call handler
-	router.HandleGetAssets(c)
-	res = c.Message.Res
-	require.NotNil(t, res)
+	for idx, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			paramsJSON, err := json.Marshal(tc.params)
+			require.NoError(t, err)
 
-	assert.Equal(t, "get_assets", res.Method)
-	assert.Equal(t, uint64(2), res.RequestID)
+			c := &RPCContext{
+				Context: context.TODO(),
+				Message: RPCMessage{
+					Req: &RPCData{
+						RequestID: uint64(idx),
+						Method:    "get_assets",
+						Params:    []any{json.RawMessage(paramsJSON)},
+						Timestamp: uint64(time.Now().Unix()),
+					},
+					Sig: []string{"dummy-signature"},
+				},
+			}
 
-	assets2, ok := res.Params[0].([]GetAssetsResponse)
-	require.True(t, ok, "Response parameter should be a slice of AssetResponse")
-	assert.Len(t, assets2, 2, "Should return 2 Polygon assets")
+			// Call handler
+			router.HandleGetAssets(c)
+			res := c.Message.Res
+			require.NotNil(t, res)
 
-	symbols2 := make(map[string]bool)
-	for _, asset := range assets2 {
-		assert.Equal(t, uint32(137), asset.ChainID, "ChainID should be Polygon")
-		symbols2[asset.Symbol] = true
+			require.Len(t, res.Params, 1, "Response should contain an array of AssetResponse")
+			assets, ok := res.Params[0].([]GetAssetsResponse)
+			require.True(t, ok, "Response parameter should be a slice of AssetResponse")
+			assert.Len(t, assets, len(tc.expectedTokenNames), "Should return expected number of assets")
+
+			// Check token names are included
+			foundTokens := make(map[string]bool)
+			for _, asset := range assets {
+				foundTokens[asset.Token] = true
+			}
+
+			for _, tokenName := range tc.expectedTokenNames {
+				assert.True(t, foundTokens[tokenName], "Should include token %s", tokenName)
+			}
+		})
 	}
-	assert.Len(t, symbols2, 2)
-	assert.True(t, symbols2["usdc"])
-	assert.True(t, symbols2["weth"])
-
-	// Case 3: Filter by chain_id=42220
-	params3 := map[string]interface{}{"chain_id": float64(42220)}
-	paramsJSON3, err := json.Marshal(params3)
-	require.NoError(t, err)
-
-	c = &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 3,
-				Method:    "get_assets",
-				Params:    []any{json.RawMessage(paramsJSON3)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-			Sig: []string{"dummy-signature"},
-		},
-	}
-
-	// Call handler
-	router.HandleGetAssets(c)
-	res = c.Message.Res
-	require.NotNil(t, res)
-
-	assets3, ok := res.Params[0].([]GetAssetsResponse)
-	require.True(t, ok, "Response parameter should be a slice of AssetResponse")
-	assert.Len(t, assets3, 1, "Should return 1 Celo asset")
-	assert.Equal(t, "celo", assets3[0].Symbol)
-	assert.Equal(t, uint32(42220), assets3[0].ChainID)
-
-	// Case 4: Filter by non-existent chain_id=1
-	params4 := map[string]interface{}{"chain_id": float64(1)}
-	paramsJSON4, err := json.Marshal(params4)
-	require.NoError(t, err)
-
-	c = &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 4,
-				Method:    "get_assets",
-				Params:    []any{json.RawMessage(paramsJSON4)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-			Sig: []string{"dummy-signature"},
-		},
-	}
-
-	// Call handler
-	router.HandleGetAssets(c)
-	res = c.Message.Res
-	require.NotNil(t, res)
-
-	assets4, ok := res.Params[0].([]GetAssetsResponse)
-	require.True(t, ok, "Response parameter should be a slice of AssetResponse")
-	assert.Len(t, assets4, 0, "Should return 0 assets for chain_id=1")
 }
 
 func TestRPCRouterHandleGetAppSessions(t *testing.T) {

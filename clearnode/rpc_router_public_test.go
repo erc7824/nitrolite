@@ -509,7 +509,7 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 		expectedTokenNames []string
 	}{
 		{
-			name:               "Get all with no sorting (default asc)",
+			name:               "Get all with no sort (default asc)",
 			params:             map[string]interface{}{},
 			expectedTokenNames: []string{"0xToken1", "0xToken2", "0xToken3", "0xToken4"},
 		},
@@ -545,7 +545,6 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 			paramsJSON, err := json.Marshal(tc.params)
 			require.NoError(t, err, "Failed to marshal params")
 
-			// Case 1: Get all
 			c := &RPCContext{
 				Context: context.TODO(),
 				Message: RPCMessage{
@@ -559,7 +558,6 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 				},
 			}
 
-			// Call handler
 			router.HandleGetAssets(c)
 			res := c.Message.Res
 			require.NotNil(t, res)
@@ -636,8 +634,8 @@ func TestRPCRouterHandleGetAssets_Pagination(t *testing.T) {
 			params:             map[string]interface{}{"offset": float64(2), "page_size": float64(3)},
 			expectedTokenNames: tokenNames[2:5], // Offset 2 with page_size 3 returns Tokens 3 to 5
 		},
-		{name: "Pagination with sorting",
-			params:             map[string]interface{}{"offset": float64(2), "page_size": float64(3), "sorting": "desc"},
+		{name: "Pagination with sort",
+			params:             map[string]interface{}{"offset": float64(2), "page_size": float64(3), "sort": "desc"},
 			expectedTokenNames: []string{"0xToken09", "0xToken08", "0xToken07"}, // Offset 2 with page_size 3 returns Tokens 9 to 7
 		},
 		{name: "Pagination with chain_id",

@@ -9,8 +9,8 @@ import (
 
 type GetAssetsParams struct {
 	PaginationParams
-	Sorting *SortingType `json:"sorting,omitempty"`  // Optional sorting type (asc/desc)
-	ChainID *uint32      `json:"chain_id,omitempty"` // Optional chain ID to filter assets
+	Sort    *SortType `json:"sort,omitempty"`     // Optional sort type (asc/desc)
+	ChainID *uint32   `json:"chain_id,omitempty"` // Optional chain ID to filter assets
 }
 
 type GetAssetsResponse struct {
@@ -105,7 +105,7 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 		return
 	}
 
-	query := applySorting(r.DB, "token", Ascending, params.Sorting)
+	query := applySort(r.DB, "token", Ascending, params.Sort)
 	query = paginate(&params.PaginationParams)(query)
 	assets, err := GetAllAssets(query, params.ChainID)
 	if err != nil {

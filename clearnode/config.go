@@ -22,6 +22,7 @@ var knownNetworks = map[string]uint32{
 	"ROOTSTOCK":   30,
 	"FLOW":        747,
 	"LOCALNET":    1337,
+	"ETH_MAINNET": 1,
 }
 
 // NetworkConfig represents configuration for a blockchain network

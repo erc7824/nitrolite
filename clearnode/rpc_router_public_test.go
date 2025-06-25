@@ -449,7 +449,7 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 		{
 			name:               "Get all with no sort (default asc, by chain_id and symbol)",
 			params:             map[string]interface{}{},
-			expectedTokenNames: []string{"0xToken1", "0xToken2", "0xToken4", "0xToken3"},
+			expectedTokenNames: []string{"0xToken3", "0xToken4", "0xToken1", "0xToken2"},
 		},
 		{
 			name:               "Filter by chain_id=137",

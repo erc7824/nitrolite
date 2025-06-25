@@ -106,7 +106,7 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 		return
 	}
 
-	query := applySort(r.DB, "chain_id, symbol", SortTypeAscending, nil)
+	query := applySort(r.DB, "symbol", SortTypeAscending, nil)
 	assets, err := GetAllAssets(query, params.ChainID)
 	if err != nil {
 		logger.Error("failed to get assets", "error", err)

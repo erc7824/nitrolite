@@ -950,7 +950,7 @@ Retrieves broker configuration information including supported networks.
 
 Retrieves all supported assets. Optionally, you can filter the assets by chain_id.
 
-> Sorted ascending by `chain_id` and `symbol` by default.
+> Sorted ascending by `symbol` by default.
 
 **Request without filter:**
 

@@ -80,27 +80,25 @@ describe('API message creators', () => {
     });
 
     describe('createAuthVerifyMessage', () => {
-        // Corrected: `params` is an object, not an array of objects.
         const rawResponse: AuthChallengeResponse = {
             method: RPCMethod.AuthChallenge,
-            requestId: 999,
-            timestamp: 200,
-            /// @ts-ignore
-            params: [
-                {
-                    challengeMessage: 'msg',
-                },
+            requestId: 1750865059076,
+            timestamp: 1750865059117,
+            params: {
+                challengeMessage: 'c8261773-2619-4fbe-9514-96392f87e7b2',
+            },
+            signatures: [
+                '0xddf03239f12089da25362dd3799edb3c6e7c1bc558f3475298b9dbe94d43137204ad9f37bad1e620d68c6a73b8ef908788f8538b41e49c857c41e6568a8fa76a00',
             ],
-            signatures: [],
         };
 
         test('successful challenge flow', async () => {
             const msgStr = await createAuthVerifyMessage(signer, rawResponse, requestId, timestamp);
-
-            expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.AuthVerify, [{ challenge: 'msg' }], timestamp]);
+            const challenge = 'c8261773-2619-4fbe-9514-96392f87e7b2';
+            expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.AuthVerify, [{ challenge }], timestamp]);
             const parsed = JSON.parse(msgStr);
             expect(parsed).toEqual({
-                req: [requestId, RPCMethod.AuthVerify, [{ challenge: 'msg' }], timestamp],
+                req: [requestId, RPCMethod.AuthVerify, [{ challenge }], timestamp],
                 sig: ['0xsig'],
             });
         });

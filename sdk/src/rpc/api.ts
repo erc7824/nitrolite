@@ -98,7 +98,7 @@ export async function createAuthVerifyMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [{ challenge: challenge.params[0].challengeMessage }];
+    const params = [{ challenge: challenge.params.challengeMessage }];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.AuthVerify, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
     return JSON.stringify(signedRequest);
@@ -486,34 +486,45 @@ export function createEIP712AuthMessageSigner(
     domain: EIP712AuthDomain,
 ): MessageSigner {
     return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
-        // TODO: perhaps it would be better to pass full EIP712AuthMessage instead of parsing part of it
-        // out of untyped data
         const address = walletClient.account?.address;
         if (!address) {
             throw new Error('Wallet client is not connected or does not have an account.');
         }
 
         const method = payload[1];
-        let challengeUUID: string = '';
-        if (method === RPCMethod.AuthChallenge) {
-            challengeUUID = payload[2][0].challengeMessage;
-        } else if (method === RPCMethod.AuthVerify) {
-            challengeUUID = payload[2][0].challenge;
-        } else {
+        if (method !== RPCMethod.AuthVerify) {
             throw new Error(
-                `Expected '${RPCMethod.AuthChallenge}' or '${RPCMethod.AuthVerify}' method, but received '${method}'`,
+                `This EIP-712 signer is designed only for the '${RPCMethod.AuthVerify}' method, but received '${method}'.`,
             );
         }
+
+        // Safely extract the challenge from the payload for an AuthVerify request.
+        // The expected structure is `[id, 'auth_verify', [{ challenge: '...' }], ts]`
+        const params = payload[2];
+        const firstParam = Array.isArray(params) ? params[0] : undefined;
+
+        if (
+            typeof firstParam !== 'object' ||
+            firstParam === null ||
+            !('challenge' in firstParam) ||
+            typeof firstParam.challenge !== 'string'
+        ) {
+            throw new Error('Invalid payload for AuthVerify: The challenge string is missing or malformed.');
+        }
+
+        // After the check, TypeScript knows `firstParam` is an object with a `challenge` property of type string.
+        const challengeUUID: string = firstParam.challenge;
 
         const message: EIP712AuthMessage = {
             ...partialMessage,
             challenge: challengeUUID,
-            wallet: address as Address,
+            wallet: address,
         };
 
-        const untypedMessage: Record<string, unknown> = Object.fromEntries(Object.entries(message));
-
         try {
+            // The message for signTypedData must be a plain object.
+            const untypedMessage: Record<string, unknown> = { ...message };
+
             // Sign with EIP-712
             const signature = await walletClient.signTypedData({
                 account: walletClient.account!,
@@ -525,8 +536,9 @@ export function createEIP712AuthMessageSigner(
 
             return signature;
         } catch (eip712Error) {
-            console.error('EIP-712 signing failed:', eip712Error);
-            throw new Error(`EIP-712 signing failed: ${eip712Error}`);
+            const errorMessage = eip712Error instanceof Error ? eip712Error.message : String(eip712Error);
+            console.error('EIP-712 signing failed:', errorMessage);
+            throw new Error(`EIP-712 signing failed: ${errorMessage}`);
         }
     };
 }

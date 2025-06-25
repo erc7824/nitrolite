@@ -1,7 +1,6 @@
 import { Address, createWalletClient, Hex, http, keccak256, stringToBytes } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { chain } from './setup';
-import { ethers } from 'ethers';
 import { createECDSAMessageSigner } from '@erc7824/nitrolite';
 
 export class Identity {
@@ -30,18 +29,9 @@ export class Identity {
                 address: this.sessionAddress,
             },
             signMessage: async ({ message: { raw } }: { message: { raw: string } }) => {
-                // const messageBytes = keccak256(stringToBytes(JSON.stringify(raw)));
-                // const flatSignature = await sessionAccount.sign({ hash: messageBytes });
+                const flatSignature = await sessionAccount.sign({ hash: raw as Hex });
 
-                // return flatSignature as Hex;
-
-                const wallet = new ethers.Wallet(sessionPrivateKey);
-
-                const flatSignature = await wallet._signingKey().signDigest(raw);
-
-                const signature = ethers.utils.joinSignature(flatSignature);
-
-                return signature as Hex;
+                return flatSignature as Hex;
             },
         };
 

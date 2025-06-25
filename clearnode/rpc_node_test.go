@@ -353,3 +353,98 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, 8, onMessageSentCounts)                  // number of messages sent
 	})
 }
+
+func TestRPCConnectionWrite(t *testing.T) {
+	t.Run("successful write", func(t *testing.T) {
+		writeChan := make(chan []byte, 1)
+		closeChan := make(chan struct{}, 1)
+		conn := NewRPCConnection("conn1", "user1", writeChan, closeChan)
+
+		message := []byte("test message")
+		conn.Write(message)
+
+		select {
+		case received := <-writeChan:
+			assert.Equal(t, message, received)
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("message not received")
+		}
+
+		assert.Empty(t, closeChan, "close channel should be empty")
+	})
+
+	t.Run("write timeout triggers connection close", func(t *testing.T) {
+		writeChan := make(chan []byte)
+		closeChan := make(chan struct{}, 1)
+		conn := NewRPCConnection("conn1", "user1", writeChan, closeChan)
+
+		originalTimeout := defaultRPCMessageWriteDuration
+		defaultRPCMessageWriteDuration = 50 * time.Millisecond
+		defer func() { defaultRPCMessageWriteDuration = originalTimeout }()
+
+		message := []byte("test message")
+		conn.Write(message)
+
+		select {
+		case <-closeChan:
+			// Success - connection close was triggered
+		case <-time.After(100 * time.Millisecond):
+			t.Fatal("connection close not triggered")
+		}
+	})
+}
+
+func TestRPCConnectionHub(t *testing.T) {
+	hub := newRPCConnectionHub()
+
+	// Add connections
+	writeChan1 := make(chan []byte, 10)
+	closeChan1 := make(chan struct{}, 1)
+	conn1 := NewRPCConnection("conn1", "user1", writeChan1, closeChan1)
+	hub.Set(conn1)
+
+	writeChan2 := make(chan []byte, 10)
+	closeChan2 := make(chan struct{}, 1)
+	conn2 := NewRPCConnection("conn2", "user1", writeChan2, closeChan2)
+	hub.Set(conn2)
+
+	writeChan3 := make(chan []byte, 10)
+	closeChan3 := make(chan struct{}, 1)
+	conn3 := NewRPCConnection("conn3", "user2", writeChan3, closeChan3)
+	hub.Set(conn3)
+
+	// Verify connections
+	assert.Equal(t, conn1, hub.Get("conn1"))
+	assert.Equal(t, conn2, hub.Get("conn2"))
+	assert.Equal(t, conn3, hub.Get("conn3"))
+
+	// Publish to user1
+	message1 := []byte("message for user1")
+	hub.Publish("user1", message1)
+
+	// Both user1 connections should receive
+	require.Equal(t, message1, <-writeChan1)
+	require.Equal(t, message1, <-writeChan2)
+
+	// user2 should not receive
+	assert.Empty(t, writeChan3)
+
+	// Remove one connection for user1
+	hub.Remove("conn1")
+	assert.Nil(t, hub.Get("conn1"))
+
+	// Publish again
+	message2 := []byte("second message")
+	hub.Publish("user1", message2)
+
+	// Only conn2 should receive now
+	require.Equal(t, message2, <-writeChan2)
+	assert.Empty(t, writeChan1)
+
+	// Remove all connections
+	hub.Remove("conn2")
+	hub.Remove("conn3")
+
+	assert.Empty(t, hub.connections)
+	assert.Empty(t, hub.authMapping)
+}

@@ -109,7 +109,7 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 		return
 	}
 
-	query := applySort(r.DB, "chain_id, symbol", Ascending, nil)
+	query := applySort(r.DB, "chain_id, symbol", SortTypeAscending, nil)
 	assets, err := GetAllAssets(query, params.ChainID)
 	if err != nil {
 		logger.Error("failed to get assets", "error", err)
@@ -215,7 +215,7 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 	var channels []Channel
 	var err error
 
-	query := applySort(r.DB, "created_at", Descending, params.Sort)
+	query := applySort(r.DB, "created_at", SortTypeDescending, params.Sort)
 	query = paginate(&params.PaginationParams)(query)
 	if params.Participant == "" {
 		if params.Status != "" {
@@ -271,7 +271,7 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 		walletAddress = params.Wallet
 	}
 
-	query := applySort(r.DB, "created_at", Descending, params.Sort)
+	query := applySort(r.DB, "created_at", SortTypeDescending, params.Sort)
 	query = paginate(&params.PaginationParams)(query)
 	ledger := GetWalletLedger(query, walletAddress)
 	entries, err := ledger.GetEntries(params.AccountID, params.Asset)

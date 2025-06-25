@@ -204,6 +204,7 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 			}
 			n.logger.Info("processing message",
 				"requestID", msg.Req.RequestID,
+				"userID", rpcConn.UserID,
 				"method", msg.Req.Method,
 				"route", methodRoute)
 

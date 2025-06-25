@@ -151,11 +151,24 @@ func (r *RPCRouter) LoggerMiddleware(c *RPCContext) {
 	logger := r.lg.With("requestID", c.Message.Req.RequestID)
 	c.Context = SetContextLogger(c.Context, logger)
 	logger = LoggerFromContext(c.Context)
-	logger.Info("handling RPC request",
-		"method", c.Message.Req.Method,
-		"userID", c.UserID)
 
 	c.Next()
+
+	if c.Message.Res == nil {
+		logger.Warn("RPC response is nil",
+			"userID", c.UserID,
+			"method", c.Message.Req.Method,
+		)
+		return
+	}
+
+	if c.Message.Res.Method == "error" {
+		logger.Warn("failed to handle RPC request",
+			"userID", c.UserID,
+			"method", c.Message.Req.Method,
+			"error", c.Message.Res.Params,
+		)
+	}
 }
 
 func (r *RPCRouter) MetricsMiddleware(c *RPCContext) {
@@ -233,6 +246,7 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 	}
 
 	c.Succeed(c.Message.Req.Method, response)
+	logger.Info("RPC history retrieved", "userID", c.UserID, "entryCount", len(response))
 }
 
 func (r *RPCRouter) HandlePing(c *RPCContext) {

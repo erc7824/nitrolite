@@ -13,10 +13,10 @@ export type Timestamp = number;
 export type AccountID = Hex;
 
 /** Represents the data payload within a request message: [requestId, method, params, timestamp?]. */
-export type RequestData = [RequestID, RPCMethod, any[], Timestamp?];
+export type RequestData = [RequestID, RPCMethod, object[], Timestamp?];
 
 /** Represents the data payload within a successful response message: [requestId, method, result, timestamp?]. */
-export type ResponseData = [RequestID, RPCMethod, any[], Timestamp?];
+export type ResponseData = [RequestID, RPCMethod, object[], Timestamp?];
 
 /** Represents the status of a channel. */
 export enum RPCChannelStatus {
@@ -124,7 +124,7 @@ export interface ParsedResponse {
     /** The method name from the response payload. Undefined if structure is invalid. */
     method?: RPCMethod;
     /** The extracted data payload (result array for success, error detail object for error). Undefined if structure is invalid or error payload malformed. */
-    data?: any[] | NitroliteRPCErrorDetail;
+    data?: object[] | NitroliteRPCErrorDetail;
     /** The Application Session ID from the message envelope. Undefined if structure is invalid. */
     sid?: Hex;
     /** The Timestamp from the response payload. Undefined if structure is invalid. */

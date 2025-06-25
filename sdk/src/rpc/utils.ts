@@ -1,5 +1,6 @@
 import { Hex, stringToHex } from 'viem';
-import { NitroliteRPCMessage, RPCMethod, RPCResponseParamsByMethod, RPCResponse } from './types';
+import { NitroliteRPCMessage, RPCMethod, RPCResponse } from './types';
+import { keysToCamel, ParamsParser, paramsParsers } from './parse/response';
 
 /**
  * Get the current time in milliseconds
@@ -139,57 +140,4 @@ export function isValidResponseRequestId(request: NitroliteRPCMessage, response:
     }
 
     return responseId === requestId;
-}
-
-/**
- * Parses a raw RPC response string into a structured RPCResponse object
- * @param response The raw RPC response string to parse
- * @returns An RPCResponse object containing the parsed data
- */
-export function parseRPCResponse(response: string): RPCResponse {
-    // TODO: Add support for other rpc protocols besides websocket
-    try {
-        const parsed = JSON.parse(response);
-
-        if (!Array.isArray(parsed.res) || parsed.res.length !== 4) {
-            throw new Error('Invalid RPC response format');
-        }
-
-        const method = parsed.res[1] as keyof RPCResponseParamsByMethod;
-        const responseObj = {
-            method: method as RPCMethod,
-            requestId: parsed.res[0],
-            timestamp: parsed.res[3],
-            signatures: parsed.sig || [],
-            params: parseRPCParameters(method, parsed.res[2]),
-        } as RPCResponse;
-
-        return responseObj;
-    } catch (e) {
-        throw new Error(`Failed to parse RPC response: ${e instanceof Error ? e.message : e}`);
-    }
-}
-
-function parseRPCParameters<M extends keyof RPCResponseParamsByMethod>(
-    _: M,
-    params: Array<any>,
-): RPCResponseParamsByMethod[M][] {
-    const result: RPCResponseParamsByMethod[M][] = [];
-
-    if (Array.isArray(params) && params.length > 0) {
-        const data = params[0];
-        if (Array.isArray(data)) {
-            // If data is an array, push each element
-            for (const item of data) {
-                if (typeof item === 'object' && item !== null) {
-                    result.push(item as RPCResponseParamsByMethod[M]);
-                }
-            }
-        } else if (typeof data === 'object' && data !== null) {
-            // If data is an object, push it directly
-            result.push(data as RPCResponseParamsByMethod[M]);
-        }
-    }
-
-    return result;
 }

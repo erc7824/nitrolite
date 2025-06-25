@@ -98,7 +98,7 @@ export async function createAuthVerifyMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [{ challenge: challenge.params[0].challenge_message }];
+    const params = [{ challenge: challenge.params[0].challengeMessage }];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.AuthVerify, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
     return JSON.stringify(signedRequest);

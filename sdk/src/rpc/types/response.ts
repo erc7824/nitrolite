@@ -13,7 +13,7 @@ import {
  */
 export interface AuthChallengeResponseParams {
     /** The challenge message to be signed by the client for authentication. */
-    challenge_message: string;
+    challengeMessage: string;
 }
 export type AuthChallengeRPCResponseParams = AuthChallengeResponseParams; // for backward compatibility
 
@@ -22,7 +22,7 @@ export type AuthChallengeRPCResponseParams = AuthChallengeResponseParams; // for
  */
 export interface AuthChallengeResponse extends GenericRPCMessage {
     method: RPCMethod.AuthChallenge;
-    params: [AuthChallengeResponseParams];
+    params: AuthChallengeResponseParams;
 }
 
 /**
@@ -31,8 +31,8 @@ export interface AuthChallengeResponse extends GenericRPCMessage {
 export interface AuthVerifyResponseParams {
     address: Address;
     /** Available only if challenge auth method was used in {@link AuthVerifyRequestParams} during the call to {@link RPCMethod.AuthRequest} */
-    jwt_token?: string;
-    session_key: Address;
+    jwtToken?: string;
+    sessionKey: Address;
     success: boolean;
 }
 export type AuthVerifyRPCResponseParams = AuthVerifyResponseParams; // for backward compatibility
@@ -53,11 +53,11 @@ export interface NetworkInfo {
     /** The name of the network (e.g., "Ethereum", "Polygon"). */
     name: string;
     /** The chain ID of the network. */
-    chain_id: number;
+    chainId: number;
     /** The custody contract address for the network. */
-    custody_address: Address;
+    custodyAddress: Address;
     /** The adjudicator contract address for the network. */
-    adjudicator_address: Address;
+    adjudicatorAddress: Address;
 }
 
 /**
@@ -65,7 +65,7 @@ export interface NetworkInfo {
  */
 export interface GetConfigResponseParams {
     /** The Ethereum address of the broker. */
-    broker_address: Address;
+    brokerAddress: Address;
     /** List of supported networks and their configurations. */
     networks: NetworkInfo[];
 }
@@ -77,8 +77,8 @@ export type GetConfigRPCResponseParams = GetConfigResponseParams; // for backwar
 export interface GetLedgerBalancesResponseParams {
     /** The asset symbol (e.g., "ETH", "USDC"). */
     asset: string;
-    /** The balance amount as a string. */
-    amount: string;
+    /** The balance amount. */
+    amount: BigInt;
 }
 export type GetLedgerBalancesRPCResponseParams = GetLedgerBalancesResponseParams; // for backward compatibility
 
@@ -89,19 +89,19 @@ export interface GetLedgerEntriesResponseParams {
     /** Unique identifier for the ledger entry. */
     id: number;
     /** The account identifier associated with the entry. */
-    account_id: string;
+    accountId: string;
     /** The type of account (e.g., "wallet", "channel"). */
-    account_type: string;
+    accountType: string;
     /** The asset symbol for the entry. */
     asset: string;
     /** The Ethereum address of the participant. */
     participant: Address;
-    /** The credit amount as a string. */
-    credit: string;
-    /** The debit amount as a string. */
-    debit: string;
+    /** The credit amount. */
+    credit: BigInt;
+    /** The debit amount. */
+    debit: BigInt;
     /** The timestamp when the entry was created. */
-    created_at: string;
+    createdAt: Date;
 }
 export type GetLedgerEntriesRPCResponseParams = GetLedgerEntriesResponseParams; // for backward compatibility
 
@@ -110,7 +110,7 @@ export type GetLedgerEntriesRPCResponseParams = GetLedgerEntriesResponseParams; 
  */
 export interface CreateAppSessionResponseParams {
     /** The unique identifier for the application session. */
-    app_session_id: Hex;
+    appSessionId: Hex;
     /** The version number of the session. */
     version: number;
     /** The current status of the channel (e.g., "open", "closed"). */
@@ -123,7 +123,7 @@ export type CreateAppSessionRPCResponseParams = CreateAppSessionResponseParams; 
  */
 export interface SubmitStateResponseParams {
     /** The unique identifier for the application session. */
-    app_session_id: Hex;
+    appSessionId: Hex;
     /** The version number of the session. */
     version: number;
     /** The current status of the channel (e.g., "open", "closed"). */
@@ -136,7 +136,7 @@ export type SubmitStateRPCResponseParams = SubmitStateResponseParams; // for bac
  */
 export interface CloseAppSessionResponseParams {
     /** The unique identifier for the application session. */
-    app_session_id: Hex;
+    appSessionId: Hex;
     /** The version number of the session. */
     version: number;
     /** The current status of the channel (e.g., "open", "closed"). */
@@ -168,7 +168,7 @@ export type GetAppDefinitionRPCResponseParams = GetAppDefinitionResponseParams; 
  */
 export interface GetAppSessionsResponseParams {
     /** The unique identifier for the application session. */
-    app_session_id: Hex;
+    appSessionId: Hex;
     /** The current status of the channel (e.g., "open", "closed"). */
     status: RPCChannelStatus;
     /** List of participant Ethereum addresses. */
@@ -186,9 +186,9 @@ export interface GetAppSessionsResponseParams {
     /** The nonce value for the session. */
     nonce: number;
     /** The timestamp when the session was created. */
-    created_at: string;
+    createdAt: Date;
     /** The timestamp when the session was last updated. */
-    updated_at: string;
+    updatedAt: Date;
 }
 export type GetAppSessionsRPCResponseParams = GetAppSessionsResponseParams; // for backward compatibility
 
@@ -204,8 +204,8 @@ export interface RPCAllocation {
     destination: Address;
     /** The token contract address. */
     token: Address;
-    /** The amount to allocate as a string. */
-    amount: string;
+    /** The amount to allocate. */
+    amount: BigInt;
 }
 
 /**
@@ -213,9 +213,9 @@ export interface RPCAllocation {
  */
 export interface ResizeChannelResponseParams {
     /** The unique identifier for the channel. */
-    channel_id: Hex;
+    channelId: Hex;
     /** The encoded state data for the channel. */
-    state_data: string;
+    stateData: string;
     /** The intent type for the state update. */
     intent: number;
     /** The version number of the channel. */
@@ -223,9 +223,9 @@ export interface ResizeChannelResponseParams {
     /** The list of allocations for the channel. */
     allocations: RPCAllocation[];
     /** The hash of the channel state. */
-    state_hash: string;
+    stateHash: string;
     /** The server's signature for the state update. */
-    server_signature: ServerSignature;
+    serverSignature: ServerSignature;
 }
 export type ResizeChannelRPCResponseParams = ResizeChannelResponseParams; // for backward compatibility
 
@@ -234,19 +234,19 @@ export type ResizeChannelRPCResponseParams = ResizeChannelResponseParams; // for
  */
 export interface CloseChannelResponseParams {
     /** The unique identifier for the channel. */
-    channel_id: Hex;
+    channelId: Hex;
     /** The intent type for the state update. */
     intent: number;
     /** The version number of the channel. */
     version: number;
     /** The encoded state data for the channel. */
-    state_data: string;
+    stateData: string;
     /** The list of final allocations for the channel. */
     allocations: RPCAllocation[];
     /** The hash of the channel state. */
-    state_hash: string;
+    stateHash: string;
     /** The server's signature for the state update. */
-    server_signature: ServerSignature;
+    serverSignature: ServerSignature;
 }
 export type CloseChannelRPCResponseParams = CloseChannelResponseParams; // for backward compatibility
 
@@ -255,7 +255,7 @@ export type CloseChannelRPCResponseParams = CloseChannelResponseParams; // for b
  */
 export interface GetChannelsResponseParams {
     /** The unique identifier for the channel. */
-    channel_id: Hex;
+    channelId: Hex;
     /** The Ethereum address of the participant. */
     participant: Address;
     /** The current status of the channel (e.g., "open", "closed"). */
@@ -264,10 +264,10 @@ export interface GetChannelsResponseParams {
     token: Address;
     /** The wallet address associated with the channel. */
     wallet: Address;
-    /** The total amount in the channel as a string. */
-    amount: string;
+    /** The total amount in the channel. */
+    amount: BigInt;
     /** The chain ID where the channel exists. */
-    chain_id: number;
+    chainId: number;
     /** The adjudicator contract address. */
     adjudicator: Address;
     /** The challenge period in seconds. */
@@ -277,9 +277,9 @@ export interface GetChannelsResponseParams {
     /** The version number of the channel. */
     version: number;
     /** The timestamp when the channel was created. */
-    created_at: string;
+    createdAt: Date;
     /** The timestamp when the channel was last updated. */
-    updated_at: string;
+    updatedAt: Date;
 }
 export type GetChannelsRPCResponseParams = GetChannelsResponseParams; // for backward compatibility
 
@@ -292,7 +292,7 @@ export interface GetRPCHistoryResponseParams {
     /** The Ethereum address of the sender. */
     sender: Address;
     /** The request ID for the RPC call. */
-    req_id: number;
+    reqId: number;
     /** The RPC method name. */
     method: string;
     /** The JSON string of the request parameters. */
@@ -300,9 +300,9 @@ export interface GetRPCHistoryResponseParams {
     /** The timestamp of the RPC call. */
     timestamp: number;
     /** Array of request signatures. */
-    req_sig: Hex[];
+    reqSig: Hex[];
     /** Array of response signatures. */
-    res_sig: Hex[];
+    resSig: Hex[];
     /** The JSON string of the response. */
     response: string;
 }
@@ -315,7 +315,7 @@ export interface GetAssetsResponseParams {
     /** The token contract address. */
     token: Address;
     /** The chain ID where the asset exists. */
-    chain_id: number;
+    chainId: number;
     /** The asset symbol (e.g., "ETH", "USDC"). */
     symbol: string;
     /** The number of decimal places for the asset. */
@@ -336,7 +336,7 @@ export interface ErrorResponse extends GenericRPCMessage {
  */
 export interface GetConfigResponse extends GenericRPCMessage {
     method: RPCMethod.GetConfig;
-    params: GetConfigResponseParams[];
+    params: GetConfigResponseParams;
 }
 
 /**
@@ -344,7 +344,7 @@ export interface GetConfigResponse extends GenericRPCMessage {
  */
 export interface GetLedgerBalancesResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerBalances;
-    params: [GetLedgerBalancesResponseParams[]];
+    params: GetLedgerBalancesResponseParams[];
 }
 
 /**
@@ -352,7 +352,7 @@ export interface GetLedgerBalancesResponse extends GenericRPCMessage {
  */
 export interface GetLedgerEntriesResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerEntries;
-    params: [GetLedgerEntriesResponseParams[]];
+    params: GetLedgerEntriesResponseParams[];
 }
 
 /**
@@ -360,7 +360,7 @@ export interface GetLedgerEntriesResponse extends GenericRPCMessage {
  */
 export interface CreateAppSessionResponse extends GenericRPCMessage {
     method: RPCMethod.CreateAppSession;
-    params: [CreateAppSessionResponseParams];
+    params: CreateAppSessionResponseParams;
 }
 
 /**
@@ -368,7 +368,7 @@ export interface CreateAppSessionResponse extends GenericRPCMessage {
  */
 export interface SubmitStateResponse extends GenericRPCMessage {
     method: RPCMethod.SubmitState;
-    params: [SubmitStateResponseParams];
+    params: SubmitStateResponseParams;
 }
 
 /**
@@ -376,7 +376,7 @@ export interface SubmitStateResponse extends GenericRPCMessage {
  */
 export interface CloseAppSessionResponse extends GenericRPCMessage {
     method: RPCMethod.CloseAppSession;
-    params: [CloseAppSessionResponseParams];
+    params: CloseAppSessionResponseParams;
 }
 
 /**
@@ -384,7 +384,7 @@ export interface CloseAppSessionResponse extends GenericRPCMessage {
  */
 export interface GetAppDefinitionResponse extends GenericRPCMessage {
     method: RPCMethod.GetAppDefinition;
-    params: [GetAppDefinitionResponseParams];
+    params: GetAppDefinitionResponseParams;
 }
 
 /**
@@ -392,7 +392,7 @@ export interface GetAppDefinitionResponse extends GenericRPCMessage {
  */
 export interface GetAppSessionsResponse extends GenericRPCMessage {
     method: RPCMethod.GetAppSessions;
-    params: [GetAppSessionsResponseParams[]];
+    params: GetAppSessionsResponseParams[];
 }
 
 /**
@@ -400,7 +400,7 @@ export interface GetAppSessionsResponse extends GenericRPCMessage {
  */
 export interface ResizeChannelResponse extends GenericRPCMessage {
     method: RPCMethod.ResizeChannel;
-    params: [ResizeChannelResponseParams];
+    params: ResizeChannelResponseParams;
 }
 
 /**
@@ -408,7 +408,7 @@ export interface ResizeChannelResponse extends GenericRPCMessage {
  */
 export interface CloseChannelResponse extends GenericRPCMessage {
     method: RPCMethod.CloseChannel;
-    params: [CloseChannelResponseParams];
+    params: CloseChannelResponseParams;
 }
 
 /**
@@ -416,7 +416,7 @@ export interface CloseChannelResponse extends GenericRPCMessage {
  */
 export interface GetChannelsResponse extends GenericRPCMessage {
     method: RPCMethod.GetChannels;
-    params: [GetChannelsResponseParams[]];
+    params: GetChannelsResponseParams[];
 }
 
 /**
@@ -424,7 +424,7 @@ export interface GetChannelsResponse extends GenericRPCMessage {
  */
 export interface GetRPCHistoryResponse extends GenericRPCMessage {
     method: RPCMethod.GetRPCHistory;
-    params: [GetRPCHistoryResponseParams[]];
+    params: GetRPCHistoryResponseParams[];
 }
 
 /**
@@ -432,7 +432,7 @@ export interface GetRPCHistoryResponse extends GenericRPCMessage {
  */
 export interface GetAssetsResponse extends GenericRPCMessage {
     method: RPCMethod.GetAssets;
-    params: [GetAssetsResponseParams[]];
+    params: GetAssetsResponseParams[];
 }
 
 /**
@@ -440,7 +440,7 @@ export interface GetAssetsResponse extends GenericRPCMessage {
  */
 export interface AuthVerifyResponse extends GenericRPCMessage {
     method: RPCMethod.AuthVerify;
-    params: [AuthVerifyResponseParams];
+    params: AuthVerifyResponseParams;
 }
 
 /**
@@ -448,7 +448,7 @@ export interface AuthVerifyResponse extends GenericRPCMessage {
  */
 export interface AuthRequestResponseParams {
     /** The challenge message to be signed by the client for authentication. */
-    challenge_message: string;
+    challengeMessage: string;
 }
 export type AuthRequestRPCResponseParams = AuthRequestResponseParams; // for backward compatibility
 
@@ -457,7 +457,7 @@ export type AuthRequestRPCResponseParams = AuthRequestResponseParams; // for bac
  */
 export interface AuthRequestResponse extends GenericRPCMessage {
     method: RPCMethod.AuthRequest;
-    params: [AuthRequestResponseParams];
+    params: AuthRequestResponseParams;
 }
 
 /**
@@ -473,7 +473,7 @@ export type MessageRPCResponseParams = MessageResponseParams; // for backward co
  */
 export interface MessageResponse extends GenericRPCMessage {
     method: RPCMethod.Message;
-    params: [MessageResponseParams];
+    params: MessageResponseParams;
 }
 
 /**
@@ -482,8 +482,8 @@ export interface MessageResponse extends GenericRPCMessage {
 export interface BalanceUpdateResponseParams {
     /** The asset symbol (e.g., "ETH", "USDC"). */
     asset: string;
-    /** The balance amount as a string. */
-    amount: string;
+    /** The balance amount. */
+    amount: BigInt;
 }
 export type BalanceUpdateRPCResponseParams = BalanceUpdateResponseParams; // for backward compatibility
 
@@ -492,7 +492,7 @@ export type BalanceUpdateRPCResponseParams = BalanceUpdateResponseParams; // for
  */
 export interface BalanceUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.BalanceUpdate;
-    params: [BalanceUpdateResponseParams[]];
+    params: BalanceUpdateResponseParams[];
 }
 
 /**
@@ -508,17 +508,17 @@ export interface ChannelsUpdateResponse extends GenericRPCMessage {
  */
 export interface ChannelUpdateResponseParams {
     /** The unique identifier for the channel. */
-    channel_id: Hex;
+    channelId: Hex;
     /** The Ethereum address of the participant. */
     participant: Address;
     /** The current status of the channel (e.g., "open", "closed"). */
     status: RPCChannelStatus;
     /** The token contract address. */
     token: Address;
-    /** The total amount in the channel as a string. */
-    amount: string;
+    /** The total amount in the channel. */
+    amount: BigInt;
     /** The chain ID where the channel exists. */
-    chain_id: number;
+    chainId: number;
     /** The adjudicator contract address. */
     adjudicator: Address;
     /** The challenge period in seconds. */
@@ -528,9 +528,9 @@ export interface ChannelUpdateResponseParams {
     /** The version number of the channel. */
     version: number;
     /** The timestamp when the channel was created. */
-    created_at: string;
+    createdAt: Date;
     /** The timestamp when the channel was last updated. */
-    updated_at: string;
+    updatedAt: Date;
 }
 export type ChannelUpdateRPCResponseParams = ChannelUpdateResponseParams; // for backward compatibility
 
@@ -539,7 +539,7 @@ export type ChannelUpdateRPCResponseParams = ChannelUpdateResponseParams; // for
  */
 export interface ChannelUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.ChannelUpdate;
-    params: [ChannelUpdateResponseParams];
+    params: ChannelUpdateResponseParams;
 }
 
 /**
@@ -555,7 +555,7 @@ export type PingRPCResponseParams = PingResponseParams; // for backward compatib
  */
 export interface PingResponse extends GenericRPCMessage {
     method: RPCMethod.Ping;
-    params: [PingResponseParams];
+    params: PingResponseParams;
 }
 
 /**
@@ -571,7 +571,7 @@ export type PongRPCResponseParams = PongResponseParams; // for backward compatib
  */
 export interface PongResponse extends GenericRPCMessage {
     method: RPCMethod.Pong;
-    params: [PongResponseParams];
+    params: PongResponseParams;
 }
 
 /**
@@ -585,7 +585,7 @@ export interface TransferRPCResponseParams {
     /** The assets and amounts that were transferred. */
     allocations: TransferAllocation[];
     /** The timestamp when the transfer was created. */
-    created_at: string;
+    createdAt: Date;
 }
 
 /**
@@ -629,30 +629,9 @@ export type RPCResponse =
 /**
  * Maps RPC methods to their corresponding parameter types.
  */
+// Helper type to extract the response type for a given method
+export type ExtractResponseByMethod<M extends RPCMethod> = Extract<RPCResponse, { method: M }>;
+
 export type RPCResponseParamsByMethod = {
-    [RPCMethod.AuthChallenge]: AuthChallengeResponseParams;
-    [RPCMethod.AuthVerify]: AuthVerifyResponseParams;
-    [RPCMethod.AuthRequest]: AuthRequestResponseParams;
-    [RPCMethod.Error]: ErrorResponseParams;
-    [RPCMethod.GetConfig]: GetConfigResponseParams;
-    [RPCMethod.GetLedgerBalances]: GetLedgerBalancesResponseParams[];
-    [RPCMethod.GetLedgerEntries]: GetLedgerEntriesResponseParams[];
-    [RPCMethod.CreateAppSession]: CreateAppSessionResponseParams;
-    [RPCMethod.SubmitState]: SubmitStateResponseParams;
-    [RPCMethod.CloseAppSession]: CloseAppSessionResponseParams;
-    [RPCMethod.GetAppDefinition]: GetAppDefinitionResponseParams;
-    [RPCMethod.GetAppSessions]: GetAppSessionsResponseParams[];
-    [RPCMethod.ResizeChannel]: ResizeChannelResponseParams;
-    [RPCMethod.CloseChannel]: CloseChannelResponseParams;
-    [RPCMethod.GetChannels]: GetChannelsResponseParams[];
-    [RPCMethod.GetRPCHistory]: GetRPCHistoryResponseParams[];
-    [RPCMethod.GetAssets]: GetAssetsResponseParams[];
-    [RPCMethod.Assets]: GetAssetsResponseParams[];
-    [RPCMethod.Ping]: PingResponseParams;
-    [RPCMethod.Pong]: PongResponseParams;
-    [RPCMethod.Message]: MessageResponseParams;
-    [RPCMethod.BalanceUpdate]: BalanceUpdateResponseParams[];
-    [RPCMethod.ChannelsUpdate]: ChannelUpdateResponseParams[];
-    [RPCMethod.ChannelUpdate]: ChannelUpdateResponseParams;
-    [RPCMethod.Transfer]: TransferRPCResponseParams;
+    [M in RPCMethod]: ExtractResponseByMethod<M>["params"];
 };

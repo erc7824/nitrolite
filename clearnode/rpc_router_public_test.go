@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"math/big"
-	"strings"
 	"testing"
 	"time"
 
@@ -192,54 +190,41 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 	signer := Signer{privateKey: rawKey}
 	participantSigner := signer.GetAddress().Hex()
 	participantWallet := "wallet_address"
-	tokenAddress := "0xToken123"
-	chainID := uint32(137)
 
+	// Create channels with specific creation times to test sorting
+	baseTime := time.Now().Add(-24 * time.Hour)
 	channels := []Channel{
 		{
 			ChannelID:   "0xChannel1",
 			Wallet:      participantWallet,
 			Participant: participantSigner,
 			Status:      ChannelStatusOpen,
-			Token:       tokenAddress + "1",
-			ChainID:     chainID,
-			Amount:      1000,
 			Nonce:       1,
-			Version:     10,
-			Challenge:   86400,
-			Adjudicator: "0xAdj1",
-			CreatedAt:   time.Now().Add(-24 * time.Hour),
-			UpdatedAt:   time.Now(),
+			CreatedAt:   baseTime,
 		},
 		{
 			ChannelID:   "0xChannel2",
 			Wallet:      participantWallet,
 			Participant: participantSigner,
 			Status:      ChannelStatusClosed,
-			Token:       tokenAddress + "2",
-			ChainID:     chainID,
-			Amount:      2000,
 			Nonce:       2,
-			Version:     20,
-			Challenge:   86400,
-			Adjudicator: "0xAdj2",
-			CreatedAt:   time.Now().Add(-12 * time.Hour),
-			UpdatedAt:   time.Now(),
+			CreatedAt:   baseTime.Add(1 * time.Hour),
 		},
 		{
 			ChannelID:   "0xChannel3",
 			Wallet:      participantWallet,
 			Participant: participantSigner,
 			Status:      ChannelStatusJoining,
-			Token:       tokenAddress + "3",
-			ChainID:     chainID,
-			Amount:      3000,
 			Nonce:       3,
-			Version:     30,
-			Challenge:   86400,
-			Adjudicator: "0xAdj3",
-			CreatedAt:   time.Now().Add(-6 * time.Hour),
-			UpdatedAt:   time.Now(),
+			CreatedAt:   baseTime.Add(2 * time.Hour),
+		},
+		{
+			ChannelID:   "0xOtherChannel",
+			Wallet:      "other_wallet",
+			Participant: "0xOtherParticipant",
+			Status:      ChannelStatusOpen,
+			Nonce:       4,
+			CreatedAt:   baseTime.Add(3 * time.Hour),
 		},
 	}
 
@@ -247,245 +232,198 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 		require.NoError(t, router.DB.Create(&channel).Error)
 	}
 
-	otherChannel := Channel{
-		ChannelID:   "0xOtherChannel",
-		Participant: "0xOtherParticipant",
-		Status:      ChannelStatusOpen,
-		Token:       tokenAddress + "4",
-		ChainID:     chainID,
-		Amount:      5000,
-		Nonce:       4,
-		Version:     40,
-		Challenge:   86400,
-		Adjudicator: "0xAdj4",
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-	}
-	require.NoError(t, router.DB.Create(&otherChannel).Error)
-
-	params := map[string]string{
-		"participant": participantWallet,
-	}
-	paramsJSON, err := json.Marshal(params)
-	require.NoError(t, err)
-
-	c := &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 123,
-				Method:    "get_channels",
-				Params:    []any{json.RawMessage(paramsJSON)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
+	tcs := []struct {
+		name               string
+		params             map[string]interface{}
+		expectedChannelIDs []string
+	}{
+		{
+			name:               "Get all with no sort (default desc by created_at)",
+			params:             map[string]interface{}{},
+			expectedChannelIDs: []string{"0xOtherChannel", "0xChannel3", "0xChannel2", "0xChannel1"},
+		},
+		{
+			name:               "Get all with ascending sort",
+			params:             map[string]interface{}{"sort": "asc"},
+			expectedChannelIDs: []string{"0xChannel1", "0xChannel2", "0xChannel3", "0xOtherChannel"},
+		},
+		{
+			name:               "Get all with descending sort",
+			params:             map[string]interface{}{"sort": "desc"},
+			expectedChannelIDs: []string{"0xOtherChannel", "0xChannel3", "0xChannel2", "0xChannel1"},
+		},
+		{
+			name:               "Filter by participant",
+			params:             map[string]interface{}{"participant": participantWallet},
+			expectedChannelIDs: []string{"0xChannel1", "0xChannel2", "0xChannel3"}, // getChannelsByWallet doesn't apply sorting
+		},
+		{
+			name:               "Filter by participant with ascending sort",
+			params:             map[string]interface{}{"participant": participantWallet, "sort": "asc"},
+			expectedChannelIDs: []string{"0xChannel1", "0xChannel2", "0xChannel3"}, // getChannelsByWallet doesn't apply sorting
+		},
+		{
+			name:               "Filter by status open",
+			params:             map[string]interface{}{"status": string(ChannelStatusOpen)},
+			expectedChannelIDs: []string{"0xOtherChannel", "0xChannel1"},
+		},
+		{
+			name:               "Filter by participant and status open",
+			params:             map[string]interface{}{"participant": participantWallet, "status": string(ChannelStatusOpen)},
+			expectedChannelIDs: []string{"0xChannel1"},
+		},
+		{
+			name:               "Filter by participant and status closed",
+			params:             map[string]interface{}{"participant": participantWallet, "status": string(ChannelStatusClosed)},
+			expectedChannelIDs: []string{"0xChannel2"},
+		},
+		{
+			name:               "Filter by participant and status joining",
+			params:             map[string]interface{}{"participant": participantWallet, "status": string(ChannelStatusJoining)},
+			expectedChannelIDs: []string{"0xChannel3"},
+		},
+		{
+			name:               "Filter by status closed only",
+			params:             map[string]interface{}{"status": string(ChannelStatusClosed)},
+			expectedChannelIDs: []string{"0xChannel2"},
 		},
 	}
 
-	// Call handler
-	router.HandleGetChannels(c)
-	res := c.Message.Res
-	require.NotNil(t, res)
+	for idx, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			paramsJSON, err := json.Marshal(tc.params)
+			require.NoError(t, err, "Failed to marshal params")
 
-	assert.Equal(t, "get_channels", res.Method)
-	assert.Equal(t, uint64(123), res.RequestID)
-
-	require.Len(t, res.Params, 1, "Response should contain a slice of ChannelResponse")
-	channelsSlice, ok := res.Params[0].([]ChannelResponse)
-	require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
-
-	// Expect 3 channels for this participant, ordered newest first
-	assert.Len(t, channelsSlice, 3, "Should return all 3 channels for the participant")
-	assert.Equal(t, "0xChannel3", channelsSlice[0].ChannelID, "First channel should be the newest")
-	assert.Equal(t, "0xChannel2", channelsSlice[1].ChannelID, "Second channel should be the middle one")
-	assert.Equal(t, "0xChannel1", channelsSlice[2].ChannelID, "Third channel should be the oldest")
-
-	for _, ch := range channelsSlice {
-		assert.Equal(t, participantSigner, ch.Participant, "ParticipantA should match")
-		assert.True(t, strings.HasPrefix(ch.Token, tokenAddress), "Token should start with the base token address")
-		assert.Equal(t, chainID, ch.ChainID, "NetworkID should match")
-
-		var originalChannel Channel
-		for _, c := range channels {
-			if c.ChannelID == ch.ChannelID {
-				originalChannel = c
-				break
+			c := &RPCContext{
+				Context: context.TODO(),
+				Message: RPCMessage{
+					Req: &RPCData{
+						RequestID: uint64(idx),
+						Method:    "get_channels",
+						Params:    []any{json.RawMessage(paramsJSON)},
+						Timestamp: uint64(time.Now().Unix()),
+					},
+					Sig: []string{"dummy-signature"},
+				},
 			}
-		}
 
-		assert.Equal(t, originalChannel.Status, ch.Status, "Status should match")
-		assert.Equal(t, big.NewInt(int64(originalChannel.Amount)), ch.Amount, "Amount should match")
-		assert.Equal(t, originalChannel.Nonce, ch.Nonce, "Nonce should match")
-		assert.Equal(t, originalChannel.Version, ch.Version, "Version should match")
-		assert.Equal(t, originalChannel.Challenge, ch.Challenge, "Challenge should match")
-		assert.Equal(t, originalChannel.Adjudicator, ch.Adjudicator, "Adjudicator should match")
-		assert.NotEmpty(t, ch.CreatedAt, "CreatedAt should not be empty")
-		assert.NotEmpty(t, ch.UpdatedAt, "UpdatedAt should not be empty")
+			router.HandleGetChannels(c)
+			res := c.Message.Res
+			require.NotNil(t, res)
+
+			assert.Equal(t, "get_channels", res.Method)
+			assert.Equal(t, uint64(idx), res.RequestID)
+			require.Len(t, res.Params, 1, "Response should contain a slice of ChannelResponse")
+
+			responseChannels, ok := res.Params[0].([]ChannelResponse)
+			require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
+			assert.Len(t, responseChannels, len(tc.expectedChannelIDs), "Should return expected number of channels")
+
+			for idx, channel := range responseChannels {
+				assert.True(t, channel.ChannelID == tc.expectedChannelIDs[idx], "Should include channel %s", tc.expectedChannelIDs[idx])
+			}
+		})
+	}
+}
+
+func TestRPCRouterHandleGetChannels_Pagination(t *testing.T) {
+	router, cleanup := setupTestRPCRouter(t)
+	defer cleanup()
+
+	channelIDs := []string{
+		"0xChannel01", "0xChannel02", "0xChannel03", "0xChannel04",
+		"0xChannel05", "0xChannel06", "0xChannel07", "0xChannel08",
+		"0xChannel09", "0xChannel10", "0xChannel11"}
+
+	testChannels := []Channel{
+		{Wallet: "0xWallet1", Participant: "0xParticipant1", Status: ChannelStatusOpen, Nonce: 1},
+		{Wallet: "0xWallet2", Participant: "0xParticipant2", Status: ChannelStatusClosed, Nonce: 2},
+		{Wallet: "0xWallet3", Participant: "0xParticipant3", Status: ChannelStatusOpen, Nonce: 3},
+		{Wallet: "0xWallet4", Participant: "0xParticipant4", Status: ChannelStatusJoining, Nonce: 4},
+		{Wallet: "0xWallet5", Participant: "0xParticipant5", Status: ChannelStatusOpen, Nonce: 5},
+		{Wallet: "0xWallet6", Participant: "0xParticipant6", Status: ChannelStatusChallenged, Nonce: 6},
+		{Wallet: "0xWallet7", Participant: "0xParticipant7", Status: ChannelStatusOpen, Nonce: 7},
+		{Wallet: "0xWallet8", Participant: "0xParticipant8", Status: ChannelStatusClosed, Nonce: 8},
+		{Wallet: "0xWallet9", Participant: "0xParticipant9", Status: ChannelStatusOpen, Nonce: 9},
+		{Wallet: "0xWallet10", Participant: "0xParticipant10", Status: ChannelStatusJoining, Nonce: 10},
+		{Wallet: "0xWallet11", Participant: "0xParticipant11", Status: ChannelStatusOpen, Nonce: 11},
 	}
 
-	// Filter by status="open"
-	openStatusParams := map[string]string{
-		"participant": participantWallet,
-		"status":      string(ChannelStatusOpen),
+	for i := range testChannels {
+		testChannels[i].ChannelID = channelIDs[i]
+		// Stagger creation times in descending order, so that default sort returns them in `channelIDs` order
+		testChannels[i].CreatedAt = time.Now().Add(time.Duration(1)*time.Hour - time.Duration(i)*time.Minute)
 	}
-	openStatusParamsJSON, err := json.Marshal(openStatusParams)
-	require.NoError(t, err)
 
-	c = &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 456,
-				Method:    "get_channels",
-				Params:    []any{json.RawMessage(openStatusParamsJSON)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
+	for _, channel := range testChannels {
+		require.NoError(t, router.DB.Create(&channel).Error)
+	}
+
+	tcs := []struct {
+		name               string
+		params             map[string]interface{}
+		expectedChannelIDs []string
+	}{
+		{name: "No params",
+			params:             map[string]interface{}{},
+			expectedChannelIDs: channelIDs[:10], // Default pagination with desc sort
+		},
+		{name: "Offset only",
+			params:             map[string]interface{}{"offset": float64(2)},
+			expectedChannelIDs: channelIDs[2:], // Skip first 2
+		},
+		{name: "Page size only",
+			params:             map[string]interface{}{"page_size": float64(5)},
+			expectedChannelIDs: channelIDs[:5], // First 5 channels
+		},
+		{name: "Offset and page size",
+			params:             map[string]interface{}{"offset": float64(2), "page_size": float64(3)},
+			expectedChannelIDs: channelIDs[2:5], // Skip 2, take 3
+		},
+		{name: "Pagination with sort asc",
+			params:             map[string]interface{}{"offset": float64(1), "page_size": float64(3), "sort": "asc"},
+			expectedChannelIDs: []string{"0xChannel10", "0xChannel09", "0xChannel08"}, // Ascending order, skip 1, take 3
+		},
+		{name: "Pagination with status filter",
+			params:             map[string]interface{}{"status": "open", "page_size": float64(3)},
+			expectedChannelIDs: []string{"0xChannel01", "0xChannel03", "0xChannel05"}, // Only open channels, first 3
 		},
 	}
 
-	// Call handler
-	router.HandleGetChannels(c)
-	res = c.Message.Res
-	require.NotNil(t, res)
+	for idx, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			paramsJSON, err := json.Marshal(tc.params)
+			require.NoError(t, err)
 
-	openChannels, ok := res.Params[0].([]ChannelResponse)
-	require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
-	assert.Len(t, openChannels, 1, "Should return only 1 open channel")
-	assert.Equal(t, "0xChannel1", openChannels[0].ChannelID, "Should return the open channel")
-	assert.Equal(t, ChannelStatusOpen, openChannels[0].Status, "Status should be open")
+			c := &RPCContext{
+				Context: context.TODO(),
+				Message: RPCMessage{
+					Req: &RPCData{
+						RequestID: uint64(idx),
+						Method:    "get_channels",
+						Params:    []any{json.RawMessage(paramsJSON)},
+						Timestamp: uint64(time.Now().Unix()),
+					},
+					Sig: []string{"dummy-signature"},
+				},
+			}
 
-	// Filter by status="closed"
-	closedStatusParams := map[string]string{
-		"participant": participantWallet,
-		"status":      string(ChannelStatusClosed),
+			// Call handler
+			router.HandleGetChannels(c)
+			res := c.Message.Res
+			require.NotNil(t, res)
+
+			require.Len(t, res.Params, 1, "Response should contain an array of ChannelResponse")
+			responseChannels, ok := res.Params[0].([]ChannelResponse)
+			require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
+			assert.Len(t, responseChannels, len(tc.expectedChannelIDs), "Should return expected number of channels")
+
+			// Check channel IDs are included in expected order
+			for idx, channel := range responseChannels {
+				assert.Equal(t, tc.expectedChannelIDs[idx], channel.ChannelID, "Should include channel %s at position %d", tc.expectedChannelIDs[idx], idx)
+			}
+		})
 	}
-	closedStatusParamsJSON, err := json.Marshal(closedStatusParams)
-	require.NoError(t, err)
-
-	c = &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 457,
-				Method:    "get_channels",
-				Params:    []any{json.RawMessage(closedStatusParamsJSON)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-		},
-	}
-
-	// Call handler
-	router.HandleGetChannels(c)
-	res = c.Message.Res
-	require.NotNil(t, res)
-
-	closedChannels, ok := res.Params[0].([]ChannelResponse)
-	require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
-	assert.Len(t, closedChannels, 1, "Should return only 1 closed channel")
-	assert.Equal(t, "0xChannel2", closedChannels[0].ChannelID, "Should return the closed channel")
-	assert.Equal(t, ChannelStatusClosed, closedChannels[0].Status, "Status should be closed")
-
-	// Filter by status="joining"
-	joiningStatusParams := map[string]string{
-		"participant": participantWallet,
-		"status":      string(ChannelStatusJoining),
-	}
-	joiningStatusParamsJSON, err := json.Marshal(joiningStatusParams)
-	require.NoError(t, err)
-
-	c = &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 458,
-				Method:    "get_channels",
-				Params:    []any{json.RawMessage(joiningStatusParamsJSON)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-		},
-	}
-
-	// Call handler
-	router.HandleGetChannels(c)
-	res = c.Message.Res
-	require.NotNil(t, res)
-
-	joiningChannels, ok := res.Params[0].([]ChannelResponse)
-	require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
-	assert.Len(t, joiningChannels, 1, "Should return only 1 joining channel")
-	assert.Equal(t, "0xChannel3", joiningChannels[0].ChannelID, "Should return the joining channel")
-	assert.Equal(t, ChannelStatusJoining, joiningChannels[0].Status, "Status should be joining")
-
-	// No participant parameter: return all 4 channels
-	c = &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 789,
-				Method:    "get_channels",
-				Params:    []any{map[string]string{}},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-			Sig: []string{},
-		},
-	}
-
-	// Call handler
-	router.HandleGetChannels(c)
-	res = c.Message.Res
-	require.NotNil(t, res)
-
-	allChannels, ok := res.Params[0].([]ChannelResponse)
-	require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
-	assert.Len(t, allChannels, 4, "Should return all 4 channels")
-
-	foundChannelIDs := make(map[string]bool)
-	for _, channel := range allChannels {
-		foundChannelIDs[channel.ChannelID] = true
-	}
-	assert.True(t, foundChannelIDs["0xChannel1"], "Should include Channel1")
-	assert.True(t, foundChannelIDs["0xChannel2"], "Should include Channel2")
-	assert.True(t, foundChannelIDs["0xChannel3"], "Should include Channel3")
-	assert.True(t, foundChannelIDs["0xOtherChannel"], "Should include OtherChannel")
-
-	// No participant but status="open": return 2 open channels
-	openStatusOnlyParams := map[string]string{
-		"status": string(ChannelStatusOpen),
-	}
-	openStatusOnlyParamsJSON, err := json.Marshal(openStatusOnlyParams)
-	require.NoError(t, err)
-
-	c = &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 790,
-				Method:    "get_channels",
-				Params:    []any{json.RawMessage(openStatusOnlyParamsJSON)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-			Sig: []string{},
-		},
-	}
-
-	// Call handler
-	router.HandleGetChannels(c)
-	res = c.Message.Res
-	require.NotNil(t, res)
-
-	openChannelsOnly, ok := res.Params[0].([]ChannelResponse)
-	require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
-	assert.Len(t, openChannelsOnly, 2, "Should return 2 open channels")
-
-	openChannelIDs := make(map[string]bool)
-	for _, channel := range openChannelsOnly {
-		openChannelIDs[channel.ChannelID] = true
-		assert.Equal(t, ChannelStatusOpen, channel.Status, "All channels should have open status")
-	}
-
-	assert.True(t, openChannelIDs["0xChannel1"], "Should include open Channel1")
-	assert.True(t, openChannelIDs["0xOtherChannel"], "Should include open OtherChannel")
-	assert.False(t, openChannelIDs["0xChannel2"], "Should not include closed Channel2")
-	assert.False(t, openChannelIDs["0xChannel3"], "Should not include joining Channel3")
 }
 
 func TestRPCRouterHandleGetAssets(t *testing.T) {

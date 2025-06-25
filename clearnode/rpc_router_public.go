@@ -41,8 +41,10 @@ type GetAppSessionParams struct {
 }
 
 type GetChannelsParams struct {
-	Participant string `json:"participant,omitempty"` // Optional participant wallet to filter channels
-	Status      string `json:"status,omitempty"`      // Optional status to filter channels
+	PaginationParams
+	Sort        *SortType `json:"sort,omitempty"`        // Optional sort type (asc/desc)
+	Participant string    `json:"participant,omitempty"` // Optional participant wallet to filter channels
+	Status      string    `json:"status,omitempty"`      // Optional status to filter channels
 }
 
 type GetLedgerEntriesParams struct {
@@ -214,12 +216,13 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 	var channels []Channel
 	var err error
 
+	query := applySort(r.DB, "created_at", Descending, params.Sort)
+	query = paginate(&params.PaginationParams)(query)
 	if params.Participant == "" {
-		query := r.DB
 		if params.Status != "" {
 			query = query.Where("status = ?", params.Status)
 		}
-		err = query.Order("created_at DESC").Find(&channels).Error
+		err = query.Find(&channels).Error
 	} else {
 		channels, err = getChannelsByWallet(r.DB, params.Participant, params.Status)
 	}

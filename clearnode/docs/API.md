@@ -351,6 +351,7 @@ Retrieves the detailed ledger entries for an account, providing a complete trans
 ### Get Channels
 
 Retrieves all channels for a participant (both open, closed, and joining), ordered by creation date (newest first). This method returns channels across all supported chains. If no participant is specified, it returns all channels.
+Also supports pagination and sorting by `created_at`.
 
 **Request:**
 
@@ -358,7 +359,21 @@ Retrieves all channels for a participant (both open, closed, and joining), order
 {
   "req": [1, "get_channels", [{
     "participant": "0x1234567890abcdef...",
-    "status":"open" // OPTIONAL FILTER
+  }], 1619123456789],
+  "sig": []
+}
+```
+
+**Request with pagination and sorting:**
+
+```json
+{
+  "req": [1, "get_channels", [{
+    "participant": "0x1234567890abcdef...",
+    "status":"open", // OPTIONAL FILTER
+    "offset": 42, // Optional: pagination offset
+    "page_size": 10, // Optional: number of channels to return
+    "sort": "desc" // Optional: sort asc or desc by created_at
   }], 1619123456789],
   "sig": []
 }

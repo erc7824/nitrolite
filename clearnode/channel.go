@@ -86,7 +86,7 @@ func getChannelsByWallet(tx *gorm.DB, wallet string, status string) ([]Channel, 
 		q = q.Where("status = ?", status)
 	}
 
-	if err := q.Order("created_at DESC").Find(&channels).Error; err != nil {
+	if err := q.Find(&channels).Error; err != nil {
 		return nil, fmt.Errorf("error finding channels for a wallet %s: %w", wallet, err)
 	}
 

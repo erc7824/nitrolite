@@ -28,7 +28,7 @@ func paginate(params *PaginationParams) func(db *gorm.DB) *gorm.DB {
 	offset := params.Offset
 	pageSize := params.PageSize
 
-	if pageSize <= 0 {
+	if pageSize == 0 {
 		pageSize = DefaultPageSize
 	} else if pageSize > MaxPageSize {
 		pageSize = MaxPageSize

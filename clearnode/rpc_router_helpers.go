@@ -42,8 +42,8 @@ func paginate(params *PaginationParams) func(db *gorm.DB) *gorm.DB {
 type SortType string
 
 const (
-	Ascending  SortType = "asc"
-	Descending SortType = "desc"
+	SortTypeAscending  SortType = "asc"
+	SortTypeDescending SortType = "desc"
 )
 
 func (s SortType) ToString() string {

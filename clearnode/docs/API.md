@@ -146,7 +146,9 @@ Retrieves the application definition for a specific ledger account.
 ### Get App Sessions
 
 Lists all virtual applications for a participant sorted by updated_at from the newest to oldest. Optionally, you can filter the results by status (open, closed).
-Also supports pagination and sorting by `created_at`.
+Supports pagination and sorting.
+
+> Sorted descending by `created_at` by default.
 
 **Request:**
 
@@ -304,7 +306,9 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 ### Get Ledger Entries
 
 Retrieves the detailed ledger entries for an account, providing a complete transaction history. This can be used to audit all deposits, withdrawals, and transfers. If no filter is specified, returns all entries, otherwise applies one or multiple filters.
-Supports pagination and sorting by `created_at`.
+Supports pagination and sorting.
+
+> Sorted descending by `created_at` by default.
 
 **Request:**
 
@@ -364,7 +368,9 @@ Supports pagination and sorting by `created_at`.
 ### Get Channels
 
 Retrieves all channels for a participant (both open, closed, and joining), ordered by creation date (newest first). This method returns channels across all supported chains. If no participant is specified, it returns all channels.
-Also supports pagination and sorting by `created_at`.
+Supports pagination and sorting.
+
+> Sorted descending by `created_at` by default.
 
 **Request:**
 

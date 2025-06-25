@@ -1,6 +1,5 @@
 import { Hex, stringToHex } from 'viem';
-import { NitroliteRPCMessage, RPCMethod, RPCResponse } from './types';
-import { keysToCamel, ParamsParser, paramsParsers } from './parse/response';
+import { NitroliteRPCMessage } from './types';
 
 /**
  * Get the current time in milliseconds

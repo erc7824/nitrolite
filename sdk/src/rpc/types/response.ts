@@ -28,13 +28,16 @@ export interface AuthChallengeResponse extends GenericRPCMessage {
 /**
  * Represents the parameters for the 'auth_verify' RPC method.
  */
-export interface AuthVerifyResponseParams {
-    address: Address;
-    /** Available only if challenge auth method was used in {@link AuthVerifyRequestParams} during the call to {@link RPCMethod.AuthRequest} */
-    jwtToken?: string;
-    sessionKey: Address;
-    success: boolean;
-}
+export type AuthVerifyResponseParams =
+    | {
+          address: Address;
+          sessionKey: Address;
+          success: boolean;
+      }
+    | {
+          /** Available only if challenge auth method was used in {@link AuthVerifyRequestParams} during the call to {@link RPCMethod.AuthRequest} */
+          jwtToken: string;
+      };
 export type AuthVerifyRPCResponseParams = AuthVerifyResponseParams; // for backward compatibility
 
 /**
@@ -78,7 +81,7 @@ export interface GetLedgerBalancesResponseParams {
     /** The asset symbol (e.g., "ETH", "USDC"). */
     asset: string;
     /** The balance amount. */
-    amount: BigInt;
+    amount: string;
 }
 export type GetLedgerBalancesRPCResponseParams = GetLedgerBalancesResponseParams; // for backward compatibility
 
@@ -97,9 +100,9 @@ export interface GetLedgerEntriesResponseParams {
     /** The Ethereum address of the participant. */
     participant: Address;
     /** The credit amount. */
-    credit: BigInt;
+    credit: string;
     /** The debit amount. */
-    debit: BigInt;
+    debit: string;
     /** The timestamp when the entry was created. */
     createdAt: Date;
 }
@@ -483,7 +486,7 @@ export interface BalanceUpdateResponseParams {
     /** The asset symbol (e.g., "ETH", "USDC"). */
     asset: string;
     /** The balance amount. */
-    amount: BigInt;
+    amount: string;
 }
 export type BalanceUpdateRPCResponseParams = BalanceUpdateResponseParams; // for backward compatibility
 
@@ -633,5 +636,5 @@ export type RPCResponse =
 export type ExtractResponseByMethod<M extends RPCMethod> = Extract<RPCResponse, { method: M }>;
 
 export type RPCResponseParamsByMethod = {
-    [M in RPCMethod]: ExtractResponseByMethod<M>["params"];
+    [M in RPCMethod]: ExtractResponseByMethod<M>['params'];
 };

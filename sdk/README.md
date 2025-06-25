@@ -34,20 +34,18 @@ Before you begin working with Nitrolite, ensure that you have:
 
 - **Node.js**: Version 16 or later
 - **Package Manager**: npm, yarn, or pnpm
-- **Development Environment**: 
-  - For frontend: React, Vue, or similar framework
-  - For backend: Node.js environment
+- **Development Environment**:
+    - For frontend: React, Vue, or similar framework
+    - For backend: Node.js environment
 - **Channel Setup**: Create a channel from your account at [apps.yellow.com](https://apps.yellow.com)
 
 ## ClearNode WebSocket
 
 **ClearNode WebSocket URL**: `wss://clearnet.yellow.com/ws`
 
-
 ## Build with AI
+
 We have generated a [llms-full.txt](https://erc7824.org/llms-full.txt) file that converts all our documentation into a single markdown document following the https://llmstxt.org/ standard.
-
-
 
 ## Complete Workflow
 

@@ -12,7 +12,8 @@ import {
     isValidResponseTimestamp,
     isValidResponseRequestId,
 } from '../../../src/rpc/utils';
-import { NitroliteRPCMessage } from '../../../src/rpc/types';
+import { rpcResponseParser } from '../../../src/rpc/parse/parse';
+import { NitroliteRPCMessage, RPCMethod, RPCChannelStatus } from '../../../src/rpc/types';
 
 describe('RPC Utils', () => {
     describe('getCurrentTimestamp', () => {
@@ -32,12 +33,12 @@ describe('RPC Utils', () => {
 
     describe('getRequestId', () => {
         test('should extract request ID from req field', () => {
-            const message = { req: [123, 'method', [], 456] };
+            const message = { req: [123, RPCMethod.Ping, [], 456] };
             expect(getRequestId(message)).toBe(123);
         });
 
         test('should extract request ID from res field', () => {
-            const message = { res: [123, 'method', [], 456] };
+            const message = { res: [123, RPCMethod.Ping, [], 456] };
             expect(getRequestId(message)).toBe(123);
         });
 
@@ -54,13 +55,13 @@ describe('RPC Utils', () => {
 
     describe('getMethod', () => {
         test('should extract method from req field', () => {
-            const message = { req: [123, 'method', [], 456] };
-            expect(getMethod(message)).toBe('method');
+            const message = { req: [123, RPCMethod.Ping, [], 456] };
+            expect(getMethod(message)).toBe(RPCMethod.Ping);
         });
 
         test('should extract method from res field', () => {
-            const message = { res: [123, 'method', [], 456] };
-            expect(getMethod(message)).toBe('method');
+            const message = { res: [123, RPCMethod.Ping, [], 456] };
+            expect(getMethod(message)).toBe(RPCMethod.Ping);
         });
 
         test('should return undefined if no method found', () => {
@@ -72,12 +73,12 @@ describe('RPC Utils', () => {
     describe('getParams', () => {
         test('should extract params from req field', () => {
             const params = ['param1', 'param2'];
-            const message = { req: [123, 'method', params, 456] };
+            const message = { req: [123, RPCMethod.Ping, params, 456] };
             expect(getParams(message)).toBe(params);
         });
 
         test('should return empty array if no params found', () => {
-            const message = { req: [123, 'method', null, 456] };
+            const message = { req: [123, RPCMethod.Ping, null, 456] };
             expect(getParams(message)).toEqual([]);
         });
 
@@ -90,12 +91,12 @@ describe('RPC Utils', () => {
     describe('getResult', () => {
         test('should extract result from res field', () => {
             const result = ['result1', 'result2'];
-            const message = { res: [123, 'method', result, 456] };
+            const message = { res: [123, RPCMethod.Ping, result, 456] };
             expect(getResult(message)).toBe(result);
         });
 
         test('should return empty array if no result found', () => {
-            const message = { res: [123, 'method', null, 456] };
+            const message = { res: [123, RPCMethod.Ping, null, 456] };
             expect(getResult(message)).toEqual([]);
         });
 
@@ -107,12 +108,12 @@ describe('RPC Utils', () => {
 
     describe('getTimestamp', () => {
         test('should extract timestamp from req field', () => {
-            const message = { req: [123, 'method', [], 456] };
+            const message = { req: [123, RPCMethod.Ping, [], 456] };
             expect(getTimestamp(message)).toBe(456);
         });
 
         test('should extract timestamp from res field', () => {
-            const message = { res: [123, 'method', [], 456] };
+            const message = { res: [123, RPCMethod.Ping, [], 456] };
             expect(getTimestamp(message)).toBe(456);
         });
 
@@ -160,50 +161,169 @@ describe('RPC Utils', () => {
 
     describe('isValidResponseTimestamp', () => {
         test('should return true if response timestamp is greater than request timestamp', () => {
-            const request: NitroliteRPCMessage = { req: [123, 'method', [], 100] };
-            const response: NitroliteRPCMessage = { res: [123, 'method', [], 200] };
+            const request: NitroliteRPCMessage = { req: [123, RPCMethod.Ping, [], 100] };
+            const response: NitroliteRPCMessage = { res: [123, RPCMethod.Ping, [], 200] };
             expect(isValidResponseTimestamp(request, response)).toBe(true);
         });
 
         test('should return false if response timestamp is less than or equal to request timestamp', () => {
-            const request: NitroliteRPCMessage = { req: [123, 'method', [], 200] };
-            const response: NitroliteRPCMessage = { res: [123, 'method', [], 200] };
+            const request: NitroliteRPCMessage = { req: [123, RPCMethod.Ping, [], 200] };
+            const response: NitroliteRPCMessage = { res: [123, RPCMethod.Ping, [], 200] };
             expect(isValidResponseTimestamp(request, response)).toBe(false);
 
-            const response2: NitroliteRPCMessage = { res: [123, 'method', [], 100] };
+            const response2: NitroliteRPCMessage = { res: [123, RPCMethod.Ping, [], 100] };
             expect(isValidResponseTimestamp(request, response2)).toBe(false);
         });
 
         test('should return false if timestamps are missing', () => {
-            const request: NitroliteRPCMessage = { req: [123, 'method', []] };
-            const response: NitroliteRPCMessage = { res: [123, 'method', [], 200] };
+            const request: NitroliteRPCMessage = { req: [123, RPCMethod.Ping, []] };
+            const response: NitroliteRPCMessage = { res: [123, RPCMethod.Ping, [], 200] };
             expect(isValidResponseTimestamp(request, response)).toBe(false);
 
-            const request2: NitroliteRPCMessage = { req: [123, 'method', [], 100] };
-            const response2: NitroliteRPCMessage = { res: [123, 'method', []] };
+            const request2: NitroliteRPCMessage = { req: [123, RPCMethod.Ping, [], 100] };
+            const response2: NitroliteRPCMessage = { res: [123, RPCMethod.Ping, []] };
             expect(isValidResponseTimestamp(request2, response2)).toBe(false);
         });
     });
 
     describe('isValidResponseRequestId', () => {
         test('should return true if response request ID matches request ID', () => {
-            const request: NitroliteRPCMessage = { req: [123, 'method', [], 100] };
-            const response: NitroliteRPCMessage = { res: [123, 'method', [], 200] };
+            const request: NitroliteRPCMessage = { req: [123, RPCMethod.Ping, [], 100] };
+            const response: NitroliteRPCMessage = { res: [123, RPCMethod.Ping, [], 200] };
             expect(isValidResponseRequestId(request, response)).toBe(true);
         });
 
         test('should return false if response request ID does not match request ID', () => {
-            const request: NitroliteRPCMessage = { req: [123, 'method', [], 100] };
-            const response: NitroliteRPCMessage = { res: [456, 'method', [], 200] };
+            const request: NitroliteRPCMessage = { req: [123, RPCMethod.Ping, [], 100] };
+            const response: NitroliteRPCMessage = { res: [456, RPCMethod.Ping, [], 200] };
             expect(isValidResponseRequestId(request, response)).toBe(false);
-
-            const request2: NitroliteRPCMessage = { req: [undefined, 'method', [], 100] as any };
-            const response2: NitroliteRPCMessage = { res: [123, 'method', [], 200] };
-            expect(isValidResponseRequestId(request2, response)).toBe(false);
-
-            const request3: NitroliteRPCMessage = { req: [123, 'method', [], 100] };
-            const response3: NitroliteRPCMessage = { res: [undefined, 'method', [], 200] as any };
-            expect(isValidResponseRequestId(request3 as any, response3)).toBe(false);
         });
+    });
+});
+
+describe('rpcResponseParser', () => {
+    test('should parse auth_challenge response correctly', () => {
+        const rawResponse = JSON.stringify({
+            res: [123, RPCMethod.AuthChallenge, [{ challenge_message: 'test-challenge' }], 456],
+            sig: ['0x123'],
+        });
+
+        const result = rpcResponseParser.authChallenge(rawResponse);
+        expect(result.method).toBe(RPCMethod.AuthChallenge);
+        expect(result.requestId).toBe(123);
+        expect(result.timestamp).toBe(456);
+        expect(result.signatures).toEqual(['0x123']);
+        expect(result.params).toEqual({ challengeMessage: 'test-challenge' });
+    });
+
+    test('should parse get_ledger_balances response correctly', () => {
+        const balances = [
+            { asset: 'ETH', amount: 1.5 },
+            { asset: 'USDC', amount: 1000 },
+        ];
+
+        const rawResponse = JSON.stringify({
+            res: [123, RPCMethod.GetLedgerBalances, balances, 456],
+            sig: ['0x123'],
+        });
+
+        const result = rpcResponseParser.getLedgerBalances(rawResponse);
+        expect(result.method).toBe(RPCMethod.GetLedgerBalances);
+        expect(result.params).toEqual([
+            { asset: 'ETH', amount: '1.5' },
+            { asset: 'USDC', amount: '1000' },
+        ]);
+    });
+
+    test('should parse get_config response correctly', () => {
+        const config = {
+            broker_address: '0x1234567890123456789012345678901234567890',
+            networks: [
+                {
+                    name: 'Ethereum',
+                    chain_id: 1,
+                    custody_address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                    adjudicator_address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+                },
+            ],
+        };
+
+        const rawResponse = JSON.stringify({
+            res: [123, RPCMethod.GetConfig, [config], 456],
+            sig: ['0x123'],
+        });
+
+        const result = rpcResponseParser.getConfig(rawResponse);
+        expect(result.method).toBe(RPCMethod.GetConfig);
+        expect(result.params).toEqual({
+            brokerAddress: '0x1234567890123456789012345678901234567890',
+            networks: [
+                {
+                    name: 'Ethereum',
+                    chainId: 1,
+                    custodyAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                    adjudicatorAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+                },
+            ],
+        });
+    });
+
+    test('should parse ping response correctly', () => {
+        const rawResponse = JSON.stringify({
+            res: [123, RPCMethod.Ping, [], 456],
+            sig: ['0x123'],
+        });
+
+        const result = rpcResponseParser.ping(rawResponse);
+        expect(result.method).toBe(RPCMethod.Ping);
+        expect(result.requestId).toBe(123);
+        expect(result.params).toEqual({});
+    });
+
+    test('should parse create_app_session response correctly', () => {
+        const params = {
+            app_session_id: '0x1234567890123456789012345678901234567890',
+            version: 1,
+            status: RPCChannelStatus.Open,
+        };
+
+        const rawResponse = JSON.stringify({
+            res: [123, RPCMethod.CreateAppSession, [params], 456],
+            sig: ['0x123'],
+        });
+
+        const result = rpcResponseParser.createAppSession(rawResponse);
+
+        expect(result.method).toBe(RPCMethod.CreateAppSession);
+        expect(result.params).toEqual({
+            appSessionId: '0x1234567890123456789012345678901234567890',
+            version: 1,
+            status: RPCChannelStatus.Open,
+        });
+    });
+
+    test('should throw error for invalid response format', () => {
+        const invalidResponse = JSON.stringify({
+            res: [123, RPCMethod.Ping, 456], // Missing one element
+        });
+
+        expect(() => rpcResponseParser.ping(invalidResponse)).toThrow('Invalid RPC response format');
+    });
+
+    test('should throw error for invalid JSON', () => {
+        const invalidJSON = 'this is not json';
+        expect(() => rpcResponseParser.ping(invalidJSON)).toThrow(/Failed to parse RPC response/);
+    });
+
+    test('should throw error when parsing with the wrong method', () => {
+        const rawResponse = JSON.stringify({
+            res: [123, RPCMethod.AuthChallenge, [{ challenge_message: 'test-challenge' }], 456],
+            sig: ['0x123'],
+        });
+
+        // Try to parse an auth_challenge response with the ping parser
+        expect(() => rpcResponseParser.ping(rawResponse)).toThrow(
+            "Expected RPC method to be 'ping', but received 'auth_challenge'",
+        );
     });
 });

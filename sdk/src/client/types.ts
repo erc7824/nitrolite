@@ -47,7 +47,7 @@ export enum ChannelStatus {
     INITIAL, // Channel is created and in funding process, State.version must be 0
     ACTIVE, // Channel fully funded and operational, State.version is greater than 0
     DISPUTE, // Challenge period is active
-    FINAL // Final state, channel can be closed
+    FINAL, // Final state, channel can be closed
 }
 
 /**

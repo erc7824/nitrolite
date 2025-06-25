@@ -7,13 +7,12 @@ import {
     Timestamp,
     CloseAppSessionRequest,
     CreateAppSessionRequest,
-    ResizeChannel,
-    AuthRequest,
+    AuthRequestParams,
     PartialEIP712AuthMessage,
     EIP712AuthTypes,
     EIP712AuthDomain,
     EIP712AuthMessage,
-    AuthChallengeRPCResponse,
+    AuthChallengeResponse,
     RequestData,
     RPCMethod,
     RPCChannelStatus,
@@ -22,6 +21,11 @@ import {
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
+import {
+    CloseAppSessionRequestParams,
+    CreateAppSessionRequestParams,
+    ResizeChannelRequestParams,
+} from './types/request';
 
 /**
  * Creates the signed, stringified message body for an 'auth_request'.
@@ -33,11 +37,11 @@ import { generateRequestId, getCurrentTimestamp } from './utils';
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
  */
 export async function createAuthRequestMessage(
-    params: AuthRequest,
+    params: AuthRequestParams,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const allowances = Object.values(params.allowances || {}).map((v) => [v.symbol, v.amount]);
+    const allowances = Object.values(params.allowances || {}).map((v) => [v.asset, v.amount]);
     const paramsArray = [
         params.wallet,
         params.participant,
@@ -90,11 +94,11 @@ export async function createAuthVerifyMessageFromChallenge(
  */
 export async function createAuthVerifyMessage(
     signer: MessageSigner,
-    challenge: AuthChallengeRPCResponse,
+    challenge: AuthChallengeResponse,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [{ challenge: challenge.params.challengeMessage }];
+    const params = [{ challenge: challenge.params[0].challengeMessage }];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.AuthVerify, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
     return JSON.stringify(signedRequest);
@@ -270,7 +274,7 @@ export async function createGetAppSessionsMessage(
  */
 export async function createAppSessionMessage(
     signer: MessageSigner,
-    params: CreateAppSessionRequest[],
+    params: CreateAppSessionRequestParams[],
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
@@ -293,7 +297,7 @@ export async function createAppSessionMessage(
  */
 export async function createCloseAppSessionMessage(
     signer: MessageSigner,
-    params: CloseAppSessionRequest[],
+    params: CloseAppSessionRequestParams[],
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
@@ -354,21 +358,21 @@ export async function createCloseChannelMessage(
  * Creates the signed, stringified message body for a 'resize_channel' request.
  *
  * @param signer - The function to sign the request payload.
- * @param params - Any specific parameters required by 'resize_channel'. See {@link ResizeChannel} for details.
+ * @param params - Any specific parameters required by 'resize_channel'. See {@link ResizeChannelRequestParams} for details.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
  */
 export async function createResizeChannelMessage(
     signer: MessageSigner,
-    params: ResizeChannel[],
+    params: ResizeChannelRequestParams[],
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.ResizeChannel, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
-    return JSON.stringify(signedRequest);
+    return JSON.stringify(signedRequest, (_, value) => (typeof value === 'bigint' ? value.toString() : value));
 }
 
 /**
@@ -538,7 +542,7 @@ export function createECDSAMessageSigner(privateKey: Hex): MessageSigner {
     return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
         try {
             const messageBytes = keccak256(stringToBytes(JSON.stringify(payload)));
-            const flatSignature = await privateKeyToAccount(privateKey).sign({hash: messageBytes});
+            const flatSignature = await privateKeyToAccount(privateKey).sign({ hash: messageBytes });
 
             return flatSignature as Hex;
         } catch (error) {

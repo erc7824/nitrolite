@@ -299,7 +299,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 	})
 	logger.Info("application session created",
 		"userID", c.UserID,
-		"sessionID", appSessionID,
+		"sessionID", appSession.SessionID,
 		"protocol", params.Definition.Protocol,
 		"participants", params.Definition.ParticipantWallets,
 		"challenge", params.Definition.Challenge,
@@ -330,7 +330,7 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 	newVersion, err := r.AppSessionService.SubmitState(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to submit state", "error", err)
-		c.Fail("failed to submit state")
+		c.Fail(err.Error())
 		return
 	}
 
@@ -369,7 +369,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 	newVersion, err := r.AppSessionService.CloseApplication(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to close application session", "error", err)
-		c.Fail("failed to close application session")
+		c.Fail(err.Error())
 		return
 	}
 

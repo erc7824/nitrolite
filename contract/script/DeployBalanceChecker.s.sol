@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {BalanceChecker} from "../test/BalanceChecker.sol";
 
 contract DeployBalanceCheckerScript is Script {
-    BalanceChecker public sc;
+    BalanceChecker public balanceChecker;
 
     function setUp() public {}
 
@@ -20,11 +20,11 @@ contract DeployBalanceCheckerScript is Script {
         vm.stopBroadcast();
         vm.startBroadcast(deployer);
 
-        sc = new BalanceChecker();
+        balanceChecker = new BalanceChecker();
 
         vm.stopBroadcast();
 
-        console.log("Deployed BalanceChecker at:", address(sc));
-        console.log("$>", address(sc), "<^");
+        console.log("Deployed BalanceChecker at:", address(balanceChecker));
+        console.log("$>", address(balanceChecker), "<^");
     }
 }

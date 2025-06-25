@@ -67,11 +67,6 @@ jobs:
         working-directory: ./integration
         run: npm ci
 
-      - name: Debug clearnode
-        if: failure()
-        run: |
-          docker compose logs clearnode
-
       - name: Run integration tests 
         working-directory: ./integration
         run: npm run test

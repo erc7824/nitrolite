@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {Custody} from "../src/Custody.sol";
 
 contract DeployCustodyScript is Script {
-    Custody public sc;
+    Custody public custody;
 
     function setUp() public {}
 
@@ -20,11 +20,11 @@ contract DeployCustodyScript is Script {
         vm.stopBroadcast();
         vm.startBroadcast(deployer);
 
-        sc = new Custody();
+        custody = new Custody();
 
         vm.stopBroadcast();
 
-        console.log("Deployed Custody at:", address(sc));
-        console.log("$>", address(sc), "<^");
+        console.log("Deployed Custody at:", address(custody));
+        console.log("$>", address(custody), "<^");
     }
 }

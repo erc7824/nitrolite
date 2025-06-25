@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {Dummy} from "../src/adjudicators/Dummy.sol";
 
 contract DeployDummyAdjudicatorScript is Script {
-    Dummy public sc;
+    Dummy public dummy;
 
     function setUp() public {}
 
@@ -20,11 +20,11 @@ contract DeployDummyAdjudicatorScript is Script {
         vm.stopBroadcast();
         vm.startBroadcast(deployer);
 
-        sc = new Dummy();
+        dummy = new Dummy();
 
         vm.stopBroadcast();
 
-        console.log("Deployed Dummy Adjudicator at:", address(sc));
-        console.log("$>", address(sc), "<^");
+        console.log("Deployed Dummy Adjudicator at:", address(dummy));
+        console.log("$>", address(dummy), "<^");
     }
 }

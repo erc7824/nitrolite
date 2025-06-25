@@ -48,9 +48,11 @@ type GetChannelsParams struct {
 }
 
 type GetLedgerEntriesParams struct {
-	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter entries
-	Asset     string `json:"asset,omitempty"`      // Optional asset to filter entries
-	Wallet    string `json:"wallet,omitempty"`     // Optional wallet address to filter entries
+	PaginationParams
+	Sort      *SortType `json:"sort,omitempty"`       // Optional sort type (asc/desc)
+	AccountID string    `json:"account_id,omitempty"` // Optional account ID to filter entries
+	Asset     string    `json:"asset,omitempty"`      // Optional asset to filter entries
+	Wallet    string    `json:"wallet,omitempty"`     // Optional wallet address to filter entries
 }
 
 type LedgerEntryResponse struct {
@@ -272,7 +274,9 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 		walletAddress = params.Wallet
 	}
 
-	ledger := GetWalletLedger(r.DB, walletAddress)
+	query := applySort(r.DB, "created_at", Descending, params.Sort)
+	query = paginate(&params.PaginationParams)(query)
+	ledger := GetWalletLedger(query, walletAddress)
 	entries, err := ledger.GetEntries(params.AccountID, params.Asset)
 	if err != nil {
 		logger.Error("failed to get ledger entries", "error", err)

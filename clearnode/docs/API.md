@@ -304,15 +304,28 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 ### Get Ledger Entries
 
 Retrieves the detailed ledger entries for an account, providing a complete transaction history. This can be used to audit all deposits, withdrawals, and transfers. If no filter is specified, returns all entries, otherwise applies one or multiple filters.
+Supports pagination and sorting by `created_at`.
 
 **Request:**
 
 ```json
 {
+  "req": [1, "get_ledger_entries", [], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Requst with filtering, pagination, and sorting:**
+
+```json
+{
   "req": [1, "get_ledger_entries", [{
-    "account_id": "0x1234567890abcdef...", // Optional
-    "wallet": "0x1234567890abcdef...", // Optional
-    "asset": "usdc",  // Optional: filter by asset
+    "account_id": "0x1234567890abcdef...",
+    "wallet": "0x1234567890abcdef...", // Optional: filter by participant
+    "asset": "usdc", // Optional: filter by asset
+    "offset": 42, // Optional: pagination offset
+    "page_size": 10, // Optional: number of entries to return
+    "sort": "desc" // Optional: sort asc or desc by created_at
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }

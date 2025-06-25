@@ -1,0 +1,11 @@
+{
+  "deployer": "0x1cc434634DCc1f4C92552057d18D205b919DEF4A",
+  "deployedTo": "0x60f0c4f3c13a05fe37759b736e56dae9853ac0e8",
+  "transactionHash": "0x368c0b4f2fd97e8a352b578628a1eecb97498153605ee2a527a5325988483dc5",
+  "commit": "0a7fc1653e31428c8157da8691a0f4df8ba906cb",
+  "timestamp": 1750839551,
+  "chainId": 1,
+  "contractPath": "./src/adjudicators/SimpleConsensus.sol:SimpleConsensus",
+  "constructorArgs": [],
+  "comment": "PROD v0.2.12"
+}

@@ -32,25 +32,22 @@ type AppDefinition struct {
 }
 
 type GetAppSessionParams struct {
-	PaginationParams
-	Sort        *SortType `json:"sort,omitempty"`        // Optional sort type (asc/desc)
-	Participant string    `json:"participant,omitempty"` // Optional participant wallet to filter sessions
-	Status      string    `json:"status,omitempty"`      // Optional status to filter sessions
+	ListOptions
+	Participant string `json:"participant,omitempty"` // Optional participant wallet to filter sessions
+	Status      string `json:"status,omitempty"`      // Optional status to filter sessions
 }
 
 type GetChannelsParams struct {
-	PaginationParams
-	Sort        *SortType `json:"sort,omitempty"`        // Optional sort type (asc/desc)
-	Participant string    `json:"participant,omitempty"` // Optional participant wallet to filter channels
-	Status      string    `json:"status,omitempty"`      // Optional status to filter channels
+	ListOptions
+	Participant string `json:"participant,omitempty"` // Optional participant wallet to filter channels
+	Status      string `json:"status,omitempty"`      // Optional status to filter channels
 }
 
 type GetLedgerEntriesParams struct {
-	PaginationParams
-	Sort      *SortType `json:"sort,omitempty"`       // Optional sort type (asc/desc)
-	AccountID string    `json:"account_id,omitempty"` // Optional account ID to filter entries
-	Asset     string    `json:"asset,omitempty"`      // Optional asset to filter entries
-	Wallet    string    `json:"wallet,omitempty"`     // Optional wallet address to filter entries
+	ListOptions
+	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter entries
+	Asset     string `json:"asset,omitempty"`      // Optional asset to filter entries
+	Wallet    string `json:"wallet,omitempty"`     // Optional wallet address to filter entries
 }
 
 type LedgerEntryResponse struct {
@@ -172,8 +169,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 		return
 	}
 
-	query := applySort(r.DB, "created_at", SortTypeDescending, params.Sort)
-	query = paginate(&params.PaginationParams)(query)
+	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
 	sessions, err := getAppSessions(query, params.Participant, params.Status)
 	if err != nil {
 		logger.Error("failed to get application sessions", "error", err)
@@ -217,8 +213,7 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 	var channels []Channel
 	var err error
 
-	query := applySort(r.DB, "created_at", SortTypeDescending, params.Sort)
-	query = paginate(&params.PaginationParams)(query)
+	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
 	if params.Participant == "" {
 		if params.Status != "" {
 			query = query.Where("status = ?", params.Status)
@@ -273,8 +268,7 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 		walletAddress = params.Wallet
 	}
 
-	query := applySort(r.DB, "created_at", SortTypeDescending, params.Sort)
-	query = paginate(&params.PaginationParams)(query)
+	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
 	ledger := GetWalletLedger(query, walletAddress)
 	entries, err := ledger.GetEntries(params.AccountID, params.Asset)
 	if err != nil {

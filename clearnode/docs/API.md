@@ -319,7 +319,7 @@ Supports pagination and sorting.
 }
 ```
 
-**Requst with filtering, pagination, and sorting:**
+**Request with filtering, pagination, and sorting:**
 
 ```json
 {
@@ -389,7 +389,7 @@ Supports pagination and sorting.
 {
   "req": [1, "get_channels", [{
     "participant": "0x1234567890abcdef...",
-    "status":"open", // OPTIONAL FILTER
+    "status":"open", // Optional filter
     "offset": 42, // Optional: pagination offset
     "page_size": 10, // Optional: number of channels to return
     "sort": "desc" // Optional: sort asc or desc by created_at

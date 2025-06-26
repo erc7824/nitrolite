@@ -83,7 +83,7 @@ func listenEvents(
 	logger.Info("starting listening events", "chainID", chainID, "contractAddress", contractAddress.String())
 	for {
 		if eventSubscription == nil {
-			waitForBackOffTimeout(logger, int(backOffCount.Load()))
+			waitForBackOffTimeout(logger, int(backOffCount.Load()), "event subscription")
 
 			historicalCh = make(chan types.Log, 1)
 			currentCh = make(chan types.Log, 100)
@@ -113,7 +113,6 @@ func listenEvents(
 					blockStep,
 					lastBlock,
 					lastIndex,
-					&backOffCount,
 					historicalCh,
 					logger,
 				)
@@ -164,15 +163,15 @@ func ReconcileBlockRange(
 	blockStep uint64,
 	lastBlock uint64,
 	lastIndex uint32,
-	backOffCount *atomic.Uint64,
 	historicalCh chan types.Log,
 	logger Logger,
 ) {
+	var backOffCount atomic.Uint64
 	startBlock := lastBlock
 	endBlock := startBlock + blockStep
 
 	for currentBlock > startBlock {
-		waitForBackOffTimeout(logger, int(backOffCount.Load()))
+		waitForBackOffTimeout(logger, int(backOffCount.Load()), "reconcile block range")
 
 		// We need to refetch events starting from last known block without adding 1 to it
 		// because it's possible that block includes more than 1 event, and some may be still unprocessed.
@@ -256,14 +255,14 @@ func extractAdvisedBlockRange(msg string) (startBlock, endBlock uint64, err erro
 }
 
 // waitForBackOffTimeout implements exponential backoff between retries
-func waitForBackOffTimeout(logger Logger, backOffCount int) {
+func waitForBackOffTimeout(logger Logger, backOffCount int, log string) {
 	if backOffCount > maxBackOffCount {
-		logger.Fatal("back off limit reached, exiting", "backOffCollisionCount", backOffCount)
+		logger.Fatal("back off limit reached on '"+log+"', exiting", "backOffCollisionCount", backOffCount)
 		return
 	}
 
 	if backOffCount > 0 {
-		logger.Info("backing off before subscribing on contract events", "backOffCollisionCount", backOffCount)
+		logger.Info("backing off on '"+log+"'", "backOffCollisionCount", backOffCount)
 		<-time.After(time.Duration(2^backOffCount-1) * time.Second)
 	}
 }

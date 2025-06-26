@@ -531,11 +531,12 @@ Participants must agree on signature weights and a quorum; this quorum is requir
 ```
 ### Submit State
 
-Submits an intermediate state into a virtual application and redistributes funds in an app session.
-To submit an intermediate state, participants must reach the signature quorum that they agreed on when creating the app session.
-This means that the sum of the weights of signers must reach the specified threshold in the app definition.
+Updates state of a virtual application.
+To submit a new state, participants must agree on the new application state by reaching the signature quorum that they agreed in the previous application state. This means that the sum of the weights of signers must reach the specified threshold in the app definition.
 
-**Request:**
+- **Dynamic Session Configuration**: Modify session parameters during its lifetime. Participants, their signature weights, quorum and allocations can be changed by mutual agreement of current participants.
+
+**Request (Update allocations only):**
 
 ```json
 {
@@ -557,6 +558,48 @@ This means that the sum of the weights of signers must reach the specified thres
   "sig": ["0x9876fedcba...", "0x8765fedcba..."]
 }
 ```
+
+**Request (Update participants and quorum):**
+
+```json
+{
+  "req": [1, "submit_state", [{
+    "app_session_id": "0x3456789012abcdef...",
+    "participants": [
+      "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
+      "0x00112233445566778899AaBbCcDdEeFf00112233",
+      "0x1111222233334444555566667777888899999999"
+    ],
+    "weights": [40, 40, 20],
+    "quorum": 80,
+    "allocations": [
+      {
+        "participant": "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
+        "asset": "usdc",
+        "amount": "100.0"
+      },
+      {
+        "participant": "0x00112233445566778899AaBbCcDdEeFf00112233",
+        "asset": "usdc",
+        "amount": "100.0"
+      },
+      {
+        "participant": "0x1111222233334444555566667777888899999999",
+        "asset": "usdc",
+        "amount": "0.0"
+      }
+    ]
+  }], 1619123456789],
+  "sig": ["0x9876fedcba...", "0x8765fedcba..."]
+}
+```
+
+**Parameters:**
+- `app_session_id`: Required. The ID of the app session to update
+- `allocations`: Required. Current fund allocations for all participants
+- `participants`: Optional. New list of participant wallet addresses (must match weights length)
+- `weights`: Optional. New signature weights for participants (must match participants length)
+- `quorum`: Optional. New required signature threshold for future operations
 
 **Response:**
 
@@ -985,3 +1028,23 @@ When an error occurs, the server responds with an error message:
   "sig": ["0xabcd1234..."]
 }
 ```
+
+### Common Error Messages
+
+**Transfer/Deposit Errors:**
+- `"invalid destination account: [address]"` - Invalid or malformed destination address
+- `"app session is closed or not found [session_id]"` - Attempting to deposit to a closed or non-existent app session
+- `"user is not a participant in this app session"` - User trying to deposit but is not a session participant
+- `"insufficient funds: [wallet] for asset [asset]"` - Insufficient balance for the transfer amount
+- `"empty allocations"` - No allocations specified in the transfer
+- `"invalid allocation: [amount] for asset [asset]"` - Zero, negative, or invalid allocation amount
+
+**Submit State Errors:**
+- `"missing required parameters: app_session_id or allocations"` - Required parameters not provided
+- `"number of participant wallets must match number of weights"` - Mismatch between participants and weights arrays
+- `"allocation to non-participant [wallet]"` - Allocation specified for a non-participant
+- `"asset [asset] not fully redistributed"` - Total allocations don't match session balance
+
+**Authentication Errors:**
+- `"missing participant signature"` - Required signature not provided
+- `"invalid signature"` - Signature verification failed

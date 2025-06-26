@@ -405,7 +405,7 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 		return
 	}
 
-	resp, err := r.ChannelService.ResizeChannel(logger, &params, rpcSigners)
+	resp, err := r.ChannelService.RequestResize(logger, &params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to initiate resize channel", "error", err)
 		c.Fail(err.Error())
@@ -442,7 +442,7 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 		return
 	}
 
-	resp, err := r.ChannelService.CloseChannel(logger, &params, rpcSigners)
+	resp, err := r.ChannelService.RequestClose(logger, &params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to initiate close channel", "error", err)
 		c.Fail(err.Error())

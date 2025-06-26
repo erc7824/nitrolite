@@ -213,14 +213,7 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 	var err error
 
 	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
-	if params.Participant == "" {
-		if params.Status != "" {
-			query = query.Where("status = ?", params.Status)
-		}
-		err = query.Find(&channels).Error
-	} else {
-		channels, err = getChannelsByWallet(r.DB, params.Participant, params.Status)
-	}
+	channels, err = getChannelsByWallet(query, params.Participant, params.Status)
 	if err != nil {
 		logger.Error("failed to get channels", "error", err)
 		c.Fail("failed to get channels")

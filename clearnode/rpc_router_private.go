@@ -39,8 +39,11 @@ type CreateAppSessionParams struct {
 }
 
 type SubmitStateParams struct {
-	AppSessionID string          `json:"app_session_id"`
-	Allocations  []AppAllocation `json:"allocations"`
+	AppSessionID       string          `json:"app_session_id"`
+	ParticipantWallets []string        `json:"participants,omitempty"` // Optional, used to change number of participants
+	Weights            []int64         `json:"weights,omitempty"`      // Optional, specifies new weights for participants
+	Quorum             uint64          `json:"quorum,omitempty"`       // Optional, specifies new quorum for the app session
+	Allocations        []AppAllocation `json:"allocations,omitempty"`  // Optional, specifies new allocations distribution between participants
 }
 
 type CloseAppSessionParams struct {
@@ -417,7 +420,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 	)
 }
 
-// HandleSubmitState updates funds allocations distribution a virtual app session
+// HandleSubmitState allows participants to change state and allocations of an application session
 func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 	ctx := c.Context
 	logger := LoggerFromContext(ctx)
@@ -428,8 +431,12 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 		c.Fail(err.Error())
 		return
 	}
-	if params.AppSessionID == "" || len(params.Allocations) == 0 {
-		c.Fail("missing required parameters: app_session_id or allocations")
+	if params.AppSessionID == "" {
+		c.Fail("missing app_session_id parameter")
+		return
+	}
+	if len(params.ParticipantWallets) != len(params.Weights) {
+		c.Fail("number of participant wallets must match number of weights")
 		return
 	}
 
@@ -483,11 +490,20 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 		if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
 			return err
 		}
-
+		if len(params.ParticipantWallets) > 0 {
+			appSession.ParticipantWallets = params.ParticipantWallets
+			appSession.Weights = params.Weights
+		}
+		if params.Quorum > 0 {
+			appSession.Quorum = params.Quorum
+		}
 		newVersion = appSession.Version + 1
 
 		return tx.Model(&appSession).Updates(map[string]any{
-			"version": newVersion,
+			"participants": appSession.ParticipantWallets,
+			"weights":      appSession.Weights,
+			"quorum":       appSession.Quorum,
+			"version":      newVersion,
 		}).Error
 	})
 

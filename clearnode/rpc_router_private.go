@@ -183,6 +183,7 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, balances)
+	logger.Info("ledger balances retrieved", "userID", c.UserID, "accountID", account)
 }
 
 // HandleTransfer unified balance funds to the specified account
@@ -262,6 +263,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		Allocations: params.Allocations,
 		CreatedAt:   time.Now(),
 	})
+	logger.Info("transfer completed", "userID", c.UserID, "transferTo", params.Destination, "allocations", params.Allocations)
 }
 
 // HandleCreateApplication creates a virtual application between participants
@@ -364,6 +366,15 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 		Version:      1,
 		Status:       string(ChannelStatusOpen),
 	})
+	logger.Info("application session created",
+		"userID", c.UserID,
+		"sessionID", appSessionID,
+		"protocol", params.Definition.Protocol,
+		"participants", params.Definition.ParticipantWallets,
+		"challenge", params.Definition.Challenge,
+		"nonce", params.Definition.Nonce,
+		"allocations", params.Allocations,
+	)
 }
 
 // HandleSubmitState updates funds allocations distribution a virtual app session
@@ -451,6 +462,12 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 		Version:      newVersion,
 		Status:       string(ChannelStatusOpen),
 	})
+	logger.Info("application session state submitted",
+		"userID", c.UserID,
+		"sessionID", params.AppSessionID,
+		"newVersion", newVersion,
+		"allocations", params.Allocations,
+	)
 }
 
 // HandleCloseApplication closes a virtual app session and redistributes funds to participants
@@ -539,6 +556,12 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 		Version:      newVersion,
 		Status:       string(ChannelStatusClosed),
 	})
+	logger.Info("application session closed",
+		"userID", c.UserID,
+		"sessionID", params.AppSessionID,
+		"newVersion", newVersion,
+		"allocations", params.Allocations,
+	)
 }
 
 // HandleResizeChannel processes a request to resize a payment channel
@@ -670,10 +693,11 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 		return
 	}
 
+	newVersion := channel.Version + 1
 	resp := ResizeChannelResponse{
 		ChannelID: channel.ChannelID,
 		Intent:    uint8(nitrolite.IntentRESIZE),
-		Version:   channel.Version + 1,
+		Version:   newVersion,
 		StateData: hexutil.Encode(encodedIntentions),
 		StateHash: stateHash,
 		Signature: Signature{
@@ -692,6 +716,15 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, resp)
+	logger.Info("channel resized",
+		"userID", c.UserID,
+		"channelID", channel.ChannelID,
+		"newVersion", newVersion,
+		"fundsDestination", params.FundsDestination,
+		"resizeAmount", params.ResizeAmount.String(),
+		"allocateAmount", params.AllocateAmount.String(),
+		"newChannelAmount", newChannelAmount.String(),
+	)
 }
 
 // HandleCloseChannel processes a request to close a payment channel
@@ -760,6 +793,7 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 		c.Fail("resize this channel first")
 	}
 
+	finalBrokerAllocation := new(big.Int).Sub(channelAmount, rawBalance)
 	allocations := []nitrolite.Allocation{
 		{
 			Destination: common.HexToAddress(params.FundsDestination),
@@ -769,7 +803,7 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 		{
 			Destination: r.Signer.GetAddress(),
 			Token:       common.HexToAddress(channel.Token),
-			Amount:      new(big.Int).Sub(channelAmount, rawBalance),
+			Amount:      finalBrokerAllocation,
 		},
 	}
 
@@ -794,10 +828,11 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 		return
 	}
 
+	newVersion := channel.Version + 1
 	resp := CloseChannelResponse{
 		ChannelID: channel.ChannelID,
 		Intent:    uint8(nitrolite.IntentFINALIZE),
-		Version:   channel.Version + 1,
+		Version:   newVersion,
 		StateData: stateDataHex,
 		StateHash: stateHash,
 		Signature: Signature{
@@ -816,6 +851,14 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, resp)
+	logger.Info("channel closed",
+		"userID", c.UserID,
+		"channelID", channel.ChannelID,
+		"newVersion", newVersion,
+		"fundsDestination", params.FundsDestination,
+		"finalUserAllocation", rawBalance.String(),
+		"finalBrokerAllocation", finalBrokerAllocation.String(),
+	)
 }
 
 func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {

@@ -14,6 +14,7 @@ func (r *RPCRouter) SendBalanceUpdate(sender string) {
 	}
 
 	r.Node.Notify(sender, "bu", balances)
+	r.lg.Info("balance update sent", "userID", sender, "balances", balances)
 }
 
 // SendChannelUpdate sends a single channel update to the client
@@ -34,4 +35,10 @@ func (r *RPCRouter) SendChannelUpdate(channel Channel) {
 	}
 
 	r.Node.Notify(channel.Wallet, "cu", channelResponse)
+	r.lg.Info("channel update sent",
+		"userID", channel.Wallet,
+		"channelID", channel.ChannelID,
+		"participant", channel.Participant,
+		"status", channel.Status,
+	)
 }

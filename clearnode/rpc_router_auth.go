@@ -162,13 +162,13 @@ func (r *RPCRouter) HandleAuthVerify(c *RPCContext) {
 	r.Metrics.AuthAttempsSuccess.With(prometheus.Labels{
 		"auth_method": authMethod,
 	}).Inc()
-	logger.Info("authentication successful",
-		"auth_method", authMethod,
-		"userID", policy.Wallet)
 
 	c.UserID = policy.Wallet
 	c.Storage.Set(ConnectionStoragePolicyKey, policy)
 	c.Succeed(req.Method, responseData)
+	logger.Info("authentication successful",
+		"authMethod", authMethod,
+		"userID", c.UserID)
 }
 
 func (r *RPCRouter) AuthMiddleware(c *RPCContext) {

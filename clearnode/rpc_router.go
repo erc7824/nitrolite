@@ -51,6 +51,7 @@ func NewRPCRouter(
 	r.Node.OnMessageSent(r.HandleMessageSent)
 
 	r.Node.Use(r.LoggerMiddleware)
+	r.Node.Use(r.MetricsMiddleware)
 	r.Node.Handle("ping", r.HandlePing)
 	r.Node.Handle("get_config", r.HandleGetConfig)
 	r.Node.Handle("get_assets", r.HandleGetAssets)
@@ -58,13 +59,13 @@ func NewRPCRouter(
 	r.Node.Handle("get_app_sessions", r.HandleGetAppSessions)
 	r.Node.Handle("get_channels", r.HandleGetChannels)
 	r.Node.Handle("get_ledger_entries", r.HandleGetLedgerEntries)
-	r.Node.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
 	r.Node.Handle("auth_request", r.HandleAuthRequest)
 	r.Node.Handle("auth_verify", r.HandleAuthVerify)
 
 	privGroup := r.Node.NewGroup("private")
 	privGroup.Use(r.AuthMiddleware)
 	privGroup.Use(r.HistoryMiddleware)
+	privGroup.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
 	privGroup.Handle("resize_channel", r.HandleResizeChannel)
 	privGroup.Handle("close_channel", r.HandleCloseChannel)
 
@@ -151,11 +152,24 @@ func (r *RPCRouter) LoggerMiddleware(c *RPCContext) {
 	logger := r.lg.With("requestID", c.Message.Req.RequestID)
 	c.Context = SetContextLogger(c.Context, logger)
 	logger = LoggerFromContext(c.Context)
-	logger.Info("handling RPC request",
-		"method", c.Message.Req.Method,
-		"userID", c.UserID)
 
 	c.Next()
+
+	if c.Message.Res == nil {
+		logger.Warn("RPC response is nil",
+			"userID", c.UserID,
+			"method", c.Message.Req.Method,
+		)
+		return
+	}
+
+	if c.Message.Res.Method == "error" {
+		logger.Warn("failed to handle RPC request",
+			"userID", c.UserID,
+			"method", c.Message.Req.Method,
+			"error", c.Message.Res.Params,
+		)
+	}
 }
 
 func (r *RPCRouter) MetricsMiddleware(c *RPCContext) {
@@ -233,6 +247,7 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 	}
 
 	c.Succeed(c.Message.Req.Method, response)
+	logger.Info("RPC history retrieved", "userID", c.UserID, "entryCount", len(response))
 }
 
 func (r *RPCRouter) HandlePing(c *RPCContext) {

@@ -51,6 +51,7 @@ func NewRPCRouter(
 	r.Node.OnMessageSent(r.HandleMessageSent)
 
 	r.Node.Use(r.LoggerMiddleware)
+	r.Node.Use(r.MetricsMiddleware)
 	r.Node.Handle("ping", r.HandlePing)
 	r.Node.Handle("get_config", r.HandleGetConfig)
 	r.Node.Handle("get_assets", r.HandleGetAssets)
@@ -58,13 +59,13 @@ func NewRPCRouter(
 	r.Node.Handle("get_app_sessions", r.HandleGetAppSessions)
 	r.Node.Handle("get_channels", r.HandleGetChannels)
 	r.Node.Handle("get_ledger_entries", r.HandleGetLedgerEntries)
-	r.Node.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
 	r.Node.Handle("auth_request", r.HandleAuthRequest)
 	r.Node.Handle("auth_verify", r.HandleAuthVerify)
 
 	privGroup := r.Node.NewGroup("private")
 	privGroup.Use(r.AuthMiddleware)
 	privGroup.Use(r.HistoryMiddleware)
+	privGroup.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
 	privGroup.Handle("resize_channel", r.HandleResizeChannel)
 	privGroup.Handle("close_channel", r.HandleCloseChannel)
 

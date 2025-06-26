@@ -110,11 +110,13 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, func()) {
 	logger := NewLoggerIPFS("root.test")
 
 	appSessionService := NewAppSessionService(db)
+	channelService := NewChannelService(db, signer)
 
 	// Create an instance of RPCRouter
 	router := &RPCRouter{
 		Signer:            signer,
 		AppSessionService: appSessionService,
+		ChannelService:    channelService,
 		DB:                db,
 		lg:                logger.NewSystem("rpc-router"),
 	}

@@ -81,7 +81,10 @@ func GetChannelByID(tx *gorm.DB, channelID string) (*Channel, error) {
 // getChannelsByWallet finds all channels for a wallet
 func getChannelsByWallet(tx *gorm.DB, wallet string, status string) ([]Channel, error) {
 	var channels []Channel
-	q := tx.Where("wallet = ?", wallet)
+	q := tx
+	if wallet != "" {
+		q = q.Where("wallet = ?", wallet)
+	}
 	if status != "" {
 		q = q.Where("status = ?", status)
 	}

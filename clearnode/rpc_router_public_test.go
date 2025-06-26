@@ -255,12 +255,12 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 		{
 			name:               "Filter by participant",
 			params:             map[string]interface{}{"participant": participantWallet},
-			expectedChannelIDs: []string{"0xChannel1", "0xChannel2", "0xChannel3"}, // getChannelsByWallet doesn't apply sorting
+			expectedChannelIDs: []string{"0xChannel3", "0xChannel2", "0xChannel1"},
 		},
 		{
 			name:               "Filter by participant with ascending sort",
 			params:             map[string]interface{}{"participant": participantWallet, "sort": "asc"},
-			expectedChannelIDs: []string{"0xChannel1", "0xChannel2", "0xChannel3"}, // getChannelsByWallet doesn't apply sorting
+			expectedChannelIDs: []string{"0xChannel1", "0xChannel2", "0xChannel3"},
 		},
 		{
 			name:               "Filter by status open",
@@ -320,7 +320,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			assert.Len(t, responseChannels, len(tc.expectedChannelIDs), "Should return expected number of channels")
 
 			for idx, channel := range responseChannels {
-				assert.True(t, channel.ChannelID == tc.expectedChannelIDs[idx], "Should include channel %s", tc.expectedChannelIDs[idx])
+				assert.True(t, channel.ChannelID == tc.expectedChannelIDs[idx], "%d-th result (%s) should equal %s", idx, channel.ChannelID, tc.expectedChannelIDs[idx])
 			}
 		})
 	}

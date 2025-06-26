@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/gorm"
 )
 
@@ -135,7 +136,7 @@ func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) 
 	send("channels", resp)
 
 	// Send initial balances
-	balances, err := GetWalletLedger(r.DB, walletAddress).GetBalances(walletAddress)
+	balances, err := GetWalletLedger(r.DB, common.HexToAddress(walletAddress)).GetBalances(NewAccountID(walletAddress))
 	if err != nil {
 		r.lg.Error("error getting balances", "sender", walletAddress, "error", err)
 		return

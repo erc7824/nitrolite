@@ -843,8 +843,10 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
 	defer cleanup()
 
-	participant1 := "0xParticipant1"
-	participant2 := "0xParticipant2"
+	participant1 := newTestCommonAddress("0xParticipant1")
+	participant1AccountID := NewAccountID(participant1.Hex())
+	participant2 := newTestCommonAddress("0xParticipant2")
+	participant2AccountID := NewAccountID(participant2.Hex())
 
 	ledger1 := GetWalletLedger(router.DB, participant1)
 	testData1 := []struct {
@@ -858,7 +860,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 		{"eth", decimal.NewFromFloat(-0.5)},
 	}
 	for _, data := range testData1 {
-		err := ledger1.Record(participant1, data.asset, data.amount)
+		err := ledger1.Record(participant1AccountID, data.asset, data.amount)
 		require.NoError(t, err)
 	}
 
@@ -871,12 +873,12 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 		{"btc", decimal.NewFromFloat(0.05)},
 	}
 	for _, data := range testData2 {
-		err := ledger2.Record(participant2, data.asset, data.amount)
+		err := ledger2.Record(participant2AccountID, data.asset, data.amount)
 		require.NoError(t, err)
 	}
 
 	// Case 1: Filter by account_id only
-	params1 := map[string]string{"account_id": participant1}
+	params1 := map[string]string{"account_id": participant1.Hex()}
 	paramsJSON1, err := json.Marshal(params1)
 	require.NoError(t, err)
 
@@ -916,7 +918,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 	assert.Equal(t, 2, assetCounts["eth"], "Should have 2 ETH entries")
 
 	// Case 2: Filter by account_id and asset
-	params2 := map[string]string{"account_id": participant1, "asset": "usdc"}
+	params2 := map[string]string{"account_id": participant1.Hex(), "asset": "usdc"}
 	paramsJSON2, err := json.Marshal(params2)
 	require.NoError(t, err)
 
@@ -944,12 +946,12 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 
 	for _, entry := range entries2 {
 		assert.Equal(t, "usdc", entry.Asset)
-		assert.Equal(t, participant1, entry.AccountID)
-		assert.Equal(t, participant1, entry.Participant)
+		assert.Equal(t, participant1AccountID.String(), entry.AccountID)
+		assert.Equal(t, participant1.Hex(), entry.Participant)
 	}
 
 	// Case 3: Filter by wallet only
-	params3 := map[string]string{"wallet": participant2}
+	params3 := map[string]string{"wallet": participant2.Hex()}
 	paramsJSON3, err := json.Marshal(params3)
 	require.NoError(t, err)
 
@@ -980,7 +982,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 	}
 
 	// Case 4: Filter by wallet and asset
-	params4 := map[string]string{"wallet": participant2, "asset": "usdc"}
+	params4 := map[string]string{"wallet": participant2.Hex(), "asset": "usdc"}
 	paramsJSON4, err := json.Marshal(params4)
 	require.NoError(t, err)
 
@@ -1009,7 +1011,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 	assert.Equal(t, participant2, entries4[0].Participant)
 
 	// Case 5: Filter by account_id and wallet (no overlap)
-	params5 := map[string]string{"account_id": participant1, "wallet": participant2}
+	params5 := map[string]string{"account_id": participant1AccountID.String(), "wallet": participant2.Hex()}
 	paramsJSON5, err := json.Marshal(params5)
 	require.NoError(t, err)
 
@@ -1062,13 +1064,13 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 	for _, entry := range entries6 {
 		foundParticipants[entry.Participant] = true
 	}
-	assert.True(t, foundParticipants[participant1], "Should include entries for participant1")
-	assert.True(t, foundParticipants[participant2], "Should include entries for participant2")
+	assert.True(t, foundParticipants[participant1.Hex()], "Should include entries for participant1")
+	assert.True(t, foundParticipants[participant2.Hex()], "Should include entries for participant2")
 
 	// Case 7: Default wallet provided
 	c = &RPCContext{
 		Context: context.TODO(),
-		UserID:  participant1,
+		UserID:  participant1.Hex(),
 		Message: RPCMessage{
 			Req: &RPCData{
 				RequestID: 7,

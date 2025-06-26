@@ -9,15 +9,15 @@ export const CONFIG = {
         {
             // 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
             WALLET_PK: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as Hex,
-            //
+            // 0xCFEA8Fd97A33D4cb68aC61eDE98Bc18D07eff004
             SESSION_PK: '0x60d7995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as Hex,
-            // 0xf8b647090e60c576FA341B66ae78dC112eF094E2
+            // 0x831cA6915B827C87caec7AbaB3b27b1357cB9a6A
             APP_SESSION_PK: '0x71e8995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as Hex,
         },
         {
             // 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
             WALLET_PK: '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a' as Hex,
-            // 
+            // 0x1c7678FfCBA8f1573201156D1de213e9e085C95f
             SESSION_PK: '0x6ef5111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a' as Hex,
             // 0x9265cF9A5Fe3eF3DD20c9318b64C9108Ef3c0255
             APP_SESSION_PK: '0x7f06111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a' as Hex,

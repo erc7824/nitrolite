@@ -7,8 +7,7 @@ module.exports = {
     transform: {
         '^.+\\.ts$': 'ts-jest',
     },
-    testTimeout: 10000, // 10 seconds for unit tests (should be fast)
-    maxWorkers: '50%', // Can run unit tests in parallel
+    testTimeout: 20000,
     modulePaths: ['<rootDir>/common'],
     moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/common/$1',

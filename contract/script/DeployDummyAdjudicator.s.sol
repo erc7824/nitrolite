@@ -25,6 +25,5 @@ contract DeployDummyAdjudicatorScript is Script {
         vm.stopBroadcast();
 
         console.log("Deployed Dummy Adjudicator at:", address(dummy));
-        console.log("$>", address(dummy), "<^");
     }
 }

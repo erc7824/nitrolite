@@ -25,6 +25,5 @@ contract DeployBalanceCheckerScript is Script {
         vm.stopBroadcast();
 
         console.log("Deployed BalanceChecker at:", address(balanceChecker));
-        console.log("$>", address(balanceChecker), "<^");
     }
 }

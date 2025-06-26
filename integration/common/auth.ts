@@ -19,7 +19,7 @@ export const createAuthSessionWithClearnode = async (
         app_name: 'Test Domain',
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
-        application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',
+        application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // random address, no use for now
         allowances: [],
     };
 

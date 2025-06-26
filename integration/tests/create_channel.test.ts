@@ -6,9 +6,10 @@ import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import { getChannelUpdatePredicateWithStatus, TestWebSocket } from '@/ws';
 import { RPCChannelStatus, rpcResponseParser } from '@erc7824/nitrolite';
+import { parseUnits } from 'viem';
 
 describe('Create channel', () => {
-    const depositAmount = BigInt(100 * 10 ** 6); // 100 USDC
+    const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
 
     let ws: TestWebSocket;
     let identity: Identity;

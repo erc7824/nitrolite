@@ -18,10 +18,10 @@ import {
     RPCChannelStatus,
     rpcResponseParser,
 } from '@erc7824/nitrolite';
-import { Hex } from 'viem';
+import { Hex, parseUnits } from 'viem';
 
 describe('Close channel', () => {
-    const depositAmount = BigInt(100 * 10 ** 6); // 100 USDC
+    const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
     const decimalDepositAmount = BigInt(100);
 
     let ws: TestWebSocket;
@@ -83,14 +83,14 @@ describe('Close channel', () => {
     it('should create and init two channels', async () => {
         const { params } = await client.createAndWaitForChannel(ws, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            amount: depositAmount * BigInt(10),
+            amount: depositAmount * BigInt(10), // 10 times the deposit amount
         });
 
         channelId = params.channelId;
 
         const { params: cpParams } = await cpClient.createAndWaitForChannel(cpWS, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            amount: depositAmount * BigInt(10),
+            amount: depositAmount * BigInt(10), // 10 times the deposit amount
         });
 
         cpChannelId = cpParams.channelId;
@@ -103,7 +103,7 @@ describe('Close channel', () => {
             app_name: 'App Domain',
             expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
             scope: 'console',
-            application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',
+            application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // random address, no use for now
             allowances: [
                 {
                     asset: 'usdc',

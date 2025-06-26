@@ -25,6 +25,5 @@ contract DeployCustodyScript is Script {
         vm.stopBroadcast();
 
         console.log("Deployed Custody at:", address(custody));
-        console.log("$>", address(custody), "<^");
     }
 }

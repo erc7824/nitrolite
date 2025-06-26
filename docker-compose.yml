@@ -29,6 +29,15 @@ services:
       timeout: 5s
       retries: 5
 
+  # Deploys the contracts to the Anvil instance
+  # Addresses of the contracts are determined by mnemonic key and derivation index.
+  # Each contract should have a unique derivation index in order to remain deterministic.
+  #
+  # Indices and corresponding addresses:
+  # Custody(58808): 0x8658501c98C3738026c4e5c361c6C3fa95DfB255
+  # DummyAdjudicator(35305): 0xcbbc03a873c11beeFA8D99477E830be48d8Ae6D7
+  # USDC ERC20(77360): 0xbD24c53072b9693A35642412227043Ffa5fac382
+  # BalanceChecker(53231): 0x730dB3A1D3Ca47e7BaEb260c24C74ED4378726Bc
   contract-deployer:
     image: ghcr.io/foundry-rs/foundry:v1.2.2
     container_name: contract-deployer

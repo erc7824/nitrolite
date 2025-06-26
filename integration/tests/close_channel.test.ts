@@ -6,10 +6,10 @@ import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import { getCloseChannelPredicate, TestWebSocket } from '@/ws';
 import { Allocation, createCloseChannelMessage, rpcResponseParser } from '@erc7824/nitrolite';
-import { Address, Hex } from 'viem';
+import { Address, Hex, parseUnits } from 'viem';
 
 describe('Close channel', () => {
-    const depositAmount = BigInt(100 * 10 ** 6); // 100 USDC
+    const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
 
     let ws: TestWebSocket;
     let identity: Identity;

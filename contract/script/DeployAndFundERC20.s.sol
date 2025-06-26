@@ -14,6 +14,7 @@ contract DeployAndFundERC20Script is Script {
     function run(uint32 deployerIndex, string memory name, string memory symbol, uint8 decimals, string memory mnemonic)
         public
     {
+        // TODO: extract deriving to separate script and reuse it
         (address gasProvider,) = deriveRememberKey(mnemonic, 0);
         vm.startBroadcast(gasProvider);
 
@@ -34,6 +35,5 @@ contract DeployAndFundERC20Script is Script {
         vm.stopBroadcast();
 
         console.log("Deployed ERC20", name, "token at:", address(token));
-        console.log("$>", address(token), "<^");
     }
 }

@@ -159,7 +159,7 @@ const ChannelUpdateParamsSchema = z
     .refine((arr) => arr.length === 1)
     .transform((arr) => arr[0]);
 
-const ChannelsUpdateParamsSchema = z.array(ChannelUpdateObjectSchema);
+const ChannelsUpdateParamsSchema = z.array(z.array(ChannelUpdateObjectSchema)).transform((arr) => arr[0]);
 
 export const channelParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.ResizeChannel]: (params) => ResizeChannelParamsSchema.parse(params),

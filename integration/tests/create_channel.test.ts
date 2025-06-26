@@ -89,11 +89,11 @@ describe('Create channel', () => {
         const openResponse = await openChannelPromise;
         expect(openResponse).toBeDefined();
 
-        const openParsedResponse = rpcResponseParser.channelsUpdate(openResponse);
-        const responseChannel = openParsedResponse.params[0];
+        const openParsedResponse = rpcResponseParser.channelUpdate(openResponse);
+        const responseChannel = openParsedResponse.params;
 
         expect(responseChannel.adjudicator).toBe(CONFIG.ADDRESSES.DUMMY_ADJUDICATOR_ADDRESS);
-        expect(responseChannel.amount).toBe(Number(depositAmount));
+        expect(responseChannel.amount).toBe(depositAmount);
         expect(responseChannel.chainId).toBe(CONFIG.CHAIN_ID);
         expect(responseChannel.challenge).toBe(CONFIG.DEFAULT_CHALLENGE_TIMEOUT);
         expect(responseChannel.channelId).toBe(channelId);
@@ -158,11 +158,11 @@ describe('Create channel', () => {
         const openResponse = await openChannelPromise;
         expect(openResponse).toBeDefined();
 
-        const openParsedResponse = rpcResponseParser.channelsUpdate(openResponse);
-        const responseChannel = openParsedResponse.params[0];
+        const openParsedResponse = rpcResponseParser.channelUpdate(openResponse);
+        const responseChannel = openParsedResponse.params;
 
         expect(responseChannel.adjudicator).toBe(CONFIG.ADDRESSES.DUMMY_ADJUDICATOR_ADDRESS);
-        expect(responseChannel.amount).toBe(Number(depositAmount));
+        expect(responseChannel.amount).toBe(depositAmount);
         expect(responseChannel.chainId).toBe(CONFIG.CHAIN_ID);
         expect(responseChannel.challenge).toBe(CONFIG.DEFAULT_CHALLENGE_TIMEOUT);
         expect(responseChannel.channelId).toBe(channelId);

@@ -83,17 +83,11 @@ describe('Clearnode Authentication', () => {
 
         const parsedAuthVerifyResponse = rpcResponseParser.authVerify(response);
 
-        // TODO: remove @ts-ignore when rpcResponseParser is fixed to return correct types
-        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.success).toBe(true);
-        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.sessionKey).toBe(authRequestParams.participant);
-        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.address).toBe(authRequestParams.wallet);
-        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.jwtToken).toBeDefined();
 
-        // @ts-ignore
         jwtToken = parsedAuthVerifyResponse.params.jwtToken;
     });
 
@@ -109,14 +103,9 @@ describe('Clearnode Authentication', () => {
 
         const parsedAuthVerifyResponse = rpcResponseParser.authVerify(response);
 
-        // TODO:
-        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.success).toBe(true);
-        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.sessionKey).toBe(authRequestParams.participant);
-        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.address).toBe(authRequestParams.wallet);
-        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.jwtToken).toBeUndefined();
     });
 });

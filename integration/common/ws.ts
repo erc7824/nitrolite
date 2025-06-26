@@ -187,7 +187,7 @@ export const getChannelUpdatePredicateWithStatus = (status: RPCChannelStatus) =>
         return genericPredicate(
             data,
             (r) => {
-                return r.method === RPCMethod.ChannelUpdate && r.params[0].status === status;
+                return r.method === RPCMethod.ChannelUpdate && r.params.status === status;
             },
             reqId
         );

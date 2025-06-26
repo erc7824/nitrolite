@@ -127,11 +127,11 @@ describe('Close channel', () => {
         const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
         expect(getLedgerBalancesParsedResponse).toBeDefined();
         expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
-        expect(getLedgerBalancesParsedResponse.params[0]).toHaveLength(1);
-        expect(getLedgerBalancesParsedResponse.params[0][0].amount).toBe(
+        expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
+        expect(getLedgerBalancesParsedResponse.params[0].amount).toBe(
             (decimalDepositAmount * BigInt(10)).toString()
         );
-        expect(getLedgerBalancesParsedResponse.params[0][0].asset).toBe('USDC');
+        expect(getLedgerBalancesParsedResponse.params[0].asset).toBe('USDC');
     });
 
     it('should create app session', async () => {
@@ -227,9 +227,8 @@ describe('Close channel', () => {
         const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
         expect(getLedgerBalancesParsedResponse).toBeDefined();
         expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
-        expect(getLedgerBalancesParsedResponse.params[0]).toHaveLength(1);
-        expect(getLedgerBalancesParsedResponse.params[0][0].amount).toBe((decimalDepositAmount * BigInt(9)).toString());
-        expect(getLedgerBalancesParsedResponse.params[0][0].asset).toBe('USDC');
+        expect(getLedgerBalancesParsedResponse.params[0].amount).toBe((decimalDepositAmount * BigInt(9)).toString());
+        expect(getLedgerBalancesParsedResponse.params[0].asset).toBe('USDC');
     });
 
     // TODO: fix multiple ws connection and add resize

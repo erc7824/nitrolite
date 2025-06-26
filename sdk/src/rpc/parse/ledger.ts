@@ -9,7 +9,15 @@ import {
 import { addressSchema, ParamsParser } from './common';
 
 const GetLedgerBalancesParamsSchema = z
-    .array(z.object({ asset: z.string(), amount: z.union([z.string(), z.number()]).transform((a) => a.toString()) }))
+    .array(
+        z.array(
+            z.object({
+                asset: z.string(),
+                amount: z.union([z.string(), z.number()]).transform((a) => a.toString()),
+            }),
+        ),
+    )
+    .transform((arr) => arr[0])
     .transform((arr) => arr as GetLedgerBalancesResponseParams[]);
 
 const GetLedgerEntriesParamsSchema = z

@@ -50,8 +50,8 @@ export class TestNitroliteClient extends NitroliteClient {
 
         const openResponse = await openChannelPromise;
 
-        const openParsedResponse = rpcResponseParser.channelsUpdate(openResponse);
-        const responseChannel = openParsedResponse.params[0];
+        const openParsedResponse = rpcResponseParser.channelUpdate(openResponse);
+        const responseChannel = openParsedResponse.params;
 
         return { params: responseChannel, initialState };
     };
@@ -99,8 +99,8 @@ export class TestNitroliteClient extends NitroliteClient {
         });
 
         const closeChannelUpdateResponse = await closeChannelUpdateChannelPromise;
-        const closeChannelUpdateParsedResponse = rpcResponseParser.channelsUpdate(closeChannelUpdateResponse);
-        const responseChannel = closeChannelUpdateParsedResponse.params[0];
+        const closeChannelUpdateParsedResponse = rpcResponseParser.channelUpdate(closeChannelUpdateResponse);
+        const responseChannel = closeChannelUpdateParsedResponse.params;
 
         return { params: responseChannel };
     };

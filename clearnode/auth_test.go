@@ -71,12 +71,14 @@ func TestAuthManagerJwtManagement(t *testing.T) {
 
 	wallet := "0x1234567890123456789012345678901234567890"
 	sessionKey := "0x6966978ce78df3228993aa46984eab6d68bbe195"
+	scope := "test_scope"
+	application := "test_application"
 
 	// Before JWT generation, session should not be valid
 	valid := authManager.ValidateSession(wallet)
 	assert.False(t, valid, "Session should not be valid before JWT verification")
 
-	_, token, err := authManager.GenerateJWT(wallet, sessionKey, "", "", []Allowance{
+	_, token, err := authManager.GenerateJWT(wallet, sessionKey, scope, application, []Allowance{
 		{
 			Asset:  "usdc",
 			Amount: "100000",
@@ -94,6 +96,8 @@ func TestAuthManagerJwtManagement(t *testing.T) {
 	// Basic JWT verification
 	assert.Equal(t, wallet, claims.Policy.Wallet)
 	assert.Equal(t, sessionKey, claims.Policy.Participant)
+	assert.Equal(t, scope, claims.Policy.Scope)
+	assert.Equal(t, application, claims.Policy.Application)
 
 	// After JWT verification, session should be valid
 	valid = authManager.ValidateSession(wallet)
@@ -132,7 +136,7 @@ func TestAuthManagerJwtSessionRegistration(t *testing.T) {
 
 func TestAuthManagerJwtExpiration(t *testing.T) {
 	signingKey, _ := crypto.GenerateKey()
-	
+
 	// We're testing session expiration, not JWT expiration,
 	// so keep the JWT valid for longer than the session
 	am := &AuthManager{
@@ -157,7 +161,7 @@ func TestAuthManagerJwtExpiration(t *testing.T) {
 		Allowances:  []Allowance{},
 		ExpiresAt:   time.Now().Add(5 * time.Minute), // Longer expiration for JWT
 	}
-	
+
 	claims := JWTClaims{
 		Policy: policy,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -201,28 +205,28 @@ func TestUpdateExpiredSession(t *testing.T) {
 	}
 
 	wallet := "0x1234567890123456789012345678901234567890"
-	
+
 	// Register the session
 	am.registerAuthSession(wallet)
-	
+
 	// Verify session is valid
 	valid := am.ValidateSession(wallet)
 	assert.True(t, valid, "Session should be valid immediately after registration")
-	
+
 	// Wait for session to expire
 	time.Sleep(300 * time.Millisecond)
-	
+
 	// Session should be invalid after expiration
 	valid = am.ValidateSession(wallet)
 	assert.False(t, valid, "Session should be invalid after expiration")
-	
+
 	// Attempt to update the expired session
 	updated := am.UpdateSession(wallet)
-	
+
 	// According to current implementation, UpdateSession returns false for non-existent sessions
 	// but does not check expiration - it just checks if the session exists in the map
 	assert.True(t, updated, "UpdateSession returns true if session exists in map, even if expired")
-	
+
 	// Verify if the session is now valid after update
 	valid = am.ValidateSession(wallet)
 	assert.True(t, valid, "Session should be valid after update")

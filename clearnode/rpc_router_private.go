@@ -135,14 +135,15 @@ type Balance struct {
 
 func (r *RPCRouter) BalanceUpdateMiddleware(c *RPCContext) {
 	logger := LoggerFromContext(c.Context)
-	walletAddress := c.UserID
+	userAddress := common.HexToAddress(c.UserID)
+	userAccountID := NewAccountID(c.UserID)
 
 	c.Next()
 
 	// Send new balances
-	balances, err := GetWalletLedger(r.DB, walletAddress).GetBalances(walletAddress)
+	balances, err := GetWalletLedger(r.DB, userAddress).GetBalances(userAccountID)
 	if err != nil {
-		logger.Error("error getting balances", "sender", walletAddress, "error", err)
+		logger.Error("error getting balances", "sender", userAddress.Hex(), "error", err)
 		return
 	}
 	r.Node.Notify(c.UserID, "bu", balances)
@@ -155,7 +156,7 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 	ctx := c.Context
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
-	walletAddress := c.UserID
+	userAddress := common.HexToAddress(c.UserID)
 
 	var params GetLedgerBalancesParams
 	if err := parseParams(req.Params, &params); err != nil {
@@ -163,17 +164,15 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 		return
 	}
 
-	accountAddress := params.AccountID
-	if accountAddress == "" {
-		if params.Participant != "" {
-			accountAddress = params.Participant
-		} else {
-			accountAddress = walletAddress
-		}
+	userAccountID := NewAccountID(c.UserID)
+	if params.AccountID != "" {
+		userAccountID = NewAccountID(params.AccountID)
+	} else if params.Participant != "" {
+		userAccountID = NewAccountID(params.Participant)
 	}
 
-	ledger := GetWalletLedger(r.DB, walletAddress)
-	balances, err := ledger.GetBalances(accountAddress)
+	ledger := GetWalletLedger(r.DB, userAddress)
+	balances, err := ledger.GetBalances(userAccountID)
 	if err != nil {
 		logger.Error("failed to get ledger balances", "error", err)
 		c.Fail("failed to get ledger balances")
@@ -181,7 +180,7 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, balances)
-	logger.Info("ledger balances retrieved", "userID", c.UserID, "accountID", params.AccountID)
+	logger.Info("ledger balances retrieved", "userID", c.UserID, "accountID", userAccountID)
 }
 
 // HandleTransfer unified balance funds to the specified account
@@ -227,21 +226,25 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			if alloc.Amount.IsZero() || alloc.Amount.IsNegative() {
 				return fmt.Errorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
-			ledger := GetWalletLedger(tx, fromWallet)
-			balance, err := ledger.Balance(fromWallet, alloc.AssetSymbol)
+
+			fromAddress := common.HexToAddress(fromWallet)
+			fromAccountID := NewAccountID(fromWallet)
+			ledger := GetWalletLedger(tx, fromAddress)
+			balance, err := ledger.Balance(fromAccountID, alloc.AssetSymbol)
 			if err != nil {
 				return fmt.Errorf("failed to check participant balance: %w", err)
 			}
-
 			if alloc.Amount.GreaterThan(balance) {
 				return fmt.Errorf("insufficient funds: %s for asset %s", fromWallet, alloc.AssetSymbol)
 			}
-
-			if err = ledger.Record(fromWallet, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
+			if err = ledger.Record(fromAccountID, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
 				return fmt.Errorf("failed to debit source account: %w", err)
 			}
-			ledger = GetWalletLedger(tx, params.Destination)
-			if err = ledger.Record(params.Destination, alloc.AssetSymbol, alloc.Amount); err != nil {
+
+			toAddress := common.HexToAddress(params.Destination)
+			toAccountID := NewAccountID(params.Destination)
+			ledger = GetWalletLedger(tx, toAddress)
+			if err = ledger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit destination account: %w", err)
 			}
 		}

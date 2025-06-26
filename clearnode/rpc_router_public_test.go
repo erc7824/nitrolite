@@ -781,8 +781,10 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
 	defer cleanup()
 
-	participant1 := "0xParticipant1"
-	participant2 := "0xParticipant2"
+	participant1 := newTestCommonAddress("0xParticipant1")
+	participant1AccountID := NewAccountID(participant1.Hex())
+	participant2 := newTestCommonAddress("0xParticipant2")
+	participant2AccountID := NewAccountID(participant2.Hex())
 
 	// Setup test data
 	ledger1 := GetWalletLedger(router.DB, participant1)
@@ -797,7 +799,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 		{"eth", decimal.NewFromFloat(-0.5)},
 	}
 	for _, data := range testData1 {
-		err := ledger1.Record(participant1, data.asset, data.amount)
+		err := ledger1.Record(participant1AccountID, data.asset, data.amount)
 		require.NoError(t, err)
 	}
 
@@ -810,7 +812,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 		{"btc", decimal.NewFromFloat(0.05)},
 	}
 	for _, data := range testData2 {
-		err := ledger2.Record(participant2, data.asset, data.amount)
+		err := ledger2.Record(participant2AccountID, data.asset, data.amount)
 		require.NoError(t, err)
 	}
 
@@ -882,13 +884,13 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 				for _, entry := range entries {
 					foundParticipants[entry.Participant] = true
 				}
-				assert.True(t, foundParticipants[participant1], "Should include entries for participant1")
-				assert.True(t, foundParticipants[participant2], "Should include entries for participant2")
+				assert.True(t, foundParticipants[participant1.Hex()], "Should include entries for participant1")
+				assert.True(t, foundParticipants[participant2.Hex()], "Should include entries for participant2")
 			},
 		},
 		{
 			name:          "Default wallet provided",
-			userID:        participant1,
+			userID:        participant1.Hex(),
 			params:        map[string]interface{}{},
 			expectedCount: 5,
 			validateFunc: func(t *testing.T, entries []LedgerEntryResponse) {
@@ -940,13 +942,14 @@ func TestRPCRouterHandleGetLedgerEntries_Pagination(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
 	defer cleanup()
 
-	participant := "0xParticipant1"
+	userAddress := newTestCommonAddress("0xParticipant1")
+	userAccountID := NewAccountID(userAddress.Hex())
 
 	tokenNames := []string{
 		"eth1", "eth2", "eth3", "eth4", "eth5", "eth6", "eth7", "eth8", "eth9", "eth10", "eth11"}
 
 	// Create 11 ledger entries for pagination testing
-	ledger := GetWalletLedger(router.DB, participant)
+	ledger := GetWalletLedger(router.DB, userAddress)
 	testData := []struct {
 		asset  string
 		amount decimal.Decimal
@@ -966,7 +969,7 @@ func TestRPCRouterHandleGetLedgerEntries_Pagination(t *testing.T) {
 
 	// Create all entries
 	for _, data := range testData {
-		err := ledger.Record(participant, data.asset, data.amount)
+		err := ledger.Record(userAccountID, data.asset, data.amount)
 		require.NoError(t, err)
 	}
 

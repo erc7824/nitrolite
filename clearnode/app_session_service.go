@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -38,6 +39,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 		return nil, fmt.Errorf("failed to generate app session ID: %w", err)
 	}
 	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
+	sessionAccountID := NewAccountID(appSessionID)
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		for _, alloc := range params.Allocations {
@@ -58,8 +60,10 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 				return err
 			}
 
-			ledger := GetWalletLedger(tx, walletAddress)
-			balance, err := ledger.Balance(walletAddress, alloc.AssetSymbol)
+			userAddress := common.HexToAddress(walletAddress)
+			userAccountID := NewAccountID(walletAddress)
+			ledger := GetWalletLedger(tx, userAddress)
+			balance, err := ledger.Balance(userAccountID, alloc.AssetSymbol)
 			if err != nil {
 				return fmt.Errorf("failed to check participant balance: %w", err)
 			}
@@ -68,10 +72,10 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 				return fmt.Errorf("insufficient funds: %s for asset %s", walletAddress, alloc.AssetSymbol)
 			}
 
-			if err = ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
+			if err = ledger.Record(userAccountID, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
 				return fmt.Errorf("failed to debit source account: %w", err)
 			}
-			if err = ledger.Record(appSessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
+			if err = ledger.Record(sessionAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit destination account: %w", err)
 			}
 		}
@@ -103,8 +107,9 @@ func (s *AppSessionService) SubmitState(params *SubmitStateParams, rpcSigners ma
 		if err != nil {
 			return err
 		}
+		sessionAccountID := NewAccountID(appSession.SessionID)
 
-		appSessionBalance, err := getAppSessionBalances(tx, appSession.SessionID)
+		appSessionBalance, err := getAppSessionBalances(tx, sessionAccountID)
 		if err != nil {
 			return err
 		}
@@ -120,17 +125,18 @@ func (s *AppSessionService) SubmitState(params *SubmitStateParams, rpcSigners ma
 				return fmt.Errorf("allocation to non-participant %s", walletAddress)
 			}
 
-			ledger := GetWalletLedger(tx, walletAddress)
-			balance, err := ledger.Balance(appSession.SessionID, alloc.AssetSymbol)
+			userAddress := common.HexToAddress(walletAddress)
+			ledger := GetWalletLedger(tx, userAddress)
+			balance, err := ledger.Balance(sessionAccountID, alloc.AssetSymbol)
 			if err != nil {
 				return fmt.Errorf("failed to get participant balance: %w", err)
 			}
 
 			// Reset participant allocation in app session to the new amount
-			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, balance.Neg()); err != nil {
+			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, balance.Neg()); err != nil {
 				return fmt.Errorf("failed to debit session: %w", err)
 			}
-			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
+			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit participant: %w", err)
 			}
 
@@ -167,8 +173,9 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 		if err != nil {
 			return err
 		}
+		sessionAccountID := NewAccountID(appSession.SessionID)
 
-		appSessionBalance, err := getAppSessionBalances(tx, appSession.SessionID)
+		appSessionBalance, err := getAppSessionBalances(tx, sessionAccountID)
 		if err != nil {
 			return err
 		}
@@ -184,17 +191,19 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 				return fmt.Errorf("allocation to non-participant %s", walletAddress)
 			}
 
-			ledger := GetWalletLedger(tx, walletAddress)
-			balance, err := ledger.Balance(appSession.SessionID, alloc.AssetSymbol)
+			userAddress := common.HexToAddress(walletAddress)
+			userAccountID := NewAccountID(walletAddress)
+			ledger := GetWalletLedger(tx, userAddress)
+			balance, err := ledger.Balance(sessionAccountID, alloc.AssetSymbol)
 			if err != nil {
 				return fmt.Errorf("failed to get participant balance: %w", err)
 			}
 
 			// Debit session, credit participant
-			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, balance.Neg()); err != nil {
+			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, balance.Neg()); err != nil {
 				return fmt.Errorf("failed to debit session: %w", err)
 			}
-			if err := ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
+			if err := ledger.Record(userAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit participant: %w", err)
 			}
 

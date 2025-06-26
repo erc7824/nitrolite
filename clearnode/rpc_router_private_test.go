@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"strings"
 	"testing"
 	"time"
 
@@ -20,17 +19,19 @@ func TestRPCRouterHandleGetLedgerBalances(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
 	defer cleanup()
 
-	ledger := GetWalletLedger(router.DB, "0xParticipant1")
-	err := ledger.Record("0xParticipant1", "usdc", decimal.NewFromInt(1000))
+	participant1 := newTestCommonAddress("0xParticipant1")
+	participant1AccountID := NewAccountID(participant1.Hex())
+	ledger := GetWalletLedger(router.DB, participant1)
+	err := ledger.Record(participant1AccountID, "usdc", decimal.NewFromInt(1000))
 	require.NoError(t, err)
 
-	params := map[string]string{"account_id": "0xParticipant1"}
+	params := map[string]string{"account_id": participant1AccountID.String()}
 	paramsJSON, err := json.Marshal(params)
 	require.NoError(t, err)
 
 	c := &RPCContext{
 		Context: context.TODO(),
-		UserID:  "0xParticipant1",
+		UserID:  participant1.Hex(),
 		Message: RPCMessage{
 			Req: &RPCData{
 				RequestID: 1,
@@ -157,8 +158,10 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 	// Create signers
 	senderKey, _ := crypto.GenerateKey()
 	senderSigner := Signer{privateKey: senderKey}
-	senderAddr := senderSigner.GetAddress().Hex()
-	recipientAddr := "0x" + strings.Repeat("1", 40) // Valid ethereum address with 1s
+	senderAddr := senderSigner.GetAddress()
+	senderAccountID := NewAccountID(senderAddr.Hex())
+	recipientAddr := newTestCommonAddress("0xRecipient")
+	recipientAccountID := NewAccountID(recipientAddr.Hex())
 
 	t.Run("SuccessfulTransfer", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
@@ -167,16 +170,16 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
-			Signer: senderAddr, Wallet: senderAddr,
+			Signer: senderAddr.Hex(), Wallet: senderAddr.Hex(),
 		}).Error)
 
 		// Fund sender's account
-		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
-		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "eth", decimal.NewFromInt(5)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "eth", decimal.NewFromInt(5)))
 
 		// Create transfer parameters
 		transferParams := TransferParams{
-			Destination: recipientAddr,
+			Destination: recipientAddr.Hex(),
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
 				{AssetSymbol: "eth", Amount: decimal.NewFromInt(2)},
@@ -187,7 +190,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		ts := uint64(time.Now().Unix())
 		c := &RPCContext{
 			Context: context.TODO(),
-			UserID:  senderAddr,
+			UserID:  senderAddr.Hex(),
 			Message: RPCMessage{
 				Req: &RPCData{
 					RequestID: 42,
@@ -219,26 +222,26 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		// Verify response structure
 		transferResp, ok := res.Params[0].(TransferResponse)
 		require.True(t, ok, "Response should be a TransferResponse")
-		assert.Equal(t, senderAddr, transferResp.From)
-		assert.Equal(t, recipientAddr, transferResp.To)
+		assert.Equal(t, senderAddr.Hex(), transferResp.From)
+		assert.Equal(t, recipientAddr.Hex(), transferResp.To)
 		assert.False(t, transferResp.CreatedAt.IsZero(), "CreatedAt should be set")
 
 		// Check balances were updated correctly
 		// Sender should have 500 USDC and 3 ETH left
-		senderUSDC, err := GetWalletLedger(db, senderAddr).Balance(senderAddr, "usdc")
+		senderUSDC, err := GetWalletLedger(db, senderAddr).Balance(senderAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(500).String(), senderUSDC.String())
 
-		senderETH, err := GetWalletLedger(db, senderAddr).Balance(senderAddr, "eth")
+		senderETH, err := GetWalletLedger(db, senderAddr).Balance(senderAccountID, "eth")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(3).String(), senderETH.String())
 
 		// Recipient should have 500 USDC and 2 ETH
-		recipientUSDC, err := GetWalletLedger(db, recipientAddr).Balance(recipientAddr, "usdc")
+		recipientUSDC, err := GetWalletLedger(db, recipientAddr).Balance(recipientAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(500).String(), recipientUSDC.String())
 
-		recipientETH, err := GetWalletLedger(db, recipientAddr).Balance(recipientAddr, "eth")
+		recipientETH, err := GetWalletLedger(db, recipientAddr).Balance(recipientAccountID, "eth")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(2).String(), recipientETH.String())
 	})
@@ -250,11 +253,11 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
-			Signer: senderAddr, Wallet: senderAddr,
+			Signer: senderAddr.Hex(), Wallet: senderAddr.Hex(),
 		}).Error)
 
 		// Fund sender's account
-		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000)))
 
 		// Create transfer with invalid destination
 		transferParams := TransferParams{
@@ -268,7 +271,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		ts := uint64(time.Now().Unix())
 		c := &RPCContext{
 			Context: context.TODO(),
-			UserID:  senderAddr,
+			UserID:  senderAddr.Hex(),
 			Message: RPCMessage{
 				Req: &RPCData{
 					RequestID: 43,
@@ -306,15 +309,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
-			Signer: senderAddr, Wallet: senderAddr,
+			Signer: senderAddr.Hex(), Wallet: senderAddr.Hex(),
 		}).Error)
 
 		// Fund sender's account
-		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000)))
 
 		// Create transfer to self
 		transferParams := TransferParams{
-			Destination: senderAddr,
+			Destination: senderAddr.Hex(),
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
 			},
@@ -324,7 +327,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		ts := uint64(time.Now().Unix())
 		c := &RPCContext{
 			Context: context.TODO(),
-			UserID:  senderAddr,
+			UserID:  senderAddr.Hex(),
 			Message: RPCMessage{
 				Req: &RPCData{
 					RequestID: 44,
@@ -362,15 +365,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
-			Signer: senderAddr, Wallet: senderAddr,
+			Signer: senderAddr.Hex(), Wallet: senderAddr.Hex(),
 		}).Error)
 
 		// Fund sender's account with a small amount
-		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(100)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(100)))
 
 		// Create transfer for more than available
 		transferParams := TransferParams{
-			Destination: recipientAddr,
+			Destination: recipientAddr.Hex(),
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
 			},
@@ -380,7 +383,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		ts := uint64(time.Now().Unix())
 		c := &RPCContext{
 			Context: context.TODO(),
-			UserID:  senderAddr,
+			UserID:  senderAddr.Hex(),
 			Message: RPCMessage{
 				Req: &RPCData{
 					RequestID: 45,
@@ -418,12 +421,12 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
-			Signer: senderAddr, Wallet: senderAddr,
+			Signer: senderAddr.Hex(), Wallet: senderAddr.Hex(),
 		}).Error)
 
 		// Create transfer with empty allocations
 		transferParams := TransferParams{
-			Destination: recipientAddr,
+			Destination: recipientAddr.Hex(),
 			Allocations: []TransferAllocation{},
 		}
 
@@ -431,7 +434,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		ts := uint64(time.Now().Unix())
 		c := &RPCContext{
 			Context: context.TODO(),
-			UserID:  senderAddr,
+			UserID:  senderAddr.Hex(),
 			Message: RPCMessage{
 				Req: &RPCData{
 					RequestID: 46,
@@ -469,15 +472,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
-			Signer: senderAddr, Wallet: senderAddr,
+			Signer: senderAddr.Hex(), Wallet: senderAddr.Hex(),
 		}).Error)
 
 		// Fund sender's account
-		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000)))
 
 		// Create transfer with zero amount
 		transferParams := TransferParams{
-			Destination: recipientAddr,
+			Destination: recipientAddr.Hex(),
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
 			},
@@ -487,7 +490,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		ts := uint64(time.Now().Unix())
 		c := &RPCContext{
 			Context: context.TODO(),
-			UserID:  senderAddr,
+			UserID:  senderAddr.Hex(),
 			Message: RPCMessage{
 				Req: &RPCData{
 					RequestID: 49,
@@ -525,15 +528,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
-			Signer: senderAddr, Wallet: senderAddr,
+			Signer: senderAddr.Hex(), Wallet: senderAddr.Hex(),
 		}).Error)
 
 		// Fund sender's account
-		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000)))
 
 		// Create transfer with negative amount
 		transferParams := TransferParams{
-			Destination: recipientAddr,
+			Destination: recipientAddr.Hex(),
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(-500)},
 			},
@@ -543,7 +546,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		ts := uint64(time.Now().Unix())
 		c := &RPCContext{
 			Context: context.TODO(),
-			UserID:  senderAddr,
+			UserID:  senderAddr.Hex(),
 			Message: RPCMessage{
 				Req: &RPCData{
 					RequestID: 47,
@@ -581,15 +584,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
-			Signer: senderAddr, Wallet: senderAddr,
+			Signer: senderAddr.Hex(), Wallet: senderAddr.Hex(),
 		}).Error)
 
 		// Fund sender's account
-		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000)))
 
 		// Create transfer parameters
 		transferParams := TransferParams{
-			Destination: recipientAddr,
+			Destination: recipientAddr.Hex(),
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
 			},
@@ -599,7 +602,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		ts := uint64(time.Now().Unix())
 		c := &RPCContext{
 			Context: context.TODO(),
-			UserID:  senderAddr,
+			UserID:  senderAddr.Hex(),
 			Message: RPCMessage{
 				Req: &RPCData{
 					RequestID: 48,
@@ -638,8 +641,10 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 	rawB, _ := crypto.GenerateKey()
 	signerA := Signer{privateKey: rawA}
 	signerB := Signer{privateKey: rawB}
-	addrA := signerA.GetAddress().Hex()
-	addrB := signerB.GetAddress().Hex()
+	signerAddressA := signerA.GetAddress()
+	signerAddressB := signerB.GetAddress()
+	accountIDA := NewAccountID(signerAddressA.Hex())
+	accountIDB := NewAccountID(signerAddressB.Hex())
 
 	t.Run("SuccessfulCreateAppSession", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
@@ -647,7 +652,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		defer cleanup()
 
 		token := "0xTokenXYZ"
-		for i, p := range []string{addrA, addrB} {
+		for i, p := range []string{signerAddressA.Hex(), signerAddressB.Hex()} {
 			ch := &Channel{
 				ChannelID:   fmt.Sprintf("0xChannel%c", 'A'+i),
 				Wallet:      p,
@@ -662,13 +667,13 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 			}).Error)
 		}
 
-		require.NoError(t, GetWalletLedger(db, addrA).Record(addrA, "usdc", decimal.NewFromInt(100)))
-		require.NoError(t, GetWalletLedger(db, addrB).Record(addrB, "usdc", decimal.NewFromInt(200)))
+		require.NoError(t, GetWalletLedger(db, signerAddressA).Record(accountIDA, "usdc", decimal.NewFromInt(100)))
+		require.NoError(t, GetWalletLedger(db, signerAddressB).Record(accountIDB, "usdc", decimal.NewFromInt(200)))
 
 		ts := uint64(time.Now().Unix())
 		def := AppDefinition{
 			Protocol:           "test-proto",
-			ParticipantWallets: []string{addrA, addrB},
+			ParticipantWallets: []string{signerAddressA.Hex(), signerAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
 			Challenge:          60,
@@ -677,8 +682,8 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		createParams := CreateAppSessionParams{
 			Definition: def,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: addrA, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: addrB, AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{ParticipantWallet: signerAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{ParticipantWallet: signerAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 			},
 		}
 
@@ -719,18 +724,19 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 
 		var vApp AppSession
 		require.NoError(t, db.Where("session_id = ?", appResp.AppSessionID).First(&vApp).Error)
-		assert.ElementsMatch(t, []string{addrA, addrB}, vApp.ParticipantWallets)
+		assert.ElementsMatch(t, []string{signerAddressA.Hex(), signerAddressB.Hex()}, vApp.ParticipantWallets)
 		assert.Equal(t, uint64(1), vApp.Version)
 
 		// Participant accounts drained
-		partBalA, _ := GetWalletLedger(db, addrA).Balance(addrA, "usdc")
-		partBalB, _ := GetWalletLedger(db, addrB).Balance(addrB, "usdc")
+		partBalA, _ := GetWalletLedger(db, signerAddressA).Balance(accountIDA, "usdc")
+		partBalB, _ := GetWalletLedger(db, signerAddressB).Balance(accountIDB, "usdc")
 		assert.True(t, partBalA.IsZero(), "Participant A balance should be zero")
 		assert.True(t, partBalB.IsZero(), "Participant B balance should be zero")
 
 		// Virtual-app funded
-		vBalA, _ := GetWalletLedger(db, addrA).Balance(appResp.AppSessionID, "usdc")
-		vBalB, _ := GetWalletLedger(db, addrB).Balance(appResp.AppSessionID, "usdc")
+		sessionAccountID := NewAccountID(appResp.AppSessionID)
+		vBalA, _ := GetWalletLedger(db, signerAddressA).Balance(sessionAccountID, "usdc")
+		vBalB, _ := GetWalletLedger(db, signerAddressB).Balance(sessionAccountID, "usdc")
 		assert.Equal(t, decimal.NewFromInt(100).String(), vBalA.String())
 		assert.Equal(t, decimal.NewFromInt(200).String(), vBalB.String())
 	})
@@ -740,7 +746,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		defer cleanup()
 
 		token := "0xTokenXYZ"
-		for i, p := range []string{addrA, addrB} {
+		for i, p := range []string{signerAddressA.Hex(), signerAddressB.Hex()} {
 			ch := &Channel{
 				ChannelID:   fmt.Sprintf("0xChannel%c", 'A'+i),
 				Wallet:      p,
@@ -755,13 +761,13 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 			}).Error)
 		}
 
-		require.NoError(t, GetWalletLedger(db, addrA).Record(addrA, "usdc", decimal.NewFromInt(100)))
-		require.NoError(t, GetWalletLedger(db, addrB).Record(addrB, "usdc", decimal.NewFromInt(200)))
+		require.NoError(t, GetWalletLedger(db, signerAddressA).Record(accountIDA, "usdc", decimal.NewFromInt(100)))
+		require.NoError(t, GetWalletLedger(db, signerAddressB).Record(accountIDB, "usdc", decimal.NewFromInt(200)))
 
 		ts := uint64(time.Now().Unix())
 		def := AppDefinition{
 			Protocol:           "test-proto",
-			ParticipantWallets: []string{addrA, addrB},
+			ParticipantWallets: []string{signerAddressA.Hex(), signerAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
 			Challenge:          60,
@@ -770,8 +776,8 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		createParams := CreateAppSessionParams{
 			Definition: def,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: addrA, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: addrB, AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{ParticipantWallet: signerAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{ParticipantWallet: signerAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 			},
 		}
 
@@ -819,29 +825,30 @@ func TestRPCRouterHandleSubmitState(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		participantA := signer.GetAddress().Hex()
-		participantB := "0xParticipantB"
+		userAddressA := signer.GetAddress()
+		userAddressB := newTestCommonAddress("0xUserB")
 
 		tokenAddress := "0xToken123"
 		require.NoError(t, db.Create(&Channel{
 			ChannelID:   "0xChannelA",
-			Participant: participantA,
+			Participant: userAddressA.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       tokenAddress,
 			Nonce:       1,
 		}).Error)
 		require.NoError(t, db.Create(&Channel{
 			ChannelID:   "0xChannelB",
-			Participant: participantB,
+			Participant: userAddressB.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       tokenAddress,
 			Nonce:       1,
 		}).Error)
 
-		vAppID := "0xVApp123"
+		vAppID := newTestCommonHash("0xVApp123")
+		sessionAccountID := NewAccountID(vAppID.Hex())
 		require.NoError(t, db.Create(&AppSession{
-			SessionID:          vAppID,
-			ParticipantWallets: []string{participantA, participantB},
+			SessionID:          vAppID.Hex(),
+			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Status:             ChannelStatusOpen,
 			Challenge:          60,
 			Weights:            []int64{100, 0},
@@ -850,14 +857,14 @@ func TestRPCRouterHandleSubmitState(t *testing.T) {
 		}).Error)
 
 		assetSymbol := "usdc"
-		require.NoError(t, GetWalletLedger(db, participantA).Record(vAppID, assetSymbol, decimal.NewFromInt(200)))
-		require.NoError(t, GetWalletLedger(db, participantB).Record(vAppID, assetSymbol, decimal.NewFromInt(300)))
+		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, assetSymbol, decimal.NewFromInt(200)))
+		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, assetSymbol, decimal.NewFromInt(300)))
 
 		submitStateParams := SubmitStateParams{
-			AppSessionID: vAppID,
+			AppSessionID: vAppID.Hex(),
 			Allocations: []AppAllocation{
-				{ParticipantWallet: participantA, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
-				{ParticipantWallet: participantB, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
 			},
 		}
 
@@ -896,13 +903,13 @@ func TestRPCRouterHandleSubmitState(t *testing.T) {
 		assert.Equal(t, uint64(2), appResp.Version)
 
 		var updated AppSession
-		require.NoError(t, db.Where("session_id = ?", vAppID).First(&updated).Error)
+		require.NoError(t, db.Where("session_id = ?", vAppID.Hex()).First(&updated).Error)
 		assert.Equal(t, ChannelStatusOpen, updated.Status)
 		assert.Equal(t, uint64(2), updated.Version)
 
 		// Check balances redistributed
-		balA, _ := GetWalletLedger(db, participantA).Balance(vAppID, "usdc")
-		balB, _ := GetWalletLedger(db, participantB).Balance(vAppID, "usdc")
+		balA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
+		balB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
 		assert.Equal(t, decimal.NewFromInt(250), balA)
 		assert.Equal(t, decimal.NewFromInt(250), balB)
 	})
@@ -916,29 +923,32 @@ func TestRPCRouterHandleCloseApplication(t *testing.T) {
 	rawKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
 	signer := Signer{privateKey: rawKey}
-	participantA := signer.GetAddress().Hex()
-	participantB := "0xParticipantB"
+	userAddressA := signer.GetAddress()
+	userAddressB := newTestCommonAddress("0xParticipantB")
+	accountIDA := NewAccountID(userAddressA.Hex())
+	accountIDB := NewAccountID(userAddressB.Hex())
 
 	tokenAddress := "0xToken123"
 	require.NoError(t, db.Create(&Channel{
 		ChannelID:   "0xChannelA",
-		Participant: participantA,
+		Participant: userAddressA.Hex(),
 		Status:      ChannelStatusOpen,
 		Token:       tokenAddress,
 		Nonce:       1,
 	}).Error)
 	require.NoError(t, db.Create(&Channel{
 		ChannelID:   "0xChannelB",
-		Participant: participantB,
+		Participant: userAddressB.Hex(),
 		Status:      ChannelStatusOpen,
 		Token:       tokenAddress,
 		Nonce:       1,
 	}).Error)
 
-	vAppID := "0xVApp123"
+	vAppID := newTestCommonHash("0xVApp123")
+	sessionAccountID := NewAccountID(vAppID.Hex())
 	require.NoError(t, db.Create(&AppSession{
-		SessionID:          vAppID,
-		ParticipantWallets: []string{participantA, participantB},
+		SessionID:          vAppID.Hex(),
+		ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 		Status:             ChannelStatusOpen,
 		Challenge:          60,
 		Weights:            []int64{100, 0},
@@ -947,14 +957,14 @@ func TestRPCRouterHandleCloseApplication(t *testing.T) {
 	}).Error)
 
 	assetSymbol := "usdc"
-	require.NoError(t, GetWalletLedger(db, participantA).Record(vAppID, assetSymbol, decimal.NewFromInt(200)))
-	require.NoError(t, GetWalletLedger(db, participantB).Record(vAppID, assetSymbol, decimal.NewFromInt(300)))
+	require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, assetSymbol, decimal.NewFromInt(200)))
+	require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, assetSymbol, decimal.NewFromInt(300)))
 
 	closeParams := CloseAppSessionParams{
-		AppSessionID: vAppID,
+		AppSessionID: vAppID.Hex(),
 		Allocations: []AppAllocation{
-			{ParticipantWallet: participantA, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
-			{ParticipantWallet: participantB, AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+			{ParticipantWallet: userAddressA.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+			{ParticipantWallet: userAddressB.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
 		},
 	}
 
@@ -993,19 +1003,19 @@ func TestRPCRouterHandleCloseApplication(t *testing.T) {
 	assert.Equal(t, uint64(3), appResp.Version)
 
 	var updated AppSession
-	require.NoError(t, db.Where("session_id = ?", vAppID).First(&updated).Error)
+	require.NoError(t, db.Where("session_id = ?", vAppID.Hex()).First(&updated).Error)
 	assert.Equal(t, ChannelStatusClosed, updated.Status)
 	assert.Equal(t, uint64(3), updated.Version)
 
 	// Check balances redistributed
-	balA, _ := GetWalletLedger(db, participantA).Balance(participantA, "usdc")
-	balB, _ := GetWalletLedger(db, participantB).Balance(participantB, "usdc")
+	balA, _ := GetWalletLedger(db, userAddressA).Balance(accountIDA, "usdc")
+	balB, _ := GetWalletLedger(db, userAddressB).Balance(accountIDB, "usdc")
 	assert.Equal(t, decimal.NewFromInt(250), balA)
 	assert.Equal(t, decimal.NewFromInt(250), balB)
 
 	// v-app accounts drained
-	vBalA, _ := GetWalletLedger(db, participantA).Balance(vAppID, "usdc")
-	vBalB, _ := GetWalletLedger(db, participantB).Balance(vAppID, "usdc")
+	vBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
+	vBalB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
 	assert.True(t, vBalA.IsZero(), "Participant A vApp balance should be zero")
 	assert.True(t, vBalB.IsZero(), "Participant B vApp balance should be zero")
 }
@@ -1019,7 +1029,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		// Create asset
 		asset := Asset{Token: "0xTokenResize", ChainID: 137, Symbol: "usdc", Decimals: 6}
@@ -1029,8 +1040,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		initialAmount := uint64(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResize",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1040,11 +1051,11 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		// Fund participant ledger with 1500 USDC (enough for resize)
-		ledger := GetWalletLedger(db, addr)
-		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(1500)))
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(1500)))
 
 		// Verify initial balance
-		initialBalance, err := ledger.Balance(addr, "usdc")
+		initialBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(1500), initialBalance)
 
@@ -1052,7 +1063,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(200),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1103,7 +1114,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
-		finalBalance, err := ledger.Balance(addr, "usdc")
+		finalBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(1500), finalBalance) // Should remain unchanged
 	})
@@ -1116,7 +1127,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		asset := Asset{Token: "0xTokenResize2", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
@@ -1124,8 +1136,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		initialAmount := uint64(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResize2",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1134,14 +1146,14 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
-		ledger := GetWalletLedger(db, addr)
-		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(500)))
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(500)))
 
 		// Prepare resize params: decrease by 300
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(-300),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1180,7 +1192,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expected), "Decreased amount mismatch")
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
-		finalBalance, err := ledger.Balance(addr, "usdc")
+		finalBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(500), finalBalance) // Should remain unchanged
 	})
@@ -1192,12 +1204,12 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
 
 		resizeParams := ResizeChannelParams{
 			ChannelID:        "0xNonExistentChannel",
 			AllocateAmount:   big.NewInt(100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1241,15 +1253,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
 
 		asset := Asset{Token: "0xTokenClosed", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		ch := Channel{
 			ChannelID:   "0xChanClosed",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusClosed,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1261,7 +1273,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1305,15 +1317,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
 
 		asset := Asset{Token: "0xTokenJoining", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		ch := Channel{
 			ChannelID:   "0xChanJoining",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusJoining,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1325,7 +1337,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1369,15 +1381,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
 
 		asset := Asset{Token: "0xToken", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		require.NoError(t, db.Create(&Channel{
 			ChannelID:   "0xChanChallenged",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusChallenged,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1387,8 +1399,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 
 		ch := Channel{
 			ChannelID:   "0xChan",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1400,7 +1412,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1444,15 +1456,16 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		asset := Asset{Token: "0xTokenInsufficient", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		ch := Channel{
 			ChannelID:   "0xChanInsufficient",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1463,13 +1476,13 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 
 		// Fund with very small amount (0.000001 USDC), but try to allocate 200 raw units
 		// This will create insufficient balance when converted to raw units
-		ledger := GetWalletLedger(db, addr)
-		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromFloat(0.000001)))
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromFloat(0.000001)))
 
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(200),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1513,15 +1526,16 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		asset := Asset{Token: "0xTokenZero", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		ch := Channel{
 			ChannelID:   "0xChanZero",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1530,13 +1544,13 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
-		ledger := GetWalletLedger(db, addr)
-		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(1500)))
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(1500)))
 
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(0),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1581,7 +1595,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		asset := Asset{Token: "0xTokenResizeOnly", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
@@ -1589,8 +1604,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		initialAmount := uint64(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResizeOnly",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1600,14 +1615,14 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		// Fund the ledger to pass balance validation
-		ledger := GetWalletLedger(db, addr)
-		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(1500)))
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(1500)))
 
 		// Resize operation: deposit 100 into channel (changes user's total balance)
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			ResizeAmount:     big.NewInt(100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1654,7 +1669,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		asset := Asset{Token: "0xTokenResizeOnly", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
@@ -1662,8 +1678,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		initialAmount := uint64(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResizeOnly",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1673,14 +1689,14 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		// Fund the ledger to pass balance validation
-		ledger := GetWalletLedger(db, addr)
-		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(1500)))
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(1500)))
 
 		// Resize operation: withdraw 100 from channel (changes user's total balance)
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			ResizeAmount:     big.NewInt(-100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1727,15 +1743,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
 
 		asset := Asset{Token: "0xTokenExcessive", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		ch := Channel{
 			ChannelID:   "0xChanExcessive",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1748,7 +1764,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(-1500),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1792,7 +1808,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
 
 		// Create a different signer for invalid signature
 		wrongKey, err := crypto.GenerateKey()
@@ -1804,8 +1820,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 
 		ch := Channel{
 			ChannelID:   "0xChanSig",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1817,7 +1833,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1861,15 +1877,16 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		asset := Asset{Token: "0xTokenLarge", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		ch := Channel{
 			ChannelID:   "0xChanLarge",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1879,14 +1896,14 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		// Fund with a very large amount
-		ledger := GetWalletLedger(db, addr)
+		ledger := GetWalletLedger(db, userAddress)
 		largeAmount := decimal.NewFromBigInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil), 0) // 10^18
-		require.NoError(t, ledger.Record(addr, "usdc", largeAmount))
+		require.NoError(t, ledger.Record(userAccountID, "usdc", largeAmount))
 
 		resizeParams := ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   new(big.Int).Exp(big.NewInt(10), big.NewInt(15), nil), // 10^15
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -1933,7 +1950,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		// Create asset
 		asset := Asset{Token: "0xTokenMixed", ChainID: 137, Symbol: "usdc", Decimals: 6}
@@ -1943,8 +1961,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		initialAmount := uint64(1000)
 		ch := Channel{
 			ChannelID:   "0xChanMixed",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -1954,11 +1972,11 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		// Fund participant ledger with 2000 USDC (enough for both operations)
-		ledger := GetWalletLedger(db, addr)
-		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(2000)))
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(2000)))
 
 		// Verify initial balance
-		initialBalance, err := ledger.Balance(addr, "usdc")
+		initialBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(2000), initialBalance)
 
@@ -1967,7 +1985,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(150), // Allocation: moves funds from user balance to channel
 			ResizeAmount:     big.NewInt(100), // Resize: deposits additional funds into channel
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -2018,7 +2036,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
-		finalBalance, err := ledger.Balance(addr, "usdc")
+		finalBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(2000), finalBalance) // Should remain unchanged
 	})
@@ -2031,7 +2049,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		// Create asset
 		asset := Asset{Token: "0xTokenMixed", ChainID: 137, Symbol: "usdc", Decimals: 6}
@@ -2041,8 +2060,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		initialAmount := uint64(0)
 		ch := Channel{
 			ChannelID:   "0xChanMixed",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -2052,11 +2071,11 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		// Fund participant ledger with 2000 USDC (enough for both operations)
-		ledger := GetWalletLedger(db, addr)
-		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(2000)))
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(2000)))
 
 		// Verify initial balance
-		initialBalance, err := ledger.Balance(addr, "usdc")
+		initialBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(2000), initialBalance)
 
@@ -2065,7 +2084,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(100),  // Allocation: moves funds from user balance to channel
 			ResizeAmount:     big.NewInt(-100), // Resize: immediately withdraws allocated funds from channel
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(resizeParams)
 
@@ -2115,7 +2134,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
-		finalBalance, err := ledger.Balance(addr, "usdc")
+		finalBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(2000), finalBalance) // Should remain unchanged
 	})
@@ -2130,7 +2149,8 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		// Create asset
 		asset := Asset{Token: "0xTokenClose", ChainID: 137, Symbol: "usdc", Decimals: 6}
@@ -2140,8 +2160,8 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		initialAmount := uint64(500)
 		ch := Channel{
 			ChannelID:   "0xChanClose",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -2151,8 +2171,8 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		// Fund participant ledger so that raw units match channel.Amount
-		require.NoError(t, GetWalletLedger(db, addr).Record(
-			addr,
+		require.NoError(t, GetWalletLedger(db, userAddress).Record(
+			userAccountID,
 			"usdc",
 			decimal.NewFromBigInt(big.NewInt(int64(initialAmount)), -int32(asset.Decimals)),
 		))
@@ -2160,7 +2180,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		// Prepare close params
 		closeParams := CloseChannelParams{
 			ChannelID:        ch.ChannelID,
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(closeParams)
 
@@ -2210,7 +2230,8 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		// Create asset
 		asset := Asset{Token: "0xTokenClose", ChainID: 137, Symbol: "usdc", Decimals: 6}
@@ -2222,8 +2243,8 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		// Seed other challenged channel
 		require.NoError(t, db.Create(&Channel{
 			ChannelID:   "0xChanChallenged",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusChallenged,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -2233,8 +2254,8 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 
 		ch := Channel{
 			ChannelID:   "0xChanClose",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -2244,8 +2265,8 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		// Fund participant ledger so that raw units match channel.Amount
-		require.NoError(t, GetWalletLedger(db, addr).Record(
-			addr,
+		require.NoError(t, GetWalletLedger(db, userAddress).Record(
+			userAccountID,
 			"usdc",
 			decimal.NewFromBigInt(big.NewInt(int64(initialAmount)), -int32(asset.Decimals)),
 		))
@@ -2253,7 +2274,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		// Prepare close params
 		closeParams := CloseChannelParams{
 			ChannelID:        ch.ChannelID,
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		paramsBytes, _ := json.Marshal(closeParams)
 

@@ -65,8 +65,10 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		return ResizeChannelResponse{}, fmt.Errorf("resize operation requires non-zero ResizeAmount or AllocateAmount")
 	}
 
-	ledger := GetWalletLedger(s.db, channel.Wallet)
-	balance, err := ledger.Balance(channel.Wallet, asset.Symbol)
+	userAddress := common.HexToAddress(channel.Wallet)
+	userAccountID := NewAccountID(channel.Wallet)
+	ledger := GetWalletLedger(s.db, userAddress)
+	balance, err := ledger.Balance(userAccountID, asset.Symbol)
 	if err != nil {
 		logger.Error("failed to check participant balance", "error", err)
 		return ResizeChannelResponse{}, fmt.Errorf("failed to check participant balance for asset %s", asset.Symbol)
@@ -177,8 +179,10 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 		return CloseChannelResponse{}, fmt.Errorf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID)
 	}
 
-	ledger := GetWalletLedger(s.db, channel.Wallet)
-	balance, err := ledger.Balance(channel.Wallet, asset.Symbol)
+	userAddress := common.HexToAddress(channel.Wallet)
+	userAccountID := NewAccountID(channel.Wallet)
+	ledger := GetWalletLedger(s.db, userAddress)
+	balance, err := ledger.Balance(userAccountID, asset.Symbol)
 	if err != nil {
 		logger.Error("failed to check participant balance", "error", err)
 		return CloseChannelResponse{}, fmt.Errorf("failed to check participant balance")

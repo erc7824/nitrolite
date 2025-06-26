@@ -270,9 +270,11 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 			return fmt.Errorf("DB error fetching asset: %w", err)
 		}
 
+		walletAddress := ev.Wallet
+		channelAccountID := NewAccountID(channelID)
 		tokenAmount := decimal.NewFromBigInt(big.NewInt(tokenAmount), -int32(asset.Decimals))
-		ledger := GetWalletLedger(tx, wallet)
-		if err := ledger.Record(channelID, asset.Symbol, tokenAmount); err != nil {
+		ledger := GetWalletLedger(tx, walletAddress)
+		if err := ledger.Record(channelAccountID, asset.Symbol, tokenAmount); err != nil {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 
@@ -332,16 +334,19 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 			return fmt.Errorf("DB error fetching asset: %w", err)
 		}
 
+		walletAddress := common.HexToAddress(channel.Wallet)
+		channelAccountID := NewAccountID(channelID)
+		walletAccountID := NewAccountID(channel.Wallet)
 		tokenAmount := decimal.NewFromBigInt(big.NewInt(int64(channel.Amount)), -int32(asset.Decimals))
 		// Transfer from channel account into user's unified account.
-		ledger := GetWalletLedger(tx, channel.Wallet)
-		if err := ledger.Record(channelID, asset.Symbol, tokenAmount.Neg()); err != nil {
+		ledger := GetWalletLedger(tx, walletAddress)
+		if err := ledger.Record(channelAccountID, asset.Symbol, tokenAmount.Neg()); err != nil {
 			log.Printf("[Joined] Error recording balance update for wallet: %v", err)
 			return err
 		}
 
-		ledger = GetWalletLedger(tx, channel.Wallet)
-		if err := ledger.Record(channel.Wallet, asset.Symbol, tokenAmount); err != nil {
+		ledger = GetWalletLedger(tx, walletAddress)
+		if err := ledger.Record(walletAccountID, asset.Symbol, tokenAmount); err != nil {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 
@@ -431,6 +436,9 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			return nil
 		}
 
+		walletAddress := common.HexToAddress(channel.Wallet)
+		channelAccountID := NewAccountID(channelID)
+		walletAccountID := NewAccountID(channel.Wallet)
 		resizeAmount := ev.DeltaAllocations[0] // Participant deposits or withdraws.
 		if resizeAmount.Cmp(big.NewInt(0)) != 0 {
 			asset, err := GetAssetByToken(tx, channel.Token, c.chainID)
@@ -442,30 +450,30 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			// Keep correct order of operation for deposits and withdrawals into the channel.
 			if amount.IsPositive() || amount.IsZero() {
 				// 1. Deposit into a channel account.
-				ledger := GetWalletLedger(tx, channel.Wallet)
-				if err := ledger.Record(channelID, asset.Symbol, amount); err != nil {
+				ledger := GetWalletLedger(tx, walletAddress)
+				if err := ledger.Record(channelAccountID, asset.Symbol, amount); err != nil {
 					return fmt.Errorf("error recording balance update for wallet: %w", err)
 				}
 				// 2. Immediately transfer from the channel account into the unified account.
-				if err := ledger.Record(channelID, asset.Symbol, amount.Neg()); err != nil {
+				if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
 					return fmt.Errorf("error recording balance update for wallet: %w", err)
 				}
-				ledger = GetWalletLedger(tx, channel.Wallet)
-				if err := ledger.Record(channel.Wallet, asset.Symbol, amount); err != nil {
+				ledger = GetWalletLedger(tx, walletAddress)
+				if err := ledger.Record(walletAccountID, asset.Symbol, amount); err != nil {
 					return fmt.Errorf("error recording balance update for participant: %w", err)
 				}
 			} else {
 				// 1. Withdraw from the unified account and immediately transfer into the unified account.
-				ledger := GetWalletLedger(tx, channel.Wallet)
-				if err := ledger.Record(channel.Wallet, asset.Symbol, amount); err != nil {
+				ledger := GetWalletLedger(tx, walletAddress)
+				if err := ledger.Record(walletAccountID, asset.Symbol, amount); err != nil {
 					return fmt.Errorf("error recording balance update for participant: %w", err)
 				}
-				if err := ledger.Record(channelID, asset.Symbol, amount.Neg()); err != nil {
+				if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
 					return fmt.Errorf("error recording balance update for wallet: %w", err)
 				}
 				// 2. Withdraw from the channel account.
-				ledger = GetWalletLedger(tx, channel.Wallet)
-				if err := ledger.Record(channelID, asset.Symbol, amount); err != nil {
+				ledger = GetWalletLedger(tx, walletAddress)
+				if err := ledger.Record(channelAccountID, asset.Symbol, amount); err != nil {
 					return fmt.Errorf("error recording balance update for wallet: %w", err)
 				}
 			}
@@ -512,17 +520,21 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		finalAllocation := ev.FinalState.Allocations[0].Amount
 		tokenAmount := decimal.NewFromBigInt(finalAllocation, -int32(asset.Decimals))
 
+		walletAddress := common.HexToAddress(channel.Wallet)
+		channelAccountID := NewAccountID(channelID)
+		walletAccountID := NewAccountID(channel.Wallet)
+
 		// Transfer fron unified account into channel account and then withdraw immidiately.
-		ledger := GetWalletLedger(tx, channel.Wallet)
-		if err := ledger.Record(channel.Wallet, asset.Symbol, tokenAmount.Neg()); err != nil {
+		ledger := GetWalletLedger(tx, walletAddress)
+		if err := ledger.Record(walletAccountID, asset.Symbol, tokenAmount.Neg()); err != nil {
 			return fmt.Errorf("error recording balance update for participant: %w", err)
 		}
 
-		if err := ledger.Record(channelID, asset.Symbol, tokenAmount); err != nil {
+		if err := ledger.Record(channelAccountID, asset.Symbol, tokenAmount); err != nil {
 			log.Printf("[Closed] Error recording balance update for wallet: %v", err)
 			return err
 		}
-		if err := ledger.Record(channelID, asset.Symbol, tokenAmount.Neg()); err != nil {
+		if err := ledger.Record(channelAccountID, asset.Symbol, tokenAmount.Neg()); err != nil {
 			log.Printf("[Closed] Error recording balance update for wallet: %v", err)
 			return err
 		}

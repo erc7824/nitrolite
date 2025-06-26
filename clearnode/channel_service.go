@@ -23,7 +23,7 @@ func NewChannelService(db *gorm.DB, signer *Signer) *ChannelService {
 	return &ChannelService{db: db, signer: signer}
 }
 
-func (s *ChannelService) ResizeChannel(logger Logger, params *ResizeChannelParams, rpcSigners map[string]struct{}) (ResizeChannelResponse, error) {
+func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParams, rpcSigners map[string]struct{}) (ResizeChannelResponse, error) {
 	channel, err := GetChannelByID(s.db, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)
@@ -147,7 +147,7 @@ func (s *ChannelService) ResizeChannel(logger Logger, params *ResizeChannelParam
 	return resp, nil
 }
 
-func (s *ChannelService) CloseChannel(logger Logger, params *CloseChannelParams, rpcSigners map[string]struct{}) (CloseChannelResponse, error) {
+func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams, rpcSigners map[string]struct{}) (CloseChannelResponse, error) {
 	channel, err := GetChannelByID(s.db, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)

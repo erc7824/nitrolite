@@ -58,7 +58,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 			addr: {},
 		}
 
-		response, err := service.ResizeChannel(LoggerFromContext(context.Background()), params, rpcSigners)
+		response, err := service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.NoError(t, err)
 
 		// Validate response
@@ -121,7 +121,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 			addr: {},
 		}
 
-		response, err := service.ResizeChannel(LoggerFromContext(context.Background()), params, rpcSigners)
+		response, err := service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.NoError(t, err)
 
 		// Channel amount should decrease
@@ -151,7 +151,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{addr: {}}
 
-		_, err = service.ResizeChannel(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "channel 0xNonExistentChannel not found")
 	})
@@ -188,7 +188,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{addr: {}}
 
-		_, err = service.ResizeChannel(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "channel 0xChanClosed is not open: closed")
 	})
@@ -225,7 +225,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{addr: {}}
 
-		_, err = service.ResizeChannel(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "channel 0xChanJoining is not open: joining")
 	})
@@ -273,7 +273,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{addr: {}}
 
-		_, err = service.ResizeChannel(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has challenged channels")
 	})
@@ -315,7 +315,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{addr: {}}
 
-		_, err = service.ResizeChannel(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "insufficient unified balance")
 	})
@@ -352,7 +352,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{} // Empty signers
 
-		_, err = service.ResizeChannel(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid signature")
 	})
@@ -402,7 +402,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 			addr: {},
 		}
 
-		response, err := service.CloseChannel(LoggerFromContext(context.Background()), params, rpcSigners)
+		response, err := service.RequestClose(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.NoError(t, err)
 
 		// Validate response
@@ -470,7 +470,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 			addr: {},
 		}
 
-		_, err = service.CloseChannel(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestClose(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has challenged channels")
 	})

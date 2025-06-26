@@ -255,14 +255,14 @@ func extractAdvisedBlockRange(msg string) (startBlock, endBlock uint64, err erro
 }
 
 // waitForBackOffTimeout implements exponential backoff between retries
-func waitForBackOffTimeout(logger Logger, backOffCount int, log string) {
+func waitForBackOffTimeout(logger Logger, backOffCount int, originator string) {
 	if backOffCount > maxBackOffCount {
-		logger.Fatal("back off limit reached on '"+log+"', exiting", "backOffCollisionCount", backOffCount)
+		logger.Fatal("back off limit reached on '"+originator+"', exiting", "backOffCollisionCount", backOffCount)
 		return
 	}
 
 	if backOffCount > 0 {
-		logger.Info("backing off on '"+log+"'", "backOffCollisionCount", backOffCount)
+		logger.Info("backing off on '"+originator+"'", "backOffCollisionCount", backOffCount)
 		<-time.After(time.Duration(2^backOffCount-1) * time.Second)
 	}
 }

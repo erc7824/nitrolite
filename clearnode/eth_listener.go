@@ -146,6 +146,7 @@ func listenEvents(
 			if err != nil {
 				logger.Error("event subscription error", "error", err, "chainID", chainID, "contractAddress", contractAddress.String())
 				eventSubscription.Unsubscribe()
+				// NOTE: do not increment backOffCount here, as connection errors on continuous subscriptions are normal
 			} else {
 				logger.Debug("subscription closed, resubscribing", "chainID", chainID, "contractAddress", contractAddress.String())
 			}
@@ -171,6 +172,8 @@ func ReconcileBlockRange(
 	endBlock := startBlock + blockStep
 
 	for currentBlock > startBlock {
+		waitForBackOffTimeout(logger, int(backOffCount.Load()))
+
 		// We need to refetch events starting from last known block without adding 1 to it
 		// because it's possible that block includes more than 1 event, and some may be still unprocessed.
 		//
@@ -197,7 +200,7 @@ func ReconcileBlockRange(
 		if err != nil {
 			newStartBlock, newEndBlock, extractErr := extractAdvisedBlockRange(err.Error())
 			if extractErr != nil {
-				logger.Error("failed to filter logs", "error", err, "chainID", chainID, "contractAddress", contractAddress.String())
+				logger.Error("failed to filter logs", "error", err, "chainID", chainID, "contractAddress", contractAddress.String(), "startBlock", startBlock, "endBlock", endBlock)
 				backOffCount.Add(1)
 				continue
 			}

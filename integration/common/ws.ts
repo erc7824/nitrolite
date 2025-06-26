@@ -1,4 +1,4 @@
-import { parseRPCResponse, RPCChannelStatus, RPCMethod, RPCResponse } from '@erc7824/nitrolite';
+import { parseAnyRPCResponse, RPCChannelStatus, RPCMethod, RPCResponse } from '@erc7824/nitrolite';
 import { WebSocket } from 'ws';
 
 interface MessageListener {
@@ -41,7 +41,7 @@ export class TestWebSocket {
 
                 for (const listener of this.messageListeners) {
                     try {
-                        listener.callback(event.toString());
+                        listener.callback(event);
                     } catch (error) {
                         console.error('Error in message listener:', error);
                     }
@@ -144,13 +144,14 @@ export class TestWebSocket {
 
 const genericPredicate = (data: string, condition: (r: RPCResponse) => boolean, reqId?: number) => {
     try {
-        const parsedData = parseRPCResponse(data);
+        const parsedData = parseAnyRPCResponse(data);
         if (condition(parsedData)) {
             return true;
         }
 
         if (reqId !== undefined && parsedData.requestId === reqId && parsedData.method === RPCMethod.Error) {
-            throw new Error(`RPC Error: ${parsedData.params.error || 'Unable to parse: ', data}`);
+            const errorMsg = parsedData.params.map((m) => m.error).join('; ');
+            throw new Error(`RPC Error: ${errorMsg}`);
         }
     } catch (error) {
         if (error.message.includes('Unsupported RPC method: assets')) {

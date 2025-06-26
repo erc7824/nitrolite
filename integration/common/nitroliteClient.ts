@@ -1,11 +1,9 @@
 import {
     Allocation,
-    ChannelsUpdateRPCResponse,
-    CloseChannelRPCResponse,
     createCloseChannelMessage,
     NitroliteClient,
-    parseRPCResponse,
     RPCChannelStatus,
+    rpcResponseParser,
 } from '@erc7824/nitrolite';
 import { Identity } from './identity';
 import { Address, createPublicClient, Hex, http } from 'viem';
@@ -52,7 +50,7 @@ export class TestNitroliteClient extends NitroliteClient {
 
         const openResponse = await openChannelPromise;
 
-        const openParsedResponse = parseRPCResponse(openResponse) as ChannelsUpdateRPCResponse;
+        const openParsedResponse = rpcResponseParser.channelsUpdate(openResponse);
         const responseChannel = openParsedResponse.params[0];
 
         return { params: responseChannel, initialState };
@@ -66,7 +64,7 @@ export class TestNitroliteClient extends NitroliteClient {
         );
 
         const closeResponse = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
-        const closeParsedResponse = parseRPCResponse(closeResponse) as CloseChannelRPCResponse;
+        const closeParsedResponse = rpcResponseParser.closeChannel(closeResponse);
 
         const closeChannelUpdateChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Closed),
@@ -76,34 +74,32 @@ export class TestNitroliteClient extends NitroliteClient {
 
         await this.closeChannel({
             finalState: {
-                channelId: closeParsedResponse.params.channel_id,
-                stateData: closeParsedResponse.params.state_data as Hex,
+                channelId: closeParsedResponse.params.channelId,
+                stateData: closeParsedResponse.params.stateData as Hex,
                 allocations: [
                     {
                         destination: closeParsedResponse.params.allocations[0].destination as Address,
                         token: closeParsedResponse.params.allocations[0].token as Address,
-                        amount: BigInt(closeParsedResponse.params.allocations[0].amount),
+                        amount: closeParsedResponse.params.allocations[0].amount,
                     },
                     {
                         destination: closeParsedResponse.params.allocations[1].destination as Address,
                         token: closeParsedResponse.params.allocations[1].token as Address,
-                        amount: BigInt(closeParsedResponse.params.allocations[1].amount),
+                        amount: closeParsedResponse.params.allocations[1].amount,
                     },
                 ] as [Allocation, Allocation],
                 version: BigInt(closeParsedResponse.params.version),
                 serverSignature: {
-                    v: +closeParsedResponse.params.server_signature.v,
-                    r: closeParsedResponse.params.server_signature.r as Hex,
-                    s: closeParsedResponse.params.server_signature.s as Hex,
+                    v: +closeParsedResponse.params.serverSignature.v,
+                    r: closeParsedResponse.params.serverSignature.r as Hex,
+                    s: closeParsedResponse.params.serverSignature.s as Hex,
                 },
             },
-            stateData: closeParsedResponse.params.state_data as Hex,
+            stateData: closeParsedResponse.params.stateData as Hex,
         });
 
         const closeChannelUpdateResponse = await closeChannelUpdateChannelPromise;
-        const closeChannelUpdateParsedResponse = parseRPCResponse(
-            closeChannelUpdateResponse
-        ) as ChannelsUpdateRPCResponse;
+        const closeChannelUpdateParsedResponse = rpcResponseParser.channelsUpdate(closeChannelUpdateResponse);
         const responseChannel = closeChannelUpdateParsedResponse.params[0];
 
         return { params: responseChannel };

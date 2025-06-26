@@ -12,15 +12,11 @@ import {
 } from '@/ws';
 import {
     AppDefinition,
-    CloseAppSessionRPCResponse,
     createAppSessionMessage,
-    CreateAppSessionRPCResponse,
     createCloseAppSessionMessage,
-    createECDSAMessageSigner,
     createGetLedgerBalancesMessage,
-    GetLedgerBalancesRPCResponse,
-    parseRPCResponse,
     RPCChannelStatus,
+    rpcResponseParser,
 } from '@erc7824/nitrolite';
 import { Hex } from 'viem';
 
@@ -90,14 +86,14 @@ describe('Close channel', () => {
             amount: depositAmount * BigInt(10),
         });
 
-        channelId = params.channel_id;
+        channelId = params.channelId;
 
         const { params: cpParams } = await cpClient.createAndWaitForChannel(cpWS, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount * BigInt(10),
         });
 
-        cpChannelId = cpParams.channel_id;
+        cpChannelId = cpParams.channelId;
     });
 
     it('should create app session with allowance for participant to deposit', async () => {
@@ -110,7 +106,7 @@ describe('Close channel', () => {
             application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc',
             allowances: [
                 {
-                    symbol: 'usdc',
+                    asset: 'usdc',
                     amount: decimalDepositAmount.toString(),
                 },
             ],
@@ -128,9 +124,7 @@ describe('Close channel', () => {
             1000
         );
 
-        const getLedgerBalancesParsedResponse = parseRPCResponse(
-            getLedgerBalancesResponse
-        ) as GetLedgerBalancesRPCResponse;
+        const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
         expect(getLedgerBalancesParsedResponse).toBeDefined();
         expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
         expect(getLedgerBalancesParsedResponse.params[0]).toHaveLength(1);
@@ -175,16 +169,14 @@ describe('Close channel', () => {
             1000
         );
 
-        const createAppSessionParsedResponse = parseRPCResponse(
-            createAppSessionResponse
-        ) as CreateAppSessionRPCResponse;
+        const createAppSessionParsedResponse = rpcResponseParser.createAppSession(createAppSessionResponse);
 
         expect(createAppSessionParsedResponse).toBeDefined();
-        expect(createAppSessionParsedResponse.params.app_session_id).toBeDefined();
+        expect(createAppSessionParsedResponse.params.appSessionId).toBeDefined();
         expect(createAppSessionParsedResponse.params.status).toBe(RPCChannelStatus.Open);
         expect(createAppSessionParsedResponse.params.version).toBeDefined();
 
-        appSessionId = createAppSessionParsedResponse.params.app_session_id;
+        appSessionId = createAppSessionParsedResponse.params.appSessionId;
     });
 
     it('should close app session', async () => {
@@ -213,10 +205,10 @@ describe('Close channel', () => {
         );
         expect(closeAppSessionResponse).toBeDefined();
 
-        const closeAppSessionParsedResponse = parseRPCResponse(closeAppSessionResponse) as CloseAppSessionRPCResponse;
+        const closeAppSessionParsedResponse = rpcResponseParser.closeAppSession(closeAppSessionResponse);
         expect(closeAppSessionParsedResponse).toBeDefined();
 
-        expect(closeAppSessionParsedResponse.params.app_session_id).toBe(appSessionId);
+        expect(closeAppSessionParsedResponse.params.appSessionId).toBe(appSessionId);
         expect(closeAppSessionParsedResponse.params.status).toBe(RPCChannelStatus.Closed);
         expect(closeAppSessionParsedResponse.params.version).toBe(2);
     });
@@ -232,9 +224,7 @@ describe('Close channel', () => {
             1000
         );
 
-        const getLedgerBalancesParsedResponse = parseRPCResponse(
-            getLedgerBalancesResponse
-        ) as GetLedgerBalancesRPCResponse;
+        const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
         expect(getLedgerBalancesParsedResponse).toBeDefined();
         expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
         expect(getLedgerBalancesParsedResponse.params[0]).toHaveLength(1);

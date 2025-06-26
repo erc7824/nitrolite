@@ -1,4 +1,4 @@
-import { Address, createWalletClient, Hex, http, keccak256, stringToBytes } from 'viem';
+import { Address, createWalletClient, Hex, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { chain } from './setup';
 import { createECDSAMessageSigner } from '@erc7824/nitrolite';

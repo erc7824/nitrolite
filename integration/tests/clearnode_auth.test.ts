@@ -3,15 +3,13 @@ import { Identity } from '@/identity';
 import { CONFIG } from '@/setup';
 import { getAuthChallengePredicate, getAuthVerifyPredicate, TestWebSocket } from '@/ws';
 import {
-    Allowance,
-    AuthChallengeRPCResponse,
-    AuthRequest,
-    AuthVerifyRPCResponse,
+    AuthChallengeResponse,
+    AuthRequestParams,
     createAuthRequestMessage,
     createAuthVerifyMessage,
     createAuthVerifyMessageWithJWT,
     createEIP712AuthMessageSigner,
-    parseRPCResponse,
+    rpcResponseParser,
 } from '@erc7824/nitrolite';
 
 describe('Clearnode Authentication', () => {
@@ -26,7 +24,7 @@ describe('Clearnode Authentication', () => {
 
     const identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);
 
-    const authRequestParams: AuthRequest = {
+    const authRequestParams: AuthRequestParams = {
         wallet: identity.walletAddress,
         participant: identity.sessionAddress,
         app_name: 'Test Domain',
@@ -43,17 +41,14 @@ describe('Clearnode Authentication', () => {
             application: authRequestParams.application,
             participant: authRequestParams.participant,
             expire: authRequestParams.expire,
-            allowances: authRequestParams.allowances.map((a: Allowance) => ({
-                asset: a.symbol,
-                amount: a.amount,
-            })),
+            allowances: authRequestParams.allowances,
         },
         {
             name: 'Test Domain',
         }
     );
 
-    let parsedChallengeResponse: AuthChallengeRPCResponse;
+    let parsedChallengeResponse: AuthChallengeResponse;
     let jwtToken: string;
 
     it('should receive challenge', async () => {
@@ -64,7 +59,7 @@ describe('Clearnode Authentication', () => {
         const response = await ws.sendAndWaitForResponse(msg, getAuthChallengePredicate(), 1000);
         expect(response).toBeDefined();
 
-        parsedChallengeResponse = parseRPCResponse(response) as AuthChallengeRPCResponse;
+        parsedChallengeResponse = rpcResponseParser.authChallenge(response);
         expect(parsedChallengeResponse.params.challengeMessage).toBeDefined();
     });
 
@@ -86,13 +81,19 @@ describe('Clearnode Authentication', () => {
         const response = await ws.sendAndWaitForResponse(msg, getAuthVerifyPredicate(), 1000);
         expect(response).toBeDefined();
 
-        const parsedAuthVerifyResponse = parseRPCResponse(response) as AuthVerifyRPCResponse;
+        const parsedAuthVerifyResponse = rpcResponseParser.authVerify(response);
 
+        // TODO: remove @ts-ignore when rpcResponseParser is fixed to return correct types
+        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.success).toBe(true);
+        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.sessionKey).toBe(authRequestParams.participant);
+        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.address).toBe(authRequestParams.wallet);
+        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.jwtToken).toBeDefined();
 
+        // @ts-ignore
         jwtToken = parsedAuthVerifyResponse.params.jwtToken;
     });
 
@@ -106,11 +107,16 @@ describe('Clearnode Authentication', () => {
         const response = await ws.sendAndWaitForResponse(msg, getAuthVerifyPredicate(), 1000);
         expect(response).toBeDefined();
 
-        const parsedAuthVerifyResponse = parseRPCResponse(response) as AuthVerifyRPCResponse;
+        const parsedAuthVerifyResponse = rpcResponseParser.authVerify(response);
 
+        // TODO:
+        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.success).toBe(true);
+        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.sessionKey).toBe(authRequestParams.participant);
+        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.address).toBe(authRequestParams.wallet);
+        // @ts-ignore
         expect(parsedAuthVerifyResponse.params.jwtToken).toBeUndefined();
     });
 });

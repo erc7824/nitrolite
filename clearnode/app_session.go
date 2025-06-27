@@ -63,7 +63,7 @@ func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct
 	var session AppSession
 	if err := tx.Where("session_id = ? AND status = ?", appSessionID, ChannelStatusOpen).
 		Order("nonce DESC").First(&session).Error; err != nil {
-		return AppSession{}, nil, fmt.Errorf("virtual app not found or not open: %w", err)
+		return AppSession{}, nil, RPCErrorf("virtual app not found or not open: %w", err)
 	}
 
 	participantWeights := make(map[string]int64, len(session.ParticipantWallets))
@@ -75,16 +75,16 @@ func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct
 	for wallet := range rpcSigners {
 		weight, ok := participantWeights[wallet]
 		if !ok {
-			return AppSession{}, nil, fmt.Errorf("signature from unknown participant wallet %s", wallet)
+			return AppSession{}, nil, RPCErrorf("signature from unknown participant wallet %s", wallet)
 		}
 		if weight <= 0 {
-			return AppSession{}, nil, fmt.Errorf("zero weight for signer %s", wallet)
+			return AppSession{}, nil, RPCErrorf("zero weight for signer %s", wallet)
 		}
 		totalWeight += weight
 	}
 
 	if totalWeight < int64(session.Quorum) {
-		return AppSession{}, nil, fmt.Errorf("quorum not met: %d / %d", totalWeight, session.Quorum)
+		return AppSession{}, nil, RPCErrorf("quorum not met: %d / %d", totalWeight, session.Quorum)
 	}
 
 	return session, participantWeights, nil

@@ -92,7 +92,7 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 	assets, err := GetAllAssets(r.DB, chainID)
 	if err != nil {
 		logger.Error("failed to get assets", "error", err)
-		c.Fail("failed to get assets")
+		c.Fail(err, "failed to get assets")
 		return
 	}
 
@@ -122,14 +122,14 @@ func (r *RPCRouter) HandleGetAppDefinition(c *RPCContext) {
 	}
 
 	if sessionID == "" {
-		c.Fail("missing account ID")
+		c.Fail(nil, "missing account ID")
 		return
 	}
 
 	var vApp AppSession
 	if err := r.DB.Where("session_id = ?", sessionID).First(&vApp).Error; err != nil {
 		logger.Error("failed to get application session", "sessionID", sessionID, "error", err)
-		c.Fail("failed to get application session")
+		c.Fail(nil, "failed to get application session")
 		return
 	}
 
@@ -164,7 +164,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 	sessions, err := getAppSessions(r.DB, participant, status)
 	if err != nil {
 		logger.Error("failed to get application sessions", "error", err)
-		c.Fail("failed to get application sessions")
+		c.Fail(err, "failed to get application sessions")
 		return
 	}
 
@@ -220,7 +220,7 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 	}
 	if err != nil {
 		logger.Error("failed to get channels", "error", err)
-		c.Fail("failed to get channels")
+		c.Fail(err, "failed to get channels")
 		return
 	}
 
@@ -276,7 +276,7 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 	entries, err := ledger.GetEntries(accountID, asset)
 	if err != nil {
 		logger.Error("failed to get ledger entries", "error", err)
-		c.Fail("failed to get ledger entries")
+		c.Fail(err, "failed to get ledger entries")
 		return
 	}
 

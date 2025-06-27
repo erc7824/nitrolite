@@ -81,37 +81,40 @@ const GetAppDefinitionParamsSchema = z
 
 const GetAppSessionsParamsSchema = z
     .array(
-        z
-            .object({
-                app_session_id: hexSchema,
-                status: statusEnum,
-                participants: z.array(addressSchema),
-                protocol: z.string(),
-                challenge: z.number(),
-                weights: z.array(z.number()),
-                quorum: z.number(),
-                version: z.number(),
-                nonce: z.number(),
-                created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-                updated_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-            })
-            .transform(
-                (s) =>
-                    ({
-                        appSessionId: s.app_session_id as `0x${string}`,
-                        status: s.status as RPCChannelStatus,
-                        participants: s.participants as Address[],
-                        protocol: s.protocol,
-                        challenge: s.challenge,
-                        weights: s.weights,
-                        quorum: s.quorum,
-                        version: s.version,
-                        nonce: s.nonce,
-                        createdAt: s.created_at,
-                        updatedAt: s.updated_at,
-                    }) as GetAppSessionsResponseParams,
-            ),
+        z.array(
+            z
+                .object({
+                    app_session_id: hexSchema,
+                    status: statusEnum,
+                    participants: z.array(addressSchema),
+                    protocol: z.string(),
+                    challenge: z.number(),
+                    weights: z.array(z.number()),
+                    quorum: z.number(),
+                    version: z.number(),
+                    nonce: z.number(),
+                    created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
+                    updated_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
+                })
+                .transform(
+                    (s) =>
+                        ({
+                            appSessionId: s.app_session_id as `0x${string}`,
+                            status: s.status as RPCChannelStatus,
+                            participants: s.participants as Address[],
+                            protocol: s.protocol,
+                            challenge: s.challenge,
+                            weights: s.weights,
+                            quorum: s.quorum,
+                            version: s.version,
+                            nonce: s.nonce,
+                            createdAt: s.created_at,
+                            updatedAt: s.updated_at,
+                        }) as GetAppSessionsResponseParams,
+                ),
+        ),
     )
+    .transform((arr) => arr[0])
     .transform((arr) => arr as GetAppSessionsResponseParams[]);
 
 export const appParamsParsers: Record<string, ParamsParser<unknown>> = {

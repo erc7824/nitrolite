@@ -217,10 +217,10 @@ describe('rpcResponseParser', () => {
     });
 
     test('should parse get_ledger_balances response correctly', () => {
-        const balances = [
+        const balances = [[
             { asset: 'ETH', amount: 1.5 },
             { asset: 'USDC', amount: 1000 },
-        ];
+        ]];
 
         const rawResponse = JSON.stringify({
             res: [123, RPCMethod.GetLedgerBalances, balances, 456],

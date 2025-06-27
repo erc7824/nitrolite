@@ -2,10 +2,10 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Custody} from "../src/Custody.sol";
+import {Dummy} from "../src/adjudicators/Dummy.sol";
 
-contract DeployCustodyScript is Script {
-    Custody public custody;
+contract DeployDummyAdjudicatorScript is Script {
+    Dummy public dummy;
 
     function setUp() public {}
 
@@ -20,10 +20,10 @@ contract DeployCustodyScript is Script {
         vm.stopBroadcast();
         vm.startBroadcast(deployer);
 
-        custody = new Custody();
+        dummy = new Dummy();
 
         vm.stopBroadcast();
 
-        console.log("Deployed Custody at:", address(custody));
+        console.log("Deployed Dummy Adjudicator at:", address(dummy));
     }
 }

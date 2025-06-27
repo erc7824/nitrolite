@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Custody} from "../src/Custody.sol";
+import {BalanceChecker} from "../test/BalanceChecker.sol";
 
-contract DeployCustodyScript is Script {
-    Custody public custody;
+contract DeployBalanceCheckerScript is Script {
+    BalanceChecker public balanceChecker;
 
     function setUp() public {}
 
@@ -20,10 +20,10 @@ contract DeployCustodyScript is Script {
         vm.stopBroadcast();
         vm.startBroadcast(deployer);
 
-        custody = new Custody();
+        balanceChecker = new BalanceChecker();
 
         vm.stopBroadcast();
 
-        console.log("Deployed Custody at:", address(custody));
+        console.log("Deployed BalanceChecker at:", address(balanceChecker));
     }
 }

@@ -14,19 +14,22 @@ const AuthChallengeParamsSchema = z
 
 const AuthVerifyParamsSchema = z
     .array(
-        z.union([
-            z.object({ address: addressSchema, session_key: addressSchema, success: z.boolean() }).transform(
+        z
+            .object({
+                address: addressSchema,
+                session_key: addressSchema,
+                success: z.boolean(),
+                jwt_token: z.string().optional(),
+            })
+            .transform(
                 (raw) =>
                     ({
                         address: raw.address as Address,
                         sessionKey: raw.session_key as Address,
                         success: raw.success,
+                        jwtToken: raw.jwt_token,
                     }) as AuthVerifyResponseParams,
             ),
-            z
-                .object({ jwt_token: z.string() })
-                .transform((raw) => ({ jwtToken: raw.jwt_token }) as AuthVerifyResponseParams),
-        ]),
     )
     .refine((arr) => arr.length === 1)
     .transform((arr) => arr[0]);

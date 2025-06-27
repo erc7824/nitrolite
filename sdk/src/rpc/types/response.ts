@@ -34,7 +34,7 @@ export type AuthVerifyResponseParams =
           sessionKey: Address;
           success: boolean;
       }
-    | {
+    & {
           /** Available only if challenge auth method was used in {@link AuthVerifyRequestParams} during the call to {@link RPCMethod.AuthRequest} */
           jwtToken: string;
       };

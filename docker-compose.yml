@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # TODO: add a frontend client to manage channels.
   database:
@@ -24,13 +22,22 @@ services:
     ports:
       - "8545:8545"
     entrypoint: ["anvil"] 
-    command: ["--host","0.0.0.0","--chain-id","1337","--accounts","15","--balance","300"]
+    command: ["--host","0.0.0.0","--chain-id","31337","--accounts","15","--balance","30000"]
     healthcheck:
       test: ["CMD", "cast", "block-number", "--rpc-url", "http://localhost:8545"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  # Deploys the contracts to the Anvil instance
+  # Addresses of the contracts are determined by mnemonic key and derivation index.
+  # Each contract should have a unique derivation index in order to remain deterministic.
+  #
+  # Indices and corresponding addresses:
+  # Custody(58808): 0x8658501c98C3738026c4e5c361c6C3fa95DfB255
+  # DummyAdjudicator(35305): 0xcbbc03a873c11beeFA8D99477E830be48d8Ae6D7
+  # USDC ERC20(77360): 0xbD24c53072b9693A35642412227043Ffa5fac382
+  # BalanceChecker(53231): 0x730dB3A1D3Ca47e7BaEb260c24C74ED4378726Bc
   contract-deployer:
     image: ghcr.io/foundry-rs/foundry:v1.2.2
     container_name: contract-deployer
@@ -40,12 +47,17 @@ services:
     volumes:
       - ./contract:/app
     working_dir: /app
+    environment:
+      RPC_URL: ${RPC_URL:-http://anvil:8545}
+      DEPLOYER_MNEMONIC: ${DEPLOYER_MNEMONIC:-"test test test test test test test test test test test junk"}
     command: >
-      bash -c "
-        forge script script/DeployCustody.s.sol:DeployCustodyScript --rpc-url http://anvil:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast &&
-        forge script ./script/DeployFundERC20.s.sol --broadcast --rpc-url http://anvil:8545 --sig 'run(string)' 'test test test test test test test test test test test junk' &&
-        forge create --broadcast --optimizer-runs 1000000 --via-ir ./test/mocks/FlagAdjudicator.sol:FlagAdjudicator --rpc-url http://anvil:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --constructor-args true &&
-      "
+      '
+        forge clean &&
+        (forge script script/DeployCustody.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string)" 58808 "$${DEPLOYER_MNEMONIC}" | grep "Deployed") &&
+        (forge script script/DeployDummyAdjudicator.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string)" 35305 "$${DEPLOYER_MNEMONIC}" | grep "Deployed") &&
+        (forge script script/DeployAndFundERC20.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string,string,uint8,string)" 77360 "USD Coin" "USDC" 6 "$${DEPLOYER_MNEMONIC}" | grep "Deployed") &&
+        (forge script script/DeployBalanceChecker.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string)" 53231 "$${DEPLOYER_MNEMONIC}" | grep "Deployed")
+      '
 
   db-init:
     image: postgres:17.2
@@ -55,6 +67,9 @@ services:
       PGDATABASE: ${POSTGRES_DB:-postgres}
       PGHOST: database
       PGPORT: 5432
+      TOKEN_ADDRESS: ${TOKEN_ADDRESS:-0xbD24c53072b9693A35642412227043Ffa5fac382}
+    volumes:
+      - ./clearnode/config/migrations/postgres:/migrations
     command: >
       sh -c "
         echo 'Waiting for database to be ready...' &&
@@ -62,16 +77,45 @@ services:
           echo 'Waiting for database connection...'
           sleep 2
         done &&
-        echo 'Checking database...' &&
+
+        # Create migrations table if it doesn't exist
+        echo 'Creating migrations table if not exists...' &&
+        psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c \"
+          CREATE TABLE IF NOT EXISTS goose_db_version (
+            id serial PRIMARY KEY,
+            version_id int8 NOT NULL,
+            is_applied boolean NOT NULL DEFAULT true,
+            tstamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+        \" &&
         
+        echo 'Running pending migrations...' &&
+        for migration in /migrations/*.sql; do
+          filename=\$$(basename \$$migration) &&
+          version=\$$(echo \$$filename | grep -o '^[0-9]\\+') &&
+          
+          if ! psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -tAc \"SELECT 1 FROM goose_db_version WHERE version_id = \$$version\" | grep -q 1; then
+            echo \"Applying migration: \$$filename\" &&
+            # Extract and execute only the Up migration
+            sed -n '/^-- +goose Up/,/^-- +goose Down/p' \$$migration | 
+            grep -v '^-- +goose' |
+            psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} &&
+            psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c \"INSERT INTO goose_db_version (version_id) VALUES (\$$version);\" &&
+            echo \"Successfully applied: \$$filename\"
+          else
+            echo \"Skipping already applied migration: \$$filename\"
+          fi
+        done &&
+
+        echo 'Checking database...' &&
         # Check if token already exists
-        TOKEN_EXISTS=$$(psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -t -c \"SELECT COUNT(*) FROM assets WHERE token = '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512' AND chain_id = 1337;\" | xargs) &&
+        TOKEN_EXISTS=$$(psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -t -c \"SELECT COUNT(*) FROM assets WHERE token = '$$TOKEN_ADDRESS' AND chain_id = 31337;\" | xargs) &&
         
         if [ \"$$TOKEN_EXISTS\" -eq \"0\" ]; then
           echo 'Seeding database with tokens...' &&
           psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c \"
             INSERT INTO assets (token, chain_id, symbol, decimals) 
-            VALUES ('0xe7f1725e7734ce288f8367e1bb143e90bb3f0512', 1337, 'USDC', 6);
+            VALUES ('$$TOKEN_ADDRESS', 31337, 'USDC', 6);
           \" &&
           echo 'Database seeded with tokens successfully'
         else
@@ -86,18 +130,26 @@ services:
 
   clearnode:
     platform: linux/amd64
-    image: ghcr.io/erc7824/nitrolite/clearnode:0.0.1-rc.28
+    build:
+      context: ./clearnode
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
       - "4242:4242"
     depends_on:
       database:
         condition: service_healthy
+      contract-deployer:
+        condition: service_completed_successfully
+      db-init:
+        condition: service_completed_successfully
     environment:
-      - BROKER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-      - LOCALNET_CUSTODY_CONTRACT_ADDRESS=0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE
-      - LOCALNET_INFURA_URL=ws://anvil:8545
-      - CLEARNODE_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-postgres}?sslmode=disable
+      BROKER_PRIVATE_KEY: ${BROKER_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+      ANVIL_CUSTODY_CONTRACT_ADDRESS: ${ANVIL_CUSTODY_CONTRACT_ADDRESS:-0x8658501c98C3738026c4e5c361c6C3fa95DfB255}
+      ANVIL_ADJUDICATOR_ADDRESS: ${ANVIL_ADJUDICATOR_ADDRESS:-0xcbbc03a873c11beeFA8D99477E830be48d8Ae6D7}
+      ANVIL_BALANCE_CHECKER_ADDRESS: ${ANVIL_BALANCE_CHECKER_ADDRESS:-0x730dB3A1D3Ca47e7BaEb260c24C74ED4378726Bc}
+      ANVIL_INFURA_URL: ws://anvil:8545
+      CLEARNODE_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-postgres}?sslmode=disable
     restart: unless-stopped
 
 volumes:

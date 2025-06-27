@@ -261,7 +261,7 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig string, authPar
 	// Store signer
 	if err := AddSigner(r.DB, challenge.Address, challenge.SessionKey); err != nil {
 		logger.Error("failed to create signer in db", "error", err)
-		return nil, nil, "failed to create signer in db"
+		return nil, nil, err.Error()
 	}
 
 	// TODO: to use expiration specified in the Policy, instead of just setting 1 hour

@@ -47,50 +47,50 @@ func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 	// }
 
 	if len(req.Params) < 7 {
-		c.Fail("invalid parameters: expected 7 parameters")
+		c.Fail(nil, "invalid parameters: expected 7 parameters")
 		return
 	}
 
 	addr, ok := req.Params[0].(string)
 	if !ok || addr == "" {
-		c.Fail(fmt.Sprintf("invalid address: %v", req.Params[0]))
+		c.Fail(nil, fmt.Sprintf("invalid address: %v", req.Params[0]))
 		return
 	}
 
 	sessionKey, ok := req.Params[1].(string)
 	if !ok || sessionKey == "" {
-		c.Fail(fmt.Sprintf("invalid session key: %v", req.Params[1]))
+		c.Fail(nil, fmt.Sprintf("invalid session key: %v", req.Params[1]))
 		return
 	}
 
 	appName, ok := req.Params[2].(string)
 	if !ok || appName == "" {
-		c.Fail(fmt.Sprintf("invalid application name: %v", req.Params[2]))
+		c.Fail(nil, fmt.Sprintf("invalid application name: %v", req.Params[2]))
 		return
 	}
 
 	rawAllowances := req.Params[3]
 	allowances, err := parseAllowances(rawAllowances)
 	if err != nil {
-		c.Fail(fmt.Sprintf("invalid allowances: %s", err.Error()))
+		c.Fail(err, fmt.Sprintf("invalid allowances: %s", err.Error()))
 		return
 	}
 
 	expire, ok := req.Params[4].(string)
 	if !ok {
-		c.Fail(fmt.Sprintf("invalid expiration time: %v", req.Params[4]))
+		c.Fail(nil, fmt.Sprintf("invalid expiration time: %v", req.Params[4]))
 		return
 	}
 
 	scope, ok := req.Params[5].(string)
 	if !ok {
-		c.Fail(fmt.Sprintf("invalid scope: %v", req.Params[5]))
+		c.Fail(nil, fmt.Sprintf("invalid scope: %v", req.Params[5]))
 		return
 	}
 
 	applicationAddress, ok := req.Params[6].(string)
 	if !ok {
-		c.Fail(fmt.Sprintf("invalid application address: %v", req.Params[6]))
+		c.Fail(nil, fmt.Sprintf("invalid application address: %v", req.Params[6]))
 	}
 
 	authParams = AuthRequestParams{
@@ -124,7 +124,7 @@ func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 	)
 	if err != nil {
 		logger.Error("failed to generate challenge", "error", err)
-		c.Fail("failed to generate challenge")
+		c.Fail(err, "failed to generate challenge")
 		return
 	}
 
@@ -143,33 +143,33 @@ func (r *RPCRouter) HandleAuthVerify(c *RPCContext) {
 
 	var authParams AuthVerifyParams
 	if err := parseParams(req.Params, &authParams); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse auth parameters")
 		return
 	}
 
 	var authMethod string
 	var policy *Policy
 	var responseData any
-	var rpcErrorMessage string
+	var err error
 	if authParams.JWT != "" {
 		authMethod = "jwt"
-		policy, responseData, rpcErrorMessage = r.handleAuthJWTVerify(ctx, authParams)
+		policy, responseData, err = r.handleAuthJWTVerify(ctx, authParams)
 	} else if len(c.Message.Sig) > 0 {
 		authMethod = "signature"
-		policy, responseData, rpcErrorMessage = r.handleAuthSigVerify(ctx, c.Message.Sig[0], authParams)
+		policy, responseData, err = r.handleAuthSigVerify(ctx, c.Message.Sig[0], authParams)
 	} else {
-		c.Fail("invalid authentication method: expected JWT or signature")
+		c.Fail(nil, "invalid authentication method: expected JWT or signature")
 		return
 	}
 
 	r.Metrics.AuthAttemptsTotal.With(prometheus.Labels{
 		"auth_method": authMethod,
 	}).Inc()
-	if rpcErrorMessage != "" {
+	if err != nil {
 		r.Metrics.AuthAttempsFail.With(prometheus.Labels{
 			"auth_method": authMethod,
 		}).Inc()
-		c.Fail(rpcErrorMessage)
+		c.Fail(err, "authentication failed")
 		return
 	}
 
@@ -193,7 +193,7 @@ func (r *RPCRouter) AuthMiddleware(c *RPCContext) {
 	// Get policy from storage
 	policy, ok := c.Storage.Get(ConnectionStoragePolicyKey)
 	if !ok || policy == nil || c.UserID == "" {
-		c.Fail("authentication required")
+		c.Fail(nil, "authentication required")
 		return
 	}
 
@@ -201,7 +201,7 @@ func (r *RPCRouter) AuthMiddleware(c *RPCContext) {
 	p, ok := policy.(*Policy)
 	if !ok {
 		logger.Error("invalid policy type in storage", "type", fmt.Sprintf("%T", policy))
-		c.Fail("invalid policy type in storage")
+		c.Fail(nil, "invalid policy type in storage")
 		return
 	}
 
@@ -209,7 +209,7 @@ func (r *RPCRouter) AuthMiddleware(c *RPCContext) {
 	if !r.AuthManager.ValidateSession(p.Wallet) {
 		// TODO: verify whether we should validate it by wallet instead of participant
 		logger.Debug("session expired", "signerAddress", p.Wallet)
-		c.Fail("session expired, please re-authenticate")
+		c.Fail(nil, "session expired, please re-authenticate")
 		return
 	}
 
@@ -218,21 +218,21 @@ func (r *RPCRouter) AuthMiddleware(c *RPCContext) {
 
 	if err := ValidateTimestamp(req.Timestamp, r.Config.msgExpiryTime); err != nil {
 		logger.Debug("invalid message timestamp", "error", err)
-		c.Fail("invalid message timestamp")
+		c.Fail(nil, "invalid message timestamp")
 		return
 	}
 
 	c.Next()
 }
 
-// handleAuthJWTVerify verifies the JWT token and returns the policy, response data and rpc error message.
-func (r *RPCRouter) handleAuthJWTVerify(ctx context.Context, authParams AuthVerifyParams) (*Policy, any, string) {
+// handleAuthJWTVerify verifies the JWT token and returns the policy, response data and error.
+func (r *RPCRouter) handleAuthJWTVerify(ctx context.Context, authParams AuthVerifyParams) (*Policy, any, error) {
 	logger := LoggerFromContext(ctx)
 
 	claims, err := r.AuthManager.VerifyJWT(authParams.JWT)
 	if err != nil {
 		logger.Error("failed to verify JWT", "error", err)
-		return nil, nil, "invalid JWT token"
+		return nil, nil, RPCErrorf("invalid JWT token")
 	}
 
 	return &claims.Policy, map[string]any{
@@ -240,17 +240,17 @@ func (r *RPCRouter) handleAuthJWTVerify(ctx context.Context, authParams AuthVeri
 		"session_key": claims.Policy.Participant,
 		// "jwt_token":   newJwtToken, TODO: add refresh token
 		"success": true,
-	}, ""
+	}, nil
 }
 
-// handleAuthJWTVerify verifies the challenge signature and returns the policy, response data and rpc error message.
-func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig string, authParams AuthVerifyParams) (*Policy, any, string) {
+// handleAuthJWTVerify verifies the challenge signature and returns the policy, response data and error.
+func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig string, authParams AuthVerifyParams) (*Policy, any, error) {
 	logger := LoggerFromContext(ctx)
 
 	challenge, err := r.AuthManager.GetChallenge(authParams.Challenge)
 	if err != nil {
 		logger.Error("failed to get challenge", "error", err)
-		return nil, nil, "invalid challenge"
+		return nil, nil, RPCErrorf("invalid challenge")
 	}
 	recoveredAddress, err := RecoverAddressFromEip712Signature(
 		challenge.Address,
@@ -264,31 +264,31 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig string, authPar
 		sig)
 	if err != nil {
 		logger.Error("failed to recover address from signature", "error", err)
-		return nil, nil, "invalid signature"
+		return nil, nil, RPCErrorf("invalid signature")
 	}
 
 	if err := r.AuthManager.ValidateChallenge(authParams.Challenge, recoveredAddress); err != nil {
 		logger.Debug("challenge verification failed", "error", err)
-		return nil, nil, "invalid challenge or signature"
+		return nil, nil, RPCErrorf("invalid challenge or signature")
 	}
 
 	// Store signer
 	if err := AddSigner(r.DB, challenge.Address, challenge.SessionKey); err != nil {
 		logger.Error("failed to create signer in db", "error", err)
-		return nil, nil, err.Error()
+		return nil, nil, err
 	}
 
 	// Generate the User tag
 	if _, err = GenerateOrRetrieveUserTag(r.DB, challenge.Address); err != nil {
 		logger.Error("failed to store user tag in db", "error", err)
-		return nil, nil, "failed to store user tag in db"
+		return nil, nil, fmt.Errorf("failed to store user tag in db")
 	}
 
 	// TODO: to use expiration specified in the Policy, instead of just setting 1 hour
 	claims, jwtToken, err := r.AuthManager.GenerateJWT(challenge.Address, challenge.SessionKey, challenge.Scope, challenge.AppName, challenge.Allowances)
 	if err != nil {
 		logger.Error("failed to generate JWT token", "error", err)
-		return nil, nil, "failed to generate JWT token"
+		return nil, nil, RPCErrorf("failed to generate JWT token")
 	}
 
 	return &claims.Policy, map[string]any{
@@ -296,7 +296,7 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig string, authPar
 		"session_key": challenge.SessionKey,
 		"jwt_token":   jwtToken,
 		"success":     true,
-	}, ""
+	}, nil
 }
 
 func ValidateTimestamp(ts uint64, expirySeconds int) error {

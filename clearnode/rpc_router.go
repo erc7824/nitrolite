@@ -240,7 +240,7 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 	var rpcHistory []RPCRecord
 	if err := r.RPCStore.db.Where("sender = ?", c.UserID).Order("timestamp DESC").Find(&rpcHistory).Error; err != nil {
 		logger.Error("failed to retrieve RPC history", "error", err)
-		c.Fail("failed to retrieve RPC history")
+		c.Fail(nil, "failed to retrieve RPC history")
 		return
 	}
 

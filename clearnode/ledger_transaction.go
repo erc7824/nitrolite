@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -19,7 +18,7 @@ const (
 )
 
 var (
-	ErrInvalidLedgerTransactionType = errors.New("invalid ledger transaction type")
+	ErrInvalidLedgerTransactionType = RPCErrorf("invalid ledger transaction type")
 )
 
 type LedgerTransaction struct {

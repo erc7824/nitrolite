@@ -321,9 +321,16 @@ func (c *RPCContext) Succeed(method string, params ...any) {
 	}
 }
 
-// Fail sets an error response with the given error message.
-// This should be called by handlers to indicate processing failure.
-func (c *RPCContext) Fail(message string) {
+// Fail sets an error response with one of the following:
+// 1. An RPCError, which will use its message as the response;
+// 2. A fallback message if the error is not an RPCError.
+func (c *RPCContext) Fail(err error, fallbackMessage string) {
+	message := fallbackMessage
+	if _, ok := err.(RPCError); ok {
+		message = err.Error()
+		fmt.Println(err)
+	}
+
 	c.Message.Res = &RPCData{
 		RequestID: c.Message.Req.RequestID,
 		Method:    "error",

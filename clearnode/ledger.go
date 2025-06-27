@@ -172,7 +172,7 @@ func getAppSessionBalances(tx *gorm.DB, appSessionID AccountID) (map[string]deci
 		Select("asset_symbol", "COALESCE(SUM(credit),0) - COALESCE(SUM(debit),0) AS balance").
 		Group("asset_symbol").
 		Scan(&rows).Error; err != nil {
-		return nil, fmt.Errorf("failed to fetch balances for account %s: %w", appSessionID, err)
+		return nil, RPCErrorf("failed to fetch balances for account %s: %w", appSessionID, err)
 	}
 
 	result := make(map[string]decimal.Decimal, len(rows))

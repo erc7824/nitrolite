@@ -28,35 +28,35 @@ func applySort(db *gorm.DB, sortBy string, defaultSort SortType, sortType *SortT
 }
 
 const (
-	DefaultPageSize = 10
-	MaxPageSize     = 100
+	DefaultLimit = 10
+	MaxLimit     = 100
 )
 
-func paginate(rawOffset, rawPageSize *uint32) func(db *gorm.DB) *gorm.DB {
+func paginate(rawOffset, rawLimit *uint32) func(db *gorm.DB) *gorm.DB {
 	offset := 0
 	if rawOffset != nil {
 		offset = int(*rawOffset)
 	}
 
-	pageSize := DefaultPageSize
-	if rawPageSize != nil {
-		pageSize = int(*rawPageSize)
+	limit := DefaultLimit
+	if rawLimit != nil {
+		limit = int(*rawLimit)
 	}
-	if pageSize == 0 {
-		pageSize = DefaultPageSize
-	} else if pageSize > MaxPageSize {
-		pageSize = MaxPageSize
+	if limit == 0 {
+		limit = DefaultLimit
+	} else if limit > MaxLimit {
+		limit = MaxLimit
 	}
 
 	return func(db *gorm.DB) *gorm.DB {
-		return db.Offset(offset).Limit(pageSize)
+		return db.Offset(offset).Limit(limit)
 	}
 }
 
 type ListOptions struct {
-	Offset   uint32    `json:"offset,omitempty"`
-	PageSize uint32    `json:"page_size,omitempty"`
-	Sort     *SortType `json:"sort,omitempty"` // Optional sort type (asc/desc)
+	Offset uint32    `json:"offset,omitempty"`
+	Limit  uint32    `json:"limit,omitempty"`
+	Sort   *SortType `json:"sort,omitempty"` // Optional sort type (asc/desc)
 }
 
 func applyListOptions(db *gorm.DB, sortBy string, defaultSort SortType, options *ListOptions) *gorm.DB {
@@ -64,7 +64,7 @@ func applyListOptions(db *gorm.DB, sortBy string, defaultSort SortType, options 
 		return db
 	}
 
-	db = paginate(&options.Offset, &options.PageSize)(db)
+	db = paginate(&options.Offset, &options.Limit)(db)
 	db = applySort(db, sortBy, defaultSort, options.Sort)
 
 	return db

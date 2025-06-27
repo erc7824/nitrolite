@@ -274,9 +274,9 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 
 		walletAddress := ev.Wallet
 		channelAccountID := NewAccountID(channelID)
-		tokenAmount := decimal.NewFromBigInt(tokenAmount, -int32(asset.Decimals))
+		ledgerTokenAmount := decimal.NewFromBigInt(tokenAmount, -int32(asset.Decimals))
 		ledger := GetWalletLedger(tx, walletAddress)
-		if err := ledger.Record(channelAccountID, asset.Symbol, tokenAmount); err != nil {
+		if err := ledger.Record(channelAccountID, asset.Symbol, ledgerTokenAmount); err != nil {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 

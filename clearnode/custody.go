@@ -58,6 +58,8 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transaction signer: %w", err)
 	}
+
+	// TODO: remove as it is unused
 	auth.GasPrice = big.NewInt(30000000000) // 20 gwei.
 	auth.GasLimit = uint64(3000000)
 
@@ -198,12 +200,12 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 	nonce := ev.Channel.Nonce
 	broker := ev.Channel.Participants[1]
 	tokenAddress := ev.Initial.Allocations[0].Token.Hex()
-	tokenAmount := ev.Initial.Allocations[0].Amount.Int64()
+	tokenAmount := ev.Initial.Allocations[0].Amount
 	adjudicator := ev.Channel.Adjudicator
 	challenge := ev.Channel.Challenge
 
-	brokerAmount := ev.Initial.Allocations[1].Amount.Int64()
-	if brokerAmount != 0 {
+	brokerAmount := ev.Initial.Allocations[1].Amount
+	if brokerAmount.Cmp(big.NewInt(0)) != 0 {
 		logger.Warn("non-zero broker amount", "amount", brokerAmount)
 		return
 	}
@@ -259,7 +261,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 			adjudicator.Hex(),
 			c.chainID,
 			tokenAddress,
-			uint64(tokenAmount),
+			decimal.NewFromBigInt(tokenAmount, 0),
 		)
 		if err != nil {
 			return err
@@ -272,7 +274,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 
 		walletAddress := ev.Wallet
 		channelAccountID := NewAccountID(channelID)
-		tokenAmount := decimal.NewFromBigInt(big.NewInt(tokenAmount), -int32(asset.Decimals))
+		tokenAmount := decimal.NewFromBigInt(tokenAmount, -int32(asset.Decimals))
 		ledger := GetWalletLedger(tx, walletAddress)
 		if err := ledger.Record(channelAccountID, asset.Symbol, tokenAmount); err != nil {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
@@ -337,7 +339,7 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 		walletAddress := common.HexToAddress(channel.Wallet)
 		channelAccountID := NewAccountID(channelID)
 		walletAccountID := NewAccountID(channel.Wallet)
-		tokenAmount := decimal.NewFromBigInt(big.NewInt(int64(channel.Amount)), -int32(asset.Decimals))
+		tokenAmount := decimal.NewFromBigInt(channel.Amount.BigInt(), -int32(asset.Decimals))
 		// Transfer from channel account into user's unified account.
 		ledger := GetWalletLedger(tx, walletAddress)
 		if err := ledger.Record(channelAccountID, asset.Symbol, tokenAmount.Neg()); err != nil {
@@ -419,7 +421,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			return fmt.Errorf("error finding channel: %w", result.Error)
 		}
 
-		newAmount := new(big.Int).SetUint64(channel.Amount)
+		newAmount := channel.Amount.BigInt()
 		for _, change := range ev.DeltaAllocations {
 			newAmount.Add(newAmount, change)
 		}
@@ -430,7 +432,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			return fmt.Errorf("invalid resize, channel balance cannot be negative: %s", newAmount.String())
 		}
 
-		channel.Amount = newAmount.Uint64()
+		channel.Amount = decimal.NewFromBigInt(newAmount, 0)
 		channel.UpdatedAt = time.Now()
 		channel.Version++
 		if err := tx.Save(&channel).Error; err != nil {
@@ -537,7 +539,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		channelAccountID := NewAccountID(channelID)
 		walletAccountID := NewAccountID(channel.Wallet)
 
-		// Transfer fron unified account into channel account and then withdraw immidiately.
+		// Transfer from unified account into channel account and then withdraw immediately.
 		ledger := GetWalletLedger(tx, walletAddress)
 		if err := ledger.Record(walletAccountID, asset.Symbol, tokenAmount.Neg()); err != nil {
 			return fmt.Errorf("error recording balance update for participant: %w", err)
@@ -558,7 +560,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		}
 
 		channel.Status = ChannelStatusClosed
-		channel.Amount = 0
+		channel.Amount = decimal.Zero
 		channel.UpdatedAt = time.Now()
 		channel.Version++
 		if err := tx.Save(&channel).Error; err != nil {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -28,7 +27,7 @@ func (r *RPCRouter) SendChannelUpdate(channel Channel) {
 		Participant: channel.Participant,
 		Status:      channel.Status,
 		Token:       channel.Token,
-		Amount:      big.NewInt(int64(channel.Amount)),
+		Amount:      channel.Amount.BigInt(),
 		ChainID:     channel.ChainID,
 		Adjudicator: channel.Adjudicator,
 		Challenge:   channel.Challenge,

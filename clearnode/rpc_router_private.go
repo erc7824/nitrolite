@@ -257,6 +257,11 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
+	r.SendBalanceUpdate(fromWallet)
+	if common.IsHexAddress(params.Destination) {
+		r.SendBalanceUpdate(params.Destination)
+	}
+
 	c.Succeed(req.Method, TransferResponse{
 		From:        fromWallet,
 		To:          params.Destination,
@@ -306,6 +311,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 	}
 	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
 
+	var participants []string
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsPositive() {
@@ -340,6 +346,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 			if err := ledger.Record(appSessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit destination account: %w", err)
 			}
+			participants = append(participants, walletAddress)
 		}
 
 		return tx.Create(&AppSession{
@@ -359,6 +366,10 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 		logger.Error("failed to create application session", "error", err)
 		c.Fail(err.Error())
 		return
+	}
+
+	for _, participant := range participants {
+		r.SendBalanceUpdate(participant)
 	}
 
 	c.Succeed(req.Method, AppSessionResponse{
@@ -493,6 +504,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 		return
 	}
 
+	var participants []string
 	var newVersion uint64
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
 		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
@@ -529,7 +541,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 			if err := ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit participant: %w", err)
 			}
-
+			participants = append(participants, walletAddress)
 			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
 		}
 
@@ -549,6 +561,10 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 		logger.Error("failed to close application session", "error", err)
 		c.Fail("failed to close application session")
 		return
+	}
+
+	for _, participant := range participants {
+		r.SendBalanceUpdate(participant)
 	}
 
 	c.Succeed(req.Method, AppSessionResponse{

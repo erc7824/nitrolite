@@ -106,7 +106,7 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 
 	var params GetAssetsParams
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 
@@ -114,7 +114,7 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 	assets, err := GetAllAssets(query, params.ChainID)
 	if err != nil {
 		logger.Error("failed to get assets", "error", err)
-		c.Fail("failed to get assets")
+		c.Fail(err, "failed to get assets")
 		return
 	}
 
@@ -135,7 +135,7 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 
 	var params GetChannelsParams
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 
@@ -146,7 +146,7 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 	channels, err = getChannelsByWallet(query, params.Participant, params.Status)
 	if err != nil {
 		logger.Error("failed to get channels", "error", err)
-		c.Fail("failed to get channels")
+		c.Fail(err, "failed to get channels")
 		return
 	}
 
@@ -181,18 +181,18 @@ func (r *RPCRouter) HandleGetAppDefinition(c *RPCContext) {
 
 	var params GetAppDefinitionParams
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 	if params.AppSessionID == "" {
-		c.Fail("missing account ID")
+		c.Fail(nil, "missing account ID")
 		return
 	}
 
 	var vApp AppSession
 	if err := r.DB.Where("session_id = ?", params.AppSessionID).First(&vApp).Error; err != nil {
 		logger.Error("failed to get application session", "sessionID", params.AppSessionID, "error", err)
-		c.Fail("failed to get application session")
+		c.Fail(err, "failed to get application session")
 		return
 	}
 
@@ -215,14 +215,14 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 
 	var params GetAppSessionParams
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 
 	sessions, err := r.AppSessionService.GetAppSessions(params.Participant, params.Status, &params.ListOptions)
 	if err != nil {
 		logger.Error("failed to get application sessions", "error", err)
-		c.Fail("failed to get application sessions")
+		c.Fail(err, "failed to get application sessions")
 		return
 	}
 
@@ -257,7 +257,7 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 
 	var params GetLedgerEntriesParams
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 
@@ -273,7 +273,7 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 	entries, err := ledger.GetEntries(&userAccountID, params.Asset)
 	if err != nil {
 		logger.Error("failed to get ledger entries", "error", err)
-		c.Fail("failed to get ledger entries")
+		c.Fail(err, "failed to get ledger entries")
 		return
 	}
 

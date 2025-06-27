@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -178,7 +177,7 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 	balances, err := ledger.GetBalances(account)
 	if err != nil {
 		logger.Error("failed to get ledger balances", "error", err)
-		c.Fail("failed to get ledger balances")
+		c.Fail(err, "failed to get ledger balances")
 		return
 	}
 
@@ -194,24 +193,24 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 
 	var params Transfer
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 
 	// Allow only ledger accounts as destination at the current stage. In the future we'll unlock application accounts.
 	if params.Destination == "" || params.Destination == c.UserID || !common.IsHexAddress(params.Destination) {
-		c.Fail(fmt.Sprintf("invalid destination account: %s", params.Destination))
+		c.Fail(nil, fmt.Sprintf("invalid destination account: %s", params.Destination))
 		return
 	}
 
 	if len(params.Allocations) == 0 {
-		c.Fail("empty allocations")
+		c.Fail(nil, "empty allocations")
 		return
 	}
 
 	if err := verifySigner(&c.Message, c.UserID); err != nil {
 		logger.Error("failed to verify signer", "error", err)
-		c.Fail(err.Error())
+		c.Fail(err, "failed to verify signer")
 		return
 	}
 
@@ -227,24 +226,24 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsZero() || alloc.Amount.IsNegative() {
-				return fmt.Errorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+				return RPCErrorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 			ledger := GetWalletLedger(tx, fromWallet)
 			balance, err := ledger.Balance(fromWallet, alloc.AssetSymbol)
 			if err != nil {
-				return fmt.Errorf("failed to check participant balance: %w", err)
+				return RPCErrorf("failed to check participant balance: %w", err)
 			}
 
 			if alloc.Amount.GreaterThan(balance) {
-				return fmt.Errorf("insufficient funds: %s for asset %s", fromWallet, alloc.AssetSymbol)
+				return RPCErrorf("insufficient funds: %s for asset %s", fromWallet, alloc.AssetSymbol)
 			}
 
 			if err = ledger.Record(fromWallet, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
-				return fmt.Errorf("failed to debit source account: %w", err)
+				return RPCErrorf("failed to debit source account: %w", err)
 			}
 			ledger = GetWalletLedger(tx, params.Destination)
 			if err = ledger.Record(params.Destination, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return fmt.Errorf("failed to credit destination account: %w", err)
+				return RPCErrorf("failed to credit destination account: %w", err)
 			}
 		}
 
@@ -253,7 +252,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 
 	if err != nil {
 		logger.Error("failed to process transfer", "error", err)
-		c.Fail(err.Error())
+		c.Fail(err, "failed to process transfer")
 		return
 	}
 
@@ -274,26 +273,26 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 
 	var params CreateAppSessionParams
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 	if len(params.Definition.ParticipantWallets) < 2 {
-		c.Fail("invalid number of participants")
+		c.Fail(nil, "invalid number of participants")
 		return
 	}
 	if len(params.Definition.Weights) != len(params.Definition.ParticipantWallets) {
-		c.Fail("number of weights must be equal to participants")
+		c.Fail(nil, "number of weights must be equal to participants")
 		return
 	}
 	if params.Definition.Nonce == 0 {
-		c.Fail("nonce is zero or not provided")
+		c.Fail(nil, "nonce is zero or not provided")
 		return
 	}
 
 	rpcSigners, err := getWallets(&c.Message)
 	if err != nil {
 		logger.Error("failed to get wallets from RPC message", "error", err)
-		c.Fail("failed to get wallets from RPC message")
+		c.Fail(err, "failed to get wallets from RPC message")
 		return
 	}
 
@@ -301,7 +300,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 	appBytes, err := json.Marshal(params.Definition)
 	if err != nil {
 		logger.Error("failed to generate app session ID", "error", err)
-		c.Fail("failed to generate app session ID")
+		c.Fail(nil, "failed to generate app session ID")
 		return
 	}
 	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
@@ -310,11 +309,11 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsPositive() {
 				if _, ok := rpcSigners[alloc.ParticipantWallet]; !ok {
-					return fmt.Errorf("missing signature for participant %s", alloc.ParticipantWallet)
+					return RPCErrorf("missing signature for participant %s", alloc.ParticipantWallet)
 				}
 			}
 			if alloc.Amount.IsNegative() {
-				return fmt.Errorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+				return RPCErrorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 			walletAddress := alloc.ParticipantWallet
 			if wallet := GetWalletBySigner(alloc.ParticipantWallet); wallet != "" {
@@ -328,17 +327,17 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 			ledger := GetWalletLedger(tx, walletAddress)
 			balance, err := ledger.Balance(walletAddress, alloc.AssetSymbol)
 			if err != nil {
-				return fmt.Errorf("failed to check participant balance: %w", err)
+				return RPCErrorf("failed to check participant balance: %w", err)
 			}
 
 			if alloc.Amount.GreaterThan(balance) {
-				return fmt.Errorf("insufficient funds: %s for asset %s", walletAddress, alloc.AssetSymbol)
+				return RPCErrorf("insufficient funds: %s for asset %s", walletAddress, alloc.AssetSymbol)
 			}
 			if err := ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
-				return fmt.Errorf("failed to debit source account: %w", err)
+				return RPCErrorf("failed to debit source account: %w", err)
 			}
 			if err := ledger.Record(appSessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return fmt.Errorf("failed to credit destination account: %w", err)
+				return RPCErrorf("failed to credit destination account: %w", err)
 			}
 		}
 
@@ -357,7 +356,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 
 	if err != nil {
 		logger.Error("failed to create application session", "error", err)
-		c.Fail(err.Error())
+		c.Fail(err, "failed to create application session")
 		return
 	}
 
@@ -385,18 +384,18 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 
 	var params SubmitStateParams
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 	if params.AppSessionID == "" || len(params.Allocations) == 0 {
-		c.Fail("missing required parameters: app_session_id or allocations")
+		c.Fail(nil, "missing required parameters: app_session_id or allocations")
 		return
 	}
 
 	rpcSigners, err := getWallets(&c.Message)
 	if err != nil {
 		logger.Error("failed to get wallets from RPC message", "error", err)
-		c.Fail("failed to get wallets from RPC message")
+		c.Fail(err, "failed to get wallets from RPC message")
 		return
 	}
 
@@ -420,21 +419,21 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 			}
 
 			if _, ok := participantWeights[walletAddress]; !ok {
-				return fmt.Errorf("allocation to non-participant %s", walletAddress)
+				return RPCErrorf("allocation to non-participant %s", walletAddress)
 			}
 
 			ledger := GetWalletLedger(tx, walletAddress)
 			balance, err := ledger.Balance(appSession.SessionID, alloc.AssetSymbol)
 			if err != nil {
-				return fmt.Errorf("failed to get participant balance: %w", err)
+				return RPCErrorf("failed to get participant balance: %w", err)
 			}
 
 			// Reset participant allocation in app session to the new amount
 			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, balance.Neg()); err != nil {
-				return fmt.Errorf("failed to debit session: %w", err)
+				return RPCErrorf("failed to debit session: %w", err)
 			}
 			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return fmt.Errorf("failed to credit participant: %w", err)
+				return RPCErrorf("failed to credit participant: %w", err)
 			}
 
 			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
@@ -453,7 +452,7 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 
 	if err != nil {
 		logger.Error("failed to submit state", "error", err)
-		c.Fail("failed to submit state")
+		c.Fail(err, "failed to submit state")
 		return
 	}
 
@@ -478,18 +477,18 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 
 	var params CloseAppSessionParams
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 	if params.AppSessionID == "" || len(params.Allocations) == 0 {
-		c.Fail("missing required parameters: app_session_id or allocations")
+		c.Fail(nil, "missing required parameters: app_session_id or allocations")
 		return
 	}
 
 	rpcSigners, err := getWallets(&c.Message)
 	if err != nil {
 		logger.Error("failed to get wallets from RPC message", "error", err)
-		c.Fail("failed to get wallets from RPC message")
+		c.Fail(err, "failed to get wallets from RPC message")
 		return
 	}
 
@@ -513,21 +512,21 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 			}
 
 			if _, ok := participantWeights[walletAddress]; !ok {
-				return fmt.Errorf("allocation to non-participant %s", walletAddress)
+				return RPCErrorf("allocation to non-participant %s", walletAddress)
 			}
 
 			ledger := GetWalletLedger(tx, walletAddress)
 			balance, err := ledger.Balance(appSession.SessionID, alloc.AssetSymbol)
 			if err != nil {
-				return fmt.Errorf("failed to get participant balance: %w", err)
+				return RPCErrorf("failed to get participant balance: %w", err)
 			}
 
 			// Debit session, credit participant
 			if err := ledger.Record(appSession.SessionID, alloc.AssetSymbol, balance.Neg()); err != nil {
-				return fmt.Errorf("failed to debit session: %w", err)
+				return RPCErrorf("failed to debit session: %w", err)
 			}
 			if err := ledger.Record(walletAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return fmt.Errorf("failed to credit participant: %w", err)
+				return RPCErrorf("failed to credit participant: %w", err)
 			}
 
 			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
@@ -547,7 +546,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 
 	if err != nil {
 		logger.Error("failed to close application session", "error", err)
-		c.Fail("failed to close application session")
+		c.Fail(err, "failed to close application session")
 		return
 	}
 
@@ -572,46 +571,46 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 
 	var params ResizeChannelParams
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 	if err := validate.Struct(&params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "invalid parameters")
 		return
 	}
 
 	channel, err := GetChannelByID(r.DB, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)
-		c.Fail(fmt.Sprintf("failed to find channel: %s", params.ChannelID))
+		c.Fail(err, fmt.Sprintf("failed to find channel: %s", params.ChannelID))
 		return
 	}
 	if channel == nil {
-		c.Fail(fmt.Sprintf("channel %s not found", params.ChannelID))
+		c.Fail(nil, fmt.Sprintf("channel %s not found", params.ChannelID))
 		return
 	}
 
 	if err = checkChallengedChannels(r.DB, channel.Wallet); err != nil {
 		logger.Error("failed to check challenged channels", "error", err)
-		c.Fail(err.Error())
+		c.Fail(err, "failed to check challenged channels")
 		return
 	}
 
 	if channel.Status != ChannelStatusOpen {
-		c.Fail(fmt.Sprintf("channel %s is not open: %s", params.ChannelID, channel.Status))
+		c.Fail(nil, fmt.Sprintf("channel %s is not open: %s", params.ChannelID, channel.Status))
 		return
 	}
 
 	if err := verifySigner(&c.Message, channel.Wallet); err != nil {
 		logger.Error("failed to verify signer", "error", err)
-		c.Fail(err.Error())
+		c.Fail(err, "failed to verify signer")
 		return
 	}
 
 	asset, err := GetAssetByToken(r.DB, channel.Token, channel.ChainID)
 	if err != nil {
 		logger.Error("failed to find asset", "error", err)
-		c.Fail(fmt.Sprintf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID))
+		c.Fail(nil, fmt.Sprintf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID))
 		return
 	}
 
@@ -624,7 +623,7 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 
 	// Prevent no-op resize operations
 	if params.ResizeAmount.Cmp(big.NewInt(0)) == 0 && params.AllocateAmount.Cmp(big.NewInt(0)) == 0 {
-		c.Fail("resize operation requires non-zero ResizeAmount or AllocateAmount")
+		c.Fail(nil, "resize operation requires non-zero ResizeAmount or AllocateAmount")
 		return
 	}
 
@@ -632,7 +631,7 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 	balance, err := ledger.Balance(channel.Wallet, asset.Symbol)
 	if err != nil {
 		logger.Error("failed to check participant balance", "error", err)
-		c.Fail(fmt.Sprintf("failed to check participant balance for asset %s", asset.Symbol))
+		c.Fail(nil, fmt.Sprintf("failed to check participant balance for asset %s", asset.Symbol))
 		return
 	}
 
@@ -640,12 +639,12 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 	newChannelAmount := new(big.Int).Add(new(big.Int).SetUint64(channel.Amount), params.AllocateAmount)
 
 	if rawBalance.Cmp(newChannelAmount) < 0 {
-		c.Fail("insufficient unified balance")
+		c.Fail(nil, "insufficient unified balance")
 		return
 	}
 	newChannelAmount.Add(newChannelAmount, params.ResizeAmount)
 	if newChannelAmount.Cmp(big.NewInt(0)) < 0 {
-		c.Fail("new channel amount must be positive")
+		c.Fail(nil, "new channel amount must be positive")
 		return
 	}
 
@@ -673,7 +672,7 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 	encodedIntentions, err := intentionArgs.Pack(resizeAmounts)
 	if err != nil {
 		logger.Error("failed to pack resize amounts", "error", err)
-		c.Fail("failed to pack resize amounts")
+		c.Fail(nil, "failed to pack resize amounts")
 		return
 	}
 
@@ -682,14 +681,14 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 	encodedState, err := nitrolite.EncodeState(channelIDHash, nitrolite.IntentRESIZE, big.NewInt(int64(channel.Version)+1), encodedIntentions, allocations)
 	if err != nil {
 		logger.Error("failed to encode state hash", "error", err)
-		c.Fail("failed to encode state hash")
+		c.Fail(nil, "failed to encode state hash")
 		return
 	}
 	stateHash := crypto.Keccak256Hash(encodedState).Hex()
 	sig, err := r.Signer.NitroSign(encodedState)
 	if err != nil {
 		logger.Error("failed to sign state", "error", err)
-		c.Fail("failed to sign state")
+		c.Fail(nil, "failed to sign state")
 		return
 	}
 
@@ -735,42 +734,42 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 
 	var params CloseChannelParams
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 
 	channel, err := GetChannelByID(r.DB, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)
-		c.Fail("failed to find channel")
+		c.Fail(err, "failed to find channel")
 		return
 	}
 	if channel == nil {
-		c.Fail(fmt.Sprintf("channel %s not found", params.ChannelID))
+		c.Fail(nil, fmt.Sprintf("channel %s not found", params.ChannelID))
 		return
 	}
 
 	if err = checkChallengedChannels(r.DB, channel.Wallet); err != nil {
 		logger.Error("failed to check challenged channels", "error", err)
-		c.Fail(err.Error())
+		c.Fail(err, "failed to check challenged channels")
 		return
 	}
 
 	if channel.Status != ChannelStatusOpen {
-		c.Fail(fmt.Sprintf("channel %s is not open: %s", params.ChannelID, channel.Status))
+		c.Fail(nil, fmt.Sprintf("channel %s is not open: %s", params.ChannelID, channel.Status))
 		return
 	}
 
 	if err := verifySigner(&c.Message, channel.Wallet); err != nil {
 		logger.Error("failed to verify signer", "error", err)
-		c.Fail(err.Error())
+		c.Fail(err, "failed to verify signer")
 		return
 	}
 
 	asset, err := GetAssetByToken(r.DB, channel.Token, channel.ChainID)
 	if err != nil {
 		logger.Error("failed to find asset", "error", err)
-		c.Fail(fmt.Sprintf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID))
+		c.Fail(nil, fmt.Sprintf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID))
 		return
 	}
 
@@ -778,19 +777,19 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 	balance, err := ledger.Balance(channel.Wallet, asset.Symbol)
 	if err != nil {
 		logger.Error("failed to check participant balance", "error", err)
-		c.Fail("failed to check participant balance")
+		c.Fail(err, "failed to check participant balance")
 		return
 	}
 	if balance.IsNegative() {
 		logger.Error("negative balance", "balance", balance.String())
-		c.Fail("negative balance")
+		c.Fail(nil, "negative balance")
 		return
 	}
 
 	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
 	channelAmount := new(big.Int).SetUint64(channel.Amount)
 	if channelAmount.Cmp(rawBalance) < 0 {
-		c.Fail("resize this channel first")
+		c.Fail(nil, "resize this channel first")
 	}
 
 	finalBrokerAllocation := new(big.Int).Sub(channelAmount, rawBalance)
@@ -811,20 +810,20 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 	stateDataBytes, err := hexutil.Decode(stateDataHex)
 	if err != nil {
 		logger.Error("failed to decode state data hex", "error", err)
-		c.Fail("failed to decode state data hex")
+		c.Fail(nil, "failed to decode state data hex")
 		return
 	}
 	encodedState, err := nitrolite.EncodeState(common.HexToHash(channel.ChannelID), nitrolite.IntentFINALIZE, big.NewInt(int64(channel.Version)+1), stateDataBytes, allocations)
 	if err != nil {
 		logger.Error("failed to encode state hash", "error", err)
-		c.Fail("failed to encode state hash")
+		c.Fail(nil, "failed to encode state hash")
 		return
 	}
 	stateHash := crypto.Keccak256Hash(encodedState).Hex()
 	sig, err := r.Signer.NitroSign(encodedState)
 	if err != nil {
 		logger.Error("failed to sign state", "error", err)
-		c.Fail("failed to sign state")
+		c.Fail(nil, "failed to sign state")
 		return
 	}
 
@@ -864,12 +863,12 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {
 	for asset, bal := range appSessionBalance {
 		if alloc, ok := allocationSum[asset]; !ok || !bal.Equal(alloc) {
-			return fmt.Errorf("asset %s not fully redistributed", asset)
+			return RPCErrorf("asset %s not fully redistributed", asset)
 		}
 	}
 	for asset := range allocationSum {
 		if _, ok := appSessionBalance[asset]; !ok {
-			return fmt.Errorf("allocation references unknown asset %s", asset)
+			return RPCErrorf("allocation references unknown asset %s", asset)
 		}
 	}
 	return nil
@@ -877,7 +876,7 @@ func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decim
 
 func parseParams(params []any, unmarshalTo any) error {
 	if len(params) == 0 {
-		return errors.New("missing parameters")
+		return RPCErrorf("missing parameters")
 	}
 	paramsJSON, err := json.Marshal(params[0])
 	if err != nil {
@@ -908,7 +907,7 @@ func getWallets(rpc *RPCMessage) (map[string]struct{}, error) {
 // verifySigner checks that the recovered signer matches the channel's wallet.
 func verifySigner(rpc *RPCMessage, channelWallet string) error {
 	if len(rpc.Sig) < 1 {
-		return errors.New("missing participant signature")
+		return RPCErrorf("missing participant signature")
 	}
 	recovered, err := RecoverAddress(rpc.Req.rawBytes, rpc.Sig[0])
 	if err != nil {
@@ -918,7 +917,7 @@ func verifySigner(rpc *RPCMessage, channelWallet string) error {
 		recovered = mapped
 	}
 	if recovered != channelWallet {
-		return errors.New("invalid signature")
+		return RPCErrorf("invalid signature")
 	}
 	return nil
 }
@@ -926,10 +925,10 @@ func verifySigner(rpc *RPCMessage, channelWallet string) error {
 func checkChallengedChannels(tx *gorm.DB, wallet string) error {
 	challengedChannels, err := getChannelsByWallet(tx, wallet, string(ChannelStatusChallenged))
 	if err != nil {
-		return fmt.Errorf("failed to check challenged channels: %w", err)
+		return RPCErrorf("failed to check challenged channels: %w", err)
 	}
 	if len(challengedChannels) > 0 {
-		return fmt.Errorf("participant %s has challenged channels, cannot execute operation", wallet)
+		return RPCErrorf("participant %s has challenged channels, cannot execute operation", wallet)
 	}
 	return nil
 }

@@ -71,18 +71,21 @@ func runReconcileCli(logger Logger) {
 	}
 
 	eventCh := make(chan types.Log, 1000)
-	go ReconcileBlockRange(
-		client,
-		common.HexToAddress(network.CustodyAddress),
-		network.ChainID,
-		blockStart.Uint64(),
-		network.BlockStep,
-		blockEnd.Uint64(),
-		0,
-		&atomic.Uint64{},
-		eventCh,
-		logger,
-	)
+	go func() {
+		ReconcileBlockRange(
+			client,
+			common.HexToAddress(network.CustodyAddress),
+			network.ChainID,
+			blockEnd.Uint64(),
+			network.BlockStep,
+			blockStart.Uint64(),
+			0,
+			&atomic.Uint64{},
+			eventCh,
+			logger,
+		)
+		close(eventCh)
+	}()
 
 	for event := range eventCh {
 		custody.handleBlockChainEvent(context.Background(), event)

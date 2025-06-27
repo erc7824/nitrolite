@@ -239,15 +239,24 @@ To get balance in a specific virtual app session, specify `app_session_id` as ac
 
 This method allows a user to transfer assets from their unified balance to another account. The user must have sufficient funds for each asset being transferred. The operation will fail if any of the specified assets have insufficient funds.
 
-CAUTION: Invalid destination address may result in loss of funds.
-Currently, `Transfer` supports ledger account of another user as destination (wallet address is identifier).
+The `destination` can be:
+- The ledger account of another user (specified as a hex address)
+- A virtual app session (specified by its `app_session_id`) 
 
-**Request:**
+**Deposit to App Sessions:**
+When transferring to an app session the system validates:
+- The app session must be open
+- The user must be a participant in the session
+- The session version is automatically incremented upon successful deposit
+
+CAUTION: Invalid destination will result in loss of funds.
+
+**Request (Transfer to another user's unified account):**
 
 ```json
 {
   "req": [1, "transfer", [{
-    "destination": "0x9876543210abcdef...",
+    "destination": "0x9876543210abcdef...", // Another user's wallet address
     "allocations": [
       {
         "asset": "usdc",
@@ -256,6 +265,23 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
       {
         "asset": "eth",
         "amount": "0.1"
+      }
+    ]
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Request (Deposit to an app session):**
+
+```json
+{
+  "req": [1, "transfer", [{
+    "destination": "0x3456789012abcdef...", // App session ID
+    "allocations": [
+      {
+        "asset": "usdc",
+        "amount": "100.0"
       }
     ]
   }], 1619123456789],

@@ -89,3 +89,12 @@ func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct
 
 	return session, participantWeights, nil
 }
+
+// isAppSessionID checks if the given string is a valid AppSessionID
+func isAppSessionID(appSessionID string) bool {
+	// AppSessionID is a hex string of 64 characters
+	if len(appSessionID) != 66 {
+		return false
+	}
+	return true
+}

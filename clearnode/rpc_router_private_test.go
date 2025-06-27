@@ -631,6 +631,243 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.Len(t, res.Params, 1)
 		assert.Contains(t, res.Params[0], "invalid signature")
 	})
+
+	t.Run("SuccessfulDepositToAppSession", func(t *testing.T) {
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
+		defer cleanup()
+
+		// Create participants
+		participantA, _ := crypto.GenerateKey()
+		participantB, _ := crypto.GenerateKey()
+		signerA := Signer{privateKey: participantA}
+		signerB := Signer{privateKey: participantB}
+		addrA := signerA.GetAddress().Hex()
+		addrB := signerB.GetAddress().Hex()
+
+		// Setup signer wallet relations
+		require.NoError(t, db.Create(&SignerWallet{Signer: addrA, Wallet: addrA}).Error)
+		require.NoError(t, db.Create(&SignerWallet{Signer: addrB, Wallet: addrB}).Error)
+
+		// Fund participant A
+		require.NoError(t, GetWalletLedger(db, addrA).Record(addrA, "usdc", decimal.NewFromInt(1000)))
+
+		// Create app session
+		appSession := AppSession{
+			SessionID:          "0x" + strings.Repeat("a", 64),
+			ParticipantWallets: []string{addrA, addrB},
+			Status:             ChannelStatusOpen,
+			Protocol:           "test-protocol",
+			Challenge:          3600,
+			Weights:            []int64{1, 1},
+			Quorum:             2,
+			Nonce:              1,
+			Version:            1,
+		}
+		require.NoError(t, db.Create(&appSession).Error)
+
+		// Create deposit transfer to app session
+		transferParams := Transfer{
+			Destination: appSession.SessionID,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  addrA,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 45,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
+			},
+		}
+
+		// Marshal and sign request
+		rawReq, err := json.Marshal(c.Message.Req)
+		require.NoError(t, err)
+		c.Message.Req.rawBytes = rawReq
+		sigBytes, err := signerA.Sign(rawReq)
+		require.NoError(t, err)
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+
+		// Call handler
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		// Verify successful response
+		assert.Equal(t, "transfer", res.Method)
+		assert.Equal(t, uint64(45), res.RequestID)
+
+		// Verify participant A's balance decreased
+		participantBalance, err := GetWalletLedger(db, addrA).Balance(addrA, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(500).String(), participantBalance.String())
+
+		// Verify app session received the deposit
+		appSessionBalance, err := GetWalletLedger(db, addrA).Balance(appSession.SessionID, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(500).String(), appSessionBalance.String())
+	})
+
+	t.Run("ErrorDepositToClosedAppSession", func(t *testing.T) {
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
+		defer cleanup()
+
+		// Create participant
+		participantA, _ := crypto.GenerateKey()
+		signerA := Signer{privateKey: participantA}
+		addrA := signerA.GetAddress().Hex()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{Signer: addrA, Wallet: addrA}).Error)
+
+		// Fund participant A
+		require.NoError(t, GetWalletLedger(db, addrA).Record(addrA, "usdc", decimal.NewFromInt(1000)))
+
+		// Create closed app session
+		appSession := AppSession{
+			SessionID:          "0x" + strings.Repeat("b", 64),
+			ParticipantWallets: []string{addrA},
+			Status:             ChannelStatusClosed, // Session is closed
+			Protocol:           "test-protocol",
+			Challenge:          3600,
+			Weights:            []int64{1},
+			Quorum:             1,
+			Nonce:              1,
+			Version:            1,
+		}
+		require.NoError(t, db.Create(&appSession).Error)
+
+		// Attempt to deposit to closed session
+		transferParams := Transfer{
+			Destination: appSession.SessionID,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  addrA,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 46,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
+			},
+		}
+
+		// Marshal and sign request
+		rawReq, err := json.Marshal(c.Message.Req)
+		require.NoError(t, err)
+		c.Message.Req.rawBytes = rawReq
+		sigBytes, err := signerA.Sign(rawReq)
+		require.NoError(t, err)
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+
+		// Call handler
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		// Verify error response
+		assert.Equal(t, "error", res.Method)
+		require.Len(t, res.Params, 1)
+		assert.Contains(t, res.Params[0], "app session is closed or not found")
+	})
+
+	t.Run("ErrorDepositNonParticipant", func(t *testing.T) {
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
+		defer cleanup()
+
+		// Create participants
+		participantA, _ := crypto.GenerateKey()
+		participantB, _ := crypto.GenerateKey()
+		nonParticipant, _ := crypto.GenerateKey()
+		signerA := Signer{privateKey: participantA}
+		signerB := Signer{privateKey: participantB}
+		signerNonParticipant := Signer{privateKey: nonParticipant}
+		addrA := signerA.GetAddress().Hex()
+		addrB := signerB.GetAddress().Hex()
+		addrNonParticipant := signerNonParticipant.GetAddress().Hex()
+
+		// Setup signer wallet relations
+		require.NoError(t, db.Create(&SignerWallet{Signer: addrA, Wallet: addrA}).Error)
+		require.NoError(t, db.Create(&SignerWallet{Signer: addrB, Wallet: addrB}).Error)
+		require.NoError(t, db.Create(&SignerWallet{Signer: addrNonParticipant, Wallet: addrNonParticipant}).Error)
+
+		// Fund non-participant
+		require.NoError(t, GetWalletLedger(db, addrNonParticipant).Record(addrNonParticipant, "usdc", decimal.NewFromInt(1000)))
+
+		// Create app session with only A and B as participants
+		appSession := AppSession{
+			SessionID:          "0x" + strings.Repeat("c", 64),
+			ParticipantWallets: []string{addrA, addrB}, // Non-participant is not included
+			Status:             ChannelStatusOpen,
+			Protocol:           "test-protocol",
+			Challenge:          3600,
+			Weights:            []int64{1, 1},
+			Quorum:             2,
+			Nonce:              1,
+			Version:            1,
+		}
+		require.NoError(t, db.Create(&appSession).Error)
+
+		// Attempt deposit from non-participant
+		transferParams := Transfer{
+			Destination: appSession.SessionID,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+			},
+		}
+
+		// Create RPC request from non-participant
+		ts := uint64(time.Now().Unix())
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  addrNonParticipant,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 47,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
+			},
+		}
+
+		// Marshal and sign request
+		rawReq, err := json.Marshal(c.Message.Req)
+		require.NoError(t, err)
+		c.Message.Req.rawBytes = rawReq
+		sigBytes, err := signerNonParticipant.Sign(rawReq)
+		require.NoError(t, err)
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+
+		// Call handler
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		// Verify error response
+		assert.Equal(t, "error", res.Method)
+		require.Len(t, res.Params, 1)
+		assert.Contains(t, res.Params[0], "user is not a participant in this app session")
+	})
 }
 
 func TestRPCRouterHandleCreateAppSession(t *testing.T) {

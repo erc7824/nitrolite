@@ -3,6 +3,8 @@ package main
 import (
 	"math/big"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 // SendBalanceUpdate sends balance updates to the client
@@ -41,4 +43,45 @@ func (r *RPCRouter) SendChannelUpdate(channel Channel) {
 		"participant", channel.Participant,
 		"status", channel.Status,
 	)
+}
+
+type AppDepositUpdate struct {
+	sessionID   string
+	participant string
+	allocations []TransferAllocation
+}
+
+// SendAppDepositUpdate sends a deposit update to all participants in the app session
+func (r *RPCRouter) SendDepositUpdate(appSession AppSession, appDepositUpdate AppDepositUpdate) {
+	for _, participant := range appSession.ParticipantWallets {
+		walletAddress := participant
+		if wallet := GetWalletBySigner(participant); wallet != "" {
+			walletAddress = wallet
+		}
+
+		for _, allocation := range appDepositUpdate.allocations {
+			depositUpdate := struct {
+				SessionID      string          `json:"session_id"`
+				AssetID        string          `json:"asset"`
+				DepositAmount  decimal.Decimal `json:"deposit_amount"`
+				UpdatedBalance decimal.Decimal `json:"updated_balance"`
+				AppVersion     uint64          `json:"app_version"`
+			}{
+				SessionID:     appSession.SessionID,
+				AssetID:       allocation.AssetSymbol,
+				DepositAmount: allocation.Amount,
+				AppVersion:    appSession.Version,
+			}
+			r.Node.Notify(walletAddress, "app_deposit", depositUpdate)
+			r.lg.Info("deposit update sent",
+				"userID", walletAddress,
+				"participant", participant,
+				"sessionID", appSession.SessionID,
+				"version", appSession.Version,
+				"asset", depositUpdate.AssetID,
+				"depositAmount", depositUpdate.DepositAmount.String(),
+				"new_balance", depositUpdate.UpdatedBalance.String(),
+			)
+		}
+	}
 }

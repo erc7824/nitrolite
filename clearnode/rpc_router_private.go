@@ -198,12 +198,10 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
-	// Allow only ledger accounts as destination at the current stage. In the future we'll unlock application accounts.
-	if params.Destination == "" || params.Destination == c.UserID || !common.IsHexAddress(params.Destination) {
+	if params.Destination == "" || params.Destination == c.UserID || (!common.IsHexAddress(params.Destination) && !isAppSessionID(params.Destination)) {
 		c.Fail(fmt.Sprintf("invalid destination account: %s", params.Destination))
 		return
 	}
-
 	if len(params.Allocations) == 0 {
 		c.Fail("empty allocations")
 		return
@@ -215,6 +213,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
+	var appSession AppSession
+	var appDepositUpdate AppDepositUpdate
 	fromWallet := c.UserID
 	err := r.DB.Transaction(func(tx *gorm.DB) error {
 		if wallet := GetWalletBySigner(fromWallet); wallet != "" {
@@ -223,6 +223,29 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 
 		if err := checkChallengedChannels(tx, fromWallet); err != nil {
 			return err
+		}
+
+		// If user is depositing into app session, verify that the app session is open and user is a participant
+		if isAppSessionID(params.Destination) {
+			if err := tx.Where("session_id = ? AND status = ?", params.Destination, ChannelStatusOpen).First(&appSession).Error; err != nil {
+				return fmt.Errorf("app session is closed or not found %s", params.Destination)
+			}
+			// Validate that the user is a participant in the app session. In the future we can allow new participants to join as well.
+			isParticipant := false
+			for _, wallet := range appSession.ParticipantWallets {
+				if wallet == fromWallet {
+					isParticipant = true
+					break
+				}
+			}
+			if !isParticipant {
+				return fmt.Errorf("user is not a participant in this app session")
+			}
+			if err := tx.Model(&appSession).Updates(map[string]any{
+				"version": appSession.Version + 1,
+			}).Error; err != nil {
+				return fmt.Errorf("failed to update app session version: %w", err)
+			}
 		}
 
 		for _, alloc := range params.Allocations {
@@ -242,9 +265,22 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			if err = ledger.Record(fromWallet, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
 				return fmt.Errorf("failed to debit source account: %w", err)
 			}
-			ledger = GetWalletLedger(tx, params.Destination)
-			if err = ledger.Record(params.Destination, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return fmt.Errorf("failed to credit destination account: %w", err)
+
+			if isAppSessionID(params.Destination) {
+				ledger = GetWalletLedger(tx, fromWallet)
+				if err = ledger.Record(params.Destination, alloc.AssetSymbol, alloc.Amount); err != nil {
+					return fmt.Errorf("failed to credit destination account: %w", err)
+				}
+				appDepositUpdate = AppDepositUpdate{
+					sessionID:   params.Destination,
+					participant: fromWallet,
+					allocations: params.Allocations,
+				}
+			} else {
+				ledger = GetWalletLedger(tx, params.Destination)
+				if err = ledger.Record(params.Destination, alloc.AssetSymbol, alloc.Amount); err != nil {
+					return fmt.Errorf("failed to credit destination account: %w", err)
+				}
 			}
 		}
 
@@ -255,6 +291,10 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		logger.Error("failed to process transfer", "error", err)
 		c.Fail(err.Error())
 		return
+	}
+
+	if isAppSessionID(params.Destination) {
+		r.SendDepositUpdate(appSession, appDepositUpdate)
 	}
 
 	c.Succeed(req.Method, TransferResponse{

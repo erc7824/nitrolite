@@ -75,8 +75,9 @@ describe('Close channel', () => {
 
         const closeChannelTxHash = await client.closeChannel({
             finalState: {
+                intent: closeParsedResponse.params.intent,
                 channelId: closeParsedResponse.params.channelId,
-                stateData: closeParsedResponse.params.stateData as Hex,
+                data: closeParsedResponse.params.stateData as Hex,
                 allocations: [
                     {
                         destination: closeParsedResponse.params.allocations[0].destination as Address,

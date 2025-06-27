@@ -19,8 +19,12 @@ const RPCAllocationSchema = z.object({
 
 const ServerSignatureSchema = z.object({
     v: z.union([z.string(), z.number()]).transform((a) => Number(a)),
-    r: hexSchema,
-    s: hexSchema,
+    // TODO: it should use hexScheme as provided, but for some reason R and S value
+    // are hex strings inside escaped double quotes: '"0x1234"' instead of '0x1234'
+    // r: hexSchema,
+    // s: hexSchema,
+    r: z.string(),
+    s: z.string(),
 });
 
 const ResizeChannelParamsSchema = z
@@ -143,7 +147,7 @@ const ChannelUpdateObjectSchema = z
         participant: addressSchema,
         status: statusEnum,
         token: addressSchema,
-        wallet: addressSchema,
+        wallet: z.union([addressSchema, z.literal('')]),
         amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
         chain_id: z.number(),
         adjudicator: addressSchema,

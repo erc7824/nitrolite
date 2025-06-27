@@ -169,7 +169,7 @@ Supports pagination and sorting.
     "participant": "0x1234567890abcdef...",
     "status": "open",  // Optional: filter by status
     "offset": 42, // Optional: pagination offset
-    "page_size": 10, // Optional: number of sessions to return
+    "limit": 10, // Optional: number of sessions to return
     "sort": "asc", // Optional: sort asc or desc
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
@@ -328,7 +328,7 @@ Supports pagination and sorting.
     "wallet": "0x1234567890abcdef...", // Optional: filter by participant
     "asset": "usdc", // Optional: filter by asset
     "offset": 42, // Optional: pagination offset
-    "page_size": 10, // Optional: number of entries to return
+    "limit": 10, // Optional: number of entries to return
     "sort": "desc" // Optional: sort asc or desc by created_at
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
@@ -391,7 +391,7 @@ Supports pagination and sorting.
     "participant": "0x1234567890abcdef...",
     "status":"open", // Optional filter
     "offset": 42, // Optional: pagination offset
-    "page_size": 10, // Optional: number of channels to return
+    "limit": 10, // Optional: number of channels to return
     "sort": "desc" // Optional: sort asc or desc by created_at
   }], 1619123456789],
   "sig": []

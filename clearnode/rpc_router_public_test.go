@@ -372,20 +372,20 @@ func TestRPCRouterHandleGetChannels_Pagination(t *testing.T) {
 			params:             map[string]interface{}{"offset": float64(2)},
 			expectedChannelIDs: channelIDs[2:], // Skip first 2
 		},
-		{name: "Page size only",
-			params:             map[string]interface{}{"page_size": float64(5)},
+		{name: "Limit only",
+			params:             map[string]interface{}{"limit": float64(5)},
 			expectedChannelIDs: channelIDs[:5], // First 5 channels
 		},
-		{name: "Offset and page size",
-			params:             map[string]interface{}{"offset": float64(2), "page_size": float64(3)},
+		{name: "Offset and limit",
+			params:             map[string]interface{}{"offset": float64(2), "limit": float64(3)},
 			expectedChannelIDs: channelIDs[2:5], // Skip 2, take 3
 		},
 		{name: "Pagination with sort asc",
-			params:             map[string]interface{}{"offset": float64(1), "page_size": float64(3), "sort": "asc"},
+			params:             map[string]interface{}{"offset": float64(1), "limit": float64(3), "sort": "asc"},
 			expectedChannelIDs: []string{"0xChannel10", "0xChannel09", "0xChannel08"}, // Ascending order, skip 1, take 3
 		},
 		{name: "Pagination with status filter",
-			params:             map[string]interface{}{"status": "open", "page_size": float64(3)},
+			params:             map[string]interface{}{"status": "open", "limit": float64(3)},
 			expectedChannelIDs: []string{"0xChannel01", "0xChannel03", "0xChannel05"}, // Only open channels, first 3
 		},
 	}
@@ -692,22 +692,22 @@ func TestRPCRouterHandleGetAppSessions_Pagination(t *testing.T) {
 		},
 		{name: "Offset only",
 			params:             map[string]interface{}{"offset": float64(2)},
-			expectedSessionIDs: sessionIDs[2:11], // Default page_size is 10, total 11, so offset 2 returns 9 sessions
+			expectedSessionIDs: sessionIDs[2:11], // Default limit is 10, total 11, so offset 2 returns 9 sessions
 		},
-		{name: "Page size only",
-			params:             map[string]interface{}{"page_size": float64(5)},
-			expectedSessionIDs: sessionIDs[:5], // Default offset is 0, so page_size 5 returns first 5 sessions
+		{name: "Limit only",
+			params:             map[string]interface{}{"limit": float64(5)},
+			expectedSessionIDs: sessionIDs[:5], // Default offset is 0, so limit 5 returns first 5 sessions
 		},
-		{name: "Offset and page size",
-			params:             map[string]interface{}{"offset": float64(2), "page_size": float64(3)},
-			expectedSessionIDs: sessionIDs[2:5], // Offset 2 with page_size 3 returns 3 sessions
+		{name: "Offset and limit",
+			params:             map[string]interface{}{"offset": float64(2), "limit": float64(3)},
+			expectedSessionIDs: sessionIDs[2:5], // Offset 2 with limit 3 returns 3 sessions
 		},
 		{name: "Pagination with sort",
-			params:             map[string]interface{}{"offset": float64(2), "page_size": float64(3), "sort": "asc"},
-			expectedSessionIDs: []string{"0xSession03", "0xSession04", "0xSession05"}, // Offset 2 with page_size 3 returns Sessions 3 to 5 (asc order)
+			params:             map[string]interface{}{"offset": float64(2), "limit": float64(3), "sort": "asc"},
+			expectedSessionIDs: []string{"0xSession03", "0xSession04", "0xSession05"}, // Offset 2 with limit 3 returns Sessions 3 to 5 (asc order)
 		},
 		{name: "Pagination with participant",
-			params:             map[string]interface{}{"participant": "0xNonExistentParticipant", "offset": float64(1), "page_size": float64(2)},
+			params:             map[string]interface{}{"participant": "0xNonExistentParticipant", "offset": float64(1), "limit": float64(2)},
 			expectedSessionIDs: []string{}, // No sessions for non-existent participant
 		},
 	}
@@ -954,20 +954,20 @@ func TestRPCRouterHandleGetLedgerEntries_Pagination(t *testing.T) {
 			params:        map[string]interface{}{"offset": float64(2)},
 			expectedToken: tokenNames[2:11], // Skip first 2, return rest
 		},
-		{name: "Page size only",
-			params:        map[string]interface{}{"page_size": float64(5)},
+		{name: "Limit only",
+			params:        map[string]interface{}{"limit": float64(5)},
 			expectedToken: tokenNames[:5], // Return first 5 tokens
 		},
-		{name: "Offset and page size",
-			params:        map[string]interface{}{"offset": float64(2), "page_size": float64(3)},
+		{name: "Offset and limit",
+			params:        map[string]interface{}{"offset": float64(2), "limit": float64(3)},
 			expectedToken: tokenNames[2:5], // Skip 2, take 3
 		},
 		{name: "Pagination with sort",
-			params:        map[string]interface{}{"offset": float64(2), "page_size": float64(3), "sort": "asc"},
+			params:        map[string]interface{}{"offset": float64(2), "limit": float64(3), "sort": "asc"},
 			expectedToken: []string{"eth9", "eth8", "eth7"}, // Ascending order by creation time, skip 2, take 3
 		},
 		{name: "Pagination with asset filter",
-			params:        map[string]interface{}{"asset": "eth1", "page_size": float64(1)},
+			params:        map[string]interface{}{"asset": "eth1", "limit": float64(1)},
 			expectedToken: []string{"eth1"}, // Only eth1 asset
 		},
 	}

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Address } from 'viem';
+import { Address, Hex } from 'viem';
 import {
     RPCMethod,
     ResizeChannelResponseParams,
@@ -7,6 +7,7 @@ import {
     GetChannelsResponseParams,
     ChannelUpdateResponseParams,
     RPCChannelStatus,
+    ChannelUpdate,
 } from '../types';
 import { hexSchema, addressSchema, statusEnum, ParamsParser } from './common';
 
@@ -16,25 +17,29 @@ const RPCAllocationSchema = z.object({
     amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
 });
 
-const ServerSignatureSchema = z.object({ v: z.string(), r: z.string(), s: z.string() });
+const ServerSignatureSchema = z.object({
+    v: z.union([z.string(), z.number()]).transform((a) => Number(a)),
+    r: hexSchema,
+    s: hexSchema,
+});
 
 const ResizeChannelParamsSchema = z
     .array(
         z
             .object({
                 channel_id: hexSchema,
-                state_data: z.string(),
+                state_data: hexSchema,
                 intent: z.number(),
                 version: z.number(),
                 allocations: z.array(RPCAllocationSchema),
-                state_hash: z.string(),
+                state_hash: hexSchema,
                 server_signature: ServerSignatureSchema,
             })
             .transform(
                 (raw) =>
                     ({
-                        channelId: raw.channel_id as `0x${string}`,
-                        stateData: raw.state_data,
+                        channelId: raw.channel_id as Hex,
+                        stateData: raw.state_data as Hex,
                         intent: raw.intent,
                         version: raw.version,
                         allocations: raw.allocations.map((a) => ({
@@ -42,8 +47,12 @@ const ResizeChannelParamsSchema = z
                             token: a.token as Address,
                             amount: a.amount,
                         })),
-                        stateHash: raw.state_hash,
-                        serverSignature: raw.server_signature,
+                        stateHash: raw.state_hash as Hex,
+                        serverSignature: {
+                            v: +raw.server_signature.v,
+                            r: raw.server_signature.r as Hex,
+                            s: raw.server_signature.s as Hex,
+                        },
                     }) as ResizeChannelResponseParams,
             ),
     )
@@ -55,18 +64,18 @@ const CloseChannelParamsSchema = z
         z
             .object({
                 channel_id: hexSchema,
-                state_data: z.string(),
+                state_data: hexSchema,
                 intent: z.number(),
                 version: z.number(),
                 allocations: z.array(RPCAllocationSchema),
-                state_hash: z.string(),
+                state_hash: hexSchema,
                 server_signature: ServerSignatureSchema,
             })
             .transform(
                 (raw) =>
                     ({
-                        channelId: raw.channel_id as `0x${string}`,
-                        stateData: raw.state_data,
+                        channelId: raw.channel_id as Hex,
+                        stateData: raw.state_data as Hex,
                         intent: raw.intent,
                         version: raw.version,
                         allocations: raw.allocations.map((a) => ({
@@ -74,8 +83,12 @@ const CloseChannelParamsSchema = z
                             token: a.token as Address,
                             amount: a.amount,
                         })),
-                        stateHash: raw.state_hash,
-                        serverSignature: raw.server_signature,
+                        stateHash: raw.state_hash as Hex,
+                        serverSignature: {
+                            v: +raw.server_signature.v,
+                            r: raw.server_signature.r as Hex,
+                            s: raw.server_signature.s as Hex,
+                        },
                     }) as CloseChannelResponseParams,
             ),
     )
@@ -84,42 +97,45 @@ const CloseChannelParamsSchema = z
 
 const GetChannelsParamsSchema = z
     .array(
-        z
-            .object({
-                channel_id: hexSchema,
-                participant: addressSchema,
-                status: statusEnum,
-                token: addressSchema,
-                wallet: addressSchema,
-                amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
-                chain_id: z.number(),
-                adjudicator: addressSchema,
-                challenge: z.number(),
-                nonce: z.number(),
-                version: z.number(),
-                created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-                updated_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-            })
-            .transform(
-                (c) =>
-                    ({
-                        channelId: c.channel_id as `0x${string}`,
-                        participant: c.participant as Address,
-                        status: c.status as RPCChannelStatus,
-                        token: c.token as Address,
-                        wallet: c.wallet as Address,
-                        amount: c.amount,
-                        chainId: c.chain_id,
-                        adjudicator: c.adjudicator as Address,
-                        challenge: c.challenge,
-                        nonce: c.nonce,
-                        version: c.version,
-                        createdAt: c.created_at,
-                        updatedAt: c.updated_at,
-                    }) as GetChannelsResponseParams,
-            ),
+        z.array(
+            z
+                .object({
+                    channel_id: hexSchema,
+                    participant: addressSchema,
+                    status: statusEnum,
+                    token: addressSchema,
+                    wallet: addressSchema,
+                    amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
+                    chain_id: z.number(),
+                    adjudicator: addressSchema,
+                    challenge: z.number(),
+                    nonce: z.number(),
+                    version: z.number(),
+                    created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
+                    updated_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
+                })
+                .transform(
+                    (c) =>
+                        ({
+                            channelId: c.channel_id as Hex,
+                            participant: c.participant as Address,
+                            status: c.status as RPCChannelStatus,
+                            token: c.token as Address,
+                            wallet: c.wallet as Address,
+                            amount: c.amount,
+                            chainId: c.chain_id,
+                            adjudicator: c.adjudicator as Address,
+                            challenge: c.challenge,
+                            nonce: c.nonce,
+                            version: c.version,
+                            createdAt: c.created_at,
+                            updatedAt: c.updated_at,
+                        }) as ChannelUpdate,
+                ),
+        ),
     )
-    .transform((arr) => arr as GetChannelsResponseParams[]);
+    .transform((arr) => arr[0])
+    .transform((arr) => arr as GetChannelsResponseParams);
 
 const ChannelUpdateObjectSchema = z
     .object({
@@ -127,6 +143,7 @@ const ChannelUpdateObjectSchema = z
         participant: addressSchema,
         status: statusEnum,
         token: addressSchema,
+        wallet: addressSchema,
         amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
         chain_id: z.number(),
         adjudicator: addressSchema,
@@ -139,10 +156,11 @@ const ChannelUpdateObjectSchema = z
     .transform(
         (c) =>
             ({
-                channelId: c.channel_id as `0x${string}`,
+                channelId: c.channel_id as Hex,
                 participant: c.participant as Address,
                 status: c.status as RPCChannelStatus,
                 token: c.token as Address,
+                wallet: c.wallet as Address,
                 amount: c.amount,
                 chainId: c.chain_id,
                 adjudicator: c.adjudicator as Address,

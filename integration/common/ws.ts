@@ -150,7 +150,7 @@ const genericPredicate = (data: string, condition: (r: RPCResponse) => boolean, 
         }
 
         if (reqId !== undefined && parsedData.requestId === reqId && parsedData.method === RPCMethod.Error) {
-            const errorMsg = parsedData.params.map((m) => m.error).join('; ');
+            const errorMsg = parsedData.params.error;
             throw new Error(`RPC Error: ${errorMsg}`);
         }
     } catch (error) {

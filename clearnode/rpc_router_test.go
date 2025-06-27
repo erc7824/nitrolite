@@ -112,6 +112,7 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, func()) {
 
 	// Create an instance of RPCRouter
 	router := &RPCRouter{
+		Node:              NewRPCNode(signer, logger),
 		Signer:            signer,
 		AppSessionService: appSessionService,
 		ChannelService:    channelService,

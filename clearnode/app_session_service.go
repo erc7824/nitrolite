@@ -22,7 +22,7 @@ func NewAppSessionService(db *gorm.DB) *AppSessionService {
 	return &AppSessionService{db: db}
 }
 
-func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}) (*AppSession, error) {
+func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}, publishBalanceUpdate func(destinationWallet string)) (*AppSession, error) {
 	if len(params.Definition.ParticipantWallets) < 2 {
 		return nil, errors.New("invalid number of participants")
 	}
@@ -41,6 +41,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
 	sessionAccountID := NewAccountID(appSessionID)
 
+	participants := make(map[string]bool)
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsPositive() {
@@ -82,6 +83,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			if err != nil {
 				return fmt.Errorf("failed to record transaction: %w", err)
 			}
+			participants[walletAddress] = true
 		}
 
 		session := &AppSession{
@@ -104,6 +106,12 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 
 	if err != nil {
 		return nil, err
+	}
+
+	if publishBalanceUpdate != nil {
+		for participant := range participants {
+			publishBalanceUpdate(participant)
+		}
 	}
 
 	return &AppSession{SessionID: appSessionID, Version: 1, Status: ChannelStatusOpen}, nil
@@ -181,11 +189,12 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 }
 
 // CloseApplication closes a virtual app session and redistributes funds to participants
-func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcSigners map[string]struct{}) (uint64, error) {
+func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcSigners map[string]struct{}, publishBalanceUpdate func(destinationWallet string)) (uint64, error) {
 	if params.AppSessionID == "" || len(params.Allocations) == 0 {
 		return 0, errors.New("missing required parameters: app_id or allocations")
 	}
 
+	participants := make(map[string]bool)
 	var newVersion uint64
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
@@ -236,6 +245,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 
 			if !alloc.Amount.IsZero() {
 				allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
+				participants[walletAddress] = true
 			}
 		}
 
@@ -257,6 +267,12 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 
 	if err != nil {
 		return 0, err
+	}
+
+	if publishBalanceUpdate != nil {
+		for participant := range participants {
+			publishBalanceUpdate(participant)
+		}
 	}
 
 	return newVersion, nil

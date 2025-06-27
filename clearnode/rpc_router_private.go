@@ -208,9 +208,9 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
+	fromWallet := c.UserID
 	var transactions []TransactionResponse
 	err := r.DB.Transaction(func(tx *gorm.DB) error {
-		fromWallet := c.UserID
 		if wallet := GetWalletBySigner(fromWallet); wallet != "" {
 			fromWallet = wallet
 		}
@@ -267,7 +267,13 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
+	r.SendBalanceUpdate(fromWallet)
+	if common.IsHexAddress(params.Destination) {
+		r.SendBalanceUpdate(params.Destination)
+	}
+
 	c.Succeed(req.Method, transactions)
+
 	logger.Info("transfer completed", "userID", c.UserID, "transferTo", params.Destination, "allocations", params.Allocations)
 }
 
@@ -290,7 +296,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 		return
 	}
 
-	appSession, err := r.AppSessionService.CreateApplication(&params, rpcSigners)
+	appSession, err := r.AppSessionService.CreateApplication(&params, rpcSigners, r.SendBalanceUpdate)
 	if err != nil {
 		logger.Error("failed to create application session", "error", err)
 		c.Fail(err.Error())
@@ -371,7 +377,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 		return
 	}
 
-	finalVersion, err := r.AppSessionService.CloseApplication(&params, rpcSigners)
+	finalVersion, err := r.AppSessionService.CloseApplication(&params, rpcSigners, r.SendBalanceUpdate)
 	if err != nil {
 		logger.Error("failed to close application session", "error", err)
 		c.Fail(err.Error())
@@ -386,7 +392,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 	logger.Info("application session closed",
 		"userID", c.UserID,
 		"sessionID", params.AppSessionID,
-		"newVersion", finalVersion,
+		"finalVersion", finalVersion,
 		"allocations", params.Allocations,
 	)
 }

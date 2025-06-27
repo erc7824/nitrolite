@@ -83,7 +83,7 @@ func listenEvents(
 	logger.Info("starting listening events", "chainID", chainID, "contractAddress", contractAddress.String())
 	for {
 		if eventSubscription == nil {
-			waitForBackOffTimeout(logger, int(backOffCount.Load()))
+			waitForBackOffTimeout(logger, int(backOffCount.Load()), "event subscription")
 
 			historicalCh = make(chan types.Log, 1)
 			currentCh = make(chan types.Log, 100)
@@ -113,7 +113,6 @@ func listenEvents(
 					blockStep,
 					lastBlock,
 					lastIndex,
-					&backOffCount,
 					historicalCh,
 					logger,
 				)
@@ -146,6 +145,7 @@ func listenEvents(
 			if err != nil {
 				logger.Error("event subscription error", "error", err, "chainID", chainID, "contractAddress", contractAddress.String())
 				eventSubscription.Unsubscribe()
+				// NOTE: do not increment backOffCount here, as connection errors on continuous subscriptions are normal
 			} else {
 				logger.Debug("subscription closed, resubscribing", "chainID", chainID, "contractAddress", contractAddress.String())
 			}
@@ -163,14 +163,16 @@ func ReconcileBlockRange(
 	blockStep uint64,
 	lastBlock uint64,
 	lastIndex uint32,
-	backOffCount *atomic.Uint64,
 	historicalCh chan types.Log,
 	logger Logger,
 ) {
+	var backOffCount atomic.Uint64
 	startBlock := lastBlock
 	endBlock := startBlock + blockStep
 
 	for currentBlock > startBlock {
+		waitForBackOffTimeout(logger, int(backOffCount.Load()), "reconcile block range")
+
 		// We need to refetch events starting from last known block without adding 1 to it
 		// because it's possible that block includes more than 1 event, and some may be still unprocessed.
 		//
@@ -197,7 +199,7 @@ func ReconcileBlockRange(
 		if err != nil {
 			newStartBlock, newEndBlock, extractErr := extractAdvisedBlockRange(err.Error())
 			if extractErr != nil {
-				logger.Error("failed to filter logs", "error", err, "chainID", chainID, "contractAddress", contractAddress.String())
+				logger.Error("failed to filter logs", "error", err, "chainID", chainID, "contractAddress", contractAddress.String(), "startBlock", startBlock, "endBlock", endBlock)
 				backOffCount.Add(1)
 				continue
 			}
@@ -253,14 +255,14 @@ func extractAdvisedBlockRange(msg string) (startBlock, endBlock uint64, err erro
 }
 
 // waitForBackOffTimeout implements exponential backoff between retries
-func waitForBackOffTimeout(logger Logger, backOffCount int) {
+func waitForBackOffTimeout(logger Logger, backOffCount int, originator string) {
 	if backOffCount > maxBackOffCount {
-		logger.Fatal("back off limit reached, exiting", "backOffCollisionCount", backOffCount)
+		logger.Fatal("back off limit reached, exiting", "originator", originator, "backOffCollisionCount", backOffCount)
 		return
 	}
 
 	if backOffCount > 0 {
-		logger.Info("backing off before subscribing on contract events", "backOffCollisionCount", backOffCount)
+		logger.Info("backing off", "originator", originator, "backOffCollisionCount", backOffCount)
 		<-time.After(time.Duration(2^backOffCount-1) * time.Second)
 	}
 }

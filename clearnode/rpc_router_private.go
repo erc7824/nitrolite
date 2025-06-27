@@ -637,7 +637,7 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 	}
 
 	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
-	newChannelAmount := new(big.Int).Add(new(big.Int).SetUint64(channel.Amount), params.AllocateAmount)
+	newChannelAmount := new(big.Int).Add(channel.Amount.BigInt(), params.AllocateAmount)
 
 	if rawBalance.Cmp(newChannelAmount) < 0 {
 		c.Fail("insufficient unified balance")
@@ -788,12 +788,11 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 	}
 
 	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
-	channelAmount := new(big.Int).SetUint64(channel.Amount)
-	if channelAmount.Cmp(rawBalance) < 0 {
+	if channel.Amount.BigInt().Cmp(rawBalance) < 0 {
 		c.Fail("resize this channel first")
 	}
 
-	finalBrokerAllocation := new(big.Int).Sub(channelAmount, rawBalance)
+	finalBrokerAllocation := new(big.Int).Sub(channel.Amount.BigInt(), rawBalance)
 	allocations := []nitrolite.Allocation{
 		{
 			Destination: common.HexToAddress(params.FundsDestination),

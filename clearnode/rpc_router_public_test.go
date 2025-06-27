@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"math/big"
 	"strings"
 	"testing"
 	"time"
@@ -203,7 +202,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       tokenAddress + "1",
 			ChainID:     chainID,
-			Amount:      1000,
+			Amount:      decimal.NewFromInt(1000),
 			Nonce:       1,
 			Version:     10,
 			Challenge:   86400,
@@ -218,7 +217,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			Status:      ChannelStatusClosed,
 			Token:       tokenAddress + "2",
 			ChainID:     chainID,
-			Amount:      2000,
+			Amount:      decimal.NewFromInt(2000),
 			Nonce:       2,
 			Version:     20,
 			Challenge:   86400,
@@ -233,7 +232,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			Status:      ChannelStatusJoining,
 			Token:       tokenAddress + "3",
 			ChainID:     chainID,
-			Amount:      3000,
+			Amount:      decimal.NewFromInt(3000),
 			Nonce:       3,
 			Version:     30,
 			Challenge:   86400,
@@ -253,7 +252,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 		Status:      ChannelStatusOpen,
 		Token:       tokenAddress + "4",
 		ChainID:     chainID,
-		Amount:      5000,
+		Amount:      decimal.NewFromInt(5000),
 		Nonce:       4,
 		Version:     40,
 		Challenge:   86400,
@@ -313,7 +312,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 		}
 
 		assert.Equal(t, originalChannel.Status, ch.Status, "Status should match")
-		assert.Equal(t, big.NewInt(int64(originalChannel.Amount)), ch.Amount, "Amount should match")
+		assert.True(t, originalChannel.Amount.Equal(decimal.NewFromBigInt(ch.Amount, 0)), "Amount should match")
 		assert.Equal(t, originalChannel.Nonce, ch.Nonce, "Nonce should match")
 		assert.Equal(t, originalChannel.Version, ch.Version, "Version should match")
 		assert.Equal(t, originalChannel.Challenge, ch.Challenge, "Challenge should match")

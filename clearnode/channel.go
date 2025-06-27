@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -20,17 +21,17 @@ var (
 
 // Channel represents a state channel between participants
 type Channel struct {
-	ChannelID   string        `gorm:"column:channel_id;primaryKey;"`
-	ChainID     uint32        `gorm:"column:chain_id;not null"`
-	Token       string        `gorm:"column:token;not null"`
-	Wallet      string        `gorm:"column:wallet;not null"`
-	Participant string        `gorm:"column:participant;not null"`
-	Amount      uint64        `gorm:"column:amount;not null"`
-	Status      ChannelStatus `gorm:"column:status;not null;"`
-	Challenge   uint64        `gorm:"column:challenge;default:0"`
-	Nonce       uint64        `gorm:"column:nonce;default:0"`
-	Version     uint64        `gorm:"column:version;default:0"`
-	Adjudicator string        `gorm:"column:adjudicator;not null"`
+	ChannelID   string          `gorm:"column:channel_id;primaryKey;"`
+	ChainID     uint32          `gorm:"column:chain_id;not null"`
+	Token       string          `gorm:"column:token;not null"`
+	Wallet      string          `gorm:"column:wallet;not null"`
+	Participant string          `gorm:"column:participant;not null"`
+	Amount      decimal.Decimal `gorm:"column:amount;not null"`
+	Status      ChannelStatus   `gorm:"column:status;not null;"`
+	Challenge   uint64          `gorm:"column:challenge;default:0"`
+	Nonce       uint64          `gorm:"column:nonce;default:0"`
+	Version     uint64          `gorm:"column:version;default:0"`
+	Adjudicator string          `gorm:"column:adjudicator;not null"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
@@ -42,7 +43,8 @@ func (Channel) TableName() string {
 
 // CreateChannel creates a new channel in the database
 // For real channels, participantB is always the broker application
-func CreateChannel(tx *gorm.DB, channelID, wallet, participantSigner string, nonce uint64, challenge uint64, adjudicator string, chainID uint32, tokenAddress string, amount uint64) (Channel, error) {
+func CreateChannel(tx *gorm.DB, channelID, wallet, participantSigner string, nonce uint64, challenge uint64, adjudicator string, chainID uint32, tokenAddress string, amount decimal.Decimal) (Channel, error) {
+
 	channel := Channel{
 		ChannelID:   channelID,
 		Wallet:      wallet,

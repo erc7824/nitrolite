@@ -369,7 +369,7 @@ func TestHandleCreatedEvent(t *testing.T) {
 			balance, err := walletLedger.Balance(NewAccountID(channelIDStr), "usdc")
 			require.NoError(t, err)
 
-			assert.Equal(t, tc.amount.String(), balance.String())
+			assert.Equal(t, tc.amount.String(), balance.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).String()) // 6 decimals for USDC default test token
 		})
 	}
 }

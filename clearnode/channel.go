@@ -26,7 +26,7 @@ type Channel struct {
 	Token       string          `gorm:"column:token;not null"`
 	Wallet      string          `gorm:"column:wallet;not null"`
 	Participant string          `gorm:"column:participant;not null"`
-	Amount      decimal.Decimal `gorm:"column:amount;not null"`
+	Amount      decimal.Decimal `gorm:"column:amount;type:varchar(78);not null"`
 	Status      ChannelStatus   `gorm:"column:status;not null;"`
 	Challenge   uint64          `gorm:"column:challenge;default:0"`
 	Nonce       uint64          `gorm:"column:nonce;default:0"`

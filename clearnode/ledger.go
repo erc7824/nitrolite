@@ -16,8 +16,8 @@ type Entry struct {
 	AccountType AccountType     `gorm:"column:account_type;not null"`
 	AssetSymbol string          `gorm:"column:asset_symbol;not null;index:idx_account_asset_symbol"`
 	Wallet      string          `gorm:"column:wallet;not null;index:idx_account_wallet"`
-	Credit      decimal.Decimal `gorm:"column:credit;type:decimal(38,18);not null"`
-	Debit       decimal.Decimal `gorm:"column:debit;type:decimal(38,18);not null"`
+	Credit      decimal.Decimal `gorm:"column:credit;type:varchar(78);not null"`
+	Debit       decimal.Decimal `gorm:"column:debit;type:varchar(78);not null"`
 	CreatedAt   time.Time
 }
 
@@ -73,17 +73,41 @@ func (l *WalletLedger) Record(accountID AccountID, assetSymbol string, amount de
 }
 
 func (l *WalletLedger) Balance(accountID AccountID, assetSymbol string) (decimal.Decimal, error) {
-	type result struct {
-		Balance decimal.Decimal `gorm:"column:balance"`
+	switch l.db.Dialector.Name() {
+	case "postgres":
+		var result struct {
+			Balance decimal.Decimal
+		}
+		err := l.db.Model(&Entry{}).
+			Where("account_id = ? AND asset_symbol = ? AND wallet = ?", accountID, assetSymbol, l.wallet).
+			Select("COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS balance").
+			Scan(&result).Error
+
+		if err != nil {
+			return decimal.Zero, err
+		}
+		return result.Balance, nil
+
+	case "sqlite":
+		// Fetch all records and sum in Go to avoid SQLite's floating-point conversion for big numbers.
+		var entries []Entry
+		err := l.db.Model(&Entry{}).
+			Where("account_id = ? AND asset_symbol = ? AND wallet = ?", accountID.String(), assetSymbol, l.wallet.Hex()).
+			Find(&entries).Error
+
+		if err != nil {
+			return decimal.Zero, err
+		}
+
+		balance := decimal.Zero
+		for _, entry := range entries {
+			balance = balance.Add(entry.Credit).Sub(entry.Debit)
+		}
+		return balance, nil
+
+	default:
+		return decimal.Zero, fmt.Errorf("unsupported database driver: %s", l.db.Dialector.Name())
 	}
-	var res result
-	if err := l.db.Model(&Entry{}).
-		Where("account_id = ? AND asset_symbol = ? AND wallet = ?", accountID.String(), assetSymbol, l.wallet.Hex()).
-		Select("COALESCE(SUM(credit),0) - COALESCE(SUM(debit),0) AS balance").
-		Scan(&res).Error; err != nil {
-		return decimal.Zero, err
-	}
-	return res.Balance, nil
 }
 
 func (l *WalletLedger) GetBalances(accountID AccountID) ([]Balance, error) {

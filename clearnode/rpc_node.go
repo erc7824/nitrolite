@@ -326,7 +326,7 @@ func (c *RPCContext) Succeed(method string, params ...any) {
 // 2. A fallback message if the error is not an RPCError.
 func (c *RPCContext) Fail(err error, fallbackMessage string) {
 	message := fallbackMessage
-	if _, ok := err.(RPCError); ok && err != nil {
+	if _, ok := err.(RPCError); ok {
 		message = err.Error()
 	}
 

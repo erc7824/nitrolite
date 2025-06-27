@@ -17,6 +17,11 @@ var embedMigrations embed.FS
 
 func main() {
 	logger := NewLoggerIPFS("root")
+	if len(os.Args) > 1 {
+		// If a CLI command is provided, run it and exit
+		runCli(logger, os.Args[1])
+		return
+	}
 
 	config, err := LoadConfig(logger)
 	if err != nil {
@@ -130,4 +135,13 @@ func main() {
 	}
 
 	logger.Info("shutdown complete")
+}
+
+func runCli(logger Logger, name string) {
+	switch name {
+	case "reconcile":
+		runReconcileCli(logger)
+	default:
+		logger.Fatal("Unknown CLI command", "name", name)
+	}
 }

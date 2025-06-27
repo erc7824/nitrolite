@@ -120,7 +120,7 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, resp)
-	logger.Info("assets retrieved", "chainID", chainID)
+	logger.Info("assets retrieved", "chainID", params.ChainID)
 }
 
 // HandleGetAppDefinition returns the application definition for a ledger account
@@ -154,7 +154,7 @@ func (r *RPCRouter) HandleGetAppDefinition(c *RPCContext) {
 		Challenge:          vApp.Challenge,
 		Nonce:              vApp.Nonce,
 	})
-	logger.Info("application definition retrieved", "sessionID", sessionID)
+	logger.Info("application definition retrieved", "sessionID", params.AppSessionID)
 }
 
 // HandleGetAppSessions returns a list of app sessions
@@ -195,7 +195,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, resp)
-	logger.Info("application sessions retrieved", "participant", participant, "status", status)
+	logger.Info("application sessions retrieved", "participant", params.Participant, "status", params.Status)
 }
 
 // HandleGetChannels returns a list of channels for a given account
@@ -241,7 +241,7 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, response)
-	logger.Info("channels retrieved", "participant", participant, "status", status)
+	logger.Info("channels retrieved", "participant", params.Participant, "status", params.Status)
 }
 
 // HandleGetLedgerEntries returns ledger entries for an account
@@ -285,5 +285,5 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, resp)
-	logger.Info("ledger entries retrieved", "accountID", accountID, "asset", asset, "wallet", walletAddress)
+	logger.Info("ledger entries retrieved", "accountID", params.AccountID, "asset", params.Asset, "wallet", walletAddress)
 }

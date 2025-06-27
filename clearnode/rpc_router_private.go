@@ -186,7 +186,7 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, balances)
-	logger.Info("ledger balances retrieved", "userID", c.UserID, "accountID", account)
+	logger.Info("ledger balances retrieved", "userID", c.UserID, "accountID", params.AccountID)
 }
 
 // HandleTransfer unified balance funds to the specified account

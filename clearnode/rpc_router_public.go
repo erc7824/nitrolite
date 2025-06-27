@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 )
 
@@ -253,12 +254,13 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
 
-	var accountID, asset, wallet string
+	var accountID AccountID
+	var wallet, asset string
 	if len(req.Params) > 0 {
 		if paramsJSON, err := json.Marshal(req.Params[0]); err == nil {
 			var params map[string]string
 			if err := json.Unmarshal(paramsJSON, &params); err == nil {
-				accountID = params["account_id"]
+				accountID = NewAccountID(params["account_id"])
 				asset = params["asset"]
 				if w, ok := params["wallet"]; ok {
 					wallet = w
@@ -272,8 +274,8 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 		walletAddress = wallet
 	}
 
-	ledger := GetWalletLedger(r.DB, walletAddress)
-	entries, err := ledger.GetEntries(accountID, asset)
+	ledger := GetWalletLedger(r.DB, common.HexToAddress(walletAddress))
+	entries, err := ledger.GetEntries(&accountID, asset)
 	if err != nil {
 		logger.Error("failed to get ledger entries", "error", err)
 		c.Fail("failed to get ledger entries")

@@ -146,14 +146,31 @@ Retrieves the application definition for a specific ledger account.
 ### Get App Sessions
 
 Lists all virtual applications for a participant sorted by updated_at from the newest to oldest. Optionally, you can filter the results by status (open, closed).
+Supports pagination and sorting.
+
+> Sorted descending by `created_at` by default.
 
 **Request:**
 
 ```json
 {
   "req": [1, "get_app_sessions", [{
+    "participant": "0x1234567890abcdef..."
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Request with filtering, pagination, and sorting:**
+
+```json
+{
+  "req": [1, "get_app_sessions", [{
     "participant": "0x1234567890abcdef...",
-    "status": "open"  // Optional: filter by status
+    "status": "open",  // Optional: filter by status
+    "offset": 42, // Optional: pagination offset
+    "limit": 10, // Optional: number of sessions to return
+    "sort": "asc", // Optional: sort asc or desc
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
@@ -289,15 +306,30 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 ### Get Ledger Entries
 
 Retrieves the detailed ledger entries for an account, providing a complete transaction history. This can be used to audit all deposits, withdrawals, and transfers. If no filter is specified, returns all entries, otherwise applies one or multiple filters.
+Supports pagination and sorting.
+
+> Sorted descending by `created_at` by default.
 
 **Request:**
 
 ```json
 {
+  "req": [1, "get_ledger_entries", [], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Request with filtering, pagination, and sorting:**
+
+```json
+{
   "req": [1, "get_ledger_entries", [{
-    "account_id": "0x1234567890abcdef...", // Optional
-    "wallet": "0x1234567890abcdef...", // Optional
-    "asset": "usdc",  // Optional: filter by asset
+    "account_id": "0x1234567890abcdef...",
+    "wallet": "0x1234567890abcdef...", // Optional: filter by participant
+    "asset": "usdc", // Optional: filter by asset
+    "offset": 42, // Optional: pagination offset
+    "limit": 10, // Optional: number of entries to return
+    "sort": "desc" // Optional: sort asc or desc by created_at
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
@@ -336,6 +368,9 @@ Retrieves the detailed ledger entries for an account, providing a complete trans
 ### Get Channels
 
 Retrieves all channels for a participant (both open, closed, and joining), ordered by creation date (newest first). This method returns channels across all supported chains. If no participant is specified, it returns all channels.
+Supports pagination and sorting.
+
+> Sorted descending by `created_at` by default.
 
 **Request:**
 
@@ -343,7 +378,21 @@ Retrieves all channels for a participant (both open, closed, and joining), order
 {
   "req": [1, "get_channels", [{
     "participant": "0x1234567890abcdef...",
-    "status":"open" // OPTIONAL FILTER
+  }], 1619123456789],
+  "sig": []
+}
+```
+
+**Request with pagination and sorting:**
+
+```json
+{
+  "req": [1, "get_channels", [{
+    "participant": "0x1234567890abcdef...",
+    "status":"open", // Optional filter
+    "offset": 42, // Optional: pagination offset
+    "limit": 10, // Optional: number of channels to return
+    "sort": "desc" // Optional: sort asc or desc by created_at
   }], 1619123456789],
   "sig": []
 }
@@ -900,6 +949,8 @@ Retrieves broker configuration information including supported networks.
 ### Get Assets
 
 Retrieves all supported assets. Optionally, you can filter the assets by chain_id.
+
+> Sorted ascending by `symbol` by default.
 
 **Request without filter:**
 

@@ -48,12 +48,21 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			addrB: {},
 		}
 
-		appSession, err := service.CreateApplication(params, rpcSigners)
+		var balanceUpdates []string
+		publishBalanceUpdate := func(wallet string) {
+			balanceUpdates = append(balanceUpdates, wallet)
+		}
+
+		appSession, err := service.CreateApplication(params, rpcSigners, publishBalanceUpdate)
 		require.NoError(t, err)
 		assert.NotNil(t, appSession)
 		assert.NotEmpty(t, appSession.SessionID)
 		assert.Equal(t, uint64(1), appSession.Version)
 		assert.Equal(t, ChannelStatusOpen, appSession.Status)
+
+		assert.Len(t, balanceUpdates, 2)
+		assert.Contains(t, balanceUpdates, addrA)
+		assert.Contains(t, balanceUpdates, addrB)
 
 		// Verify balances
 		balA, err := GetWalletLedger(db, addrA).Balance(addrA, "usdc")
@@ -87,7 +96,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{addrA: {}}
 
-		_, err := service.CreateApplication(params, rpcSigners)
+		_, err := service.CreateApplication(params, rpcSigners, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "insufficient funds")
 	})
@@ -118,7 +127,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{addrA: {}}
 
-		_, err := service.CreateApplication(params, rpcSigners)
+		_, err := service.CreateApplication(params, rpcSigners, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has challenged channels")
 	})
@@ -223,9 +232,18 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			addrB: {},
 		}
 
-		newVersion, err := service.CloseApplication(params, rpcSigners)
+		var balanceUpdates []string
+		publishBalanceUpdate := func(wallet string) {
+			balanceUpdates = append(balanceUpdates, wallet)
+		}
+
+		newVersion, err := service.CloseApplication(params, rpcSigners, publishBalanceUpdate)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), newVersion)
+
+		assert.Len(t, balanceUpdates, 2)
+		assert.Contains(t, balanceUpdates, addrA)
+		assert.Contains(t, balanceUpdates, addrB)
 
 		var closedSession AppSession
 		require.NoError(t, db.First(&closedSession, "session_id = ?", session.SessionID).Error)

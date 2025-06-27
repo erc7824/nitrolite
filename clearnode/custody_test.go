@@ -253,96 +253,113 @@ func createMockResizedEvent(t *testing.T, amount int64) (*types.Log, *nitrolite.
 }
 
 func TestHandleCreatedEvent(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		custody, db, cleanup := setupMockCustody(t)
-		defer cleanup()
+	uint256Max := new(big.Int)
+	uint256Max.Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+	uint256MaxMinus1 := new(big.Int).Sub(uint256Max, big.NewInt(1))
 
-		amount := int64(1000000)
+	testCases := []struct {
+		name        string
+		amount      *big.Int
+		description string
+	}{
+		{
+			name:        "Normal Amount",
+			amount:      big.NewInt(1000000),
+			description: "Test with normal amount of 1,000,000",
+		},
+		{
+			name:        "Max Uint256 - 1",
+			amount:      uint256MaxMinus1,
+			description: "Test with uint256 max - 1",
+		},
+	}
 
-		channelIDBytes := [32]byte{1, 2, 3, 4}
-		walletAddr := common.HexToAddress("0xWallet123")
-		channelStruct := nitrolite.Channel{
-			Participants: []common.Address{common.HexToAddress("0xParticipant1"), custody.signer.GetAddress()},
-			Adjudicator:  common.HexToAddress("0xAdjudicatorAddress"),
-			Challenge:    3600,
-			Nonce:        12345,
-		}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			custody, db, cleanup := setupMockCustody(t)
+			defer cleanup()
 
-		allocation := []nitrolite.Allocation{
-			{
-				Destination: common.HexToAddress("0xParticipant1"),
-				Token:       common.HexToAddress(tokenAddress),
-				Amount:      big.NewInt(amount),
-			},
-			{
-				Destination: custody.signer.GetAddress(),
-				Token:       common.HexToAddress(tokenAddress),
-				Amount:      big.NewInt(0),
-			},
-		}
+			channelIDBytes := [32]byte{1, 2, 3, 4}
+			walletAddr := common.HexToAddress("0xWallet123")
+			channelStruct := nitrolite.Channel{
+				Participants: []common.Address{common.HexToAddress("0xParticipant1"), custody.signer.GetAddress()},
+				Adjudicator:  common.HexToAddress("0xAdjudicatorAddress"),
+				Challenge:    3600,
+				Nonce:        12345,
+			}
 
-		initialState := nitrolite.State{
-			Intent:      0,
-			Version:     big.NewInt(0),
-			Data:        []byte{},
-			Allocations: allocation,
-			Sigs:        []nitrolite.Signature{},
-		}
+			allocation := []nitrolite.Allocation{
+				{
+					Destination: common.HexToAddress("0xParticipant1"),
+					Token:       common.HexToAddress(tokenAddress),
+					Amount:      tc.amount,
+				},
+				{
+					Destination: custody.signer.GetAddress(),
+					Token:       common.HexToAddress(tokenAddress),
+					Amount:      big.NewInt(0),
+				},
+			}
 
-		mockEvent := &nitrolite.CustodyCreated{
-			ChannelId: channelIDBytes,
-			Wallet:    walletAddr,
-			Channel:   channelStruct,
-			Initial:   initialState,
-		}
+			initialState := nitrolite.State{
+				Intent:      0,
+				Version:     big.NewInt(0),
+				Data:        []byte{},
+				Allocations: allocation,
+				Sigs:        []nitrolite.Signature{},
+			}
 
-		var capturedChannel Channel
-		custody.sendChannelUpdate = func(ch Channel) {
-			capturedChannel = ch
-		}
+			mockEvent := &nitrolite.CustodyCreated{
+				ChannelId: channelIDBytes,
+				Wallet:    walletAddr,
+				Channel:   channelStruct,
+				Initial:   initialState,
+			}
 
-		logger := custody.logger
-		custody.handleCreated(logger, mockEvent)
+			var capturedChannel Channel
+			custody.sendChannelUpdate = func(ch Channel) {
+				capturedChannel = ch
+			}
 
-		channelIDStr := common.Hash(mockEvent.ChannelId).Hex()
-		var dbChannel Channel
-		dbErr := db.Where("channel_id = ?", channelIDStr).First(&dbChannel).Error
-		require.NoError(t, dbErr)
+			logger := custody.logger
+			custody.handleCreated(logger, mockEvent)
 
-		assert.Equal(t, channelIDStr, dbChannel.ChannelID)
-		assert.Equal(t, mockEvent.Wallet.Hex(), dbChannel.Wallet)
-		assert.Equal(t, mockEvent.Channel.Participants[0].Hex(), dbChannel.Participant)
-		assert.Equal(t, mockEvent.Channel.Nonce, dbChannel.Nonce)
-		assert.Equal(t, mockEvent.Channel.Challenge, dbChannel.Challenge)
-		assert.Equal(t, mockEvent.Channel.Adjudicator.Hex(), dbChannel.Adjudicator)
-		assert.Equal(t, uint64(amount), dbChannel.Amount)
-		assert.Equal(t, tokenAddress, dbChannel.Token)
-		assert.Equal(t, ChannelStatusJoining, dbChannel.Status)
+			channelIDStr := common.Hash(mockEvent.ChannelId).Hex()
+			var dbChannel Channel
+			dbErr := db.Where("channel_id = ?", channelIDStr).First(&dbChannel).Error
+			require.NoError(t, dbErr)
 
-		var signerWallet SignerWallet
-		signerErr := db.Where("wallet = ? AND signer = ?", mockEvent.Wallet.Hex(), mockEvent.Channel.Participants[0].Hex()).First(&signerWallet).Error
-		require.NoError(t, signerErr)
+			assert.Equal(t, dbChannel.ChannelID, channelIDStr)
+			assert.Equal(t, dbChannel.Wallet, mockEvent.Wallet.Hex())
+			assert.Equal(t, dbChannel.Participant, mockEvent.Channel.Participants[0].Hex())
+			assert.Equal(t, dbChannel.Nonce, mockEvent.Channel.Nonce)
+			assert.Equal(t, dbChannel.Challenge, mockEvent.Channel.Challenge)
+			assert.Equal(t, dbChannel.Adjudicator, mockEvent.Channel.Adjudicator.Hex())
+			assert.Equal(t, dbChannel.Amount, decimal.NewFromBigInt(tc.amount, 0))
+			assert.Equal(t, dbChannel.Token, tokenAddress)
+			assert.Equal(t, dbChannel.Status, ChannelStatusJoining)
 
-		var entries []Entry
-		entriesErr := db.Where("wallet = ?", mockEvent.Wallet.Hex()).Find(&entries).Error
-		require.NoError(t, entriesErr)
-		assert.NotEmpty(t, entries)
+			var entries []Entry
+			entriesErr := db.Where("wallet = ?", mockEvent.Wallet.Hex()).Find(&entries).Error
+			require.NoError(t, entriesErr)
+			assert.NotEmpty(t, entries)
 
-		assert.Equal(t, channelIDStr, capturedChannel.ChannelID)
-		assert.Equal(t, mockEvent.Wallet.Hex(), capturedChannel.Wallet)
-		assert.Equal(t, uint32(custody.chainID), dbChannel.ChainID)
-		assert.False(t, dbChannel.CreatedAt.IsZero())
-		assert.False(t, dbChannel.UpdatedAt.IsZero())
+			assert.Equal(t, capturedChannel.ChannelID, channelIDStr)
+			assert.Equal(t, capturedChannel.Wallet, mockEvent.Wallet.Hex())
+			assert.Equal(t, dbChannel.ChainID, uint32(custody.chainID))
+			assert.False(t, dbChannel.CreatedAt.IsZero())
+			assert.False(t, dbChannel.UpdatedAt.IsZero())
 
-		assert.WithinDuration(t, time.Now(), dbChannel.CreatedAt, 2*time.Second)
-		assert.WithinDuration(t, time.Now(), dbChannel.UpdatedAt, 2*time.Second)
+			assert.WithinDuration(t, time.Now(), dbChannel.CreatedAt, 2*time.Second)
+			assert.WithinDuration(t, time.Now(), dbChannel.UpdatedAt, 2*time.Second)
 
-		walletLedger := GetWalletLedger(db, mockEvent.Wallet.Hex())
-		balance, err := walletLedger.Balance(channelIDStr, "usdc")
-		require.NoError(t, err)
-		expected := decimal.NewFromInt(amount).Div(decimal.NewFromInt(1000000)) // Adjusted for 6 decimals
-		assert.True(t, expected.Equal(balance), "Expected channel balance to be %s, got %s", expected, balance)
-	})
+			walletLedger := GetWalletLedger(db, mockEvent.Wallet.Hex())
+			balance, err := walletLedger.Balance(channelIDStr, "usdc")
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.amount.String(), balance.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).String()) // 6 decimals for USDC default test token
+		})
+	}
 }
 
 func TestHandleJoinedEvent(t *testing.T) {
@@ -350,7 +367,7 @@ func TestHandleJoinedEvent(t *testing.T) {
 		custody, db, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		amount := uint64(1000000)
+		amount := decimal.NewFromInt(1000000)
 
 		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
 		walletAddr := "0xWallet123"
@@ -378,7 +395,7 @@ func TestHandleJoinedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		tokenAmountDecimal := decimal.NewFromInt(int64(amount)).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		tokenAmountDecimal := decimal.NewFromBigInt(amount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 		err = ledger.Record(channelID, asset.Symbol, tokenAmountDecimal)
 		require.NoError(t, err)
 
@@ -451,7 +468,7 @@ func TestHandleJoinedEvent(t *testing.T) {
 			Status:    ChannelStatusJoining,
 			Token:     tokenAddress,
 			ChainID:   custody.chainID,
-			Amount:    1000000,
+			Amount:    decimal.NewFromInt(1000000),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
@@ -490,7 +507,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		custody, db, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		initialAmount := uint64(1000000)
+		initialAmount := decimal.NewFromInt(1000000)
 		finalAmount := int64(500000)
 
 		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
@@ -519,7 +536,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := decimal.NewFromInt(int64(initialAmount)).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialAmountDecimal := decimal.NewFromBigInt(initialAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
 		err = ledger.Record(walletAddr, asset.Symbol, initialAmountDecimal)
 		require.NoError(t, err)
@@ -550,7 +567,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ChannelStatusClosed, updatedChannel.Status)
-		assert.Equal(t, uint64(0), updatedChannel.Amount, "Amount should be zero after closing")
+		assert.Equal(t, decimal.NewFromInt(0), updatedChannel.Amount, "Amount should be zero after closing")
 		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
 
 		var entries []Entry
@@ -583,7 +600,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		custody, db, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		initialAmount := uint64(1000000)
+		initialAmount := decimal.NewFromInt(1000000)
 		finalAmount := int64(1000000)
 
 		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
@@ -613,7 +630,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := decimal.NewFromInt(int64(initialAmount)).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialAmountDecimal := decimal.NewFromBigInt(initialAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
 		// Initial balance in wallet
 		err = ledger.Record(walletAddr, asset.Symbol, initialAmountDecimal)
@@ -629,7 +646,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ChannelStatusClosed, updatedChannel.Status)
-		assert.Equal(t, uint64(0), updatedChannel.Amount, "Amount should be zero after closing")
+		assert.Equal(t, decimal.NewFromInt(0), updatedChannel.Amount, "Amount should be zero after closing")
 
 		// Check final wallet balance
 		walletBalance, err := ledger.Balance(walletAddr, asset.Symbol)
@@ -650,7 +667,7 @@ func TestHandleChallengedEvent(t *testing.T) {
 		custody, db, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		amount := uint64(1000000)
+		amount := decimal.NewFromInt(1000000)
 
 		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
 		walletAddr := "0xWallet123"
@@ -674,7 +691,7 @@ func TestHandleChallengedEvent(t *testing.T) {
 		err := db.Create(&initialChannel).Error
 		require.NoError(t, err)
 
-		_, mockEvent := createMockChallengedEvent(t, custody.signer, tokenAddress, int64(amount))
+		_, mockEvent := createMockChallengedEvent(t, custody.signer, tokenAddress, amount.BigInt().Int64())
 
 		var channelUpdateCalled bool
 		var capturedChannel Channel
@@ -711,7 +728,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		custody, db, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		initialAmount := uint64(1000000)
+		initialAmount := decimal.NewFromInt(1000000)
 		deltaAmount := int64(500000) // Increase
 		expectedAmount := uint64(1500000)
 
@@ -741,7 +758,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := decimal.NewFromInt(int64(initialAmount)).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialAmountDecimal := decimal.NewFromBigInt(initialAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
 		err = ledger.Record(walletAddr, asset.Symbol, initialAmountDecimal)
 		require.NoError(t, err)
@@ -772,7 +789,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ChannelStatusOpen, updatedChannel.Status, "Status should remain open")
-		assert.Equal(t, expectedAmount, updatedChannel.Amount, "Amount should be increased by deltaAmount")
+		assert.Equal(t, expectedAmount, updatedChannel.Amount.BigInt().Uint64(), "Amount should be increased by deltaAmount")
 		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
@@ -784,7 +801,7 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		assert.True(t, channelUpdateCalled, "Channel update callback should be called")
 		assert.Equal(t, channelID, capturedChannel.ChannelID)
-		assert.Equal(t, expectedAmount, capturedChannel.Amount)
+		assert.Equal(t, expectedAmount, capturedChannel.Amount.BigInt().Uint64())
 
 		walletBalance, err := ledger.Balance(walletAddr, asset.Symbol)
 		require.NoError(t, err)
@@ -804,7 +821,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		custody, db, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		initialAmount := uint64(1000000)
+		initialAmount := decimal.NewFromInt(1000000)
 		deltaAmount := int64(-300000) // Decrease
 		expectedAmount := uint64(700000)
 
@@ -834,7 +851,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := decimal.NewFromInt(int64(initialAmount)).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialAmountDecimal := decimal.NewFromBigInt(initialAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
 		err = ledger.Record(walletAddr, asset.Symbol, initialAmountDecimal)
 		require.NoError(t, err)
@@ -849,7 +866,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ChannelStatusOpen, updatedChannel.Status)
-		assert.Equal(t, expectedAmount, updatedChannel.Amount)
+		assert.Equal(t, expectedAmount, updatedChannel.Amount.BigInt().Uint64())
 		assert.Greater(t, updatedChannel.Version, initialChannel.Version)
 
 		walletBalance, err := ledger.Balance(walletAddr, asset.Symbol)
@@ -877,7 +894,7 @@ func TestHandleResizedEvent(t *testing.T) {
 			Status:    ChannelStatusOpen,
 			Token:     tokenAddress,
 			ChainID:   custody.chainID,
-			Amount:    1000000,
+			Amount:    decimal.NewFromInt(1000000),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}

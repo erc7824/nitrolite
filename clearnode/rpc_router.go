@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"math/big"
 	"time"
 
 	"gorm.io/gorm"
@@ -120,7 +119,7 @@ func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) 
 			Participant: ch.Participant,
 			Status:      ch.Status,
 			Token:       ch.Token,
-			Amount:      big.NewInt(int64(ch.Amount)),
+			Amount:      ch.Amount.BigInt(),
 			ChainID:     ch.ChainID,
 			Adjudicator: ch.Adjudicator,
 			Challenge:   ch.Challenge,

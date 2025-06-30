@@ -6,6 +6,7 @@ import {
     RPCChannelStatus,
     AuthVerifyRequestParams,
     TransferAllocation,
+    ChannelUpdate,
 } from '.';
 
 /**
@@ -197,9 +198,9 @@ export type GetAppSessionsRPCResponseParams = GetAppSessionsResponseParams; // f
 
 export interface ServerSignature {
     /** The recovery value of the signature. */
-    v: string;
-    r: string;
-    s: string;
+    v: number;
+    r: Hex;
+    s: Hex;
 }
 
 export interface RPCAllocation {
@@ -218,7 +219,7 @@ export interface ResizeChannelResponseParams {
     /** The unique identifier for the channel. */
     channelId: Hex;
     /** The encoded state data for the channel. */
-    stateData: string;
+    stateData: Hex;
     /** The intent type for the state update. */
     intent: number;
     /** The version number of the channel. */
@@ -226,7 +227,7 @@ export interface ResizeChannelResponseParams {
     /** The list of allocations for the channel. */
     allocations: RPCAllocation[];
     /** The hash of the channel state. */
-    stateHash: string;
+    stateHash: Hex;
     /** The server's signature for the state update. */
     serverSignature: ServerSignature;
 }
@@ -243,11 +244,11 @@ export interface CloseChannelResponseParams {
     /** The version number of the channel. */
     version: number;
     /** The encoded state data for the channel. */
-    stateData: string;
+    stateData: Hex;
     /** The list of final allocations for the channel. */
     allocations: RPCAllocation[];
     /** The hash of the channel state. */
-    stateHash: string;
+    stateHash: Hex;
     /** The server's signature for the state update. */
     serverSignature: ServerSignature;
 }
@@ -256,34 +257,7 @@ export type CloseChannelRPCResponseParams = CloseChannelResponseParams; // for b
 /**
  * Represents the parameters for the 'get_channels' RPC method.
  */
-export interface GetChannelsResponseParams {
-    /** The unique identifier for the channel. */
-    channelId: Hex;
-    /** The Ethereum address of the participant. */
-    participant: Address;
-    /** The current status of the channel (e.g., "open", "closed"). */
-    status: RPCChannelStatus;
-    /** The token contract address. */
-    token: Address;
-    /** The wallet address associated with the channel. */
-    wallet: Address;
-    /** The total amount in the channel. */
-    amount: BigInt;
-    /** The chain ID where the channel exists. */
-    chainId: number;
-    /** The adjudicator contract address. */
-    adjudicator: Address;
-    /** The challenge period in seconds. */
-    challenge: number;
-    /** The nonce value for the channel. */
-    nonce: number;
-    /** The version number of the channel. */
-    version: number;
-    /** The timestamp when the channel was created. */
-    createdAt: Date;
-    /** The timestamp when the channel was last updated. */
-    updatedAt: Date;
-}
+export type GetChannelsResponseParams = ChannelUpdate[];
 export type GetChannelsRPCResponseParams = GetChannelsResponseParams; // for backward compatibility
 
 /**
@@ -331,7 +305,7 @@ export type GetAssetsRPCResponseParams = GetAssetsResponseParams; // for backwar
  */
 export interface ErrorResponse extends GenericRPCMessage {
     method: RPCMethod.Error;
-    params: ErrorResponseParams[];
+    params: ErrorResponseParams;
 }
 
 /**
@@ -419,7 +393,7 @@ export interface CloseChannelResponse extends GenericRPCMessage {
  */
 export interface GetChannelsResponse extends GenericRPCMessage {
     method: RPCMethod.GetChannels;
-    params: GetChannelsResponseParams[];
+    params: GetChannelsResponseParams;
 }
 
 /**
@@ -435,6 +409,11 @@ export interface GetRPCHistoryResponse extends GenericRPCMessage {
  */
 export interface GetAssetsResponse extends GenericRPCMessage {
     method: RPCMethod.GetAssets;
+    params: GetAssetsResponseParams[];
+}
+
+export interface AssetsResponse extends GenericRPCMessage {
+    method: RPCMethod.Assets;
     params: GetAssetsResponseParams[];
 }
 
@@ -480,7 +459,7 @@ export interface MessageResponse extends GenericRPCMessage {
 }
 
 /**
- * Represents the parameters for the 'balance_update' RPC method.
+ * Represents the parameters for the 'bu' RPC method.
  */
 export interface BalanceUpdateResponseParams {
     /** The asset symbol (e.g., "ETH", "USDC"). */
@@ -491,7 +470,7 @@ export interface BalanceUpdateResponseParams {
 export type BalanceUpdateRPCResponseParams = BalanceUpdateResponseParams; // for backward compatibility
 
 /**
- * Represents the response structure for the 'balance_update' RPC method.
+ * Represents the response structure for the 'bu' RPC method.
  */
 export interface BalanceUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.BalanceUpdate;
@@ -499,46 +478,26 @@ export interface BalanceUpdateResponse extends GenericRPCMessage {
 }
 
 /**
+ * Represents the parameters for the 'channels' RPC method.
+ */
+export type ChannelsUpdateResponseParams = ChannelUpdate;
+
+/**
  * Represents the response structure for the 'channels_update' RPC method.
  */
 export interface ChannelsUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.ChannelsUpdate;
-    params: ChannelUpdateResponseParams[];
+    params: ChannelsUpdateResponseParams;
 }
 
 /**
- * Represents the parameters for the 'channel_update' RPC method.
+ * Represents the parameters for the 'cu' RPC method.
  */
-export interface ChannelUpdateResponseParams {
-    /** The unique identifier for the channel. */
-    channelId: Hex;
-    /** The Ethereum address of the participant. */
-    participant: Address;
-    /** The current status of the channel (e.g., "open", "closed"). */
-    status: RPCChannelStatus;
-    /** The token contract address. */
-    token: Address;
-    /** The total amount in the channel. */
-    amount: BigInt;
-    /** The chain ID where the channel exists. */
-    chainId: number;
-    /** The adjudicator contract address. */
-    adjudicator: Address;
-    /** The challenge period in seconds. */
-    challenge: number;
-    /** The nonce value for the channel. */
-    nonce: number;
-    /** The version number of the channel. */
-    version: number;
-    /** The timestamp when the channel was created. */
-    createdAt: Date;
-    /** The timestamp when the channel was last updated. */
-    updatedAt: Date;
-}
+export type ChannelUpdateResponseParams = ChannelUpdate;
 export type ChannelUpdateRPCResponseParams = ChannelUpdateResponseParams; // for backward compatibility
 
 /**
- * Represents the response structure for the 'channel_update' RPC method.
+ * Represents the response structure for the 'cu' RPC method.
  */
 export interface ChannelUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.ChannelUpdate;
@@ -621,6 +580,7 @@ export type RPCResponse =
     | GetChannelsResponse
     | GetRPCHistoryResponse
     | GetAssetsResponse
+    | AssetsResponse
     | PingResponse
     | PongResponse
     | MessageResponse
@@ -634,6 +594,8 @@ export type RPCResponse =
  */
 // Helper type to extract the response type for a given method
 export type ExtractResponseByMethod<M extends RPCMethod> = Extract<RPCResponse, { method: M }>;
+
+export type RPCResponseParams = ExtractResponseByMethod<RPCMethod>['params'];
 
 export type RPCResponseParamsByMethod = {
     [M in RPCMethod]: ExtractResponseByMethod<M>['params'];

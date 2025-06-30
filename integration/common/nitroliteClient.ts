@@ -74,8 +74,9 @@ export class TestNitroliteClient extends NitroliteClient {
 
         await this.closeChannel({
             finalState: {
-                channelId: closeParsedResponse.params.channelId,
-                stateData: closeParsedResponse.params.stateData as Hex,
+                intent: closeParsedResponse.params.intent,
+                channelId: closeParsedResponse.params.channelId as Hex,
+                data: closeParsedResponse.params.stateData as Hex,
                 allocations: [
                     {
                         destination: closeParsedResponse.params.allocations[0].destination as Address,

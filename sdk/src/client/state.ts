@@ -133,7 +133,7 @@ export async function _prepareAndSignResizeState(
 ): Promise<{ resizeStateWithSigs: State; proofs: State[]; channelId: ChannelId }> {
     const { resizeState, proofStates } = params;
 
-    if (!resizeState.stateData) {
+    if (!resizeState.data) {
         throw new Errors.MissingParameterError('State data is required for closing the channel.');
     }
 
@@ -141,7 +141,7 @@ export async function _prepareAndSignResizeState(
     const serverSignature = removeQuotesFromRS(resizeState.serverSignature);
 
     const stateToSign: State = {
-        data: resizeState.stateData,
+        data: resizeState.data,
         intent: resizeState.intent,
         allocations: resizeState.allocations,
         version: resizeState.version,

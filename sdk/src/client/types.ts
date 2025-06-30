@@ -71,15 +71,26 @@ export interface ChannelData {
     lastValidState: State; // Last valid state of the channel recorded on-chain
 }
 
-/**
- * Channel state structure - matches the contract State struct
- */
-export interface State {
+interface UnsignedState {
     intent: StateIntent; // Intent of the state (uint8 enum in contract)
     version: bigint; // Version of the state (uint256 in contract)
     data: Hex; // Application data encoded (bytes in contract)
     allocations: Allocation[]; // Asset allocation array
+}
+
+/**
+ * Channel state structure - matches the contract State struct
+ */
+export interface State extends UnsignedState {
     sigs: Signature[]; // State signatures array
+}
+
+/**
+ * Extended state structure with channel ID and server signature to close the channel
+ */
+export interface FinalState extends UnsignedState {
+    channelId: ChannelId;
+    serverSignature: Signature;
 }
 
 // Legacy types for backward compatibility
@@ -149,13 +160,7 @@ export interface CreateChannelParams {
  */
 export interface CloseChannelParams {
     stateData?: Hex;
-    finalState: {
-        channelId: ChannelId;
-        stateData: Hex;
-        allocations: [Allocation, Allocation];
-        version: bigint;
-        serverSignature: Signature;
-    };
+    finalState: FinalState;
 }
 
 /**
@@ -171,14 +176,7 @@ export interface ChallengeChannelParams {
  * Parameters required for resizing a state channel.
  */
 export interface ResizeChannelParams {
-    resizeState: {
-        channelId: ChannelId;
-        stateData: Hex;
-        allocations: [Allocation, Allocation];
-        version: bigint;
-        intent: StateIntent;
-        serverSignature: Signature;
-    };
+    resizeState: FinalState;
     proofStates: State[];
 }
 

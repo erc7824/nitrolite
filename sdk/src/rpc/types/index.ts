@@ -150,6 +150,38 @@ export interface AppDefinition {
 }
 
 /**
+ * Represents a channel update message sent over the RPC protocol.
+ */
+export interface ChannelUpdate {
+    /** The unique identifier for the channel. */
+    channelId: Hex;
+    /** The Ethereum address of the participant. */
+    participant: Address;
+    /** The current status of the channel (e.g., "open", "closed"). */
+    status: RPCChannelStatus;
+    /** The token contract address. */
+    token: Address;
+    /** The wallet address associated with the channel. */
+    wallet: Address;
+    /** The total amount in the channel. */
+    amount: BigInt;
+    /** The chain ID where the channel exists. */
+    chainId: number;
+    /** The adjudicator contract address. */
+    adjudicator: Address;
+    /** The challenge period in seconds. */
+    challenge: number;
+    /** The nonce value for the channel. */
+    nonce: number;
+    /** The version number of the channel. */
+    version: number;
+    /** The timestamp when the channel was created. */
+    createdAt: Date;
+    /** The timestamp when the channel was last updated. */
+    updatedAt: Date;
+}
+
+/**
  * Defines standard error codes for the Nitrolite RPC protocol.
  * Includes standard JSON-RPC codes and custom codes for specific errors.
  */

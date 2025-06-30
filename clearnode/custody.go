@@ -228,29 +228,26 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		return
 	}
 
-	// Check if there is already existing open channel with the broker
-	existingOpenChannel, err := CheckExistingChannels(c.db, wallet, tokenAddress, c.chainID)
-	if err != nil {
-		logger.Error("error checking channels in database", "error", err)
-		return
-	}
-
-	if existingOpenChannel != nil {
-		logger.Error("an open channel with broker already exists", "existingChannelId", existingOpenChannel.ChannelID)
-		return
-	}
-
-	err = AddSigner(c.db, wallet, participantSigner)
-	if err != nil {
-		logger.Error("error recording signer in database", "error", err)
+	if err := AddSigner(c.db, wallet, participantSigner); err != nil {
+		logger.Error("failed to add signer", "error", err)
 		return
 	}
 
 	var ch Channel
-	err = c.db.Transaction(func(tx *gorm.DB) error {
+	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
 		if err := c.saveContractEvent(tx, "created", *ev, ev.Raw); err != nil {
 			return err
+		}
+
+		// Check if there is already existing open channel with the broker
+		existingOpenChannel, err := CheckExistingChannels(c.db, wallet, tokenAddress, c.chainID)
+		if err != nil {
+			return err
+		}
+
+		if existingOpenChannel != nil {
+			return fmt.Errorf("an open channel with broker already exists: %s", existingOpenChannel.ChannelID)
 		}
 
 		ch, err = CreateChannel(

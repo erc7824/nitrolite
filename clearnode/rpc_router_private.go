@@ -36,18 +36,18 @@ type TransferResponse struct {
 type CreateAppSessionParams struct {
 	Definition  AppDefinition   `json:"definition"`
 	Allocations []AppAllocation `json:"allocations"`
-	SessionData string          `json:"session_data"`
+	SessionData *string         `json:"session_data"`
 }
 
 type SubmitStateParams struct {
 	AppSessionID string          `json:"app_session_id"`
 	Allocations  []AppAllocation `json:"allocations"`
-	SessionData  string          `json:"session_data"`
+	SessionData  *string         `json:"session_data"`
 }
 
 type CloseAppSessionParams struct {
 	AppSessionID string          `json:"app_session_id"`
-	SessionData  string          `json:"session_data"`
+	SessionData  *string         `json:"session_data"`
 	Allocations  []AppAllocation `json:"allocations"`
 }
 
@@ -61,7 +61,7 @@ type AppSessionResponse struct {
 	AppSessionID       string   `json:"app_session_id"`
 	Status             string   `json:"status"`
 	ParticipantWallets []string `json:"participants"`
-	SessionData        string   `json:"session_data"`
+	SessionData        string   `json:"session_data,omitempty"`
 	Protocol           string   `json:"protocol"`
 	Challenge          uint64   `json:"challenge"`
 	Weights            []int64  `json:"weights"`
@@ -299,7 +299,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: appSession.SessionID,
-		SessionData:  params.SessionData,
+		SessionData:  sessionData,
 		Version:      appSession.Version,
 		Status:       string(ChannelStatusOpen),
 	})
@@ -342,7 +342,7 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: params.AppSessionID,
-		SessionData:  params.SessionData,
+		SessionData:  sessionData,
 		Version:      newVersion,
 		Status:       string(ChannelStatusOpen),
 	})
@@ -382,7 +382,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: params.AppSessionID,
-		SessionData:  params.SessionData,
+		SessionData:  sessionData,
 		Version:      finalVersion,
 		Status:       string(ChannelStatusClosed),
 	})

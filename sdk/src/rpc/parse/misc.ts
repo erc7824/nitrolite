@@ -68,33 +68,37 @@ const TransferParamsSchema = z
 
 const GetRPCHistoryParamsSchema = z
     .array(
-        z
-            .object({
-                id: z.number(),
-                sender: addressSchema,
-                req_id: z.number(),
-                method: z.string(),
-                params: z.string(),
-                timestamp: z.number(),
-                req_sig: z.array(hexSchema),
-                res_sig: z.array(hexSchema),
-                response: z.string(),
-            })
-            .transform(
-                (h) =>
-                    ({
-                        id: h.id,
-                        sender: h.sender as Address,
-                        reqId: h.req_id,
-                        method: h.method,
-                        params: h.params,
-                        timestamp: h.timestamp,
-                        reqSig: h.req_sig as any,
-                        resSig: h.res_sig as any,
-                        response: h.response,
-                    }) as GetRPCHistoryResponseParams,
-            ),
+        z.array(
+            z
+                .object({
+                    id: z.number(),
+                    sender: addressSchema,
+                    req_id: z.number(),
+                    method: z.string(),
+                    params: z.string(),
+                    timestamp: z.number(),
+                    req_sig: z.array(hexSchema),
+                    res_sig: z.array(hexSchema),
+                    response: z.string(),
+                })
+                .transform(
+                    (h) =>
+                        ({
+                            id: h.id,
+                            sender: h.sender as Address,
+                            reqId: h.req_id,
+                            method: h.method,
+                            params: h.params,
+                            timestamp: h.timestamp,
+                            reqSig: h.req_sig as any,
+                            resSig: h.res_sig as any,
+                            response: h.response,
+                        }) as GetRPCHistoryResponseParams,
+                ),
+        ),
     )
+    .refine((arr) => arr.length === 1)
+    .transform((arr) => arr[0])
     .transform((arr) => arr as GetRPCHistoryResponseParams[]);
 
 const parseMessageParams: ParamsParser<unknown> = (params) => {

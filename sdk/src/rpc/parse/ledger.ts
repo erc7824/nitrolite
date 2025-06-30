@@ -17,6 +17,7 @@ const GetLedgerBalancesParamsSchema = z
             }),
         ),
     )
+    .refine((arr) => arr.length === 1)
     .transform((arr) => arr[0])
     .transform((arr) => arr as GetLedgerBalancesResponseParams[]);
 
@@ -49,6 +50,7 @@ const GetLedgerEntriesParamsSchema = z
                 ),
         ),
     )
+    .refine((arr) => arr.length === 1)
     .transform((arr) => arr[0])
     .transform((arr) => arr as GetLedgerEntriesResponseParams[]);
 

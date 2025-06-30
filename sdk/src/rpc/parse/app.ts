@@ -114,6 +114,7 @@ const GetAppSessionsParamsSchema = z
                 ),
         ),
     )
+    .refine((arr) => arr.length === 1)
     .transform((arr) => arr[0])
     .transform((arr) => arr as GetAppSessionsResponseParams[]);
 

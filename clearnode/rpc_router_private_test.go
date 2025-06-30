@@ -679,13 +679,14 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 			Challenge:          60,
 			Nonce:              ts,
 		}
+		data := `{"key":"value"}`
 		createParams := CreateAppSessionParams{
 			Definition: def,
 			Allocations: []AppAllocation{
 				{ParticipantWallet: signerAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 				{ParticipantWallet: signerAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 			},
-			SessionData: `{"key":"value"}`,
+			SessionData: &data,
 		}
 
 		c := &RPCContext{
@@ -722,13 +723,13 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, string(ChannelStatusOpen), appResp.Status)
 		assert.Equal(t, uint64(1), appResp.Version)
-		assert.Equal(t, `{"key":"value"}`, appResp.SessionData)
+		assert.Equal(t, data, appResp.SessionData)
 
 		var vApp AppSession
 		require.NoError(t, db.Where("session_id = ?", appResp.AppSessionID).First(&vApp).Error)
 		assert.ElementsMatch(t, []string{signerAddressA.Hex(), signerAddressB.Hex()}, vApp.ParticipantWallets)
 		assert.Equal(t, uint64(1), vApp.Version)
-		assert.Equal(t, `{"key":"value"}`, vApp.SessionData)
+		assert.Equal(t, data, vApp.SessionData)
 
 		// Participant accounts drained
 		partBalA, _ := GetWalletLedger(db, signerAddressA).Balance(accountIDA, "usdc")
@@ -864,13 +865,14 @@ func TestRPCRouterHandleSubmitState(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, assetSymbol, decimal.NewFromInt(200)))
 		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, assetSymbol, decimal.NewFromInt(300)))
 
+		data := `{"state":"updated"}`
 		submitStateParams := SubmitStateParams{
 			AppSessionID: vAppID.Hex(),
 			Allocations: []AppAllocation{
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
 			},
-			SessionData: `{"state":"updated"}`,
+			SessionData: &data,
 		}
 
 		// Create RPC request
@@ -907,13 +909,13 @@ func TestRPCRouterHandleSubmitState(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, string(ChannelStatusOpen), appResp.Status)
 		assert.Equal(t, uint64(2), appResp.Version)
-		assert.Equal(t, `{"state":"updated"}`, appResp.SessionData)
+		assert.Equal(t, data, appResp.SessionData)
 
 		var updated AppSession
 		require.NoError(t, db.Where("session_id = ?", vAppID.Hex()).First(&updated).Error)
 		assert.Equal(t, ChannelStatusOpen, updated.Status)
 		assert.Equal(t, uint64(2), updated.Version)
-		assert.Equal(t, `{"state":"updated"}`, updated.SessionData)
+		assert.Equal(t, data, updated.SessionData)
 
 		// Check balances redistributed
 		balA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
@@ -969,13 +971,14 @@ func TestRPCRouterHandleCloseApplication(t *testing.T) {
 	require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, assetSymbol, decimal.NewFromInt(200)))
 	require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, assetSymbol, decimal.NewFromInt(300)))
 
+	data := `{"state":"closed"}`
 	closeParams := CloseAppSessionParams{
 		AppSessionID: vAppID.Hex(),
 		Allocations: []AppAllocation{
 			{ParticipantWallet: userAddressA.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
 			{ParticipantWallet: userAddressB.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
 		},
-		SessionData: `{"state":"closed"}`,
+		SessionData: &data,
 	}
 
 	// Create RPC request
@@ -1012,13 +1015,13 @@ func TestRPCRouterHandleCloseApplication(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, string(ChannelStatusClosed), appResp.Status)
 	assert.Equal(t, uint64(3), appResp.Version)
-	assert.Equal(t, `{"state":"closed"}`, appResp.SessionData)
+	assert.Equal(t, data, appResp.SessionData)
 
 	var updated AppSession
 	require.NoError(t, db.Where("session_id = ?", vAppID.Hex()).First(&updated).Error)
 	assert.Equal(t, ChannelStatusClosed, updated.Status)
 	assert.Equal(t, uint64(3), updated.Version)
-	assert.Equal(t, `{"state":"closed"}`, updated.SessionData)
+	assert.Equal(t, data, updated.SessionData)
 
 	// Check balances redistributed
 	balA, _ := GetWalletLedger(db, userAddressA).Balance(accountIDA, "usdc")

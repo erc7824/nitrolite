@@ -80,12 +80,13 @@ type GetTransactionsParams struct {
 }
 
 type TransactionResponse struct {
-	Hash      string          `json:"hash"`
-	From      string          `json:"from"`
-	To        string          `json:"to"`
-	Asset     string          `json:"asset"`
-	Amount    decimal.Decimal `json:"amount"`
-	CreatedAt time.Time       `json:"created_at"`
+	TxHash      string          `json:"tx_hash"`
+	TxType      TransactionType `json:"tx_type"`
+	FromAccount string          `json:"from_account"`
+	ToAccount   string          `json:"to_account"`
+	Asset       string          `json:"asset"`
+	Amount      decimal.Decimal `json:"amount"`
+	CreatedAt   time.Time       `json:"created_at"`
 }
 
 func (r *RPCRouter) HandlePing(c *RPCContext) {
@@ -331,12 +332,13 @@ func (r *RPCRouter) HandleGetTransactions(c *RPCContext) {
 	resp := make([]TransactionResponse, len(transactions))
 	for i, tx := range transactions {
 		resp[i] = TransactionResponse{
-			Hash:      tx.Hash,
-			From:      tx.FromAccount,
-			To:        tx.ToAccount,
-			Asset:     tx.AssetSymbol,
-			Amount:    tx.Amount,
-			CreatedAt: tx.CreatedAt,
+			TxHash:      tx.Hash,
+			TxType:      tx.Type,
+			FromAccount: tx.FromAccount,
+			ToAccount:   tx.ToAccount,
+			Asset:       tx.AssetSymbol,
+			Amount:      tx.Amount,
+			CreatedAt:   tx.CreatedAt,
 		}
 	}
 

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
@@ -24,13 +23,6 @@ type TransferParams struct {
 type TransferAllocation struct {
 	AssetSymbol string          `json:"asset"`
 	Amount      decimal.Decimal `json:"amount"`
-}
-
-type TransferResponse struct {
-	From        string               `json:"from"`
-	To          string               `json:"to"`
-	Allocations []TransferAllocation `json:"allocations"`
-	CreatedAt   time.Time            `json:"created_at"`
 }
 
 type CreateAppSessionParams struct {
@@ -216,8 +208,9 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
-	fromWallet := c.UserID
+	var transactions []TransactionResponse
 	err := r.DB.Transaction(func(tx *gorm.DB) error {
+		fromWallet := c.UserID
 		if wallet := GetWalletBySigner(fromWallet); wallet != "" {
 			fromWallet = wallet
 		}
@@ -251,8 +244,20 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			if err = ledger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit destination account: %w", err)
 			}
+			transaction, err := RecordTransaction(tx, TransactionTypeTransfer, fromWallet, params.Destination, alloc.AssetSymbol, alloc.Amount)
+			if err != nil {
+				return fmt.Errorf("failed to record transaction: %w", err)
+			}
+			transactions = append(transactions, TransactionResponse{
+				TxHash:      transaction.Hash,
+				TxType:      transaction.Type,
+				FromAccount: transaction.FromAccount,
+				ToAccount:   transaction.ToAccount,
+				Asset:       transaction.AssetSymbol,
+				Amount:      transaction.Amount,
+				CreatedAt:   transaction.CreatedAt,
+			})
 		}
-
 		return nil
 	})
 
@@ -262,12 +267,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
-	c.Succeed(req.Method, TransferResponse{
-		From:        fromWallet,
-		To:          params.Destination,
-		Allocations: params.Allocations,
-		CreatedAt:   time.Now(),
-	})
+	c.Succeed(req.Method, transactions)
 	logger.Info("transfer completed", "userID", c.UserID, "transferTo", params.Destination, "allocations", params.Allocations)
 }
 

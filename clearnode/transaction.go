@@ -11,9 +11,20 @@ import (
 	"gorm.io/gorm"
 )
 
+type TransactionType string
+
+var (
+	TransactionTypeTransfer      TransactionType = "transfer"
+	TransactionTypeDeposit       TransactionType = "deposit"
+	TransactionTypeWithdrawal    TransactionType = "withdrawal"
+	TransactionTypeAppDeposit    TransactionType = "app_deposit"
+	TransactionTypeAppWithdrawal TransactionType = "app_withdrawal"
+)
+
 type Transaction struct {
 	ID          uint            `gorm:"primaryKey"`
 	Hash        string          `gorm:"column:hash;not null;uniqueIndex"`
+	Type        TransactionType `gorm:"column:tx_type;not null;index:idx_type;index:idx_from_to_account"`
 	FromAccount string          `gorm:"column:from_account;not null;index:idx_from_account;index:idx_from_to_account"`
 	ToAccount   string          `gorm:"column:to_account;not null;index:idx_to_account;index:idx_from_to_account"`
 	AssetSymbol string          `gorm:"column:asset_symbol;not null"`
@@ -37,6 +48,7 @@ func (t *Transaction) BeforeCreate(tx *gorm.DB) (err error) {
 func (t *Transaction) AfterCreate(tx *gorm.DB) (err error) {
 	txHash := getTransactionHash(
 		t.ID,
+		t.Type,
 		t.FromAccount,
 		t.ToAccount,
 		t.AssetSymbol,
@@ -47,8 +59,9 @@ func (t *Transaction) AfterCreate(tx *gorm.DB) (err error) {
 	return tx.Model(t).UpdateColumn("hash", txHash).Error
 }
 
-func RecordTransaction(tx *gorm.DB, fromAccount, toAccount, assetSymbol string, amount decimal.Decimal) (*Transaction, error) {
+func RecordTransaction(tx *gorm.DB, txType TransactionType, fromAccount, toAccount, assetSymbol string, amount decimal.Decimal) (*Transaction, error) {
 	transaction := &Transaction{
+		Type:        txType,
 		FromAccount: fromAccount,
 		ToAccount:   toAccount,
 		AssetSymbol: assetSymbol,
@@ -84,10 +97,11 @@ func GetTransactions(tx *gorm.DB, accountID, assetSymbol string) ([]Transaction,
 }
 
 // getTransactionHash generates a deterministic hash for a transaction based on its attributes.
-func getTransactionHash(id uint, fromAccount, toAccount, assetSymbol string, amount decimal.Decimal, timestamp int64) string {
+func getTransactionHash(id uint, txType TransactionType, fromAccount, toAccount, assetSymbol string, amount decimal.Decimal, timestamp int64) string {
 	dataString := fmt.Sprintf(
-		"%d:%s:%s:%s:%s:%s",
+		"%d:%s:%s:%s:%s:%s:%s",
 		id,
+		txType,
 		fromAccount,
 		toAccount,
 		assetSymbol,

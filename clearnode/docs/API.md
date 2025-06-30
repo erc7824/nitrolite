@@ -378,24 +378,37 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 
 ```json
 {
-  "res": [1, "transfer", [{
-    "from": "0x1234567890abcdef...",
-    "to": "0x9876543210abcdef...",
-    "allocations": [
-      {
-        "asset": "usdc",
-        "amount": "50.0"
-      },
-      {
-        "asset": "eth",
-        "amount": "0.1"
-      }
-    ],
-    "created_at": "2023-05-01T12:00:00Z"
-  }], 1619123456789],
+  "res": [1, "transfer", [[
+    {
+      "tx_hash": "0xabcdef1234567890...",
+      "tx_type": "transfer",
+      "from_account": "0x1234567890abcdef...",
+      "to_account": "0x9876543210abcdef...",
+      "asset": "usdc",
+      "amount": "50.0",
+      "created_at": "2023-05-01T12:00:00Z"
+    },
+    {
+      "tx_hash": "0x9876543210fedcba...",
+      "tx_type": "transfer",
+      "from_account": "0x1234567890abcdef...",
+      "to_account": "0x9876543210abcdef...",
+      "asset": "eth",
+      "amount": "0.1",
+      "created_at": "2023-05-01T12:00:00Z"
+    }
+  ]], 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
+The response now returns an array of transaction objects, with one transaction created for each asset being transferred. Each transaction includes:
+- `tx_hash`: Unique transaction hash generated from transaction data
+- `tx_type`: Transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
+- `from_account`: The account that sent the funds
+- `to_account`: The account that received the funds
+- `asset`: The asset symbol that was transferred
+- `amount`: The amount transferred for this specific asset
+- `created_at`: When the transaction was created (ISO 8601 format)
 
 ### Get Ledger Entries
 
@@ -482,17 +495,17 @@ Pagination is going to be added.
 {
   "res": [1, "get_transactions", [[
     {
-      "hash": "0xabcdef1234567890...",
-      "from": "0x1234567890abcdef...",
-      "to": "0x9876543210abcdef...",
+      "tx_hash": "0xabcdef1234567890...",
+      "from_account": "0x1234567890abcdef...",
+      "to_account": "0x9876543210abcdef...",
       "asset": "usdc",
       "amount": "50.0",
       "created_at": "2023-05-01T12:00:00Z"
     },
     {
-      "hash": "0x9876543210fedcba...",
-      "from": "0x9876543210abcdef...",
-      "to": "0x1234567890abcdef...",
+      "tx_hash": "0x9876543210fedcba...",
+      "from_account": "0x9876543210abcdef...",
+      "to_account": "0x1234567890abcdef...",
       "asset": "usdc",
       "amount": "25.0",
       "created_at": "2023-05-01T10:30:00Z"
@@ -503,9 +516,9 @@ Pagination is going to be added.
 ```
 
 Each transaction response includes:
-- `hash`: Unique transaction hash generated from transaction data
-- `from`: The account that sent the funds
-- `to`: The account that received the funds
+- `tx_hash`: Unique transaction hash generated from transaction data
+- `from_account`: The account that sent the funds
+- `to_account`: The account that received the funds
 - `asset`: The asset symbol (e.g., "usdc", "eth")
 - `amount`: The transaction amount
 - `created_at`: When the transaction was created (ISO 8601 format)

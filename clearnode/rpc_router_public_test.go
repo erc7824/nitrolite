@@ -1082,8 +1082,8 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 				require.True(t, txs[1].CreatedAt.After(txs[2].CreatedAt))
 				// Verify account1 is always involved
 				for _, tx := range txs {
-					assert.True(t, tx.From == account1 || tx.To == account1)
-					assert.NotEmpty(t, tx.Hash)
+					assert.True(t, tx.FromAccount == account1 || tx.ToAccount == account1)
+					assert.NotEmpty(t, tx.TxHash)
 				}
 			},
 		},
@@ -1094,7 +1094,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				for _, tx := range txs {
 					assert.Equal(t, "usdc", tx.Asset)
-					assert.True(t, tx.From == account1 || tx.To == account1)
+					assert.True(t, tx.FromAccount == account1 || tx.ToAccount == account1)
 				}
 			},
 		},
@@ -1104,8 +1104,8 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			expectedLen: 1,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				assert.Equal(t, "eth", txs[0].Asset)
-				assert.Equal(t, account1, txs[0].From)
-				assert.Equal(t, account3, txs[0].To)
+				assert.Equal(t, account1, txs[0].FromAccount)
+				assert.Equal(t, account3, txs[0].ToAccount)
 			},
 		},
 		{
@@ -1115,8 +1115,8 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				foundAccounts := make(map[string]bool)
 				for _, tx := range txs {
-					foundAccounts[tx.From] = true
-					foundAccounts[tx.To] = true
+					foundAccounts[tx.FromAccount] = true
+					foundAccounts[tx.ToAccount] = true
 				}
 				assert.True(t, foundAccounts[account1])
 				assert.True(t, foundAccounts[account2])

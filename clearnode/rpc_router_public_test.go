@@ -1054,10 +1054,10 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 
 	// Create and seed test transactions
 	testTransactions := []Transaction{
-		{FromAccount: account1, ToAccount: account2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100), CreatedAt: time.Now().Add(-3 * time.Hour)},
-		{FromAccount: account2, ToAccount: account1, AssetSymbol: "usdc", Amount: decimal.NewFromInt(50), CreatedAt: time.Now().Add(-2 * time.Hour)},
-		{FromAccount: account1, ToAccount: account3, AssetSymbol: "eth", Amount: decimal.NewFromFloat(1.5), CreatedAt: time.Now().Add(-1 * time.Hour)},
-		{FromAccount: account3, ToAccount: account2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(25), CreatedAt: time.Now()},
+		{Type: TransactionTypeTransfer, FromAccount: account1, ToAccount: account2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100), CreatedAt: time.Now().Add(-3 * time.Hour)},
+		{Type: TransactionTypeDeposit, FromAccount: account2, ToAccount: account1, AssetSymbol: "usdc", Amount: decimal.NewFromInt(50), CreatedAt: time.Now().Add(-2 * time.Hour)},
+		{Type: TransactionTypeTransfer, FromAccount: account1, ToAccount: account3, AssetSymbol: "eth", Amount: decimal.NewFromFloat(1.5), CreatedAt: time.Now().Add(-1 * time.Hour)},
+		{Type: TransactionTypeWithdrawal, FromAccount: account3, ToAccount: account2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(25), CreatedAt: time.Now()},
 	}
 	for _, tx := range testTransactions {
 		// We use a temporary variable to avoid taking the address of a loop variable.
@@ -1132,6 +1132,62 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 		{
 			name:        "Filter by non-existent asset",
 			params:      map[string]any{"asset": "nonexistent"},
+			expectedLen: 0,
+			assertions:  nil,
+		},
+		{
+			name:        "Filter by transaction type - transfer",
+			params:      map[string]any{"tx_type": "transfer"},
+			expectedLen: 2,
+			assertions: func(t *testing.T, txs []TransactionResponse) {
+				for _, tx := range txs {
+					assert.Equal(t, TransactionTypeTransfer, tx.TxType)
+				}
+			},
+		},
+		{
+			name:        "Filter by transaction type - deposit",
+			params:      map[string]any{"tx_type": "deposit"},
+			expectedLen: 1,
+			assertions: func(t *testing.T, txs []TransactionResponse) {
+				assert.Equal(t, TransactionTypeDeposit, txs[0].TxType)
+				assert.Equal(t, account2, txs[0].FromAccount)
+				assert.Equal(t, account1, txs[0].ToAccount)
+			},
+		},
+		{
+			name:        "Filter by transaction type - withdrawal",
+			params:      map[string]any{"tx_type": "withdrawal"},
+			expectedLen: 1,
+			assertions: func(t *testing.T, txs []TransactionResponse) {
+				assert.Equal(t, TransactionTypeWithdrawal, txs[0].TxType)
+				assert.Equal(t, account3, txs[0].FromAccount)
+				assert.Equal(t, account2, txs[0].ToAccount)
+			},
+		},
+		{
+			name:        "Filter by account and transaction type",
+			params:      map[string]any{"account_id": account1, "tx_type": "transfer"},
+			expectedLen: 2,
+			assertions: func(t *testing.T, txs []TransactionResponse) {
+				for _, tx := range txs {
+					assert.Equal(t, TransactionTypeTransfer, tx.TxType)
+					assert.True(t, tx.FromAccount == account1 || tx.ToAccount == account1)
+				}
+			},
+		},
+		{
+			name:        "Filter by asset and transaction type",
+			params:      map[string]any{"asset": "usdc", "tx_type": "deposit"},
+			expectedLen: 1,
+			assertions: func(t *testing.T, txs []TransactionResponse) {
+				assert.Equal(t, "usdc", txs[0].Asset)
+				assert.Equal(t, TransactionTypeDeposit, txs[0].TxType)
+			},
+		},
+		{
+			name:        "Filter by non-existent transaction type",
+			params:      map[string]any{"tx_type": "nonexistent"},
 			expectedLen: 0,
 			assertions:  nil,
 		},

@@ -75,7 +75,7 @@ func RecordTransaction(tx *gorm.DB, txType TransactionType, fromAccount, toAccou
 	return transaction, err
 }
 
-func GetTransactions(tx *gorm.DB, accountID, assetSymbol string) ([]Transaction, error) {
+func GetTransactions(tx *gorm.DB, accountID, assetSymbol, txType string) ([]Transaction, error) {
 	var transactions []Transaction
 	q := tx.Model(&Transaction{})
 
@@ -85,6 +85,9 @@ func GetTransactions(tx *gorm.DB, accountID, assetSymbol string) ([]Transaction,
 	}
 	if assetSymbol != "" {
 		q = q.Where("asset_symbol = ?", assetSymbol)
+	}
+	if txType != "" {
+		q = q.Where("tx_type = ?", txType)
 	}
 
 	q = q.Order("created_at DESC")

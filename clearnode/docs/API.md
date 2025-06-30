@@ -474,7 +474,7 @@ Supports pagination and sorting.
 
 ### Get Transactions
 
-Retrieves transaction history with optional filtering by asset. This endpoint provides a view of all transactions where the specified account appears as either the sender or receiver.
+Retrieves transaction history with optional filtering by asset and transaction type. This endpoint provides a view of all transactions where the specified account appears as either the sender or receiver.
 Pagination is going to be added.
 
 **Request:**
@@ -483,7 +483,8 @@ Pagination is going to be added.
 {
   "req": [1, "get_transactions", [{
     "account_id": "0x1234567890abcdef...",
-    "asset": "usdc"  // Optional: filter by asset
+    "asset": "usdc",     // Optional: filter by asset
+    "tx_type": "transfer" // Optional: filter by transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
@@ -496,6 +497,7 @@ Pagination is going to be added.
   "res": [1, "get_transactions", [[
     {
       "tx_hash": "0xabcdef1234567890...",
+      "tx_type": "transfer",
       "from_account": "0x1234567890abcdef...",
       "to_account": "0x9876543210abcdef...",
       "asset": "usdc",
@@ -504,6 +506,7 @@ Pagination is going to be added.
     },
     {
       "tx_hash": "0x9876543210fedcba...",
+      "tx_type": "deposit",
       "from_account": "0x9876543210abcdef...",
       "to_account": "0x1234567890abcdef...",
       "asset": "usdc",
@@ -517,13 +520,21 @@ Pagination is going to be added.
 
 Each transaction response includes:
 - `tx_hash`: Unique transaction hash generated from transaction data
+- `tx_type`: Transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
 - `from_account`: The account that sent the funds
 - `to_account`: The account that received the funds
 - `asset`: The asset symbol (e.g., "usdc", "eth")
 - `amount`: The transaction amount
 - `created_at`: When the transaction was created (ISO 8601 format)
 
-Transactions are ordered by creation date (newest first). If no `account_id` is provided, returns all transactions. The `asset` filter can be used to narrow results to a specific asset type.
+**Available Transaction Types:**
+- `transfer`: Direct transfers between user accounts
+- `deposit`: Funds deposited into channels or accounts
+- `withdrawal`: Funds withdrawn from channels or accounts
+- `app_deposit`: Deposits related to virtual application sessions
+- `app_withdrawal`: Withdrawals related to virtual application sessions
+
+Transactions are ordered by creation date (newest first). If no `account_id` is provided, returns all transactions. The `asset` and `tx_type` filters can be used to narrow results to specific asset types or transaction types.
 
 ### Get RPC History
 

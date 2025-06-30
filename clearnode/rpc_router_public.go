@@ -77,6 +77,7 @@ type GetTransactionsParams struct {
 	// Pagination will be added with another PR
 	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter transactions
 	Asset     string `json:"asset,omitempty"`      // Optional asset to filter transactions
+	TxType    string `json:"tx_type,omitempty"`    // Optional transaction type to filter transactions
 }
 
 type TransactionResponse struct {
@@ -322,7 +323,7 @@ func (r *RPCRouter) HandleGetTransactions(c *RPCContext) {
 		return
 	}
 
-	transactions, err := GetTransactions(r.DB, params.AccountID, params.Asset)
+	transactions, err := GetTransactions(r.DB, params.AccountID, params.Asset, params.TxType)
 	if err != nil {
 		logger.Error("failed to get transactions", "error", err)
 		c.Fail("failed to get transactions")
@@ -343,5 +344,5 @@ func (r *RPCRouter) HandleGetTransactions(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, resp)
-	logger.Info("transactions retrieved", "count", len(transactions), "accountID", params.AccountID, "asset", params.Asset)
+	logger.Info("transactions retrieved", "count", len(transactions), "accountID", params.AccountID, "asset", params.Asset, "txType", params.TxType)
 }

@@ -82,7 +82,7 @@ type GetTransactionsParams struct {
 
 type TransactionResponse struct {
 	TxHash      string          `json:"tx_hash"`
-	TxType      TransactionType `json:"tx_type"`
+	TxType      string          `json:"tx_type"`
 	FromAccount string          `json:"from_account"`
 	ToAccount   string          `json:"to_account"`
 	Asset       string          `json:"asset"`
@@ -323,7 +323,17 @@ func (r *RPCRouter) HandleGetTransactions(c *RPCContext) {
 		return
 	}
 
-	transactions, err := GetTransactions(r.DB, params.AccountID, params.Asset, params.TxType)
+	var txType *TransactionType
+	if params.TxType != "" {
+		parsedType, ok := ParseTransactionType(params.TxType)
+		if !ok {
+			c.Fail("invalid transaction type")
+			return
+		}
+		txType = &parsedType
+	}
+
+	transactions, err := GetTransactions(r.DB, params.AccountID, params.Asset, txType)
 	if err != nil {
 		logger.Error("failed to get transactions", "error", err)
 		c.Fail("failed to get transactions")
@@ -334,7 +344,7 @@ func (r *RPCRouter) HandleGetTransactions(c *RPCContext) {
 	for i, tx := range transactions {
 		resp[i] = TransactionResponse{
 			TxHash:      tx.Hash,
-			TxType:      tx.Type,
+			TxType:      tx.Type.String(),
 			FromAccount: tx.FromAccount,
 			ToAccount:   tx.ToAccount,
 			Asset:       tx.AssetSymbol,

@@ -277,7 +277,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 			err = db.Where("hash = ?", responseTx.TxHash).First(&dbTx).Error
 			require.NoError(t, err, "Response transaction should exist in database")
 
-			assert.Equal(t, dbTx.Type, responseTx.TxType, "Transaction type should match")
+			assert.Equal(t, dbTx.Type.String(), responseTx.TxType, "Transaction type should match")
 			assert.Equal(t, dbTx.FromAccount, responseTx.FromAccount, "From account should match")
 			assert.Equal(t, dbTx.ToAccount, responseTx.ToAccount, "To account should match")
 			assert.Equal(t, dbTx.AssetSymbol, responseTx.Asset, "Asset should match")

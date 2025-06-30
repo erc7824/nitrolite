@@ -1141,7 +1141,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			expectedLen: 2,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				for _, tx := range txs {
-					assert.Equal(t, TransactionTypeTransfer, tx.TxType)
+					assert.Equal(t, "transfer", tx.TxType)
 				}
 			},
 		},
@@ -1150,7 +1150,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			params:      map[string]any{"tx_type": "deposit"},
 			expectedLen: 1,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
-				assert.Equal(t, TransactionTypeDeposit, txs[0].TxType)
+				assert.Equal(t, "deposit", txs[0].TxType)
 				assert.Equal(t, account2, txs[0].FromAccount)
 				assert.Equal(t, account1, txs[0].ToAccount)
 			},
@@ -1160,7 +1160,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			params:      map[string]any{"tx_type": "withdrawal"},
 			expectedLen: 1,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
-				assert.Equal(t, TransactionTypeWithdrawal, txs[0].TxType)
+				assert.Equal(t, "withdrawal", txs[0].TxType)
 				assert.Equal(t, account3, txs[0].FromAccount)
 				assert.Equal(t, account2, txs[0].ToAccount)
 			},
@@ -1171,7 +1171,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			expectedLen: 2,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				for _, tx := range txs {
-					assert.Equal(t, TransactionTypeTransfer, tx.TxType)
+					assert.Equal(t, "transfer", tx.TxType)
 					assert.True(t, tx.FromAccount == account1 || tx.ToAccount == account1)
 				}
 			},
@@ -1182,14 +1182,8 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			expectedLen: 1,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				assert.Equal(t, "usdc", txs[0].Asset)
-				assert.Equal(t, TransactionTypeDeposit, txs[0].TxType)
+				assert.Equal(t, "deposit", txs[0].TxType)
 			},
-		},
-		{
-			name:        "Filter by non-existent transaction type",
-			params:      map[string]any{"tx_type": "nonexistent"},
-			expectedLen: 0,
-			assertions:  nil,
 		},
 	}
 
@@ -1239,4 +1233,37 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			}
 		})
 	}
+
+	// --- 4. ERROR TEST CASES ---
+	t.Run("Filter by non-existent transaction type should return error", func(t *testing.T) {
+		params := map[string]any{"tx_type": "nonexistent"}
+		paramsJSON, err := json.Marshal(params)
+		require.NoError(t, err)
+
+		c := &RPCContext{
+			Context: context.TODO(),
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 999,
+					Method:    "get_transactions",
+					Params:    []any{json.RawMessage(paramsJSON)},
+					Timestamp: uint64(time.Now().Unix()),
+				},
+			},
+		}
+
+		// Call the handler
+		router.HandleGetTransactions(c)
+
+		// Should return an error response
+		res := c.Message.Res
+		require.NotNil(t, res, "Response should not be nil")
+		assert.Equal(t, "error", res.Method, "Should return error method")
+		require.Len(t, res.Params, 1, "Error response should contain one parameter")
+
+		// Verify error message
+		errorMsg, ok := res.Params[0].(string)
+		require.True(t, ok, "Error parameter should be a string")
+		assert.Equal(t, "invalid transaction type", errorMsg, "Should return correct error message")
+	})
 }

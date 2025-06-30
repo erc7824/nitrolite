@@ -11,14 +11,14 @@ import (
 	"gorm.io/gorm"
 )
 
-type TransactionType string
+type TransactionType int
 
-var (
-	TransactionTypeTransfer      TransactionType = "transfer"
-	TransactionTypeDeposit       TransactionType = "deposit"
-	TransactionTypeWithdrawal    TransactionType = "withdrawal"
-	TransactionTypeAppDeposit    TransactionType = "app_deposit"
-	TransactionTypeAppWithdrawal TransactionType = "app_withdrawal"
+const (
+	TransactionTypeTransfer      TransactionType = 100
+	TransactionTypeDeposit       TransactionType = 201
+	TransactionTypeWithdrawal    TransactionType = 202
+	TransactionTypeAppDeposit    TransactionType = 301
+	TransactionTypeAppWithdrawal TransactionType = 302
 )
 
 type Transaction struct {
@@ -41,7 +41,7 @@ func (t *Transaction) BeforeCreate(tx *gorm.DB) (err error) {
 		t.CreatedAt = time.Now()
 	}
 	// Set a temporary hash. This will be overwritten in AfterCreate.
-	t.Hash = "pending"
+	t.Hash = fmt.Sprintf("pending-%p", t)
 	return nil
 }
 
@@ -75,7 +75,7 @@ func RecordTransaction(tx *gorm.DB, txType TransactionType, fromAccount, toAccou
 	return transaction, err
 }
 
-func GetTransactions(tx *gorm.DB, accountID, assetSymbol, txType string) ([]Transaction, error) {
+func GetTransactions(tx *gorm.DB, accountID, assetSymbol string, txType *TransactionType) ([]Transaction, error) {
 	var transactions []Transaction
 	q := tx.Model(&Transaction{})
 
@@ -86,7 +86,7 @@ func GetTransactions(tx *gorm.DB, accountID, assetSymbol, txType string) ([]Tran
 	if assetSymbol != "" {
 		q = q.Where("asset_symbol = ?", assetSymbol)
 	}
-	if txType != "" {
+	if txType != nil {
 		q = q.Where("tx_type = ?", txType)
 	}
 
@@ -115,4 +115,40 @@ func getTransactionHash(id uint, txType TransactionType, fromAccount, toAccount,
 	hash := sha256.New()
 	hash.Write([]byte(dataString))
 	return hex.EncodeToString(hash.Sum(nil))
+}
+
+// TransactionTypeToString converts integer transaction type to string
+func (t TransactionType) String() string {
+	switch t {
+	case TransactionTypeTransfer:
+		return "transfer"
+	case TransactionTypeDeposit:
+		return "deposit"
+	case TransactionTypeWithdrawal:
+		return "withdrawal"
+	case TransactionTypeAppDeposit:
+		return "app_deposit"
+	case TransactionTypeAppWithdrawal:
+		return "app_withdrawal"
+	default:
+		return ""
+	}
+}
+
+// ParseTransactionType converts string transaction type to integer
+func ParseTransactionType(s string) (TransactionType, bool) {
+	switch s {
+	case "transfer":
+		return TransactionTypeTransfer, true
+	case "deposit":
+		return TransactionTypeDeposit, true
+	case "withdrawal":
+		return TransactionTypeWithdrawal, true
+	case "app_deposit":
+		return TransactionTypeAppDeposit, true
+	case "app_withdrawal":
+		return TransactionTypeAppWithdrawal, true
+	default:
+		return 0, false
+	}
 }

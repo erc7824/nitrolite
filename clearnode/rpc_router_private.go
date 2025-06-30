@@ -250,7 +250,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			}
 			transactions = append(transactions, TransactionResponse{
 				TxHash:      transaction.Hash,
-				TxType:      transaction.Type,
+				TxType:      transaction.Type.String(),
 				FromAccount: transaction.FromAccount,
 				ToAccount:   transaction.ToAccount,
 				Asset:       transaction.AssetSymbol,

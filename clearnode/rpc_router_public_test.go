@@ -1042,3 +1042,145 @@ func TestRPCRouterHandleGetLedgerEntries_Pagination(t *testing.T) {
 		})
 	}
 }
+
+func TestRPCRouterHandleGetTransactions(t *testing.T) {
+	// --- 1. SETUP (Runs once for all test cases) ---
+	router, cleanup := setupTestRPCRouter(t)
+	defer cleanup()
+
+	account1 := "0xAccount1"
+	account2 := "0xAccount2"
+	account3 := "0xAccount3"
+
+	// Create and seed test transactions
+	testTransactions := []Transaction{
+		{FromAccount: account1, ToAccount: account2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100), CreatedAt: time.Now().Add(-3 * time.Hour)},
+		{FromAccount: account2, ToAccount: account1, AssetSymbol: "usdc", Amount: decimal.NewFromInt(50), CreatedAt: time.Now().Add(-2 * time.Hour)},
+		{FromAccount: account1, ToAccount: account3, AssetSymbol: "eth", Amount: decimal.NewFromFloat(1.5), CreatedAt: time.Now().Add(-1 * time.Hour)},
+		{FromAccount: account3, ToAccount: account2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(25), CreatedAt: time.Now()},
+	}
+	for _, tx := range testTransactions {
+		// We use a temporary variable to avoid taking the address of a loop variable.
+		tempTx := tx
+		require.NoError(t, router.DB.Create(&tempTx).Error)
+	}
+
+	// --- 2. DEFINE TEST CASES ---
+	testCases := []struct {
+		name        string
+		params      map[string]any
+		expectedLen int
+		assertions  func(t *testing.T, transactions []TransactionResponse) // Optional custom assertions
+	}{
+		{
+			name:        "Get all transactions for a specific account",
+			params:      map[string]any{"account_id": account1},
+			expectedLen: 3,
+			assertions: func(t *testing.T, txs []TransactionResponse) {
+				// Verify ordering (newest first)
+				require.True(t, txs[0].CreatedAt.After(txs[1].CreatedAt))
+				require.True(t, txs[1].CreatedAt.After(txs[2].CreatedAt))
+				// Verify account1 is always involved
+				for _, tx := range txs {
+					assert.True(t, tx.From == account1 || tx.To == account1)
+					assert.NotEmpty(t, tx.Hash)
+				}
+			},
+		},
+		{
+			name:        "Filter by account and asset",
+			params:      map[string]any{"account_id": account1, "asset": "usdc"},
+			expectedLen: 2,
+			assertions: func(t *testing.T, txs []TransactionResponse) {
+				for _, tx := range txs {
+					assert.Equal(t, "usdc", tx.Asset)
+					assert.True(t, tx.From == account1 || tx.To == account1)
+				}
+			},
+		},
+		{
+			name:        "Filter by asset only",
+			params:      map[string]any{"asset": "eth"},
+			expectedLen: 1,
+			assertions: func(t *testing.T, txs []TransactionResponse) {
+				assert.Equal(t, "eth", txs[0].Asset)
+				assert.Equal(t, account1, txs[0].From)
+				assert.Equal(t, account3, txs[0].To)
+			},
+		},
+		{
+			name:        "No filters should return all transactions",
+			params:      map[string]any{},
+			expectedLen: 4,
+			assertions: func(t *testing.T, txs []TransactionResponse) {
+				foundAccounts := make(map[string]bool)
+				for _, tx := range txs {
+					foundAccounts[tx.From] = true
+					foundAccounts[tx.To] = true
+				}
+				assert.True(t, foundAccounts[account1])
+				assert.True(t, foundAccounts[account2])
+				assert.True(t, foundAccounts[account3])
+			},
+		},
+		{
+			name:        "Account with no transactions",
+			params:      map[string]any{"account_id": "0xNonExistentAccount"},
+			expectedLen: 0,
+			assertions:  nil, // No extra assertions needed beyond length check
+		},
+		{
+			name:        "Filter by non-existent asset",
+			params:      map[string]any{"asset": "nonexistent"},
+			expectedLen: 0,
+			assertions:  nil,
+		},
+	}
+
+	// --- 3. RUN TEST CASES ---
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Marshal params for the current test case
+			paramsJSON, err := json.Marshal(tc.params)
+			require.NoError(t, err)
+
+			// Create a new context for each request
+			c := &RPCContext{
+				Context: context.TODO(),
+				Message: RPCMessage{
+					Req: &RPCData{
+						RequestID: uint64(i + 1), // Unique request ID per test case
+						Method:    "get_transactions",
+						Params:    []any{json.RawMessage(paramsJSON)},
+						Timestamp: uint64(time.Now().Unix()),
+					},
+				},
+			}
+
+			// Call the handler
+			router.HandleGetTransactions(c)
+
+			// General assertions for all cases
+			res := c.Message.Res
+			require.NotNil(t, res, "Response should not be nil")
+			assert.Equal(t, "get_transactions", res.Method)
+			require.Len(t, res.Params, 1, "Response should contain one parameter")
+
+			// Unmarshal the actual transaction data
+			var transactions []TransactionResponse
+			// We need to marshal the interface{} back to JSON, then unmarshal into our concrete type.
+			respBytes, err := json.Marshal(res.Params[0])
+			require.NoError(t, err)
+			err = json.Unmarshal(respBytes, &transactions)
+			require.NoError(t, err, "Response parameter should be a slice of TransactionResponse")
+
+			// Assert the expected number of transactions were returned
+			assert.Len(t, transactions, tc.expectedLen)
+
+			// Run specific assertions for this test case, if any
+			if tc.assertions != nil {
+				tc.assertions(t, transactions)
+			}
+		})
+	}
+}

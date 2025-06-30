@@ -73,6 +73,21 @@ type BrokerConfig struct {
 	Networks      []NetworkInfo `json:"networks"`
 }
 
+type GetTransactionsParams struct {
+	// Pagination will be added with another PR
+	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter transactions
+	Asset     string `json:"asset,omitempty"`      // Optional asset to filter transactions
+}
+
+type TransactionResponse struct {
+	Hash      string          `json:"hash"`
+	From      string          `json:"from"`
+	To        string          `json:"to"`
+	Asset     string          `json:"asset"`
+	Amount    decimal.Decimal `json:"amount"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
 func (r *RPCRouter) HandlePing(c *RPCContext) {
 	c.Succeed("pong")
 }
@@ -293,4 +308,38 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 
 	c.Succeed(req.Method, resp)
 	logger.Info("ledger entries retrieved", "accountID", userAccountID, "asset", params.Asset, "wallet", userAddress)
+}
+
+func (r *RPCRouter) HandleGetTransactions(c *RPCContext) {
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+
+	var params GetTransactionsParams
+	if err := parseParams(req.Params, &params); err != nil {
+		c.Fail(err.Error())
+		return
+	}
+
+	transactions, err := GetTransactions(r.DB, params.AccountID, params.Asset)
+	if err != nil {
+		logger.Error("failed to get transactions", "error", err)
+		c.Fail("failed to get transactions")
+		return
+	}
+
+	resp := make([]TransactionResponse, len(transactions))
+	for i, tx := range transactions {
+		resp[i] = TransactionResponse{
+			Hash:      tx.Hash,
+			From:      tx.FromAccount,
+			To:        tx.ToAccount,
+			Asset:     tx.AssetSymbol,
+			Amount:    tx.Amount,
+			CreatedAt: tx.CreatedAt,
+		}
+	}
+
+	c.Succeed(req.Method, resp)
+	logger.Info("transactions retrieved", "count", len(transactions), "accountID", params.AccountID, "asset", params.Asset)
 }

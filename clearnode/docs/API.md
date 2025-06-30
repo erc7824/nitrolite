@@ -14,6 +14,7 @@
 | `get_app_definition` | Retrieves application definition for a ledger account | Public |
 | `get_app_sessions` | Lists virtual applications for a participant with optional status filter | Public |
 | `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Public |
+| `get_transactions` | Retrieves transaction history with optional filtering | Public |
 | `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
 | `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
 | `transfer` | Transfers funds from user's unified balance to another account | Private |
@@ -457,6 +458,59 @@ Supports pagination and sorting.
   "sig": ["0xabcd1234..."]
 }
 ```
+
+### Get Transactions
+
+Retrieves transaction history with optional filtering by asset. This endpoint provides a view of all transactions where the specified account appears as either the sender or receiver.
+Pagination is going to be added.
+
+**Request:**
+
+```json
+{
+  "req": [1, "get_transactions", [{
+    "account_id": "0x1234567890abcdef...",
+    "asset": "usdc"  // Optional: filter by asset
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "get_transactions", [[
+    {
+      "hash": "0xabcdef1234567890...",
+      "from": "0x1234567890abcdef...",
+      "to": "0x9876543210abcdef...",
+      "asset": "usdc",
+      "amount": "50.0",
+      "created_at": "2023-05-01T12:00:00Z"
+    },
+    {
+      "hash": "0x9876543210fedcba...",
+      "from": "0x9876543210abcdef...",
+      "to": "0x1234567890abcdef...",
+      "asset": "usdc",
+      "amount": "25.0",
+      "created_at": "2023-05-01T10:30:00Z"
+    }
+  ]], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+Each transaction response includes:
+- `hash`: Unique transaction hash generated from transaction data
+- `from`: The account that sent the funds
+- `to`: The account that received the funds
+- `asset`: The asset symbol (e.g., "usdc", "eth")
+- `amount`: The transaction amount
+- `created_at`: When the transaction was created (ISO 8601 format)
+
+Transactions are ordered by creation date (newest first). If no `account_id` is provided, returns all transactions. The `asset` filter can be used to narrow results to a specific asset type.
 
 ### Get RPC History
 

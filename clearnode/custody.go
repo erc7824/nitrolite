@@ -143,7 +143,7 @@ func (c *Custody) Join(channelID string, lastStateData []byte) (common.Hash, err
 func (c *Custody) handleBlockChainEvent(ctx context.Context, l types.Log) {
 	ctx = SetContextLogger(ctx, c.logger)
 	logger := LoggerFromContext(ctx)
-	logger.Debug("received event", "blockNumber", l.BlockNumber, "txHahs", l.TxHash.String(), "logIndex", l.Index)
+	logger.Debug("received event", "blockNumber", l.BlockNumber, "txHash", l.TxHash.String(), "logIndex", l.Index)
 
 	eventID := l.Topics[0]
 	switch eventID {

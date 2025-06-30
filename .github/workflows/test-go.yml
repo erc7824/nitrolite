@@ -30,10 +30,6 @@ jobs:
           cache: true
           cache-dependency-path: '${{ inputs.project-path }}/go.sum'
 
-      - name: Echo file content
-        run: sed -n '576,596p' ./rpc_router_private.go
-        working-directory: ${{ inputs.project-path }}
-
       - name: Test
         run: go test -v ./...
         working-directory: ${{ inputs.project-path }}

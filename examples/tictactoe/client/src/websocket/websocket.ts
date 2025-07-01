@@ -7,7 +7,7 @@ import {
     createPingMessage,
     createAuthVerifyMessageWithJWT,
     createEIP712AuthMessageSigner,
-    parseRPCResponse,
+    parseAnyRPCResponse,
     RPCMethod,
 } from "@erc7824/nitrolite";
 import type { Channel } from "@erc7824/nitrolite";
@@ -294,7 +294,7 @@ export class WebSocketClient {
                 const data = event.data || event;
 
                 try {
-                    const response = parseRPCResponse(data);
+                    const response = parseAnyRPCResponse(data);
 
                     // Check for challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
                     if (response.method === RPCMethod.AuthChallenge) {
@@ -333,14 +333,14 @@ export class WebSocketClient {
                     }
                     // Check for success response
                     else if (response.method === RPCMethod.AuthVerify) {
-                        if (!response.params[0].success) {
+                        if (!response.params.success) {
                             return;
                         }
                         console.log("Authentication successful");
 
                         // If response contains a JWT token, store it
-                        if (response.params[0].jwt_token) {
-                            const jwtToken = response.params[0].jwt_token;
+                        if (response.params.jwtToken) {
+                            const jwtToken = response.params.jwtToken;
                             console.log("JWT token received:", jwtToken);
                             if (typeof window !== "undefined") {
                                 window.localStorage?.setItem("jwtToken", jwtToken);
@@ -359,7 +359,7 @@ export class WebSocketClient {
                     }
                     // Check for error response
                     else if (response.method === RPCMethod.Error) {
-                        const errorMsg = response.params[0].error || "Authentication failed";
+                        const errorMsg = response.params.error || "Authentication failed";
                         console.error("Authentication failed:", errorMsg);
                         if (typeof window !== "undefined") {
                             window.localStorage?.removeItem("jwtToken");

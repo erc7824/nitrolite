@@ -126,7 +126,7 @@ export function BackgroundAnimation() {
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
         
         // Adjust color opacity
-        let color = this.color.slice(0, -4) + opacity + ')';
+        const color = this.color.slice(0, -4) + opacity + ')';
         
         ctx.fillStyle = color;
         ctx.fill();

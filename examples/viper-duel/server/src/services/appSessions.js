@@ -3,7 +3,7 @@
  * This file handles creating and closing app sessions for games
  */
 import {
-  parseRPCResponse,
+  parseAnyRPCResponse,
   RPCMethod,
   createAppSessionMessage,
   createCloseAppSessionMessage,
@@ -265,18 +265,18 @@ export async function createAppSessionWithSignatures(roomId) {
       const handleAppSessionResponse = (data) => {
         try {
           const rawData = typeof data === 'string' ? data : data.toString();
-          const message = parseRPCResponse(rawData);
+          const message = parseAnyRPCResponse(rawData);
           logger.data(`Received app session creation response:`, message);
 
 
           if (message.method === RPCMethod.CreateAppSession) {
             rpcClient.ws.removeListener('message', handleAppSessionResponse);
-            resolve(message.params[0]);
+            resolve(message.params);
           }
 
           if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleAppSessionResponse);
-            reject(new Error(`Error: ${message.params[0].error}`));
+            reject(new Error(`Error: ${message.params.error}`));
           }
         } catch (error) {
           logger.error('Error handling app session response:', error);
@@ -408,7 +408,7 @@ export async function createAppSession(roomId, participantA, participantB, betAm
       const handleAppSessionResponse = (data) => {
         try {
           const rawData = typeof data === 'string' ? data : data.toString();
-          const message = parseRPCResponse(rawData);
+          const message = parseAnyRPCResponse(rawData);
 
           logger.data(`Received app session creation response:`, message);
 
@@ -422,7 +422,7 @@ export async function createAppSession(roomId, participantA, participantB, betAm
           // Also check for error responses
           if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleAppSessionResponse);
-            reject(new Error(`Error: ${message.params[0].error}`));
+            reject(new Error(`Error: ${message.params.error}`));
           }
         } catch (error) {
           logger.error('Error handling app session response:', error);
@@ -626,7 +626,7 @@ export async function closeAppSession(roomId, allocations) {
       const handleCloseSessionResponse = (data) => {
         try {
           const rawData = typeof data === 'string' ? data : data.toString();
-          const message = parseRPCResponse(rawData);
+          const message = parseAnyRPCResponse(rawData);
           logger.data(`Received close session response:`, message);
 
           // Check if this is a close session response
@@ -639,7 +639,7 @@ export async function closeAppSession(roomId, allocations) {
           // Also check for error responses
           if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleCloseSessionResponse);
-            reject(new Error(`Error: ${message.params[0].error}`));
+            reject(new Error(`Error: ${message.params.error}`));
           }
         } catch (error) {
           logger.error('Error handling close session response:', error);

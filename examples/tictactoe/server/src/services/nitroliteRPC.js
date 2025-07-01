@@ -8,7 +8,7 @@ import {
     createEIP712AuthMessageSigner,
     createPingMessage,
     NitroliteRPC,
-    parseRPCResponse,
+    parseAnyRPCResponse,
     RPCMethod
 } from "@erc7824/nitrolite";
 import dotenv from "dotenv";
@@ -195,7 +195,7 @@ export class NitroliteRPCClient {
                 const data = event.data || event;
 
                 try {
-                    const response = parseRPCResponse(data);
+                    const response = parseAnyRPCResponse(data);
 
                     if (response.method === RPCMethod.AuthChallenge) {
                         logger.auth("Received auth_challenge, preparing EIP-712 auth_verify...");
@@ -242,7 +242,7 @@ export class NitroliteRPCClient {
                     }
                     // Check for success response
                     else if (response.method === RPCMethod.AuthVerify) {
-                        if (!response.params[0].success) {
+                        if (!response.params.success) {
                             return;
                         }
                         logger.auth("Authentication successful");
@@ -270,7 +270,7 @@ export class NitroliteRPCClient {
                     }
                     // Check for error response
                     else if (response.method === RPCMethod.Error) {
-                        const errorMsg = response.params[0].error || "Authentication failed";
+                        const errorMsg = response.params.error || "Authentication failed";
 
                         logger.error("Authentication failed:", errorMsg);
                         cleanup();
@@ -320,7 +320,7 @@ export class NitroliteRPCClient {
         try {
             // Ensure data is properly handled as string
             const rawData = typeof data === "string" ? data : data.toString();
-            const message = parseRPCResponse(rawData);
+            const message = parseAnyRPCResponse(rawData);
             logger.data("Received message", message);
 
             // Notify callbacks first to allow for authentication handling
@@ -329,9 +329,15 @@ export class NitroliteRPCClient {
 
             // Handle response to pending requests
             if (message.method === RPCMethod.GetChannels || message.method === RPCMethod.ChannelsUpdate) {
+                let channels = [];
+                if (message.method === RPCMethod.GetChannels) {
+                    channels = message.params;
+                } else {
+                    channels = [message.params];
+                }
                 if (this.pendingRequests.has(requestId)) {
                     const { resolve } = this.pendingRequests.get(requestId);
-                    resolve(message.params);
+                    resolve(channels);
                     this.pendingRequests.delete(requestId);
                 }
             }
@@ -340,7 +346,7 @@ export class NitroliteRPCClient {
             if (message.method === RPCMethod.Error) {
                 if (this.pendingRequests.has(requestId)) {
                     const { reject } = this.pendingRequests.get(requestId);
-                    reject(new Error(`Error: ${message.params[0].error}`));
+                    reject(new Error(`Error: ${message.params.error}`));
                     this.pendingRequests.delete(requestId);
                 }
             }

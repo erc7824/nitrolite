@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@erc7824/nitrolite": "0.2.11",
+    "@erc7824/nitrolite": "0.2.20",
     "@privy-io/cross-app-connect": "0.2.1",
     "@radix-ui/react-dialog": "1.1.13",
     "@radix-ui/react-label": "2.1.6",

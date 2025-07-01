@@ -1,4 +1,4 @@
-import { AuthRequestParams, createAuthRequestMessage, createAuthVerifyMessage, createAuthVerifyMessageWithJWT, createEIP712AuthMessageSigner, parseRPCResponse, RPCMethod } from '@erc7824/nitrolite';
+import { AuthRequestParams, createAuthRequestMessage, createAuthVerifyMessage, createAuthVerifyMessageWithJWT, createEIP712AuthMessageSigner, parseAnyRPCResponse, RPCMethod } from '@erc7824/nitrolite';
 import type { WalletSigner } from '../crypto';
 import type { Hex } from 'viem';
 import { getAddress } from 'viem';
@@ -124,7 +124,7 @@ export async function authenticate(
         const handleAuthResponse = async (event: MessageEvent) => {
             let response;
             try {
-                response = parseRPCResponse(event.data);
+                response = parseAnyRPCResponse(event.data);
                 console.log('Received auth message:', response);
             } catch (error) {
                 console.error('Error parsing auth response:', error);
@@ -177,9 +177,9 @@ export async function authenticate(
                     console.log('Authentication successful');
 
                     // If response contains a JWT token, store it
-                    if (response.params[0]?.['jwt_token']) {
-                        console.log('JWT token received:', response.params[0]['jwt_token']);
-                        window.localStorage.setItem('jwt_token', response.params[0]['jwt_token']);
+                    if (response.params.jwtToken) {
+                        console.log('JWT token received:', response.params.jwtToken);
+                        window.localStorage.setItem('jwt_token', response.params.jwtToken);
                     }
 
                     cleanup();
@@ -188,7 +188,7 @@ export async function authenticate(
                 // Check for error response
                 else if (response.method === RPCMethod.Error) {
                     const errorMsg =
-                        response.params[0] || 'Authentication failed';
+                        response.params.error || 'Authentication failed';
 
                     console.error('Authentication failed:', errorMsg);
 

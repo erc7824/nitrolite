@@ -1,7 +1,8 @@
 import {
+    ChannelUpdate,
     createGetLedgerBalancesMessage,
     createPingMessage,
-    parseRPCResponse,
+    parseAnyRPCResponse,
     RPCMethod,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, CHAIN_ID } from "../config";
@@ -228,17 +229,24 @@ class ClearNetService {
     private async handleWebSocketMessage(raw: string): Promise<void> {
         console.log("Received WebSocket message:", raw);
 
-        const message = parseRPCResponse(raw);
+        const message = parseAnyRPCResponse(raw);
         console.log("Parsed message:", message);
 
-        if (message.method === RPCMethod.ChannelsUpdate) {
+        if (message.method === RPCMethod.GetChannels || message.method === RPCMethod.ChannelsUpdate) {
+            let channels: ChannelUpdate[];
+            if (message.method === RPCMethod.GetChannels) {
+                channels = message.params;
+            } else {
+                channels = [message.params];
+            }
+
             console.log('[ClearNetService] Received channels update:', message);
-            const channel = message.params.find((ch: any) => {
+            const channel = channels.find((ch: any) => {
                 return ch.chain_id === CHAIN_ID && ch.status === "open";
             });
             console.log('[ClearNetService] Received new active channel:', channel);
             if (channel) {
-                this.activeChannel = channel.channel_id;
+                this.activeChannel = channel.channelId;
                 console.log('[ClearNetService] Active channel updated:', this.activeChannel);
             }
         }
@@ -249,7 +257,7 @@ class ClearNetService {
             this.wsConnection?.send(message);
         }
         if (message.method === RPCMethod.Error) {
-            console.error("WebSocket error message:", message.params[0].error);
+            console.error("WebSocket error message:", message.params.error);
         }
     }
 

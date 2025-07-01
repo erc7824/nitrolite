@@ -1,32 +1,40 @@
 import WebSocket from "ws";
-import { ethers } from "ethers";
+import {ethers} from "ethers";
 import {
-    createAuthRequestMessage,
-    createAuthVerifyMessage,
-    createAuthVerifyMessageWithJWT,
-    createEIP712AuthMessageSigner,
-    RequestData,
-    ResponsePayload,
-    MessageSigner,
     AppDefinition,
-    NitroliteRPC,
-    createGetLedgerBalancesMessage,
-    createCloseAppSessionMessage,
-    parseRPCResponse,
-    RPCResponse,
     AuthRequestParams,
-    RPCMethod,
+    ChannelUpdate,
     CloseAppSessionRequestParams,
     createAppSessionMessage,
     CreateAppSessionRequestParams,
+    createAuthRequestMessage,
+    createAuthVerifyMessage,
+    createAuthVerifyMessageWithJWT,
+    createCloseAppSessionMessage,
+    createEIP712AuthMessageSigner,
+    createGetLedgerBalancesMessage,
+    MessageSigner,
+    NitroliteRPC,
+    parseAnyRPCResponse,
+    RequestData,
+    ResponsePayload,
+    RPCMethod,
+    RPCResponse,
 } from "@erc7824/nitrolite";
-import { BROKER_WS_URL, WALLET_PRIVATE_KEY } from "../config/index.ts";
-import { setBrokerWebSocket, getBrokerWebSocket, addPendingRequest, getPendingRequest, clearPendingRequest } from "./stateService.ts";
-import { Hex, createWalletClient, http } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { polygon } from "viem/chains";
+import {BROKER_WS_URL, WALLET_PRIVATE_KEY} from "../config/index.ts";
+import {
+    addPendingRequest,
+    clearPendingRequest,
+    getBrokerWebSocket,
+    getPendingRequest,
+    setBrokerWebSocket
+} from "./stateService.ts";
+import {createWalletClient, Hex, http} from "viem";
+import {privateKeyToAccount} from "viem/accounts";
+import {polygon} from "viem/chains";
 
 import util from 'util';
+
 util.inspect.defaultOptions.depth = null;
 
 export const DEFAULT_PROTOCOL = "app_snake_nitrolite";
@@ -46,7 +54,7 @@ async function getChannels(): Promise<void> {
     }
 
     const signer = createEthersSigner(WALLET_PRIVATE_KEY);
-    const params = [{ participant: signer.address }];
+    const params = [{participant: signer.address}];
     const request = NitroliteRPC.createRequest(10, RPCMethod.GetChannels, params);
     const getChannelMessage = await NitroliteRPC.signRequestMessage(request, signer.sign);
     brokerWs.send(JSON.stringify(getChannelMessage));
@@ -154,7 +162,7 @@ async function authenticateWithBroker(): Promise<void> {
             try {
                 let message: RPCResponse;
                 try {
-                    message = parseRPCResponse(data.toString());
+                    message = parseAnyRPCResponse(data.toString());
                 } catch (error) {
                     console.warn("Error parsing auth message from broker, skipping:", error);
                     return;
@@ -162,7 +170,7 @@ async function authenticateWithBroker(): Promise<void> {
                 console.log("Auth process message received:", message);
 
                 // Check for auth_challenge response (response to our auth_request)
-                if (message.method === "auth_challenge") {
+                if (message.method === RPCMethod.AuthChallenge) {
                     console.log("Received auth_challenge, preparing EIP-712 auth_verify...");
 
                     try {
@@ -215,13 +223,13 @@ async function authenticateWithBroker(): Promise<void> {
                     }
                 }
                 // Check for auth_verify success response
-                else if (message.method === "auth_verify") {
+                else if (message.method === RPCMethod.AuthVerify) {
                     console.log("Authentication successful");
 
                     // If response contains a JWT token, store it
-                    if (message.params[0].jwt_token) {
-                        console.log('JWT token received:', message.params[0].jwt_token);
-                        jwtToken = message.params[0].jwt_token;
+                    if (message.params.jwtToken) {
+                        console.log('JWT token received:', message.params.jwtToken);
+                        jwtToken = message.params.jwtToken;
                     }
 
                     isAuthenticated = true;
@@ -229,8 +237,8 @@ async function authenticateWithBroker(): Promise<void> {
                     resolve();
                 }
                 // Check for error responses
-                else if (message.method === "error") {
-                    const errorMsg = message.params[0].error || 'Authentication failed';
+                else if (message.method === RPCMethod.Error) {
+                    const errorMsg = message.params.error || 'Authentication failed';
                     console.error('Authentication failed:', message, errorMsg);
 
                     // Check if this is a JWT authentication failure and fallback to signer auth
@@ -325,7 +333,7 @@ async function authenticateWithBroker(): Promise<void> {
 export function handleBrokerMessage(raw: string): void {
     try {
         console.log("Received message from broker:", raw);
-        const message = parseRPCResponse(raw);
+        const message = parseAnyRPCResponse(raw);
         console.log("Parsed message:", message);
 
         // Handle ping messages
@@ -333,11 +341,11 @@ export function handleBrokerMessage(raw: string): void {
             console.log("Received ping from broker, sending pong");
             const brokerWs = getBrokerWebSocket();
             if (brokerWs && brokerWs.readyState === WebSocket.OPEN) {
-                brokerWs.send(JSON.stringify({ type: "pong" }));
+                brokerWs.send(JSON.stringify({type: "pong"}));
             }
             return;
         } else if (message.method === RPCMethod.Error) {
-            console.log("Received error from broker:", message.params[0].error);
+            console.log("Received error from broker:", message.params.error);
 
             // Check if it's a response to a pending request
             if (!message.requestId) {
@@ -345,15 +353,22 @@ export function handleBrokerMessage(raw: string): void {
             }
             const pendingRequest = getPendingRequest(message.requestId.toString());
             if (pendingRequest) {
-                const { reject, timeout } = pendingRequest;
+                const {reject, timeout} = pendingRequest;
                 clearTimeout(timeout);
                 clearPendingRequest(message.requestId.toString());
-                reject(new Error(message.params[0].error));
+                reject(new Error(message.params.error));
             }
             return;
         } else if (message.method === RPCMethod.GetChannels || message.method === RPCMethod.ChannelsUpdate) {
+            let channels: ChannelUpdate[];
+            if (message.method === RPCMethod.GetChannels) {
+                channels = message.params;
+            } else {
+                channels = [message.params];
+            }
+
             console.log("Received get_channels from broker:", message.params);
-            if (message.params.length === 0) {
+            if (channels.length === 0) {
                 throw new Error("No channels found. Please open a channel at apps.yellow.com");
             }
 
@@ -363,7 +378,7 @@ export function handleBrokerMessage(raw: string): void {
             }
             const pendingRequest = getPendingRequest(message.requestId.toString());
             if (pendingRequest) {
-                const { resolve, timeout } = pendingRequest;
+                const {resolve, timeout} = pendingRequest;
                 clearTimeout(timeout);
                 clearPendingRequest(message.requestId.toString());
                 resolve(message.params);
@@ -375,7 +390,7 @@ export function handleBrokerMessage(raw: string): void {
         if (message.requestId) {
             const pendingRequest = getPendingRequest(message.requestId.toString());
             if (pendingRequest) {
-                const { resolve, timeout } = pendingRequest;
+                const {resolve, timeout} = pendingRequest;
                 clearTimeout(timeout);
                 clearPendingRequest(message.requestId.toString());
                 resolve(message.params || []);
@@ -396,7 +411,7 @@ export function isAuthenticatedWithBroker(): boolean {
 }
 
 // Re-export the authentication function for external use
-export { authenticateWithBroker };
+export {authenticateWithBroker};
 
 // Sends a request to the broker and returns a promise
 export async function sendToBroker(request: any): Promise<any> {
@@ -459,12 +474,12 @@ export async function sendToBroker(request: any): Promise<any> {
                 };
             }
 
-            return { req: preparedRequest, requestId };
+            return {req: preparedRequest, requestId};
         };
 
         // Execute the async preparation outside the Promise executor
         prepareRequest()
-            .then(({ req, requestId }) => {
+            .then(({req, requestId}) => {
                 // Convert requestId to string for tracking
                 const requestIdStr = requestId.toString();
 
@@ -571,7 +586,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
         const requestId = Date.now();
         const timestamp = Date.now();
         const request: { req: [number, string, { app_session_id: string }[], number] } = {
-            req: [requestId, "get_app_definition", [{ app_session_id: appId }], timestamp]
+            req: [requestId, "get_app_definition", [{app_session_id: appId}], timestamp]
         };
         console.log("[closeAppSession] Verifying app session exists:", appId);
         await sendToBroker(request);
@@ -647,12 +662,12 @@ export function createEthersSigner(privateKey: string): WalletSigner {
             address: wallet.address as Hex,
             sign: async (data: RequestData | ResponsePayload): Promise<Hex> => {
                 try {
-                    const messageStr = typeof data === "string" ? data : JSON.stringify(data);
+                    const messageStr = JSON.stringify(data);
 
                     const digestHex = ethers.id(messageStr);
                     const messageBytes = ethers.getBytes(digestHex);
 
-                    const { serialized: signature } = wallet.signingKey.sign(messageBytes);
+                    const {serialized: signature} = wallet.signingKey.sign(messageBytes);
                     return signature as Hex;
                 } catch (error) {
                     console.error("Error signing message:", error);

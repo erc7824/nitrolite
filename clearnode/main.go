@@ -52,9 +52,10 @@ func main() {
 	}
 
 	appSessionService := NewAppSessionService(db)
+	channelService := NewChannelService(db, signer)
 
 	rpcNode := NewRPCNode(signer, logger)
-	rpcRouter := NewRPCRouter(rpcNode, config, signer, appSessionService, db, authManager, metrics, rpcStore, logger)
+	rpcRouter := NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, logger)
 
 	rpcListenAddr := ":8000"
 	rpcListenEndpoint := "/ws"

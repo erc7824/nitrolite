@@ -17,6 +17,7 @@ type RPCRouter struct {
 	Config            *Config
 	Signer            *Signer
 	AppSessionService *AppSessionService
+	ChannelService    *ChannelService
 	DB                *gorm.DB
 	AuthManager       *AuthManager
 	Metrics           *Metrics
@@ -30,6 +31,7 @@ func NewRPCRouter(
 	conf *Config,
 	signer *Signer,
 	appSessionService *AppSessionService,
+	channelService *ChannelService,
 	db *gorm.DB,
 	authManager *AuthManager,
 	metrics *Metrics,
@@ -41,6 +43,7 @@ func NewRPCRouter(
 		Config:            conf,
 		Signer:            signer,
 		AppSessionService: appSessionService,
+		ChannelService:    channelService,
 		DB:                db,
 		AuthManager:       authManager,
 		Metrics:           metrics,

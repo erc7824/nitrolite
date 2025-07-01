@@ -154,6 +154,109 @@ func TestRPCRouterHandleGetRPCHistory(t *testing.T) {
 	assert.Equal(t, uint64(1), rpcHistory[2].ReqID, "Third record should be the oldest")
 }
 
+func TestRPCRouterHandleGetUserTag(t *testing.T) {
+	// Create signers
+	userKey, _ := crypto.GenerateKey()
+	userSigner := Signer{privateKey: userKey}
+	userAddr := userSigner.GetAddress().Hex()
+
+	t.Run("Succesfully retrieve the user tag", func(t *testing.T) {
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
+		defer cleanup()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: userAddr, Wallet: userAddr,
+		}).Error)
+
+		// Setup user tag
+		userTag, err := GenerateOrRetrieveUserTag(db, userAddr)
+		require.NoError(t, err)
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  userAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 42,
+					Method:    "get_user_tag",
+					Params:    []any{},
+					Timestamp: ts,
+				},
+			},
+		}
+
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
+		require.NoError(t, err)
+		c.Message.Req.rawBytes = rawReq
+
+		// 2) Sign rawReq directly
+		sigBytes, err := userSigner.Sign(rawReq)
+		require.NoError(t, err)
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+
+		// Call handler
+		router.HandleGetUserTag(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		// Verify response
+		assert.Equal(t, "get_user_tag", res.Method)
+		assert.Equal(t, uint64(42), res.RequestID)
+		// Verify response structure
+		getTagResponse, ok := res.Params[0].(GetUserTagResponse)
+		require.True(t, ok, "Response should be a GetUserTagResponse")
+		assert.Equal(t, userTag.Tag, getTagResponse.Tag)
+	})
+	t.Run("Error when there is no tag", func(t *testing.T) {
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
+		defer cleanup()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: userAddr, Wallet: userAddr,
+		}).Error)
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  userAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 42,
+					Method:    "get_user_tag",
+					Params:    []any{},
+					Timestamp: ts,
+				},
+			},
+		}
+
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
+		require.NoError(t, err)
+		c.Message.Req.rawBytes = rawReq
+
+		// 2) Sign rawReq directly
+		sigBytes, err := userSigner.Sign(rawReq)
+		require.NoError(t, err)
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+
+		// Call handler
+		router.HandleGetUserTag(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		assert.Equal(t, "error", res.Method)
+		require.Len(t, res.Params, 1)
+		assert.Contains(t, res.Params[0], "failed to get user tag")
+	})
+}
 func TestRPCRouterHandleTransfer(t *testing.T) {
 	// Create signers
 	senderKey, _ := crypto.GenerateKey()
@@ -284,6 +387,93 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		}
 	})
 
+	t.Run("Successful Transfer by destination tag", func(t *testing.T) {
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
+		defer cleanup()
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: senderAddr, Wallet: senderAddr,
+		}).Error)
+
+		// Fund sender's account
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "eth", decimal.NewFromInt(5)))
+
+		// Setup user tag for receipient
+		recipientTag, err := GenerateOrRetrieveUserTag(db, recipientAddr)
+		require.NoError(t, err)
+
+		// Create transfer parameters
+		transferParams := Transfer{
+			DestinationTag: recipientTag.Tag,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+				{AssetSymbol: "eth", Amount: decimal.NewFromInt(2)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  senderAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 42,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
+			},
+		}
+
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
+		require.NoError(t, err)
+		c.Message.Req.rawBytes = rawReq
+
+		// 2) Sign rawReq directly
+		sigBytes, err := senderSigner.Sign(rawReq)
+		require.NoError(t, err)
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+
+		// Call handler
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		// Verify response
+		assert.Equal(t, "transfer", res.Method)
+		assert.Equal(t, uint64(42), res.RequestID)
+		// Verify response structure
+		t.Logf("Response: %+v", res)
+		transferResp, ok := res.Params[0].(TransferResponse)
+		require.True(t, ok, "Response should be a TransferResponse")
+		assert.Equal(t, senderAddr, transferResp.From)
+		assert.Equal(t, recipientAddr, transferResp.To)
+		assert.False(t, transferResp.CreatedAt.IsZero(), "CreatedAt should be set")
+
+		// Check balances were updated correctly
+		// Sender should have 500 USDC and 3 ETH left
+		senderUSDC, err := GetWalletLedger(db, senderAddr).Balance(senderAddr, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(500).String(), senderUSDC.String())
+
+		senderETH, err := GetWalletLedger(db, senderAddr).Balance(senderAddr, "eth")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(3).String(), senderETH.String())
+
+		// Recipient should have 500 USDC and 2 ETH
+		recipientUSDC, err := GetWalletLedger(db, recipientAddr).Balance(recipientAddr, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(500).String(), recipientUSDC.String())
+
+		recipientETH, err := GetWalletLedger(db, recipientAddr).Balance(recipientAddr, "eth")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(2).String(), recipientETH.String())
+	})
 	t.Run("ErrorInvalidDestinationAddress", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
@@ -393,7 +583,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		assert.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "invalid destination")
+		assert.Contains(t, res.Params[0], "cannot transfer to self")
 	})
 
 	t.Run("ErrorInsufficientFunds", func(t *testing.T) {

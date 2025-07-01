@@ -278,6 +278,13 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig string, authPar
 		return nil, nil, err.Error()
 	}
 
+	// Generate the User tag
+	_, err = GenerateOrRetrieveUserTag(r.DB, challenge.Address)
+	if err != nil {
+		logger.Error("failed to store user tag in db", "error", err)
+		return nil, nil, "failed to store user tag in db"
+	}
+
 	// TODO: to use expiration specified in the Policy, instead of just setting 1 hour
 	claims, jwtToken, err := r.AuthManager.GenerateJWT(challenge.Address, challenge.SessionKey, challenge.Scope, challenge.AppName, challenge.Allowances)
 	if err != nil {

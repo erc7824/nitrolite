@@ -95,7 +95,7 @@ export interface GetLedgerEntriesResponseParams {
     /** The account identifier associated with the entry. */
     accountId: string;
     /** The type of account (e.g., "wallet", "channel"). */
-    accountType: string;
+    accountType: number;
     /** The asset symbol for the entry. */
     asset: string;
     /** The Ethereum address of the participant. */

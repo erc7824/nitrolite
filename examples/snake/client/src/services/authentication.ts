@@ -1,4 +1,4 @@
-import { createAuthRequestMessage, createAuthVerifyMessage, createAuthVerifyMessageWithJWT, createEIP712AuthMessageSigner } from '@erc7824/nitrolite';
+import { AuthRequestParams, createAuthRequestMessage, createAuthVerifyMessage, createAuthVerifyMessageWithJWT, createEIP712AuthMessageSigner, parseAnyRPCResponse, RPCMethod } from '@erc7824/nitrolite';
 import type { WalletSigner } from '../crypto';
 import type { Hex } from 'viem';
 import { getAddress } from 'viem';
@@ -52,7 +52,7 @@ export async function authenticate(
     console.log('- Empty signature for auth_request');
     console.log('- EIP-712 signature for auth_verify challenge (UUID only)');
 
-    const authMessage = {
+    const authMessage: AuthRequestParams = {
         wallet: walletAddress as Hex,
         participant: signer.address as Hex,
         app_name: 'Snake Game',
@@ -61,7 +61,7 @@ export async function authenticate(
         application: walletAddress as Hex,
         allowances: [
             {
-                symbol: 'usdc',
+                asset: 'usdc',
                 amount: '0',
             },
         ],
@@ -123,9 +123,8 @@ export async function authenticate(
 
         const handleAuthResponse = async (event: MessageEvent) => {
             let response;
-
             try {
-                response = JSON.parse(event.data);
+                response = parseAnyRPCResponse(event.data);
                 console.log('Received auth message:', response);
             } catch (error) {
                 console.error('Error parsing auth response:', error);
@@ -135,7 +134,7 @@ export async function authenticate(
 
             try {
                 // Check for challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
-                if (response.res && response.res[1] === 'auth_challenge') {
+                if (response.method === RPCMethod.AuthChallenge) {
                     console.log('Received auth_challenge, preparing EIP-712 auth_verify...');
                     resetTimeout(); // Reset timeout while we process and send verify
 
@@ -151,18 +150,15 @@ export async function authenticate(
                             application: authMessage.application,
                             participant: authMessage.participant,
                             expire: authMessage.expire,
-                            allowances: authMessage.allowances.map((allowance) => ({
-                                asset: allowance.symbol,
-                                amount: allowance.amount.toString(),
+                            allowances: authMessage.allowances.map(({ asset, amount }: { asset: string, amount: any }) => ({
+                                asset,
+                                amount: amount.toString(),
                             })),
                         }, getAuthDomain());
 
                         console.log('Calling createAuthVerifyMessage...');
                         // Create and send verification message with EIP-712 signature
-                        const authVerify = await createAuthVerifyMessage(
-                            eip712SigningFunction,
-                            event.data, // Pass the raw challenge response string/object
-                        );
+                        const authVerify = await createAuthVerifyMessage(eip712SigningFunction, response);
 
                         console.log('Sending auth_verify with EIP-712 signature');
                         ws.send(authVerify);
@@ -177,22 +173,22 @@ export async function authenticate(
                     }
                 }
                 // Check for success response
-                else if (response.res && (response.res[1] === 'auth_verify' || response.res[1] === 'auth_success')) {
+                else if (response.method === RPCMethod.AuthVerify) {
                     console.log('Authentication successful');
 
                     // If response contains a JWT token, store it
-                    if (response.res[2]?.[0]?.['jwt_token']) {
-                        console.log('JWT token received:', response.res[2][0]['jwt_token']);
-                        window.localStorage.setItem('jwt_token', response.res[2][0]['jwt_token']);
+                    if (response.params.jwtToken) {
+                        console.log('JWT token received:', response.params.jwtToken);
+                        window.localStorage.setItem('jwt_token', response.params.jwtToken);
                     }
 
                     cleanup();
                     resolve();
                 }
                 // Check for error response
-                else if (response.err || (response.res && response.res[1] === 'error')) {
+                else if (response.method === RPCMethod.Error) {
                     const errorMsg =
-                        response.err?.[1] || response.error || response.res?.[2]?.[0]?.error || 'Authentication failed';
+                        response.params.error || 'Authentication failed';
 
                     console.error('Authentication failed:', errorMsg);
 

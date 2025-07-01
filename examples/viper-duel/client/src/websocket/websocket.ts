@@ -7,7 +7,8 @@ import {
     createPingMessage,
     createAuthVerifyMessageWithJWT,
     createEIP712AuthMessageSigner,
-    parseRPCResponse,
+    parseAnyRPCResponse,
+    RPCMethod,
 } from "@erc7824/nitrolite";
 import type { Channel } from "@erc7824/nitrolite";
 import { WalletStore } from "../store";
@@ -289,11 +290,11 @@ export class WebSocketClient {
             }, this.options.requestTimeout);
 
             const handleAuthResponse = async (event: MessageEvent) => {
-                const response = parseRPCResponse(event.data);
+                const response = parseAnyRPCResponse(event.data);
 
                 try {
                     // Check for challenge response: {"res": [id, "auth_challenge", {"challenge": "uuid"}, timestamp]}
-                    if (response.method === "auth_challenge") {
+                    if (response.method === RPCMethod.AuthChallenge) {
                         console.log("Received auth_challenge, preparing EIP-712 auth_verify...");
 
                         try {
@@ -328,7 +329,10 @@ export class WebSocketClient {
                         }
                     }
                     // Check for success response
-                    else if (response.method === "auth_verify" && response.params.success) {
+                    else if (response.method === RPCMethod.AuthVerify) {
+                        if (!response.params.success) {
+                            return;
+                        }
                         console.log("Authentication successful");
 
                         // If response contains a JWT token, store it
@@ -341,7 +345,7 @@ export class WebSocketClient {
 
                         // Authentication successful
                         const paramsForChannels = [{ participant: ethers.getAddress(privyWalletAddress) as `0x${string}` }];
-                        const getChannelsMessage = NitroliteRPC.createRequest(10, "get_channels", paramsForChannels);
+                        const getChannelsMessage = NitroliteRPC.createRequest(10, RPCMethod.GetChannels, paramsForChannels);
                         const getChannelMessage = await NitroliteRPC.signRequestMessage(getChannelsMessage, this.signer.sign);
                         console.log("getChannelMessage", getChannelMessage);
                         this.ws?.send(JSON.stringify(getChannelMessage));
@@ -350,7 +354,7 @@ export class WebSocketClient {
                         resolve();
                     }
                     // Check for error response
-                    else if (response.method === "error") {
+                    else if (response.method === RPCMethod.Error) {
                         const errorMsg = response.params.error || "Authentication failed";
                         console.error("Authentication failed:", errorMsg);
                         if (typeof window !== "undefined") {

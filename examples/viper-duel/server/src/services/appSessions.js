@@ -2,7 +2,12 @@
  * Nitrolite app sessions for game rooms
  * This file handles creating and closing app sessions for games
  */
-import { createAppSessionMessage, createCloseAppSessionMessage } from '@erc7824/nitrolite';
+import {
+  parseAnyRPCResponse,
+  RPCMethod,
+  createAppSessionMessage,
+  createCloseAppSessionMessage,
+} from "@erc7824/nitrolite";
 import { ethers } from 'ethers';
 import dotenv from 'dotenv';
 import logger from '../utils/logger.js';
@@ -30,12 +35,12 @@ export async function generateAppSessionMessage(roomId, participantA, participan
     // Format addresses to proper checksum format
     const formattedParticipantA = ethers.getAddress(participantA);
     const formattedParticipantB = ethers.getAddress(participantB);
-    
+
     logger.nitro(`Generating app session message for room ${roomId} with participants A: ${formattedParticipantA}, B: ${formattedParticipantB}`);
-    
+
     // Check if we already have a pending session (to ensure consistency)
     let pendingSession = pendingAppSessions.get(roomId);
-    
+
     if (pendingSession) {
       logger.nitro(`Using existing app session message for room ${roomId} - nonce: ${pendingSession.nonce}, requestToSign: ${JSON.stringify(pendingSession.requestToSign)}`);
       return {
@@ -45,16 +50,16 @@ export async function generateAppSessionMessage(roomId, participantA, participan
         requestToSign: pendingSession.requestToSign
       };
     }
-    
+
     // Get the RPC client
     const rpcClient = await getRPCClient();
     if (!rpcClient) {
       throw new Error('RPC client not initialized');
     }
-    
+
     // Get the server's address and format it
     const serverAddress = ethers.getAddress(rpcClient.address);
-    
+
     // Create app definition with fixed nonce to ensure all participants sign the same message
     const nonce = Date.now();
     const appDefinition = {
@@ -65,7 +70,7 @@ export async function generateAppSessionMessage(roomId, participantA, participan
       challenge: 0,
       nonce: nonce,
     };
-    
+
     const appSessionData = [{
       definition: appDefinition,
       allocations: [
@@ -86,17 +91,17 @@ export async function generateAppSessionMessage(roomId, participantA, participan
         },
       ]
     }];
-    
+
     // Generate the complete request structure that everyone will sign
     const sign = rpcClient.signMessage.bind(rpcClient);
     const signedMessage = await createAppSessionMessage(sign, appSessionData);
     const parsedMessage = JSON.parse(signedMessage);
-    
+
     // Extract the request structure that clients should sign (same as what server signs)
     const requestToSign = parsedMessage.req;
-    
+
     logger.data(`Generated request structure for room ${roomId}:`, requestToSign);
-    
+
     // Store the pending app session data including the request structure
     pendingAppSessions.set(roomId, {
       appSessionData,
@@ -111,7 +116,7 @@ export async function generateAppSessionMessage(roomId, participantA, participan
       requestToSign: requestToSign,
       originalSignedMessage: signedMessage
     });
-    
+
     logger.nitro(`App session message generated for room ${roomId} with nonce ${nonce}`);
     return {
       appSessionData,
@@ -119,7 +124,7 @@ export async function generateAppSessionMessage(roomId, participantA, participan
       participants: [formattedParticipantA, formattedParticipantB, serverAddress],
       requestToSign: requestToSign
     };
-    
+
   } catch (error) {
     logger.error(`Error generating app session message for room ${roomId}:`, error);
     throw error;
@@ -137,30 +142,30 @@ export async function addAppSessionSignature(roomId, participantAddress, signatu
   try {
     // Format the participant address to proper checksum format
     const formattedParticipantAddress = ethers.getAddress(participantAddress);
-    
+
     const pendingSession = pendingAppSessions.get(roomId);
     if (!pendingSession) {
       throw new Error(`No pending app session found for room ${roomId}`);
     }
-    
+
     // Verify the participant is part of this session
     const isValidParticipant = [pendingSession.participantA, pendingSession.participantB].includes(formattedParticipantAddress);
     if (!isValidParticipant) {
       throw new Error(`Invalid participant ${formattedParticipantAddress} for room ${roomId}`);
     }
-    
+
     // Store the signature
     pendingSession.signatures.set(formattedParticipantAddress, signature);
-    
+
     logger.nitro(`Added signature for ${formattedParticipantAddress} in room ${roomId} (${pendingSession.signatures.size}/2 collected)`);
     logger.data(`Signature details:`, { participantAddress: formattedParticipantAddress, signature: signature.substring(0, 10) + '...', signatureLength: signature.length });
-    
+
     // Check if we have all participant signatures (not including server)
-    const allParticipantsSigned = pendingSession.signatures.has(pendingSession.participantA) && 
+    const allParticipantsSigned = pendingSession.signatures.has(pendingSession.participantA) &&
                                   pendingSession.signatures.has(pendingSession.participantB);
-    
+
     return allParticipantsSigned;
-    
+
   } catch (error) {
     logger.error(`Error adding signature for room ${roomId}:`, error);
     throw error;
@@ -178,27 +183,27 @@ export async function createAppSessionWithSignatures(roomId) {
     if (!pendingSession) {
       throw new Error(`No pending app session found for room ${roomId}`);
     }
-    
+
     // Verify all signatures are collected
-    const allSigned = pendingSession.signatures.has(pendingSession.participantA) && 
+    const allSigned = pendingSession.signatures.has(pendingSession.participantA) &&
                       pendingSession.signatures.has(pendingSession.participantB);
-    
+
     if (!allSigned) {
       throw new Error(`Not all signatures collected for room ${roomId}`);
     }
-    
+
     logger.nitro(`Creating app session with collected signatures for room ${roomId}`);
-    
+
     // Get the RPC client
     const rpcClient = await getRPCClient();
     if (!rpcClient) {
       throw new Error('RPC client not initialized');
     }
-    
+
     // Collect all signatures including server signature
     const participantASignature = pendingSession.signatures.get(pendingSession.participantA);
     const participantBSignature = pendingSession.signatures.get(pendingSession.participantB);
-    
+
     logger.data(`Participant signatures for room ${roomId}:`, {
       participantA: pendingSession.participantA,
       participantB: pendingSession.participantB,
@@ -206,7 +211,7 @@ export async function createAppSessionWithSignatures(roomId) {
       participantBSignature,
       allStoredSignatures: Array.from(pendingSession.signatures.entries())
     });
-    
+
     // Validate that we have all participant signatures
     if (!participantASignature) {
       throw new Error(`Missing signature from participant A: ${pendingSession.participantA}`);
@@ -214,93 +219,92 @@ export async function createAppSessionWithSignatures(roomId) {
     if (!participantBSignature) {
       throw new Error(`Missing signature from participant B: ${pendingSession.participantB}`);
     }
-    
+
     // Don't create a new server signature - use the existing signed message structure
     // but replace the single server signature with all collected signatures
-    
+
     // Create a properly formatted message with all signatures
     // The signatures should be in the same order as participants: [participantA, participantB, server]
     const allSignatures = [participantASignature, participantBSignature];
-    
+
     // Now let the server sign the same request structure as the clients
     const sign = rpcClient.signMessage.bind(rpcClient);
-    
+
     logger.data(`Server signing request structure for room ${roomId}:`, pendingSession.requestToSign);
-    
+
     // Sign the same request structure that clients signed
     const serverSignature = await sign(pendingSession.requestToSign);
-    
+
     logger.data(`Server signature created:`, serverSignature);
-    
+
     // Add server signature to complete the array
     allSignatures.push(serverSignature);
-    
+
     logger.data(`Combined signatures for room ${roomId}:`, allSignatures);
-    
+
     // Send the message directly using ws.send
     logger.nitro(`Sending app session creation message for room ${roomId}`);
-    
+
     if (!rpcClient.ws || rpcClient.ws.readyState !== 1) {
       throw new Error('WebSocket not connected or not in OPEN state');
     }
-    
+
     // Create the final message with all signatures
     const finalMessage = JSON.parse(pendingSession.originalSignedMessage);
     finalMessage.sig = allSignatures;
-    
+
     logger.data(`Final message structure:`, {
       req: finalMessage.req,
       signatures: finalMessage.sig,
       participantsOrder: pendingSession.appSessionData[0].definition.participants,
       messageToSend: JSON.stringify(finalMessage)
     });
-    
+
     // Set up a promise to handle the response from the WebSocket
     const appSessionResponsePromise = new Promise((resolve, reject) => {
       const handleAppSessionResponse = (data) => {
         try {
           const rawData = typeof data === 'string' ? data : data.toString();
-          const message = JSON.parse(rawData);
-          
+          const message = parseAnyRPCResponse(rawData);
           logger.data(`Received app session creation response:`, message);
-          
-          if (message.res && (message.res[1] === 'create_app_session' || 
-                             message.res[1] === 'app_session_created')) {
+
+
+          if (message.method === RPCMethod.CreateAppSession) {
             rpcClient.ws.removeListener('message', handleAppSessionResponse);
-            resolve(message.res[2]);
+            resolve(message.params);
           }
-          
-          if (message.err) {
+
+          if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleAppSessionResponse);
-            reject(new Error(`Error ${message.err[1]}: ${message.err[2]}`));
+            reject(new Error(`Error: ${message.params.error}`));
           }
         } catch (error) {
           logger.error('Error handling app session response:', error);
         }
       };
-      
+
       rpcClient.ws.on('message', handleAppSessionResponse);
-      
+
       setTimeout(() => {
         rpcClient.ws.removeListener('message', handleAppSessionResponse);
         reject(new Error('App session creation timeout'));
       }, 10000);
     });
-    
+
     // Send the final message (convert to string)
     rpcClient.ws.send(JSON.stringify(finalMessage));
-    
+
     // Wait for the response
     const response = await appSessionResponsePromise;
-    
+
     logger.data(`App session creation response for room ${roomId}:`, response);
-    
+
     const appId = response?.app_session_id || response?.[0]?.app_session_id;
-    
+
     if (!appId) {
       throw new Error('Failed to get app ID from response');
     }
-    
+
     // Store the app ID for this room
     roomAppSessions.set(roomId, {
       appId,
@@ -311,13 +315,13 @@ export async function createAppSessionWithSignatures(roomId) {
       betAmount: pendingSession.betAmount,
       createdAt: Date.now()
     });
-    
+
     // Clean up pending session
     pendingAppSessions.delete(roomId);
-    
+
     logger.nitro(`Created app session with ID ${appId} for room ${roomId}`);
     return appId;
-    
+
   } catch (error) {
     logger.error(`Error creating app session with signatures for room ${roomId}:`, error);
     throw error;
@@ -335,25 +339,22 @@ export async function createAppSessionWithSignatures(roomId) {
 export async function createAppSession(roomId, participantA, participantB, betAmount = 0) {
   try {
     logger.nitro(`Creating app session for room ${roomId}`);
-    
+
     // Get the RPC client
     const rpcClient = await getRPCClient();
     if (!rpcClient) {
       throw new Error('RPC client not initialized');
     }
-    
+
     // Get the server's address
     const serverAddress = rpcClient.address;
-    
+
     // Check if token address is available
     const tokenAddress = process.env.USDC_TOKEN_ADDRESS;
     if (!tokenAddress) {
       throw new Error('Token address not set in environment variables');
     }
-    
-    // Define the deposit amount (use '0' for free games or actual amount for paid games)
-    const amount = '0'; // Set this to the appropriate amount if needed
-    
+
     // Create app definition
     const appDefinition = {
       protocol: "app_aura_nitrolite_v0",
@@ -363,10 +364,10 @@ export async function createAppSession(roomId, participantA, participantB, betAm
       challenge: 0,
       nonce: Date.now(),
     };
-    
+
     // Use the RPC client's signMessage method for consistent signing
     const sign = rpcClient.signMessage.bind(rpcClient);
-    
+
     // Create the signed message
     const signedMessage = await createAppSessionMessage(
       sign,
@@ -396,65 +397,64 @@ export async function createAppSession(roomId, participantA, participantB, betAm
     logger.data(`Signed app session message for room ${roomId}:`, signedMessage);
     // Send the message directly using ws.send, similar to authentication
     logger.nitro(`Sending app session creation message for room ${roomId}`);
-    
+
     if (!rpcClient.ws || rpcClient.ws.readyState !== 1) { // WebSocket.OPEN
       throw new Error('WebSocket not connected or not in OPEN state');
     }
-    
+
     // Set up a promise to handle the response from the WebSocket
     const appSessionResponsePromise = new Promise((resolve, reject) => {
       // Create a one-time message handler for the app session response
       const handleAppSessionResponse = (data) => {
         try {
           const rawData = typeof data === 'string' ? data : data.toString();
-          const message = JSON.parse(rawData);
-          
+          const message = parseAnyRPCResponse(rawData);
+
           logger.data(`Received app session creation response:`, message);
-          
+
           // Check if this is an app session response
-          if (message.res && (message.res[1] === 'create_app_session' || 
-                             message.res[1] === 'app_session_created')) {
+          if (message.method === RPCMethod.CreateAppSession) {
             // Remove the listener once we get the response
             rpcClient.ws.removeListener('message', handleAppSessionResponse);
-            resolve(message.res[2]); // The app session data should be in the 3rd position
+            resolve(message.params);
           }
-          
+
           // Also check for error responses
-          if (message.err) {
+          if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleAppSessionResponse);
-            reject(new Error(`Error ${message.err[1]}: ${message.err[2]}`));
+            reject(new Error(`Error: ${message.params.error}`));
           }
         } catch (error) {
           logger.error('Error handling app session response:', error);
         }
       };
-      
+
       // Add the message handler
       rpcClient.ws.on('message', handleAppSessionResponse);
-      
+
       // Set timeout to prevent hanging
       setTimeout(() => {
         rpcClient.ws.removeListener('message', handleAppSessionResponse);
         reject(new Error('App session creation timeout'));
       }, 10000);
     });
-    
+
     // Send the signed message directly
     rpcClient.ws.send(signedMessage);
-    
+
     // Wait for the response
     const response = await appSessionResponsePromise;
-    
+
     // Log the response
     logger.data(`App session creation response for room ${roomId}:`, response);
-    
+
     // The response structure might vary, adapt this based on actual response
     const appId = response?.app_session_id || response?.[0]?.app_session_id;
-    
+
     if (!appId) {
       throw new Error('Failed to get app ID from response');
     }
-    
+
     // Store the app ID for this room
     roomAppSessions.set(roomId, {
       appId,
@@ -465,10 +465,10 @@ export async function createAppSession(roomId, participantA, participantB, betAm
       betAmount,
       createdAt: Date.now()
     });
-    
+
     logger.nitro(`Created app session with ID ${appId} for room ${roomId}`);
     return appId;
-    
+
   } catch (error) {
     logger.error(`Error creating app session for room ${roomId}:`, error);
     throw error;
@@ -491,12 +491,12 @@ export async function closeAppSessionWithWinner(roomId, winnerId = null) {
     }
 
     const { participantA, participantB, betAmount = 0 } = appSession;
-    
+
     // Calculate allocations based on winner and bet amount
     // Need to ensure exact redistribution of what was initially allocated
     const betAmountStr = betAmount.toString();
     const totalPot = (betAmount * 2).toString();
-    
+
     let allocations;
     if (winnerId === 'A') {
       // Player A wins - gets all the funds
@@ -511,7 +511,7 @@ export async function closeAppSessionWithWinner(roomId, winnerId = null) {
       allocations = [betAmountStr, betAmountStr, '0'];
       logger.nitro(`Tie in room ${roomId} - splitting allocation evenly: ${betAmountStr} each`);
     }
-    
+
     logger.data(`Allocation calculation for room ${roomId}:`, {
       betAmount,
       betAmountStr,
@@ -522,7 +522,7 @@ export async function closeAppSessionWithWinner(roomId, winnerId = null) {
 
     // Use the existing closeAppSession function with calculated allocations
     return await closeAppSession(roomId, allocations);
-    
+
   } catch (error) {
     logger.error(`Error closing app session with winner for room ${roomId}:`, error);
     return false;
@@ -543,16 +543,16 @@ export async function closeAppSession(roomId, allocations) {
       logger.warn(`No app session found for room ${roomId}`);
       return false;
     }
-    
+
     // Make sure appId exists and is properly extracted
     const appId = appSession.appId;
     if (!appId) {
       logger.error(`No appId found in app session for room ${roomId}`);
       return false;
     }
-    
+
     logger.nitro(`Closing app session ${appId} for room ${roomId}`);
-    
+
     // Get the RPC client
     const rpcClient = await getRPCClient();
     if (!rpcClient) {
@@ -584,7 +584,7 @@ export async function closeAppSession(roomId, allocations) {
         amount: allocations[2].toString(),
       },
     ];
-    
+
     // Log the allocations for debugging
     const totalAmount = parseFloat(allocations[0]) + parseFloat(allocations[1]) + parseFloat(allocations[2]);
     const expectedTotal = (appSession.betAmount || 0) * 2;
@@ -595,84 +595,82 @@ export async function closeAppSession(roomId, allocations) {
       totalAmount: totalAmount.toString(),
       expectedTotal: expectedTotal.toString()
     });
-    
+
     // Final allocations and close request
     const closeRequest = {
       app_session_id: appId,
       allocations: finalAllocations,
     };
-    
+
     // Use the RPC client's signMessage method for consistent signing
     const sign = rpcClient.signMessage.bind(rpcClient);
-    
+
     // Create the signed message
     const signedMessage = await createCloseAppSessionMessage(
-      sign, 
-      [closeRequest], 
+      sign,
+      [closeRequest],
     );
 
     logger.data(`Signed app session close message for room ${roomId}:`, signedMessage);
-    
+
     // Send the message directly using ws.send, similar to authentication
     logger.nitro(`Sending app session close message for room ${roomId}`);
-    
+
     if (!rpcClient.ws || rpcClient.ws.readyState !== 1) { // WebSocket.OPEN
       throw new Error('WebSocket not connected or not in OPEN state');
     }
-    
+
     // Set up a promise to handle the response from the WebSocket
     const closeSessionResponsePromise = new Promise((resolve, reject) => {
       // Create a one-time message handler for the close session response
       const handleCloseSessionResponse = (data) => {
         try {
           const rawData = typeof data === 'string' ? data : data.toString();
-          const message = JSON.parse(rawData);
-          
+          const message = parseAnyRPCResponse(rawData);
           logger.data(`Received close session response:`, message);
-          
+
           // Check if this is a close session response
-          if (message.res && (message.res[1] === 'close_app_session' || 
-                             message.res[1] === 'app_session_closed')) {
+          if (message.method === RPCMethod.CloseAppSession) {
             // Remove the listener once we get the response
             rpcClient.ws.removeListener('message', handleCloseSessionResponse);
-            resolve(message.res[2]);
+            resolve(message.params);
           }
-          
+
           // Also check for error responses
-          if (message.err) {
+          if (message.method === RPCMethod.Error) {
             rpcClient.ws.removeListener('message', handleCloseSessionResponse);
-            reject(new Error(`Error ${message.err[1]}: ${message.err[2]}`));
+            reject(new Error(`Error: ${message.params.error}`));
           }
         } catch (error) {
           logger.error('Error handling close session response:', error);
         }
       };
-      
+
       // Add the message handler
       rpcClient.ws.on('message', handleCloseSessionResponse);
-      
+
       // Set timeout to prevent hanging
       setTimeout(() => {
         rpcClient.ws.removeListener('message', handleCloseSessionResponse);
         reject(new Error('Close session timeout'));
       }, 10000);
     });
-    
+
     // Send the signed message directly
     rpcClient.ws.send(signedMessage);
-    
+
     // Wait for the response
     const response = await closeSessionResponsePromise;
-    
+
     // Log the response
     logger.data(`App session close response for room ${roomId}:`, response);
-    
+
     // Remove the app session
     roomAppSessions.delete(roomId);
-    
+
     logger.nitro(`Closed app session ${appId} for room ${roomId}`);
     return true;
-    
+
   } catch (error) {
     logger.error(`Error closing app session for room ${roomId}:`, error);
     return false;
@@ -698,7 +696,7 @@ export function getPendingAppSessionMessage(roomId) {
   if (!pendingSession) {
     return null;
   }
-  
+
   return {
     appSessionData: pendingSession.appSessionData,
     appDefinition: pendingSession.appDefinition,

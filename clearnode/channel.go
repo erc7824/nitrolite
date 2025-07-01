@@ -26,6 +26,8 @@ type Channel struct {
 	Token       string `gorm:"column:token;not null"`
 	Wallet      string `gorm:"column:wallet;not null"`
 	Participant string `gorm:"column:participant;not null"`
+
+	// Amount represents an Integer value of token amount as represented on the blockchain
 	// type:varchar(78) is set for sqlite to address the issue of not supporting big decimals
 	Amount      decimal.Decimal `gorm:"column:amount;type:varchar(78);not null"`
 	Status      ChannelStatus   `gorm:"column:status;not null;"`

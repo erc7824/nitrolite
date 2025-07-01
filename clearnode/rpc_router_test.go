@@ -6,10 +6,8 @@ import (
 	"log"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	container "github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -124,28 +122,4 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, func()) {
 	return router, func() {
 		dbCleanup()
 	}
-}
-
-func TestRPCRouterHandlePing(t *testing.T) {
-	router, cleanup := setupTestRPCRouter(t)
-	defer cleanup()
-
-	c := &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 1,
-				Method:    "ping",
-				Params:    []any{nil},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-			Sig: []string{"dummy-signature"},
-		},
-	}
-
-	router.HandlePing(c)
-	res := c.Message.Res
-	require.NotNil(t, res)
-
-	assert.Equal(t, "pong", res.Method)
 }

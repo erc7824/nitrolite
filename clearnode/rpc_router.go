@@ -255,7 +255,3 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 	c.Succeed(c.Message.Req.Method, response)
 	logger.Info("RPC history retrieved", "userID", c.UserID, "entryCount", len(response))
 }
-
-func (r *RPCRouter) HandlePing(c *RPCContext) {
-	c.Succeed("pong")
-}

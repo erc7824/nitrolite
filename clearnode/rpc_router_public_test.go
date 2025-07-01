@@ -12,56 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRPCRouterHandleGetAppDefinition_Success(t *testing.T) {
-	router, cleanup := setupTestRPCRouter(t)
-	defer cleanup()
-
-	// Seed an AppSession
-	session := AppSession{
-		SessionID:          "0xSess123",
-		ParticipantWallets: []string{"0xA", "0xB"},
-		Protocol:           "proto",
-		Weights:            []int64{10, 20},
-		Quorum:             15,
-		Challenge:          30,
-		Nonce:              99,
-	}
-	require.NoError(t, router.DB.Create(&session).Error)
-
-	// Build RPC request
-	params := map[string]string{"app_session_id": session.SessionID}
-	b, _ := json.Marshal(params)
-	c := &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 5,
-				Method:    "get_app_definition",
-				Params:    []any{json.RawMessage(b)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-		},
-	}
-
-	// Call handler
-	router.HandleGetAppDefinition(c)
-	res := c.Message.Res
-	require.NotNil(t, res)
-
-	assert.Equal(t, "get_app_definition", res.Method)
-
-	// Validate response payload
-	def, ok := res.Params[0].(AppDefinition)
-	require.True(t, ok)
-	assert.Equal(t, session.Protocol, def.Protocol)
-	assert.EqualValues(t, session.ParticipantWallets, def.ParticipantWallets)
-	assert.EqualValues(t, session.Weights, def.Weights)
-	assert.Equal(t, session.Quorum, def.Quorum)
-	assert.Equal(t, session.Challenge, def.Challenge)
-	assert.Equal(t, session.Nonce, def.Nonce)
-}
-
-func TestRPCRouterHandleGetAppDefinition_MissingID(t *testing.T) {
+func TestRPCRouterHandlePing(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
 	defer cleanup()
 
@@ -69,50 +20,20 @@ func TestRPCRouterHandleGetAppDefinition_MissingID(t *testing.T) {
 		Context: context.TODO(),
 		Message: RPCMessage{
 			Req: &RPCData{
-				RequestID: 6,
-				Method:    "get_app_definition",
-				Params:    []any{},
+				RequestID: 1,
+				Method:    "ping",
+				Params:    []any{nil},
 				Timestamp: uint64(time.Now().Unix()),
 			},
+			Sig: []string{"dummy-signature"},
 		},
 	}
 
-	// Call handler
-	router.HandleGetAppDefinition(c)
+	router.HandlePing(c)
 	res := c.Message.Res
 	require.NotNil(t, res)
 
-	assert.Equal(t, "error", res.Method)
-	require.Len(t, res.Params, 1)
-	assert.Contains(t, res.Params[0], "missing account ID")
-}
-
-func TestRPCRouterHandleGetAppDefinition_NotFound(t *testing.T) {
-	router, cleanup := setupTestRPCRouter(t)
-	defer cleanup()
-
-	params := map[string]string{"app_session_id": "nonexistent"}
-	b, _ := json.Marshal(params)
-	c := &RPCContext{
-		Context: context.TODO(),
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 6,
-				Method:    "get_app_definition",
-				Params:    []any{json.RawMessage(b)},
-				Timestamp: uint64(time.Now().Unix()),
-			},
-		},
-	}
-
-	// Call handler
-	router.HandleGetAppDefinition(c)
-	res := c.Message.Res
-	require.NotNil(t, res)
-
-	assert.Equal(t, "error", res.Method)
-	require.Len(t, res.Params, 1)
-	assert.Contains(t, res.Params[0], "failed to get application session")
+	assert.Equal(t, "pong", res.Method)
 }
 
 func TestRPCRouterHandleGetConfig(t *testing.T) {
@@ -179,6 +100,85 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 		delete(expectedNetworks, network.Name)
 	}
 	assert.Empty(t, expectedNetworks, "All expected networks should be found")
+}
+
+func TestRPCRouterHandleGetAssets(t *testing.T) {
+	router, cleanup := setupTestRPCRouter(t)
+	defer cleanup()
+
+	testAssets := []Asset{
+		{Token: "0xToken1", ChainID: 137, Symbol: "usdc", Decimals: 6},
+		{Token: "0xToken2", ChainID: 137, Symbol: "weth", Decimals: 18},
+		{Token: "0xToken3", ChainID: 42220, Symbol: "celo", Decimals: 18},
+		{Token: "0xToken4", ChainID: 8453, Symbol: "usdbc", Decimals: 6},
+	}
+
+	for _, asset := range testAssets {
+		require.NoError(t, router.DB.Create(&asset).Error)
+	}
+
+	tcs := []struct {
+		name               string
+		params             map[string]interface{}
+		expectedTokenNames []string
+	}{
+		{
+			name:               "Get all with no sort (default asc, by chain_id and symbol)",
+			params:             map[string]interface{}{},
+			expectedTokenNames: []string{"0xToken3", "0xToken4", "0xToken1", "0xToken2"},
+		},
+		{
+			name:               "Filter by chain_id=137",
+			params:             map[string]interface{}{"chain_id": float64(137)},
+			expectedTokenNames: []string{"0xToken1", "0xToken2"},
+		},
+		{
+			name:               "Filter by chain_id=42220",
+			params:             map[string]interface{}{"chain_id": float64(42220)},
+			expectedTokenNames: []string{"0xToken3"},
+		},
+		{
+			name:               "Filter by non-existent chain_id=1",
+			params:             map[string]interface{}{"chain_id": float64(1)},
+			expectedTokenNames: []string{},
+		},
+	}
+
+	for idx, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			paramsJSON, err := json.Marshal(tc.params)
+			require.NoError(t, err, "Failed to marshal params")
+
+			c := &RPCContext{
+				Context: context.TODO(),
+				Message: RPCMessage{
+					Req: &RPCData{
+						RequestID: uint64(idx),
+						Method:    "get_assets",
+						Params:    []any{json.RawMessage(paramsJSON)},
+						Timestamp: uint64(time.Now().Unix()),
+					},
+					Sig: []string{"dummy-signature"},
+				},
+			}
+
+			router.HandleGetAssets(c)
+			res := c.Message.Res
+			require.NotNil(t, res)
+
+			assert.Equal(t, "get_assets", res.Method)
+			assert.Equal(t, uint64(idx), res.RequestID)
+			require.Len(t, res.Params, 1, "Response should contain an array of AssetResponse")
+
+			responseAssets, ok := res.Params[0].([]GetAssetsResponse)
+			require.True(t, ok, "Response parameter should be a slice of AssetResponse")
+			assert.Len(t, responseAssets, len(tc.expectedTokenNames), "Should return expected number of assets")
+
+			for idx, asset := range responseAssets {
+				assert.True(t, asset.Token == tc.expectedTokenNames[idx], "Should include token %s", tc.expectedTokenNames[idx])
+			}
+		})
+	}
 }
 
 func TestRPCRouterHandleGetChannels(t *testing.T) {
@@ -426,83 +426,107 @@ func TestRPCRouterHandleGetChannels_Pagination(t *testing.T) {
 	}
 }
 
-func TestRPCRouterHandleGetAssets(t *testing.T) {
+func TestRPCRouterHandleGetAppDefinition_Success(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
 	defer cleanup()
 
-	testAssets := []Asset{
-		{Token: "0xToken1", ChainID: 137, Symbol: "usdc", Decimals: 6},
-		{Token: "0xToken2", ChainID: 137, Symbol: "weth", Decimals: 18},
-		{Token: "0xToken3", ChainID: 42220, Symbol: "celo", Decimals: 18},
-		{Token: "0xToken4", ChainID: 8453, Symbol: "usdbc", Decimals: 6},
+	// Seed an AppSession
+	session := AppSession{
+		SessionID:          "0xSess123",
+		ParticipantWallets: []string{"0xA", "0xB"},
+		Protocol:           "proto",
+		Weights:            []int64{10, 20},
+		Quorum:             15,
+		Challenge:          30,
+		Nonce:              99,
 	}
+	require.NoError(t, router.DB.Create(&session).Error)
 
-	for _, asset := range testAssets {
-		require.NoError(t, router.DB.Create(&asset).Error)
-	}
-
-	tcs := []struct {
-		name               string
-		params             map[string]interface{}
-		expectedTokenNames []string
-	}{
-		{
-			name:               "Get all with no sort (default asc, by chain_id and symbol)",
-			params:             map[string]interface{}{},
-			expectedTokenNames: []string{"0xToken3", "0xToken4", "0xToken1", "0xToken2"},
-		},
-		{
-			name:               "Filter by chain_id=137",
-			params:             map[string]interface{}{"chain_id": float64(137)},
-			expectedTokenNames: []string{"0xToken1", "0xToken2"},
-		},
-		{
-			name:               "Filter by chain_id=42220",
-			params:             map[string]interface{}{"chain_id": float64(42220)},
-			expectedTokenNames: []string{"0xToken3"},
-		},
-		{
-			name:               "Filter by non-existent chain_id=1",
-			params:             map[string]interface{}{"chain_id": float64(1)},
-			expectedTokenNames: []string{},
+	// Build RPC request
+	params := map[string]string{"app_session_id": session.SessionID}
+	b, _ := json.Marshal(params)
+	c := &RPCContext{
+		Context: context.TODO(),
+		Message: RPCMessage{
+			Req: &RPCData{
+				RequestID: 5,
+				Method:    "get_app_definition",
+				Params:    []any{json.RawMessage(b)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
 		},
 	}
 
-	for idx, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-			paramsJSON, err := json.Marshal(tc.params)
-			require.NoError(t, err, "Failed to marshal params")
+	// Call handler
+	router.HandleGetAppDefinition(c)
+	res := c.Message.Res
+	require.NotNil(t, res)
 
-			c := &RPCContext{
-				Context: context.TODO(),
-				Message: RPCMessage{
-					Req: &RPCData{
-						RequestID: uint64(idx),
-						Method:    "get_assets",
-						Params:    []any{json.RawMessage(paramsJSON)},
-						Timestamp: uint64(time.Now().Unix()),
-					},
-					Sig: []string{"dummy-signature"},
-				},
-			}
+	assert.Equal(t, "get_app_definition", res.Method)
 
-			router.HandleGetAssets(c)
-			res := c.Message.Res
-			require.NotNil(t, res)
+	// Validate response payload
+	def, ok := res.Params[0].(AppDefinition)
+	require.True(t, ok)
+	assert.Equal(t, session.Protocol, def.Protocol)
+	assert.EqualValues(t, session.ParticipantWallets, def.ParticipantWallets)
+	assert.EqualValues(t, session.Weights, def.Weights)
+	assert.Equal(t, session.Quorum, def.Quorum)
+	assert.Equal(t, session.Challenge, def.Challenge)
+	assert.Equal(t, session.Nonce, def.Nonce)
+}
 
-			assert.Equal(t, "get_assets", res.Method)
-			assert.Equal(t, uint64(idx), res.RequestID)
-			require.Len(t, res.Params, 1, "Response should contain an array of AssetResponse")
+func TestRPCRouterHandleGetAppDefinition_MissingID(t *testing.T) {
+	router, cleanup := setupTestRPCRouter(t)
+	defer cleanup()
 
-			responseAssets, ok := res.Params[0].([]GetAssetsResponse)
-			require.True(t, ok, "Response parameter should be a slice of AssetResponse")
-			assert.Len(t, responseAssets, len(tc.expectedTokenNames), "Should return expected number of assets")
-
-			for idx, asset := range responseAssets {
-				assert.True(t, asset.Token == tc.expectedTokenNames[idx], "Should include token %s", tc.expectedTokenNames[idx])
-			}
-		})
+	c := &RPCContext{
+		Context: context.TODO(),
+		Message: RPCMessage{
+			Req: &RPCData{
+				RequestID: 6,
+				Method:    "get_app_definition",
+				Params:    []any{},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		},
 	}
+
+	// Call handler
+	router.HandleGetAppDefinition(c)
+	res := c.Message.Res
+	require.NotNil(t, res)
+
+	assert.Equal(t, "error", res.Method)
+	require.Len(t, res.Params, 1)
+	assert.Contains(t, res.Params[0], "missing account ID")
+}
+
+func TestRPCRouterHandleGetAppDefinition_NotFound(t *testing.T) {
+	router, cleanup := setupTestRPCRouter(t)
+	defer cleanup()
+
+	params := map[string]string{"app_session_id": "nonexistent"}
+	b, _ := json.Marshal(params)
+	c := &RPCContext{
+		Context: context.TODO(),
+		Message: RPCMessage{
+			Req: &RPCData{
+				RequestID: 6,
+				Method:    "get_app_definition",
+				Params:    []any{json.RawMessage(b)},
+				Timestamp: uint64(time.Now().Unix()),
+			},
+		},
+	}
+
+	// Call handler
+	router.HandleGetAppDefinition(c)
+	res := c.Message.Res
+	require.NotNil(t, res)
+
+	assert.Equal(t, "error", res.Method)
+	require.Len(t, res.Params, 1)
+	assert.Contains(t, res.Params[0], "failed to get application session")
 }
 
 func TestRPCRouterHandleGetAppSessions(t *testing.T) {

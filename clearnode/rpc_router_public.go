@@ -18,6 +18,12 @@ type GetAssetsResponse struct {
 	Decimals uint8  `json:"decimals"`
 }
 
+type GetChannelsParams struct {
+	ListOptions
+	Participant string `json:"participant,omitempty"` // Optional participant wallet to filter channels
+	Status      string `json:"status,omitempty"`      // Optional status to filter channels
+}
+
 type GetAppDefinitionParams struct {
 	AppSessionID string `json:"app_session_id"` // The application session ID to get the definition for
 }
@@ -36,13 +42,6 @@ type GetAppSessionParams struct {
 	Participant string `json:"participant,omitempty"` // Optional participant wallet to filter sessions
 	Status      string `json:"status,omitempty"`      // Optional status to filter sessions
 }
-
-type GetChannelsParams struct {
-	ListOptions
-	Participant string `json:"participant,omitempty"` // Optional participant wallet to filter channels
-	Status      string `json:"status,omitempty"`      // Optional status to filter channels
-}
-
 type GetLedgerEntriesParams struct {
 	ListOptions
 	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter entries
@@ -71,6 +70,10 @@ type NetworkInfo struct {
 type BrokerConfig struct {
 	BrokerAddress string        `json:"broker_address"`
 	Networks      []NetworkInfo `json:"networks"`
+}
+
+func (r *RPCRouter) HandlePing(c *RPCContext) {
+	c.Succeed("pong")
 }
 
 // HandleGetConfig returns the broker configuration
@@ -121,6 +124,52 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 
 	c.Succeed(req.Method, resp)
 	logger.Info("assets retrieved", "chainID", params.ChainID)
+}
+
+// HandleGetChannels returns a list of channels for a given account
+func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+
+	var params GetChannelsParams
+	if err := parseParams(req.Params, &params); err != nil {
+		c.Fail(err.Error())
+		return
+	}
+
+	var channels []Channel
+	var err error
+
+	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
+	channels, err = getChannelsByWallet(query, params.Participant, params.Status)
+	if err != nil {
+		logger.Error("failed to get channels", "error", err)
+		c.Fail("failed to get channels")
+		return
+	}
+
+	response := make([]ChannelResponse, 0, len(channels))
+	for _, channel := range channels {
+		response = append(response, ChannelResponse{
+			ChannelID:   channel.ChannelID,
+			Participant: channel.Participant,
+			Status:      channel.Status,
+			Token:       channel.Token,
+			Wallet:      channel.Wallet,
+			Amount:      big.NewInt(int64(channel.Amount)),
+			ChainID:     channel.ChainID,
+			Adjudicator: channel.Adjudicator,
+			Challenge:   channel.Challenge,
+			Nonce:       channel.Nonce,
+			Version:     channel.Version,
+			CreatedAt:   channel.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:   channel.UpdatedAt.Format(time.RFC3339),
+		})
+	}
+
+	c.Succeed(req.Method, response)
+	logger.Info("channels retrieved", "participant", params.Participant, "status", params.Status)
 }
 
 // HandleGetAppDefinition returns the application definition for a ledger account
@@ -196,52 +245,6 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 
 	c.Succeed(req.Method, resp)
 	logger.Info("application sessions retrieved", "participant", params.Participant, "status", params.Status)
-}
-
-// HandleGetChannels returns a list of channels for a given account
-func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
-	ctx := c.Context
-	logger := LoggerFromContext(ctx)
-	req := c.Message.Req
-
-	var params GetChannelsParams
-	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
-		return
-	}
-
-	var channels []Channel
-	var err error
-
-	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
-	channels, err = getChannelsByWallet(query, params.Participant, params.Status)
-	if err != nil {
-		logger.Error("failed to get channels", "error", err)
-		c.Fail("failed to get channels")
-		return
-	}
-
-	response := make([]ChannelResponse, 0, len(channels))
-	for _, channel := range channels {
-		response = append(response, ChannelResponse{
-			ChannelID:   channel.ChannelID,
-			Participant: channel.Participant,
-			Status:      channel.Status,
-			Token:       channel.Token,
-			Wallet:      channel.Wallet,
-			Amount:      big.NewInt(int64(channel.Amount)),
-			ChainID:     channel.ChainID,
-			Adjudicator: channel.Adjudicator,
-			Challenge:   channel.Challenge,
-			Nonce:       channel.Nonce,
-			Version:     channel.Version,
-			CreatedAt:   channel.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:   channel.UpdatedAt.Format(time.RFC3339),
-		})
-	}
-
-	c.Succeed(req.Method, response)
-	logger.Info("channels retrieved", "participant", params.Participant, "status", params.Status)
 }
 
 // HandleGetLedgerEntries returns ledger entries for an account

@@ -10,9 +10,9 @@
 | `ping` | Simple connectivity check | Public |
 | `get_config` | Retrieves broker configuration and supported networks | Public |
 | `get_assets` | Retrieves all supported assets (optionally filtered by chain_id) | Public |
+| `get_channels` | Lists all channels for a participant with their status across all chains | Public |
 | `get_app_definition` | Retrieves application definition for a ledger account | Public |
 | `get_app_sessions` | Lists virtual applications for a participant with optional status filter | Public |
-| `get_channels` | Lists all channels for a participant with their status across all chains | Public |
 | `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Public |
 | `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
 | `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
@@ -106,6 +106,97 @@ After successful authentication, the server provides a JWT token that can be use
 The JWT token has a default validity period of 24 hours and must be refreshed by making a new authentication request before expiration.
 
 ## Ledger Management
+
+### Get Channels
+
+Retrieves all channels for a participant (both open, closed, and joining), ordered by creation date (newest first). This method returns channels across all supported chains. If no participant is specified, it returns all channels.
+Supports pagination and sorting.
+
+> Sorted descending by `created_at` by default.
+
+**Request:**
+
+```json
+{
+  "req": [1, "get_channels", [{
+    "participant": "0x1234567890abcdef...",
+  }], 1619123456789],
+  "sig": []
+}
+```
+
+**Request with pagination and sorting:**
+
+```json
+{
+  "req": [1, "get_channels", [{
+    "participant": "0x1234567890abcdef...",
+    "status":"open", // Optional filter
+    "offset": 42, // Optional: pagination offset
+    "limit": 10, // Optional: number of channels to return
+    "sort": "desc" // Optional: sort asc or desc by created_at
+  }], 1619123456789],
+  "sig": []
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "get_channels", [[
+    {
+      "channel_id": "0xfedcba9876543210...",
+      "participant": "0x1234567890abcdef...",
+      "wallet": "0x1234567890abcdef...",
+      "status": "open",
+      "token": "0xeeee567890abcdef...",
+      "amount": "100000",
+      "chain_id": 137,
+      "adjudicator": "0xAdjudicatorContractAddress...",
+      "challenge": 86400,
+      "nonce": 1,
+      "version": 2,
+      "created_at": "2023-05-01T12:00:00Z",
+      "updated_at": "2023-05-01T12:30:00Z"
+    },
+    {
+      "channel_id": "0xabcdef1234567890...",
+      "participant": "0x1234567890abcdef...",
+      "wallet": "0x1234567890abcdef...",
+      "status": "closed",
+      "token": "0xeeee567890abcdef...",
+      "amount": "50000",
+      "chain_id": 42220,
+      "adjudicator": "0xAdjudicatorContractAddress...",
+      "challenge": 86400,
+      "nonce": 1,
+      "version": 3,
+      "created_at": "2023-04-15T10:00:00Z",
+      "updated_at": "2023-04-20T14:30:00Z"
+    }
+  ]], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+The signature in the request must be from the participant's private key, verifying they own the address. This prevents unauthorized access to channel information.
+
+Each channel response includes:
+
+- `channel_id`: Unique identifier for the channel
+- `participant`: The participant's address
+- `wallet`: The wallet address associated with this channel (may differ from participant if using delegation)
+- `status`: Current status ("open", "closed", or "joining")
+- `token`: The token address for the channel
+- `amount`: Total channel capacity
+- `chain_id`: The blockchain network ID where the channel exists (e.g., 137 for Polygon, 42220 for Celo, 8453 for Base)
+- `adjudicator`: The address of the adjudicator contract
+- `challenge`: Challenge period duration in seconds
+- `nonce`: Current nonce value for the channel
+- `version`: Current version of the channel state
+- `created_at`: When the channel was created (ISO 8601 format)
+- `updated_at`: When the channel was last updated (ISO 8601 format)
 
 ### Get App Definition
 
@@ -364,96 +455,6 @@ Supports pagination and sorting.
   "sig": ["0xabcd1234..."]
 }
 ```
-
-### Get Channels
-
-Retrieves all channels for a participant (both open, closed, and joining), ordered by creation date (newest first). This method returns channels across all supported chains. If no participant is specified, it returns all channels.
-Supports pagination and sorting.
-
-> Sorted descending by `created_at` by default.
-
-**Request:**
-
-```json
-{
-  "req": [1, "get_channels", [{
-    "participant": "0x1234567890abcdef...",
-  }], 1619123456789],
-  "sig": []
-}
-```
-
-**Request with pagination and sorting:**
-
-```json
-{
-  "req": [1, "get_channels", [{
-    "participant": "0x1234567890abcdef...",
-    "status":"open", // Optional filter
-    "offset": 42, // Optional: pagination offset
-    "limit": 10, // Optional: number of channels to return
-    "sort": "desc" // Optional: sort asc or desc by created_at
-  }], 1619123456789],
-  "sig": []
-}
-```
-
-**Response:**
-
-```json
-{
-  "res": [1, "get_channels", [[
-    {
-      "channel_id": "0xfedcba9876543210...",
-      "participant": "0x1234567890abcdef...",
-      "wallet": "0x1234567890abcdef...",
-      "status": "open",
-      "token": "0xeeee567890abcdef...",
-      "amount": "100000",
-      "chain_id": 137,
-      "adjudicator": "0xAdjudicatorContractAddress...",
-      "challenge": 86400,
-      "nonce": 1,
-      "version": 2,
-      "created_at": "2023-05-01T12:00:00Z",
-      "updated_at": "2023-05-01T12:30:00Z"
-    },
-    {
-      "channel_id": "0xabcdef1234567890...",
-      "participant": "0x1234567890abcdef...",
-      "wallet": "0x1234567890abcdef...",
-      "status": "closed",
-      "token": "0xeeee567890abcdef...",
-      "amount": "50000",
-      "chain_id": 42220,
-      "adjudicator": "0xAdjudicatorContractAddress...",
-      "challenge": 86400,
-      "nonce": 1,
-      "version": 3,
-      "created_at": "2023-04-15T10:00:00Z",
-      "updated_at": "2023-04-20T14:30:00Z"
-    }
-  ]], 1619123456789],
-  "sig": ["0xabcd1234..."]
-}
-```
-
-The signature in the request must be from the participant's private key, verifying they own the address. This prevents unauthorized access to channel information.
-
-Each channel response includes:
-- `channel_id`: Unique identifier for the channel
-- `participant`: The participant's address
-- `wallet`: The wallet address associated with this channel (may differ from participant if using delegation)
-- `status`: Current status ("open", "closed", or "joining")
-- `token`: The token address for the channel
-- `amount`: Total channel capacity
-- `chain_id`: The blockchain network ID where the channel exists (e.g., 137 for Polygon, 42220 for Celo, 8453 for Base)
-- `adjudicator`: The address of the adjudicator contract
-- `challenge`: Challenge period duration in seconds
-- `nonce`: Current nonce value for the channel
-- `version`: Current version of the channel state
-- `created_at`: When the channel was created (ISO 8601 format)
-- `updated_at`: When the channel was last updated (ISO 8601 format)
 
 ### Get RPC History
 

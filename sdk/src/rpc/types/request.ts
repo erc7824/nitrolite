@@ -367,6 +367,38 @@ export interface TransferRequest extends GenericRPCMessage {
 export type TransferRPCRequestParams = TransferRequestParams; // for backward compatibility
 
 /**
+ * Represents the request parameters for the 'get_transactions' RPC method.
+ */
+export enum TxType {
+    Transfer = 'transfer',
+    Deposit = 'deposit',
+    Withdrawal = 'withdrawal',
+    AppDeposit = 'app_deposit',
+    AppWithdrawal = 'app_withdrawal',
+}
+
+/**
+ * Represents the request parameters for the 'get_transactions' RPC method.
+ */
+export interface GetTransactionsRequestParams {
+    /** The account ID to filter transactions. */
+    account_id?: string;
+    /** The asset symbol to filter transactions. */
+    asset?: string;
+    /** Optional wallet address to filter transactions. If provided, overrides the authenticated wallet. */
+    tx_type?: TxType;
+}
+export type GetTransactionsRPCRequestParams = GetTransactionsRequestParams; // for backward compatibility
+
+/**
+ * Represents the request structure for the 'get_transactions' RPC method.
+ */
+export interface GetTransactionsRequest extends GenericRPCMessage {
+    method: RPCMethod.GetTransactions;
+    params: GetTransactionsRequestParams;
+}
+
+/**
  * Union type for all possible RPC request types.
  * This allows for type-safe handling of different request structures.
  */
@@ -390,7 +422,8 @@ export type RPCRequest =
     | PingRequest
     | PongRequest
     | MessageRequest
-    | TransferRequest;
+    | TransferRequest
+    | GetTransactionsRequest;
 
 /**
  * Maps RPC methods to their corresponding request parameter types.
@@ -416,4 +449,5 @@ export type RPCRequestParamsByMethod = {
     [RPCMethod.Pong]: [];
     [RPCMethod.Message]: any[];
     [RPCMethod.Transfer]: TransferRequestParams;
+    [RPCMethod.GetTransactions]: GetTransactionsRequestParams;
 };

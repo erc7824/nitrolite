@@ -336,4 +336,5 @@ export enum RPCMethod {
     Ping = 'ping',
     Pong = 'pong',
     Transfer = 'transfer',
+    GetTransactions = 'get_transactions',
 }

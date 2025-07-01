@@ -210,6 +210,25 @@ export async function createGetLedgerEntriesMessage(
     return JSON.stringify(signedRequest);
 }
 
+export async function createGetTranscationsMessage(
+    signer: MessageSigner,
+    accountId: string,
+    asset?: string,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const params = [
+        {
+            account_id: accountId,
+            ...(asset ? { asset } : {}),
+        },
+    ];
+    const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetTransactions, params, timestamp);
+    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+
+    return JSON.stringify(signedRequest);
+}
+
 /**
  * Creates the signed, stringified message body for a 'get_app_definition' request.
  *

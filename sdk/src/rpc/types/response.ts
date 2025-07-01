@@ -7,6 +7,7 @@ import {
     AuthVerifyRequestParams,
     TransferAllocation,
     ChannelUpdate,
+    TxType,
 } from '.';
 
 /**
@@ -559,6 +560,34 @@ export interface TransferRPCResponse extends GenericRPCMessage {
 }
 
 /**
+ * Represents the parameters for the 'get_transactions' RPC method.
+ */
+export interface GetTransactionsResponseParams {
+    /** The transaction hash. */
+    txHash: Hex;
+    /** The type of transaction. */
+    txType: TxType;
+    /** The Ethereum address of the sender account. */
+    fromAccount: Address;
+    /** The Ethereum address of the recipient account. */
+    toAccount: Address;
+    /** The asset symbol (e.g., "ETH", "USDC"). */
+    asset: string;
+    /** The amount of the asset transferred. */
+    amount: BigInt;
+    /** The timestamp when the transaction was created. */
+    createdAt: Date;
+}
+
+/**
+ * Represents the response structure for the 'get_transactions' RPC method.
+ */
+export interface GetTransactionsResponse extends GenericRPCMessage {
+    method: RPCMethod.GetTransactions;
+    params: GetTransactionsResponseParams[];
+}
+
+/**
  * Union type for all possible RPC response types.
  * This allows for type-safe handling of different response structures.
  */
@@ -587,7 +616,8 @@ export type RPCResponse =
     | BalanceUpdateResponse
     | ChannelsUpdateResponse
     | ChannelUpdateResponse
-    | TransferRPCResponse;
+    | TransferRPCResponse
+    | GetTransactionsResponse;
 
 /**
  * Maps RPC methods to their corresponding parameter types.

@@ -279,8 +279,7 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig string, authPar
 	}
 
 	// Generate the User tag
-	_, err = GenerateOrRetrieveUserTag(r.DB, challenge.Address)
-	if err != nil {
+	if _, err = GenerateOrRetrieveUserTag(r.DB, challenge.Address); err != nil {
 		logger.Error("failed to store user tag in db", "error", err)
 		return nil, nil, "failed to store user tag in db"
 	}

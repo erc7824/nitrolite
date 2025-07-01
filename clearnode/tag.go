@@ -1,8 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 
 	"gorm.io/gorm"
 )
@@ -85,17 +86,29 @@ func GetWalletByTag(db *gorm.DB, tag string) (string, error) {
 
 	var model UserTagModel
 	if err := db.Where("tag = ?", tag).First(&model).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return "", fmt.Errorf("no associated wallet for tag: %s", tag)
+		}
 		return "", fmt.Errorf("failed to retrieve record: %v", err)
 	}
 	return model.Wallet, nil
 }
 
-// GenerateRandomAlphanumericTag generates a random alphanumeric tag of length 8.
+// GenerateRandomAlphanumericTag generates a random alphanumeric tag of length 6.
 func GenerateRandomAlphanumericTag() string {
 	const charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	result := make([]byte, 8)
+	result := make([]byte, 6)
+	charsetMaxIndex := big.NewInt(int64(len(charset) - 1))
+
 	for i := range result {
-		result[i] = charset[rand.Intn(len(charset))]
+		// Use crypto/rand.Int() for cryptographically secure random numbers
+		randomIndex, err := rand.Int(rand.Reader, charsetMaxIndex)
+		if err != nil {
+			// If crypto/rand fails, this is a serious error that should cause a panic
+			// since we can't generate secure random numbers
+			panic(fmt.Sprintf("failed to generate secure random number: %v", err))
+		}
+		result[i] = charset[randomIndex.Int64()]
 	}
 	return string(result)
 }

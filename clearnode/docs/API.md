@@ -522,7 +522,6 @@ Supports pagination and sorting.
 ```
 
 ### Get Transactions
->>>>>>> 2816726 (feat: add user tag)
 
 Retrieves ledger transaction history with optional filtering by asset and transaction type. This endpoint provides a view of transactions where the specified account appears as either the sender or receiver.
 Supports pagination and sorting.

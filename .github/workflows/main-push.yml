@@ -48,6 +48,13 @@ jobs:
       project-path: ${{ matrix.path }}
       project-name: ${{ matrix.name }}
 
+  build-and-publish-sdk:
+    needs: test-sdk
+    name: Build and Publish (SDK)
+    uses: ./.github/workflows/publish-sdk.yml
+    secrets:
+      npm-token: ${{ secrets.NPM_TOKEN }}
+  
   auto-tag:
     name: Auto-Tag
     needs: test-clearnode

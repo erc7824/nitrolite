@@ -77,7 +77,6 @@ jobs:
       - name: Build & Publish SDK
         if: steps.version-check.outputs.changed == 'true'
         working-directory: ./sdk
-        run: npm publish --tag aplha --access public
-        # run: npm publish --tag latest --access public
+        run: npm publish --tag latest --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.npm-token }}

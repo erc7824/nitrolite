@@ -1200,7 +1200,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 				Message: RPCMessage{
 					Req: &RPCData{
 						RequestID: uint64(i + 1), // Unique request ID per test case
-						Method:    "get_transactions",
+						Method:    "get_ledger_transactions",
 						Params:    []any{json.RawMessage(paramsJSON)},
 						Timestamp: uint64(time.Now().Unix()),
 					},
@@ -1213,7 +1213,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			// General assertions for all cases
 			res := c.Message.Res
 			require.NotNil(t, res, "Response should not be nil")
-			assert.Equal(t, "get_transactions", res.Method)
+			assert.Equal(t, "get_ledger_transactions", res.Method)
 			require.Len(t, res.Params, 1, "Response should contain one parameter")
 
 			// Unmarshal the actual transaction data
@@ -1245,7 +1245,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			Message: RPCMessage{
 				Req: &RPCData{
 					RequestID: 999,
-					Method:    "get_transactions",
+					Method:    "get_ledger_transactions",
 					Params:    []any{json.RawMessage(paramsJSON)},
 					Timestamp: uint64(time.Now().Unix()),
 				},
@@ -1264,6 +1264,6 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 		// Verify error message
 		errorMsg, ok := res.Params[0].(string)
 		require.True(t, ok, "Error parameter should be a string")
-		assert.Equal(t, "invalid transaction type", errorMsg, "Should return correct error message")
+		assert.Equal(t, ErrInvalidTransactionType.Error(), errorMsg, "Should return correct error message")
 	})
 }

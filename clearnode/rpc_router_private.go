@@ -248,15 +248,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			if err != nil {
 				return fmt.Errorf("failed to record transaction: %w", err)
 			}
-			transactions = append(transactions, TransactionResponse{
-				TxHash:      transaction.Hash,
-				TxType:      transaction.Type.String(),
-				FromAccount: transaction.FromAccount,
-				ToAccount:   transaction.ToAccount,
-				Asset:       transaction.AssetSymbol,
-				Amount:      transaction.Amount,
-				CreatedAt:   transaction.CreatedAt,
-			})
+			transactions = append(transactions, transaction.JSON())
 		}
 		return nil
 	})

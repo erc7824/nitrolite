@@ -61,6 +61,13 @@ type LedgerEntryResponse struct {
 	CreatedAt   time.Time       `json:"created_at"`
 }
 
+type GetTransactionsParams struct {
+	// Pagination will be added with another PR
+	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter transactions
+	Asset     string `json:"asset,omitempty"`      // Optional asset to filter transactions
+	TxType    string `json:"tx_type,omitempty"`    // Optional transaction type to filter transactions
+}
+
 type NetworkInfo struct {
 	Name               string `json:"name"`
 	ChainID            uint32 `json:"chain_id"`
@@ -71,13 +78,6 @@ type NetworkInfo struct {
 type BrokerConfig struct {
 	BrokerAddress string        `json:"broker_address"`
 	Networks      []NetworkInfo `json:"networks"`
-}
-
-type GetTransactionsParams struct {
-	// Pagination will be added with another PR
-	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter transactions
-	Asset     string `json:"asset,omitempty"`      // Optional asset to filter transactions
-	TxType    string `json:"tx_type,omitempty"`    // Optional transaction type to filter transactions
 }
 
 type TransactionResponse struct {
@@ -325,9 +325,9 @@ func (r *RPCRouter) HandleGetTransactions(c *RPCContext) {
 
 	var txType *TransactionType
 	if params.TxType != "" {
-		parsedType, ok := ParseTransactionType(params.TxType)
-		if !ok {
-			c.Fail("invalid transaction type")
+		parsedType, err := ParseTransactionType(params.TxType)
+		if err != nil {
+			c.Fail(err.Error())
 			return
 		}
 		txType = &parsedType
@@ -342,15 +342,7 @@ func (r *RPCRouter) HandleGetTransactions(c *RPCContext) {
 
 	resp := make([]TransactionResponse, len(transactions))
 	for i, tx := range transactions {
-		resp[i] = TransactionResponse{
-			TxHash:      tx.Hash,
-			TxType:      tx.Type.String(),
-			FromAccount: tx.FromAccount,
-			ToAccount:   tx.ToAccount,
-			Asset:       tx.AssetSymbol,
-			Amount:      tx.Amount,
-			CreatedAt:   tx.CreatedAt,
-		}
+		resp[i] = tx.JSON()
 	}
 
 	c.Succeed(req.Method, resp)

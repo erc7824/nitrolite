@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -21,6 +22,10 @@ const (
 	TransactionTypeAppWithdrawal TransactionType = 302
 )
 
+var (
+	ErrInvalidTransactionType = errors.New("invalid transaction type")
+)
+
 type Transaction struct {
 	ID          uint            `gorm:"primaryKey"`
 	Hash        string          `gorm:"column:hash;not null;uniqueIndex"`
@@ -30,6 +35,18 @@ type Transaction struct {
 	AssetSymbol string          `gorm:"column:asset_symbol;not null"`
 	Amount      decimal.Decimal `gorm:"column:amount;type:decimal(38,18);not null"`
 	CreatedAt   time.Time
+}
+
+func (tx *Transaction) JSON() TransactionResponse {
+	return TransactionResponse{
+		TxHash:      tx.Hash,
+		TxType:      tx.Type.String(),
+		FromAccount: tx.FromAccount,
+		ToAccount:   tx.ToAccount,
+		Asset:       tx.AssetSymbol,
+		Amount:      tx.Amount,
+		CreatedAt:   tx.CreatedAt,
+	}
 }
 
 func (Transaction) TableName() string {
@@ -136,19 +153,19 @@ func (t TransactionType) String() string {
 }
 
 // ParseTransactionType converts string transaction type to integer
-func ParseTransactionType(s string) (TransactionType, bool) {
+func ParseTransactionType(s string) (TransactionType, error) {
 	switch s {
 	case "transfer":
-		return TransactionTypeTransfer, true
+		return TransactionTypeTransfer, nil
 	case "deposit":
-		return TransactionTypeDeposit, true
+		return TransactionTypeDeposit, nil
 	case "withdrawal":
-		return TransactionTypeWithdrawal, true
+		return TransactionTypeWithdrawal, nil
 	case "app_deposit":
-		return TransactionTypeAppDeposit, true
+		return TransactionTypeAppDeposit, nil
 	case "app_withdrawal":
-		return TransactionTypeAppWithdrawal, true
+		return TransactionTypeAppWithdrawal, nil
 	default:
-		return 0, false
+		return 0, ErrInvalidTransactionType
 	}
 }

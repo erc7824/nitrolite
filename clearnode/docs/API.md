@@ -14,7 +14,7 @@
 | `get_app_definition` | Retrieves application definition for a ledger account | Public |
 | `get_app_sessions` | Lists virtual applications for a participant with optional status filter | Public |
 | `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Public |
-| `get_transactions` | Retrieves transaction history with optional filtering | Public |
+| `get_ledger_transactions` | Retrieves transaction history with optional filtering | Public |
 | `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
 | `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
 | `transfer` | Transfers funds from user's unified balance to another account | Private |
@@ -401,7 +401,10 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
   "sig": ["0xabcd1234..."]
 }
 ```
-The response now returns an array of transaction objects, with one transaction created for each asset being transferred. Each transaction includes:
+The response returns an array of transaction objects, with one transaction for each asset being transferred. 
+
+Each transaction includes:
+
 - `tx_hash`: Unique transaction hash generated from transaction data
 - `tx_type`: Transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
 - `from_account`: The account that sent the funds
@@ -474,17 +477,24 @@ Supports pagination and sorting.
 
 ### Get Transactions
 
-Retrieves transaction history with optional filtering by asset and transaction type. This endpoint provides a view of all transactions where the specified account appears as either the sender or receiver.
-Pagination is going to be added.
+Retrieves transaction history with optional filtering by asset and transaction type. This endpoint provides a view of transactions where the specified account appears as either the sender or receiver.
+Pagination is going to be added soon.
+
+**Available Transaction Types:**
+- `transfer`: Direct transfers between user accounts
+- `deposit`: Funds deposited into channels or accounts
+- `withdrawal`: Funds withdrawn from channels or accounts
+- `app_deposit`: Deposits related to virtual application sessions
+- `app_withdrawal`: Withdrawals related to virtual application sessions
 
 **Request:**
 
 ```json
 {
-  "req": [1, "get_transactions", [{
+  "req": [1, "get_ledger_transactions", [{
     "account_id": "0x1234567890abcdef...",
     "asset": "usdc",     // Optional: filter by asset
-    "tx_type": "transfer" // Optional: filter by transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
+    "tx_type": "transfer" // Optional: filter by transaction type
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
@@ -494,7 +504,7 @@ Pagination is going to be added.
 
 ```json
 {
-  "res": [1, "get_transactions", [[
+  "res": [1, "get_ledger_transactions", [[
     {
       "tx_hash": "0xabcdef1234567890...",
       "tx_type": "transfer",
@@ -526,13 +536,6 @@ Each transaction response includes:
 - `asset`: The asset symbol (e.g., "usdc", "eth")
 - `amount`: The transaction amount
 - `created_at`: When the transaction was created (ISO 8601 format)
-
-**Available Transaction Types:**
-- `transfer`: Direct transfers between user accounts
-- `deposit`: Funds deposited into channels or accounts
-- `withdrawal`: Funds withdrawn from channels or accounts
-- `app_deposit`: Deposits related to virtual application sessions
-- `app_withdrawal`: Withdrawals related to virtual application sessions
 
 Transactions are ordered by creation date (newest first). If no `account_id` is provided, returns all transactions. The `asset` and `tx_type` filters can be used to narrow results to specific asset types or transaction types.
 

@@ -88,18 +88,18 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			addrA: decimal.NewFromInt(100),
 			addrB: decimal.NewFromInt(200),
 		}
+
+		assert.Equal(t, len(transactions), 2, "Expected 2 transactions to be recorded")
 		for _, tx := range transactions {
 			expectedAmount, exists := expectedTxs[tx.FromAccount]
-			assert.True(t, exists, "Unexpected from_account in transaction: %s", tx.FromAccount)
+			assert.True(t, exists, "Unexpected destination of a transaction: %s", tx.FromAccount)
 			assert.Equal(t, TransactionTypeAppDeposit, tx.Type, "Transaction type should be app deposit")
 			assert.Equal(t, appSession.SessionID, tx.ToAccount, "To account should be app session ID")
 			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
 			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
 			assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
 			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
-			delete(expectedTxs, tx.FromAccount)
 		}
-		assert.Empty(t, expectedTxs, "All expected transactions should be found")
 	})
 
 	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
@@ -365,18 +365,18 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			addrA: decimal.NewFromInt(100),
 			addrB: decimal.NewFromInt(200),
 		}
+
+		assert.Equal(t, len(transactions), 2, "Expected 2 transactions to be recorded")
 		for _, tx := range transactions {
 			expectedAmount, exists := expectedTxs[tx.ToAccount]
-			assert.True(t, exists, "Unexpected to_account in transaction: %s", tx.ToAccount)
+			assert.True(t, exists, "Unexpected destination of a transaction: %s", tx.ToAccount)
 			assert.Equal(t, TransactionTypeAppWithdrawal, tx.Type, "Transaction type should be app withdrawal")
 			assert.Equal(t, session.SessionID, tx.FromAccount, "From account should be app session ID")
 			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
 			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
 			assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
 			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
-			delete(expectedTxs, tx.ToAccount)
 		}
-		assert.Empty(t, expectedTxs, "All expected transactions should be found")
 	})
 
 	t.Run("SuccessfulCloseApplicationWithZeroAllocation", func(t *testing.T) {

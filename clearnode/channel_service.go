@@ -75,7 +75,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 	}
 
 	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
-	newChannelAmount := new(big.Int).Add(new(big.Int).SetUint64(channel.Amount), params.AllocateAmount)
+	newChannelAmount := new(big.Int).Add(channel.Amount.BigInt(), params.AllocateAmount)
 
 	if rawBalance.Cmp(newChannelAmount) < 0 {
 		return ResizeChannelResponse{}, fmt.Errorf("insufficient unified balance for channel %s: required %s, available %s", channel.ChannelID, newChannelAmount.String(), rawBalance.String())
@@ -193,7 +193,7 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 	}
 
 	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
-	channelAmount := new(big.Int).SetUint64(channel.Amount)
+	channelAmount := channel.Amount.BigInt()
 	if channelAmount.Cmp(rawBalance) < 0 {
 		return CloseChannelResponse{}, fmt.Errorf("resize this channel first")
 	}

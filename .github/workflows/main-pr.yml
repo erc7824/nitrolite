@@ -28,6 +28,7 @@ jobs:
 
   test-integration:
     name: Test (Integration)
+    needs: test-sdk
     uses: ./.github/workflows/test-integration.yml
     with:
       project-path: 'integration'
@@ -35,6 +36,7 @@ jobs:
 
   test-examples:
     name: Test Examples Compilation
+    needs: test-sdk
     uses: ./.github/workflows/build-node-project.yml
     strategy:
       matrix:

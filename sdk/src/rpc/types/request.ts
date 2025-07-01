@@ -385,7 +385,7 @@ export interface GetTransactionsRequestParams {
     account_id?: string;
     /** The asset symbol to filter transactions. */
     asset?: string;
-    /** Optional wallet address to filter transactions. If provided, overrides the authenticated wallet. */
+    /** The transaction type to filter transactions. */
     tx_type?: TxType;
 }
 export type GetTransactionsRPCRequestParams = GetTransactionsRequestParams; // for backward compatibility

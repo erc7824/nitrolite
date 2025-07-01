@@ -128,8 +128,7 @@ const GetTransactionsParamsSchema = z.
                         createdAt: raw.created_at,
                     }) as GetTransactionsResponseParams,
             ),
-    )
-    .transform((arr) => arr[0]);
+    );
 
 const parseMessageParams: ParamsParser<unknown> = (params) => {
     if (!Array.isArray(params) || params.length === 0) throw new ParserParamsMissingError(RPCMethod.Message);

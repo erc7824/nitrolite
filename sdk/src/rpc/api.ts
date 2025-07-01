@@ -210,7 +210,7 @@ export async function createGetLedgerEntriesMessage(
     return JSON.stringify(signedRequest);
 }
 
-export async function createGetTranscationsMessage(
+export async function createGetTransactionsMessage(
     signer: MessageSigner,
     accountId: string,
     asset?: string,

@@ -78,6 +78,7 @@ func GetChannelByID(tx *gorm.DB, channelID string) (*Channel, error) {
 	return &channel, nil
 }
 
+// TODO: add ListOptions and move to channel service
 // getChannelsByWallet finds all channels for a wallet
 func getChannelsByWallet(tx *gorm.DB, wallet string, status string) ([]Channel, error) {
 	var channels []Channel

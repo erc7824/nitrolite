@@ -1,0 +1,67 @@
+name: Publish SDK
+
+on:
+  workflow_call:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'sdk/package.json'
+          cache: npm
+          cache-dependency-path: | 
+            **/package-lock.json 
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            **/node_modules
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
+
+      - name: Check if version changed
+        id: version-check
+        run: |
+          cd sdk
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          git show HEAD~1:sdk/package.json > prev-package.json 2>/dev/null || echo '{}' > prev-package.json
+          PREVIOUS_VERSION=$(node -p "try { require('./prev-package.json').version } catch(e) { '' }")
+          rm prev-package.json
+          
+          echo "Current version: $CURRENT_VERSION"
+          echo "Previous version: $PREVIOUS_VERSION"
+          
+          if [ "$CURRENT_VERSION" = "$PREVIOUS_VERSION" ]; then
+            echo "Version unchanged, skipping publish"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version changed, proceeding with publish"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies
+        if: steps.version-check.outputs.changed == 'true'
+        working-directory: ./sdk
+        run: npm ci
+
+      - name: Build for publish
+        if: steps.version-check.outputs.changed == 'true'
+        working-directory: ./sdk
+        run: npm run prepublishOnly
+
+      - name: Publish to npm
+        if: steps.version-check.outputs.changed == 'true'
+        working-directory: ./sdk
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

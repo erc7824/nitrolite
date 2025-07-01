@@ -28,6 +28,7 @@ jobs:
 
   test-examples:
     name: Test Examples Compilation
+    needs: test-sdk
     uses: ./.github/workflows/build-node-project.yml
     strategy:
       matrix:

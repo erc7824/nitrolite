@@ -105,7 +105,7 @@ func CreateResponse(id uint64, method string, responseParams []any) *RPCMessage 
 }
 
 // RPCError represents an error in the RPC protocol
-// It is used to identify whether error should be returned to the client
+// It should be used when we want this precise error to be inside RPCMessage's response.
 type RPCError struct {
 	err error
 }

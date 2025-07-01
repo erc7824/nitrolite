@@ -67,6 +67,30 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		appBalA, err := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(100), appBalA)
+
+		// Verify transactions were recorded to the database
+		var transactions []Transaction
+		err = db.Where("tx_type = ?", TransactionTypeAppDeposit).Find(&transactions).Error
+		require.NoError(t, err)
+		assert.Len(t, transactions, 2, "Should have 2 app deposit transactions recorded")
+
+		// Verify transaction details
+		expectedTxs := map[string]decimal.Decimal{
+			addrA: decimal.NewFromInt(100),
+			addrB: decimal.NewFromInt(200),
+		}
+		for _, tx := range transactions {
+			expectedAmount, exists := expectedTxs[tx.FromAccount]
+			assert.True(t, exists, "Unexpected from_account in transaction: %s", tx.FromAccount)
+			assert.Equal(t, TransactionTypeAppDeposit, tx.Type, "Transaction type should be app deposit")
+			assert.Equal(t, appSession.SessionID, tx.ToAccount, "To account should be app session ID")
+			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
+			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
+			assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
+			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
+			delete(expectedTxs, tx.FromAccount)
+		}
+		assert.Empty(t, expectedTxs, "All expected transactions should be found")
 	})
 
 	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
@@ -311,6 +335,30 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		walletBalA, err := ledgerA.Balance(userAccountIDA, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(100), walletBalA)
+
+		// Verify transactions were recorded to the database
+		var transactions []Transaction
+		err = db.Where("tx_type = ?", TransactionTypeAppWithdrawal).Find(&transactions).Error
+		require.NoError(t, err)
+		assert.Len(t, transactions, 2, "Should have 2 app withdrawal transactions recorded")
+
+		// Verify transaction details
+		expectedTxs := map[string]decimal.Decimal{
+			addrA: decimal.NewFromInt(100),
+			addrB: decimal.NewFromInt(200),
+		}
+		for _, tx := range transactions {
+			expectedAmount, exists := expectedTxs[tx.ToAccount]
+			assert.True(t, exists, "Unexpected to_account in transaction: %s", tx.ToAccount)
+			assert.Equal(t, TransactionTypeAppWithdrawal, tx.Type, "Transaction type should be app withdrawal")
+			assert.Equal(t, session.SessionID, tx.FromAccount, "From account should be app session ID")
+			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
+			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
+			assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
+			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
+			delete(expectedTxs, tx.ToAccount)
+		}
+		assert.Empty(t, expectedTxs, "All expected transactions should be found")
 	})
 
 	t.Run("SuccessfulCloseApplicationWithZeroAllocation", func(t *testing.T) {

@@ -161,7 +161,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 		}
 	}
 
-	sessions, err := getAppSessions(r.DB, participant, status)
+	sessions, err := r.AppSessionService.GetAppSessions(participant, status)
 	if err != nil {
 		logger.Error("failed to get application sessions", "error", err)
 		c.Fail("failed to get application sessions")

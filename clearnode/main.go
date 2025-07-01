@@ -51,8 +51,10 @@ func main() {
 		logger.Fatal("failed to initialize auth manager", "error", err)
 	}
 
+	appSessionService := NewAppSessionService(db)
+
 	rpcNode := NewRPCNode(signer, logger)
-	rpcRouter := NewRPCRouter(rpcNode, config, signer, db, authManager, metrics, rpcStore, logger)
+	rpcRouter := NewRPCRouter(rpcNode, config, signer, appSessionService, db, authManager, metrics, rpcStore, logger)
 
 	rpcListenAddr := ":8000"
 	rpcListenEndpoint := "/ws"

@@ -47,7 +47,7 @@ type Custody struct {
 func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr, adjudicatorAddr, balanceCheckerAddr string, chain uint32, blockStep uint64, logger Logger) (*Custody, error) {
 	client, err := ethclient.Dial(infuraURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Ethereum node: %w", err)
+		return nil, fmt.Errorf("failed to connect to blockchain node: %w", err)
 	}
 
 	chainID, err := client.ChainID(context.Background())
@@ -280,6 +280,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 
+		logger.Info("handled created event", "channelId", channelID)
 		return nil
 	})
 	if errors.Is(err, ErrCustodyEventAlreadyProcessed) {
@@ -359,7 +360,7 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 			return fmt.Errorf("failed to record transaction: %w", err)
 		}
 
-		logger.Info("joined channel", "channelId", channelID)
+		logger.Info("handled joined event", "channelId", channelID)
 		return nil
 	})
 	if errors.Is(err, ErrCustodyEventAlreadyProcessed) {
@@ -397,7 +398,7 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 			return fmt.Errorf("error saving channel in database: %w", err)
 		}
 
-		logger.Info("challenged channel", "channelId", channelID)
+		logger.Info("handled challenged event", "channelId", channelID)
 		return nil
 	})
 	if errors.Is(err, ErrCustodyEventAlreadyProcessed) {
@@ -500,7 +501,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			}
 		}
 
-		logger.Info("resized channel", "channelId", channelID, "newAmount", channel.Amount)
+		logger.Info("handled resized event", "channelId", channelID, "newAmount", channel.Amount)
 		return nil
 	})
 	if errors.Is(err, ErrCustodyEventAlreadyProcessed) {
@@ -576,7 +577,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 			return fmt.Errorf("failed to close channel: %w", err)
 		}
 
-		logger.Info("closed channel", "channelId", channelID)
+		logger.Info("handled closed event", "channelId", channelID)
 		return nil
 	})
 	if errors.Is(err, ErrCustodyEventAlreadyProcessed) {
@@ -673,9 +674,9 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 }
 
 // saveContractEvent saves a contract event to the database if it has not been processed before.
-// It returns true if the event was already processed, false otherwise.
+// It returns ErrCustodyEventAlreadyProcessed if the event was already processed.
 func (c *Custody) saveContractEvent(tx *gorm.DB, name string, event any, rawLog types.Log) error {
-	alreadyProcessed, err := CheckContractEvent(tx, c.chainID, rawLog.TxHash.Hex(), uint32(rawLog.Index))
+	alreadyProcessed, err := IsContractEventPresent(tx, c.chainID, rawLog.TxHash.Hex(), uint32(rawLog.Index))
 	if err != nil {
 		return err
 	}

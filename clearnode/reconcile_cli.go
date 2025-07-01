@@ -35,7 +35,7 @@ func runReconcileCli(logger Logger) {
 
 	network, ok := config.networks[networkName]
 	if !ok {
-		logger.Fatal("Network ain't configured", "network", networkName)
+		logger.Fatal("Network is not configured", "network", networkName)
 	}
 
 	client, err := ethclient.Dial(network.InfuraURL)

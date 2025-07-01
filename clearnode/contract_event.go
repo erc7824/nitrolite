@@ -64,7 +64,7 @@ func GetLatestContractEvent(db *gorm.DB, contractAddress string, networkID uint3
 	return &ev, err
 }
 
-func CheckContractEvent(db *gorm.DB, chainID uint32, txHash string, logIndex uint32) (bool, error) {
+func IsContractEventPresent(db *gorm.DB, chainID uint32, txHash string, logIndex uint32) (bool, error) {
 	var count int64
 	err := db.Model(&ContractEvent{}).
 		Where("chain_id = ? AND transaction_hash = ? AND log_index = ?", chainID, txHash, logIndex).

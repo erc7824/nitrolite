@@ -28,7 +28,7 @@ const GetLedgerEntriesParamsSchema = z
                 .object({
                     id: z.number(),
                     account_id: z.string(),
-                    account_type: z.string(),
+                    account_type: z.number(),
                     asset: z.string(),
                     participant: addressSchema,
                     credit: z.union([z.string(), z.number()]).transform((v) => v.toString()),

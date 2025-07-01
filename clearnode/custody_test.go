@@ -244,13 +244,13 @@ func createMockChallengedEvent(t *testing.T, signer *Signer, token string, amoun
 	return &log, event
 }
 
-func createMockResizedEvent(t *testing.T, amount int64) (*types.Log, *nitrolite.CustodyResized) {
+func createMockResizedEvent(t *testing.T, amount *big.Int) (*types.Log, *nitrolite.CustodyResized) {
 	t.Helper()
 
 	channelID := [32]byte{1, 2, 3, 4}
 
 	deltaAllocations := []*big.Int{
-		big.NewInt(amount),
+		amount,
 		big.NewInt(0),
 	}
 
@@ -793,8 +793,8 @@ func TestHandleResizedEvent(t *testing.T) {
 		defer cleanup()
 
 		initialAmount := decimal.NewFromInt(1000000)
-		deltaAmount := int64(500000) // Increase
-		expectedAmount := uint64(1500000)
+		deltaAmount := decimal.NewFromInt(500000) // Increase
+		expectedAmount := decimal.NewFromInt(1500000)
 
 		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
 		channelAccountID := NewAccountID(channelID)
@@ -829,7 +829,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
 		require.NoError(t, err)
 
-		_, mockEvent := createMockResizedEvent(t, deltaAmount)
+		_, mockEvent := createMockResizedEvent(t, deltaAmount.BigInt())
 
 		var balanceUpdateCalled bool
 		var capturedWallet string
@@ -855,7 +855,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ChannelStatusOpen, updatedChannel.Status, "Status should remain open")
-		assert.Equal(t, expectedAmount, updatedChannel.Amount.BigInt().Uint64(), "Amount should be increased by deltaAmount")
+		assert.Equal(t, expectedAmount, updatedChannel.Amount, "Amount should be increased by deltaAmount")
 		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
@@ -867,12 +867,12 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		assert.True(t, channelUpdateCalled, "Channel update callback should be called")
 		assert.Equal(t, channelID, capturedChannel.ChannelID)
-		assert.Equal(t, expectedAmount, capturedChannel.Amount.BigInt().Uint64())
+		assert.Equal(t, expectedAmount, capturedChannel.Amount)
 
 		walletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)
 		require.NoError(t, err)
 
-		deltaAmountDecimal := decimal.NewFromInt(deltaAmount).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		deltaAmountDecimal := deltaAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 		expectedWalletBalance := initialAmountDecimal.Add(deltaAmountDecimal)
 
 		assert.True(t, expectedWalletBalance.Equal(walletBalance),
@@ -902,8 +902,8 @@ func TestHandleResizedEvent(t *testing.T) {
 		defer cleanup()
 
 		initialAmount := decimal.NewFromInt(1000000)
-		deltaAmount := int64(-300000) // Decrease
-		expectedAmount := uint64(700000)
+		deltaAmount := decimal.NewFromInt(-300000) // Decrease
+		expectedAmount := decimal.NewFromInt(700000)
 
 		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
 		channelAccountID := NewAccountID(channelID)
@@ -938,7 +938,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
 		require.NoError(t, err)
 
-		_, mockEvent := createMockResizedEvent(t, deltaAmount)
+		_, mockEvent := createMockResizedEvent(t, deltaAmount.BigInt())
 
 		logger := custody.logger.With("event", "Resized")
 		custody.handleResized(logger, mockEvent)
@@ -948,13 +948,13 @@ func TestHandleResizedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ChannelStatusOpen, updatedChannel.Status)
-		assert.Equal(t, expectedAmount, updatedChannel.Amount.BigInt().Uint64())
+		assert.Equal(t, expectedAmount, updatedChannel.Amount)
 		assert.Greater(t, updatedChannel.Version, initialChannel.Version)
 
 		walletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)
 		require.NoError(t, err)
 
-		deltaAmountDecimal := decimal.NewFromInt(deltaAmount).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		deltaAmountDecimal := deltaAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 		expectedWalletBalance := initialAmountDecimal.Add(deltaAmountDecimal)
 
 		assert.True(t, expectedWalletBalance.Equal(walletBalance),
@@ -997,7 +997,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		err := db.Create(&initialChannel).Error
 		require.NoError(t, err)
 
-		_, mockEvent := createMockResizedEvent(t, 500000)
+		_, mockEvent := createMockResizedEvent(t, big.NewInt(500000))
 
 		var balanceUpdateCalled bool
 		custody.sendBalanceUpdate = func(wallet string) {
@@ -1062,7 +1062,7 @@ func TestHandleEventWithInvalidChannel(t *testing.T) {
 		custody, _, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		_, mockEvent := createMockResizedEvent(t, 500000)
+		_, mockEvent := createMockResizedEvent(t, big.NewInt(500000))
 
 		logger := custody.logger.With("event", "Resized")
 		// Should not panic when channel doesn't exist

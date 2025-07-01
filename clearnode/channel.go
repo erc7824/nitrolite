@@ -21,11 +21,12 @@ var (
 
 // Channel represents a state channel between participants
 type Channel struct {
-	ChannelID   string          `gorm:"column:channel_id;primaryKey;"`
-	ChainID     uint32          `gorm:"column:chain_id;not null"`
-	Token       string          `gorm:"column:token;not null"`
-	Wallet      string          `gorm:"column:wallet;not null"`
-	Participant string          `gorm:"column:participant;not null"`
+	ChannelID   string `gorm:"column:channel_id;primaryKey;"`
+	ChainID     uint32 `gorm:"column:chain_id;not null"`
+	Token       string `gorm:"column:token;not null"`
+	Wallet      string `gorm:"column:wallet;not null"`
+	Participant string `gorm:"column:participant;not null"`
+	// type:varchar(78) is set for sqlite to address the issue of not supporting big decimals
 	Amount      decimal.Decimal `gorm:"column:amount;type:varchar(78);not null"`
 	Status      ChannelStatus   `gorm:"column:status;not null;"`
 	Challenge   uint64          `gorm:"column:challenge;default:0"`

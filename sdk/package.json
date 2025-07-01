@@ -32,7 +32,7 @@
         "test:integration:coverage": "jest --config jest.integration.config.js --coverage",
         "test:nonregression": "npm run test:integration",
         "test:all": "npm run test && npm run test:integration",
-        "prepublishOnly": "npm run clean && npm run validate && npm run build:prod"
+        "prepublishOnly": "npm run clean && npm run build:prod"
     },
     "keywords": [
         "erc7824",

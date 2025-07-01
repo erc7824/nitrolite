@@ -22,6 +22,8 @@ jobs:
   build-and-publish-sdk:
     name: Build and Publish (SDK)
     uses: ./.github/workflows/publish-sdk.yml
+    secrets:
+      npm-token: ${{ secrets.NPM_TOKEN }}
 
   test-sdk:
     name: Test (SDK)

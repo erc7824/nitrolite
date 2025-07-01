@@ -2,32 +2,21 @@ name: Publish SDK
 
 on:
   workflow_call:
+    secrets:
+      npm-token:
+        description: 'NPM token for publishing the SDK'
+        required: true
 
 jobs:
   publish:
+    name: Publish SDK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: 'sdk/package.json'
-          cache: npm
-          cache-dependency-path: | 
-            **/package-lock.json 
-
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            **/node_modules
-          key: ${{ runner.os }}-deps-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-deps-
+          submodules: recursive
 
       - name: Check if version changed
         id: version-check
@@ -49,19 +38,46 @@ jobs:
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Setup Node.js
+        if: steps.version-check.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'sdk/package.json'
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+          cache-dependency-path: | 
+            **/package-lock.json 
+
+      - name: Cache dependencies
+        if: steps.version-check.outputs.changed == 'true'
+        uses: actions/cache@v3
+        with:
+          path: |
+            **/node_modules
+          key: ${{ runner.os }}-deps-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-
+
+      - name: Install Foundry
+        if: steps.version-check.outputs.changed == 'true'
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v0.3.0
+
+      - name: Run Forge build
+        if: steps.version-check.outputs.changed == 'true'
+        working-directory: ./contract
+        run: forge build
+
       - name: Install dependencies
         if: steps.version-check.outputs.changed == 'true'
         working-directory: ./sdk
         run: npm ci
 
-      - name: Build for publish
+      - name: Build & Publish SDK
         if: steps.version-check.outputs.changed == 'true'
         working-directory: ./sdk
-        run: npm run prepublishOnly
-
-      - name: Publish to npm
-        if: steps.version-check.outputs.changed == 'true'
-        working-directory: ./sdk
-        run: npm publish
+        run: npm publish --tag aplha --access public
+        # run: npm publish --tag latest --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.npm-token }}

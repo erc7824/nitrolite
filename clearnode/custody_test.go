@@ -107,7 +107,7 @@ func createMockLog(eventID common.Hash) types.Log {
 	}
 }
 
-func createMockCreatedEvent(t *testing.T, signer *Signer, token string, amount int64) (*types.Log, *nitrolite.CustodyCreated) {
+func createMockCreatedEvent(t *testing.T, signer *Signer, token string, amount *big.Int) (*types.Log, *nitrolite.CustodyCreated) {
 	t.Helper()
 
 	channelID := [32]byte{1, 2, 3, 4}
@@ -125,7 +125,7 @@ func createMockCreatedEvent(t *testing.T, signer *Signer, token string, amount i
 		{
 			Destination: participantAddr,
 			Token:       common.HexToAddress(token),
-			Amount:      big.NewInt(amount),
+			Amount:      amount,
 		},
 		{
 			Destination: signer.GetAddress(),
@@ -169,7 +169,7 @@ func createMockJoinedEvent(t *testing.T) (*types.Log, *nitrolite.CustodyJoined) 
 	return &log, event
 }
 
-func createMockClosedEvent(t *testing.T, signer *Signer, token string, amount int64) (*types.Log, *nitrolite.CustodyClosed) {
+func createMockClosedEvent(t *testing.T, signer *Signer, token string, amount *big.Int) (*types.Log, *nitrolite.CustodyClosed) {
 	t.Helper()
 
 	channelID := [32]byte{1, 2, 3, 4}
@@ -179,7 +179,7 @@ func createMockClosedEvent(t *testing.T, signer *Signer, token string, amount in
 		{
 			Destination: participantAddr,
 			Token:       common.HexToAddress(token),
-			Amount:      big.NewInt(amount),
+			Amount:      amount,
 		},
 		{
 			Destination: signer.GetAddress(),
@@ -206,7 +206,7 @@ func createMockClosedEvent(t *testing.T, signer *Signer, token string, amount in
 	return &log, event
 }
 
-func createMockChallengedEvent(t *testing.T, signer *Signer, token string, amount int64) (*types.Log, *nitrolite.CustodyChallenged) {
+func createMockChallengedEvent(t *testing.T, signer *Signer, token string, amount *big.Int) (*types.Log, *nitrolite.CustodyChallenged) {
 	t.Helper()
 
 	channelID := [32]byte{1, 2, 3, 4}
@@ -216,7 +216,7 @@ func createMockChallengedEvent(t *testing.T, signer *Signer, token string, amoun
 		{
 			Destination: participantAddr,
 			Token:       common.HexToAddress(token),
-			Amount:      big.NewInt(amount),
+			Amount:      amount,
 		},
 		{
 			Destination: signer.GetAddress(),
@@ -536,7 +536,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		defer cleanup()
 
 		initialAmount := decimal.NewFromInt(1000000)
-		finalAmount := int64(500000)
+		finalAmount := big.NewInt(500000)
 
 		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
 		channelAccountID := NewAccountID(channelID)
@@ -647,7 +647,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		defer cleanup()
 
 		initialAmount := decimal.NewFromInt(1000000)
-		finalAmount := int64(1000000)
+		finalAmount := big.NewInt(1000000)
 
 		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
 		channelAccountID := NewAccountID(channelID)
@@ -755,7 +755,7 @@ func TestHandleChallengedEvent(t *testing.T) {
 		err := db.Create(&initialChannel).Error
 		require.NoError(t, err)
 
-		_, mockEvent := createMockChallengedEvent(t, custody.signer, tokenAddress, amount.BigInt().Int64())
+		_, mockEvent := createMockChallengedEvent(t, custody.signer, tokenAddress, amount.BigInt())
 
 		var channelUpdateCalled bool
 		var capturedChannel Channel
@@ -1040,7 +1040,7 @@ func TestHandleEventWithInvalidChannel(t *testing.T) {
 		custody, _, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, 500000)
+		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, big.NewInt(500000))
 
 		logger := custody.logger.With("event", "Closed")
 		// Should not panic when channel doesn't exist
@@ -1051,7 +1051,7 @@ func TestHandleEventWithInvalidChannel(t *testing.T) {
 		custody, _, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		_, mockEvent := createMockChallengedEvent(t, custody.signer, tokenAddress, 500000)
+		_, mockEvent := createMockChallengedEvent(t, custody.signer, tokenAddress, big.NewInt(500000))
 
 		logger := custody.logger.With("event", "Challenged")
 		// Should not panic when channel doesn't exist

@@ -3,11 +3,15 @@ package main
 import (
 	"math/big"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // SendBalanceUpdate sends balance updates to the client
 func (r *RPCRouter) SendBalanceUpdate(sender string) {
-	balances, err := GetWalletLedger(r.DB, sender).GetBalances(sender)
+	senderAddress := common.HexToAddress(sender)
+	senderAccountID := NewAccountID(sender)
+	balances, err := GetWalletLedger(r.DB, senderAddress).GetBalances(senderAccountID)
 	if err != nil {
 		r.lg.Error("error getting balances", "sender", sender, "error", err)
 		return

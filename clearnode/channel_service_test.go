@@ -19,7 +19,8 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		// Create asset
 		asset := Asset{Token: "0xTokenResize", ChainID: 137, Symbol: "usdc", Decimals: 6}
@@ -29,8 +30,8 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		initialAmount := uint64(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResize",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -40,11 +41,11 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		// Fund participant ledger with 1500 USDC (enough for resize)
-		ledger := GetWalletLedger(db, addr)
-		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(1500)))
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(1500)))
 
 		// Verify initial balance
-		initialBalance, err := ledger.Balance(addr, "usdc")
+		initialBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(1500), initialBalance)
 
@@ -52,10 +53,10 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(200),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{
-			addr: {},
+			userAddress.Hex(): {},
 		}
 
 		response, err := service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
@@ -78,7 +79,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
-		finalBalance, err := ledger.Balance(addr, "usdc")
+		finalBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(1500), finalBalance) // Should remain unchanged
 	})
@@ -90,7 +91,8 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		asset := Asset{Token: "0xTokenResize2", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
@@ -98,8 +100,8 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		initialAmount := uint64(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResize2",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -108,17 +110,17 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
-		ledger := GetWalletLedger(db, addr)
-		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromInt(500)))
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(500)))
 
 		service := NewChannelService(db, &signer)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(-300),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{
-			addr: {},
+			userAddress.Hex(): {},
 		}
 
 		response, err := service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
@@ -129,7 +131,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		assert.Equal(t, 0, response.Allocations[0].Amount.Cmp(expected), "Decreased amount mismatch")
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
-		finalBalance, err := ledger.Balance(addr, "usdc")
+		finalBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(500), finalBalance) // Should remain unchanged
 	})
@@ -141,15 +143,15 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
 
 		service := NewChannelService(db, &signer)
 		params := &ResizeChannelParams{
 			ChannelID:        "0xNonExistentChannel",
 			AllocateAmount:   big.NewInt(100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
-		rpcSigners := map[string]struct{}{addr: {}}
+		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
 
 		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
@@ -163,15 +165,15 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
 
 		asset := Asset{Token: "0xTokenClosed", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		ch := Channel{
 			ChannelID:   "0xChanClosed",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusClosed,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -184,9 +186,9 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
-		rpcSigners := map[string]struct{}{addr: {}}
+		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
 
 		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
@@ -200,15 +202,15 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
 
 		asset := Asset{Token: "0xTokenJoining", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		ch := Channel{
 			ChannelID:   "0xChanJoining",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusJoining,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -221,9 +223,9 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
-		rpcSigners := map[string]struct{}{addr: {}}
+		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
 
 		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
@@ -237,15 +239,15 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
 
 		asset := Asset{Token: "0xToken", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		require.NoError(t, db.Create(&Channel{
 			ChannelID:   "0xChanChallenged",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusChallenged,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -255,8 +257,8 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 
 		ch := Channel{
 			ChannelID:   "0xChan",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -269,9 +271,9 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
-		rpcSigners := map[string]struct{}{addr: {}}
+		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
 
 		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
@@ -285,15 +287,16 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		asset := Asset{Token: "0xTokenInsufficient", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		ch := Channel{
 			ChannelID:   "0xChanInsufficient",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -304,16 +307,16 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 
 		// Fund with very small amount (0.000001 USDC), but try to allocate 200 raw units
 		// This will create insufficient balance when converted to raw units
-		ledger := GetWalletLedger(db, addr)
-		require.NoError(t, ledger.Record(addr, "usdc", decimal.NewFromFloat(0.000001)))
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromFloat(0.000001)))
 
 		service := NewChannelService(db, &signer)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(200),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
-		rpcSigners := map[string]struct{}{addr: {}}
+		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
 
 		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
 		require.Error(t, err)
@@ -327,15 +330,15 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
 
 		asset := Asset{Token: "0xTokenSig", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
 		ch := Channel{
 			ChannelID:   "0xChanSig",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -348,7 +351,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
 			AllocateAmount:   big.NewInt(100),
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{} // Empty signers
 
@@ -366,7 +369,8 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		// Create asset
 		asset := Asset{Token: "0xTokenClose", ChainID: 137, Symbol: "usdc", Decimals: 6}
@@ -376,8 +380,8 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		initialAmount := uint64(500)
 		ch := Channel{
 			ChannelID:   "0xChanClose",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -387,8 +391,8 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		// Fund participant ledger so that raw units match channel.Amount
-		require.NoError(t, GetWalletLedger(db, addr).Record(
-			addr,
+		require.NoError(t, GetWalletLedger(db, userAddress).Record(
+			userAccountID,
 			"usdc",
 			decimal.NewFromBigInt(big.NewInt(int64(initialAmount)), -int32(asset.Decimals)),
 		))
@@ -396,10 +400,10 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		service := NewChannelService(db, &signer)
 		params := &CloseChannelParams{
 			ChannelID:        ch.ChannelID,
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{
-			addr: {},
+			userAddress.Hex(): {},
 		}
 
 		response, err := service.RequestClose(LoggerFromContext(context.Background()), params, rpcSigners)
@@ -421,7 +425,8 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		signer := Signer{privateKey: rawKey}
-		addr := signer.GetAddress().Hex()
+		userAddress := signer.GetAddress()
+		userAccountID := NewAccountID(userAddress.Hex())
 
 		// Create asset
 		asset := Asset{Token: "0xTokenClose", ChainID: 137, Symbol: "usdc", Decimals: 6}
@@ -433,8 +438,8 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		// Seed other challenged channel
 		require.NoError(t, db.Create(&Channel{
 			ChannelID:   "0xChanChallenged",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusChallenged,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -444,8 +449,8 @@ func TestChannelService_CloseChannel(t *testing.T) {
 
 		ch := Channel{
 			ChannelID:   "0xChanClose",
-			Participant: addr,
-			Wallet:      addr,
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
@@ -455,8 +460,8 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		// Fund participant ledger so that raw units match channel.Amount
-		require.NoError(t, GetWalletLedger(db, addr).Record(
-			addr,
+		require.NoError(t, GetWalletLedger(db, userAddress).Record(
+			userAccountID,
 			"usdc",
 			decimal.NewFromBigInt(big.NewInt(int64(initialAmount)), -int32(asset.Decimals)),
 		))
@@ -464,10 +469,10 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		service := NewChannelService(db, &signer)
 		params := &CloseChannelParams{
 			ChannelID:        ch.ChannelID,
-			FundsDestination: addr,
+			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{
-			addr: {},
+			userAddress.Hex(): {},
 		}
 
 		_, err = service.RequestClose(LoggerFromContext(context.Background()), params, rpcSigners)

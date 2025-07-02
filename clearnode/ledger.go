@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -25,18 +26,34 @@ func (Entry) TableName() string {
 }
 
 type WalletLedger struct {
-	wallet string
+	wallet common.Address
 	db     *gorm.DB
 }
 
-func GetWalletLedger(db *gorm.DB, wallet string) *WalletLedger {
+// AccountID represents a unique identifier for an account, which can be a wallet or an application session.
+// Main reason for creating this type is to ensure the address format is consistent ( e.g., no downcase conversion).
+type AccountID string
+
+func NewAccountID(accountID string) AccountID {
+	if !common.IsHexAddress(accountID) {
+		return AccountID(accountID)
+	}
+
+	return AccountID(common.HexToAddress(accountID).Hex())
+}
+
+func (a AccountID) String() string {
+	return string(a)
+}
+
+func GetWalletLedger(db *gorm.DB, wallet common.Address) *WalletLedger {
 	return &WalletLedger{wallet: wallet, db: db}
 }
 
-func (l *WalletLedger) Record(accountID string, assetSymbol string, amount decimal.Decimal) error {
+func (l *WalletLedger) Record(accountID AccountID, assetSymbol string, amount decimal.Decimal) error {
 	entry := &Entry{
-		AccountID:   accountID,
-		Wallet:      l.wallet,
+		AccountID:   accountID.String(),
+		Wallet:      l.wallet.Hex(),
 		AssetSymbol: assetSymbol,
 		Credit:      decimal.Zero,
 		Debit:       decimal.Zero,
@@ -55,13 +72,13 @@ func (l *WalletLedger) Record(accountID string, assetSymbol string, amount decim
 	return l.db.Create(entry).Error
 }
 
-func (l *WalletLedger) Balance(accountID string, assetSymbol string) (decimal.Decimal, error) {
+func (l *WalletLedger) Balance(accountID AccountID, assetSymbol string) (decimal.Decimal, error) {
 	type result struct {
 		Balance decimal.Decimal `gorm:"column:balance"`
 	}
 	var res result
 	if err := l.db.Model(&Entry{}).
-		Where("account_id = ? AND asset_symbol = ? AND wallet = ?", accountID, assetSymbol, l.wallet).
+		Where("account_id = ? AND asset_symbol = ? AND wallet = ?", accountID.String(), assetSymbol, l.wallet.Hex()).
 		Select("COALESCE(SUM(credit),0) - COALESCE(SUM(debit),0) AS balance").
 		Scan(&res).Error; err != nil {
 		return decimal.Zero, err
@@ -69,7 +86,7 @@ func (l *WalletLedger) Balance(accountID string, assetSymbol string) (decimal.De
 	return res.Balance, nil
 }
 
-func (l *WalletLedger) GetBalances(accountID string) ([]Balance, error) {
+func (l *WalletLedger) GetBalances(accountID AccountID) ([]Balance, error) {
 	type row struct {
 		Asset   string          `gorm:"column:asset_symbol"`
 		Balance decimal.Decimal `gorm:"column:balance"`
@@ -78,7 +95,7 @@ func (l *WalletLedger) GetBalances(accountID string) ([]Balance, error) {
 	var rows []row
 	if err := l.db.
 		Model(&Entry{}).
-		Where("account_id = ? AND wallet = ?", accountID, l.wallet).
+		Where("account_id = ? AND wallet = ?", accountID.String(), l.wallet.Hex()).
 		Select("asset_symbol", "COALESCE(SUM(credit),0) - COALESCE(SUM(debit),0) AS balance").
 		Group("asset_symbol").
 		Scan(&rows).Error; err != nil {
@@ -95,16 +112,17 @@ func (l *WalletLedger) GetBalances(accountID string) ([]Balance, error) {
 	return balances, nil
 }
 
-func (l *WalletLedger) GetEntries(accountID, assetSymbol string) ([]Entry, error) {
+func (l *WalletLedger) GetEntries(accountID *AccountID, assetSymbol string) ([]Entry, error) {
 	var entries []Entry
 	q := l.db.Model(&Entry{})
 
-	if accountID != "" {
-		q = q.Where("account_id = ?", accountID)
+	if accountID != nil && accountID.String() != "" {
+		q = q.Where("account_id = ?", accountID.String())
 	}
 
-	if l.wallet != "" {
-		q = q.Where("wallet = ?", l.wallet)
+	// TODO: design a better way to handle the case when wallet is not set
+	if l.wallet.Hex() != common.HexToAddress("").Hex() {
+		q = q.Where("wallet = ?", l.wallet.Hex())
 	}
 
 	if assetSymbol != "" {
@@ -117,7 +135,7 @@ func (l *WalletLedger) GetEntries(accountID, assetSymbol string) ([]Entry, error
 	return entries, nil
 }
 
-func getAppSessionBalances(tx *gorm.DB, appSessionID string) (map[string]decimal.Decimal, error) {
+func getAppSessionBalances(tx *gorm.DB, appSessionID AccountID) (map[string]decimal.Decimal, error) {
 	type row struct {
 		Asset   string          `gorm:"column:asset_symbol"`
 		Balance decimal.Decimal `gorm:"column:balance"`
@@ -126,7 +144,7 @@ func getAppSessionBalances(tx *gorm.DB, appSessionID string) (map[string]decimal
 	var rows []row
 	if err := tx.
 		Model(&Entry{}).
-		Where("account_id = ?", appSessionID).
+		Where("account_id = ?", appSessionID.String()).
 		Select("asset_symbol", "COALESCE(SUM(credit),0) - COALESCE(SUM(debit),0) AS balance").
 		Group("asset_symbol").
 		Scan(&rows).Error; err != nil {

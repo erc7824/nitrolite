@@ -831,8 +831,8 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 				assetCounts := map[string]int{}
 				for _, entry := range entries {
 					assetCounts[entry.Asset]++
-					assert.Equal(t, participant1, entry.AccountID, "Should return correct account_id")
-					assert.Equal(t, participant1, entry.Participant, "Should return entries for participant1")
+					assert.Equal(t, participant1.Hex(), entry.AccountID, "Should return correct account_id")
+					assert.Equal(t, participant1.Hex(), entry.Participant, "Should return entries for participant1")
 				}
 				assert.Equal(t, 3, assetCounts["usdc"], "Should have 3 USDC entries")
 				assert.Equal(t, 2, assetCounts["eth"], "Should have 2 ETH entries")
@@ -845,8 +845,8 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 			validateFunc: func(t *testing.T, entries []LedgerEntryResponse) {
 				for _, entry := range entries {
 					assert.Equal(t, "usdc", entry.Asset)
-					assert.Equal(t, participant1, entry.AccountID, "Should return correct account_id")
-					assert.Equal(t, participant1, entry.Participant, "Should return entries for participant1")
+					assert.Equal(t, participant1.Hex(), entry.AccountID, "Should return correct account_id")
+					assert.Equal(t, participant1.Hex(), entry.Participant, "Should return entries for participant1")
 				}
 			},
 		},
@@ -856,7 +856,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 			expectedCount: 2,
 			validateFunc: func(t *testing.T, entries []LedgerEntryResponse) {
 				for _, entry := range entries {
-					assert.Equal(t, participant2, entry.Participant, "Should return entries for participant2")
+					assert.Equal(t, participant2.Hex(), entry.Participant, "Should return entries for participant2")
 				}
 			},
 		},
@@ -866,7 +866,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 			expectedCount: 1,
 			validateFunc: func(t *testing.T, entries []LedgerEntryResponse) {
 				assert.Equal(t, "usdc", entries[0].Asset)
-				assert.Equal(t, participant2, entries[0].Participant)
+				assert.Equal(t, participant2.Hex(), entries[0].Participant)
 			},
 		},
 		{
@@ -895,7 +895,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 			expectedCount: 5,
 			validateFunc: func(t *testing.T, entries []LedgerEntryResponse) {
 				for _, entry := range entries {
-					assert.Equal(t, participant1, entry.Participant, "Should return entries for default wallet participant1")
+					assert.Equal(t, participant1.Hex(), entry.Participant, "Should return entries for default wallet participant1")
 				}
 			},
 		},

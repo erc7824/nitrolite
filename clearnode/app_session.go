@@ -1,12 +1,9 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"time"
 
 	"github.com/lib/pq"
-	"gorm.io/gorm"
 )
 
 // AppSession represents a virtual payment application session between participants
@@ -27,35 +24,4 @@ type AppSession struct {
 
 func (AppSession) TableName() string {
 	return "app_sessions"
-}
-
-// TODO: add ListOptions as parameter and move back to session service
-// getAppSessions finds all app sessions
-// If participantWallet is specified, it returns only sessions for that participant
-// If participantWallet is empty, it returns all sessions
-func getAppSessions(tx *gorm.DB, participantWallet string, status string) ([]AppSession, error) {
-	var sessions []AppSession
-	query := tx.WithContext(context.TODO())
-
-	if participantWallet != "" {
-		switch tx.Dialector.Name() {
-		case "postgres":
-			query = query.Where("? = ANY(participants)", participantWallet)
-		case "sqlite":
-			query = query.Where("instr(participants, ?) > 0", participantWallet)
-		default:
-			return nil, fmt.Errorf("unsupported database driver: %s", tx.Dialector.Name())
-		}
-	}
-
-	if status != "" {
-		query = query.Where("status = ?", status)
-	}
-
-	query = query.Order("updated_at DESC")
-	if err := query.Find(&sessions).Error; err != nil {
-		return nil, err
-	}
-
-	return sessions, nil
 }

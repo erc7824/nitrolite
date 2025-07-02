@@ -218,8 +218,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 		return
 	}
 
-	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
-	sessions, err := getAppSessions(query, params.Participant, params.Status)
+	sessions, err := r.AppSessionService.GetAppSessions(params.Participant, params.Status, &params.ListOptions)
 	if err != nil {
 		logger.Error("failed to get application sessions", "error", err)
 		c.Fail("failed to get application sessions")

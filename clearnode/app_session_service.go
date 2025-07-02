@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -217,6 +218,36 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 	}
 
 	return newVersion, nil
+}
+
+// getAppSessions finds all app sessions
+// If participantWallet is specified, it returns only sessions for that participant
+// If participantWallet is empty, it returns all sessions
+func (s *AppSessionService) GetAppSessions(participantWallet string, status string, options *ListOptions) ([]AppSession, error) {
+	var sessions []AppSession
+	query := s.db.WithContext(context.TODO())
+	query = applyListOptions(query, "updated_at", SortTypeDescending, options)
+
+	if participantWallet != "" {
+		switch s.db.Dialector.Name() {
+		case "postgres":
+			query = query.Where("? = ANY(participants)", participantWallet)
+		case "sqlite":
+			query = query.Where("instr(participants, ?) > 0", participantWallet)
+		default:
+			return nil, fmt.Errorf("unsupported database driver: %s", s.db.Dialector.Name())
+		}
+	}
+
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	if err := query.Find(&sessions).Error; err != nil {
+		return nil, err
+	}
+
+	return sessions, nil
 }
 
 // verifyQuorum loads an open AppSession, verifies signatures meet quorum

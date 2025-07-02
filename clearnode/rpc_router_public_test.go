@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -674,7 +675,7 @@ func TestRPCRouterHandleGetAppSessions_Pagination(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
 	defer cleanup()
 
-	baseTime := time.Now().Add(-24 * time.Hour)
+	baseTime := time.Now()
 
 	sessionIDs := []string{
 		"0xSession11", "0xSession10", "0xSession09",
@@ -684,21 +685,23 @@ func TestRPCRouterHandleGetAppSessions_Pagination(t *testing.T) {
 	}
 
 	testSessions := []AppSession{
-		{Nonce: 11, ParticipantWallets: []string{"0xParticipant11"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(10 * time.Hour)},
-		{Nonce: 10, ParticipantWallets: []string{"0xParticipant10"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(9 * time.Hour)},
-		{Nonce: 9, ParticipantWallets: []string{"0xParticipant9"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(8 * time.Hour)},
-		{Nonce: 8, ParticipantWallets: []string{"0xParticipant8"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(7 * time.Hour)},
-		{Nonce: 7, ParticipantWallets: []string{"0xParticipant7"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(6 * time.Hour)},
-		{Nonce: 6, ParticipantWallets: []string{"0xParticipant6"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(5 * time.Hour)},
-		{Nonce: 5, ParticipantWallets: []string{"0xParticipant5"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(4 * time.Hour)},
-		{Nonce: 4, ParticipantWallets: []string{"0xParticipant4"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(3 * time.Hour)},
-		{Nonce: 3, ParticipantWallets: []string{"0xParticipant3"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(2 * time.Hour)},
-		{Nonce: 2, ParticipantWallets: []string{"0xParticipant2"}, Status: ChannelStatusOpen, CreatedAt: baseTime.Add(1 * time.Hour)},
-		{Nonce: 1, ParticipantWallets: []string{"0xParticipant1"}, Status: ChannelStatusOpen, CreatedAt: baseTime},
+		{Nonce: 11, ParticipantWallets: []string{"0xParticipant11"}, Status: ChannelStatusOpen},
+		{Nonce: 10, ParticipantWallets: []string{"0xParticipant10"}, Status: ChannelStatusOpen},
+		{Nonce: 9, ParticipantWallets: []string{"0xParticipant9"}, Status: ChannelStatusOpen},
+		{Nonce: 8, ParticipantWallets: []string{"0xParticipant8"}, Status: ChannelStatusOpen},
+		{Nonce: 7, ParticipantWallets: []string{"0xParticipant7"}, Status: ChannelStatusOpen},
+		{Nonce: 6, ParticipantWallets: []string{"0xParticipant6"}, Status: ChannelStatusOpen},
+		{Nonce: 5, ParticipantWallets: []string{"0xParticipant5"}, Status: ChannelStatusOpen},
+		{Nonce: 4, ParticipantWallets: []string{"0xParticipant4"}, Status: ChannelStatusOpen},
+		{Nonce: 3, ParticipantWallets: []string{"0xParticipant3"}, Status: ChannelStatusOpen},
+		{Nonce: 2, ParticipantWallets: []string{"0xParticipant2"}, Status: ChannelStatusOpen},
+		{Nonce: 1, ParticipantWallets: []string{"0xParticipant1"}, Status: ChannelStatusOpen},
 	}
 
 	for i := range testSessions {
 		testSessions[i].SessionID = sessionIDs[i]
+		testSessions[i].UpdatedAt = baseTime.Add(-time.Duration(i) * time.Hour)
+		testSessions[i].CreatedAt = testSessions[i].UpdatedAt
 	}
 
 	for _, session := range testSessions {
@@ -764,9 +767,11 @@ func TestRPCRouterHandleGetAppSessions_Pagination(t *testing.T) {
 			require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
 			assert.Len(t, responseSessions, len(tc.expectedSessionIDs), "Should return expected number of sessions")
 
+			fmt.Println("Response Sessions:", responseSessions)
+
 			// Check session IDs are in expected order
 			for idx, session := range responseSessions {
-				assert.True(t, session.AppSessionID == tc.expectedSessionIDs[idx], "Should include session %s", tc.expectedSessionIDs[idx])
+				assert.True(t, session.AppSessionID == tc.expectedSessionIDs[idx], "Retrieved %d-th session ID should be equal %s", idx, tc.expectedSessionIDs[idx])
 			}
 		})
 	}

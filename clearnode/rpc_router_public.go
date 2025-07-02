@@ -62,7 +62,7 @@ type LedgerEntryResponse struct {
 }
 
 type GetLedgerTransactionsParams struct {
-	// Pagination will be added with another PR
+	ListOptions
 	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter transactions
 	Asset     string `json:"asset,omitempty"`      // Optional asset to filter transactions
 	TxType    string `json:"tx_type,omitempty"`    // Optional transaction type to filter transactions
@@ -333,7 +333,8 @@ func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
 		txType = &parsedType
 	}
 
-	transactions, err := GetLedgerTransactions(r.DB, params.AccountID, params.Asset, txType)
+	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
+	transactions, err := GetLedgerTransactions(query, params.AccountID, params.Asset, txType)
 	if err != nil {
 		logger.Error("failed to get transactions", "error", err)
 		c.Fail("failed to get transactions")

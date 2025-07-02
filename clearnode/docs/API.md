@@ -478,7 +478,9 @@ Supports pagination and sorting.
 ### Get Transactions
 
 Retrieves ledger transaction history with optional filtering by asset and transaction type. This endpoint provides a view of transactions where the specified account appears as either the sender or receiver.
-Pagination is going to be added soon.
+Supports pagination and sorting.
+
+> Sorted descending by `created_at` by default.
 
 **Available Transaction Types:**
 - `transfer`: Direct transfers between unified accounts
@@ -495,6 +497,22 @@ Pagination is going to be added soon.
     "account_id": "0x1234567890abcdef...",
     "asset": "usdc",     // Optional: filter by asset
     "tx_type": "transfer" // Optional: filter by transaction type
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Request with filtering, pagination, and sorting:**
+
+```json
+{
+  "req": [1, "get_ledger_transactions", [{
+    "account_id": "0x1234567890abcdef...",
+    "asset": "usdc",     // Optional: filter by asset
+    "tx_type": "transfer", // Optional: filter by transaction type
+    "offset": 42, // Optional: pagination offset
+    "limit": 10, // Optional: number of transactions to return
+    "sort": "desc" // Optional: sort asc or desc by created_at
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }

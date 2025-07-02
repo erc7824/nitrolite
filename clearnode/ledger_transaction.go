@@ -107,8 +107,6 @@ func GetLedgerTransactions(tx *gorm.DB, accountID, assetSymbol string, txType *T
 		q = q.Where("tx_type = ?", txType)
 	}
 
-	q = q.Order("created_at DESC")
-
 	if err := q.Find(&transactions).Error; err != nil {
 		return nil, err
 	}

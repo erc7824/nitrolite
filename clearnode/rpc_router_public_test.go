@@ -1267,3 +1267,153 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 		assert.Equal(t, ErrInvalidTransactionType.Error(), errorMsg, "Should return correct error message")
 	})
 }
+
+func TestRPCRouterHandleGetLedgerTransactions_Pagination(t *testing.T) {
+	router, cleanup := setupTestRPCRouter(t)
+	defer cleanup()
+
+	account1 := "0xAccount1"
+	account2 := "0xAccount2"
+	account3 := "0xAccount3"
+
+	// Create 11 test transactions for pagination testing
+	testTransactions := []LedgerTransaction{
+		{Type: TransactionTypeTransfer, FromAccount: account1, ToAccount: account2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100), CreatedAt: time.Now().Add(-10 * time.Hour)},
+		{Type: TransactionTypeDeposit, FromAccount: account2, ToAccount: account1, AssetSymbol: "usdc", Amount: decimal.NewFromInt(50), CreatedAt: time.Now().Add(-9 * time.Hour)},
+		{Type: TransactionTypeTransfer, FromAccount: account1, ToAccount: account3, AssetSymbol: "eth", Amount: decimal.NewFromFloat(1.5), CreatedAt: time.Now().Add(-8 * time.Hour)},
+		{Type: TransactionTypeWithdrawal, FromAccount: account3, ToAccount: account2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(25), CreatedAt: time.Now().Add(-7 * time.Hour)},
+		{Type: TransactionTypeTransfer, FromAccount: account2, ToAccount: account1, AssetSymbol: "usdc", Amount: decimal.NewFromInt(75), CreatedAt: time.Now().Add(-6 * time.Hour)},
+		{Type: TransactionTypeDeposit, FromAccount: account1, ToAccount: account3, AssetSymbol: "eth", Amount: decimal.NewFromFloat(0.5), CreatedAt: time.Now().Add(-5 * time.Hour)},
+		{Type: TransactionTypeTransfer, FromAccount: account3, ToAccount: account2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(30), CreatedAt: time.Now().Add(-4 * time.Hour)},
+		{Type: TransactionTypeWithdrawal, FromAccount: account2, ToAccount: account1, AssetSymbol: "eth", Amount: decimal.NewFromFloat(0.2), CreatedAt: time.Now().Add(-3 * time.Hour)},
+		{Type: TransactionTypeTransfer, FromAccount: account1, ToAccount: account2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(60), CreatedAt: time.Now().Add(-2 * time.Hour)},
+		{Type: TransactionTypeDeposit, FromAccount: account2, ToAccount: account3, AssetSymbol: "usdc", Amount: decimal.NewFromInt(40), CreatedAt: time.Now().Add(-1 * time.Hour)},
+		{Type: TransactionTypeTransfer, FromAccount: account3, ToAccount: account1, AssetSymbol: "eth", Amount: decimal.NewFromFloat(0.1), CreatedAt: time.Now()},
+	}
+
+	// Insert all test transactions
+	for _, tx := range testTransactions {
+		tempTx := tx
+		require.NoError(t, router.DB.Create(&tempTx).Error)
+	}
+
+	// Expected order: most recent first (descending by created_at)
+	expectedHashes := make([]string, 11)
+	for i := 0; i < 11; i++ {
+		var tx LedgerTransaction
+		require.NoError(t, router.DB.Where("created_at = ?", testTransactions[10-i].CreatedAt).First(&tx).Error)
+		expectedHashes[i] = tx.Hash
+	}
+
+	tcs := []struct {
+		name          string
+		params        map[string]interface{}
+		expectedCount int
+		expectedFirst string
+		expectedLast  string
+	}{
+		{
+			name:          "No params (default pagination)",
+			params:        map[string]interface{}{},
+			expectedCount: 10, // Default limit should be 10
+			expectedFirst: expectedHashes[0],
+			expectedLast:  expectedHashes[9],
+		},
+		{
+			name:          "Offset only",
+			params:        map[string]interface{}{"offset": float64(2)},
+			expectedCount: 9, // Skip first 2, get remaining 9
+			expectedFirst: expectedHashes[2],
+			expectedLast:  expectedHashes[10],
+		},
+		{
+			name:          "Limit only",
+			params:        map[string]interface{}{"limit": float64(5)},
+			expectedCount: 5, // Get first 5
+			expectedFirst: expectedHashes[0],
+			expectedLast:  expectedHashes[4],
+		},
+		{
+			name:          "Offset and limit",
+			params:        map[string]interface{}{"offset": float64(3), "limit": float64(4)},
+			expectedCount: 4, // Skip 3, take 4
+			expectedFirst: expectedHashes[3],
+			expectedLast:  expectedHashes[6],
+		},
+		{
+			name:          "Pagination with sort asc",
+			params:        map[string]interface{}{"offset": float64(1), "limit": float64(3), "sort": "asc"},
+			expectedCount: 3, // Ascending order, skip 1, take 3
+			expectedFirst: expectedHashes[9], // 2nd oldest
+			expectedLast:  expectedHashes[7],  // 4th oldest
+		},
+		{
+			name:          "Pagination with asset filter",
+			params:        map[string]interface{}{"asset": "usdc", "limit": float64(3)},
+			expectedCount: 3, // Only USDC transactions, first 3
+		},
+		{
+			name:          "Pagination with account filter",
+			params:        map[string]interface{}{"account_id": account1, "limit": float64(4)},
+			expectedCount: 4, // Only transactions involving account1, first 4
+		},
+	}
+
+	for idx, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			paramsJSON, err := json.Marshal(tc.params)
+			require.NoError(t, err)
+
+			c := &RPCContext{
+				Context: context.TODO(),
+				Message: RPCMessage{
+					Req: &RPCData{
+						RequestID: uint64(idx + 100),
+						Method:    "get_ledger_transactions",
+						Params:    []any{json.RawMessage(paramsJSON)},
+						Timestamp: uint64(time.Now().Unix()),
+					},
+				},
+			}
+
+			// Call handler
+			router.HandleGetLedgerTransactions(c)
+			res := c.Message.Res
+			require.NotNil(t, res)
+
+			assert.Equal(t, "get_ledger_transactions", res.Method)
+			require.Len(t, res.Params, 1, "Response should contain an array of TransactionResponse")
+
+			var transactions []TransactionResponse
+			respBytes, err := json.Marshal(res.Params[0])
+			require.NoError(t, err)
+			err = json.Unmarshal(respBytes, &transactions)
+			require.NoError(t, err)
+
+			assert.Len(t, transactions, tc.expectedCount, "Should return expected number of transactions")
+
+			// For non-filter tests, verify order
+			if tc.expectedFirst != "" && tc.expectedLast != "" && len(transactions) > 0 {
+				assert.Equal(t, tc.expectedFirst, transactions[0].TxHash, "First transaction hash should match")
+				if len(transactions) > 1 {
+					assert.Equal(t, tc.expectedLast, transactions[len(transactions)-1].TxHash, "Last transaction hash should match")
+				}
+			}
+
+			// Verify transactions are properly sorted by created_at
+			if len(transactions) > 1 {
+				sortOrder := tc.params["sort"]
+				isAsc := sortOrder == "asc"
+				for i := 0; i < len(transactions)-1; i++ {
+					curr := transactions[i].CreatedAt
+					next := transactions[i+1].CreatedAt
+					if isAsc {
+						assert.True(t, curr.Before(next) || curr.Equal(next), "Transactions should be sorted ascending by created_at")
+					} else {
+						assert.True(t, curr.After(next) || curr.Equal(next), "Transactions should be sorted descending by created_at")
+					}
+				}
+			}
+		})
+	}
+}

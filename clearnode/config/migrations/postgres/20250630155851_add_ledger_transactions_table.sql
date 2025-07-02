@@ -1,0 +1,31 @@
+-- +goose Up
+-- +goose StatementBegin
+CREATE TABLE ledger_transactions (
+    id SERIAL PRIMARY KEY,
+    hash VARCHAR NOT NULL UNIQUE,
+    tx_type INTEGER NOT NULL,
+    from_account VARCHAR NOT NULL,
+    to_account VARCHAR NOT NULL,
+    asset_symbol VARCHAR NOT NULL,
+    amount DECIMAL(64,18) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Create indexes for optimal query performance
+CREATE INDEX idx_ledger_transactions_type ON ledger_transactions(tx_type);
+CREATE INDEX idx_ledger_transactions_from_account ON ledger_transactions(from_account);
+CREATE INDEX idx_ledger_transactions_to_account ON ledger_transactions(to_account);
+CREATE INDEX idx_ledger_transactions_from_to_account ON ledger_transactions(from_account, to_account);
+CREATE INDEX idx_ledger_transactions_created_at ON ledger_transactions(created_at DESC);
+CREATE INDEX idx_ledger_transactions_asset_symbol ON ledger_transactions(asset_symbol);
+
+-- Composite indexes for common query patterns
+CREATE INDEX idx_ledger_transactions_from_account_asset ON ledger_transactions(from_account, asset_symbol);
+CREATE INDEX idx_ledger_transactions_to_account_asset ON ledger_transactions(to_account, asset_symbol);
+CREATE INDEX idx_ledger_transactions_type_asset ON ledger_transactions(tx_type, asset_symbol);
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE ledger_transactions;
+-- +goose StatementEnd

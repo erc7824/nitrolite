@@ -12,7 +12,7 @@ A Channel represents a state channel between participants for token transfers, e
 - `Token` (string): Token address used in this channel
 - `Participant` (string): Address of the participant
 - `Wallet` (string): Wallet address that owns this channel (may differ from participant if using delegation)
-- `Amount` (uint64): Current amount in the channel
+- `RawAmount` (decimal): Current amount in the channel in wei
 - `Status` (enum): Current state of the channel ("joining", "open", "closed")
 - `Challenge` (uint64): Challenge period for disputes (in blocks)
 - `Nonce` (uint64): Sequence number for state updates

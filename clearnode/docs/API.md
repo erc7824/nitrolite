@@ -808,8 +808,8 @@ Adjusts the capacity of a channel.
 {
   "req": [1, "resize_channel", [{
     "channel_id": "0x4567890123abcdef...",
-    "allocate_amount": "20.0",
-    "resize_amount": "100.0",
+    "allocate_amount": "200000000", // Amount in wei.
+    "resize_amount": "1000000000", // Amount in wei.
     "funds_destination": "0x1234567890abcdef..."
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
@@ -824,6 +824,7 @@ Example:
 - User wants to deposit 75 usdc on Celo. User calls `resize_channel`, with `allocate_amount=0` and `resize_amount=75`.
 - Now user's unified balance is 100 usdc (20 on Polygon and 80 on Celo).
 - Now user wants wo withdraw all 100 usdc on Polygon. To withdraw, user must allocate 80 on this specific channel (`allocate_amount=80`), and resize it (`resize_amount=-100`). Also it is recommended to deallocate the channel on Celo (optional, but we may make this required in the future).
+- Note: all amounts are shown as examples. In your requests, you must specify these amounts in wei.
 
 **Response:**
 

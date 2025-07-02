@@ -128,7 +128,7 @@ func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) 
 			Participant: ch.Participant,
 			Status:      ch.Status,
 			Token:       ch.Token,
-			Amount:      ch.Amount.BigInt(),
+			Amount:      ch.RawAmount.BigInt(),
 			ChainID:     ch.ChainID,
 			Adjudicator: ch.Adjudicator,
 			Challenge:   ch.Challenge,

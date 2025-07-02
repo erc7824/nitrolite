@@ -21,20 +21,19 @@ var (
 
 // Channel represents a state channel between participants
 type Channel struct {
-	ChannelID   string `gorm:"column:channel_id;primaryKey;"`
-	ChainID     uint32 `gorm:"column:chain_id;not null"`
-	Token       string `gorm:"column:token;not null"`
-	Wallet      string `gorm:"column:wallet;not null"`
-	Participant string `gorm:"column:participant;not null"`
-
-	// Amount represents an Integer value of token amount as represented on the blockchain
+	ChannelID   string          `gorm:"column:channel_id;primaryKey;"`
+	ChainID     uint32          `gorm:"column:chain_id;not null"`
+	Token       string          `gorm:"column:token;not null"`
+	Wallet      string          `gorm:"column:wallet;not null"`
+	Participant string          `gorm:"column:participant;not null"`
+	RawAmount   decimal.Decimal `gorm:"column:raw_amount;type:varchar(78);not null"`
+	// RawAmount represents an Integer value of token amount (wei) as represented on the blockchain
 	// type:varchar(78) is set for sqlite to address the issue of not supporting big decimals
-	Amount      decimal.Decimal `gorm:"column:amount;type:varchar(78);not null"`
-	Status      ChannelStatus   `gorm:"column:status;not null;"`
-	Challenge   uint64          `gorm:"column:challenge;default:0"`
-	Nonce       uint64          `gorm:"column:nonce;default:0"`
-	Version     uint64          `gorm:"column:version;default:0"`
-	Adjudicator string          `gorm:"column:adjudicator;not null"`
+	Status      ChannelStatus `gorm:"column:status;not null;"`
+	Challenge   uint64        `gorm:"column:challenge;default:0"`
+	Nonce       uint64        `gorm:"column:nonce;default:0"`
+	Version     uint64        `gorm:"column:version;default:0"`
+	Adjudicator string        `gorm:"column:adjudicator;not null"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
@@ -58,7 +57,7 @@ func CreateChannel(tx *gorm.DB, channelID, wallet, participantSigner string, non
 		Adjudicator: adjudicator,
 		Challenge:   challenge,
 		Token:       tokenAddress,
-		Amount:      amount,
+		RawAmount:   amount,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}

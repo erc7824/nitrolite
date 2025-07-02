@@ -118,7 +118,10 @@ func (l *WalletLedger) GetEntries(accountID *AccountID, assetSymbol string) ([]E
 		q = q.Where("account_id = ?", accountID.String())
 	}
 
-	q = q.Where("wallet = ?", l.wallet.Hex())
+	// TODO: design a better way to handle the case when wallet is not set
+	if l.wallet.Hex() != common.HexToAddress("").Hex() {
+		q = q.Where("wallet = ?", l.wallet.Hex())
+	}
 
 	if assetSymbol != "" {
 		q = q.Where("asset_symbol = ?", assetSymbol)

@@ -247,15 +247,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Verify transactions were recorded to the database
 		var transactions []LedgerTransaction
-		err = db.Where("from_account = ? AND to_account = ?", senderAddr, recipientAddr).Find(&transactions).Error
+		err = db.Where("from_account = ? AND to_account = ?", senderAddr.Hex(), recipientAddr.Hex()).Find(&transactions).Error
 		require.NoError(t, err)
 		assert.Len(t, transactions, 2, "Should have 2 transactions recorded (one for each asset)")
 
 		// Verify transaction details
 		for _, tx := range transactions {
 			assert.Equal(t, TransactionTypeTransfer, tx.Type, "Transaction type should be transfer")
-			assert.Equal(t, senderAddr, tx.FromAccount, "From account should match")
-			assert.Equal(t, recipientAddr, tx.ToAccount, "To account should match")
+			assert.Equal(t, senderAddr.Hex(), tx.FromAccount, "From account should match")
+			assert.Equal(t, recipientAddr.Hex(), tx.ToAccount, "To account should match")
 			assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
 			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 

@@ -65,8 +65,8 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		sessionAccountID := NewAccountID(appSession.SessionID)
 
 		assert.Len(t, balanceUpdates, 2)
-		assert.Contains(t, balanceUpdates, userAddressA)
-		assert.Contains(t, balanceUpdates, userAddressB)
+		assert.Contains(t, balanceUpdates, userAddressA.Hex())
+		assert.Contains(t, balanceUpdates, userAddressB.Hex())
 
 		// Verify balances
 		balA, err := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
@@ -85,8 +85,8 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		// Verify transaction details
 		expectedTxs := map[string]decimal.Decimal{
-			addrA: decimal.NewFromInt(100),
-			addrB: decimal.NewFromInt(200),
+			userAddressA.Hex(): decimal.NewFromInt(100),
+			userAddressB.Hex(): decimal.NewFromInt(200),
 		}
 
 		assert.Equal(t, len(transactions), 2, "Expected 2 transactions to be recorded")
@@ -182,7 +182,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{userAddressA.Hex(): {}}
 
-		_, err := service.CreateApplication(params, rpcSigners)
+		_, err := service.CreateApplication(params, rpcSigners, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "negative allocation: -50 for asset usdc")
 	})
@@ -338,8 +338,8 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		assert.Equal(t, uint64(2), newVersion)
 
 		assert.Len(t, balanceUpdates, 2)
-		assert.Contains(t, balanceUpdates, addrA)
-		assert.Contains(t, balanceUpdates, addrB)
+		assert.Contains(t, balanceUpdates, userAddressA.Hex())
+		assert.Contains(t, balanceUpdates, userAddressB.Hex())
 
 		var closedSession AppSession
 		require.NoError(t, db.First(&closedSession, "session_id = ?", session.SessionID).Error)
@@ -362,8 +362,8 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 
 		// Verify transaction details
 		expectedTxs := map[string]decimal.Decimal{
-			addrA: decimal.NewFromInt(100),
-			addrB: decimal.NewFromInt(200),
+			userAddressA.Hex(): decimal.NewFromInt(100),
+			userAddressB.Hex(): decimal.NewFromInt(200),
 		}
 
 		assert.Equal(t, len(transactions), 2, "Expected 2 transactions to be recorded")
@@ -413,7 +413,12 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		newVersion, err := service.CloseApplication(params, rpcSigners)
+		var balanceUpdates []string
+		publishBalanceUpdate := func(wallet string) {
+			balanceUpdates = append(balanceUpdates, wallet)
+		}
+
+		newVersion, err := service.CloseApplication(params, rpcSigners, publishBalanceUpdate)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), newVersion)
 
@@ -429,6 +434,8 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		walletBalA, err := ledgerA.Balance(userAccountIDA, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(0), walletBalA)
+
+		assert.Len(t, balanceUpdates, 0)
 	})
 
 	t.Run("ErrorNegativeAllocation", func(t *testing.T) {
@@ -465,7 +472,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		_, err := service.CloseApplication(params, rpcSigners)
+		_, err := service.CloseApplication(params, rpcSigners, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "negative allocation: -100 for asset usdc")
 	})

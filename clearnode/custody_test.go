@@ -455,14 +455,14 @@ func TestHandleJoinedEvent(t *testing.T) {
 
 		// Verify transaction was recorded to the database
 		var transactions []LedgerTransaction
-		err = db.Where("from_account = ? AND to_account = ?", channelID, walletAddr).Find(&transactions).Error
+		err = db.Where("from_account = ? AND to_account = ?", channelID, walletAddr.Hex()).Find(&transactions).Error
 		require.NoError(t, err)
 		assert.Len(t, transactions, 1, "Should have 1 deposit transaction recorded")
 
 		tx := transactions[0]
 		assert.Equal(t, TransactionTypeDeposit, tx.Type, "Transaction type should be deposit")
 		assert.Equal(t, channelID, tx.FromAccount, "From account should be channel ID")
-		assert.Equal(t, walletAddr, tx.ToAccount, "To account should be wallet address")
+		assert.Equal(t, walletAddr.Hex(), tx.ToAccount, "To account should be wallet address")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 		assert.True(t, tokenAmountDecimal.Equal(tx.Amount), "Transaction amount should match deposited amount")
 		assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
@@ -611,13 +611,13 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		// Verify transaction was recorded to the database
 		var transactions []LedgerTransaction
-		err = db.Where("from_account = ? AND to_account = ?", walletAddr, channelID).Find(&transactions).Error
+		err = db.Where("from_account = ? AND to_account = ?", walletAddr.Hex(), channelID).Find(&transactions).Error
 		require.NoError(t, err)
 		assert.Len(t, transactions, 1, "Should have 1 withdrawal transaction recorded")
 
 		tx := transactions[0]
 		assert.Equal(t, TransactionTypeWithdrawal, tx.Type, "Transaction type should be withdrawal")
-		assert.Equal(t, walletAddr, tx.FromAccount, "From account should be wallet address")
+		assert.Equal(t, walletAddr.Hex(), tx.FromAccount, "From account should be wallet address")
 		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 
@@ -695,13 +695,13 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		// Verify transaction was recorded to the database
 		var transactions []LedgerTransaction
-		err = db.Where("from_account = ? AND to_account = ?", walletAddr, channelID).Find(&transactions).Error
+		err = db.Where("from_account = ? AND to_account = ?", walletAddr.Hex(), channelID).Find(&transactions).Error
 		require.NoError(t, err)
 		assert.Len(t, transactions, 1, "Should have 1 withdrawal transaction recorded")
 
 		tx := transactions[0]
 		assert.Equal(t, TransactionTypeWithdrawal, tx.Type, "Transaction type should be withdrawal")
-		assert.Equal(t, walletAddr, tx.FromAccount, "From account should be wallet address")
+		assert.Equal(t, walletAddr.Hex(), tx.FromAccount, "From account should be wallet address")
 		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 
@@ -870,14 +870,14 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		// Verify transaction was recorded to the database
 		var transactions []LedgerTransaction
-		err = db.Where("from_account = ? AND to_account = ?", channelID, walletAddr).Find(&transactions).Error
+		err = db.Where("from_account = ? AND to_account = ?", channelID, walletAddr.Hex()).Find(&transactions).Error
 		require.NoError(t, err)
 		assert.Len(t, transactions, 1, "Should have 1 deposit transaction recorded")
 
 		tx := transactions[0]
 		assert.Equal(t, TransactionTypeDeposit, tx.Type, "Transaction type should be deposit")
 		assert.Equal(t, channelID, tx.FromAccount, "From account should be channel ID")
-		assert.Equal(t, walletAddr, tx.ToAccount, "To account should be wallet address")
+		assert.Equal(t, walletAddr.Hex(), tx.ToAccount, "To account should be wallet address")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 		assert.True(t, deltaAmountDecimal.Equal(tx.Amount), "Transaction amount should match delta amount")
 		assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
@@ -953,13 +953,13 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		// Verify transaction was recorded to the database
 		var transactions []LedgerTransaction
-		err = db.Where("from_account = ? AND to_account = ?", walletAddr, channelID).Find(&transactions).Error
+		err = db.Where("from_account = ? AND to_account = ?", walletAddr.Hex(), channelID).Find(&transactions).Error
 		require.NoError(t, err)
 		assert.Len(t, transactions, 1, "Should have 1 withdrawal transaction recorded")
 
 		tx := transactions[0]
 		assert.Equal(t, TransactionTypeWithdrawal, tx.Type, "Transaction type should be withdrawal")
-		assert.Equal(t, walletAddr, tx.FromAccount, "From account should be wallet address")
+		assert.Equal(t, walletAddr.Hex(), tx.FromAccount, "From account should be wallet address")
 		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 		assert.True(t, deltaAmountDecimal.Equal(tx.Amount), "Transaction amount should match delta amount")

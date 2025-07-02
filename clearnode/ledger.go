@@ -30,6 +30,8 @@ type WalletLedger struct {
 	db     *gorm.DB
 }
 
+// AccountID represents a unique identifier for an account, which can be a wallet or an application session.
+// Main reason for creating this type is to ensure the address format is consistent ( e.g., no downcase conversion).
 type AccountID string
 
 func NewAccountID(accountID string) AccountID {

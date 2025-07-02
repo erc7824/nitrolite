@@ -79,7 +79,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			if err = ledger.Record(sessionAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit destination account: %w", err)
 			}
-			_, err = RecordTransaction(tx, TransactionTypeAppDeposit, walletAddress, appSessionID, alloc.AssetSymbol, alloc.Amount)
+			_, err = RecordLedgerTransaction(tx, TransactionTypeAppDeposit, walletAddress, appSessionID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
 				return fmt.Errorf("failed to record transaction: %w", err)
 			}
@@ -238,7 +238,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 			if err := ledger.Record(userAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit participant: %w", err)
 			}
-			_, err = RecordTransaction(tx, TransactionTypeAppWithdrawal, appSession.SessionID, walletAddress, alloc.AssetSymbol, alloc.Amount)
+			_, err = RecordLedgerTransaction(tx, TransactionTypeAppWithdrawal, appSession.SessionID, walletAddress, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
 				return fmt.Errorf("failed to record transaction: %w", err)
 			}

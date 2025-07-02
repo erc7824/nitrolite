@@ -78,7 +78,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		assert.Equal(t, decimal.NewFromInt(100), appBalA)
 
 		// Verify transactions were recorded to the database
-		var transactions []Transaction
+		var transactions []LedgerTransaction
 		err = db.Where("tx_type = ?", TransactionTypeAppDeposit).Find(&transactions).Error
 		require.NoError(t, err)
 		assert.Len(t, transactions, 2, "Should have 2 app deposit transactions recorded")
@@ -355,7 +355,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		assert.Equal(t, decimal.NewFromInt(100), walletBalA)
 
 		// Verify transactions were recorded to the database
-		var transactions []Transaction
+		var transactions []LedgerTransaction
 		err = db.Where("tx_type = ?", TransactionTypeAppWithdrawal).Find(&transactions).Error
 		require.NoError(t, err)
 		assert.Len(t, transactions, 2, "Should have 2 app withdrawal transactions recorded")

@@ -246,7 +246,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		assert.Equal(t, decimal.NewFromInt(2).String(), recipientETH.String())
 
 		// Verify transactions were recorded to the database
-		var transactions []Transaction
+		var transactions []LedgerTransaction
 		err = db.Where("from_account = ? AND to_account = ?", senderAddr, recipientAddr).Find(&transactions).Error
 		require.NoError(t, err)
 		assert.Len(t, transactions, 2, "Should have 2 transactions recorded (one for each asset)")
@@ -273,7 +273,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		assert.Len(t, transferResp, 2, "Response should contain 2 transaction objects")
 		for _, responseTx := range transferResp {
 			// Find matching transaction in database
-			var dbTx Transaction
+			var dbTx LedgerTransaction
 			err = db.Where("hash = ?", responseTx.TxHash).First(&dbTx).Error
 			require.NoError(t, err, "Response transaction should exist in database")
 

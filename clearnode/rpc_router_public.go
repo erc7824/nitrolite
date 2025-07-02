@@ -61,7 +61,7 @@ type LedgerEntryResponse struct {
 	CreatedAt   time.Time       `json:"created_at"`
 }
 
-type GetTransactionsParams struct {
+type GetLedgerTransactionsParams struct {
 	// Pagination will be added with another PR
 	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter transactions
 	Asset     string `json:"asset,omitempty"`      // Optional asset to filter transactions
@@ -312,12 +312,12 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 	logger.Info("ledger entries retrieved", "accountID", userAccountID, "asset", params.Asset, "wallet", userAddress)
 }
 
-func (r *RPCRouter) HandleGetTransactions(c *RPCContext) {
+func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
 	ctx := c.Context
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
 
-	var params GetTransactionsParams
+	var params GetLedgerTransactionsParams
 	if err := parseParams(req.Params, &params); err != nil {
 		c.Fail(err.Error())
 		return
@@ -325,7 +325,7 @@ func (r *RPCRouter) HandleGetTransactions(c *RPCContext) {
 
 	var txType *TransactionType
 	if params.TxType != "" {
-		parsedType, err := ParseTransactionType(params.TxType)
+		parsedType, err := parseTransactionType(params.TxType)
 		if err != nil {
 			c.Fail(err.Error())
 			return
@@ -333,7 +333,7 @@ func (r *RPCRouter) HandleGetTransactions(c *RPCContext) {
 		txType = &parsedType
 	}
 
-	transactions, err := GetTransactions(r.DB, params.AccountID, params.Asset, txType)
+	transactions, err := GetLedgerTransactions(r.DB, params.AccountID, params.Asset, txType)
 	if err != nil {
 		logger.Error("failed to get transactions", "error", err)
 		c.Fail("failed to get transactions")

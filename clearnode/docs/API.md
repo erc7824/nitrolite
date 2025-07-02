@@ -477,15 +477,15 @@ Supports pagination and sorting.
 
 ### Get Transactions
 
-Retrieves transaction history with optional filtering by asset and transaction type. This endpoint provides a view of transactions where the specified account appears as either the sender or receiver.
+Retrieves ledger transaction history with optional filtering by asset and transaction type. This endpoint provides a view of transactions where the specified account appears as either the sender or receiver.
 Pagination is going to be added soon.
 
 **Available Transaction Types:**
-- `transfer`: Direct transfers between user accounts
-- `deposit`: Funds deposited into channels or accounts
-- `withdrawal`: Funds withdrawn from channels or accounts
-- `app_deposit`: Deposits related to virtual application sessions
-- `app_withdrawal`: Withdrawals related to virtual application sessions
+- `transfer`: Direct transfers between unified accounts
+- `deposit`: Funds deposited to a unified account
+- `withdrawal`: Funds withdrawn from a unified account
+- `app_deposit`: Deposits into to application sessions
+- `app_withdrawal`: Withdrawals from application sessions
 
 **Request:**
 

@@ -350,7 +350,7 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 
-		_, err = RecordTransaction(tx, TransactionTypeDeposit, channelID, channel.Wallet, asset.Symbol, tokenAmount)
+		_, err = RecordLedgerTransaction(tx, TransactionTypeDeposit, channelID, channel.Wallet, asset.Symbol, tokenAmount)
 		if err != nil {
 			return fmt.Errorf("failed to record transaction: %w", err)
 		}
@@ -467,7 +467,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 				if err := ledger.Record(walletAccountID, asset.Symbol, amount); err != nil {
 					return fmt.Errorf("error recording balance update for participant: %w", err)
 				}
-				_, err = RecordTransaction(tx, TransactionTypeDeposit, channelID, channel.Wallet, asset.Symbol, amount)
+				_, err = RecordLedgerTransaction(tx, TransactionTypeDeposit, channelID, channel.Wallet, asset.Symbol, amount)
 				if err != nil {
 					return fmt.Errorf("failed to record transaction: %w", err)
 				}
@@ -480,7 +480,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 				if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
 					return fmt.Errorf("error recording balance update for wallet: %w", err)
 				}
-				_, err = RecordTransaction(tx, TransactionTypeWithdrawal, channel.Wallet, channelID, asset.Symbol, amount)
+				_, err = RecordLedgerTransaction(tx, TransactionTypeWithdrawal, channel.Wallet, channelID, asset.Symbol, amount)
 				if err != nil {
 					return fmt.Errorf("failed to record transaction: %w", err)
 				}
@@ -547,7 +547,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 			log.Printf("[Closed] Error recording balance update for wallet: %v", err)
 			return err
 		}
-		_, err = RecordTransaction(tx, TransactionTypeWithdrawal, channel.Wallet, channelID, asset.Symbol, tokenAmount)
+		_, err = RecordLedgerTransaction(tx, TransactionTypeWithdrawal, channel.Wallet, channelID, asset.Symbol, tokenAmount)
 		if err != nil {
 			return fmt.Errorf("failed to record transaction: %w", err)
 		}

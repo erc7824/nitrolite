@@ -26,7 +26,7 @@ var (
 	ErrInvalidTransactionType = errors.New("invalid transaction type")
 )
 
-type Transaction struct {
+type LedgerTransaction struct {
 	ID          uint            `gorm:"primaryKey"`
 	Hash        string          `gorm:"column:hash;not null;uniqueIndex"`
 	Type        TransactionType `gorm:"column:tx_type;not null;index:idx_type;index:idx_from_to_account"`
@@ -37,7 +37,7 @@ type Transaction struct {
 	CreatedAt   time.Time
 }
 
-func (tx *Transaction) JSON() TransactionResponse {
+func (tx *LedgerTransaction) JSON() TransactionResponse {
 	return TransactionResponse{
 		TxHash:      tx.Hash,
 		TxType:      tx.Type.String(),
@@ -49,11 +49,11 @@ func (tx *Transaction) JSON() TransactionResponse {
 	}
 }
 
-func (Transaction) TableName() string {
-	return "transactions"
+func (LedgerTransaction) TableName() string {
+	return "ledger_transactions"
 }
 
-func (t *Transaction) BeforeCreate(tx *gorm.DB) (err error) {
+func (t *LedgerTransaction) BeforeCreate(tx *gorm.DB) (err error) {
 	if t.CreatedAt.IsZero() {
 		t.CreatedAt = time.Now()
 	}
@@ -62,7 +62,7 @@ func (t *Transaction) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
-func (t *Transaction) AfterCreate(tx *gorm.DB) (err error) {
+func (t *LedgerTransaction) AfterCreate(tx *gorm.DB) (err error) {
 	txHash := getTransactionHash(
 		t.ID,
 		t.Type,
@@ -76,8 +76,8 @@ func (t *Transaction) AfterCreate(tx *gorm.DB) (err error) {
 	return tx.Model(t).UpdateColumn("hash", txHash).Error
 }
 
-func RecordTransaction(tx *gorm.DB, txType TransactionType, fromAccount, toAccount, assetSymbol string, amount decimal.Decimal) (*Transaction, error) {
-	transaction := &Transaction{
+func RecordLedgerTransaction(tx *gorm.DB, txType TransactionType, fromAccount, toAccount, assetSymbol string, amount decimal.Decimal) (*LedgerTransaction, error) {
+	transaction := &LedgerTransaction{
 		Type:        txType,
 		FromAccount: fromAccount,
 		ToAccount:   toAccount,
@@ -92,9 +92,9 @@ func RecordTransaction(tx *gorm.DB, txType TransactionType, fromAccount, toAccou
 	return transaction, err
 }
 
-func GetTransactions(tx *gorm.DB, accountID, assetSymbol string, txType *TransactionType) ([]Transaction, error) {
-	var transactions []Transaction
-	q := tx.Model(&Transaction{})
+func GetLedgerTransactions(tx *gorm.DB, accountID, assetSymbol string, txType *TransactionType) ([]LedgerTransaction, error) {
+	var transactions []LedgerTransaction
+	q := tx.Model(&LedgerTransaction{})
 
 	if accountID != "" {
 		q = q.Where("from_account = ? OR to_account = ?", accountID, accountID)
@@ -152,8 +152,8 @@ func (t TransactionType) String() string {
 	}
 }
 
-// ParseTransactionType converts string transaction type to integer
-func ParseTransactionType(s string) (TransactionType, error) {
+// parseTransactionType converts string transaction type to integer
+func parseTransactionType(s string) (TransactionType, error) {
 	switch s {
 	case "transfer":
 		return TransactionTypeTransfer, nil

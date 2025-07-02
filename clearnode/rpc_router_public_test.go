@@ -1053,7 +1053,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 	account3 := "0xAccount3"
 
 	// Create and seed test transactions
-	testTransactions := []Transaction{
+	testTransactions := []LedgerTransaction{
 		{Type: TransactionTypeTransfer, FromAccount: account1, ToAccount: account2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100), CreatedAt: time.Now().Add(-3 * time.Hour)},
 		{Type: TransactionTypeDeposit, FromAccount: account2, ToAccount: account1, AssetSymbol: "usdc", Amount: decimal.NewFromInt(50), CreatedAt: time.Now().Add(-2 * time.Hour)},
 		{Type: TransactionTypeTransfer, FromAccount: account1, ToAccount: account3, AssetSymbol: "eth", Amount: decimal.NewFromFloat(1.5), CreatedAt: time.Now().Add(-1 * time.Hour)},
@@ -1208,7 +1208,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			}
 
 			// Call the handler
-			router.HandleGetTransactions(c)
+			router.HandleGetLedgerTransactions(c)
 
 			// General assertions for all cases
 			res := c.Message.Res
@@ -1253,7 +1253,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 		}
 
 		// Call the handler
-		router.HandleGetTransactions(c)
+		router.HandleGetLedgerTransactions(c)
 
 		// Should return an error response
 		res := c.Message.Res

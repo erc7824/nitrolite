@@ -114,7 +114,7 @@ func (l *WalletLedger) GetEntries(accountID *AccountID, assetSymbol string) ([]E
 	var entries []Entry
 	q := l.db.Model(&Entry{})
 
-	if accountID != nil {
+	if accountID != nil && accountID.String() != "" {
 		q = q.Where("account_id = ?", accountID.String())
 	}
 

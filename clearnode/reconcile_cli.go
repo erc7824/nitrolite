@@ -4,13 +4,14 @@ import (
 	"context"
 	"math/big"
 	"os"
-	"sync/atomic"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
+// runReconcileCli is the entry point for the reconcile command line interface.
+// Example: clearnode reconcile eth_mainnet 1000000 2000000
 func runReconcileCli(logger Logger) {
 	logger = logger.NewSystem("reconcile")
 	if len(os.Args) < 5 {
@@ -80,7 +81,6 @@ func runReconcileCli(logger Logger) {
 			network.BlockStep,
 			blockStart.Uint64(),
 			0,
-			&atomic.Uint64{},
 			eventCh,
 			logger,
 		)

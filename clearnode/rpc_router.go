@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -98,9 +99,9 @@ func (r *RPCRouter) HandleConnect(send SendRPCMessageFunc) {
 	}
 
 	// Convert to AssetResponse format
-	response := make([]AssetResponse, 0, len(assets))
+	response := make([]GetAssetsResponse, 0, len(assets))
 	for _, asset := range assets {
-		response = append(response, AssetResponse(asset))
+		response = append(response, GetAssetsResponse(asset))
 	}
 
 	send("assets", response)
@@ -256,6 +257,16 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 	logger.Info("RPC history retrieved", "userID", c.UserID, "entryCount", len(response))
 }
 
-func (r *RPCRouter) HandlePing(c *RPCContext) {
-	c.Succeed("pong")
+func parseParams(params []any, unmarshalTo any) error {
+	if len(params) > 0 {
+		paramsJSON, err := json.Marshal(params[0])
+		if err != nil {
+			return fmt.Errorf("failed to parse parameters: %w", err)
+		}
+		err = json.Unmarshal(paramsJSON, &unmarshalTo)
+		if err != nil {
+			return err
+		}
+	}
+	return validate.Struct(unmarshalTo)
 }

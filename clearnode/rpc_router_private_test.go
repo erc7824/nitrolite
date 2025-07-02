@@ -175,7 +175,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "eth", decimal.NewFromInt(5)))
 
 		// Create transfer parameters
-		transferParams := Transfer{
+		transferParams := TransferParams{
 			Destination: recipientAddr,
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
@@ -257,7 +257,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
 
 		// Create transfer with invalid destination
-		transferParams := Transfer{
+		transferParams := TransferParams{
 			Destination: "not-a-valid-address",
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
@@ -313,7 +313,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
 
 		// Create transfer to self
-		transferParams := Transfer{
+		transferParams := TransferParams{
 			Destination: senderAddr,
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
@@ -369,7 +369,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(100)))
 
 		// Create transfer for more than available
-		transferParams := Transfer{
+		transferParams := TransferParams{
 			Destination: recipientAddr,
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
@@ -422,7 +422,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		}).Error)
 
 		// Create transfer with empty allocations
-		transferParams := Transfer{
+		transferParams := TransferParams{
 			Destination: recipientAddr,
 			Allocations: []TransferAllocation{},
 		}
@@ -476,7 +476,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
 
 		// Create transfer with zero amount
-		transferParams := Transfer{
+		transferParams := TransferParams{
 			Destination: recipientAddr,
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
@@ -532,7 +532,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
 
 		// Create transfer with negative amount
-		transferParams := Transfer{
+		transferParams := TransferParams{
 			Destination: recipientAddr,
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(-500)},
@@ -588,7 +588,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAddr, "usdc", decimal.NewFromInt(1000)))
 
 		// Create transfer parameters
-		transferParams := Transfer{
+		transferParams := TransferParams{
 			Destination: recipientAddr,
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},

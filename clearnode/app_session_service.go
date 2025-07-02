@@ -223,9 +223,10 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 // getAppSessions finds all app sessions
 // If participantWallet is specified, it returns only sessions for that participant
 // If participantWallet is empty, it returns all sessions
-func (s *AppSessionService) GetAppSessions(participantWallet string, status string) ([]AppSession, error) {
+func (s *AppSessionService) GetAppSessions(participantWallet string, status string, options *ListOptions) ([]AppSession, error) {
 	var sessions []AppSession
 	query := s.db.WithContext(context.TODO())
+	query = applyListOptions(query, "updated_at", SortTypeDescending, options)
 
 	if participantWallet != "" {
 		switch s.db.Dialector.Name() {
@@ -242,7 +243,6 @@ func (s *AppSessionService) GetAppSessions(participantWallet string, status stri
 		query = query.Where("status = ?", status)
 	}
 
-	query = query.Order("updated_at DESC")
 	if err := query.Find(&sessions).Error; err != nil {
 		return nil, err
 	}

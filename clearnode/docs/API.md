@@ -279,6 +279,7 @@ Supports pagination and sorting.
         "0x1234567890abcdef...",
         "0x00112233445566778899AaBbCcDdEeFf00112233"
       ],
+      "session_data": "{\"gameType\":\"rps\",\"rounds\":5,\"currentRound\":3,\"scores\":{\"0x1234567890abcdef\":2,\"0x00112233445566778899AaBbCcDdEeFf00112233\":1}}",
       "protocol": "NitroAura",
       "challenge": 86400,
       "weights": [50, 50],
@@ -293,6 +294,7 @@ Supports pagination and sorting.
         "0x1234567890abcdef...",
         "0xAaBbCcDdEeFf0011223344556677889900aAbBcC"
       ],
+      "session_data": "{\"gameType\":\"snake\",\"boardSize\":20,\"snakeLength\":5,\"score\":150,\"level\":3,\"gameState\":\"active\"}",
       "protocol": "NitroSnake",
       "challenge": 86400,
       "weights": [70, 30],
@@ -508,6 +510,8 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
 Creates a virtual application between participants.
 Participants must agree on signature weights and a quorum; this quorum is required to submit an intermediate state or close an app session. The create app session request must be signed by all participants with non-zero allocations.
 
+The optional `session_data` field can be used to store application-specific data that will be preserved throughout the session lifecycle. This enables applications to maintain custom state information such as configuration settings, business logic state, or any other data needed for the application.
+
 **Request:**
 
 ```json
@@ -535,7 +539,8 @@ Participants must agree on signature weights and a quorum; this quorum is requir
         "asset": "usdc",
         "amount": "100.0"
       }
-    ]
+    ],
+    "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"waiting\"}"
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
@@ -559,6 +564,8 @@ Submits an intermediate state into a virtual application and redistributes funds
 To submit an intermediate state, participants must reach the signature quorum that they agreed on when creating the app session.
 This means that the sum of the weights of signers must reach the specified threshold in the app definition.
 
+The optional `session_data` field can be used to update application-specific data associated with the session, allowing applications to track progress, update configurations, or store any custom state changes during the session lifecycle.
+
 **Request:**
 
 ```json
@@ -576,7 +583,8 @@ This means that the sum of the weights of signers must reach the specified thres
         "asset": "usdc",
         "amount": "200.0"
       }
-    ]
+    ],
+    "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"finished\",\"winner\":\"0x00112233445566778899AaBbCcDdEeFf00112233\",\"endCondition\":\"checkmate\"}"
   }], 1619123456789],
   "sig": ["0x9876fedcba...", "0x8765fedcba..."]
 }
@@ -601,6 +609,8 @@ Closes a virtual application and redistributes funds.
 To close the app session, participants must reach the signature quorum that they agreed on when creating the app session.
 This means that the sum of the weights of signers must reach the specified threshold in the app definition.
 
+The optional `session_data` field can be used to provide final application-specific data when closing the session, such as final results, completion status, or any other concluding information that should be preserved with the session closure.
+
 **Request:**
 
 ```json
@@ -618,7 +628,8 @@ This means that the sum of the weights of signers must reach the specified thres
         "asset": "usdc",
         "amount": "200.0"
       }
-    ]
+    ],
+    "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"closed\",\"winner\":\"0x00112233445566778899AaBbCcDdEeFf00112233\",\"endCondition\":\"checkmate\",\"moveHistory\":[\"e2e4\",\"e7e5\",\"Nf3\",\"Nc6\"]}"
   }], 1619123456789],
   "sig": ["0x9876fedcba...", "0x8765fedcba..."]
 }

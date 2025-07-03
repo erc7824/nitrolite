@@ -49,7 +49,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 				}
 			}
 			if alloc.Amount.IsNegative() {
-				return fmt.Errorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+				return fmt.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 			walletAddress := alloc.ParticipantWallet
 			if wallet := GetWalletBySigner(alloc.ParticipantWallet); wallet != "" {
@@ -121,6 +121,10 @@ func (s *AppSessionService) SubmitState(params *SubmitStateParams, rpcSigners ma
 
 		allocationSum := map[string]decimal.Decimal{}
 		for _, alloc := range params.Allocations {
+			if alloc.Amount.IsNegative() {
+				return fmt.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+			}
+
 			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
 			if walletAddress == "" {
 				walletAddress = alloc.ParticipantWallet
@@ -145,7 +149,9 @@ func (s *AppSessionService) SubmitState(params *SubmitStateParams, rpcSigners ma
 				return fmt.Errorf("failed to credit participant: %w", err)
 			}
 
-			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
+			if !alloc.Amount.IsZero() {
+				allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
+			}
 		}
 
 		if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
@@ -191,6 +197,10 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 
 		allocationSum := map[string]decimal.Decimal{}
 		for _, alloc := range params.Allocations {
+			if alloc.Amount.IsNegative() {
+				return fmt.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+			}
+
 			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
 			if walletAddress == "" {
 				walletAddress = alloc.ParticipantWallet
@@ -216,7 +226,9 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 				return fmt.Errorf("failed to credit participant: %w", err)
 			}
 
-			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
+			if !alloc.Amount.IsZero() {
+				allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
+			}
 		}
 
 		if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
@@ -231,7 +243,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 		if params.SessionData != nil {
 			updates["session_data"] = *params.SessionData
 		}
-		
+
 		return tx.Model(&appSession).Updates(updates).Error
 	})
 

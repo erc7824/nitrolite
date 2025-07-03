@@ -126,6 +126,33 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has challenged channels")
 	})
+
+	t.Run("ErrorNegativeAllocation", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
+		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
+
+		service := NewAppSessionService(db)
+		params := &CreateAppSessionParams{
+			Definition: AppDefinition{
+				Protocol:           "test-proto",
+				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
+				Weights:            []int64{1, 0},
+				Quorum:             1,
+				Nonce:              uint64(time.Now().Unix()),
+			},
+			Allocations: []AppAllocation{
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
+			},
+		}
+		rpcSigners := map[string]struct{}{userAddressA.Hex(): {}}
+
+		_, err := service.CreateApplication(params, rpcSigners)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "negative allocation: -50 for asset usdc")
+	})
 }
 
 func TestAppSessionService_SubmitState(t *testing.T) {
@@ -184,6 +211,44 @@ func TestAppSessionService_SubmitState(t *testing.T) {
 		appBalB, err := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(50), appBalB)
+	})
+
+	t.Run("ErrorNegativeAllocation", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		service := NewAppSessionService(db)
+		session := &AppSession{
+			SessionID:          "test-session-negative",
+			Protocol:           "test-proto",
+			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
+			Weights:            []int64{1, 1},
+			Quorum:             2,
+			Status:             ChannelStatusOpen,
+			Version:            1,
+		}
+		require.NoError(t, db.Create(session).Error)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		ledgerA := GetWalletLedger(db, userAddressA)
+		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+
+		params := &SubmitStateParams{
+			AppSessionID: session.SessionID,
+			Allocations: []AppAllocation{
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+			},
+		}
+
+		rpcSigners := map[string]struct{}{
+			userAddressA.Hex(): {},
+			userAddressB.Hex(): {},
+		}
+
+		_, err := service.SubmitState(params, rpcSigners)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "negative allocation: -50 for asset usdc")
 	})
 }
 
@@ -246,5 +311,96 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		walletBalA, err := ledgerA.Balance(userAccountIDA, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(100), walletBalA)
+	})
+
+	t.Run("SuccessfulCloseApplicationWithZeroAllocation", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		service := NewAppSessionService(db)
+		session := &AppSession{
+			SessionID:          "test-session-close",
+			Protocol:           "test-proto",
+			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
+			Weights:            []int64{1, 1},
+			Quorum:             2,
+			Status:             ChannelStatusOpen,
+			Version:            1,
+		}
+		require.NoError(t, db.Create(session).Error)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		ledgerA := GetWalletLedger(db, userAddressA)
+		ledgerB := GetWalletLedger(db, userAddressB)
+		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(0)))
+		require.NoError(t, ledgerB.Record(sessionAccountID, "usdc", decimal.NewFromInt(0)))
+
+		params := &CloseAppSessionParams{
+			AppSessionID: session.SessionID,
+			Allocations: []AppAllocation{
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+			},
+		}
+		rpcSigners := map[string]struct{}{
+			userAddressA.Hex(): {},
+			userAddressB.Hex(): {},
+		}
+
+		newVersion, err := service.CloseApplication(params, rpcSigners)
+		require.NoError(t, err)
+		assert.Equal(t, uint64(2), newVersion)
+
+		var closedSession AppSession
+		require.NoError(t, db.First(&closedSession, "session_id = ?", session.SessionID).Error)
+		assert.Equal(t, ChannelStatusClosed, closedSession.Status)
+
+		// Verify balances
+		appBalA, err := ledgerA.Balance(sessionAccountID, "usdc")
+		require.NoError(t, err)
+		assert.True(t, appBalA.IsZero())
+
+		walletBalA, err := ledgerA.Balance(userAccountIDA, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(0), walletBalA)
+	})
+
+	t.Run("ErrorNegativeAllocation", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		service := NewAppSessionService(db)
+		session := &AppSession{
+			SessionID:          "test-session-close-negative",
+			Protocol:           "test-proto",
+			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
+			Weights:            []int64{1, 1},
+			Quorum:             2,
+			Status:             ChannelStatusOpen,
+			Version:            1,
+		}
+		require.NoError(t, db.Create(session).Error)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		ledgerA := GetWalletLedger(db, userAddressA)
+		ledgerB := GetWalletLedger(db, userAddressB)
+		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		require.NoError(t, ledgerB.Record(sessionAccountID, "usdc", decimal.NewFromInt(200)))
+
+		params := &CloseAppSessionParams{
+			AppSessionID: session.SessionID,
+			Allocations: []AppAllocation{
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-100)},
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(400)},
+			},
+		}
+		rpcSigners := map[string]struct{}{
+			userAddressA.Hex(): {},
+			userAddressB.Hex(): {},
+		}
+
+		_, err := service.CloseApplication(params, rpcSigners)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "negative allocation: -100 for asset usdc")
 	})
 }

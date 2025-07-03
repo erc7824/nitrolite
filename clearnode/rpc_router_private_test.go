@@ -679,7 +679,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 			Challenge:          60,
 			Nonce:              ts,
 		}
-		data := `{"key":"value"}`
+		data := `{"state":"initial"}`
 		createParams := CreateAppSessionParams{
 			Definition: def,
 			Allocations: []AppAllocation{
@@ -723,13 +723,13 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, string(ChannelStatusOpen), appResp.Status)
 		assert.Equal(t, uint64(1), appResp.Version)
-		assert.Equal(t, data, appResp.SessionData)
+		assert.Empty(t, appResp.SessionData, "session data should not be returned in response")
 
 		var vApp AppSession
 		require.NoError(t, db.Where("session_id = ?", appResp.AppSessionID).First(&vApp).Error)
 		assert.ElementsMatch(t, []string{signerAddressA.Hex(), signerAddressB.Hex()}, vApp.ParticipantWallets)
 		assert.Equal(t, uint64(1), vApp.Version)
-		assert.Equal(t, data, vApp.SessionData)
+		assert.Equal(t, data, vApp.SessionData, "session data should be stored in the database")
 
 		// Participant accounts drained
 		partBalA, _ := GetWalletLedger(db, signerAddressA).Balance(accountIDA, "usdc")
@@ -909,13 +909,13 @@ func TestRPCRouterHandleSubmitState(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, string(ChannelStatusOpen), appResp.Status)
 		assert.Equal(t, uint64(2), appResp.Version)
-		assert.Equal(t, data, appResp.SessionData)
+		assert.Empty(t, appResp.SessionData, "session data should not be returned in response")
 
 		var updated AppSession
 		require.NoError(t, db.Where("session_id = ?", vAppID.Hex()).First(&updated).Error)
 		assert.Equal(t, ChannelStatusOpen, updated.Status)
 		assert.Equal(t, uint64(2), updated.Version)
-		assert.Equal(t, data, updated.SessionData)
+		assert.Equal(t, data, updated.SessionData, "session data should be stored in the database")
 
 		// Check balances redistributed
 		balA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
@@ -1015,13 +1015,13 @@ func TestRPCRouterHandleCloseApplication(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, string(ChannelStatusClosed), appResp.Status)
 	assert.Equal(t, uint64(3), appResp.Version)
-	assert.Equal(t, data, appResp.SessionData)
+	assert.Empty(t, "", appResp.SessionData, "session data should not be returned in response")
 
 	var updated AppSession
 	require.NoError(t, db.Where("session_id = ?", vAppID.Hex()).First(&updated).Error)
 	assert.Equal(t, ChannelStatusClosed, updated.Status)
 	assert.Equal(t, uint64(3), updated.Version)
-	assert.Equal(t, data, updated.SessionData)
+	assert.Equal(t, data, updated.SessionData, "session data should be stored in the database")
 
 	// Check balances redistributed
 	balA, _ := GetWalletLedger(db, userAddressA).Balance(accountIDA, "usdc")

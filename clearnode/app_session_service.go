@@ -80,7 +80,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			}
 		}
 
-		return tx.Create(&AppSession{
+		session := &AppSession{
 			Protocol:           params.Definition.Protocol,
 			SessionID:          appSessionID,
 			ParticipantWallets: params.Definition.ParticipantWallets,
@@ -90,7 +90,12 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			Quorum:             params.Definition.Quorum,
 			Nonce:              params.Definition.Nonce,
 			Version:            1,
-		}).Error
+		}
+		if params.SessionData != nil {
+			session.SessionData = *params.SessionData
+		}
+
+		return tx.Create(session).Error
 	})
 
 	if err != nil {
@@ -148,10 +153,14 @@ func (s *AppSessionService) SubmitState(params *SubmitStateParams, rpcSigners ma
 		}
 
 		newVersion = appSession.Version + 1
-
-		return tx.Model(&appSession).Updates(map[string]any{
+		updates := map[string]any{
 			"version": newVersion,
-		}).Error
+		}
+		if params.SessionData != nil {
+			updates["session_data"] = *params.SessionData
+		}
+
+		return tx.Model(&appSession).Updates(updates).Error
 	})
 
 	if err != nil {
@@ -215,11 +224,15 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 		}
 
 		newVersion = appSession.Version + 1
-
-		return tx.Model(&appSession).Updates(map[string]any{
+		updates := map[string]any{
 			"status":  ChannelStatusClosed,
 			"version": newVersion,
-		}).Error
+		}
+		if params.SessionData != nil {
+			updates["session_data"] = *params.SessionData
+		}
+		
+		return tx.Model(&appSession).Updates(updates).Error
 	})
 
 	if err != nil {

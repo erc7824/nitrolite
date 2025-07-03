@@ -299,7 +299,6 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: appSession.SessionID,
-		SessionData:  sessionData,
 		Version:      appSession.Version,
 		Status:       string(ChannelStatusOpen),
 	})
@@ -342,7 +341,6 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: params.AppSessionID,
-		SessionData:  sessionData,
 		Version:      newVersion,
 		Status:       string(ChannelStatusOpen),
 	})
@@ -382,7 +380,6 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 
 	c.Succeed(req.Method, AppSessionResponse{
 		AppSessionID: params.AppSessionID,
-		SessionData:  sessionData,
 		Version:      finalVersion,
 		Status:       string(ChannelStatusClosed),
 	})

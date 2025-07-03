@@ -12,7 +12,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"golang.org/x/sync/errgroup"
 )
 
 var validate = validator.New()
@@ -95,17 +94,15 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	errorGroup, parentCtx := errgroup.WithContext(r.Context())
 	connectionID := uuid.NewString()
-	messageSink := make(chan []byte, 10)
-	n.connHub.Set(&RPCConnection{
-		ConnectionID: connectionID,
-		WriteSink:    messageSink,
-		Storage:      NewSafeStorage(),
-	})
+	processSink := make(chan []byte, 10)
+	writeSink := make(chan []byte, 10)
+	closeConnCh := make(chan struct{}, 1)
+	rpcConnection := NewRPCConnection(connectionID, "", writeSink, closeConnCh)
+	n.connHub.Set(rpcConnection)
 
 	for _, handler := range n.onConnectHandlers {
-		handler(n.getSendMessageFunc(messageSink))
+		handler(n.getSendMessageFunc(rpcConnection))
 	}
 
 	// Cleanup function executed when connection closes
@@ -120,12 +117,34 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 			handler(userID)
 		}
 
+		defer close(closeConnCh) // Close the connection channel when done
 		n.logger.Info("connection closed", "connectionID", connectionID, "userID", userID)
 	}()
 
-	// readMesages handles incoming messages from the WebSocket connection.
+	readMessages := func(abortOthers func()) {
+		defer abortOthers()      // Stop other goroutines when done
+		defer close(processSink) // Close the processing channel when done
+
+		for {
+			_, messageBytes, err := conn.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+					n.logger.Error("WebSocket connection closed with unexpected reason", "error", err)
+				}
+				return
+			}
+			processSink <- messageBytes // Send message to processing channel
+		}
+	}
+
+	// processMesages handles incoming messages from the WebSocket connection.
 	// It validates messages, routes them to appropriate handlers, and manages authentication.
-	readMesages := func() error {
+	processMesages := func(ctx context.Context, abortOthers context.CancelFunc) {
+		defer abortOthers()    // Stop other goroutines when done
+		defer close(writeSink) // Close write sink to stop writing messages
+
+		rpcConn := rpcConnection
+		safeStorage := NewSafeStorage()
 		authHandlerExecuted := false
 		handleAuthenticated := func(userID string) {
 			if authHandlerExecuted {
@@ -133,8 +152,12 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 			}
 			authHandlerExecuted = true
 
+			rpcConn = NewRPCConnection(rpcConn.ConnectionID, userID, rpcConn.WriteSink, rpcConn.CloseConnCh)
+			n.connHub.Set(rpcConn)
+			n.logger.Info("user authenticated", "userID", userID, "connectionID", connectionID)
+
 			for _, handler := range n.onAuthenticatedHandlers {
-				handler(userID, n.getSendMessageFunc(messageSink))
+				handler(userID, n.getSendMessageFunc(rpcConn))
 			}
 		}
 		postProcessContext := func(c *RPCContext) {
@@ -145,30 +168,15 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 
 	read_loop:
 		for {
-			rpcConn := n.connHub.Get(connectionID)
-			if rpcConn == nil {
-				n.logger.Error("connection not found in hub", "connectionID", connectionID)
-				return fmt.Errorf("connection not found in hub for ID %s", connectionID)
-			}
-
+			var messageBytes []byte
 			select {
-			case <-parentCtx.Done():
-				n.logger.Info("context done, stopping message processing")
-				close(rpcConn.WriteSink)
-				return nil
-			default:
-			}
-
-			_, messageBytes, err := conn.ReadMessage()
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					n.logger.Error("WebSocket connection closed with unexpected reason", "error", err)
-				} else {
-					err = nil
+			case <-ctx.Done():
+				n.logger.Debug("context done, stopping message processing")
+				return
+			case messageBytes = <-processSink:
+				if len(messageBytes) == 0 {
+					continue read_loop // Skip empty messages
 				}
-
-				close(rpcConn.WriteSink)
-				return err
 			}
 
 			var msg RPCMessage
@@ -214,7 +222,7 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				Signer:   n.signer,
 				Message:  msg,
 				handlers: routeHandlers,
-				Storage:  rpcConn.Storage,
+				Storage:  safeStorage,
 			}
 			ctx.Next() // Start processing the handlers
 
@@ -223,53 +231,78 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				n.logger.Error("failed to prepare response", "error", err, "method", msg.Req.Method)
 				continue
 			}
-			writeRPCMessageWithTimeout(rpcConn.WriteSink, responseBytes)
+			rpcConn.Write(responseBytes)
 
 			postProcessContext(ctx)
-
-			n.connHub.Set(&RPCConnection{
-				ConnectionID: rpcConn.ConnectionID,
-				UserID:       ctx.UserID,
-				WriteSink:    rpcConn.WriteSink,
-				Storage:      ctx.Storage,
-			})
 		}
 	}
 
 	// writeMessages handles outgoing messages to the WebSocket connection.
 	// It reads from the message sink channel and writes to the WebSocket.
-	writeMessages := func() error {
-		for messageBytes := range messageSink {
-			w, err := conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				n.logger.Error("error getting writer for response", "error", err)
-				continue
-			}
+	writeMessages := func(ctx context.Context, abortOthers context.CancelFunc) {
+		defer abortOthers() // Stop other goroutines
 
-			if _, err := w.Write(messageBytes); err != nil {
-				n.logger.Error("error writing response", "error", err)
-				w.Close()
-				continue
-			}
+		for {
+			select {
+			case <-ctx.Done():
+				n.logger.Debug("context done, stopping message writing")
+				return
+			case messageBytes := <-writeSink:
+				if len(messageBytes) == 0 {
+					continue // Skip empty messages
+				}
 
-			if err := w.Close(); err != nil {
-				n.logger.Error("error closing writer for response", "error", err)
-				continue
-			}
+				w, err := conn.NextWriter(websocket.TextMessage)
+				if err != nil {
+					n.logger.Error("error getting writer for response", "error", err)
+					continue
+				}
 
-			for _, handler := range n.onMessageSentHandlers {
-				handler()
+				if _, err := w.Write(messageBytes); err != nil {
+					n.logger.Error("error writing response", "error", err)
+					w.Close()
+					continue
+				}
+
+				if err := w.Close(); err != nil {
+					n.logger.Error("error closing writer for response", "error", err)
+					continue
+				}
+
+				for _, handler := range n.onMessageSentHandlers {
+					handler()
+				}
 			}
 		}
-
-		return nil
 	}
 
-	errorGroup.Go(readMesages)
-	errorGroup.Go(writeMessages)
-	if err := errorGroup.Wait(); err != nil && parentCtx.Err() == nil {
-		n.logger.Error("error in WebSocket message handling", "error", err)
+	// waitForConnClose waits for the WebSocket connection to close.
+	// It listens for the close signal and logs the closure event.
+	waitForConnClose := func(ctx context.Context, abortOthers context.CancelFunc) {
+		defer abortOthers() // Stop other goroutines when done
+
+		select {
+		case <-ctx.Done():
+			n.logger.Debug("context done, stopping connection close wait")
+		case <-closeConnCh:
+			n.logger.Info("WebSocket connection closed by server", "connectionID", connectionID)
+		}
 	}
+
+	parentCtx, cancel := context.WithCancel(r.Context())
+	wg := &sync.WaitGroup{}
+	wg.Add(3) // We wait only for process, write and close goroutines, read goroutine will exit once connection is closed
+	abortOthers := func() {
+		cancel()  // Trigger exit on other goroutines
+		wg.Done() // Decrement the wait group counter
+	}
+
+	go readMessages(cancel)
+	go processMesages(parentCtx, abortOthers)
+	go writeMessages(parentCtx, abortOthers)
+	go waitForConnClose(parentCtx, abortOthers)
+
+	wg.Wait()
 }
 
 // RPCHandler is a function that processes an RPC request.
@@ -478,7 +511,7 @@ func (wn *RPCNode) Notify(userID, method string, params ...any) {
 
 // getSendMessageFunc creates a SendRPCMessageFunc for a specific connection.
 // The returned function can be used to send notifications to that connection.
-func (wn *RPCNode) getSendMessageFunc(writeSink chan<- []byte) SendRPCMessageFunc {
+func (wn *RPCNode) getSendMessageFunc(conn *RPCConnection) SendRPCMessageFunc {
 	return func(method string, params ...any) {
 		message, err := prepareRawNotification(wn.signer, method, params...)
 		if err != nil {
@@ -486,12 +519,12 @@ func (wn *RPCNode) getSendMessageFunc(writeSink chan<- []byte) SendRPCMessageFun
 			return
 		}
 
-		if writeSink == nil {
-			wn.logger.Error("write sink is nil, cannot send message", "method", method)
+		if conn == nil {
+			wn.logger.Error("RPCConnection is nil, cannot send message", "method", method)
 			return
 		}
 
-		writeRPCMessageWithTimeout(writeSink, message)
+		conn.Write(message)
 	}
 }
 
@@ -519,7 +552,7 @@ func (wn *RPCNode) sendErrorResponse(conn *RPCConnection, requestID uint64, mess
 		return
 	}
 
-	writeRPCMessageWithTimeout(conn.WriteSink, responseBytes)
+	conn.Write(responseBytes)
 }
 
 // RPCHandlerGroup represents a collection of handlers with shared middleware.
@@ -565,8 +598,31 @@ type RPCConnection struct {
 	UserID string
 	// WriteSink is the channel for sending messages to this connection
 	WriteSink chan<- []byte
-	// Storage provides per-connection storage for session data
-	Storage *SafeStorage
+	// CloseConnCh is a channel that can be used to signal connection closure
+	CloseConnCh chan<- struct{}
+}
+
+// NewRPCConnection creates a new RPCConnection instance.
+func NewRPCConnection(connID, userID string, writeSink chan<- []byte, closeConnCh chan<- struct{}) *RPCConnection {
+	return &RPCConnection{
+		ConnectionID: connID,
+		UserID:       userID,
+		WriteSink:    writeSink,
+		CloseConnCh:  closeConnCh,
+	}
+}
+
+// Write sends a message to the connection's write sink.
+// If the write operation takes too long, it signals the connection to close.
+// This is useful for preventing hangs if the client is unresponsive.
+func (conn *RPCConnection) Write(message []byte) {
+	select {
+	case <-time.After(defaultRPCMessageWriteDuration):
+		conn.CloseConnCh <- struct{}{} // Signal connection closure if write times out
+		return
+	case conn.WriteSink <- message:
+		return
+	}
 }
 
 // rpcConnectionHub manages all active WebSocket connections.
@@ -575,7 +631,7 @@ type rpcConnectionHub struct {
 	// connections maps connection IDs to RPCConnection instances
 	connections map[string]*RPCConnection
 	// authMapping maps user IDs to connection IDs for authenticated users
-	authMapping map[string]string
+	authMapping map[string]map[string]bool
 	// mu protects concurrent access to the maps
 	mu sync.RWMutex
 }
@@ -585,7 +641,7 @@ type rpcConnectionHub struct {
 func newRPCConnectionHub() *rpcConnectionHub {
 	return &rpcConnectionHub{
 		connections: make(map[string]*RPCConnection),
-		authMapping: make(map[string]string),
+		authMapping: make(map[string]map[string]bool),
 	}
 }
 
@@ -596,9 +652,17 @@ func (hub *rpcConnectionHub) Set(conn *RPCConnection) {
 	defer hub.mu.Unlock()
 	hub.connections[conn.ConnectionID] = conn
 
-	if conn.UserID != "" {
-		hub.authMapping[conn.UserID] = conn.ConnectionID
+	if conn.UserID == "" {
+		return
 	}
+
+	// If the connection has a UserID, update the auth mapping
+	if _, exists := hub.authMapping[conn.UserID]; !exists {
+		hub.authMapping[conn.UserID] = make(map[string]bool)
+	}
+
+	// Update the mapping for this user
+	hub.authMapping[conn.UserID][conn.ConnectionID] = true
 }
 
 // Get retrieves a connection by its connection ID.
@@ -626,7 +690,17 @@ func (hub *rpcConnectionHub) Remove(connID string) {
 	}
 
 	delete(hub.connections, connID)
-	delete(hub.authMapping, conn.UserID)
+	if conn.UserID == "" {
+		return
+	}
+
+	// If the connection has a UserID, remove it from the auth mapping
+	if userConns, exists := hub.authMapping[conn.UserID]; exists {
+		delete(userConns, connID)
+		if len(userConns) == 0 {
+			delete(hub.authMapping, conn.UserID) // Remove user mapping if no connections left
+		}
+	}
 }
 
 // Publish sends a message to a specific authenticated user.
@@ -634,17 +708,21 @@ func (hub *rpcConnectionHub) Remove(connID string) {
 func (hub *rpcConnectionHub) Publish(userID string, message []byte) {
 	hub.mu.RLock()
 	defer hub.mu.RUnlock()
-	connID, ok := hub.authMapping[userID]
+	connIDs, ok := hub.authMapping[userID]
 	if !ok {
 		return
 	}
 
-	conn, ok := hub.connections[connID]
-	if !ok {
-		return
-	}
+	// Iterate over all connections for this user and send the message
+	for connID := range connIDs {
+		conn := hub.connections[connID]
+		if conn == nil || conn.WriteSink == nil {
+			continue // Skip if connection is nil or write sink is not set
+		}
 
-	writeRPCMessageWithTimeout(conn.WriteSink, message)
+		// Write the message to the connection's write sink
+		conn.Write(message)
+	}
 }
 
 // SafeStorage provides thread-safe key-value storage for connection-specific data.
@@ -679,14 +757,4 @@ func (s *SafeStorage) Get(key string) (any, bool) {
 	defer s.mu.RUnlock()
 
 	return s.storage[key], s.storage[key] != nil
-}
-
-func writeRPCMessageWithTimeout(writeSink chan<- []byte, message []byte) {
-	select {
-	case <-time.After(defaultRPCMessageWriteDuration):
-		// TODO: implement retry mechanism
-		return
-	case writeSink <- message:
-		return
-	}
 }

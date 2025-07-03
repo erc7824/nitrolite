@@ -122,22 +122,22 @@ export interface CreateAppSessionRequest extends GenericRPCMessage {
 }
 
 /**
- * Represents the request parameters for the 'submit_state' RPC method.
+ * Represents the request parameters for the 'submit_app_state' RPC method.
  */
-export interface SubmitStateRequestParams {
+export interface SubmitAppStateRequestParams {
     /** The unique identifier of the application session to update. */
     app_session_id: Hex;
     /** The new allocation distribution among participants. Must include all participants and maintain total balance. */
     allocations: AppSessionAllocation[];
 }
-export type SubmitStateRPCRequestParams = SubmitStateRequestParams; // for backward compatibility
+export type SubmitAppStateRPCRequestParams = SubmitAppStateRequestParams; // for backward compatibility
 
 /**
- * Represents the request structure for the 'submit_state' RPC method.
+ * Represents the request structure for the 'submit_app_state' RPC method.
  */
-export interface SubmitStateRequest extends GenericRPCMessage {
-    method: RPCMethod.SubmitState;
-    params: [SubmitStateRequestParams];
+export interface SubmitAppStateRequest extends GenericRPCMessage {
+    method: RPCMethod.SubmitAppState;
+    params: [SubmitAppStateRequestParams];
 }
 
 /**
@@ -378,7 +378,7 @@ export type RPCRequest =
     | GetLedgerBalancesRequest
     | GetLedgerEntriesRequest
     | CreateAppSessionRequest
-    | SubmitStateRequest
+    | SubmitAppStateRequest
     | CloseAppSessionRequest
     | GetAppDefinitionRequest
     | GetAppSessionsRequest
@@ -403,7 +403,7 @@ export type RPCRequestParamsByMethod = {
     [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRequestParams;
     [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRequestParams;
     [RPCMethod.CreateAppSession]: CreateAppSessionRequestParams;
-    [RPCMethod.SubmitState]: SubmitStateRequestParams;
+    [RPCMethod.SubmitAppState]: SubmitAppStateRequestParams;
     [RPCMethod.CloseAppSession]: CloseAppSessionRequestParams;
     [RPCMethod.GetAppDefinition]: GetAppDefinitionRequestParams;
     [RPCMethod.GetAppSessions]: GetAppSessionsRequestParams;

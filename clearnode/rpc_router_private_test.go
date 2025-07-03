@@ -820,8 +820,8 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 	})
 }
 
-func TestRPCRouterHandleSubmitState(t *testing.T) {
-	t.Run("SuccessfulSubmitState", func(t *testing.T) {
+func TestRPCRouterHandleSubmitAppState(t *testing.T) {
+	t.Run("SuccessfulSubmitAppState", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
 		defer cleanup()
@@ -866,7 +866,7 @@ func TestRPCRouterHandleSubmitState(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, assetSymbol, decimal.NewFromInt(300)))
 
 		data := `{"state":"updated"}`
-		submitStateParams := SubmitStateParams{
+		submitAppStateParams := SubmitAppStateParams{
 			AppSessionID: vAppID.Hex(),
 			Allocations: []AppAllocation{
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
@@ -876,14 +876,14 @@ func TestRPCRouterHandleSubmitState(t *testing.T) {
 		}
 
 		// Create RPC request
-		paramsJSON, err := json.Marshal(submitStateParams)
+		paramsJSON, err := json.Marshal(submitAppStateParams)
 		require.NoError(t, err)
 		c := &RPCContext{
 			Context: context.TODO(),
 			Message: RPCMessage{
 				Req: &RPCData{
 					RequestID: 1,
-					Method:    "submit_state",
+					Method:    "submit_app_state",
 					Params:    []any{json.RawMessage(paramsJSON)},
 					Timestamp: uint64(time.Now().Unix()),
 				},
@@ -901,7 +901,7 @@ func TestRPCRouterHandleSubmitState(t *testing.T) {
 		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
 
 		// Call handler
-		router.HandleSubmitState(c)
+		router.HandleSubmitAppState(c)
 		res := c.Message.Res
 		require.NotNil(t, res)
 

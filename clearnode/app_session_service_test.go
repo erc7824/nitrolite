@@ -128,7 +128,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 	})
 }
 
-func TestAppSessionService_SubmitState(t *testing.T) {
+func TestAppSessionService_SubmitAppState(t *testing.T) {
 	rawA, _ := crypto.GenerateKey()
 	rawB, _ := crypto.GenerateKey()
 	signerA := Signer{privateKey: rawA}
@@ -136,7 +136,7 @@ func TestAppSessionService_SubmitState(t *testing.T) {
 	userAddressA := signerA.GetAddress()
 	userAddressB := signerB.GetAddress()
 
-	t.Run("SuccessfulSubmitState", func(t *testing.T) {
+	t.Run("SuccessfulSubmitAppState", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
@@ -156,7 +156,7 @@ func TestAppSessionService_SubmitState(t *testing.T) {
 		ledgerA := GetWalletLedger(db, userAddressA)
 		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
 
-		params := &SubmitStateParams{
+		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Allocations: []AppAllocation{
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
@@ -172,7 +172,7 @@ func TestAppSessionService_SubmitState(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		newVersion, err := service.SubmitState(params, rpcSigners)
+		newVersion, err := service.SubmitAppState(params, rpcSigners)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), newVersion)
 

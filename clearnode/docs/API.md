@@ -18,7 +18,7 @@
 | `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
 | `transfer` | Transfers funds from user's unified balance to another account | Private |
 | `create_app_session` | Creates a new virtual application on a ledger | Private |
-| `submit_state` | Submits an intermediate state into a virtual application | Private |
+| `submit_app_state` | Submits an intermediate state into a virtual application | Private |
 | `close_app_session` | Closes a virtual application | Private |
 | `close_channel` | Closes a payment channel | Private |
 | `resize_channel` | Adjusts channel capacity | Private |
@@ -558,7 +558,7 @@ The optional `session_data` field can be used to store application-specific data
   "sig": ["0xabcd1234..."]
 }
 ```
-### Submit State
+### Submit Application State
 
 Submits an intermediate state into a virtual application and redistributes funds in an app session.
 To submit an intermediate state, participants must reach the signature quorum that they agreed on when creating the app session.
@@ -570,7 +570,7 @@ The optional `session_data` field can be used to update application-specific dat
 
 ```json
 {
-  "req": [1, "submit_state", [{
+  "req": [1, "submit_app_state", [{
     "app_session_id": "0x3456789012abcdef...",
     "allocations": [
       {
@@ -584,7 +584,7 @@ The optional `session_data` field can be used to update application-specific dat
         "amount": "200.0"
       }
     ],
-    "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"finished\",\"winner\":\"0x00112233445566778899AaBbCcDdEeFf00112233\",\"endCondition\":\"checkmate\"}"
+    "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"finished\",\"winner\":\"0x00112233445566778899AaBbCcDdEeFf00112233\",\"endCondition\":\"checkmate\"}" // Optional
   }], 1619123456789],
   "sig": ["0x9876fedcba...", "0x8765fedcba..."]
 }
@@ -594,7 +594,7 @@ The optional `session_data` field can be used to update application-specific dat
 
 ```json
 {
-  "res": [1, "submit_state", [{
+  "res": [1, "submit_app_state", [{
     "app_session_id": "0x3456789012abcdef...",
     "version": "567",
     "status": "open"

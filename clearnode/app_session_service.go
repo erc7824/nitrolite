@@ -105,7 +105,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 	return &AppSession{SessionID: appSessionID, Version: 1, Status: ChannelStatusOpen}, nil
 }
 
-func (s *AppSessionService) SubmitState(params *SubmitStateParams, rpcSigners map[string]struct{}) (uint64, error) {
+func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSigners map[string]struct{}) (uint64, error) {
 	var newVersion uint64
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
@@ -231,7 +231,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 		if params.SessionData != nil {
 			updates["session_data"] = *params.SessionData
 		}
-		
+
 		return tx.Model(&appSession).Updates(updates).Error
 	})
 

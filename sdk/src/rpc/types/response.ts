@@ -123,9 +123,9 @@ export interface CreateAppSessionResponseParams {
 export type CreateAppSessionRPCResponseParams = CreateAppSessionResponseParams; // for backward compatibility
 
 /**
- * Represents the parameters for the 'submit_state' RPC method.
+ * Represents the parameters for the 'submit_app_state' RPC method.
  */
-export interface SubmitStateResponseParams {
+export interface SubmitAppStateResponseParams {
     /** The unique identifier for the application session. */
     appSessionId: Hex;
     /** The version number of the session. */
@@ -133,7 +133,7 @@ export interface SubmitStateResponseParams {
     /** The current status of the channel (e.g., "open", "closed"). */
     status: RPCChannelStatus;
 }
-export type SubmitStateRPCResponseParams = SubmitStateResponseParams; // for backward compatibility
+export type SubmitAppStateRPCResponseParams = SubmitAppStateResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'close_app_session' RPC method.
@@ -341,11 +341,11 @@ export interface CreateAppSessionResponse extends GenericRPCMessage {
 }
 
 /**
- * Represents the response structure for the 'submit_state' RPC method.
+ * Represents the response structure for the 'submit_app_state' RPC method.
  */
-export interface SubmitStateResponse extends GenericRPCMessage {
-    method: RPCMethod.SubmitState;
-    params: SubmitStateResponseParams;
+export interface SubmitAppStateResponse extends GenericRPCMessage {
+    method: RPCMethod.SubmitAppState;
+    params: SubmitAppStateResponseParams;
 }
 
 /**
@@ -571,7 +571,7 @@ export type RPCResponse =
     | GetLedgerBalancesResponse
     | GetLedgerEntriesResponse
     | CreateAppSessionResponse
-    | SubmitStateResponse
+    | SubmitAppStateResponse
     | CloseAppSessionResponse
     | GetAppDefinitionResponse
     | GetAppSessionsResponse

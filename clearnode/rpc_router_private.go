@@ -84,7 +84,7 @@ type ResizeChannelResponse struct {
 type Allocation struct {
 	Participant  string   `json:"destination"`
 	TokenAddress string   `json:"token"`
-	Amount       *big.Int `json:"amount,string"` // Amount in wei
+	RawAmount    *big.Int `json:"amount,string"`
 }
 
 type CloseChannelParams struct {
@@ -108,7 +108,7 @@ type ChannelResponse struct {
 	Status      ChannelStatus `json:"status"`
 	Token       string        `json:"token"`
 	Wallet      string        `json:"wallet"`
-	Amount      *big.Int      `json:"amount"` // Total amount in the channel (user + broker) in wei
+	RawAmount   *big.Int      `json:"amount"` // Total amount in the channel (user + broker)
 	ChainID     uint32        `json:"chain_id"`
 	Adjudicator string        `json:"adjudicator"`
 	Challenge   uint64        `json:"challenge"`

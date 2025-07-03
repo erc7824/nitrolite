@@ -421,18 +421,18 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			return fmt.Errorf("error finding channel: %w", result.Error)
 		}
 
-		newAmount := channel.RawAmount.BigInt()
+		newRawAmount := channel.RawAmount.BigInt()
 		for _, change := range ev.DeltaAllocations {
-			newAmount.Add(newAmount, change)
+			newRawAmount.Add(newRawAmount, change)
 		}
 
-		if newAmount.Sign() < 0 {
+		if newRawAmount.Sign() < 0 {
 			// TODO: what do we do in this case?
 			logger.Error("invalid resize, channel balance cannot be negative", "channelId", channelID)
-			return fmt.Errorf("invalid resize, channel balance cannot be negative: %s", newAmount.String())
+			return fmt.Errorf("invalid resize, channel balance cannot be negative: %s", newRawAmount.String())
 		}
 
-		channel.RawAmount = decimal.NewFromBigInt(newAmount, 0)
+		channel.RawAmount = decimal.NewFromBigInt(newRawAmount, 0)
 		channel.UpdatedAt = time.Now()
 		channel.Version++
 		if err := tx.Save(&channel).Error; err != nil {
@@ -501,7 +501,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 		logger.Error("failed to resize channel", "channelId", channelID, "error", err)
 		return
 	}
-	logger.Info("resized channel", "channelId", channelID, "newAmount", channel.RawAmount)
+	logger.Info("resized channel", "channelId", channelID, "newRawAmount", channel.RawAmount)
 
 	c.sendBalanceUpdate(channel.Wallet)
 	c.sendChannelUpdate(channel)

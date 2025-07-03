@@ -1091,7 +1091,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&asset).Error)
 
 		// Create channel with initial amount 1000
-		initialAmount := decimal.NewFromInt(1000)
+		initialRawAmount := decimal.NewFromInt(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResize",
 			Participant: userAddress.Hex(),
@@ -1099,7 +1099,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     1,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -1156,15 +1156,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		assert.Equal(t, ch.Version+1, resObj.Version)
 
 		// New channel amount should be initial + 200
-		expected := new(big.Int).Add(initialAmount.BigInt(), big.NewInt(200))
-		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expected), "Allocated amount mismatch")
-		assert.Equal(t, 0, resObj.Allocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		expected := new(big.Int).Add(initialRawAmount.BigInt(), big.NewInt(200))
+		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Allocated amount mismatch")
+		assert.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
-		assert.Equal(t, initialAmount, unchangedChannel.RawAmount) // Should remain unchanged
-		assert.Equal(t, ch.Version, unchangedChannel.Version)      // Should remain unchanged
+		assert.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
+		assert.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
 		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
@@ -1187,7 +1187,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		asset := Asset{Token: "0xTokenResize2", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
-		initialAmount := decimal.NewFromInt(1000)
+		initialRawAmount := decimal.NewFromInt(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResize2",
 			Participant: userAddress.Hex(),
@@ -1195,7 +1195,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     1,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -1242,8 +1242,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.True(t, ok)
 
 		// Channel amount should decrease
-		expected := new(big.Int).Sub(initialAmount.BigInt(), big.NewInt(300))
-		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expected), "Decreased amount mismatch")
+		expected := new(big.Int).Sub(initialRawAmount.BigInt(), big.NewInt(300))
+		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Decreased amount mismatch")
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, "usdc")
@@ -1655,7 +1655,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		asset := Asset{Token: "0xTokenResizeOnly", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
-		initialAmount := decimal.NewFromInt(1000)
+		initialRawAmount := decimal.NewFromInt(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResizeOnly",
 			Participant: userAddress.Hex(),
@@ -1663,7 +1663,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     1,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -1711,8 +1711,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.True(t, ok)
 
 		// Should be initial amount (1000) + allocate amount (0) + resize amount (100) = 1100
-		expected := new(big.Int).Add(initialAmount.BigInt(), big.NewInt(100))
-		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expected))
+		expected := new(big.Int).Add(initialRawAmount.BigInt(), big.NewInt(100))
+		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected))
 	})
 
 	t.Run("SuccessfulResizeWithdrawal", func(t *testing.T) {
@@ -1729,7 +1729,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		asset := Asset{Token: "0xTokenResizeOnly", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
-		initialAmount := decimal.NewFromInt(1000)
+		initialRawAmount := decimal.NewFromInt(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResizeOnly",
 			Participant: userAddress.Hex(),
@@ -1737,7 +1737,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     1,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -1785,8 +1785,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.True(t, ok)
 
 		// Should be initial amount (1000) + allocate amount (0) - resize amount (100) = 900
-		expected := new(big.Int).Add(initialAmount.BigInt(), big.NewInt(-100))
-		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expected))
+		expected := new(big.Int).Add(initialRawAmount.BigInt(), big.NewInt(-100))
+		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected))
 	})
 
 	t.Run("ErrorExcessiveDeallocation", func(t *testing.T) {
@@ -1993,7 +1993,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 
 		// Verify the large allocation was processed correctly
 		expectedAmount := new(big.Int).Add(big.NewInt(1000), new(big.Int).Exp(big.NewInt(10), big.NewInt(15), nil))
-		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expectedAmount))
+		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expectedAmount))
 	})
 
 	t.Run("SuccessfulAllocationWithResizeDeposit", func(t *testing.T) {
@@ -2012,7 +2012,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&asset).Error)
 
 		// Create channel with initial amount 1000
-		initialAmount := decimal.NewFromInt(1000)
+		initialRawAmount := decimal.NewFromInt(1000)
 		ch := Channel{
 			ChannelID:   "0xChanMixed",
 			Participant: userAddress.Hex(),
@@ -2020,7 +2020,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     1,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -2078,15 +2078,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		assert.Equal(t, ch.Version+1, resObj.Version)
 
 		// New channel amount should be initial + AllocateAmount + ResizeAmount = 1000 + 150 + 100 = 1250
-		expected := new(big.Int).Add(initialAmount.BigInt(), big.NewInt(250))
-		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(expected), "Combined allocation+resize amount mismatch")
-		assert.Equal(t, 0, resObj.Allocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		expected := new(big.Int).Add(initialRawAmount.BigInt(), big.NewInt(250))
+		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Combined allocation+resize amount mismatch")
+		assert.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
-		assert.Equal(t, initialAmount, unchangedChannel.RawAmount) // Should remain unchanged
-		assert.Equal(t, ch.Version, unchangedChannel.Version)      // Should remain unchanged
+		assert.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
+		assert.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
 		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
@@ -2111,7 +2111,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&asset).Error)
 
 		// Create channel with initial amount 0
-		initialAmount := decimal.NewFromInt(0)
+		initialRawAmount := decimal.NewFromInt(0)
 		ch := Channel{
 			ChannelID:   "0xChanMixed",
 			Participant: userAddress.Hex(),
@@ -2119,7 +2119,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     1,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -2177,14 +2177,14 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		assert.Equal(t, ch.Version+1, resObj.Version)
 
 		// New channel amount should be initial + AllocateAmount + ResizeAmount = 0 + 100 - 100 = 0
-		assert.Equal(t, 0, resObj.Allocations[0].Amount.Cmp(big.NewInt(0)), "Combined allocation+resize amount mismatch")
-		assert.Equal(t, 0, resObj.Allocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(big.NewInt(0)), "Combined allocation+resize amount mismatch")
+		assert.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
-		assert.Equal(t, initialAmount, unchangedChannel.RawAmount) // Should remain unchanged
-		assert.Equal(t, ch.Version, unchangedChannel.Version)      // Should remain unchanged
+		assert.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
+		assert.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
 		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
@@ -2211,7 +2211,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		require.NoError(t, db.Create(&asset).Error)
 
 		// Create channel with amount 500
-		initialAmount := decimal.NewFromInt(500)
+		initialRawAmount := decimal.NewFromInt(500)
 		ch := Channel{
 			ChannelID:   "0xChanClose",
 			Participant: userAddress.Hex(),
@@ -2219,7 +2219,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     2,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -2228,7 +2228,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddress).Record(
 			userAccountID,
 			"usdc",
-			decimal.NewFromBigInt(initialAmount.BigInt(), -int32(asset.Decimals)),
+			decimal.NewFromBigInt(initialRawAmount.BigInt(), -int32(asset.Decimals)),
 		))
 
 		// Prepare close params
@@ -2273,8 +2273,8 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		assert.Equal(t, ch.Version+1, resObj.Version)
 
 		// Final allocation should send full balance to destination
-		assert.Equal(t, 0, resObj.FinalAllocations[0].Amount.Cmp(initialAmount.BigInt()), "Primary allocation mismatch")
-		assert.Equal(t, 0, resObj.FinalAllocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		assert.Equal(t, 0, resObj.FinalAllocations[0].RawAmount.Cmp(initialRawAmount.BigInt()), "Primary allocation mismatch")
+		assert.Equal(t, 0, resObj.FinalAllocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
 	})
 	t.Run("ErrorOtherChallengedChannel", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
@@ -2292,7 +2292,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		require.NoError(t, db.Create(&asset).Error)
 
 		// Create channel with amount 500
-		initialAmount := decimal.NewFromInt(500)
+		initialRawAmount := decimal.NewFromInt(500)
 
 		// Seed other challenged channel
 		require.NoError(t, db.Create(&Channel{
@@ -2302,7 +2302,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 			Status:      ChannelStatusChallenged,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     2,
 		}).Error)
 
@@ -2313,7 +2313,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     2,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -2322,7 +2322,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddress).Record(
 			userAccountID,
 			"usdc",
-			decimal.NewFromBigInt(initialAmount.BigInt(), -int32(asset.Decimals)),
+			decimal.NewFromBigInt(initialRawAmount.BigInt(), -int32(asset.Decimals)),
 		))
 
 		// Prepare close params

@@ -143,7 +143,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		resp.Allocations = append(resp.Allocations, Allocation{
 			Participant:  alloc.Destination.Hex(),
 			TokenAddress: alloc.Token.Hex(),
-			Amount:       alloc.Amount,
+			RawAmount:    alloc.Amount,
 		})
 	}
 	return resp, nil
@@ -246,7 +246,7 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 		resp.FinalAllocations = append(resp.FinalAllocations, Allocation{
 			Participant:  alloc.Destination.Hex(),
 			TokenAddress: alloc.Token.Hex(),
-			Amount:       alloc.Amount,
+			RawAmount:    alloc.Amount,
 		})
 	}
 

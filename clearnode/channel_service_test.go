@@ -27,7 +27,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&asset).Error)
 
 		// Create channel with initial amount 1000
-		initialAmount := decimal.NewFromInt(1000)
+		initialRawAmount := decimal.NewFromInt(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResize",
 			Participant: userAddress.Hex(),
@@ -35,7 +35,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     1,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -67,15 +67,15 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		assert.Equal(t, ch.Version+1, response.Version)
 
 		// New channel amount should be initial + 200
-		expected := initialAmount.Add(decimal.NewFromInt(200))
-		assert.Equal(t, 0, response.Allocations[0].Amount.Cmp(expected.BigInt()), "Allocated amount mismatch")
-		assert.Equal(t, 0, response.Allocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		expected := initialRawAmount.Add(decimal.NewFromInt(200))
+		assert.Equal(t, 0, response.Allocations[0].RawAmount.Cmp(expected.BigInt()), "Allocated amount mismatch")
+		assert.Equal(t, 0, response.Allocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
-		assert.Equal(t, initialAmount, unchangedChannel.RawAmount) // Should remain unchanged
-		assert.Equal(t, ch.Version, unchangedChannel.Version)      // Should remain unchanged
+		assert.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
+		assert.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
 		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
@@ -97,7 +97,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		asset := Asset{Token: "0xTokenResize2", ChainID: 137, Symbol: "usdc", Decimals: 6}
 		require.NoError(t, db.Create(&asset).Error)
 
-		initialAmount := decimal.NewFromInt(1000)
+		initialRawAmount := decimal.NewFromInt(1000)
 		ch := Channel{
 			ChannelID:   "0xChanResize2",
 			Participant: userAddress.Hex(),
@@ -105,7 +105,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     1,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -127,8 +127,8 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		require.NoError(t, err)
 
 		// Channel amount should decrease
-		expected := initialAmount.Sub(decimal.NewFromInt(300))
-		assert.Equal(t, 0, response.Allocations[0].Amount.Cmp(expected.BigInt()), "Decreased amount mismatch")
+		expected := initialRawAmount.Sub(decimal.NewFromInt(300))
+		assert.Equal(t, 0, response.Allocations[0].RawAmount.Cmp(expected.BigInt()), "Decreased amount mismatch")
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, "usdc")
@@ -377,7 +377,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		require.NoError(t, db.Create(&asset).Error)
 
 		// Create channel with amount 500
-		initialAmount := decimal.NewFromInt(500)
+		initialRawAmount := decimal.NewFromInt(500)
 		ch := Channel{
 			ChannelID:   "0xChanClose",
 			Participant: userAddress.Hex(),
@@ -385,7 +385,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     2,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -394,7 +394,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddress).Record(
 			userAccountID,
 			"usdc",
-			decimal.NewFromBigInt(initialAmount.BigInt(), -int32(asset.Decimals)),
+			decimal.NewFromBigInt(initialRawAmount.BigInt(), -int32(asset.Decimals)),
 		))
 
 		service := NewChannelService(db, &signer)
@@ -414,8 +414,8 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		assert.Equal(t, ch.Version+1, response.Version)
 
 		// Final allocation should send full balance to destination
-		assert.Equal(t, 0, response.FinalAllocations[0].Amount.Cmp(initialAmount.BigInt()), "Primary allocation mismatch")
-		assert.Equal(t, 0, response.FinalAllocations[1].Amount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		assert.Equal(t, 0, response.FinalAllocations[0].RawAmount.Cmp(initialRawAmount.BigInt()), "Primary allocation mismatch")
+		assert.Equal(t, 0, response.FinalAllocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
 	})
 
 	t.Run("ErrorOtherChallengedChannel", func(t *testing.T) {
@@ -433,7 +433,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		require.NoError(t, db.Create(&asset).Error)
 
 		// Create channel with amount 500
-		initialAmount := decimal.NewFromInt(500)
+		initialRawAmount := decimal.NewFromInt(500)
 
 		// Seed other challenged channel
 		require.NoError(t, db.Create(&Channel{
@@ -443,7 +443,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 			Status:      ChannelStatusChallenged,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     2,
 		}).Error)
 
@@ -454,7 +454,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       asset.Token,
 			ChainID:     137,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Version:     2,
 		}
 		require.NoError(t, db.Create(&ch).Error)
@@ -463,7 +463,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddress).Record(
 			userAccountID,
 			"usdc",
-			decimal.NewFromBigInt(initialAmount.BigInt(), -int32(asset.Decimals)),
+			decimal.NewFromBigInt(initialRawAmount.BigInt(), -int32(asset.Decimals)),
 		))
 
 		service := NewChannelService(db, &signer)

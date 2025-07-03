@@ -535,7 +535,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		custody, db, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		initialAmount := decimal.NewFromInt(1000000)
+		initialRawAmount := decimal.NewFromInt(1000000)
 		finalAmount := big.NewInt(500000)
 
 		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
@@ -551,7 +551,7 @@ func TestHandleClosedEvent(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       tokenAddress,
 			ChainID:     custody.chainID,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Nonce:       12345,
 			Version:     1,
 			Challenge:   3600,
@@ -566,9 +566,9 @@ func TestHandleClosedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := decimal.NewFromBigInt(initialAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialRawAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
-		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
+		err = ledger.Record(walletAccountID, asset.Symbol, initialRawAmountDecimal)
 		require.NoError(t, err)
 
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, finalAmount)
@@ -646,7 +646,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		custody, db, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		initialAmount := decimal.NewFromInt(1000000)
+		initialRawAmount := decimal.NewFromInt(1000000)
 		finalAmount := big.NewInt(1000000)
 
 		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
@@ -662,7 +662,7 @@ func TestHandleClosedEvent(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       tokenAddress,
 			ChainID:     custody.chainID,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Nonce:       12345,
 			Version:     1,
 			Challenge:   3600,
@@ -678,7 +678,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := decimal.NewFromBigInt(initialAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
 		// Initial balance in wallet
 		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
@@ -792,7 +792,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		custody, db, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		initialAmount := decimal.NewFromInt(1000000)
+		initialRawAmount := decimal.NewFromInt(1000000)
 		deltaAmount := decimal.NewFromInt(500000) // Increase
 		expectedAmount := decimal.NewFromInt(1500000)
 
@@ -809,7 +809,7 @@ func TestHandleResizedEvent(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       tokenAddress,
 			ChainID:     custody.chainID,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Nonce:       12345,
 			Version:     1,
 			Challenge:   3600,
@@ -824,7 +824,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := decimal.NewFromBigInt(initialAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
 		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
 		require.NoError(t, err)
@@ -901,7 +901,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		custody, db, cleanup := setupMockCustody(t)
 		defer cleanup()
 
-		initialAmount := decimal.NewFromInt(1000000)
+		initialRawAmount := decimal.NewFromInt(1000000)
 		deltaAmount := decimal.NewFromInt(-300000) // Decrease
 		expectedAmount := decimal.NewFromInt(700000)
 
@@ -918,7 +918,7 @@ func TestHandleResizedEvent(t *testing.T) {
 			Status:      ChannelStatusOpen,
 			Token:       tokenAddress,
 			ChainID:     custody.chainID,
-			RawAmount:   initialAmount,
+			RawAmount:   initialRawAmount,
 			Nonce:       12345,
 			Version:     1,
 			Challenge:   3600,
@@ -933,7 +933,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := decimal.NewFromBigInt(initialAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
 		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
 		require.NoError(t, err)

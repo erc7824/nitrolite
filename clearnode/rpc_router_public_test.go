@@ -545,6 +545,7 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 		{
 			SessionID:          "0xSession1",
 			ParticipantWallets: []string{participantAddr, "0xParticipant2"},
+			SessionData:        `{"key":"value"}`,
 			Status:             ChannelStatusOpen,
 			Protocol:           "test-app-1",
 			Challenge:          60,
@@ -558,6 +559,7 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 		{
 			SessionID:          "0xSession2",
 			ParticipantWallets: []string{participantAddr, "0xParticipant3"},
+			SessionData:        `{"key":"value"}`,
 			Status:             ChannelStatusClosed,
 			Protocol:           "test-app-2",
 			Challenge:          120,
@@ -571,6 +573,7 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 		{
 			SessionID:          "0xSession3",
 			ParticipantWallets: []string{"0xParticipant4", "0xParticipant5"},
+			SessionData:        `{"key":"value"}`,
 			Status:             ChannelStatusOpen,
 			Protocol:           "test-app-3",
 			Challenge:          90,

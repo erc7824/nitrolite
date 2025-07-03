@@ -3,7 +3,7 @@ import { Address } from 'viem';
 import {
     RPCMethod,
     CreateAppSessionResponseParams,
-    SubmitStateResponseParams,
+    SubmitAppStateResponseParams,
     CloseAppSessionResponseParams,
     GetAppDefinitionResponseParams,
     GetAppSessionsResponseParams,
@@ -25,7 +25,7 @@ const CreateAppSessionParamsSchema = z
     .refine((arr) => arr.length === 1)
     .transform((arr) => arr[0]);
 
-const SubmitStateParamsSchema = z
+const SubmitAppStateParamsSchema = z
     .array(
         z.object({ app_session_id: hexSchema, version: z.number(), status: statusEnum }).transform(
             (raw) =>
@@ -33,7 +33,7 @@ const SubmitStateParamsSchema = z
                     appSessionId: raw.app_session_id as `0x${string}`,
                     version: raw.version,
                     status: raw.status as RPCChannelStatus,
-                }) as SubmitStateResponseParams,
+                }) as SubmitAppStateResponseParams,
         ),
     )
     .refine((arr) => arr.length === 1)
@@ -120,7 +120,7 @@ const GetAppSessionsParamsSchema = z
 
 export const appParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.CreateAppSession]: (params) => CreateAppSessionParamsSchema.parse(params),
-    [RPCMethod.SubmitState]: (params) => SubmitStateParamsSchema.parse(params),
+    [RPCMethod.SubmitAppState]: (params) => SubmitAppStateParamsSchema.parse(params),
     [RPCMethod.CloseAppSession]: (params) => CloseAppSessionParamsSchema.parse(params),
     [RPCMethod.GetAppDefinition]: (params) => GetAppDefinitionParamsSchema.parse(params),
     [RPCMethod.GetAppSessions]: (params) => GetAppSessionsParamsSchema.parse(params),

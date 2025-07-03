@@ -39,7 +39,7 @@ type CreateAppSessionParams struct {
 	SessionData *string         `json:"session_data"`
 }
 
-type SubmitStateParams struct {
+type SubmitAppStateParams struct {
 	AppSessionID string          `json:"app_session_id"`
 	Allocations  []AppAllocation `json:"allocations"`
 	SessionData  *string         `json:"session_data"`
@@ -313,13 +313,13 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 	)
 }
 
-// HandleSubmitState updates funds allocations distribution a virtual app session
-func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
+// HandleSubmitAppState updates funds allocations distribution a virtual app session
+func (r *RPCRouter) HandleSubmitAppState(c *RPCContext) {
 	ctx := c.Context
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
 
-	var params SubmitStateParams
+	var params SubmitAppStateParams
 	if err := parseParams(req.Params, &params); err != nil {
 		c.Fail(err.Error())
 		return
@@ -332,9 +332,9 @@ func (r *RPCRouter) HandleSubmitState(c *RPCContext) {
 		return
 	}
 
-	newVersion, err := r.AppSessionService.SubmitState(&params, rpcSigners)
+	newVersion, err := r.AppSessionService.SubmitAppState(&params, rpcSigners)
 	if err != nil {
-		logger.Error("failed to submit state", "error", err)
+		logger.Error("failed to submit app state", "error", err)
 		c.Fail(err.Error())
 		return
 	}

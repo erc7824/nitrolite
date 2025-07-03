@@ -18,6 +18,10 @@ import (
 var validate = validator.New()
 
 const (
+	defaultRPCErrorMessage = "an error occurred while processing the request"
+)
+
+const (
 	// rpcNodeGroupHandlerPrefix is the prefix used for all handler group IDs
 	rpcNodeGroupHandlerPrefix = "group."
 	// rpcNodeGroupRoot is the identifier for the root handler group
@@ -321,9 +325,19 @@ func (c *RPCContext) Succeed(method string, params ...any) {
 	}
 }
 
-// Fail sets an error response with the given error message.
-// This should be called by handlers to indicate processing failure.
-func (c *RPCContext) Fail(message string) {
+// Fail sets an error message for response
+// If the error is an RPCError, its message will be used; otherwise, the fallbackMessage is used.
+// This should be called by handlers to indicate an error occurred during processing.
+func (c *RPCContext) Fail(err error, fallbackMessage string) {
+	message := fallbackMessage
+	if _, ok := err.(RPCError); ok {
+		message = err.Error()
+		fmt.Println(err)
+	}
+	if message == "" {
+		message = defaultRPCErrorMessage
+	}
+
 	c.Message.Res = &RPCData{
 		RequestID: c.Message.Req.RequestID,
 		Method:    "error",

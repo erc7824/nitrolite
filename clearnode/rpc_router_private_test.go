@@ -2228,7 +2228,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddress).Record(
 			userAccountID,
 			"usdc",
-			decimal.NewFromBigInt(initialRawAmount.BigInt(), -int32(asset.Decimals)),
+			rawToDecimal(initialRawAmount.BigInt(), asset.Decimals),
 		))
 
 		// Prepare close params
@@ -2322,7 +2322,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddress).Record(
 			userAccountID,
 			"usdc",
-			decimal.NewFromBigInt(initialRawAmount.BigInt(), -int32(asset.Decimals)),
+			rawToDecimal(initialRawAmount.BigInt(), asset.Decimals),
 		))
 
 		// Prepare close params

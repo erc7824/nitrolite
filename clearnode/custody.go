@@ -274,7 +274,8 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 
 		walletAddress := ev.Wallet
 		channelAccountID := NewAccountID(channelID)
-		amount := decimal.NewFromBigInt(rawAmount, -int32(asset.Decimals))
+
+		amount := rawToDecimal(rawAmount, asset.Decimals)
 		ledger := GetWalletLedger(tx, walletAddress)
 		if err := ledger.Record(channelAccountID, asset.Symbol, amount); err != nil {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
@@ -339,7 +340,7 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 		walletAddress := common.HexToAddress(channel.Wallet)
 		channelAccountID := NewAccountID(channelID)
 		walletAccountID := NewAccountID(channel.Wallet)
-		amount := decimal.NewFromBigInt(channel.RawAmount.BigInt(), -int32(asset.Decimals))
+		amount := rawToDecimal(channel.RawAmount.BigInt(), asset.Decimals)
 		// Transfer from channel account into user's unified account.
 		ledger := GetWalletLedger(tx, walletAddress)
 		if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
@@ -453,7 +454,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 				return fmt.Errorf("DB error fetching asset: %w", err)
 			}
 
-			amount := decimal.NewFromBigInt(resizeAmount, -int32(asset.Decimals))
+			amount := rawToDecimal(resizeAmount, asset.Decimals)
 			// Keep correct order of operation for deposits and withdrawals into the channel.
 			if amount.IsPositive() || amount.IsZero() {
 				// 1. Deposit into a channel account.
@@ -533,7 +534,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		}
 
 		rawAmount := ev.FinalState.Allocations[0].Amount
-		amount := decimal.NewFromBigInt(rawAmount, -int32(asset.Decimals))
+		amount := rawToDecimal(rawAmount, asset.Decimals)
 
 		walletAddress := common.HexToAddress(channel.Wallet)
 		channelAccountID := NewAccountID(channelID)
@@ -630,7 +631,8 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 	for i, asset := range assets {
 		var available decimal.Decimal
 		if len(availInfo) > 0 && i < len(availInfo[0]) {
-			available = decimal.NewFromBigInt(availInfo[0][i], -int32(asset.Decimals))
+			available := rawToDecimal(availInfo[0][i], asset.Decimals)
+
 			metrics.BrokerBalanceAvailable.With(prometheus.Labels{
 				"network": fmt.Sprintf("%d", c.chainID),
 				"token":   asset.Token,
@@ -638,7 +640,7 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			}).Set(available.InexactFloat64())
 		}
 
-		walletBalance := decimal.NewFromBigInt(rawWalletBalances[i], -int32(asset.Decimals))
+		walletBalance := rawToDecimal(rawWalletBalances[i], asset.Decimals)
 		metrics.BrokerWalletBalance.With(prometheus.Labels{
 			"network": fmt.Sprintf("%d", c.chainID),
 			"token":   asset.Token,
@@ -680,4 +682,12 @@ func (c *Custody) saveContractEvent(tx *gorm.DB, name string, event any, rawLog 
 	}
 
 	return StoreContractEvent(tx, contractEvent)
+}
+
+// rawToDecimal converts a raw big.Int amount to a decimal.Decimal with the specified number of decimals.
+func rawToDecimal(raw *big.Int, decimals uint8) decimal.Decimal {
+	if raw == nil {
+		return decimal.Zero
+	}
+	return decimal.NewFromBigInt(raw, -int32(decimals))
 }

@@ -394,7 +394,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddress).Record(
 			userAccountID,
 			"usdc",
-			decimal.NewFromBigInt(initialRawAmount.BigInt(), -int32(asset.Decimals)),
+			rawToDecimal(initialRawAmount.BigInt(), asset.Decimals),
 		))
 
 		service := NewChannelService(db, &signer)
@@ -463,7 +463,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddress).Record(
 			userAccountID,
 			"usdc",
-			decimal.NewFromBigInt(initialRawAmount.BigInt(), -int32(asset.Decimals)),
+			rawToDecimal(initialRawAmount.BigInt(), asset.Decimals),
 		))
 
 		service := NewChannelService(db, &signer)

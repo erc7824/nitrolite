@@ -325,7 +325,7 @@ func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
 
 	var txType *TransactionType
 	if params.TxType != "" {
-		parsedType, err := parseTransactionType(params.TxType)
+		parsedType, err := parseLedgerTransactionType(params.TxType)
 		if err != nil {
 			c.Fail(err.Error())
 			return

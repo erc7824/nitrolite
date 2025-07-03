@@ -1264,7 +1264,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 		// Verify error message
 		errorMsg, ok := res.Params[0].(string)
 		require.True(t, ok, "Error parameter should be a string")
-		assert.Equal(t, ErrInvalidTransactionType.Error(), errorMsg, "Should return correct error message")
+		assert.Equal(t, ErrInvalidLedgerTransactionType.Error(), errorMsg, "Should return correct error message")
 	})
 }
 
@@ -1343,9 +1343,9 @@ func TestRPCRouterHandleGetLedgerTransactions_Pagination(t *testing.T) {
 		{
 			name:          "Pagination with sort asc",
 			params:        map[string]interface{}{"offset": float64(1), "limit": float64(3), "sort": "asc"},
-			expectedCount: 3, // Ascending order, skip 1, take 3
+			expectedCount: 3,                 // Ascending order, skip 1, take 3
 			expectedFirst: expectedHashes[9], // 2nd oldest
-			expectedLast:  expectedHashes[7],  // 4th oldest
+			expectedLast:  expectedHashes[7], // 4th oldest
 		},
 		{
 			name:          "Pagination with asset filter",

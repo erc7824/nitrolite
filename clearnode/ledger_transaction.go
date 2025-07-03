@@ -23,7 +23,7 @@ const (
 )
 
 var (
-	ErrInvalidTransactionType = errors.New("invalid transaction type")
+	ErrInvalidLedgerTransactionType = errors.New("invalid ledger transaction type")
 )
 
 type LedgerTransaction struct {
@@ -150,8 +150,8 @@ func (t TransactionType) String() string {
 	}
 }
 
-// parseTransactionType converts string transaction type to integer
-func parseTransactionType(s string) (TransactionType, error) {
+// parseLedgerTransactionType converts string transaction type to integer
+func parseLedgerTransactionType(s string) (TransactionType, error) {
 	switch s {
 	case "transfer":
 		return TransactionTypeTransfer, nil
@@ -164,6 +164,6 @@ func parseTransactionType(s string) (TransactionType, error) {
 	case "app_withdrawal":
 		return TransactionTypeAppWithdrawal, nil
 	default:
-		return 0, ErrInvalidTransactionType
+		return 0, ErrInvalidLedgerTransactionType
 	}
 }

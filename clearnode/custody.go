@@ -241,7 +241,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		}
 
 		// Check if there is already existing open channel with the broker
-		existingOpenChannel, err := CheckExistingChannels(c.db, wallet, tokenAddress, c.chainID)
+		existingOpenChannel, err := CheckExistingChannels(tx, wallet, tokenAddress, c.chainID)
 		if err != nil {
 			return err
 		}
@@ -501,7 +501,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			}
 		}
 
-		logger.Info("handled resized event", "channelId", channelID, "newAmount", channel.Amount)
+		logger.Info("handled resized event", "channelId", channelID, "newAmount", channel.RawAmount)
 		return nil
 	})
 	if errors.Is(err, ErrCustodyEventAlreadyProcessed) {

@@ -142,6 +142,8 @@ export interface CreateAppSessionRequestParams {
     definition: AppDefinition;
     /** The initial allocation distribution among participants. Each participant must have sufficient balance for their allocation. */
     allocations: AppSessionAllocation[];
+    /** Optional session data as a JSON string that can store application-specific state or metadata. */
+    session_data?: string;
 }
 export type CreateAppSessionRPCRequestParams = CreateAppSessionRequestParams; // for backward compatibility
 
@@ -161,6 +163,8 @@ export interface SubmitAppStateRequestParams {
     app_session_id: Hex;
     /** The new allocation distribution among participants. Must include all participants and maintain total balance. */
     allocations: AppSessionAllocation[];
+    /** Optional session data as a JSON string that can store application-specific state or metadata. */
+    session_data?: string;
 }
 export type SubmitAppStateRPCRequestParams = SubmitAppStateRequestParams; // for backward compatibility
 
@@ -180,6 +184,8 @@ export interface CloseAppSessionRequestParams {
     app_session_id: Hex;
     /** The final allocation distribution among participants upon closing. Must include all participants and maintain total balance. */
     allocations: AppSessionAllocation[];
+    /** Optional session data as a JSON string that can store application-specific state or metadata. */
+    session_data?: string;
 }
 export type CloseAppSessionRPCRequestParams = CloseAppSessionRequestParams; // for backward compatibility
 

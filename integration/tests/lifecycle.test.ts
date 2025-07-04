@@ -8,13 +8,17 @@ import {
     getCloseAppSessionPredicate,
     getCreateAppSessionPredicate,
     getGetLedgerBalancesPredicate,
+    getGetAppSessionsPredicate,
+    getSubmitStatePredicate,
     TestWebSocket,
 } from '@/ws';
 import {
     AppDefinition,
     createAppSessionMessage,
     createCloseAppSessionMessage,
+    createGetAppSessionsMessage,
     createGetLedgerBalancesMessage,
+    createSubmitStateMessage,
     RPCChannelStatus,
     rpcResponseParser,
 } from '@erc7824/nitrolite';
@@ -161,6 +165,11 @@ describe('Close channel', () => {
             {
                 definition,
                 allocations,
+                session_data: JSON.stringify({
+                    gameType: "chess",
+                    timeControl: { initial: 600, increment: 5 },
+                    gameState: "waiting"
+                })
             },
         ]);
         const createAppSessionResponse = await appWS.sendAndWaitForResponse(
@@ -179,6 +188,72 @@ describe('Close channel', () => {
         appSessionId = createAppSessionParsedResponse.params.appSessionId;
     });
 
+    it('should submit state with updated session_data', async () => {
+        const submitStateMsg = await createSubmitStateMessage(appIdentity.messageSigner, [
+            {
+                app_session_id: appSessionId as Hex,
+                allocations: [
+                    {
+                        participant: appIdentity.walletAddress,
+                        asset: 'USDC',
+                        amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+                    },
+                    {
+                        participant: appCPIdentity.walletAddress,
+                        asset: 'USDC',
+                        amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+                    },
+                ],
+                session_data: JSON.stringify({
+                    gameType: "chess",
+                    timeControl: { initial: 600, increment: 5 },
+                    gameState: "active",
+                    currentMove: "e2e4",
+                    moveCount: 1
+                })
+            },
+        ]);
+
+        const submitStateResponse = await appWS.sendAndWaitForResponse(
+            submitStateMsg,
+            getSubmitStatePredicate(),
+            1000
+        );
+
+        const submitStateParsedResponse = rpcResponseParser.submitState(submitStateResponse);
+        expect(submitStateParsedResponse).toBeDefined();
+        expect(submitStateParsedResponse.params.appSessionId).toBe(appSessionId);
+        expect(submitStateParsedResponse.params.status).toBe(RPCChannelStatus.Open);
+        expect(submitStateParsedResponse.params.version).toBe(2);
+    });
+
+    it('should verify sessionData changes after updates', async () => {
+        const getAppSessionsMsg = await createGetAppSessionsMessage(
+            appIdentity.messageSigner,
+            appIdentity.walletAddress
+        );
+        const getAppSessionsResponse = await appWS.sendAndWaitForResponse(
+            getAppSessionsMsg,
+            getGetAppSessionsPredicate(),
+            1000
+        );
+
+        const getAppSessionsParsedResponse = rpcResponseParser.getAppSessions(getAppSessionsResponse);
+        expect(getAppSessionsParsedResponse).toBeDefined();
+        expect(getAppSessionsParsedResponse.params).toHaveLength(1);
+        
+        const appSession = getAppSessionsParsedResponse.params[0];
+        expect(appSession.appSessionId).toBe(appSessionId);
+        expect(appSession.sessionData).toBeDefined();
+        
+        const sessionData = JSON.parse(appSession.sessionData!);
+        expect(sessionData.gameState).toBe('active');
+        expect(sessionData.currentMove).toBe('e2e4');
+        expect(sessionData.moveCount).toBe(1);
+        expect(sessionData.gameType).toBe('chess');
+        expect(sessionData.timeControl).toEqual({ initial: 600, increment: 5 });
+    });
+
     it('should close app session', async () => {
         const closeAppSessionMsg = await createCloseAppSessionMessage(appIdentity.messageSigner, [
             {
@@ -195,6 +270,13 @@ describe('Close channel', () => {
                         amount: decimalDepositAmount.toString(),
                     },
                 ],
+                session_data: JSON.stringify({
+                    gameType: "chess",
+                    timeControl: { initial: 600, increment: 5 },
+                    gameState: "finished",
+                    winner: "white",
+                    endCondition: "checkmate"
+                })
             },
         ]);
 
@@ -210,7 +292,35 @@ describe('Close channel', () => {
 
         expect(closeAppSessionParsedResponse.params.appSessionId).toBe(appSessionId);
         expect(closeAppSessionParsedResponse.params.status).toBe(RPCChannelStatus.Closed);
-        expect(closeAppSessionParsedResponse.params.version).toBe(2);
+        expect(closeAppSessionParsedResponse.params.version).toBe(3);
+    });
+
+    it('should verify sessionData changes after closing', async () => {
+        const getAppSessionsMsg = await createGetAppSessionsMessage(
+            appIdentity.messageSigner,
+            appIdentity.walletAddress
+        );
+        const getAppSessionsResponse = await appWS.sendAndWaitForResponse(
+            getAppSessionsMsg,
+            getGetAppSessionsPredicate(),
+            1000
+        );
+
+        const getAppSessionsParsedResponse = rpcResponseParser.getAppSessions(getAppSessionsResponse);
+        expect(getAppSessionsParsedResponse).toBeDefined();
+        expect(getAppSessionsParsedResponse.params).toHaveLength(1);
+        
+        const appSession = getAppSessionsParsedResponse.params[0];
+        expect(appSession.appSessionId).toBe(appSessionId);
+        expect(appSession.sessionData).toBeDefined();
+        expect(appSession.status).toBe(RPCChannelStatus.Closed);
+        
+        const sessionData = JSON.parse(appSession.sessionData!);
+        expect(sessionData.gameState).toBe('finished');
+        expect(sessionData.winner).toBe('white');
+        expect(sessionData.endCondition).toBe('checkmate');
+        expect(sessionData.gameType).toBe('chess');
+        expect(sessionData.timeControl).toEqual({ initial: 600, increment: 5 });
     });
 
     it('should update ledger balances', async () => {

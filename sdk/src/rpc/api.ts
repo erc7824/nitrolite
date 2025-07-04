@@ -23,6 +23,7 @@ import { generateRequestId, getCurrentTimestamp } from './utils';
 import {
     CloseAppSessionRequestParams,
     CreateAppSessionRequestParams,
+    SubmitStateRequestParams,
     ResizeChannelRequestParams,
 } from './types/request';
 
@@ -298,6 +299,27 @@ export async function createAppSessionMessage(
 ): Promise<string> {
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.CreateAppSession, params, timestamp);
 
+    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+
+    return JSON.stringify(signedRequest);
+}
+
+/**
+ * Creates the signed, stringified message body for a 'submit_state' request.
+ *
+ * @param signer - The function to sign the request payload.
+ * @param params - The specific parameters required by 'submit_state'. See {@link SubmitStateRequestParams} for details.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ */
+export async function createSubmitStateMessage(
+    signer: MessageSigner,
+    params: SubmitStateRequestParams[],
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const request = NitroliteRPC.createRequest(requestId, RPCMethod.SubmitState, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);

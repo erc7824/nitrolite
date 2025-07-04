@@ -2,7 +2,7 @@
   "name": "nitrolite-integration-tests",
   "private": true,
   "scripts": {
-    "test": "jest --runInBand",
+    "test": "jest --runInBand --detectOpenHandles",
     "test:watch": "jest --watch --runInBand"
   },
   "dependencies": {

@@ -29,12 +29,12 @@ type GetAppDefinitionParams struct {
 }
 
 type AppDefinition struct {
-	Protocol           string   `json:"protocol"`
-	ParticipantWallets []string `json:"participants"`
-	Weights            []int64  `json:"weights"` // Signature weight for each participant.
-	Quorum             uint64   `json:"quorum"`
-	Challenge          uint64   `json:"challenge"`
-	Nonce              uint64   `json:"nonce"`
+	Protocol     string   `json:"protocol"`
+	Participants []string `json:"participants"`
+	Weights      []int64  `json:"weights"` // Signature weight for each participant.
+	Quorum       uint64   `json:"quorum"`
+	Challenge    uint64   `json:"challenge"`
+	Nonce        uint64   `json:"nonce"`
 }
 
 type GetAppSessionParams struct {
@@ -215,12 +215,12 @@ func (r *RPCRouter) HandleGetAppDefinition(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, AppDefinition{
-		Protocol:           vApp.Protocol,
-		ParticipantWallets: vApp.ParticipantWallets,
-		Weights:            vApp.Weights,
-		Quorum:             vApp.Quorum,
-		Challenge:          vApp.Challenge,
-		Nonce:              vApp.Nonce,
+		Protocol:     vApp.Protocol,
+		Participants: vApp.Participants,
+		Weights:      vApp.Weights,
+		Quorum:       vApp.Quorum,
+		Challenge:    vApp.Challenge,
+		Nonce:        vApp.Nonce,
 	})
 	logger.Info("application definition retrieved", "sessionID", params.AppSessionID)
 }
@@ -248,18 +248,18 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 	resp := make([]AppSessionResponse, len(sessions))
 	for i, session := range sessions {
 		resp[i] = AppSessionResponse{
-			AppSessionID:       session.SessionID,
-			Status:             string(session.Status),
-			ParticipantWallets: session.ParticipantWallets,
-			SessionData:        session.SessionData,
-			Protocol:           session.Protocol,
-			Challenge:          session.Challenge,
-			Weights:            session.Weights,
-			Quorum:             session.Quorum,
-			Version:            session.Version,
-			Nonce:              session.Nonce,
-			CreatedAt:          session.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:          session.UpdatedAt.Format(time.RFC3339),
+			AppSessionID: session.SessionID,
+			Status:       string(session.Status),
+			Participants: session.Participants,
+			SessionData:  session.SessionData,
+			Protocol:     session.Protocol,
+			Challenge:    session.Challenge,
+			Weights:      session.Weights,
+			Quorum:       session.Quorum,
+			Version:      session.Version,
+			Nonce:        session.Nonce,
+			CreatedAt:    session.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:    session.UpdatedAt.Format(time.RFC3339),
 		}
 	}
 

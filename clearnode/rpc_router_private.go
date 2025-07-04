@@ -48,24 +48,24 @@ type CloseAppSessionParams struct {
 }
 
 type AppAllocation struct {
-	ParticipantWallet string          `json:"participant"`
-	AssetSymbol       string          `json:"asset"`
-	Amount            decimal.Decimal `json:"amount"`
+	Participant string          `json:"participant"`
+	AssetSymbol string          `json:"asset"`
+	Amount      decimal.Decimal `json:"amount"`
 }
 
 type AppSessionResponse struct {
-	AppSessionID       string   `json:"app_session_id"`
-	Status             string   `json:"status"`
-	ParticipantWallets []string `json:"participants"`
-	SessionData        string   `json:"session_data,omitempty"`
-	Protocol           string   `json:"protocol"`
-	Challenge          uint64   `json:"challenge"`
-	Weights            []int64  `json:"weights"`
-	Quorum             uint64   `json:"quorum"`
-	Version            uint64   `json:"version"`
-	Nonce              uint64   `json:"nonce"`
-	CreatedAt          string   `json:"created_at"`
-	UpdatedAt          string   `json:"updated_at"`
+	AppSessionID string   `json:"app_session_id"`
+	Status       string   `json:"status"`
+	Participants []string `json:"participants"`
+	SessionData  string   `json:"session_data,omitempty"`
+	Protocol     string   `json:"protocol"`
+	Challenge    uint64   `json:"challenge"`
+	Weights      []int64  `json:"weights"`
+	Quorum       uint64   `json:"quorum"`
+	Version      uint64   `json:"version"`
+	Nonce        uint64   `json:"nonce"`
+	CreatedAt    string   `json:"created_at"`
+	UpdatedAt    string   `json:"updated_at"`
 }
 
 type ResizeChannelParams struct {
@@ -204,7 +204,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		r.Metrics.TransferAttemptsFail.Inc()
 		c.Fail(nil, "destination or destination_tag must be provided")
 		return
-	case params.Destination != "" && !common.IsHexAddress(params.Destination):
+	case params.Destination != "" && !common.IsHexAddress(params.Destination) && !isAppSessionID(params.Destination):
 		r.Metrics.TransferAttemptsFail.Inc()
 		c.Fail(nil, fmt.Sprintf("invalid destination account: %s", params.Destination))
 		return
@@ -224,8 +224,9 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	toAccountTag := params.DestinationUserTag
 	fromAccountTag := ""
 
-	destinationAddress := params.Destination
-	if destinationAddress == "" {
+	destinationAccount := params.Destination
+
+	if destinationAccount == "" {
 		// Retrieve the destination address by Tag
 		destinationWallet, err := GetWalletByTag(r.DB, params.DestinationUserTag)
 		if err != nil {
@@ -235,27 +236,29 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			return
 		}
 
-		destinationAddress = destinationWallet.Wallet
+		destinationAccount = destinationWallet.Wallet
 		toAccountTag = destinationWallet.Tag
 	}
 	if toAccountTag == "" {
 		// Even if destination tag is not specified, it should be included in the returned transaction in case it exists
-		tag, err := GetUserTagByWallet(r.DB, destinationAddress)
+		tag, err := GetUserTagByWallet(r.DB, destinationAccount)
 		if err != nil && err != gorm.ErrRecordNotFound {
 			r.Metrics.TransferAttemptsFail.Inc()
-			logger.Error("failed to get user tag by wallet", "wallet", destinationAddress, "error", err)
-			c.Fail(err, fmt.Sprintf("failed to get user tag for wallet: %s", destinationAddress))
+			logger.Error("failed to get user tag by wallet", "wallet", destinationAccount, "error", err)
+			c.Fail(err, fmt.Sprintf("failed to get user tag for wallet: %s", destinationAccount))
 			return
 		}
 		toAccountTag = tag
 	}
 
-	if destinationAddress == c.UserID {
+	if destinationAccount == c.UserID {
 		r.Metrics.TransferAttemptsFail.Inc()
 		c.Fail(nil, "cannot transfer to self")
 		return
 	}
 
+	var appSession AppSession
+	var newAppAllocations []AppAllocation
 	fromWallet := c.UserID
 	var err error
 	// Sender tag should be included in the returned transaction in case it exists
@@ -278,6 +281,33 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		}
 
 		var transactions []TransactionWithTags
+		participantWallets := make(map[string]bool)
+		isAppDeposit := isAppSessionID(params.Destination)
+
+		// If user is depositing into app session, perform app-specific validation first.
+		if isAppDeposit {
+			if err := tx.Where("session_id = ? AND status = ?", params.Destination, ChannelStatusOpen).First(&appSession).Error; err != nil {
+				return fmt.Errorf("app session is closed or not found %s", params.Destination)
+			}
+			// Validate that the user is a participant.
+			for _, participant := range appSession.Participants {
+				participantWallet := participant
+				if wallet := GetWalletBySigner(participant); wallet != "" {
+					participantWallet = wallet
+				}
+				participantWallets[participantWallet] = true // Store resolved wallet addresses
+			}
+			if !participantWallets[fromWallet] {
+				return fmt.Errorf("user is not a participant in this app session")
+			}
+
+			if err := tx.Model(&appSession).Updates(map[string]any{
+				"version": appSession.Version + 1,
+			}).Error; err != nil {
+				return fmt.Errorf("failed to update app session version: %w", err)
+			}
+		}
+
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsZero() || alloc.Amount.IsNegative() {
 				return RPCErrorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
@@ -286,6 +316,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			fromAddress := common.HexToAddress(fromWallet)
 			fromAccountID := NewAccountID(fromWallet)
 			ledger := GetWalletLedger(tx, fromAddress)
+
+			// Debit from source
 			balance, err := ledger.Balance(fromAccountID, alloc.AssetSymbol)
 			if err != nil {
 				return RPCErrorf("failed to check participant balance: %w", err)
@@ -297,13 +329,25 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 				return RPCErrorf("failed to debit source account: %w", err)
 			}
 
-			toAddress := common.HexToAddress(destinationAddress)
-			toAccountID := NewAccountID(destinationAddress)
-			ledger = GetWalletLedger(tx, toAddress)
-			if err = ledger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return RPCErrorf("failed to credit destination account: %w", err)
+			// Credit to destination
+			toAccountID := NewAccountID(destinationAccount)
+			txType := TransactionTypeTransfer
+			if isAppDeposit {
+				// For app deposits, the credit happens within the sender's own ledger to an account representing the app session
+				if err = ledger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
+					return fmt.Errorf("failed to credit destination app account: %w", err)
+				}
+				txType = TransactionTypeAppDeposit
+			} else {
+				// For direct transfers, credit the recipient's ledger
+				destLedger := GetWalletLedger(tx, common.HexToAddress(destinationAccount))
+				if err = destLedger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
+					return fmt.Errorf("failed to credit destination account: %w", err)
+				}
 			}
-			transaction, err := RecordLedgerTransaction(tx, TransactionTypeTransfer, fromAccountID, toAccountID, alloc.AssetSymbol, alloc.Amount)
+
+			// Record the transaction
+			transaction, err := RecordLedgerTransaction(tx, txType, fromAccountID, toAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
 				return fmt.Errorf("failed to record transaction: %w", err)
 			}
@@ -319,6 +363,27 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			return fmt.Errorf("failed to format transactions: %w", err)
 		}
 		resp = formattedTransactions
+		// Calculate the new allocations after all transfers have been processed.
+		if isAppDeposit {
+			appAccountID := NewAccountID(params.Destination)
+			for walletAddr := range participantWallets {
+				ledger := GetWalletLedger(tx, common.HexToAddress(walletAddr))
+				balances, err := ledger.GetBalances(appAccountID)
+				if err != nil {
+					return fmt.Errorf("failed to fetch final app balance for participant %s: %w", walletAddr, err)
+				}
+				for _, balance := range balances {
+					if !balance.Amount.IsZero() {
+						newAppAllocations = append(newAppAllocations, AppAllocation{
+							Participant: walletAddr,
+							AssetSymbol: balance.Asset,
+							Amount:      balance.Amount,
+						})
+					}
+				}
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -330,9 +395,11 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 
 	r.SendBalanceUpdate(fromWallet)
 	r.SendTransferNotification(fromWallet, resp)
-	if common.IsHexAddress(destinationAddress) {
-		r.SendBalanceUpdate(destinationAddress)
-		r.SendTransferNotification(destinationAddress, resp)
+	if common.IsHexAddress(destinationAccount) {
+		r.SendBalanceUpdate(destinationAccount)
+		r.SendTransferNotification(destinationAccount, resp)
+	} else if isAppSessionID(params.Destination) {
+		r.SendApplicationUpdate(appSession, newAppAllocations)
 	}
 
 	r.Metrics.TransferAttemptsSuccess.Inc()
@@ -375,7 +442,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 		"userID", c.UserID,
 		"sessionID", appSession.SessionID,
 		"protocol", params.Definition.Protocol,
-		"participants", params.Definition.ParticipantWallets,
+		"participants", params.Definition.Participants,
 		"challenge", params.Definition.Challenge,
 		"nonce", params.Definition.Nonce,
 		"allocations", params.Allocations,

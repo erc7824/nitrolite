@@ -433,13 +433,13 @@ func TestRPCRouterHandleGetAppDefinition_Success(t *testing.T) {
 
 	// Seed an AppSession
 	session := AppSession{
-		SessionID:          "0xSess123",
-		ParticipantWallets: []string{"0xA", "0xB"},
-		Protocol:           "proto",
-		Weights:            []int64{10, 20},
-		Quorum:             15,
-		Challenge:          30,
-		Nonce:              99,
+		SessionID:    "0xSess123",
+		Participants: []string{"0xA", "0xB"},
+		Protocol:     "proto",
+		Weights:      []int64{10, 20},
+		Quorum:       15,
+		Challenge:    30,
+		Nonce:        99,
 	}
 	require.NoError(t, router.DB.Create(&session).Error)
 
@@ -469,7 +469,7 @@ func TestRPCRouterHandleGetAppDefinition_Success(t *testing.T) {
 	def, ok := res.Params[0].(AppDefinition)
 	require.True(t, ok)
 	assert.Equal(t, session.Protocol, def.Protocol)
-	assert.EqualValues(t, session.ParticipantWallets, def.ParticipantWallets)
+	assert.EqualValues(t, session.Participants, def.Participants)
 	assert.EqualValues(t, session.Weights, def.Weights)
 	assert.Equal(t, session.Quorum, def.Quorum)
 	assert.Equal(t, session.Challenge, def.Challenge)
@@ -543,46 +543,46 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 	baseTime := time.Now().Add(-24 * time.Hour)
 	sessions := []AppSession{
 		{
-			SessionID:          "0xSession1",
-			ParticipantWallets: []string{participantAddr, "0xParticipant2"},
-			SessionData:        `{"key":"value"}`,
-			Status:             ChannelStatusOpen,
-			Protocol:           "test-app-1",
-			Challenge:          60,
-			Weights:            []int64{50, 50},
-			Quorum:             75,
-			Nonce:              1,
-			Version:            1,
-			CreatedAt:          baseTime,
-			UpdatedAt:          baseTime,
+			SessionID:    "0xSession1",
+			Participants: []string{participantAddr, "0xParticipant2"},
+			SessionData:  `{"key":"value"}`,
+			Status:       ChannelStatusOpen,
+			Protocol:     "test-app-1",
+			Challenge:    60,
+			Weights:      []int64{50, 50},
+			Quorum:       75,
+			Nonce:        1,
+			Version:      1,
+			CreatedAt:    baseTime,
+			UpdatedAt:    baseTime,
 		},
 		{
-			SessionID:          "0xSession2",
-			ParticipantWallets: []string{participantAddr, "0xParticipant3"},
-			SessionData:        `{"key":"value"}`,
-			Status:             ChannelStatusClosed,
-			Protocol:           "test-app-2",
-			Challenge:          120,
-			Weights:            []int64{30, 70},
-			Quorum:             80,
-			Nonce:              2,
-			Version:            2,
-			CreatedAt:          baseTime.Add(1 * time.Hour),
-			UpdatedAt:          baseTime.Add(1 * time.Hour),
+			SessionID:    "0xSession2",
+			Participants: []string{participantAddr, "0xParticipant3"},
+			SessionData:  `{"key":"value"}`,
+			Status:       ChannelStatusClosed,
+			Protocol:     "test-app-2",
+			Challenge:    120,
+			Weights:      []int64{30, 70},
+			Quorum:       80,
+			Nonce:        2,
+			Version:      2,
+			CreatedAt:    baseTime.Add(1 * time.Hour),
+			UpdatedAt:    baseTime.Add(1 * time.Hour),
 		},
 		{
-			SessionID:          "0xSession3",
-			ParticipantWallets: []string{"0xParticipant4", "0xParticipant5"},
-			SessionData:        `{"key":"value"}`,
-			Status:             ChannelStatusOpen,
-			Protocol:           "test-app-3",
-			Challenge:          90,
-			Weights:            []int64{40, 60},
-			Quorum:             60,
-			Nonce:              3,
-			Version:            3,
-			CreatedAt:          baseTime.Add(2 * time.Hour),
-			UpdatedAt:          baseTime.Add(2 * time.Hour),
+			SessionID:    "0xSession3",
+			Participants: []string{"0xParticipant4", "0xParticipant5"},
+			SessionData:  `{"key":"value"}`,
+			Status:       ChannelStatusOpen,
+			Protocol:     "test-app-3",
+			Challenge:    90,
+			Weights:      []int64{40, 60},
+			Quorum:       60,
+			Nonce:        3,
+			Version:      3,
+			CreatedAt:    baseTime.Add(2 * time.Hour),
+			UpdatedAt:    baseTime.Add(2 * time.Hour),
 		},
 	}
 
@@ -688,17 +688,17 @@ func TestRPCRouterHandleGetAppSessions_Pagination(t *testing.T) {
 	}
 
 	testSessions := []AppSession{
-		{Nonce: 11, ParticipantWallets: []string{"0xParticipant11"}, Status: ChannelStatusOpen},
-		{Nonce: 10, ParticipantWallets: []string{"0xParticipant10"}, Status: ChannelStatusOpen},
-		{Nonce: 9, ParticipantWallets: []string{"0xParticipant9"}, Status: ChannelStatusOpen},
-		{Nonce: 8, ParticipantWallets: []string{"0xParticipant8"}, Status: ChannelStatusOpen},
-		{Nonce: 7, ParticipantWallets: []string{"0xParticipant7"}, Status: ChannelStatusOpen},
-		{Nonce: 6, ParticipantWallets: []string{"0xParticipant6"}, Status: ChannelStatusOpen},
-		{Nonce: 5, ParticipantWallets: []string{"0xParticipant5"}, Status: ChannelStatusOpen},
-		{Nonce: 4, ParticipantWallets: []string{"0xParticipant4"}, Status: ChannelStatusOpen},
-		{Nonce: 3, ParticipantWallets: []string{"0xParticipant3"}, Status: ChannelStatusOpen},
-		{Nonce: 2, ParticipantWallets: []string{"0xParticipant2"}, Status: ChannelStatusOpen},
-		{Nonce: 1, ParticipantWallets: []string{"0xParticipant1"}, Status: ChannelStatusOpen},
+		{Nonce: 11, Participants: []string{"0xParticipant11"}, Status: ChannelStatusOpen},
+		{Nonce: 10, Participants: []string{"0xParticipant10"}, Status: ChannelStatusOpen},
+		{Nonce: 9, Participants: []string{"0xParticipant9"}, Status: ChannelStatusOpen},
+		{Nonce: 8, Participants: []string{"0xParticipant8"}, Status: ChannelStatusOpen},
+		{Nonce: 7, Participants: []string{"0xParticipant7"}, Status: ChannelStatusOpen},
+		{Nonce: 6, Participants: []string{"0xParticipant6"}, Status: ChannelStatusOpen},
+		{Nonce: 5, Participants: []string{"0xParticipant5"}, Status: ChannelStatusOpen},
+		{Nonce: 4, Participants: []string{"0xParticipant4"}, Status: ChannelStatusOpen},
+		{Nonce: 3, Participants: []string{"0xParticipant3"}, Status: ChannelStatusOpen},
+		{Nonce: 2, Participants: []string{"0xParticipant2"}, Status: ChannelStatusOpen},
+		{Nonce: 1, Participants: []string{"0xParticipant1"}, Status: ChannelStatusOpen},
 	}
 
 	for i := range testSessions {

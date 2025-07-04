@@ -11,21 +11,15 @@ CREATE TABLE ledger_transactions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Create indexes for optimal query performance
-CREATE INDEX idx_ledger_transactions_type ON ledger_transactions(tx_type);
-CREATE INDEX idx_ledger_transactions_from_account ON ledger_transactions(from_account);
-CREATE INDEX idx_ledger_transactions_to_account ON ledger_transactions(to_account);
-CREATE INDEX idx_ledger_transactions_from_to_account ON ledger_transactions(from_account, to_account);
-CREATE INDEX idx_ledger_transactions_created_at ON ledger_transactions(created_at DESC);
-CREATE INDEX idx_ledger_transactions_asset_symbol ON ledger_transactions(asset_symbol);
+CREATE INDEX idx_ledger_transactions_from_account_comp ON ledger_transactions(from_account, asset_symbol, created_at DESC);
+CREATE INDEX idx_ledger_transactions_to_account_comp ON ledger_transactions(to_account, asset_symbol, created_at DESC);
 
--- Composite indexes for common query patterns
-CREATE INDEX idx_ledger_transactions_from_account_asset ON ledger_transactions(from_account, asset_symbol);
-CREATE INDEX idx_ledger_transactions_to_account_asset ON ledger_transactions(to_account, asset_symbol);
-CREATE INDEX idx_ledger_transactions_type_asset ON ledger_transactions(tx_type, asset_symbol);
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
-DROP TABLE ledger_transactions;
+DROP INDEX IF EXISTS idx_ledger_transactions_to_account_comp;
+DROP INDEX IF EXISTS idx_ledger_transactions_from_account_comp;
+
+DROP TABLE IF EXISTS ledger_transactions;
 -- +goose StatementEnd

@@ -141,6 +141,8 @@ func runCli(logger Logger, name string) {
 	switch name {
 	case "reconcile":
 		runReconcileCli(logger)
+	case "export-transactions":
+		runExportTransactionsCli(logger)
 	default:
 		logger.Fatal("Unknown CLI command", "name", name)
 	}

@@ -61,7 +61,7 @@ const txTypeEnum = z.enum(Object.values(TxType) as [string, ...string[]]);
 const GetLedgerTransactionsParamsSchema = z.array(
     z
         .object({
-            tx_hash: hexSchema,
+            id: z.number(),
             tx_type: txTypeEnum,
             from_account: addressSchema,
             to_account: addressSchema,
@@ -73,7 +73,7 @@ const GetLedgerTransactionsParamsSchema = z.array(
         .transform(
             (raw) =>
                 ({
-                    txHash: raw.tx_hash as Hash,
+                    id: raw.id,
                     txType: raw.tx_type as TxType,
                     fromAccount: raw.from_account as Address,
                     toAccount: raw.to_account as Address,

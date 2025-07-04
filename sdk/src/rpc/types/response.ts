@@ -113,7 +113,7 @@ export type GetLedgerEntriesRPCResponseParams = GetLedgerEntriesResponseParams; 
  */
 export interface GetLedgerTransactionsResponseParams {
     /** The transaction hash. */
-    txHash: Hex;
+    id: number;
     /** The type of transaction. */
     txType: TxType;
     /** The Ethereum address of the sender account. */

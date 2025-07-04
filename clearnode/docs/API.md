@@ -15,6 +15,7 @@
 | `get_app_sessions` | Lists virtual applications for a participant with optional status filter | Public |
 | `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Public |
 | `get_ledger_transactions` | Retrieves transaction history with optional filtering | Public |
+| `get_user_tag` | Retrieves user's tag| Private |
 | `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
 | `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
 | `transfer` | Transfers funds from user's unified balance to another account | Private |
@@ -346,9 +347,35 @@ To get balance in a specific virtual app session, specify `app_session_id` as ac
 }
 ```
 
+### Get User Tag
+
+Retrieves the user's tag, which can be used for transfer operations. The tag is a unique identifier for the user.
+
+**Request:**
+
+```json
+{
+  "req": [1, "get_user_tag", [], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "get_user_tag", [
+    {
+      "tag": "UX123D8C",
+    }], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
 ### Transfer Funds
 
 This method allows a user to transfer assets from their unified balance to another account. The user must have sufficient funds for each asset being transferred. The operation will fail if any of the specified assets have insufficient funds.
+
+User may specify the `destination` (wallet address) or `destination_user_tag` (user tag) to identify the recipient. `destination_user_tag` is used if and only if the `destination` field is empty.
 
 CAUTION: Invalid destination address may result in loss of funds.
 Currently, `Transfer` supports ledger account of another user as destination (wallet address is identifier).
@@ -359,6 +386,25 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 {
   "req": [1, "transfer", [{
     "destination": "0x9876543210abcdef...",
+    "allocations": [
+      {
+        "asset": "usdc",
+        "amount": "50.0"
+      },
+      {
+        "asset": "eth",
+        "amount": "0.1"
+      }
+    ]
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+
+// OR
+
+{
+  "req": [1, "transfer", [{
+    "destination_user_tag": "UX123D8C",
     "allocations": [
       {
         "asset": "usdc",

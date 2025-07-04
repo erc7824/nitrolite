@@ -14,7 +14,7 @@ import (
 func TestChannelService_ResizeChannel(t *testing.T) {
 	t.Run("SuccessfulAllocation", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -86,7 +86,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 
 	t.Run("SuccessfulDeallocation", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 
 	t.Run("ErrorInvalidChannelID", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -160,7 +160,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 
 	t.Run("ErrorChannelClosed", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -197,7 +197,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 
 	t.Run("ErrorChannelJoining", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -234,7 +234,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 
 	t.Run("ErrorOtherChallengedChannel", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -282,7 +282,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 
 	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -325,7 +325,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 
 	t.Run("ErrorInvalidSignature", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -364,7 +364,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 func TestChannelService_CloseChannel(t *testing.T) {
 	t.Run("SuccessfulCloseChannel", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -420,7 +420,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 
 	t.Run("ErrorOtherChallengedChannel", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)

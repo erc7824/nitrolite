@@ -76,6 +76,7 @@ func NewRPCRouter(
 	privGroup.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
 	privGroup.Handle("resize_channel", r.HandleResizeChannel)
 	privGroup.Handle("close_channel", r.HandleCloseChannel)
+	privGroup.Handle("get_user_tag", r.HandleGetUserTag)
 
 	appSessionGroup := privGroup.NewGroup("app_session")
 	appSessionGroup.Use(r.BalanceUpdateMiddleware)

@@ -16,8 +16,13 @@ type GetLedgerBalancesParams struct {
 }
 
 type TransferParams struct {
-	Destination string               `json:"destination"`
-	Allocations []TransferAllocation `json:"allocations"`
+	Destination        string               `json:"destination"`
+	DestinationUserTag string               `json:"destination_user_tag"`
+	Allocations        []TransferAllocation `json:"allocations"`
+}
+
+type GetUserTagResponse struct {
+	Tag string `json:"tag"`
 }
 
 type TransferAllocation struct {
@@ -192,13 +197,15 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	}
 
 	// Allow only ledger accounts as destination at the current stage. In the future we'll unlock application accounts.
-	if params.Destination == "" || params.Destination == c.UserID || !common.IsHexAddress(params.Destination) {
+	switch {
+	case params.Destination == "" && params.DestinationUserTag == "":
+		c.Fail("destination or destination_tag must be provided")
+		return
+	case params.Destination != "" && !common.IsHexAddress(params.Destination):
 		c.Fail(fmt.Sprintf("invalid destination account: %s", params.Destination))
 		return
-	}
-
-	if len(params.Allocations) == 0 {
-		c.Fail("empty allocations")
+	case len(params.Allocations) == 0:
+		c.Fail("allocations cannot be empty")
 		return
 	}
 
@@ -208,6 +215,23 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
+	destinationAddress := params.Destination
+	if destinationAddress == "" {
+		// Retrieve the destination address by Tag
+		destinationAddr, err := GetWalletByTag(r.DB, params.DestinationUserTag)
+		if err != nil {
+			logger.Error("failed to get wallet by tag", "tag", params.DestinationUserTag, "error", err)
+			c.Fail(fmt.Sprintf("failed to get wallet by tag: %s", params.DestinationUserTag))
+			return
+		}
+
+		destinationAddress = destinationAddr
+	}
+
+	if destinationAddress == c.UserID {
+		c.Fail("cannot transfer to self")
+		return
+	}
 	fromWallet := c.UserID
 	var transactions []TransactionResponse
 	err := r.DB.Transaction(func(tx *gorm.DB) error {
@@ -238,8 +262,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 				return fmt.Errorf("failed to debit source account: %w", err)
 			}
 
-			toAddress := common.HexToAddress(params.Destination)
-			toAccountID := NewAccountID(params.Destination)
+			toAddress := common.HexToAddress(destinationAddress)
+			toAccountID := NewAccountID(destinationAddress)
 			ledger = GetWalletLedger(tx, toAddress)
 			if err = ledger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit destination account: %w", err)
@@ -260,8 +284,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	}
 
 	r.SendBalanceUpdate(fromWallet)
-	if common.IsHexAddress(params.Destination) {
-		r.SendBalanceUpdate(params.Destination)
+	if common.IsHexAddress(destinationAddress) {
+		r.SendBalanceUpdate(destinationAddress)
 	}
 
 	c.Succeed(req.Method, transactions)
@@ -424,6 +448,25 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 		"resizeAmount", params.ResizeAmount.String(),
 		"allocateAmount", params.AllocateAmount.String(),
 	)
+}
+
+func (r *RPCRouter) HandleGetUserTag(c *RPCContext) {
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+
+	tag, err := GetUserTagByWallet(r.DB, c.UserID)
+	if err != nil {
+		logger.Error("failed to get user tag", "error", err)
+		c.Fail("failed to get user tag")
+		return
+	}
+
+	response := GetUserTagResponse{
+		Tag: tag,
+	}
+
+	c.Succeed(req.Method, response)
 }
 
 // HandleCloseChannel processes a request to close a payment channel

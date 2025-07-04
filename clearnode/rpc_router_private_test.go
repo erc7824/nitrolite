@@ -11,13 +11,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRPCRouterHandleGetLedgerBalances(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
-	defer cleanup()
+	t.Cleanup(cleanup)
 
 	participant1 := newTestCommonAddress("0xParticipant1")
 	participant1AccountID := NewAccountID(participant1.Hex())
@@ -50,21 +49,21 @@ func TestRPCRouterHandleGetLedgerBalances(t *testing.T) {
 	require.NotEmpty(t, res.Params)
 	balancesArray, ok := res.Params[0].([]Balance)
 	require.True(t, ok, "Response should contain an array of Balance")
-	assert.Equal(t, 1, len(balancesArray), "Should have 1 balance entry")
+	require.Equal(t, 1, len(balancesArray), "Should have 1 balance entry")
 
 	expectedAssets := map[string]decimal.Decimal{"usdc": decimal.NewFromInt(1000)}
 	for _, balance := range balancesArray {
 		expectedBalance, exists := expectedAssets[balance.Asset]
-		assert.True(t, exists, "Unexpected asset in response: %s", balance.Asset)
-		assert.Equal(t, expectedBalance, balance.Amount, "Incorrect balance for asset %s", balance.Asset)
+		require.True(t, exists, "Unexpected asset in response: %s", balance.Asset)
+		require.Equal(t, expectedBalance, balance.Amount, "Incorrect balance for asset %s", balance.Asset)
 		delete(expectedAssets, balance.Asset)
 	}
-	assert.Empty(t, expectedAssets, "Not all expected assets were found")
+	require.Empty(t, expectedAssets, "Not all expected assets were found")
 }
 
 func TestRPCRouterHandleGetRPCHistory(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
-	defer cleanup()
+	t.Cleanup(cleanup)
 
 	rawKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -141,19 +140,123 @@ func TestRPCRouterHandleGetRPCHistory(t *testing.T) {
 	res := c.Message.Res
 	require.NotNil(t, res)
 
-	assert.Equal(t, "get_rpc_history", res.Method)
-	assert.Equal(t, uint64(100), res.RequestID)
+	require.Equal(t, "get_rpc_history", res.Method)
+	require.Equal(t, uint64(100), res.RequestID)
 
 	require.Len(t, res.Params, 1, "Response should contain RPCEntry entries")
 	rpcHistory, ok := res.Params[0].([]RPCEntry)
 	require.True(t, ok, "Response parameter should be a slice of RPCEntry")
-	assert.Len(t, rpcHistory, 3, "Should return 3 records for the participant")
+	require.Len(t, rpcHistory, 3, "Should return 3 records for the participant")
 
-	assert.Equal(t, uint64(3), rpcHistory[0].ReqID, "First record should be the newest")
-	assert.Equal(t, uint64(2), rpcHistory[1].ReqID, "Second record should be the middle one")
-	assert.Equal(t, uint64(1), rpcHistory[2].ReqID, "Third record should be the oldest")
+	require.Equal(t, uint64(3), rpcHistory[0].ReqID, "First record should be the newest")
+	require.Equal(t, uint64(2), rpcHistory[1].ReqID, "Second record should be the middle one")
+	require.Equal(t, uint64(1), rpcHistory[2].ReqID, "Third record should be the oldest")
 }
 
+func TestRPCRouterHandleGetUserTag(t *testing.T) {
+	t.Parallel()
+	// Create signers
+	userKey, _ := crypto.GenerateKey()
+	userSigner := Signer{privateKey: userKey}
+	userAddr := userSigner.GetAddress().Hex()
+
+	t.Run("Succesfully retrieve the user tag", func(t *testing.T) {
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
+		t.Cleanup(cleanup)
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: userAddr, Wallet: userAddr,
+		}).Error)
+
+		// Setup user tag
+		userTag, err := GenerateOrRetrieveUserTag(db, userAddr)
+		require.NoError(t, err)
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  userAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 42,
+					Method:    "get_user_tag",
+					Params:    []any{},
+					Timestamp: ts,
+				},
+			},
+		}
+
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
+		require.NoError(t, err)
+		c.Message.Req.rawBytes = rawReq
+
+		// 2) Sign rawReq directly
+		sigBytes, err := userSigner.Sign(rawReq)
+		require.NoError(t, err)
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+
+		// Call handler
+		router.HandleGetUserTag(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		// Verify response
+		require.Equal(t, "get_user_tag", res.Method)
+		require.Equal(t, uint64(42), res.RequestID)
+		// Verify response structure
+		getTagResponse, ok := res.Params[0].(GetUserTagResponse)
+		require.True(t, ok, "Response should be a GetUserTagResponse")
+		require.Equal(t, userTag.Tag, getTagResponse.Tag)
+	})
+	t.Run("Error when there is no tag", func(t *testing.T) {
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
+		t.Cleanup(cleanup)
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: userAddr, Wallet: userAddr,
+		}).Error)
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  userAddr,
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 42,
+					Method:    "get_user_tag",
+					Params:    []any{},
+					Timestamp: ts,
+				},
+			},
+		}
+
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
+		require.NoError(t, err)
+		c.Message.Req.rawBytes = rawReq
+
+		// 2) Sign rawReq directly
+		sigBytes, err := userSigner.Sign(rawReq)
+		require.NoError(t, err)
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+
+		// Call handler
+		router.HandleGetUserTag(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		require.Equal(t, "error", res.Method)
+		require.Len(t, res.Params, 1)
+		require.Contains(t, res.Params[0], "failed to get user tag")
+	})
+}
 func TestRPCRouterHandleTransfer(t *testing.T) {
 	// Create signers
 	senderKey, _ := crypto.GenerateKey()
@@ -166,7 +269,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 	t.Run("SuccessfulTransfer", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
@@ -217,77 +320,167 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.NotNil(t, res)
 
 		// Verify response
-		assert.Equal(t, "transfer", res.Method)
-		assert.Equal(t, uint64(42), res.RequestID)
+		require.Equal(t, "transfer", res.Method)
+		require.Equal(t, uint64(42), res.RequestID)
 		// Verify response structure
 		transferResp, ok := res.Params[0].([]TransactionResponse)
 		require.True(t, ok, "Response should be a slice of TransactionResponse")
-		assert.Equal(t, senderAddr.Hex(), transferResp[0].FromAccount)
-		assert.Equal(t, recipientAddr.Hex(), transferResp[0].ToAccount)
-		assert.False(t, transferResp[0].CreatedAt.IsZero(), "CreatedAt should be set")
+		require.Equal(t, senderAddr.Hex(), transferResp[0].FromAccount)
+		require.Equal(t, recipientAddr.Hex(), transferResp[0].ToAccount)
+		require.False(t, transferResp[0].CreatedAt.IsZero(), "CreatedAt should be set")
 
 		// Check balances were updated correctly
 		// Sender should have 500 USDC and 3 ETH left
 		senderUSDC, err := GetWalletLedger(db, senderAddr).Balance(senderAccountID, "usdc")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(500).String(), senderUSDC.String())
+		require.Equal(t, decimal.NewFromInt(500).String(), senderUSDC.String())
 
 		senderETH, err := GetWalletLedger(db, senderAddr).Balance(senderAccountID, "eth")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(3).String(), senderETH.String())
+		require.Equal(t, decimal.NewFromInt(3).String(), senderETH.String())
 
 		// Recipient should have 500 USDC and 2 ETH
 		recipientUSDC, err := GetWalletLedger(db, recipientAddr).Balance(recipientAccountID, "usdc")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(500).String(), recipientUSDC.String())
+		require.Equal(t, decimal.NewFromInt(500).String(), recipientUSDC.String())
 
 		recipientETH, err := GetWalletLedger(db, recipientAddr).Balance(recipientAccountID, "eth")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(2).String(), recipientETH.String())
+		require.Equal(t, decimal.NewFromInt(2).String(), recipientETH.String())
 
 		// Verify transactions were recorded to the database
 		var transactions []LedgerTransaction
 		err = db.Where("from_account = ? AND to_account = ?", senderAddr.Hex(), recipientAddr.Hex()).Find(&transactions).Error
 		require.NoError(t, err)
-		assert.Len(t, transactions, 2, "Should have 2 transactions recorded (one for each asset)")
+		require.Len(t, transactions, 2, "Should have 2 transactions recorded (one for each asset)")
 
 		// Verify transaction details
 		for _, tx := range transactions {
-			assert.Equal(t, TransactionTypeTransfer, tx.Type, "Transaction type should be transfer")
-			assert.Equal(t, senderAddr.Hex(), tx.FromAccount, "From account should match")
-			assert.Equal(t, recipientAddr.Hex(), tx.ToAccount, "To account should match")
-			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
+			require.Equal(t, TransactionTypeTransfer, tx.Type, "Transaction type should be transfer")
+			require.Equal(t, senderAddr.Hex(), tx.FromAccount, "From account should match")
+			require.Equal(t, recipientAddr.Hex(), tx.ToAccount, "To account should match")
+			require.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 
 			// Check asset-specific amounts
 			if tx.AssetSymbol == "usdc" {
-				assert.Equal(t, decimal.NewFromInt(500), tx.Amount, "USDC amount should match")
+				require.Equal(t, decimal.NewFromInt(500), tx.Amount, "USDC amount should match")
 			} else if tx.AssetSymbol == "eth" {
-				assert.Equal(t, decimal.NewFromInt(2), tx.Amount, "ETH amount should match")
+				require.Equal(t, decimal.NewFromInt(2), tx.Amount, "ETH amount should match")
 			} else {
 				t.Errorf("Unexpected asset symbol: %s", tx.AssetSymbol)
 			}
 		}
 
 		// Verify response transactions match database transactions
-		assert.Len(t, transferResp, 2, "Response should contain 2 transaction objects")
+		require.Len(t, transferResp, 2, "Response should contain 2 transaction objects")
 		for _, responseTx := range transferResp {
 			// Find matching transaction in database
 			var dbTx LedgerTransaction
 			err = db.Where("id = ?", responseTx.Id).First(&dbTx).Error
 			require.NoError(t, err, "Response transaction should exist in database")
 
-			assert.Equal(t, dbTx.Type.String(), responseTx.TxType, "Transaction type should match")
-			assert.Equal(t, dbTx.FromAccount, responseTx.FromAccount, "From account should match")
-			assert.Equal(t, dbTx.ToAccount, responseTx.ToAccount, "To account should match")
-			assert.Equal(t, dbTx.AssetSymbol, responseTx.Asset, "Asset should match")
-			assert.Equal(t, dbTx.Amount, responseTx.Amount, "Amount should match")
+			require.Equal(t, dbTx.Type.String(), responseTx.TxType, "Transaction type should match")
+			require.Equal(t, dbTx.FromAccount, responseTx.FromAccount, "From account should match")
+			require.Equal(t, dbTx.ToAccount, responseTx.ToAccount, "To account should match")
+			require.Equal(t, dbTx.AssetSymbol, responseTx.Asset, "Asset should match")
+			require.Equal(t, dbTx.Amount, responseTx.Amount, "Amount should match")
 		}
 	})
 
+	t.Run("Successful Transfer by destination user tag", func(t *testing.T) {
+		router, cleanup := setupTestRPCRouter(t)
+		db := router.DB
+		t.Cleanup(cleanup)
+
+		// Setup signer wallet relation
+		require.NoError(t, db.Create(&SignerWallet{
+			Signer: senderAddr.Hex(), Wallet: senderAddr.Hex(),
+		}).Error)
+
+		// Fund sender's account
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000)))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "eth", decimal.NewFromInt(5)))
+
+		// Setup user tag for receipient
+		recipientTag, err := GenerateOrRetrieveUserTag(db, recipientAddr.Hex())
+		require.NoError(t, err)
+
+		// Create transfer parameters
+		transferParams := TransferParams{
+			DestinationUserTag: recipientTag.Tag,
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+				{AssetSymbol: "eth", Amount: decimal.NewFromInt(2)},
+			},
+		}
+
+		// Create RPC request
+		ts := uint64(time.Now().Unix())
+		c := &RPCContext{
+			Context: context.TODO(),
+			UserID:  senderAddr.Hex(),
+			Message: RPCMessage{
+				Req: &RPCData{
+					RequestID: 42,
+					Method:    "transfer",
+					Params:    []any{transferParams},
+					Timestamp: ts,
+				},
+			},
+		}
+
+		// 1) Marshal c.Message.Req exactly as a JSON array
+		rawReq, err := json.Marshal(c.Message.Req)
+		require.NoError(t, err)
+		c.Message.Req.rawBytes = rawReq
+
+		// 2) Sign rawReq directly
+		sigBytes, err := senderSigner.Sign(rawReq)
+		require.NoError(t, err)
+		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+
+		// Call handler
+		router.HandleTransfer(c)
+		res := c.Message.Res
+		require.NotNil(t, res)
+
+		// Verify response
+		require.Equal(t, "transfer", res.Method)
+		require.Equal(t, uint64(42), res.RequestID)
+		// Verify response structure
+		transactionResponse, ok := res.Params[0].([]TransactionResponse)
+		require.True(t, ok, "Response should be a TransactionResponse")
+
+		targetTransaction := transactionResponse[0]
+
+		require.Len(t, transactionResponse, 2, "Should have 2 transaction entries for the transfer")
+		require.Equal(t, senderAddr.Hex(), targetTransaction.FromAccount)
+		require.Equal(t, recipientAddr.Hex(), targetTransaction.ToAccount)
+		require.False(t, targetTransaction.CreatedAt.IsZero(), "CreatedAt should be set")
+
+		// Check balances were updated correctly
+		// Sender should have 500 USDC and 3 ETH left
+		senderUSDC, err := GetWalletLedger(db, senderAddr).Balance(senderAccountID, "usdc")
+		require.NoError(t, err)
+		require.Equal(t, decimal.NewFromInt(500).String(), senderUSDC.String())
+
+		senderETH, err := GetWalletLedger(db, senderAddr).Balance(senderAccountID, "eth")
+		require.NoError(t, err)
+		require.Equal(t, decimal.NewFromInt(3).String(), senderETH.String())
+
+		// Recipient should have 500 USDC and 2 ETH
+		recipientUSDC, err := GetWalletLedger(db, recipientAddr).Balance(recipientAccountID, "usdc")
+		require.NoError(t, err)
+		require.Equal(t, decimal.NewFromInt(500).String(), recipientUSDC.String())
+
+		recipientETH, err := GetWalletLedger(db, recipientAddr).Balance(recipientAccountID, "eth")
+		require.NoError(t, err)
+		require.Equal(t, decimal.NewFromInt(2).String(), recipientETH.String())
+	})
 	t.Run("ErrorInvalidDestinationAddress", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
@@ -335,15 +528,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "invalid destination account")
+		require.Contains(t, res.Params[0], "invalid destination account")
 	})
 
 	t.Run("ErrorTransferToSelf", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
@@ -391,15 +584,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "invalid destination")
+		require.Contains(t, res.Params[0], "cannot transfer to self")
 	})
 
 	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
@@ -447,15 +640,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "insufficient funds")
+		require.Contains(t, res.Params[0], "insufficient funds")
 	})
 
 	t.Run("ErrorEmptyAllocations", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
@@ -498,15 +691,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "empty allocations")
+		require.Contains(t, res.Params[0], "allocations cannot be empty")
 	})
 
 	t.Run("ErrorZeroAmount", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
@@ -554,15 +747,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "invalid allocation")
+		require.Contains(t, res.Params[0], "invalid allocation")
 	})
 
 	t.Run("ErrorNegativeAmount", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
@@ -610,15 +803,15 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "invalid allocation")
+		require.Contains(t, res.Params[0], "invalid allocation")
 	})
 
 	t.Run("ErrorInvalidSignature", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		// Setup signer wallet relation
 		require.NoError(t, db.Create(&SignerWallet{
@@ -668,9 +861,9 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "invalid signature")
+		require.Contains(t, res.Params[0], "invalid signature")
 	})
 }
 
@@ -687,7 +880,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 	t.Run("SuccessfulCreateAppSession", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		token := "0xTokenXYZ"
 		for i, p := range []string{signerAddressA.Hex(), signerAddressB.Hex()} {
@@ -756,36 +949,36 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "create_app_session", res.Method)
+		require.Equal(t, "create_app_session", res.Method)
 		appResp, ok := res.Params[0].(AppSessionResponse)
 		require.True(t, ok)
-		assert.Equal(t, string(ChannelStatusOpen), appResp.Status)
-		assert.Equal(t, uint64(1), appResp.Version)
-		assert.Empty(t, appResp.SessionData, "session data should not be returned in response")
+		require.Equal(t, string(ChannelStatusOpen), appResp.Status)
+		require.Equal(t, uint64(1), appResp.Version)
+		require.Empty(t, appResp.SessionData, "session data should not be returned in response")
 
 		var vApp AppSession
 		require.NoError(t, db.Where("session_id = ?", appResp.AppSessionID).First(&vApp).Error)
-		assert.ElementsMatch(t, []string{signerAddressA.Hex(), signerAddressB.Hex()}, vApp.ParticipantWallets)
-		assert.Equal(t, uint64(1), vApp.Version)
-		assert.Equal(t, data, vApp.SessionData, "session data should be stored in the database")
+		require.ElementsMatch(t, []string{signerAddressA.Hex(), signerAddressB.Hex()}, vApp.ParticipantWallets)
+		require.Equal(t, uint64(1), vApp.Version)
+		require.Equal(t, data, vApp.SessionData, "session data should be stored in the database")
 
 		// Participant accounts drained
 		partBalA, _ := GetWalletLedger(db, signerAddressA).Balance(accountIDA, "usdc")
 		partBalB, _ := GetWalletLedger(db, signerAddressB).Balance(accountIDB, "usdc")
-		assert.True(t, partBalA.IsZero(), "Participant A balance should be zero")
-		assert.True(t, partBalB.IsZero(), "Participant B balance should be zero")
+		require.True(t, partBalA.IsZero(), "Participant A balance should be zero")
+		require.True(t, partBalB.IsZero(), "Participant B balance should be zero")
 
 		// Virtual-app funded
 		sessionAccountID := NewAccountID(appResp.AppSessionID)
 		vBalA, _ := GetWalletLedger(db, signerAddressA).Balance(sessionAccountID, "usdc")
 		vBalB, _ := GetWalletLedger(db, signerAddressB).Balance(sessionAccountID, "usdc")
-		assert.Equal(t, decimal.NewFromInt(100).String(), vBalA.String())
-		assert.Equal(t, decimal.NewFromInt(200).String(), vBalB.String())
+		require.Equal(t, decimal.NewFromInt(100).String(), vBalA.String())
+		require.Equal(t, decimal.NewFromInt(200).String(), vBalB.String())
 	})
 	t.Run("ErrorChallengedChannel", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		token := "0xTokenXYZ"
 		for i, p := range []string{signerAddressA.Hex(), signerAddressB.Hex()} {
@@ -852,9 +1045,9 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "has challenged channels")
+		require.Contains(t, res.Params[0], "has challenged channels")
 	})
 }
 
@@ -862,7 +1055,7 @@ func TestRPCRouterHandleSubmitAppState(t *testing.T) {
 	t.Run("SuccessfulSubmitAppState", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -945,28 +1138,28 @@ func TestRPCRouterHandleSubmitAppState(t *testing.T) {
 
 		appResp, ok := res.Params[0].(AppSessionResponse)
 		require.True(t, ok)
-		assert.Equal(t, string(ChannelStatusOpen), appResp.Status)
-		assert.Equal(t, uint64(2), appResp.Version)
-		assert.Empty(t, appResp.SessionData, "session data should not be returned in response")
+		require.Equal(t, string(ChannelStatusOpen), appResp.Status)
+		require.Equal(t, uint64(2), appResp.Version)
+		require.Empty(t, appResp.SessionData, "session data should not be returned in response")
 
 		var updated AppSession
 		require.NoError(t, db.Where("session_id = ?", vAppID.Hex()).First(&updated).Error)
-		assert.Equal(t, ChannelStatusOpen, updated.Status)
-		assert.Equal(t, uint64(2), updated.Version)
-		assert.Equal(t, data, updated.SessionData, "session data should be stored in the database")
+		require.Equal(t, ChannelStatusOpen, updated.Status)
+		require.Equal(t, uint64(2), updated.Version)
+		require.Equal(t, data, updated.SessionData, "session data should be stored in the database")
 
 		// Check balances redistributed
 		balA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
 		balB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
-		assert.Equal(t, decimal.NewFromInt(250), balA)
-		assert.Equal(t, decimal.NewFromInt(250), balB)
+		require.Equal(t, decimal.NewFromInt(250), balA)
+		require.Equal(t, decimal.NewFromInt(250), balB)
 	})
 }
 
 func TestRPCRouterHandleCloseApplication(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
 	db := router.DB
-	defer cleanup()
+	t.Cleanup(cleanup)
 
 	rawKey, err := crypto.GenerateKey()
 	require.NoError(t, err)
@@ -1051,34 +1244,34 @@ func TestRPCRouterHandleCloseApplication(t *testing.T) {
 
 	appResp, ok := res.Params[0].(AppSessionResponse)
 	require.True(t, ok)
-	assert.Equal(t, string(ChannelStatusClosed), appResp.Status)
-	assert.Equal(t, uint64(3), appResp.Version)
-	assert.Empty(t, "", appResp.SessionData, "session data should not be returned in response")
+	require.Equal(t, string(ChannelStatusClosed), appResp.Status)
+	require.Equal(t, uint64(3), appResp.Version)
+	require.Empty(t, "", appResp.SessionData, "session data should not be returned in response")
 
 	var updated AppSession
 	require.NoError(t, db.Where("session_id = ?", vAppID.Hex()).First(&updated).Error)
-	assert.Equal(t, ChannelStatusClosed, updated.Status)
-	assert.Equal(t, uint64(3), updated.Version)
-	assert.Equal(t, data, updated.SessionData, "session data should be stored in the database")
+	require.Equal(t, ChannelStatusClosed, updated.Status)
+	require.Equal(t, uint64(3), updated.Version)
+	require.Equal(t, data, updated.SessionData, "session data should be stored in the database")
 
 	// Check balances redistributed
 	balA, _ := GetWalletLedger(db, userAddressA).Balance(accountIDA, "usdc")
 	balB, _ := GetWalletLedger(db, userAddressB).Balance(accountIDB, "usdc")
-	assert.Equal(t, decimal.NewFromInt(250), balA)
-	assert.Equal(t, decimal.NewFromInt(250), balB)
+	require.Equal(t, decimal.NewFromInt(250), balA)
+	require.Equal(t, decimal.NewFromInt(250), balB)
 
 	// v-app accounts drained
 	vBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
 	vBalB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
-	assert.True(t, vBalA.IsZero(), "Participant A vApp balance should be zero")
-	assert.True(t, vBalB.IsZero(), "Participant B vApp balance should be zero")
+	require.True(t, vBalA.IsZero(), "Participant A vApp balance should be zero")
+	require.True(t, vBalB.IsZero(), "Participant B vApp balance should be zero")
 }
 
 func TestRPCRouterHandleResizeChannel(t *testing.T) {
 	t.Run("SuccessfulAllocation", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1111,7 +1304,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// Verify initial balance
 		initialBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(1500), initialBalance)
+		require.Equal(t, decimal.NewFromInt(1500), initialBalance)
 
 		// Prepare allocation params: allocate 200 to channel (does not change user's total balance)
 		resizeParams := ResizeChannelParams{
@@ -1149,34 +1342,34 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NotNil(t, res)
 
 		// Validate response
-		assert.Equal(t, "resize_channel", res.Method)
+		require.Equal(t, "resize_channel", res.Method)
 		resObj, ok := res.Params[0].(ResizeChannelResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
-		assert.Equal(t, ch.ChannelID, resObj.ChannelID)
-		assert.Equal(t, ch.Version+1, resObj.Version)
+		require.Equal(t, ch.ChannelID, resObj.ChannelID)
+		require.Equal(t, ch.Version+1, resObj.Version)
 
 		// New channel amount should be initial + 200
 		expected := new(big.Int).Add(initialRawAmount.BigInt(), big.NewInt(200))
-		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Allocated amount mismatch")
-		assert.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Allocated amount mismatch")
+		require.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
-		assert.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
-		assert.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
-		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
+		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
+		require.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
+		require.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(1500), finalBalance) // Should remain unchanged
+		require.Equal(t, decimal.NewFromInt(1500), finalBalance) // Should remain unchanged
 	})
 
 	t.Run("SuccessfulDeallocation", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1243,17 +1436,17 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 
 		// Channel amount should decrease
 		expected := new(big.Int).Sub(initialRawAmount.BigInt(), big.NewInt(300))
-		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Decreased amount mismatch")
+		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Decreased amount mismatch")
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(500), finalBalance) // Should remain unchanged
+		require.Equal(t, decimal.NewFromInt(500), finalBalance) // Should remain unchanged
 	})
 
 	t.Run("ErrorInvalidChannelID", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1294,15 +1487,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "channel 0xNonExistentChannel not found")
+		require.Contains(t, res.Params[0], "channel 0xNonExistentChannel not found")
 	})
 
 	t.Run("ErrorChannelClosed", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1358,15 +1551,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "channel 0xChanClosed is not open: closed")
+		require.Contains(t, res.Params[0], "channel 0xChanClosed is not open: closed")
 	})
 
 	t.Run("ErrorChannelJoining", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1422,15 +1615,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "channel 0xChanJoining is not open: joining")
+		require.Contains(t, res.Params[0], "channel 0xChanJoining is not open: joining")
 	})
 
 	t.Run("ErrorOtherChallengedChannel", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1497,15 +1690,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "has challenged channels")
+		require.Contains(t, res.Params[0], "has challenged channels")
 	})
 
 	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1567,15 +1760,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "insufficient unified balance")
+		require.Contains(t, res.Params[0], "insufficient unified balance")
 	})
 
 	t.Run("ErrorZeroAmounts", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1636,15 +1829,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NotNil(t, res)
 
 		// Zero allocation should now be rejected as it's a wasteful no-op operation
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "resize operation requires non-zero ResizeAmount or AllocateAmount")
+		require.Contains(t, res.Params[0], "resize operation requires non-zero ResizeAmount or AllocateAmount")
 	})
 
 	t.Run("SuccessfulResizeDeposit", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1712,13 +1905,13 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 
 		// Should be initial amount (1000) + allocate amount (0) + resize amount (100) = 1100
 		expected := new(big.Int).Add(initialRawAmount.BigInt(), big.NewInt(100))
-		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected))
+		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected))
 	})
 
 	t.Run("SuccessfulResizeWithdrawal", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1786,13 +1979,13 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 
 		// Should be initial amount (1000) + allocate amount (0) - resize amount (100) = 900
 		expected := new(big.Int).Add(initialRawAmount.BigInt(), big.NewInt(-100))
-		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected))
+		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected))
 	})
 
 	t.Run("ErrorExcessiveDeallocation", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1849,15 +2042,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "new channel amount must be positive")
+		require.Contains(t, res.Params[0], "new channel amount must be positive")
 	})
 
 	t.Run("ErrorInvalidSignature", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1918,15 +2111,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "invalid signature")
+		require.Contains(t, res.Params[0], "invalid signature")
 	})
 
 	t.Run("BoundaryLargeAllocation", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -1993,13 +2186,13 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 
 		// Verify the large allocation was processed correctly
 		expectedAmount := new(big.Int).Add(big.NewInt(1000), new(big.Int).Exp(big.NewInt(10), big.NewInt(15), nil))
-		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expectedAmount))
+		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expectedAmount))
 	})
 
 	t.Run("SuccessfulAllocationWithResizeDeposit", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -2032,7 +2225,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// Verify initial balance
 		initialBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(2000), initialBalance)
+		require.Equal(t, decimal.NewFromInt(2000), initialBalance)
 
 		// Combined operation: allocate 150 to channel + resize (deposit) 100 more
 		resizeParams := ResizeChannelParams{
@@ -2071,34 +2264,34 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NotNil(t, res)
 
 		// Validate response
-		assert.Equal(t, "resize_channel", res.Method)
+		require.Equal(t, "resize_channel", res.Method)
 		resObj, ok := res.Params[0].(ResizeChannelResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
-		assert.Equal(t, ch.ChannelID, resObj.ChannelID)
-		assert.Equal(t, ch.Version+1, resObj.Version)
+		require.Equal(t, ch.ChannelID, resObj.ChannelID)
+		require.Equal(t, ch.Version+1, resObj.Version)
 
 		// New channel amount should be initial + AllocateAmount + ResizeAmount = 1000 + 150 + 100 = 1250
 		expected := new(big.Int).Add(initialRawAmount.BigInt(), big.NewInt(250))
-		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Combined allocation+resize amount mismatch")
-		assert.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Combined allocation+resize amount mismatch")
+		require.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
-		assert.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
-		assert.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
-		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
+		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
+		require.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
+		require.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(2000), finalBalance) // Should remain unchanged
+		require.Equal(t, decimal.NewFromInt(2000), finalBalance) // Should remain unchanged
 	})
 
 	t.Run("SuccessfulAllocationWithResizeWithdrawal", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -2131,7 +2324,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// Verify initial balance
 		initialBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(2000), initialBalance)
+		require.Equal(t, decimal.NewFromInt(2000), initialBalance)
 
 		// Combined operation: allocate 150 to channel + resize (deposit) 100 more
 		resizeParams := ResizeChannelParams{
@@ -2170,27 +2363,27 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NotNil(t, res)
 
 		// Validate response
-		assert.Equal(t, "resize_channel", res.Method)
+		require.Equal(t, "resize_channel", res.Method)
 		resObj, ok := res.Params[0].(ResizeChannelResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
-		assert.Equal(t, ch.ChannelID, resObj.ChannelID)
-		assert.Equal(t, ch.Version+1, resObj.Version)
+		require.Equal(t, ch.ChannelID, resObj.ChannelID)
+		require.Equal(t, ch.Version+1, resObj.Version)
 
 		// New channel amount should be initial + AllocateAmount + ResizeAmount = 0 + 100 - 100 = 0
-		assert.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(big.NewInt(0)), "Combined allocation+resize amount mismatch")
-		assert.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(big.NewInt(0)), "Combined allocation+resize amount mismatch")
+		require.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
-		assert.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
-		assert.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
-		assert.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
+		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
+		require.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
+		require.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(2000), finalBalance) // Should remain unchanged
+		require.Equal(t, decimal.NewFromInt(2000), finalBalance) // Should remain unchanged
 	})
 }
 
@@ -2198,7 +2391,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 	t.Run("SuccessfulCloseChannel", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -2266,20 +2459,20 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		require.NotNil(t, res)
 
 		// Validate response
-		assert.Equal(t, "close_channel", res.Method)
+		require.Equal(t, "close_channel", res.Method)
 		resObj, ok := res.Params[0].(CloseChannelResponse)
 		require.True(t, ok, "Response should be CloseChannelResponse")
-		assert.Equal(t, ch.ChannelID, resObj.ChannelID)
-		assert.Equal(t, ch.Version+1, resObj.Version)
+		require.Equal(t, ch.ChannelID, resObj.ChannelID)
+		require.Equal(t, ch.Version+1, resObj.Version)
 
 		// Final allocation should send full balance to destination
-		assert.Equal(t, 0, resObj.FinalAllocations[0].RawAmount.Cmp(initialRawAmount.BigInt()), "Primary allocation mismatch")
-		assert.Equal(t, 0, resObj.FinalAllocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		require.Equal(t, 0, resObj.FinalAllocations[0].RawAmount.Cmp(initialRawAmount.BigInt()), "Primary allocation mismatch")
+		require.Equal(t, 0, resObj.FinalAllocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
 	})
 	t.Run("ErrorOtherChallengedChannel", func(t *testing.T) {
 		router, cleanup := setupTestRPCRouter(t)
 		db := router.DB
-		defer cleanup()
+		t.Cleanup(cleanup)
 
 		rawKey, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -2359,8 +2552,8 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		res := c.Message.Res
 		require.NotNil(t, res)
 
-		assert.Equal(t, "error", res.Method)
+		require.Equal(t, "error", res.Method)
 		require.Len(t, res.Params, 1)
-		assert.Contains(t, res.Params[0], "has challenged channels")
+		require.Contains(t, res.Params[0], "has challenged channels")
 	})
 }

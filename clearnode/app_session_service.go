@@ -14,12 +14,17 @@ import (
 
 // AppSessionService handles the business logic for app sessions.
 type AppSessionService struct {
-	db *gorm.DB
+	db                   *gorm.DB
+	publishBalanceUpdate func(destinationWallet string)
 }
 
 // NewAppSessionService creates a new AppSessionService.
 func NewAppSessionService(db *gorm.DB) *AppSessionService {
 	return &AppSessionService{db: db}
+}
+
+func (s *AppSessionService) SetPublishBalanceUpdateCallback(callback func(destinationWallet string)) {
+	s.publishBalanceUpdate = callback
 }
 
 func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}) (*AppSession, error) {
@@ -41,6 +46,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
 	sessionAccountID := NewAccountID(appSessionID)
 
+	participants := make(map[string]bool)
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsPositive() {
@@ -78,6 +84,11 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			if err = ledger.Record(sessionAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit destination account: %w", err)
 			}
+			_, err = RecordLedgerTransaction(tx, TransactionTypeAppDeposit, walletAddress, appSessionID, alloc.AssetSymbol, alloc.Amount)
+			if err != nil {
+				return fmt.Errorf("failed to record transaction: %w", err)
+			}
+			participants[walletAddress] = true
 		}
 
 		session := &AppSession{
@@ -100,6 +111,12 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 
 	if err != nil {
 		return nil, err
+	}
+
+	if s.publishBalanceUpdate != nil {
+		for participant := range participants {
+			s.publishBalanceUpdate(participant)
+		}
 	}
 
 	return &AppSession{SessionID: appSessionID, Version: 1, Status: ChannelStatusOpen}, nil
@@ -182,6 +199,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 		return 0, errors.New("missing required parameters: app_id or allocations")
 	}
 
+	participants := make(map[string]bool)
 	var newVersion uint64
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
@@ -225,9 +243,14 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 			if err := ledger.Record(userAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit participant: %w", err)
 			}
+			_, err = RecordLedgerTransaction(tx, TransactionTypeAppWithdrawal, appSession.SessionID, walletAddress, alloc.AssetSymbol, alloc.Amount)
+			if err != nil {
+				return fmt.Errorf("failed to record transaction: %w", err)
+			}
 
 			if !alloc.Amount.IsZero() {
 				allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
+				participants[walletAddress] = true
 			}
 		}
 
@@ -249,6 +272,12 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 
 	if err != nil {
 		return 0, err
+	}
+
+	if s.publishBalanceUpdate != nil {
+		for participant := range participants {
+			s.publishBalanceUpdate(participant)
+		}
 	}
 
 	return newVersion, nil

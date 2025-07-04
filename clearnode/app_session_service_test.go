@@ -30,7 +30,14 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
 		require.NoError(t, GetWalletLedger(db, userAddressB).Record(userAccountIDB, "usdc", decimal.NewFromInt(200)))
 
+		var balanceUpdates []string
+		publishBalanceUpdate := func(wallet string) {
+			balanceUpdates = append(balanceUpdates, wallet)
+		}
+
 		service := NewAppSessionService(db)
+		service.SetPublishBalanceUpdateCallback(publishBalanceUpdate)
+
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -59,6 +66,10 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		sessionAccountID := NewAccountID(appSession.SessionID)
 
+		assert.Len(t, balanceUpdates, 2)
+		assert.Contains(t, balanceUpdates, userAddressA.Hex())
+		assert.Contains(t, balanceUpdates, userAddressB.Hex())
+
 		// Verify balances
 		balA, err := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
 		require.NoError(t, err)
@@ -67,6 +78,29 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		appBalA, err := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(100), appBalA)
+
+		// Verify transactions were recorded to the database
+		var transactions []LedgerTransaction
+		err = db.Where("tx_type = ?", TransactionTypeAppDeposit).Find(&transactions).Error
+		require.NoError(t, err)
+		assert.Len(t, transactions, 2, "Should have 2 app deposit transactions recorded")
+
+		// Verify transaction details
+		expectedTxs := map[string]decimal.Decimal{
+			userAddressA.Hex(): decimal.NewFromInt(100),
+			userAddressB.Hex(): decimal.NewFromInt(200),
+		}
+
+		assert.Equal(t, len(transactions), 2, "Expected 2 transactions to be recorded")
+		for _, tx := range transactions {
+			expectedAmount, exists := expectedTxs[tx.FromAccount]
+			assert.True(t, exists, "Unexpected destination of a transaction: %s", tx.FromAccount)
+			assert.Equal(t, TransactionTypeAppDeposit, tx.Type, "Transaction type should be app deposit")
+			assert.Equal(t, appSession.SessionID, tx.ToAccount, "To account should be app session ID")
+			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
+			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
+			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
+		}
 	})
 
 	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
@@ -265,7 +299,14 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
+		var balanceUpdates []string
+		publishBalanceUpdate := func(wallet string) {
+			balanceUpdates = append(balanceUpdates, wallet)
+		}
+
 		service := NewAppSessionService(db)
+		service.SetPublishBalanceUpdateCallback(publishBalanceUpdate)
+
 		session := &AppSession{
 			SessionID:          "test-session-close",
 			Protocol:           "test-proto",
@@ -299,6 +340,10 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), newVersion)
 
+		assert.Len(t, balanceUpdates, 2)
+		assert.Contains(t, balanceUpdates, userAddressA.Hex())
+		assert.Contains(t, balanceUpdates, userAddressB.Hex())
+
 		var closedSession AppSession
 		require.NoError(t, db.First(&closedSession, "session_id = ?", session.SessionID).Error)
 		assert.Equal(t, ChannelStatusClosed, closedSession.Status)
@@ -311,13 +356,43 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		walletBalA, err := ledgerA.Balance(userAccountIDA, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(100), walletBalA)
+
+		// Verify transactions were recorded to the database
+		var transactions []LedgerTransaction
+		err = db.Where("tx_type = ?", TransactionTypeAppWithdrawal).Find(&transactions).Error
+		require.NoError(t, err)
+		assert.Len(t, transactions, 2, "Should have 2 app withdrawal transactions recorded")
+
+		// Verify transaction details
+		expectedTxs := map[string]decimal.Decimal{
+			userAddressA.Hex(): decimal.NewFromInt(100),
+			userAddressB.Hex(): decimal.NewFromInt(200),
+		}
+
+		assert.Equal(t, len(transactions), 2, "Expected 2 transactions to be recorded")
+		for _, tx := range transactions {
+			expectedAmount, exists := expectedTxs[tx.ToAccount]
+			assert.True(t, exists, "Unexpected destination of a transaction: %s", tx.ToAccount)
+			assert.Equal(t, TransactionTypeAppWithdrawal, tx.Type, "Transaction type should be app withdrawal")
+			assert.Equal(t, session.SessionID, tx.FromAccount, "From account should be app session ID")
+			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
+			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
+			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
+		}
 	})
 
 	t.Run("SuccessfulCloseApplicationWithZeroAllocation", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
+		var balanceUpdates []string
+		publishBalanceUpdate := func(wallet string) {
+			balanceUpdates = append(balanceUpdates, wallet)
+		}
+
 		service := NewAppSessionService(db)
+		service.SetPublishBalanceUpdateCallback(publishBalanceUpdate)
+
 		session := &AppSession{
 			SessionID:          "test-session-close",
 			Protocol:           "test-proto",
@@ -363,6 +438,8 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		walletBalA, err := ledgerA.Balance(userAccountIDA, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(0), walletBalA)
+
+		assert.Len(t, balanceUpdates, 0)
 	})
 
 	t.Run("ErrorNegativeAllocation", func(t *testing.T) {

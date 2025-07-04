@@ -14,6 +14,7 @@
 | `get_app_definition` | Retrieves application definition for a ledger account | Public |
 | `get_app_sessions` | Lists virtual applications for a participant with optional status filter | Public |
 | `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Public |
+| `get_ledger_transactions` | Retrieves transaction history with optional filtering | Public |
 | `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
 | `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
 | `transfer` | Transfers funds from user's unified balance to another account | Private |
@@ -377,24 +378,40 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 
 ```json
 {
-  "res": [1, "transfer", [{
-    "from": "0x1234567890abcdef...",
-    "to": "0x9876543210abcdef...",
-    "allocations": [
-      {
-        "asset": "usdc",
-        "amount": "50.0"
-      },
-      {
-        "asset": "eth",
-        "amount": "0.1"
-      }
-    ],
-    "created_at": "2023-05-01T12:00:00Z"
-  }], 1619123456789],
+  "res": [1, "transfer", [[
+    {
+      "id": "1",
+      "tx_type": "transfer",
+      "from_account": "0x1234567890abcdef...",
+      "to_account": "0x9876543210abcdef...",
+      "asset": "usdc",
+      "amount": "50.0",
+      "created_at": "2023-05-01T12:00:00Z"
+    },
+    {
+      "id": "2",
+      "tx_type": "transfer",
+      "from_account": "0x1234567890abcdef...",
+      "to_account": "0x9876543210abcdef...",
+      "asset": "eth",
+      "amount": "0.1",
+      "created_at": "2023-05-01T12:00:00Z"
+    }
+  ]], 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
+The response returns an array of transaction objects, with one transaction for each asset being transferred. 
+
+Each transaction includes:
+
+- `id`: Unique transaction reference
+- `tx_type`: Transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
+- `from_account`: The account that sent the funds
+- `to_account`: The account that received the funds
+- `asset`: The asset symbol that was transferred
+- `amount`: The amount transferred for this specific asset
+- `created_at`: When the transaction was created (ISO 8601 format)
 
 ### Get Ledger Entries
 
@@ -457,6 +474,88 @@ Supports pagination and sorting.
   "sig": ["0xabcd1234..."]
 }
 ```
+
+### Get Transactions
+
+Retrieves ledger transaction history with optional filtering by asset and transaction type. This endpoint provides a view of transactions where the specified account appears as either the sender or receiver.
+Supports pagination and sorting.
+
+> Sorted descending by `created_at` by default.
+
+**Available Transaction Types:**
+- `transfer`: Direct transfers between unified accounts
+- `deposit`: Funds deposited to a unified account
+- `withdrawal`: Funds withdrawn from a unified account
+- `app_deposit`: Deposits into to application sessions
+- `app_withdrawal`: Withdrawals from application sessions
+
+**Request:**
+
+```json
+{
+  "req": [1, "get_ledger_transactions", [{
+    "account_id": "0x1234567890abcdef...",
+    "asset": "usdc",     // Optional: filter by asset
+    "tx_type": "transfer" // Optional: filter by transaction type
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Request with filtering, pagination, and sorting:**
+
+```json
+{
+  "req": [1, "get_ledger_transactions", [{
+    "account_id": "0x1234567890abcdef...",
+    "asset": "usdc",     // Optional: filter by asset
+    "tx_type": "transfer", // Optional: filter by transaction type
+    "offset": 42, // Optional: pagination offset
+    "limit": 10, // Optional: number of transactions to return
+    "sort": "desc" // Optional: sort asc or desc by created_at
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "get_ledger_transactions", [[
+    {
+      "id": "1",
+      "tx_type": "transfer",
+      "from_account": "0x1234567890abcdef...",
+      "to_account": "0x9876543210abcdef...",
+      "asset": "usdc",
+      "amount": "50.0",
+      "created_at": "2023-05-01T12:00:00Z"
+    },
+    {
+      "id": "2",
+      "tx_type": "deposit",
+      "from_account": "0x9876543210abcdef...",
+      "to_account": "0x1234567890abcdef...",
+      "asset": "usdc",
+      "amount": "25.0",
+      "created_at": "2023-05-01T10:30:00Z"
+    }
+  ]], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+Each transaction response includes:
+- `if`: Unique transaction id reference.
+- `tx_type`: Transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
+- `from_account`: The account that sent the funds
+- `to_account`: The account that received the funds
+- `asset`: The asset symbol (e.g., "usdc", "eth")
+- `amount`: The transaction amount
+- `created_at`: When the transaction was created (ISO 8601 format)
+
+Transactions are ordered by creation date (newest first). If no `account_id` is provided, returns all transactions. The `asset` and `tx_type` filters can be used to narrow results to specific asset types or transaction types.
 
 ### Get RPC History
 

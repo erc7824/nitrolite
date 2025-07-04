@@ -61,6 +61,13 @@ type LedgerEntryResponse struct {
 	CreatedAt   time.Time       `json:"created_at"`
 }
 
+type GetLedgerTransactionsParams struct {
+	ListOptions
+	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter transactions
+	Asset     string `json:"asset,omitempty"`      // Optional asset to filter transactions
+	TxType    string `json:"tx_type,omitempty"`    // Optional transaction type to filter transactions
+}
+
 type NetworkInfo struct {
 	Name               string `json:"name"`
 	ChainID            uint32 `json:"chain_id"`
@@ -71,6 +78,16 @@ type NetworkInfo struct {
 type BrokerConfig struct {
 	BrokerAddress string        `json:"broker_address"`
 	Networks      []NetworkInfo `json:"networks"`
+}
+
+type TransactionResponse struct {
+	Id          uint            `json:"id"`
+	TxType      string          `json:"tx_type"`
+	FromAccount string          `json:"from_account"`
+	ToAccount   string          `json:"to_account"`
+	Asset       string          `json:"asset"`
+	Amount      decimal.Decimal `json:"amount"`
+	CreatedAt   time.Time       `json:"created_at"`
 }
 
 func (r *RPCRouter) HandlePing(c *RPCContext) {
@@ -293,4 +310,42 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 
 	c.Succeed(req.Method, resp)
 	logger.Info("ledger entries retrieved", "accountID", userAccountID, "asset", params.Asset, "wallet", userAddress)
+}
+
+func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+
+	var params GetLedgerTransactionsParams
+	if err := parseParams(req.Params, &params); err != nil {
+		c.Fail(err.Error())
+		return
+	}
+
+	var txType *TransactionType
+	if params.TxType != "" {
+		parsedType, err := parseLedgerTransactionType(params.TxType)
+		if err != nil {
+			c.Fail(err.Error())
+			return
+		}
+		txType = &parsedType
+	}
+
+	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
+	transactions, err := GetLedgerTransactions(query, params.AccountID, params.Asset, txType)
+	if err != nil {
+		logger.Error("failed to get transactions", "error", err)
+		c.Fail("failed to get transactions")
+		return
+	}
+
+	resp := make([]TransactionResponse, len(transactions))
+	for i, tx := range transactions {
+		resp[i] = tx.JSON()
+	}
+
+	c.Succeed(req.Method, resp)
+	logger.Info("transactions retrieved", "count", len(transactions), "accountID", params.AccountID, "asset", params.Asset, "txType", params.TxType)
 }

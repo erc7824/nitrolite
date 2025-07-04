@@ -220,11 +220,11 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		assert.Equal(t, "transfer", res.Method)
 		assert.Equal(t, uint64(42), res.RequestID)
 		// Verify response structure
-		transferResp, ok := res.Params[0].(TransferResponse)
-		require.True(t, ok, "Response should be a TransferResponse")
-		assert.Equal(t, senderAddr.Hex(), transferResp.From)
-		assert.Equal(t, recipientAddr.Hex(), transferResp.To)
-		assert.False(t, transferResp.CreatedAt.IsZero(), "CreatedAt should be set")
+		transferResp, ok := res.Params[0].([]TransactionResponse)
+		require.True(t, ok, "Response should be a slice of TransactionResponse")
+		assert.Equal(t, senderAddr.Hex(), transferResp[0].FromAccount)
+		assert.Equal(t, recipientAddr.Hex(), transferResp[0].ToAccount)
+		assert.False(t, transferResp[0].CreatedAt.IsZero(), "CreatedAt should be set")
 
 		// Check balances were updated correctly
 		// Sender should have 500 USDC and 3 ETH left
@@ -244,6 +244,44 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		recipientETH, err := GetWalletLedger(db, recipientAddr).Balance(recipientAccountID, "eth")
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(2).String(), recipientETH.String())
+
+		// Verify transactions were recorded to the database
+		var transactions []LedgerTransaction
+		err = db.Where("from_account = ? AND to_account = ?", senderAddr.Hex(), recipientAddr.Hex()).Find(&transactions).Error
+		require.NoError(t, err)
+		assert.Len(t, transactions, 2, "Should have 2 transactions recorded (one for each asset)")
+
+		// Verify transaction details
+		for _, tx := range transactions {
+			assert.Equal(t, TransactionTypeTransfer, tx.Type, "Transaction type should be transfer")
+			assert.Equal(t, senderAddr.Hex(), tx.FromAccount, "From account should match")
+			assert.Equal(t, recipientAddr.Hex(), tx.ToAccount, "To account should match")
+			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
+
+			// Check asset-specific amounts
+			if tx.AssetSymbol == "usdc" {
+				assert.Equal(t, decimal.NewFromInt(500), tx.Amount, "USDC amount should match")
+			} else if tx.AssetSymbol == "eth" {
+				assert.Equal(t, decimal.NewFromInt(2), tx.Amount, "ETH amount should match")
+			} else {
+				t.Errorf("Unexpected asset symbol: %s", tx.AssetSymbol)
+			}
+		}
+
+		// Verify response transactions match database transactions
+		assert.Len(t, transferResp, 2, "Response should contain 2 transaction objects")
+		for _, responseTx := range transferResp {
+			// Find matching transaction in database
+			var dbTx LedgerTransaction
+			err = db.Where("id = ?", responseTx.Id).First(&dbTx).Error
+			require.NoError(t, err, "Response transaction should exist in database")
+
+			assert.Equal(t, dbTx.Type.String(), responseTx.TxType, "Transaction type should match")
+			assert.Equal(t, dbTx.FromAccount, responseTx.FromAccount, "From account should match")
+			assert.Equal(t, dbTx.ToAccount, responseTx.ToAccount, "To account should match")
+			assert.Equal(t, dbTx.AssetSymbol, responseTx.Asset, "Asset should match")
+			assert.Equal(t, dbTx.Amount, responseTx.Amount, "Amount should match")
+		}
 	})
 
 	t.Run("ErrorInvalidDestinationAddress", func(t *testing.T) {

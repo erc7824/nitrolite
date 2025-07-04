@@ -25,7 +25,7 @@ func setupTestSqlite(t testing.TB) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(uniqueDSN), &gorm.Config{})
 	require.NoError(t, err)
 
-	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{})
+	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{}, &LedgerTransaction{})
 	require.NoError(t, err)
 
 	return db
@@ -62,7 +62,7 @@ func setupTestPostgres(ctx context.Context, t testing.TB) (*gorm.DB, testcontain
 	db, err := gorm.Open(postgres.Open(url), &gorm.Config{})
 	require.NoError(t, err)
 
-	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{})
+	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{}, &LedgerTransaction{})
 	require.NoError(t, err)
 
 	return db, postgresContainer
@@ -107,17 +107,19 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, func()) {
 
 	logger := NewLoggerIPFS("root.test")
 
-	appSessionService := NewAppSessionService(db)
 	channelService := NewChannelService(db, signer)
 
 	// Create an instance of RPCRouter
 	router := &RPCRouter{
+		Node:              NewRPCNode(signer, logger),
 		Signer:            signer,
-		AppSessionService: appSessionService,
+		AppSessionService: NewAppSessionService(db),
 		ChannelService:    channelService,
 		DB:                db,
 		lg:                logger.NewSystem("rpc-router"),
 	}
+
+	router.AppSessionService.SetPublishBalanceUpdateCallback(router.SendBalanceUpdate)
 
 	return router, func() {
 		dbCleanup()

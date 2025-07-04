@@ -452,6 +452,20 @@ func TestHandleJoinedEvent(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, tokenAmountDecimal.Equal(walletBalance),
 			"Wallet balance should be %s, got %s", tokenAmountDecimal, walletBalance)
+
+		// Verify transaction was recorded to the database
+		var transactions []LedgerTransaction
+		err = db.Where("from_account = ? AND to_account = ?", channelID, walletAddr.Hex()).Find(&transactions).Error
+		require.NoError(t, err)
+		assert.Len(t, transactions, 1, "Should have 1 deposit transaction recorded")
+
+		tx := transactions[0]
+		assert.Equal(t, TransactionTypeDeposit, tx.Type, "Transaction type should be deposit")
+		assert.Equal(t, channelID, tx.FromAccount, "From account should be channel ID")
+		assert.Equal(t, walletAddr.Hex(), tx.ToAccount, "To account should be wallet address")
+		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
+		assert.True(t, tokenAmountDecimal.Equal(tx.Amount), "Transaction amount should match deposited amount")
+		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 
 	t.Run("Channel Not Found", func(t *testing.T) {
@@ -593,6 +607,22 @@ func TestHandleClosedEvent(t *testing.T) {
 		channelBalance, err := ledger.Balance(channelAccountID, asset.Symbol)
 		require.NoError(t, err)
 		assert.True(t, channelBalance.IsZero(), "Channel balance should be zero after closing")
+
+		// Verify transaction was recorded to the database
+		var transactions []LedgerTransaction
+		err = db.Where("from_account = ? AND to_account = ?", walletAddr.Hex(), channelID).Find(&transactions).Error
+		require.NoError(t, err)
+		assert.Len(t, transactions, 1, "Should have 1 withdrawal transaction recorded")
+
+		tx := transactions[0]
+		assert.Equal(t, TransactionTypeWithdrawal, tx.Type, "Transaction type should be withdrawal")
+		assert.Equal(t, walletAddr.Hex(), tx.FromAccount, "From account should be wallet address")
+		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
+		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
+
+		finalAmountDecimal := decimal.NewFromInt(finalAmount).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		assert.True(t, finalAmountDecimal.Equal(tx.Amount), "Transaction amount should match final amount")
+		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 
 	t.Run("Success Equal Final aAmount", func(t *testing.T) {
@@ -660,6 +690,22 @@ func TestHandleClosedEvent(t *testing.T) {
 		channelBalance, err := ledger.Balance(channelAccountID, asset.Symbol)
 		require.NoError(t, err)
 		assert.True(t, channelBalance.IsZero(), "Channel balance should be zero after closing")
+
+		// Verify transaction was recorded to the database
+		var transactions []LedgerTransaction
+		err = db.Where("from_account = ? AND to_account = ?", walletAddr.Hex(), channelID).Find(&transactions).Error
+		require.NoError(t, err)
+		assert.Len(t, transactions, 1, "Should have 1 withdrawal transaction recorded")
+
+		tx := transactions[0]
+		assert.Equal(t, TransactionTypeWithdrawal, tx.Type, "Transaction type should be withdrawal")
+		assert.Equal(t, walletAddr.Hex(), tx.FromAccount, "From account should be wallet address")
+		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
+		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
+
+		finalAmountDecimal := decimal.NewFromInt(finalAmount).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		assert.True(t, finalAmountDecimal.Equal(tx.Amount), "Transaction amount should match final amount")
+		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 }
 
@@ -818,6 +864,20 @@ func TestHandleResizedEvent(t *testing.T) {
 		channelBalance, err := ledger.Balance(channelAccountID, asset.Symbol)
 		require.NoError(t, err)
 		assert.True(t, channelBalance.IsZero(), "Channel balance should be zero after resize (funds moved to wallet)")
+
+		// Verify transaction was recorded to the database
+		var transactions []LedgerTransaction
+		err = db.Where("from_account = ? AND to_account = ?", channelID, walletAddr.Hex()).Find(&transactions).Error
+		require.NoError(t, err)
+		assert.Len(t, transactions, 1, "Should have 1 deposit transaction recorded")
+
+		tx := transactions[0]
+		assert.Equal(t, TransactionTypeDeposit, tx.Type, "Transaction type should be deposit")
+		assert.Equal(t, channelID, tx.FromAccount, "From account should be channel ID")
+		assert.Equal(t, walletAddr.Hex(), tx.ToAccount, "To account should be wallet address")
+		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
+		assert.True(t, deltaAmountDecimal.Equal(tx.Amount), "Transaction amount should match delta amount")
+		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 
 	t.Run("Negative Resize", func(t *testing.T) {
@@ -886,6 +946,20 @@ func TestHandleResizedEvent(t *testing.T) {
 		channelBalance, err := ledger.Balance(channelAccountID, asset.Symbol)
 		require.NoError(t, err)
 		assert.True(t, channelBalance.IsZero(), "Channel balance should be zero after resize")
+
+		// Verify transaction was recorded to the database
+		var transactions []LedgerTransaction
+		err = db.Where("from_account = ? AND to_account = ?", walletAddr.Hex(), channelID).Find(&transactions).Error
+		require.NoError(t, err)
+		assert.Len(t, transactions, 1, "Should have 1 withdrawal transaction recorded")
+
+		tx := transactions[0]
+		assert.Equal(t, TransactionTypeWithdrawal, tx.Type, "Transaction type should be withdrawal")
+		assert.Equal(t, walletAddr.Hex(), tx.FromAccount, "From account should be wallet address")
+		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
+		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
+		assert.True(t, deltaAmountDecimal.Equal(tx.Amount), "Transaction amount should match delta amount")
+		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 
 	t.Run("Channel Not Found", func(t *testing.T) {

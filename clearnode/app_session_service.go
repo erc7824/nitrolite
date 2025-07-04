@@ -14,7 +14,8 @@ import (
 
 // AppSessionService handles the business logic for app sessions.
 type AppSessionService struct {
-	db *gorm.DB
+	db                   *gorm.DB
+	publishBalanceUpdate func(destinationWallet string)
 }
 
 // NewAppSessionService creates a new AppSessionService.
@@ -22,7 +23,11 @@ func NewAppSessionService(db *gorm.DB) *AppSessionService {
 	return &AppSessionService{db: db}
 }
 
-func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}, publishBalanceUpdate func(destinationWallet string)) (*AppSession, error) {
+func (s *AppSessionService) SetPublishBalanceUpdateCallback(callback func(destinationWallet string)) {
+	s.publishBalanceUpdate = callback
+}
+
+func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}) (*AppSession, error) {
 	if len(params.Definition.ParticipantWallets) < 2 {
 		return nil, errors.New("invalid number of participants")
 	}
@@ -108,9 +113,9 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 		return nil, err
 	}
 
-	if publishBalanceUpdate != nil {
+	if s.publishBalanceUpdate != nil {
 		for participant := range participants {
-			publishBalanceUpdate(participant)
+			s.publishBalanceUpdate(participant)
 		}
 	}
 
@@ -189,7 +194,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 }
 
 // CloseApplication closes a virtual app session and redistributes funds to participants
-func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcSigners map[string]struct{}, publishBalanceUpdate func(destinationWallet string)) (uint64, error) {
+func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcSigners map[string]struct{}) (uint64, error) {
 	if params.AppSessionID == "" || len(params.Allocations) == 0 {
 		return 0, errors.New("missing required parameters: app_id or allocations")
 	}
@@ -269,9 +274,9 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 		return 0, err
 	}
 
-	if publishBalanceUpdate != nil {
+	if s.publishBalanceUpdate != nil {
 		for participant := range participants {
-			publishBalanceUpdate(participant)
+			s.publishBalanceUpdate(participant)
 		}
 	}
 

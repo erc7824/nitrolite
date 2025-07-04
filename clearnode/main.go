@@ -56,6 +56,7 @@ func main() {
 
 	rpcNode := NewRPCNode(signer, logger)
 	rpcRouter := NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, logger)
+	appSessionService.SetPublishBalanceUpdateCallback(rpcRouter.SendBalanceUpdate)
 
 	rpcListenAddr := ":8000"
 	rpcListenEndpoint := "/ws"

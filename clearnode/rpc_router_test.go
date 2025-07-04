@@ -107,18 +107,19 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, func()) {
 
 	logger := NewLoggerIPFS("root.test")
 
-	appSessionService := NewAppSessionService(db)
 	channelService := NewChannelService(db, signer)
 
 	// Create an instance of RPCRouter
 	router := &RPCRouter{
 		Node:              NewRPCNode(signer, logger),
 		Signer:            signer,
-		AppSessionService: appSessionService,
+		AppSessionService: NewAppSessionService(db),
 		ChannelService:    channelService,
 		DB:                db,
 		lg:                logger.NewSystem("rpc-router"),
 	}
+
+	router.AppSessionService.SetPublishBalanceUpdateCallback(router.SendBalanceUpdate)
 
 	return router, func() {
 		dbCleanup()

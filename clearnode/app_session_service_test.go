@@ -30,7 +30,14 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
 		require.NoError(t, GetWalletLedger(db, userAddressB).Record(userAccountIDB, "usdc", decimal.NewFromInt(200)))
 
+		var balanceUpdates []string
+		publishBalanceUpdate := func(wallet string) {
+			balanceUpdates = append(balanceUpdates, wallet)
+		}
+
 		service := NewAppSessionService(db)
+		service.SetPublishBalanceUpdateCallback(publishBalanceUpdate)
+
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -50,12 +57,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		var balanceUpdates []string
-		publishBalanceUpdate := func(wallet string) {
-			balanceUpdates = append(balanceUpdates, wallet)
-		}
-
-		appSession, err := service.CreateApplication(params, rpcSigners, publishBalanceUpdate)
+		appSession, err := service.CreateApplication(params, rpcSigners)
 		require.NoError(t, err)
 		assert.NotNil(t, appSession)
 		assert.NotEmpty(t, appSession.SessionID)
@@ -124,7 +126,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{userAddressA.Hex(): {}}
 
-		_, err := service.CreateApplication(params, rpcSigners, nil)
+		_, err := service.CreateApplication(params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "insufficient funds")
 	})
@@ -155,7 +157,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{userAddressA.Hex(): {}}
 
-		_, err := service.CreateApplication(params, rpcSigners, nil)
+		_, err := service.CreateApplication(params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has challenged channels")
 	})
@@ -182,7 +184,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{userAddressA.Hex(): {}}
 
-		_, err := service.CreateApplication(params, rpcSigners, nil)
+		_, err := service.CreateApplication(params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "negative allocation: -50 for asset usdc")
 	})
@@ -298,7 +300,14 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
+		var balanceUpdates []string
+		publishBalanceUpdate := func(wallet string) {
+			balanceUpdates = append(balanceUpdates, wallet)
+		}
+
 		service := NewAppSessionService(db)
+		service.SetPublishBalanceUpdateCallback(publishBalanceUpdate)
+
 		session := &AppSession{
 			SessionID:          "test-session-close",
 			Protocol:           "test-proto",
@@ -328,12 +337,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		var balanceUpdates []string
-		publishBalanceUpdate := func(wallet string) {
-			balanceUpdates = append(balanceUpdates, wallet)
-		}
-
-		newVersion, err := service.CloseApplication(params, rpcSigners, publishBalanceUpdate)
+		newVersion, err := service.CloseApplication(params, rpcSigners)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), newVersion)
 
@@ -383,7 +387,14 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
+		var balanceUpdates []string
+		publishBalanceUpdate := func(wallet string) {
+			balanceUpdates = append(balanceUpdates, wallet)
+		}
+
 		service := NewAppSessionService(db)
+		service.SetPublishBalanceUpdateCallback(publishBalanceUpdate)
+
 		session := &AppSession{
 			SessionID:          "test-session-close",
 			Protocol:           "test-proto",
@@ -413,12 +424,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		var balanceUpdates []string
-		publishBalanceUpdate := func(wallet string) {
-			balanceUpdates = append(balanceUpdates, wallet)
-		}
-
-		newVersion, err := service.CloseApplication(params, rpcSigners, publishBalanceUpdate)
+		newVersion, err := service.CloseApplication(params, rpcSigners)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), newVersion)
 
@@ -472,7 +478,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		_, err := service.CloseApplication(params, rpcSigners, nil)
+		_, err := service.CloseApplication(params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "negative allocation: -100 for asset usdc")
 	})

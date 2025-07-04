@@ -225,9 +225,9 @@ export const getCreateAppSessionPredicate = () => {
     };
 };
 
-export const getSubmitStatePredicate = () => {
+export const getSubmitAppStatePredicate = () => {
     return (data: string, reqId?: number): boolean => {
-        return genericPredicate(data, (r) => r.method === RPCMethod.SubmitState, reqId);
+        return genericPredicate(data, (r) => r.method === RPCMethod.SubmitAppState, reqId);
     };
 };
 

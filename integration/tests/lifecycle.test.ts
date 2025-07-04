@@ -9,7 +9,7 @@ import {
     getCreateAppSessionPredicate,
     getGetLedgerBalancesPredicate,
     getGetAppSessionsPredicate,
-    getSubmitStatePredicate,
+    getSubmitAppStatePredicate,
     TestWebSocket,
 } from '@/ws';
 import {
@@ -98,8 +98,8 @@ describe('Close channel', () => {
         endCondition: "checkmate"
     };
 
-    const submitStateUpdate = async (allocations: AppSessionAllocation[], sessionData: object, expectedVersion: number) => {
-        const submitStateMsg = await createSubmitAppStateMessage(appIdentity.messageSigner, [
+    const submitAppStateUpdate = async (allocations: AppSessionAllocation[], sessionData: object, expectedVersion: number) => {
+        const submitAppStateMsg = await createSubmitAppStateMessage(appIdentity.messageSigner, [
             {
                 app_session_id: appSessionId as Hex,
                 allocations,
@@ -107,19 +107,19 @@ describe('Close channel', () => {
             },
         ]);
 
-        const submitStateResponse = await appWS.sendAndWaitForResponse(
-            submitStateMsg,
-            getSubmitStatePredicate(),
+        const submitAppStateResponse = await appWS.sendAndWaitForResponse(
+            submitAppStateMsg,
+            getSubmitAppStatePredicate(),
             1000
         );
 
-        const submitStateParsedResponse = rpcResponseParser.submitState(submitStateResponse);
-        expect(submitStateParsedResponse).toBeDefined();
-        expect(submitStateParsedResponse.params.appSessionId).toBe(appSessionId);
-        expect(submitStateParsedResponse.params.status).toBe(RPCChannelStatus.Open);
-        expect(submitStateParsedResponse.params.version).toBe(expectedVersion);
+        const submitAppStateParsedResponse = rpcResponseParser.submitAppState(submitAppStateResponse);
+        expect(submitAppStateParsedResponse).toBeDefined();
+        expect(submitAppStateParsedResponse.params.appSessionId).toBe(appSessionId);
+        expect(submitAppStateParsedResponse.params.status).toBe(RPCChannelStatus.Open);
+        expect(submitAppStateParsedResponse.params.version).toBe(expectedVersion);
 
-        return submitStateParsedResponse;
+        return submitAppStateParsedResponse;
     };
 
     const closeAppSessionWithState = async (allocations: AppSessionAllocation[], sessionData: object, expectedVersion: number) => {
@@ -299,7 +299,7 @@ describe('Close channel', () => {
             },
         ];
 
-        await submitStateUpdate(allocations, SESSION_DATA_ACTIVE, 2);
+        await submitAppStateUpdate(allocations, SESSION_DATA_ACTIVE, 2);
     });
 
     it('should verify sessionData changes after updates', async () => {

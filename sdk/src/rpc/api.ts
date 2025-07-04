@@ -307,7 +307,7 @@ export async function createAppSessionMessage(
  * Creates the signed, stringified message body for a 'submit_state' request.
  *
  * @param signer - The function to sign the request payload.
- * @param params - The specific parameters required by 'submit_state'. See {@link SubmitStateRequestParams} for details.
+ * @param params - The specific parameters required by 'submit_state'. See {@link SubmitAppStateRequestParams} for details.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.

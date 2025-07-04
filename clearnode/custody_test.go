@@ -637,7 +637,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 
-		finalAmountDecimal := decimal.NewFromInt(finalAmount).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		finalAmountDecimal := decimal.NewFromBigInt(finalAmount, 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 		assert.True(t, finalAmountDecimal.Equal(tx.Amount), "Transaction amount should match final amount")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
@@ -720,7 +720,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 
-		finalAmountDecimal := decimal.NewFromInt(finalAmount).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		finalAmountDecimal := decimal.NewFromBigInt(finalAmount, 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 		assert.True(t, finalAmountDecimal.Equal(tx.Amount), "Transaction amount should match final amount")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})

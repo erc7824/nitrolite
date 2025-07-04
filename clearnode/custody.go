@@ -353,7 +353,7 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 
-		_, err = RecordLedgerTransaction(tx, TransactionTypeDeposit, channelID, channel.Wallet, asset.Symbol, tokenAmount)
+		_, err = RecordLedgerTransaction(tx, TransactionTypeDeposit, channelID, channel.Wallet, asset.Symbol, amount)
 		if err != nil {
 			return fmt.Errorf("failed to record transaction: %w", err)
 		}

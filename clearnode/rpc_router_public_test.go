@@ -1083,7 +1083,6 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 				// Verify account1 is always involved
 				for _, tx := range txs {
 					assert.True(t, tx.FromAccount == account1 || tx.ToAccount == account1)
-					assert.NotEmpty(t, tx.TxHash)
 				}
 			},
 		},
@@ -1393,9 +1392,9 @@ func TestRPCRouterHandleGetLedgerTransactions_Pagination(t *testing.T) {
 
 			// For non-filter tests, verify order
 			if tc.expectedFirst != "" && tc.expectedLast != "" && len(transactions) > 0 {
-				assert.Equal(t, tc.expectedFirst, transactions[0].TxHash, "First transaction hash should match")
+				assert.Equal(t, tc.expectedFirst, transactions[0].Id, "First transaction hash should match")
 				if len(transactions) > 1 {
-					assert.Equal(t, tc.expectedLast, transactions[len(transactions)-1].TxHash, "Last transaction hash should match")
+					assert.Equal(t, tc.expectedLast, transactions[len(transactions)-1].Id, "Last transaction hash should match")
 				}
 			}
 

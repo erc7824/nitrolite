@@ -380,7 +380,7 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 {
   "res": [1, "transfer", [[
     {
-      "tx_hash": "0xabcdef1234567890...",
+      "id": "1",
       "tx_type": "transfer",
       "from_account": "0x1234567890abcdef...",
       "to_account": "0x9876543210abcdef...",
@@ -389,7 +389,7 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
       "created_at": "2023-05-01T12:00:00Z"
     },
     {
-      "tx_hash": "0x9876543210fedcba...",
+      "id": "2",
       "tx_type": "transfer",
       "from_account": "0x1234567890abcdef...",
       "to_account": "0x9876543210abcdef...",
@@ -405,7 +405,7 @@ The response returns an array of transaction objects, with one transaction for e
 
 Each transaction includes:
 
-- `tx_hash`: Unique transaction hash generated from transaction data
+- `id`: Unique transaction reference
 - `tx_type`: Transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
 - `from_account`: The account that sent the funds
 - `to_account`: The account that received the funds
@@ -524,7 +524,7 @@ Supports pagination and sorting.
 {
   "res": [1, "get_ledger_transactions", [[
     {
-      "tx_hash": "0xabcdef1234567890...",
+      "id": "1",
       "tx_type": "transfer",
       "from_account": "0x1234567890abcdef...",
       "to_account": "0x9876543210abcdef...",
@@ -533,7 +533,7 @@ Supports pagination and sorting.
       "created_at": "2023-05-01T12:00:00Z"
     },
     {
-      "tx_hash": "0x9876543210fedcba...",
+      "id": "2",
       "tx_type": "deposit",
       "from_account": "0x9876543210abcdef...",
       "to_account": "0x1234567890abcdef...",
@@ -547,7 +547,7 @@ Supports pagination and sorting.
 ```
 
 Each transaction response includes:
-- `tx_hash`: Unique transaction hash generated from transaction data
+- `if`: Unique transaction id reference.
 - `tx_type`: Transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
 - `from_account`: The account that sent the funds
 - `to_account`: The account that received the funds

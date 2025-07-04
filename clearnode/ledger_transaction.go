@@ -1,11 +1,7 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
-	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -38,7 +34,7 @@ type LedgerTransaction struct {
 
 func (tx *LedgerTransaction) JSON() TransactionResponse {
 	return TransactionResponse{
-		TxHash:      getTransactionHash(tx.ID, tx.Type, tx.FromAccount, tx.ToAccount, tx.AssetSymbol, tx.Amount, tx.CreatedAt.Unix()),
+		Id:          tx.ID,
 		TxType:      tx.Type.String(),
 		FromAccount: tx.FromAccount,
 		ToAccount:   tx.ToAccount,
@@ -87,24 +83,6 @@ func GetLedgerTransactions(tx *gorm.DB, accountID, assetSymbol string, txType *T
 	}
 
 	return transactions, nil
-}
-
-// getTransactionHash generates a deterministic hash for a transaction based on its attributes.
-func getTransactionHash(id uint, txType TransactionType, fromAccount, toAccount, assetSymbol string, amount decimal.Decimal, timestamp int64) string {
-	dataString := fmt.Sprintf(
-		"%d:%s:%s:%s:%s:%s:%s",
-		id,
-		txType,
-		fromAccount,
-		toAccount,
-		assetSymbol,
-		amount.String(),
-		strconv.FormatInt(timestamp, 10), // Use FormatInt for int64
-	)
-
-	hash := sha256.New()
-	hash.Write([]byte(dataString))
-	return hex.EncodeToString(hash.Sum(nil))
 }
 
 // TransactionTypeToString converts integer transaction type to string

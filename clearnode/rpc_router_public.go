@@ -81,7 +81,7 @@ type BrokerConfig struct {
 }
 
 type TransactionResponse struct {
-	TxHash      string          `json:"tx_hash"`
+	Id          uint            `json:"id"`
 	TxType      string          `json:"tx_type"`
 	FromAccount string          `json:"from_account"`
 	ToAccount   string          `json:"to_account"`

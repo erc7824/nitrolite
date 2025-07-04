@@ -273,7 +273,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		for _, responseTx := range transferResp {
 			// Find matching transaction in database
 			var dbTx LedgerTransaction
-			err = db.Where("hash = ?", responseTx.TxHash).First(&dbTx).Error
+			err = db.Where("id = ?", responseTx.Id).First(&dbTx).Error
 			require.NoError(t, err, "Response transaction should exist in database")
 
 			assert.Equal(t, dbTx.Type.String(), responseTx.TxType, "Transaction type should match")

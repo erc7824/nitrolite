@@ -79,7 +79,7 @@ func (l *WalletLedger) Balance(accountID AccountID, assetSymbol string) (decimal
 			Balance decimal.Decimal
 		}
 		err := l.db.Model(&Entry{}).
-			Where("account_id = ? AND asset_symbol = ? AND wallet = ?", accountID, assetSymbol, l.wallet).
+			Where("account_id = ? AND asset_symbol = ? AND wallet = ?", accountID.String(), assetSymbol, l.wallet.Hex()).
 			Select("COALESCE(SUM(credit), 0) - COALESCE(SUM(debit), 0) AS balance").
 			Scan(&result).Error
 

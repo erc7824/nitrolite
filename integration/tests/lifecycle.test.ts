@@ -72,6 +72,31 @@ describe('Close channel', () => {
         };
     };
 
+    const GAME_TYPE = "chess";
+    const TIME_CONTROL = { initial: 600, increment: 5 };
+    
+    const SESSION_DATA_WAITING = {
+        gameType: GAME_TYPE,
+        timeControl: TIME_CONTROL,
+        gameState: "waiting"
+    };
+    
+    const SESSION_DATA_ACTIVE = {
+        gameType: GAME_TYPE,
+        timeControl: TIME_CONTROL,
+        gameState: "active",
+        currentMove: "e2e4",
+        moveCount: 1
+    };
+    
+    const SESSION_DATA_FINISHED = {
+        gameType: GAME_TYPE,
+        timeControl: TIME_CONTROL,
+        gameState: "finished",
+        winner: "white",
+        endCondition: "checkmate"
+    };
+
     beforeAll(async () => {
         blockUtils = new BlockchainUtils();
         databaseUtils = new DatabaseUtils();
@@ -190,11 +215,7 @@ describe('Close channel', () => {
             {
                 definition,
                 allocations,
-                session_data: JSON.stringify({
-                    gameType: "chess",
-                    timeControl: { initial: 600, increment: 5 },
-                    gameState: "waiting"
-                })
+                session_data: JSON.stringify(SESSION_DATA_WAITING)
             },
         ]);
         const createAppSessionResponse = await appWS.sendAndWaitForResponse(
@@ -229,13 +250,7 @@ describe('Close channel', () => {
                         amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
                     },
                 ],
-                session_data: JSON.stringify({
-                    gameType: "chess",
-                    timeControl: { initial: 600, increment: 5 },
-                    gameState: "active",
-                    currentMove: "e2e4",
-                    moveCount: 1
-                })
+                session_data: JSON.stringify(SESSION_DATA_ACTIVE)
             },
         ]);
 
@@ -255,11 +270,7 @@ describe('Close channel', () => {
     it('should verify sessionData changes after updates', async () => {
         const { sessionData } = await fetchAndParseAppSessions();
         
-        expect(sessionData.gameState).toBe('active');
-        expect(sessionData.currentMove).toBe('e2e4');
-        expect(sessionData.moveCount).toBe(1);
-        expect(sessionData.gameType).toBe('chess');
-        expect(sessionData.timeControl).toEqual({ initial: 600, increment: 5 });
+        expect(sessionData).toEqual(SESSION_DATA_ACTIVE);
     });
 
     it('should close app session', async () => {
@@ -278,13 +289,7 @@ describe('Close channel', () => {
                         amount: decimalDepositAmount.toString(),
                     },
                 ],
-                session_data: JSON.stringify({
-                    gameType: "chess",
-                    timeControl: { initial: 600, increment: 5 },
-                    gameState: "finished",
-                    winner: "white",
-                    endCondition: "checkmate"
-                })
+                session_data: JSON.stringify(SESSION_DATA_FINISHED)
             },
         ]);
 
@@ -307,11 +312,7 @@ describe('Close channel', () => {
         const { appSession, sessionData } = await fetchAndParseAppSessions();
         
         expect(appSession.status).toBe(RPCChannelStatus.Closed);
-        expect(sessionData.gameState).toBe('finished');
-        expect(sessionData.winner).toBe('white');
-        expect(sessionData.endCondition).toBe('checkmate');
-        expect(sessionData.gameType).toBe('chess');
-        expect(sessionData.timeControl).toEqual({ initial: 600, increment: 5 });
+        expect(sessionData).toEqual(SESSION_DATA_FINISHED);
     });
 
     it('should update ledger balances', async () => {

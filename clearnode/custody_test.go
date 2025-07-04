@@ -975,7 +975,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		assert.Equal(t, walletAddr.Hex(), tx.FromAccount, "From account should be wallet address")
 		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
-		assert.True(t, deltaAmountDecimal.Equal(tx.Amount), "Transaction amount should match delta amount")
+		assert.True(t, deltaAmountDecimal.Abs().Equal(tx.Amount), "Transaction amount should match delta amount")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 

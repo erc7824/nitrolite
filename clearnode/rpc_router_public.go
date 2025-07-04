@@ -332,8 +332,9 @@ func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
 		txType = &parsedType
 	}
 
+	userAccountID := NewAccountID(params.AccountID)
 	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
-	transactions, err := GetLedgerTransactions(query, params.AccountID, params.Asset, txType)
+	transactions, err := GetLedgerTransactions(query, userAccountID, params.Asset, txType)
 	if err != nil {
 		logger.Error("failed to get transactions", "error", err)
 		c.Fail("failed to get transactions")

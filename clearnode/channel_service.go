@@ -75,21 +75,21 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 	}
 
 	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
-	newChannelAmount := new(big.Int).Add(new(big.Int).SetUint64(channel.Amount), params.AllocateAmount)
+	newChannelRawAmount := new(big.Int).Add(channel.RawAmount.BigInt(), params.AllocateAmount)
 
-	if rawBalance.Cmp(newChannelAmount) < 0 {
-		return ResizeChannelResponse{}, fmt.Errorf("insufficient unified balance for channel %s: required %s, available %s", channel.ChannelID, newChannelAmount.String(), rawBalance.String())
+	if rawBalance.Cmp(newChannelRawAmount) < 0 {
+		return ResizeChannelResponse{}, fmt.Errorf("insufficient unified balance for channel %s: required %s, available %s", channel.ChannelID, newChannelRawAmount.String(), rawBalance.String())
 	}
-	newChannelAmount.Add(newChannelAmount, params.ResizeAmount)
-	if newChannelAmount.Cmp(big.NewInt(0)) < 0 {
-		return ResizeChannelResponse{}, fmt.Errorf("new channel amount must be positive: %s", newChannelAmount.String())
+	newChannelRawAmount.Add(newChannelRawAmount, params.ResizeAmount)
+	if newChannelRawAmount.Cmp(big.NewInt(0)) < 0 {
+		return ResizeChannelResponse{}, fmt.Errorf("new channel amount must be positive: %s", newChannelRawAmount.String())
 	}
 
 	allocations := []nitrolite.Allocation{
 		{
 			Destination: common.HexToAddress(params.FundsDestination),
 			Token:       common.HexToAddress(channel.Token),
-			Amount:      newChannelAmount,
+			Amount:      newChannelRawAmount,
 		},
 		{
 			Destination: s.signer.GetAddress(),
@@ -143,7 +143,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		resp.Allocations = append(resp.Allocations, Allocation{
 			Participant:  alloc.Destination.Hex(),
 			TokenAddress: alloc.Token.Hex(),
-			Amount:       alloc.Amount,
+			RawAmount:    alloc.Amount,
 		})
 	}
 	return resp, nil
@@ -193,8 +193,8 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 	}
 
 	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
-	channelAmount := new(big.Int).SetUint64(channel.Amount)
-	if channelAmount.Cmp(rawBalance) < 0 {
+	channelRawAmount := channel.RawAmount.BigInt()
+	if channelRawAmount.Cmp(rawBalance) < 0 {
 		return CloseChannelResponse{}, fmt.Errorf("resize this channel first")
 	}
 
@@ -207,7 +207,7 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 		{
 			Destination: s.signer.GetAddress(),
 			Token:       common.HexToAddress(channel.Token),
-			Amount:      new(big.Int).Sub(channelAmount, rawBalance),
+			Amount:      new(big.Int).Sub(channelRawAmount, rawBalance),
 		},
 	}
 
@@ -246,7 +246,7 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 		resp.FinalAllocations = append(resp.FinalAllocations, Allocation{
 			Participant:  alloc.Destination.Hex(),
 			TokenAddress: alloc.Token.Hex(),
-			Amount:       alloc.Amount,
+			RawAmount:    alloc.Amount,
 		})
 	}
 

@@ -58,6 +58,8 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transaction signer: %w", err)
 	}
+
+	// TODO: remove as it is unused
 	auth.GasPrice = big.NewInt(30000000000) // 20 gwei.
 	auth.GasLimit = uint64(3000000)
 
@@ -198,12 +200,12 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 	nonce := ev.Channel.Nonce
 	broker := ev.Channel.Participants[1]
 	tokenAddress := ev.Initial.Allocations[0].Token.Hex()
-	tokenAmount := ev.Initial.Allocations[0].Amount.Int64()
+	rawAmount := ev.Initial.Allocations[0].Amount
 	adjudicator := ev.Channel.Adjudicator
 	challenge := ev.Channel.Challenge
 
-	brokerAmount := ev.Initial.Allocations[1].Amount.Int64()
-	if brokerAmount != 0 {
+	brokerAmount := ev.Initial.Allocations[1].Amount
+	if brokerAmount.Cmp(big.NewInt(0)) != 0 {
 		logger.Warn("non-zero broker amount", "amount", brokerAmount)
 		return
 	}
@@ -259,7 +261,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 			adjudicator.Hex(),
 			c.chainID,
 			tokenAddress,
-			uint64(tokenAmount),
+			decimal.NewFromBigInt(rawAmount, 0),
 		)
 		if err != nil {
 			return err
@@ -272,9 +274,10 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 
 		walletAddress := ev.Wallet
 		channelAccountID := NewAccountID(channelID)
-		tokenAmount := decimal.NewFromBigInt(big.NewInt(tokenAmount), -int32(asset.Decimals))
+
+		amount := rawToDecimal(rawAmount, asset.Decimals)
 		ledger := GetWalletLedger(tx, walletAddress)
-		if err := ledger.Record(channelAccountID, asset.Symbol, tokenAmount); err != nil {
+		if err := ledger.Record(channelAccountID, asset.Symbol, amount); err != nil {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 
@@ -337,20 +340,20 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 		walletAddress := common.HexToAddress(channel.Wallet)
 		channelAccountID := NewAccountID(channelID)
 		walletAccountID := NewAccountID(channel.Wallet)
-		tokenAmount := decimal.NewFromBigInt(big.NewInt(int64(channel.Amount)), -int32(asset.Decimals))
+		amount := rawToDecimal(channel.RawAmount.BigInt(), asset.Decimals)
 		// Transfer from channel account into user's unified account.
 		ledger := GetWalletLedger(tx, walletAddress)
-		if err := ledger.Record(channelAccountID, asset.Symbol, tokenAmount.Neg()); err != nil {
+		if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
 			log.Printf("[Joined] Error recording balance update for wallet: %v", err)
 			return err
 		}
 
 		ledger = GetWalletLedger(tx, walletAddress)
-		if err := ledger.Record(walletAccountID, asset.Symbol, tokenAmount); err != nil {
+		if err := ledger.Record(walletAccountID, asset.Symbol, amount); err != nil {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 
-		_, err = RecordLedgerTransaction(tx, TransactionTypeDeposit, channelID, channel.Wallet, asset.Symbol, tokenAmount)
+		_, err = RecordLedgerTransaction(tx, TransactionTypeDeposit, channelID, channel.Wallet, asset.Symbol, amount)
 		if err != nil {
 			return fmt.Errorf("failed to record transaction: %w", err)
 		}
@@ -419,18 +422,18 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			return fmt.Errorf("error finding channel: %w", result.Error)
 		}
 
-		newAmount := new(big.Int).SetUint64(channel.Amount)
+		newRawAmount := channel.RawAmount.BigInt()
 		for _, change := range ev.DeltaAllocations {
-			newAmount.Add(newAmount, change)
+			newRawAmount.Add(newRawAmount, change)
 		}
 
-		if newAmount.Sign() < 0 {
+		if newRawAmount.Sign() < 0 {
 			// TODO: what do we do in this case?
 			logger.Error("invalid resize, channel balance cannot be negative", "channelId", channelID)
-			return fmt.Errorf("invalid resize, channel balance cannot be negative: %s", newAmount.String())
+			return fmt.Errorf("invalid resize, channel balance cannot be negative: %s", newRawAmount.String())
 		}
 
-		channel.Amount = newAmount.Uint64()
+		channel.RawAmount = decimal.NewFromBigInt(newRawAmount, 0)
 		channel.UpdatedAt = time.Now()
 		channel.Version++
 		if err := tx.Save(&channel).Error; err != nil {
@@ -451,7 +454,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 				return fmt.Errorf("DB error fetching asset: %w", err)
 			}
 
-			amount := decimal.NewFromBigInt(resizeAmount, -int32(asset.Decimals))
+			amount := rawToDecimal(resizeAmount, asset.Decimals)
 			// Keep correct order of operation for deposits and withdrawals into the channel.
 			if amount.IsPositive() || amount.IsZero() {
 				// 1. Deposit into a channel account.
@@ -499,7 +502,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 		logger.Error("failed to resize channel", "channelId", channelID, "error", err)
 		return
 	}
-	logger.Info("resized channel", "channelId", channelID, "newAmount", channel.Amount)
+	logger.Info("resized channel", "channelId", channelID, "newRawAmount", channel.RawAmount)
 
 	c.sendBalanceUpdate(channel.Wallet)
 	c.sendChannelUpdate(channel)
@@ -530,35 +533,37 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 			return fmt.Errorf("DB error fetching asset: %w", err)
 		}
 
-		finalAllocation := ev.FinalState.Allocations[0].Amount
-		tokenAmount := decimal.NewFromBigInt(finalAllocation, -int32(asset.Decimals))
+		rawAmount := ev.FinalState.Allocations[0].Amount
+		amount := rawToDecimal(rawAmount, asset.Decimals)
 
 		walletAddress := common.HexToAddress(channel.Wallet)
 		channelAccountID := NewAccountID(channelID)
 		walletAccountID := NewAccountID(channel.Wallet)
 
-		// Transfer fron unified account into channel account and then withdraw immidiately.
+		// Transfer from unified account into channel account and then withdraw immediately.
 		ledger := GetWalletLedger(tx, walletAddress)
-		if err := ledger.Record(walletAccountID, asset.Symbol, tokenAmount.Neg()); err != nil {
+		if err := ledger.Record(walletAccountID, asset.Symbol, amount.Neg()); err != nil {
 			return fmt.Errorf("error recording balance update for participant: %w", err)
 		}
 
-		if err := ledger.Record(channelAccountID, asset.Symbol, tokenAmount); err != nil {
+		if err := ledger.Record(channelAccountID, asset.Symbol, amount); err != nil {
 			log.Printf("[Closed] Error recording balance update for wallet: %v", err)
 			return err
 		}
-		_, err = RecordLedgerTransaction(tx, TransactionTypeWithdrawal, channel.Wallet, channelID, asset.Symbol, tokenAmount)
+
+		_, err = RecordLedgerTransaction(tx, TransactionTypeWithdrawal, walletAddress.Hex(), channelID, asset.Symbol, amount)
 		if err != nil {
 			return fmt.Errorf("failed to record transaction: %w", err)
 		}
+
 		// 2. Withdraw from the channel account.
-		if err := ledger.Record(channelAccountID, asset.Symbol, tokenAmount.Neg()); err != nil {
+		if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
 			log.Printf("[Closed] Error recording balance update for wallet: %v", err)
 			return err
 		}
 
 		channel.Status = ChannelStatusClosed
-		channel.Amount = 0
+		channel.RawAmount = decimal.Zero
 		channel.UpdatedAt = time.Now()
 		channel.Version++
 		if err := tx.Save(&channel).Error; err != nil {
@@ -605,28 +610,29 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			"expected", len(assets), "got", len(availInfo[0]))
 	}
 
-	walletBalances, err := c.balanceChecker.Balances(callOpts, []common.Address{brokerAddr}, tokenAddrs)
+	rawWalletBalances, err := c.balanceChecker.Balances(callOpts, []common.Address{brokerAddr}, tokenAddrs)
 	if err != nil {
 		logger.Error("failed to get wallet balances", "network", c.chainID, "error", err)
 		return
 	}
-	if len(walletBalances) != len(assets) {
+	if len(rawWalletBalances) != len(assets) {
 		logger.Warn("unexpected wallet balances length", "network", c.chainID,
-			"expected", len(assets), "got", len(walletBalances))
+			"expected", len(assets), "got", len(rawWalletBalances))
 	}
 
 	// Get the native token balance
-	nativeBalance, err := c.client.BalanceAt(ctx, brokerAddr, nil)
+	rawNativeBalance, err := c.client.BalanceAt(ctx, brokerAddr, nil)
 	if err != nil {
 		logger.Error("failed to get native asset balance", "network", c.chainID, "error", err)
 		return
 	}
-	walletBalances = append(walletBalances, nativeBalance)
+	rawWalletBalances = append(rawWalletBalances, rawNativeBalance)
 
 	for i, asset := range assets {
 		var available decimal.Decimal
 		if len(availInfo) > 0 && i < len(availInfo[0]) {
-			available = decimal.NewFromBigInt(availInfo[0][i], -int32(asset.Decimals))
+			available := rawToDecimal(availInfo[0][i], asset.Decimals)
+
 			metrics.BrokerBalanceAvailable.With(prometheus.Labels{
 				"network": fmt.Sprintf("%d", c.chainID),
 				"token":   asset.Token,
@@ -634,7 +640,7 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 			}).Set(available.InexactFloat64())
 		}
 
-		walletBalance := decimal.NewFromBigInt(walletBalances[i], -int32(asset.Decimals))
+		walletBalance := rawToDecimal(rawWalletBalances[i], asset.Decimals)
 		metrics.BrokerWalletBalance.With(prometheus.Labels{
 			"network": fmt.Sprintf("%d", c.chainID),
 			"token":   asset.Token,
@@ -676,4 +682,12 @@ func (c *Custody) saveContractEvent(tx *gorm.DB, name string, event any, rawLog 
 	}
 
 	return StoreContractEvent(tx, contractEvent)
+}
+
+// rawToDecimal converts a raw big.Int amount to a decimal.Decimal with the specified number of decimals.
+func rawToDecimal(raw *big.Int, decimals uint8) decimal.Decimal {
+	if raw == nil {
+		return decimal.Zero
+	}
+	return decimal.NewFromBigInt(raw, -int32(decimals))
 }

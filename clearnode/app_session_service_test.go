@@ -437,7 +437,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 
 		walletBalA, err := ledgerA.Balance(userAccountIDA, "usdc")
 		require.NoError(t, err)
-		assert.Equal(t, decimal.NewFromInt(0), walletBalA)
+		assert.True(t, walletBalA.IsZero())
 
 		assert.Len(t, balanceUpdates, 0)
 	})

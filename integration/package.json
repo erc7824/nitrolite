@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test": "jest --runInBand --detectOpenHandles",
-    "test:watch": "jest --watch --runInBand"
+    "test:watch": "jest --watch --runInBand --detectOpenHandles"
   },
   "dependencies": {
     "@erc7824/nitrolite": "file:../sdk",

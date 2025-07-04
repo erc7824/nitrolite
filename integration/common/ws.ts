@@ -225,6 +225,18 @@ export const getCreateAppSessionPredicate = () => {
     };
 };
 
+export const getSubmitAppStatePredicate = () => {
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.SubmitAppState, reqId);
+    };
+};
+
+export const getGetAppSessionsPredicate = () => {
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.GetAppSessions, reqId);
+    };
+};
+
 export const getCloseAppSessionPredicate = () => {
     return (data: string, reqId?: number): boolean => {
         return genericPredicate(data, (r) => r.method === RPCMethod.CloseAppSession, reqId);

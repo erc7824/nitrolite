@@ -95,6 +95,7 @@ const GetAppSessionsParamsSchema = z
                     nonce: z.number(),
                     created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
                     updated_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
+                    session_data: z.string().optional(),
                 })
                 .transform(
                     (s) =>
@@ -110,6 +111,7 @@ const GetAppSessionsParamsSchema = z
                             nonce: s.nonce,
                             createdAt: s.created_at,
                             updatedAt: s.updated_at,
+                            sessionData: s.session_data,
                         }) as GetAppSessionsResponseParams,
                 ),
         ),

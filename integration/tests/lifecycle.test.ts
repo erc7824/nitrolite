@@ -8,17 +8,22 @@ import {
     getCloseAppSessionPredicate,
     getCreateAppSessionPredicate,
     getGetLedgerBalancesPredicate,
+    getGetAppSessionsPredicate,
+    getSubmitAppStatePredicate,
     TestWebSocket,
 } from '@/ws';
 import {
     AppDefinition,
+    AppSessionAllocation,
     createAppSessionMessage,
     createCloseAppSessionMessage,
+    createGetAppSessionsMessage,
     createGetLedgerBalancesMessage,
+    createSubmitAppStateMessage,
     RPCChannelStatus,
     rpcResponseParser,
 } from '@erc7824/nitrolite';
-import { Hex, parseUnits } from 'viem';
+import { Hex, parseUnits, Address } from 'viem';
 
 describe('Close channel', () => {
     const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
@@ -42,6 +47,106 @@ describe('Close channel', () => {
     let channelId: Hex;
     let cpChannelId: Hex;
     let appSessionId: string;
+
+    const fetchAndParseAppSessions = async () => {
+        const getAppSessionsMsg = await createGetAppSessionsMessage(
+            appIdentity.messageSigner,
+            appIdentity.walletAddress
+        );
+        const getAppSessionsResponse = await appWS.sendAndWaitForResponse(
+            getAppSessionsMsg,
+            getGetAppSessionsPredicate(),
+            1000
+        );
+
+        const getAppSessionsParsedResponse = rpcResponseParser.getAppSessions(getAppSessionsResponse);
+        expect(getAppSessionsParsedResponse).toBeDefined();
+        expect(getAppSessionsParsedResponse.params).toHaveLength(1);
+
+        const appSession = getAppSessionsParsedResponse.params[0];
+        expect(appSession.appSessionId).toBe(appSessionId);
+        expect(appSession.sessionData).toBeDefined();
+
+        return {
+            appSession,
+            sessionData: JSON.parse(appSession.sessionData!)
+        };
+    };
+
+    const GAME_TYPE = "chess";
+    const TIME_CONTROL = { initial: 600, increment: 5 };
+
+    const SESSION_DATA_WAITING = {
+        gameType: GAME_TYPE,
+        timeControl: TIME_CONTROL,
+        gameState: "waiting"
+    };
+
+    const SESSION_DATA_ACTIVE = {
+        gameType: GAME_TYPE,
+        timeControl: TIME_CONTROL,
+        gameState: "active",
+        currentMove: "e2e4",
+        moveCount: 1
+    };
+
+    const SESSION_DATA_FINISHED = {
+        gameType: GAME_TYPE,
+        timeControl: TIME_CONTROL,
+        gameState: "finished",
+        winner: "white",
+        endCondition: "checkmate"
+    };
+
+    const submitAppStateUpdate = async (allocations: AppSessionAllocation[], sessionData: object, expectedVersion: number) => {
+        const submitAppStateMsg = await createSubmitAppStateMessage(appIdentity.messageSigner, [
+            {
+                app_session_id: appSessionId as Hex,
+                allocations,
+                session_data: JSON.stringify(sessionData)
+            },
+        ]);
+
+        const submitAppStateResponse = await appWS.sendAndWaitForResponse(
+            submitAppStateMsg,
+            getSubmitAppStatePredicate(),
+            1000
+        );
+
+        const submitAppStateParsedResponse = rpcResponseParser.submitAppState(submitAppStateResponse);
+        expect(submitAppStateParsedResponse).toBeDefined();
+        expect(submitAppStateParsedResponse.params.appSessionId).toBe(appSessionId);
+        expect(submitAppStateParsedResponse.params.status).toBe(RPCChannelStatus.Open);
+        expect(submitAppStateParsedResponse.params.version).toBe(expectedVersion);
+
+        return submitAppStateParsedResponse;
+    };
+
+    const closeAppSessionWithState = async (allocations: AppSessionAllocation[], sessionData: object, expectedVersion: number) => {
+        const closeAppSessionMsg = await createCloseAppSessionMessage(appIdentity.messageSigner, [
+            {
+                app_session_id: appSessionId as Hex,
+                allocations,
+                session_data: JSON.stringify(sessionData)
+            },
+        ]);
+
+        const closeAppSessionResponse = await appWS.sendAndWaitForResponse(
+            closeAppSessionMsg,
+            getCloseAppSessionPredicate(),
+            1000
+        );
+
+        expect(closeAppSessionResponse).toBeDefined();
+
+        const closeAppSessionParsedResponse = rpcResponseParser.closeAppSession(closeAppSessionResponse);
+        expect(closeAppSessionParsedResponse).toBeDefined();
+        expect(closeAppSessionParsedResponse.params.appSessionId).toBe(appSessionId);
+        expect(closeAppSessionParsedResponse.params.status).toBe(RPCChannelStatus.Closed);
+        expect(closeAppSessionParsedResponse.params.version).toBe(expectedVersion);
+
+        return closeAppSessionParsedResponse;
+    };
 
     beforeAll(async () => {
         blockUtils = new BlockchainUtils();
@@ -161,6 +266,7 @@ describe('Close channel', () => {
             {
                 definition,
                 allocations,
+                session_data: JSON.stringify(SESSION_DATA_WAITING)
             },
         ]);
         const createAppSessionResponse = await appWS.sendAndWaitForResponse(
@@ -179,38 +285,51 @@ describe('Close channel', () => {
         appSessionId = createAppSessionParsedResponse.params.appSessionId;
     });
 
-    it('should close app session', async () => {
-        const closeAppSessionMsg = await createCloseAppSessionMessage(appIdentity.messageSigner, [
+    it('should submit state with updated session_data', async () => {
+        const allocations = [
             {
-                app_session_id: appSessionId as Hex,
-                allocations: [
-                    {
-                        participant: appIdentity.walletAddress,
-                        asset: 'USDC',
-                        amount: '0',
-                    },
-                    {
-                        participant: appCPIdentity.walletAddress,
-                        asset: 'USDC',
-                        amount: decimalDepositAmount.toString(),
-                    },
-                ],
+                participant: appIdentity.walletAddress,
+                asset: 'USDC',
+                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
-        ]);
+            {
+                participant: appCPIdentity.walletAddress,
+                asset: 'USDC',
+                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+            },
+        ];
 
-        const closeAppSessionResponse = await appWS.sendAndWaitForResponse(
-            closeAppSessionMsg,
-            getCloseAppSessionPredicate(),
-            1000
-        );
-        expect(closeAppSessionResponse).toBeDefined();
+        await submitAppStateUpdate(allocations, SESSION_DATA_ACTIVE, 2);
+    });
 
-        const closeAppSessionParsedResponse = rpcResponseParser.closeAppSession(closeAppSessionResponse);
-        expect(closeAppSessionParsedResponse).toBeDefined();
+    it('should verify sessionData changes after updates', async () => {
+        const { sessionData } = await fetchAndParseAppSessions();
 
-        expect(closeAppSessionParsedResponse.params.appSessionId).toBe(appSessionId);
-        expect(closeAppSessionParsedResponse.params.status).toBe(RPCChannelStatus.Closed);
-        expect(closeAppSessionParsedResponse.params.version).toBe(2);
+        expect(sessionData).toEqual(SESSION_DATA_ACTIVE);
+    });
+
+    it('should close app session', async () => {
+        const allocations = [
+            {
+                participant: appIdentity.walletAddress,
+                asset: 'USDC',
+                amount: '0',
+            },
+            {
+                participant: appCPIdentity.walletAddress,
+                asset: 'USDC',
+                amount: decimalDepositAmount.toString(),
+            },
+        ];
+
+        await closeAppSessionWithState(allocations, SESSION_DATA_FINISHED, 3);
+    });
+
+    it('should verify sessionData changes after closing', async () => {
+        const { appSession, sessionData } = await fetchAndParseAppSessions();
+
+        expect(appSession.status).toBe(RPCChannelStatus.Closed);
+        expect(sessionData).toEqual(SESSION_DATA_FINISHED);
     });
 
     it('should update ledger balances', async () => {

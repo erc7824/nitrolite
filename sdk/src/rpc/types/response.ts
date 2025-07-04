@@ -212,6 +212,8 @@ export interface GetAppSessionsResponseParams {
     createdAt: Date;
     /** The timestamp when the session was last updated. */
     updatedAt: Date;
+    /** Optional session data as a JSON string that stores application-specific state or metadata. */
+    sessionData?: string;
 }
 export type GetAppSessionsRPCResponseParams = GetAppSessionsResponseParams; // for backward compatibility
 

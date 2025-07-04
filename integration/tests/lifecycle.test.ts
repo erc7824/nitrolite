@@ -47,6 +47,31 @@ describe('Close channel', () => {
     let cpChannelId: Hex;
     let appSessionId: string;
 
+    const fetchAndParseAppSessions = async () => {
+        const getAppSessionsMsg = await createGetAppSessionsMessage(
+            appIdentity.messageSigner,
+            appIdentity.walletAddress
+        );
+        const getAppSessionsResponse = await appWS.sendAndWaitForResponse(
+            getAppSessionsMsg,
+            getGetAppSessionsPredicate(),
+            1000
+        );
+
+        const getAppSessionsParsedResponse = rpcResponseParser.getAppSessions(getAppSessionsResponse);
+        expect(getAppSessionsParsedResponse).toBeDefined();
+        expect(getAppSessionsParsedResponse.params).toHaveLength(1);
+        
+        const appSession = getAppSessionsParsedResponse.params[0];
+        expect(appSession.appSessionId).toBe(appSessionId);
+        expect(appSession.sessionData).toBeDefined();
+        
+        return {
+            appSession,
+            sessionData: JSON.parse(appSession.sessionData!)
+        };
+    };
+
     beforeAll(async () => {
         blockUtils = new BlockchainUtils();
         databaseUtils = new DatabaseUtils();
@@ -228,25 +253,8 @@ describe('Close channel', () => {
     });
 
     it('should verify sessionData changes after updates', async () => {
-        const getAppSessionsMsg = await createGetAppSessionsMessage(
-            appIdentity.messageSigner,
-            appIdentity.walletAddress
-        );
-        const getAppSessionsResponse = await appWS.sendAndWaitForResponse(
-            getAppSessionsMsg,
-            getGetAppSessionsPredicate(),
-            1000
-        );
-
-        const getAppSessionsParsedResponse = rpcResponseParser.getAppSessions(getAppSessionsResponse);
-        expect(getAppSessionsParsedResponse).toBeDefined();
-        expect(getAppSessionsParsedResponse.params).toHaveLength(1);
+        const { sessionData } = await fetchAndParseAppSessions();
         
-        const appSession = getAppSessionsParsedResponse.params[0];
-        expect(appSession.appSessionId).toBe(appSessionId);
-        expect(appSession.sessionData).toBeDefined();
-        
-        const sessionData = JSON.parse(appSession.sessionData!);
         expect(sessionData.gameState).toBe('active');
         expect(sessionData.currentMove).toBe('e2e4');
         expect(sessionData.moveCount).toBe(1);
@@ -296,26 +304,9 @@ describe('Close channel', () => {
     });
 
     it('should verify sessionData changes after closing', async () => {
-        const getAppSessionsMsg = await createGetAppSessionsMessage(
-            appIdentity.messageSigner,
-            appIdentity.walletAddress
-        );
-        const getAppSessionsResponse = await appWS.sendAndWaitForResponse(
-            getAppSessionsMsg,
-            getGetAppSessionsPredicate(),
-            1000
-        );
-
-        const getAppSessionsParsedResponse = rpcResponseParser.getAppSessions(getAppSessionsResponse);
-        expect(getAppSessionsParsedResponse).toBeDefined();
-        expect(getAppSessionsParsedResponse.params).toHaveLength(1);
+        const { appSession, sessionData } = await fetchAndParseAppSessions();
         
-        const appSession = getAppSessionsParsedResponse.params[0];
-        expect(appSession.appSessionId).toBe(appSessionId);
-        expect(appSession.sessionData).toBeDefined();
         expect(appSession.status).toBe(RPCChannelStatus.Closed);
-        
-        const sessionData = JSON.parse(appSession.sessionData!);
         expect(sessionData.gameState).toBe('finished');
         expect(sessionData.winner).toBe('white');
         expect(sessionData.endCondition).toBe('checkmate');

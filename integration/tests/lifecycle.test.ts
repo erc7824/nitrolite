@@ -19,7 +19,7 @@ import {
     createCloseAppSessionMessage,
     createGetAppSessionsMessage,
     createGetLedgerBalancesMessage,
-    createSubmitStateMessage,
+    createSubmitAppStateMessage,
     RPCChannelStatus,
     rpcResponseParser,
 } from '@erc7824/nitrolite';
@@ -99,7 +99,7 @@ describe('Close channel', () => {
     };
 
     const submitStateUpdate = async (allocations: AppSessionAllocation[], sessionData: object, expectedVersion: number) => {
-        const submitStateMsg = await createSubmitStateMessage(appIdentity.messageSigner, [
+        const submitStateMsg = await createSubmitAppStateMessage(appIdentity.messageSigner, [
             {
                 app_session_id: appSessionId as Hex,
                 allocations,

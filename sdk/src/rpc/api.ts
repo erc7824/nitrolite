@@ -23,7 +23,7 @@ import { generateRequestId, getCurrentTimestamp } from './utils';
 import {
     CloseAppSessionRequestParams,
     CreateAppSessionRequestParams,
-    SubmitStateRequestParams,
+    SubmitAppStateRequestParams,
     ResizeChannelRequestParams,
 } from './types/request';
 
@@ -298,7 +298,6 @@ export async function createAppSessionMessage(
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.CreateAppSession, params, timestamp);
-
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);
@@ -313,13 +312,13 @@ export async function createAppSessionMessage(
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
  */
-export async function createSubmitStateMessage(
+export async function createSubmitAppStateMessage(
     signer: MessageSigner,
-    params: SubmitStateRequestParams[],
+    params: SubmitAppStateRequestParams[],
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const request = NitroliteRPC.createRequest(requestId, RPCMethod.SubmitState, params, timestamp);
+    const request = NitroliteRPC.createRequest(requestId, RPCMethod.SubmitAppState, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);

@@ -465,7 +465,6 @@ func TestHandleJoinedEvent(t *testing.T) {
 		assert.Equal(t, walletAddr.Hex(), tx.ToAccount, "To account should be wallet address")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 		assert.True(t, tokenAmountDecimal.Equal(tx.Amount), "Transaction amount should match deposited amount")
-		assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 
@@ -623,7 +622,6 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		finalAmountDecimal := decimal.NewFromInt(finalAmount).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 		assert.True(t, finalAmountDecimal.Equal(tx.Amount), "Transaction amount should match final amount")
-		assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 
@@ -707,7 +705,6 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		finalAmountDecimal := decimal.NewFromInt(finalAmount).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 		assert.True(t, finalAmountDecimal.Equal(tx.Amount), "Transaction amount should match final amount")
-		assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 }
@@ -880,7 +877,6 @@ func TestHandleResizedEvent(t *testing.T) {
 		assert.Equal(t, walletAddr.Hex(), tx.ToAccount, "To account should be wallet address")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 		assert.True(t, deltaAmountDecimal.Equal(tx.Amount), "Transaction amount should match delta amount")
-		assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 
@@ -963,7 +959,6 @@ func TestHandleResizedEvent(t *testing.T) {
 		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 		assert.True(t, deltaAmountDecimal.Equal(tx.Amount), "Transaction amount should match delta amount")
-		assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 

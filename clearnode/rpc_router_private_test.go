@@ -256,7 +256,6 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 			assert.Equal(t, TransactionTypeTransfer, tx.Type, "Transaction type should be transfer")
 			assert.Equal(t, senderAddr.Hex(), tx.FromAccount, "From account should match")
 			assert.Equal(t, recipientAddr.Hex(), tx.ToAccount, "To account should match")
-			assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
 			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 
 			// Check asset-specific amounts

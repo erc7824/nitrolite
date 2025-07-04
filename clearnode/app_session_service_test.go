@@ -99,7 +99,6 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			assert.Equal(t, appSession.SessionID, tx.ToAccount, "To account should be app session ID")
 			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
 			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
-			assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
 			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 		}
 	})
@@ -378,7 +377,6 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			assert.Equal(t, session.SessionID, tx.FromAccount, "From account should be app session ID")
 			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
 			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
-			assert.NotEmpty(t, tx.Hash, "Transaction hash should be generated")
 			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 		}
 	})

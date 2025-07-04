@@ -2,7 +2,6 @@
 -- +goose StatementBegin
 CREATE TABLE ledger_transactions (
     id SERIAL PRIMARY KEY,
-    hash VARCHAR NOT NULL UNIQUE,
     tx_type INTEGER NOT NULL,
     from_account VARCHAR NOT NULL,
     to_account VARCHAR NOT NULL,

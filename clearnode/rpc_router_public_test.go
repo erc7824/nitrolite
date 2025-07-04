@@ -1302,7 +1302,6 @@ func TestRPCRouterHandleGetLedgerTransactions_Pagination(t *testing.T) {
 	for i := 0; i < 11; i++ {
 		var tx LedgerTransaction
 		require.NoError(t, router.DB.Where("created_at = ?", testTransactions[10-i].CreatedAt).First(&tx).Error)
-		expectedHashes[i] = tx.Hash
 	}
 
 	tcs := []struct {

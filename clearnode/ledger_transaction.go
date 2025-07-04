@@ -28,7 +28,6 @@ var (
 
 type LedgerTransaction struct {
 	ID          uint            `gorm:"primaryKey"`
-	Hash        string          `gorm:"column:hash;not null;uniqueIndex"`
 	Type        TransactionType `gorm:"column:tx_type;not null;index:idx_type;index:idx_from_to_account"`
 	FromAccount string          `gorm:"column:from_account;not null;index:idx_from_account;index:idx_from_to_account"`
 	ToAccount   string          `gorm:"column:to_account;not null;index:idx_to_account;index:idx_from_to_account"`
@@ -39,7 +38,7 @@ type LedgerTransaction struct {
 
 func (tx *LedgerTransaction) JSON() TransactionResponse {
 	return TransactionResponse{
-		TxHash:      tx.Hash,
+		TxHash:      getTransactionHash(tx.ID, tx.Type, tx.FromAccount, tx.ToAccount, tx.AssetSymbol, tx.Amount, tx.CreatedAt.Unix()),
 		TxType:      tx.Type.String(),
 		FromAccount: tx.FromAccount,
 		ToAccount:   tx.ToAccount,
@@ -53,29 +52,7 @@ func (LedgerTransaction) TableName() string {
 	return "ledger_transactions"
 }
 
-func (t *LedgerTransaction) BeforeCreate(tx *gorm.DB) (err error) {
-	if t.CreatedAt.IsZero() {
-		t.CreatedAt = time.Now()
-	}
-	// Set a temporary hash. This will be overwritten in AfterCreate.
-	t.Hash = fmt.Sprintf("pending-%p", t)
-	return nil
-}
-
-func (t *LedgerTransaction) AfterCreate(tx *gorm.DB) (err error) {
-	txHash := getTransactionHash(
-		t.ID,
-		t.Type,
-		t.FromAccount,
-		t.ToAccount,
-		t.AssetSymbol,
-		t.Amount,
-		t.CreatedAt.UnixMilli(),
-	)
-
-	return tx.Model(t).UpdateColumn("hash", txHash).Error
-}
-
+// RecordLedgerTransaction records a new ledger transaction in the database.
 func RecordLedgerTransaction(tx *gorm.DB, txType TransactionType, fromAccount, toAccount, assetSymbol string, amount decimal.Decimal) (*LedgerTransaction, error) {
 	transaction := &LedgerTransaction{
 		Type:        txType,
@@ -87,18 +64,16 @@ func RecordLedgerTransaction(tx *gorm.DB, txType TransactionType, fromAccount, t
 
 	err := tx.Create(transaction).Error
 
-	fmt.Println("recording transaction from: ", fromAccount, " to ", toAccount, " ", assetSymbol, " ", amount)
-
 	return transaction, err
 }
 
+// GetLedgerTransactions retrieves ledger transactions based on the provided filters.
 func GetLedgerTransactions(tx *gorm.DB, accountID, assetSymbol string, txType *TransactionType) ([]LedgerTransaction, error) {
 	var transactions []LedgerTransaction
 	q := tx.Model(&LedgerTransaction{})
 
 	if accountID != "" {
 		q = q.Where("from_account = ? OR to_account = ?", accountID, accountID)
-
 	}
 	if assetSymbol != "" {
 		q = q.Where("asset_symbol = ?", assetSymbol)

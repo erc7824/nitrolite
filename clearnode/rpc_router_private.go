@@ -244,7 +244,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			if err = ledger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit destination account: %w", err)
 			}
-			transaction, err := RecordLedgerTransaction(tx, TransactionTypeTransfer, fromWallet, params.Destination, alloc.AssetSymbol, alloc.Amount)
+			transaction, err := RecordLedgerTransaction(tx, TransactionTypeTransfer, fromAccountID, toAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
 				return fmt.Errorf("failed to record transaction: %w", err)
 			}

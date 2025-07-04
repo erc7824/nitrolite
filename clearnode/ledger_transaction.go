@@ -49,13 +49,13 @@ func (LedgerTransaction) TableName() string {
 }
 
 // RecordLedgerTransaction records a new ledger transaction in the database.
-func RecordLedgerTransaction(tx *gorm.DB, txType TransactionType, fromAccount, toAccount, assetSymbol string, amount decimal.Decimal) (*LedgerTransaction, error) {
+func RecordLedgerTransaction(tx *gorm.DB, txType TransactionType, fromAccount, toAccount AccountID, assetSymbol string, amount decimal.Decimal) (*LedgerTransaction, error) {
 	transaction := &LedgerTransaction{
 		Type:        txType,
-		FromAccount: fromAccount,
-		ToAccount:   toAccount,
+		FromAccount: fromAccount.String(),
+		ToAccount:   toAccount.String(),
 		AssetSymbol: assetSymbol,
-		Amount:      amount,
+		Amount:      amount.Abs(),
 	}
 
 	err := tx.Create(transaction).Error
@@ -64,12 +64,12 @@ func RecordLedgerTransaction(tx *gorm.DB, txType TransactionType, fromAccount, t
 }
 
 // GetLedgerTransactions retrieves ledger transactions based on the provided filters.
-func GetLedgerTransactions(tx *gorm.DB, accountID, assetSymbol string, txType *TransactionType) ([]LedgerTransaction, error) {
+func GetLedgerTransactions(tx *gorm.DB, accountID AccountID, assetSymbol string, txType *TransactionType) ([]LedgerTransaction, error) {
 	var transactions []LedgerTransaction
 	q := tx.Model(&LedgerTransaction{})
 
-	if accountID != "" {
-		q = q.Where("from_account = ? OR to_account = ?", accountID, accountID)
+	if accountID.String() != "" {
+		q = q.Where("from_account = ? OR to_account = ?", accountID.String(), accountID.String())
 	}
 	if assetSymbol != "" {
 		q = q.Where("asset_symbol = ?", assetSymbol)

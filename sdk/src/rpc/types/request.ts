@@ -24,13 +24,13 @@ export interface AuthChallengeRequest extends GenericRPCMessage {
  */
 export type AuthVerifyRequestParams =
     | {
-          /** JSON Web Token for authentication. */
-          jwt: string;
-      }
+        /** JSON Web Token for authentication. */
+        jwt: string;
+    }
     | {
-          /** The challenge token received from auth_challenge response. Used to verify the client's signature and prevent replay attacks. */
-          challenge: string;
-      };
+        /** The challenge token received from auth_challenge response. Used to verify the client's signature and prevent replay attacks. */
+        challenge: string;
+    };
 export type AuthVerifyRPCRequestParams = AuthVerifyRequestParams; // for backward compatibility
 
 /**
@@ -87,6 +87,38 @@ export type GetLedgerEntriesRPCRequestParams = GetLedgerEntriesRequestParams; //
 export interface GetLedgerEntriesRequest extends GenericRPCMessage {
     method: RPCMethod.GetLedgerEntries;
     params: [GetLedgerEntriesRequestParams];
+}
+
+/**
+ * Represents the request parameters for the 'get_transactions' RPC method.
+ */
+export enum TxType {
+    Transfer = 'transfer',
+    Deposit = 'deposit',
+    Withdrawal = 'withdrawal',
+    AppDeposit = 'app_deposit',
+    AppWithdrawal = 'app_withdrawal',
+}
+
+/**
+ * Represents the request parameters for the 'get_transactions' RPC method.
+ */
+export interface GetLedgerTransactionsRequestParams {
+    /** The account ID to filter transactions. */
+    account_id?: string;
+    /** The asset symbol to filter transactions. */
+    asset?: string;
+    /** The transaction type to filter transactions. */
+    tx_type?: TxType;
+}
+export type GetLedgerTransactionsRPCRequestParams = GetLedgerTransactionsRequestParams; // for backward compatibility
+
+/**
+ * Represents the request structure for the 'get_transactions' RPC method.
+ */
+export interface GetLedgerTransactionsRequest extends GenericRPCMessage {
+    method: RPCMethod.GetLedgerTransactions;
+    params: GetLedgerTransactionsRequestParams;
 }
 
 /** Represents the allocation of assets within an application session.
@@ -377,6 +409,7 @@ export type RPCRequest =
     | GetConfigRequest
     | GetLedgerBalancesRequest
     | GetLedgerEntriesRequest
+    | GetLedgerTransactionsRequest
     | CreateAppSessionRequest
     | SubmitAppStateRequest
     | CloseAppSessionRequest
@@ -402,6 +435,7 @@ export type RPCRequestParamsByMethod = {
     [RPCMethod.GetConfig]: [];
     [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRequestParams;
     [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRequestParams;
+    [RPCMethod.GetLedgerTransactions]: GetLedgerTransactionsRequestParams;
     [RPCMethod.CreateAppSession]: CreateAppSessionRequestParams;
     [RPCMethod.SubmitAppState]: SubmitAppStateRequestParams;
     [RPCMethod.CloseAppSession]: CloseAppSessionRequestParams;

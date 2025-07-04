@@ -318,6 +318,7 @@ export enum RPCMethod {
     GetConfig = 'get_config',
     GetLedgerBalances = 'get_ledger_balances',
     GetLedgerEntries = 'get_ledger_entries',
+    GetLedgerTransactions = 'get_ledger_transactions',
     CreateAppSession = 'create_app_session',
     SubmitAppState = 'submit_app_state',
     CloseAppSession = 'close_app_session',

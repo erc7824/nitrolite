@@ -7,6 +7,7 @@ import {
     AuthVerifyRequestParams,
     TransferAllocation,
     ChannelUpdate,
+    TxType,
 } from '.';
 
 /**
@@ -29,16 +30,14 @@ export interface AuthChallengeResponse extends GenericRPCMessage {
 /**
  * Represents the parameters for the 'auth_verify' RPC method.
  */
-export type AuthVerifyResponseParams =
-    | {
-          address: Address;
-          sessionKey: Address;
-          success: boolean;
-      }
-    & {
-          /** Available only if challenge auth method was used in {@link AuthVerifyRequestParams} during the call to {@link RPCMethod.AuthRequest} */
-          jwtToken: string;
-      };
+export type AuthVerifyResponseParams = {
+    address: Address;
+    sessionKey: Address;
+    success: boolean;
+} & {
+    /** Available only if challenge auth method was used in {@link AuthVerifyRequestParams} during the call to {@link RPCMethod.AuthRequest} */
+    jwtToken: string;
+};
 export type AuthVerifyRPCResponseParams = AuthVerifyResponseParams; // for backward compatibility
 
 /**
@@ -108,6 +107,26 @@ export interface GetLedgerEntriesResponseParams {
     createdAt: Date;
 }
 export type GetLedgerEntriesRPCResponseParams = GetLedgerEntriesResponseParams; // for backward compatibility
+
+/**
+ * Represents the parameters for the 'get_transactions' RPC method.
+ */
+export interface GetLedgerTransactionsResponseParams {
+    /** The transaction hash. */
+    id: number;
+    /** The type of transaction. */
+    txType: TxType;
+    /** The Ethereum address of the sender account. */
+    fromAccount: Address;
+    /** The Ethereum address of the recipient account. */
+    toAccount: Address;
+    /** The asset symbol (e.g., "ETH", "USDC"). */
+    asset: string;
+    /** The amount of the asset transferred. */
+    amount: BigInt;
+    /** The timestamp when the transaction was created. */
+    createdAt: Date;
+}
 
 /**
  * Represents the parameters for the 'create_app_session' RPC method.
@@ -330,6 +349,14 @@ export interface GetLedgerBalancesResponse extends GenericRPCMessage {
 export interface GetLedgerEntriesResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerEntries;
     params: GetLedgerEntriesResponseParams[];
+}
+
+/**
+ * Represents the response structure for the 'get_transactions' RPC method.
+ */
+export interface GetLedgerTransactionsResponse extends GenericRPCMessage {
+    method: RPCMethod.GetLedgerTransactions;
+    params: GetLedgerTransactionsResponseParams[];
 }
 
 /**
@@ -570,6 +597,7 @@ export type RPCResponse =
     | GetConfigResponse
     | GetLedgerBalancesResponse
     | GetLedgerEntriesResponse
+    | GetLedgerTransactionsResponse
     | CreateAppSessionResponse
     | SubmitAppStateResponse
     | CloseAppSessionResponse

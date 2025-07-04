@@ -14,6 +14,7 @@ import {
 } from '@/ws';
 import {
     AppDefinition,
+    AppSessionAllocation,
     createAppSessionMessage,
     createCloseAppSessionMessage,
     createGetAppSessionsMessage,
@@ -22,7 +23,7 @@ import {
     RPCChannelStatus,
     rpcResponseParser,
 } from '@erc7824/nitrolite';
-import { Hex, parseUnits } from 'viem';
+import { Hex, parseUnits, Address } from 'viem';
 
 describe('Close channel', () => {
     const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
@@ -61,11 +62,11 @@ describe('Close channel', () => {
         const getAppSessionsParsedResponse = rpcResponseParser.getAppSessions(getAppSessionsResponse);
         expect(getAppSessionsParsedResponse).toBeDefined();
         expect(getAppSessionsParsedResponse.params).toHaveLength(1);
-        
+
         const appSession = getAppSessionsParsedResponse.params[0];
         expect(appSession.appSessionId).toBe(appSessionId);
         expect(appSession.sessionData).toBeDefined();
-        
+
         return {
             appSession,
             sessionData: JSON.parse(appSession.sessionData!)
@@ -74,13 +75,13 @@ describe('Close channel', () => {
 
     const GAME_TYPE = "chess";
     const TIME_CONTROL = { initial: 600, increment: 5 };
-    
+
     const SESSION_DATA_WAITING = {
         gameType: GAME_TYPE,
         timeControl: TIME_CONTROL,
         gameState: "waiting"
     };
-    
+
     const SESSION_DATA_ACTIVE = {
         gameType: GAME_TYPE,
         timeControl: TIME_CONTROL,
@@ -88,13 +89,63 @@ describe('Close channel', () => {
         currentMove: "e2e4",
         moveCount: 1
     };
-    
+
     const SESSION_DATA_FINISHED = {
         gameType: GAME_TYPE,
         timeControl: TIME_CONTROL,
         gameState: "finished",
         winner: "white",
         endCondition: "checkmate"
+    };
+
+    const submitStateUpdate = async (allocations: AppSessionAllocation[], sessionData: object, expectedVersion: number) => {
+        const submitStateMsg = await createSubmitStateMessage(appIdentity.messageSigner, [
+            {
+                app_session_id: appSessionId as Hex,
+                allocations,
+                session_data: JSON.stringify(sessionData)
+            },
+        ]);
+
+        const submitStateResponse = await appWS.sendAndWaitForResponse(
+            submitStateMsg,
+            getSubmitStatePredicate(),
+            1000
+        );
+
+        const submitStateParsedResponse = rpcResponseParser.submitState(submitStateResponse);
+        expect(submitStateParsedResponse).toBeDefined();
+        expect(submitStateParsedResponse.params.appSessionId).toBe(appSessionId);
+        expect(submitStateParsedResponse.params.status).toBe(RPCChannelStatus.Open);
+        expect(submitStateParsedResponse.params.version).toBe(expectedVersion);
+
+        return submitStateParsedResponse;
+    };
+
+    const closeAppSessionWithState = async (allocations: AppSessionAllocation[], sessionData: object, expectedVersion: number) => {
+        const closeAppSessionMsg = await createCloseAppSessionMessage(appIdentity.messageSigner, [
+            {
+                app_session_id: appSessionId as Hex,
+                allocations,
+                session_data: JSON.stringify(sessionData)
+            },
+        ]);
+
+        const closeAppSessionResponse = await appWS.sendAndWaitForResponse(
+            closeAppSessionMsg,
+            getCloseAppSessionPredicate(),
+            1000
+        );
+
+        expect(closeAppSessionResponse).toBeDefined();
+
+        const closeAppSessionParsedResponse = rpcResponseParser.closeAppSession(closeAppSessionResponse);
+        expect(closeAppSessionParsedResponse).toBeDefined();
+        expect(closeAppSessionParsedResponse.params.appSessionId).toBe(appSessionId);
+        expect(closeAppSessionParsedResponse.params.status).toBe(RPCChannelStatus.Closed);
+        expect(closeAppSessionParsedResponse.params.version).toBe(expectedVersion);
+
+        return closeAppSessionParsedResponse;
     };
 
     beforeAll(async () => {
@@ -235,82 +286,48 @@ describe('Close channel', () => {
     });
 
     it('should submit state with updated session_data', async () => {
-        const submitStateMsg = await createSubmitStateMessage(appIdentity.messageSigner, [
+        const allocations = [
             {
-                app_session_id: appSessionId as Hex,
-                allocations: [
-                    {
-                        participant: appIdentity.walletAddress,
-                        asset: 'USDC',
-                        amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
-                    },
-                    {
-                        participant: appCPIdentity.walletAddress,
-                        asset: 'USDC',
-                        amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
-                    },
-                ],
-                session_data: JSON.stringify(SESSION_DATA_ACTIVE)
+                participant: appIdentity.walletAddress,
+                asset: 'USDC',
+                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
-        ]);
+            {
+                participant: appCPIdentity.walletAddress,
+                asset: 'USDC',
+                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+            },
+        ];
 
-        const submitStateResponse = await appWS.sendAndWaitForResponse(
-            submitStateMsg,
-            getSubmitStatePredicate(),
-            1000
-        );
-
-        const submitStateParsedResponse = rpcResponseParser.submitState(submitStateResponse);
-        expect(submitStateParsedResponse).toBeDefined();
-        expect(submitStateParsedResponse.params.appSessionId).toBe(appSessionId);
-        expect(submitStateParsedResponse.params.status).toBe(RPCChannelStatus.Open);
-        expect(submitStateParsedResponse.params.version).toBe(2);
+        await submitStateUpdate(allocations, SESSION_DATA_ACTIVE, 2);
     });
 
     it('should verify sessionData changes after updates', async () => {
         const { sessionData } = await fetchAndParseAppSessions();
-        
+
         expect(sessionData).toEqual(SESSION_DATA_ACTIVE);
     });
 
     it('should close app session', async () => {
-        const closeAppSessionMsg = await createCloseAppSessionMessage(appIdentity.messageSigner, [
+        const allocations = [
             {
-                app_session_id: appSessionId as Hex,
-                allocations: [
-                    {
-                        participant: appIdentity.walletAddress,
-                        asset: 'USDC',
-                        amount: '0',
-                    },
-                    {
-                        participant: appCPIdentity.walletAddress,
-                        asset: 'USDC',
-                        amount: decimalDepositAmount.toString(),
-                    },
-                ],
-                session_data: JSON.stringify(SESSION_DATA_FINISHED)
+                participant: appIdentity.walletAddress,
+                asset: 'USDC',
+                amount: '0',
             },
-        ]);
+            {
+                participant: appCPIdentity.walletAddress,
+                asset: 'USDC',
+                amount: decimalDepositAmount.toString(),
+            },
+        ];
 
-        const closeAppSessionResponse = await appWS.sendAndWaitForResponse(
-            closeAppSessionMsg,
-            getCloseAppSessionPredicate(),
-            1000
-        );
-        expect(closeAppSessionResponse).toBeDefined();
-
-        const closeAppSessionParsedResponse = rpcResponseParser.closeAppSession(closeAppSessionResponse);
-        expect(closeAppSessionParsedResponse).toBeDefined();
-
-        expect(closeAppSessionParsedResponse.params.appSessionId).toBe(appSessionId);
-        expect(closeAppSessionParsedResponse.params.status).toBe(RPCChannelStatus.Closed);
-        expect(closeAppSessionParsedResponse.params.version).toBe(3);
+        await closeAppSessionWithState(allocations, SESSION_DATA_FINISHED, 3);
     });
 
     it('should verify sessionData changes after closing', async () => {
         const { appSession, sessionData } = await fetchAndParseAppSessions();
-        
+
         expect(appSession.status).toBe(RPCChannelStatus.Closed);
         expect(sessionData).toEqual(SESSION_DATA_FINISHED);
     });

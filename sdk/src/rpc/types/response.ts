@@ -30,16 +30,14 @@ export interface AuthChallengeResponse extends GenericRPCMessage {
 /**
  * Represents the parameters for the 'auth_verify' RPC method.
  */
-export type AuthVerifyResponseParams =
-    | {
-          address: Address;
-          sessionKey: Address;
-          success: boolean;
-      }
-    & {
-          /** Available only if challenge auth method was used in {@link AuthVerifyRequestParams} during the call to {@link RPCMethod.AuthRequest} */
-          jwtToken: string;
-      };
+export type AuthVerifyResponseParams = {
+    address: Address;
+    sessionKey: Address;
+    success: boolean;
+} & {
+    /** Available only if challenge auth method was used in {@link AuthVerifyRequestParams} during the call to {@link RPCMethod.AuthRequest} */
+    jwtToken: string;
+};
 export type AuthVerifyRPCResponseParams = AuthVerifyResponseParams; // for backward compatibility
 
 /**

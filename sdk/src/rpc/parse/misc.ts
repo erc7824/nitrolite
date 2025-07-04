@@ -1,14 +1,11 @@
 import { z } from 'zod';
-import { Address, Hash } from 'viem';
+import { Address } from 'viem';
 import {
     RPCMethod,
     GetConfigResponseParams,
     ErrorResponseParams,
     TransferRPCResponseParams,
     GetRPCHistoryResponseParams,
-    GetTransactionsResponseParams,
-    RPCChannelStatus,
-    TxType,
 } from '../types';
 import { hexSchema, addressSchema, ParamsParser, ParserParamsMissingError } from './common';
 
@@ -104,34 +101,6 @@ const GetRPCHistoryParamsSchema = z
     .transform((arr) => arr[0])
     .transform((arr) => arr as GetRPCHistoryResponseParams[]);
 
-const txTypeEnum = z.enum(Object.values(TxType) as [string, ...string[]]);
-
-const GetTransactionsParamsSchema = z.array(
-    z
-        .object({
-            tx_hash: hexSchema,
-            tx_type: txTypeEnum,
-            from_account: addressSchema,
-            to_account: addressSchema,
-            asset: z.string(),
-            amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
-            created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-        })
-        .strict()
-        .transform(
-            (raw) =>
-                ({
-                    txHash: raw.tx_hash as Hash,
-                    txType: raw.tx_type as TxType,
-                    fromAccount: raw.from_account as Address,
-                    toAccount: raw.to_account as Address,
-                    asset: raw.asset,
-                    amount: raw.amount,
-                    createdAt: raw.created_at,
-                }) as GetTransactionsResponseParams,
-        ),
-);
-
 const parseMessageParams: ParamsParser<unknown> = (params) => {
     if (!Array.isArray(params) || params.length === 0) throw new ParserParamsMissingError(RPCMethod.Message);
     return params[0];
@@ -143,5 +112,4 @@ export const miscParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.Transfer]: (params) => TransferParamsSchema.parse(params),
     [RPCMethod.GetRPCHistory]: (params) => GetRPCHistoryParamsSchema.parse(params),
     [RPCMethod.Message]: parseMessageParams,
-    [RPCMethod.GetTransactions]: (params) => GetTransactionsParamsSchema.parse(params),
 };

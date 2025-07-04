@@ -5,7 +5,6 @@ import {
     AccountID,
     RequestID,
     Timestamp,
-    CloseAppSessionRequest,
     CreateAppSessionRequest,
     AuthRequestParams,
     PartialEIP712AuthMessage,
@@ -212,7 +211,7 @@ export async function createGetLedgerEntriesMessage(
     return JSON.stringify(signedRequest);
 }
 
-export async function createGetTransactionsMessage(
+export async function createGetLedgerTransactionsMessage(
     signer: MessageSigner,
     accountId: string,
     asset?: string,
@@ -225,7 +224,7 @@ export async function createGetTransactionsMessage(
             ...(asset ? { asset } : {}),
         },
     ];
-    const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetTransactions, params, timestamp);
+    const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetLedgerTransactions, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);

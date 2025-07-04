@@ -1,12 +1,14 @@
 import { z } from 'zod';
-import { Address } from 'viem';
+import { Address, Hash } from 'viem';
 import {
     RPCMethod,
     GetLedgerBalancesResponseParams,
     GetLedgerEntriesResponseParams,
     BalanceUpdateResponseParams,
+    GetLedgerTransactionsResponseParams,
+    TxType,
 } from '../types';
-import { addressSchema, ParamsParser } from './common';
+import { addressSchema, hexSchema, ParamsParser } from './common';
 
 const GetLedgerBalancesParamsSchema = z
     .array(
@@ -54,6 +56,34 @@ const GetLedgerEntriesParamsSchema = z
     .transform((arr) => arr[0])
     .transform((arr) => arr as GetLedgerEntriesResponseParams[]);
 
+const txTypeEnum = z.enum(Object.values(TxType) as [string, ...string[]]);
+
+const GetLedgerTransactionsParamsSchema = z.array(
+    z
+        .object({
+            tx_hash: hexSchema,
+            tx_type: txTypeEnum,
+            from_account: addressSchema,
+            to_account: addressSchema,
+            asset: z.string(),
+            amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
+            created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
+        })
+        .strict()
+        .transform(
+            (raw) =>
+                ({
+                    txHash: raw.tx_hash as Hash,
+                    txType: raw.tx_type as TxType,
+                    fromAccount: raw.from_account as Address,
+                    toAccount: raw.to_account as Address,
+                    asset: raw.asset,
+                    amount: raw.amount,
+                    createdAt: raw.created_at,
+                }) as GetLedgerTransactionsResponseParams,
+        ),
+);
+
 const BalanceUpdateParamsSchema = z
     .array(
         z.array(
@@ -68,5 +98,6 @@ const BalanceUpdateParamsSchema = z
 export const ledgerParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.GetLedgerBalances]: (params) => GetLedgerBalancesParamsSchema.parse(params),
     [RPCMethod.GetLedgerEntries]: (params) => GetLedgerEntriesParamsSchema.parse(params),
+    [RPCMethod.GetLedgerTransactions]: (params) => GetLedgerTransactionsParamsSchema.parse(params),
     [RPCMethod.BalanceUpdate]: (params) => BalanceUpdateParamsSchema.parse(params),
 };

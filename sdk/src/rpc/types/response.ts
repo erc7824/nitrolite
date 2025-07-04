@@ -109,6 +109,26 @@ export interface GetLedgerEntriesResponseParams {
 export type GetLedgerEntriesRPCResponseParams = GetLedgerEntriesResponseParams; // for backward compatibility
 
 /**
+ * Represents the parameters for the 'get_transactions' RPC method.
+ */
+export interface GetLedgerTransactionsResponseParams {
+    /** The transaction hash. */
+    txHash: Hex;
+    /** The type of transaction. */
+    txType: TxType;
+    /** The Ethereum address of the sender account. */
+    fromAccount: Address;
+    /** The Ethereum address of the recipient account. */
+    toAccount: Address;
+    /** The asset symbol (e.g., "ETH", "USDC"). */
+    asset: string;
+    /** The amount of the asset transferred. */
+    amount: BigInt;
+    /** The timestamp when the transaction was created. */
+    createdAt: Date;
+}
+
+/**
  * Represents the parameters for the 'create_app_session' RPC method.
  */
 export interface CreateAppSessionResponseParams {
@@ -329,6 +349,14 @@ export interface GetLedgerBalancesResponse extends GenericRPCMessage {
 export interface GetLedgerEntriesResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerEntries;
     params: GetLedgerEntriesResponseParams[];
+}
+
+/**
+ * Represents the response structure for the 'get_transactions' RPC method.
+ */
+export interface GetLedgerTransactionsResponse extends GenericRPCMessage {
+    method: RPCMethod.GetLedgerTransactions;
+    params: GetLedgerTransactionsResponseParams[];
 }
 
 /**
@@ -558,34 +586,6 @@ export interface TransferRPCResponse extends GenericRPCMessage {
 }
 
 /**
- * Represents the parameters for the 'get_transactions' RPC method.
- */
-export interface GetTransactionsResponseParams {
-    /** The transaction hash. */
-    txHash: Hex;
-    /** The type of transaction. */
-    txType: TxType;
-    /** The Ethereum address of the sender account. */
-    fromAccount: Address;
-    /** The Ethereum address of the recipient account. */
-    toAccount: Address;
-    /** The asset symbol (e.g., "ETH", "USDC"). */
-    asset: string;
-    /** The amount of the asset transferred. */
-    amount: BigInt;
-    /** The timestamp when the transaction was created. */
-    createdAt: Date;
-}
-
-/**
- * Represents the response structure for the 'get_transactions' RPC method.
- */
-export interface GetTransactionsResponse extends GenericRPCMessage {
-    method: RPCMethod.GetTransactions;
-    params: GetTransactionsResponseParams[];
-}
-
-/**
  * Union type for all possible RPC response types.
  * This allows for type-safe handling of different response structures.
  */
@@ -597,6 +597,7 @@ export type RPCResponse =
     | GetConfigResponse
     | GetLedgerBalancesResponse
     | GetLedgerEntriesResponse
+    | GetLedgerTransactionsResponse
     | CreateAppSessionResponse
     | SubmitAppStateResponse
     | CloseAppSessionResponse
@@ -614,8 +615,7 @@ export type RPCResponse =
     | BalanceUpdateResponse
     | ChannelsUpdateResponse
     | ChannelUpdateResponse
-    | TransferRPCResponse
-    | GetTransactionsResponse;
+    | TransferRPCResponse;
 
 /**
  * Maps RPC methods to their corresponding parameter types.

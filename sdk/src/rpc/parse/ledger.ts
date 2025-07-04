@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Address, Hash } from 'viem';
+import { Address } from 'viem';
 import {
     RPCMethod,
     GetLedgerBalancesResponseParams,
@@ -8,7 +8,7 @@ import {
     GetLedgerTransactionsResponseParams,
     TxType,
 } from '../types';
-import { addressSchema, hexSchema, ParamsParser } from './common';
+import { addressSchema, ParamsParser } from './common';
 
 const GetLedgerBalancesParamsSchema = z
     .array(

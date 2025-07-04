@@ -233,7 +233,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		ledgerA := GetWalletLedger(db, userAddressA)
 		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
 
-		params := &SubmitStateParams{
+		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Allocations: []AppAllocation{
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
@@ -246,7 +246,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		_, err := service.SubmitState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "negative allocation: -50 for asset usdc")
 	})

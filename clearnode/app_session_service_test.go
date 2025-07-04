@@ -40,16 +40,16 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           "test-proto",
-				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-				Weights:            []int64{1, 1},
-				Quorum:             2,
-				Challenge:          60,
-				Nonce:              uint64(time.Now().Unix()),
+				Protocol:     "test-proto",
+				Participants: []string{userAddressA.Hex(), userAddressB.Hex()},
+				Weights:      []int64{1, 1},
+				Quorum:       2,
+				Challenge:    60,
+				Nonce:        uint64(time.Now().Unix()),
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 			},
 		}
 		rpcSigners := map[string]struct{}{
@@ -113,14 +113,14 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		service := NewAppSessionService(db)
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           "test-proto",
-				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-				Weights:            []int64{1, 0},
-				Quorum:             1,
-				Nonce:              uint64(time.Now().Unix()),
+				Protocol:     "test-proto",
+				Participants: []string{userAddressA.Hex(), userAddressB.Hex()},
+				Weights:      []int64{1, 0},
+				Quorum:       1,
+				Nonce:        uint64(time.Now().Unix()),
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 		rpcSigners := map[string]struct{}{userAddressA.Hex(): {}}
@@ -144,14 +144,14 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		service := NewAppSessionService(db)
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           "test-proto",
-				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-				Weights:            []int64{1, 0},
-				Quorum:             1,
-				Nonce:              uint64(time.Now().Unix()),
+				Protocol:     "test-proto",
+				Participants: []string{userAddressA.Hex(), userAddressB.Hex()},
+				Weights:      []int64{1, 0},
+				Quorum:       1,
+				Nonce:        uint64(time.Now().Unix()),
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 		rpcSigners := map[string]struct{}{userAddressA.Hex(): {}}
@@ -171,14 +171,14 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		service := NewAppSessionService(db)
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           "test-proto",
-				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-				Weights:            []int64{1, 0},
-				Quorum:             1,
-				Nonce:              uint64(time.Now().Unix()),
+				Protocol:     "test-proto",
+				Participants: []string{userAddressA.Hex(), userAddressB.Hex()},
+				Weights:      []int64{1, 0},
+				Quorum:       1,
+				Nonce:        uint64(time.Now().Unix()),
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
 			},
 		}
 		rpcSigners := map[string]struct{}{userAddressA.Hex(): {}}
@@ -203,13 +203,13 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 
 		service := NewAppSessionService(db)
 		session := &AppSession{
-			SessionID:          "test-session",
-			Protocol:           "test-proto",
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
+			SessionID:    "test-session",
+			Protocol:     "test-proto",
+			Participants: []string{userAddressA.Hex(), userAddressB.Hex()},
+			Weights:      []int64{1, 1},
+			Quorum:       2,
+			Status:       ChannelStatusOpen,
+			Version:      1,
 		}
 		require.NoError(t, db.Create(session).Error)
 		sessionAccountID := NewAccountID(session.SessionID)
@@ -220,8 +220,8 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
@@ -253,13 +253,13 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 
 		service := NewAppSessionService(db)
 		session := &AppSession{
-			SessionID:          "test-session-negative",
-			Protocol:           "test-proto",
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
+			SessionID:    "test-session-negative",
+			Protocol:     "test-proto",
+			Participants: []string{userAddressA.Hex(), userAddressB.Hex()},
+			Weights:      []int64{1, 1},
+			Quorum:       2,
+			Status:       ChannelStatusOpen,
+			Version:      1,
 		}
 		require.NoError(t, db.Create(session).Error)
 		sessionAccountID := NewAccountID(session.SessionID)
@@ -270,8 +270,8 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 			},
 		}
 
@@ -308,13 +308,13 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		service.SetPublishBalanceUpdateCallback(publishBalanceUpdate)
 
 		session := &AppSession{
-			SessionID:          "test-session-close",
-			Protocol:           "test-proto",
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
+			SessionID:    "test-session-close",
+			Protocol:     "test-proto",
+			Participants: []string{userAddressA.Hex(), userAddressB.Hex()},
+			Weights:      []int64{1, 1},
+			Quorum:       2,
+			Status:       ChannelStatusOpen,
+			Version:      1,
 		}
 		require.NoError(t, db.Create(session).Error)
 		sessionAccountID := NewAccountID(session.SessionID)
@@ -327,8 +327,8 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		params := &CloseAppSessionParams{
 			AppSessionID: session.SessionID,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 			},
 		}
 		rpcSigners := map[string]struct{}{
@@ -394,13 +394,13 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		service.SetPublishBalanceUpdateCallback(publishBalanceUpdate)
 
 		session := &AppSession{
-			SessionID:          "test-session-close",
-			Protocol:           "test-proto",
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
+			SessionID:    "test-session-close",
+			Protocol:     "test-proto",
+			Participants: []string{userAddressA.Hex(), userAddressB.Hex()},
+			Weights:      []int64{1, 1},
+			Quorum:       2,
+			Status:       ChannelStatusOpen,
+			Version:      1,
 		}
 		require.NoError(t, db.Create(session).Error)
 		sessionAccountID := NewAccountID(session.SessionID)
@@ -413,8 +413,8 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		params := &CloseAppSessionParams{
 			AppSessionID: session.SessionID,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
 			},
 		}
 		rpcSigners := map[string]struct{}{
@@ -448,13 +448,13 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 
 		service := NewAppSessionService(db)
 		session := &AppSession{
-			SessionID:          "test-session-close-negative",
-			Protocol:           "test-proto",
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
+			SessionID:    "test-session-close-negative",
+			Protocol:     "test-proto",
+			Participants: []string{userAddressA.Hex(), userAddressB.Hex()},
+			Weights:      []int64{1, 1},
+			Quorum:       2,
+			Status:       ChannelStatusOpen,
+			Version:      1,
 		}
 		require.NoError(t, db.Create(session).Error)
 		sessionAccountID := NewAccountID(session.SessionID)
@@ -467,8 +467,8 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		params := &CloseAppSessionParams{
 			AppSessionID: session.SessionID,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-100)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(400)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-100)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(400)},
 			},
 		}
 		rpcSigners := map[string]struct{}{

@@ -6,7 +6,7 @@ import {
     ErrorResponseParams,
     TransferRPCResponseParams,
     GetRPCHistoryResponseParams,
-    GetUserTagResponseParams,
+    UserTagParams,
 } from '../types';
 import { hexSchema, addressSchema, ParamsParser, ParserParamsMissingError } from './common';
 
@@ -109,7 +109,7 @@ const GetUserTagParamsSchema = z
                 tag: z.string(),
             })
             .strict()
-            .transform((raw) => ({ tag: raw.tag }) as GetUserTagResponseParams),
+            .transform((raw) => ({ tag: raw.tag }) as UserTagParams),
     )
     .refine((arr) => arr.length === 1)
     .transform((arr) => arr[0]);

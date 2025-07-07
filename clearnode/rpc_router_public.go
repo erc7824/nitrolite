@@ -343,15 +343,11 @@ func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
 		return
 	}
 
-	resp := make([]TransactionResponse, len(transactions))
-	for i, tx := range transactions {
-		transaction, err := tx.FormatWithTags(r.DB)
-		if err != nil {
-			logger.Error("failed to format transaction with tags", "tx_id", tx.ID, "error", err)
-			c.Fail("failed to return transactions")
-			return
-		}
-		resp[i] = transaction
+	resp, err := FormatTransactionsWithTags(r.DB, transactions)
+	if err != nil {
+		logger.Error("failed to format transactions with tags", "error", err)
+		c.Fail("failed to return transactions")
+		return
 	}
 
 	c.Succeed(req.Method, resp)

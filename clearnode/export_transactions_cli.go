@@ -32,7 +32,7 @@ func NewTransactionExporter(db *gorm.DB, logger Logger) *TransactionExporter {
 
 // ExportToCSV exports transactions to CSV format
 func (e *TransactionExporter) ExportToCSV(writer io.Writer, options ExportOptions) error {
-	transactions, err := GetLedgerTransactions(e.db, NewAccountID(options.AccountID), options.AssetSymbol, options.TxType)
+	dbTransactions, err := GetLedgerTransactions(e.db, NewAccountID(options.AccountID), options.AssetSymbol, options.TxType)
 	if err != nil {
 		return fmt.Errorf("failed to get transactions: %w", err)
 	}
@@ -46,21 +46,21 @@ func (e *TransactionExporter) ExportToCSV(writer io.Writer, options ExportOption
 		return fmt.Errorf("failed to write header to CSV: %w", err)
 	}
 
+	transactions, err := FormatTransactionsWithTags(e.db, dbTransactions)
+	if err != nil {
+		return fmt.Errorf("failed to format transactions with tags: %w", err)
+	}
+
 	// Write transactions
 	for _, tx := range transactions {
-		var row []string
-		txWithTags, err := tx.FormatWithTags(e.db)
-		if err != nil {
-			return fmt.Errorf("failed to format transaction %d: %w", tx.ID, err)
-		}
-		row = []string{
-			fmt.Sprintf("%d", tx.ID),
-			tx.Type.String(),
+		row := []string{
+			fmt.Sprintf("%d", tx.Id),
+			tx.TxType,
 			tx.FromAccount,
-			txWithTags.FromAccountTag,
+			tx.FromAccountTag,
 			tx.ToAccount,
-			txWithTags.ToAccountTag,
-			tx.AssetSymbol,
+			tx.ToAccountTag,
+			tx.Asset,
 			tx.Amount.String(),
 			tx.CreatedAt.String(),
 		}

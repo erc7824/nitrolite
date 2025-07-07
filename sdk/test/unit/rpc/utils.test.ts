@@ -219,8 +219,8 @@ describe('rpcResponseParser', () => {
     test('should parse get_ledger_balances response correctly', () => {
         const balances = [
             [
-                { asset: 'ETH', amount: 1.5 },
-                { asset: 'USDC', amount: 1000 },
+                { asset: 'eth', amount: 1.5 },
+                { asset: 'usdc', amount: 1000 },
             ],
         ];
 
@@ -232,8 +232,8 @@ describe('rpcResponseParser', () => {
         const result = rpcResponseParser.getLedgerBalances(rawResponse);
         expect(result.method).toBe(RPCMethod.GetLedgerBalances);
         expect(result.params).toEqual([
-            { asset: 'ETH', amount: '1.5' },
-            { asset: 'USDC', amount: '1000' },
+            { asset: 'eth', amount: '1.5' },
+            { asset: 'usdc', amount: '1000' },
         ]);
     });
 

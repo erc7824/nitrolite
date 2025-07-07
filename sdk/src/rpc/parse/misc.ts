@@ -6,6 +6,7 @@ import {
     ErrorResponseParams,
     TransferRPCResponseParams,
     GetRPCHistoryResponseParams,
+    GetUserTagResponseParams,
 } from '../types';
 import { hexSchema, addressSchema, ParamsParser, ParserParamsMissingError } from './common';
 
@@ -101,6 +102,18 @@ const GetRPCHistoryParamsSchema = z
     .transform((arr) => arr[0])
     .transform((arr) => arr as GetRPCHistoryResponseParams[]);
 
+const GetUserTagParamsSchema = z
+    .array(
+        z
+            .object({
+                tag: z.string(),
+            })
+            .strict()
+            .transform((raw) => ({ tag: raw.tag }) as GetUserTagResponseParams),
+    )
+    .refine((arr) => arr.length === 1)
+    .transform((arr) => arr[0]);
+
 const parseMessageParams: ParamsParser<unknown> = (params) => {
     if (!Array.isArray(params) || params.length === 0) throw new ParserParamsMissingError(RPCMethod.Message);
     return params[0];
@@ -111,5 +124,6 @@ export const miscParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.Error]: (params) => ErrorParamsSchema.parse(params),
     [RPCMethod.Transfer]: (params) => TransferParamsSchema.parse(params),
     [RPCMethod.GetRPCHistory]: (params) => GetRPCHistoryParamsSchema.parse(params),
+    [RPCMethod.GetUserTag]: (params) => GetUserTagParamsSchema.parse(params),
     [RPCMethod.Message]: parseMessageParams,
 };

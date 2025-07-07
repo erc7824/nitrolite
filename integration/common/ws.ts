@@ -66,11 +66,7 @@ export class TestWebSocket {
         });
     }
 
-    waitForMessage(
-        predicate: (data: string, reqId?: number) => boolean,
-        reqId?: number,
-        timeout = 1000
-    ): Promise<string> {
+    waitForMessage(predicate: (data: string, reqId?: number) => boolean, reqId?: number, timeout = 1000): Promise<string> {
         return new Promise((resolve, reject) => {
             const listenerId = Math.random().toString(36).substring(2);
 
@@ -216,6 +212,18 @@ export const getErrorPredicate = () => {
 export const getGetLedgerBalancesPredicate = () => {
     return (data: string, reqId?: number): boolean => {
         return genericPredicate(data, (r) => r.method === RPCMethod.GetLedgerBalances, reqId);
+    };
+};
+
+export const getGetLedgerTransactionsPredicate = () => {
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.GetLedgerTransactions, reqId);
+    };
+};
+
+export const getGetUserTagPredicate = () => {
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.GetUserTag, reqId);
     };
 };
 

@@ -16,7 +16,6 @@ import {
     RPCMethod,
     RPCChannelStatus,
     ResponsePayload,
-    TransferAllocation,
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
@@ -25,6 +24,9 @@ import {
     CreateAppSessionRequestParams,
     SubmitAppStateRequestParams,
     ResizeChannelRequestParams,
+    GetLedgerTransactionsFilters,
+    GetLedgerTransactionsRequestParams,
+    TransferRequestParams,
 } from './types/request';
 
 /**
@@ -162,6 +164,25 @@ export async function createGetConfigMessage(
 }
 
 /**
+ * Creates the signed, stringified message body for a 'get_user_tag' request.
+ *
+ * @param signer - The function to sign the request payload.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ */
+export async function createGetUserTagMessage(
+    signer: MessageSigner,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetUserTag, [], timestamp);
+    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+
+    return JSON.stringify(signedRequest);
+}
+
+/**
  * Creates the signed, stringified message body for a 'get_ledger_balances' request.
  *
  * @param signer - The function to sign the request payload.
@@ -212,19 +233,39 @@ export async function createGetLedgerEntriesMessage(
     return JSON.stringify(signedRequest);
 }
 
+/**
+ * Creates the signed, stringified message body for a 'get_ledger_transactions' request.
+ *
+ * @param signer - The function to sign the request payload.
+ * @param accountId - The account ID to get transactions for.
+ * @param filters - Optional filters to apply to the transactions.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ */
 export async function createGetLedgerTransactionsMessage(
     signer: MessageSigner,
     accountId: string,
-    asset?: string,
+    filters?: GetLedgerTransactionsFilters,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [
-        {
-            account_id: accountId,
-            ...(asset ? { asset } : {}),
-        },
-    ];
+    // Build filtered parameters object
+    const filteredParams: Partial<GetLedgerTransactionsFilters> = {};
+    if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                (filteredParams as any)[key] = value;
+            }
+        });
+    }
+
+    const paramsObj: GetLedgerTransactionsRequestParams = {
+        account_id: accountId,
+        ...filteredParams,
+    };
+
+    const params = [paramsObj];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetLedgerTransactions, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
@@ -491,20 +532,30 @@ export async function createGetAssetsMessage(
  * Creates the signed, stringified message body for a 'transfer' request.
  *
  * @param signer - The function to sign the request payload.
- * @param destination - The destination address to transfer assets to.
- * @param allocations - The assets and amounts to transfer.
+ * @param transferParams - The transfer parameters including destination/destination_user_tag and allocations.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
  */
 export async function createTransferMessage(
     signer: MessageSigner,
-    destination: Address,
-    allocations: TransferAllocation[],
+    transferParams: TransferRequestParams,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [{ destination, allocations }];
+    // Validate that exactly one destination type is provided (XOR logic)
+    const hasDestination = !!transferParams.destination;
+    const hasDestinationTag = !!transferParams.destination_user_tag;
+
+    if (hasDestination === hasDestinationTag) {
+        throw new Error(
+            hasDestination
+                ? 'Cannot provide both destination and destination_user_tag'
+                : 'Either destination or destination_user_tag must be provided',
+        );
+    }
+
+    const params = [transferParams];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.Transfer, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 

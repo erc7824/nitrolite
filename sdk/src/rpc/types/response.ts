@@ -129,6 +129,15 @@ export interface GetLedgerTransactionsResponseParams {
 }
 
 /**
+ * Represents the parameters for the 'get_user_tag' RPC method.
+ */
+export interface UserTagParams {
+    /** The user's unique tag identifier. */
+    tag: string;
+}
+export type GetUserTagRPCResponseParams = UserTagParams; // for backward compatibility
+
+/**
  * Represents the parameters for the 'create_app_session' RPC method.
  */
 export interface CreateAppSessionResponseParams {
@@ -359,6 +368,14 @@ export interface GetLedgerEntriesResponse extends GenericRPCMessage {
 export interface GetLedgerTransactionsResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerTransactions;
     params: GetLedgerTransactionsResponseParams[];
+}
+
+/**
+ * Represents the response structure for the 'get_user_tag' RPC method.
+ */
+export interface GetUserTagResponse extends GenericRPCMessage {
+    method: RPCMethod.GetUserTag;
+    params: GetUserTagResponseParams;
 }
 
 /**
@@ -600,6 +617,7 @@ export type RPCResponse =
     | GetLedgerBalancesResponse
     | GetLedgerEntriesResponse
     | GetLedgerTransactionsResponse
+    | GetUserTagResponse
     | CreateAppSessionResponse
     | SubmitAppStateResponse
     | CloseAppSessionResponse

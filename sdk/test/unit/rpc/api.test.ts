@@ -8,6 +8,8 @@ import {
     createPingMessage,
     createGetConfigMessage,
     createGetLedgerBalancesMessage,
+    createGetLedgerTransactionsMessage,
+    createGetUserTagMessage,
     createGetAppDefinitionMessage,
     createAppSessionMessage,
     createCloseAppSessionMessage,
@@ -29,6 +31,7 @@ import {
     ResizeChannelRequestParams,
     AuthRequestParams,
     CloseAppSessionRequestParams,
+    TxType,
 } from '../../../src/rpc/types';
 
 describe('API message creators', () => {
@@ -120,6 +123,16 @@ describe('API message creators', () => {
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.GetConfig, [], timestamp],
+            sig: ['0xsig'],
+        });
+    });
+
+    test('createGetUserTagMessage', async () => {
+        const msgStr = await createGetUserTagMessage(signer, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetUserTag, [], timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, RPCMethod.GetUserTag, [], timestamp],
             sig: ['0xsig'],
         });
     });
@@ -274,24 +287,145 @@ describe('API message creators', () => {
         });
     });
 
-    test('createTransferMessage', async () => {
+    test('createTransferMessage with destination address', async () => {
         const destination = '0x1234567890123456789012345678901234567890' as Address;
         const allocations: TransferAllocation[] = [
             {
-                asset: 'USDC',
+                asset: 'usdc',
                 amount: '100.5',
             },
             {
-                asset: 'ETH',
+                asset: 'eth',
                 amount: '0.25',
             },
         ];
-        const transferParams = [{ destination, allocations }];
-        const msgStr = await createTransferMessage(signer, destination, allocations, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Transfer, transferParams, timestamp]);
+        const transferParams = { destination, allocations };
+        const msgStr = await createTransferMessage(signer, transferParams, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Transfer, [transferParams], timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.Transfer, transferParams, timestamp],
+            req: [requestId, RPCMethod.Transfer, [transferParams], timestamp],
+            sig: ['0xsig'],
+        });
+    });
+
+    test('createTransferMessage with destination_user_tag', async () => {
+        const destination_user_tag = 'UX123D8C';
+        const allocations: TransferAllocation[] = [
+            {
+                asset: 'usdc',
+                amount: '100.5',
+            },
+        ];
+        const transferParams = { destination_user_tag, allocations };
+        const msgStr = await createTransferMessage(signer, transferParams, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Transfer, [transferParams], timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, RPCMethod.Transfer, [transferParams], timestamp],
+            sig: ['0xsig'],
+        });
+    });
+
+    test('createTransferMessage validates destination parameters', async () => {
+        const allocations: TransferAllocation[] = [{ asset: 'usdc', amount: '100.5' }];
+
+        // Test missing both parameters
+        await expect(createTransferMessage(signer, { allocations }, requestId, timestamp)).rejects.toThrow(
+            'Either destination or destination_user_tag must be provided',
+        );
+
+        // Test both parameters provided
+        const destination = '0x1234567890123456789012345678901234567890' as Address;
+        const destination_user_tag = 'UX123D8C';
+        await expect(
+            createTransferMessage(signer, { destination, destination_user_tag, allocations }, requestId, timestamp),
+        ).rejects.toThrow('Cannot provide both destination and destination_user_tag');
+    });
+
+    test('createGetLedgerTransactionsMessage with no filters', async () => {
+        const accountId = 'test-account';
+        const expectedParams = [{ account_id: accountId }];
+        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, undefined, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
+            sig: ['0xsig'],
+        });
+    });
+
+    test('createGetLedgerTransactionsMessage with all filters', async () => {
+        const accountId = 'test-account';
+        const filters = {
+            asset: 'usdc',
+            tx_type: TxType.Transfer,
+            offset: 10,
+            limit: 20,
+            sort: 'desc' as const,
+        };
+        const expectedParams = [
+            {
+                account_id: accountId,
+                asset: 'usdc',
+                tx_type: TxType.Transfer,
+                offset: 10,
+                limit: 20,
+                sort: 'desc',
+            },
+        ];
+        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
+            sig: ['0xsig'],
+        });
+    });
+
+    test('createGetLedgerTransactionsMessage with partial filters', async () => {
+        const accountId = 'test-account';
+        const filters = {
+            asset: 'eth',
+            limit: 5,
+        };
+        const expectedParams = [
+            {
+                account_id: accountId,
+                asset: 'eth',
+                limit: 5,
+            },
+        ];
+        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
+            sig: ['0xsig'],
+        });
+    });
+
+    test('createGetLedgerTransactionsMessage filters out null/undefined/empty values', async () => {
+        const accountId = 'test-account';
+        const filters = {
+            asset: '',
+            tx_type: TxType.Transfer,
+            offset: 0,
+            limit: undefined,
+            sort: null as any,
+        };
+        const expectedParams = [
+            {
+                account_id: accountId,
+                tx_type: TxType.Transfer,
+                offset: 0,
+            },
+        ];
+        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
             sig: ['0xsig'],
         });
     });

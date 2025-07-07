@@ -58,31 +58,36 @@ const GetLedgerEntriesParamsSchema = z
 
 const txTypeEnum = z.enum(Object.values(TxType) as [string, ...string[]]);
 
-const GetLedgerTransactionsParamsSchema = z.array(
-    z
-        .object({
-            id: z.number(),
-            tx_type: txTypeEnum,
-            from_account: addressSchema,
-            to_account: addressSchema,
-            asset: z.string(),
-            amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
-            created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-        })
-        .strict()
-        .transform(
-            (raw) =>
-                ({
-                    id: raw.id,
-                    txType: raw.tx_type as TxType,
-                    fromAccount: raw.from_account as Address,
-                    toAccount: raw.to_account as Address,
-                    asset: raw.asset,
-                    amount: raw.amount,
-                    createdAt: raw.created_at,
-                }) as GetLedgerTransactionsResponseParams,
+const GetLedgerTransactionsParamsSchema = z
+    .array(
+        z.array(
+            z
+                .object({
+                    id: z.number(),
+                    tx_type: txTypeEnum,
+                    from_account: addressSchema,
+                    to_account: addressSchema,
+                    asset: z.string(),
+                    amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
+                    created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
+                })
+                .strict()
+                .transform(
+                    (raw) =>
+                        ({
+                            id: raw.id,
+                            txType: raw.tx_type as TxType,
+                            fromAccount: raw.from_account as Address,
+                            toAccount: raw.to_account as Address,
+                            asset: raw.asset,
+                            amount: raw.amount,
+                            createdAt: raw.created_at,
+                        }) as GetLedgerTransactionsResponseParams,
+                ),
         ),
-);
+    )
+    .refine((arr) => arr.length === 1)
+    .transform((arr) => arr[0] as GetLedgerTransactionsResponseParams[]);
 
 const BalanceUpdateParamsSchema = z
     .array(

@@ -24,13 +24,13 @@ export interface AuthChallengeRequest extends GenericRPCMessage {
  */
 export type AuthVerifyRequestParams =
     | {
-        /** JSON Web Token for authentication. */
-        jwt: string;
-    }
+          /** JSON Web Token for authentication. */
+          jwt: string;
+      }
     | {
-        /** The challenge token received from auth_challenge response. Used to verify the client's signature and prevent replay attacks. */
-        challenge: string;
-    };
+          /** The challenge token received from auth_challenge response. Used to verify the client's signature and prevent replay attacks. */
+          challenge: string;
+      };
 export type AuthVerifyRPCRequestParams = AuthVerifyRequestParams; // for backward compatibility
 
 /**
@@ -103,13 +103,22 @@ export enum TxType {
 /**
  * Represents the request parameters for the 'get_transactions' RPC method.
  */
-export interface GetLedgerTransactionsRequestParams {
-    /** The account ID to filter transactions. */
-    account_id?: string;
+export interface GetLedgerTransactionsFilters {
     /** The asset symbol to filter transactions. */
     asset?: string;
     /** The transaction type to filter transactions. */
     tx_type?: TxType;
+    /** Pagination offset. */
+    offset?: number;
+    /** Number of transactions to return. */
+    limit?: number;
+    /** Sort order by created_at. */
+    sort?: 'asc' | 'desc';
+}
+
+export interface GetLedgerTransactionsRequestParams extends GetLedgerTransactionsFilters {
+    /** The account ID to filter transactions. */
+    account_id: string;
 }
 export type GetLedgerTransactionsRPCRequestParams = GetLedgerTransactionsRequestParams; // for backward compatibility
 
@@ -119,6 +128,22 @@ export type GetLedgerTransactionsRPCRequestParams = GetLedgerTransactionsRequest
 export interface GetLedgerTransactionsRequest extends GenericRPCMessage {
     method: RPCMethod.GetLedgerTransactions;
     params: GetLedgerTransactionsRequestParams;
+}
+
+/**
+ * Represents the request parameters for the 'get_user_tag' RPC method.
+ */
+export interface GetUserTagRequestParams {
+    // This method takes no parameters - empty object
+}
+export type GetUserTagRPCRequestParams = GetUserTagRequestParams; // for backward compatibility
+
+/**
+ * Represents the request structure for the 'get_user_tag' RPC method.
+ */
+export interface GetUserTagRequest extends GenericRPCMessage {
+    method: RPCMethod.GetUserTag;
+    params: [];
 }
 
 /** Represents the allocation of assets within an application session.
@@ -389,8 +414,10 @@ export interface PongRequest extends GenericRPCMessage {
  * Represents the request parameters for the 'transfer' RPC method.
  */
 export interface TransferRequestParams {
-    /** The destination address to transfer assets to. */
-    destination: Address;
+    /** The destination address to transfer assets to. Required if destination_user_tag is not provided. */
+    destination?: Address;
+    /** The destination user tag to transfer assets to. Required if destination is not provided. */
+    destination_user_tag?: string;
     /** The assets and amounts to transfer. */
     allocations: TransferAllocation[];
 }
@@ -416,6 +443,7 @@ export type RPCRequest =
     | GetLedgerBalancesRequest
     | GetLedgerEntriesRequest
     | GetLedgerTransactionsRequest
+    | GetUserTagRequest
     | CreateAppSessionRequest
     | SubmitAppStateRequest
     | CloseAppSessionRequest
@@ -442,6 +470,7 @@ export type RPCRequestParamsByMethod = {
     [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRequestParams;
     [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRequestParams;
     [RPCMethod.GetLedgerTransactions]: GetLedgerTransactionsRequestParams;
+    [RPCMethod.GetUserTag]: [];
     [RPCMethod.CreateAppSession]: CreateAppSessionRequestParams;
     [RPCMethod.SubmitAppState]: SubmitAppStateRequestParams;
     [RPCMethod.CloseAppSession]: CloseAppSessionRequestParams;

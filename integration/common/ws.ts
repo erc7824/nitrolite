@@ -219,6 +219,12 @@ export const getGetLedgerBalancesPredicate = () => {
     };
 };
 
+export const getGetLedgerTransactionsPredicate = () => {
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.GetLedgerTransactions, reqId);
+    };
+};
+
 export const getCreateAppSessionPredicate = () => {
     return (data: string, reqId?: number): boolean => {
         return genericPredicate(data, (r) => r.method === RPCMethod.CreateAppSession, reqId);

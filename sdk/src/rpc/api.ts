@@ -25,6 +25,7 @@ import {
     CreateAppSessionRequestParams,
     SubmitAppStateRequestParams,
     ResizeChannelRequestParams,
+    GetLedgerTransactionsFilters,
 } from './types/request';
 
 /**
@@ -215,16 +216,21 @@ export async function createGetLedgerEntriesMessage(
 export async function createGetLedgerTransactionsMessage(
     signer: MessageSigner,
     accountId: string,
-    asset?: string,
+    filters?: GetLedgerTransactionsFilters,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [
-        {
-            account_id: accountId,
-            ...(asset ? { asset } : {}),
-        },
-    ];
+    const paramsObj: any = { account_id: accountId };
+
+    if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                paramsObj[key] = value;
+            }
+        });
+    }
+
+    const params = [paramsObj];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.GetLedgerTransactions, params, timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 

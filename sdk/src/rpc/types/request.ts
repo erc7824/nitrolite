@@ -24,13 +24,13 @@ export interface AuthChallengeRequest extends GenericRPCMessage {
  */
 export type AuthVerifyRequestParams =
     | {
-        /** JSON Web Token for authentication. */
-        jwt: string;
-    }
+          /** JSON Web Token for authentication. */
+          jwt: string;
+      }
     | {
-        /** The challenge token received from auth_challenge response. Used to verify the client's signature and prevent replay attacks. */
-        challenge: string;
-    };
+          /** The challenge token received from auth_challenge response. Used to verify the client's signature and prevent replay attacks. */
+          challenge: string;
+      };
 export type AuthVerifyRPCRequestParams = AuthVerifyRequestParams; // for backward compatibility
 
 /**
@@ -103,13 +103,22 @@ export enum TxType {
 /**
  * Represents the request parameters for the 'get_transactions' RPC method.
  */
-export interface GetLedgerTransactionsRequestParams {
-    /** The account ID to filter transactions. */
-    account_id?: string;
+export interface GetLedgerTransactionsFilters {
     /** The asset symbol to filter transactions. */
     asset?: string;
     /** The transaction type to filter transactions. */
     tx_type?: TxType;
+    /** Pagination offset. */
+    offset?: number;
+    /** Number of transactions to return. */
+    limit?: number;
+    /** Sort order by created_at. */
+    sort?: 'asc' | 'desc';
+}
+
+export interface GetLedgerTransactionsRequestParams extends GetLedgerTransactionsFilters {
+    /** The account ID to filter transactions. */
+    account_id?: string;
 }
 export type GetLedgerTransactionsRPCRequestParams = GetLedgerTransactionsRequestParams; // for backward compatibility
 

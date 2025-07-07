@@ -8,6 +8,7 @@ import {
     createPingMessage,
     createGetConfigMessage,
     createGetLedgerBalancesMessage,
+    createGetLedgerTransactionsMessage,
     createGetAppDefinitionMessage,
     createAppSessionMessage,
     createCloseAppSessionMessage,
@@ -29,6 +30,7 @@ import {
     ResizeChannelRequestParams,
     AuthRequestParams,
     CloseAppSessionRequestParams,
+    TxType,
 } from '../../../src/rpc/types';
 
 describe('API message creators', () => {
@@ -292,6 +294,93 @@ describe('API message creators', () => {
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.Transfer, transferParams, timestamp],
+            sig: ['0xsig'],
+        });
+    });
+
+    test('createGetLedgerTransactionsMessage with no filters', async () => {
+        const accountId = 'test-account';
+        const expectedParams = [{ account_id: accountId }];
+        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, undefined, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
+            sig: ['0xsig'],
+        });
+    });
+
+    test('createGetLedgerTransactionsMessage with all filters', async () => {
+        const accountId = 'test-account';
+        const filters = {
+            asset: 'USDC',
+            tx_type: TxType.Transfer,
+            offset: 10,
+            limit: 20,
+            sort: 'desc' as const,
+        };
+        const expectedParams = [
+            {
+                account_id: accountId,
+                asset: 'USDC',
+                tx_type: TxType.Transfer,
+                offset: 10,
+                limit: 20,
+                sort: 'desc',
+            },
+        ];
+        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
+            sig: ['0xsig'],
+        });
+    });
+
+    test('createGetLedgerTransactionsMessage with partial filters', async () => {
+        const accountId = 'test-account';
+        const filters = {
+            asset: 'ETH',
+            limit: 5,
+        };
+        const expectedParams = [
+            {
+                account_id: accountId,
+                asset: 'ETH',
+                limit: 5,
+            },
+        ];
+        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
+            sig: ['0xsig'],
+        });
+    });
+
+    test('createGetLedgerTransactionsMessage filters out null/undefined/empty values', async () => {
+        const accountId = 'test-account';
+        const filters = {
+            asset: '',
+            tx_type: TxType.Transfer,
+            offset: 0,
+            limit: undefined,
+            sort: null as any,
+        };
+        const expectedParams = [
+            {
+                account_id: accountId,
+                tx_type: TxType.Transfer,
+                offset: 0,
+            },
+        ];
+        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const parsed = JSON.parse(msgStr);
+        expect(parsed).toEqual({
+            req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
             sig: ['0xsig'],
         });
     });

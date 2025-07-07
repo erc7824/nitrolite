@@ -118,7 +118,7 @@ export interface GetLedgerTransactionsFilters {
 
 export interface GetLedgerTransactionsRequestParams extends GetLedgerTransactionsFilters {
     /** The account ID to filter transactions. */
-    account_id?: string;
+    account_id: string;
 }
 export type GetLedgerTransactionsRPCRequestParams = GetLedgerTransactionsRequestParams; // for backward compatibility
 

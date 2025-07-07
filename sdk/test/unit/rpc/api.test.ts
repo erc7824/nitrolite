@@ -295,7 +295,7 @@ describe('API message creators', () => {
                 amount: '100.5',
             },
             {
-                asset: 'ETH',
+                asset: 'eth',
                 amount: '0.25',
             },
         ];
@@ -386,13 +386,13 @@ describe('API message creators', () => {
     test('createGetLedgerTransactionsMessage with partial filters', async () => {
         const accountId = 'test-account';
         const filters = {
-            asset: 'ETH',
+            asset: 'eth',
             limit: 5,
         };
         const expectedParams = [
             {
                 account_id: accountId,
-                asset: 'ETH',
+                asset: 'eth',
                 limit: 5,
             },
         ];

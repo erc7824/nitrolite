@@ -131,11 +131,11 @@ export interface GetLedgerTransactionsResponseParams {
 /**
  * Represents the parameters for the 'get_user_tag' RPC method.
  */
-export interface GetUserTagResponseParams {
+export interface UserTagParams {
     /** The user's unique tag identifier. */
     tag: string;
 }
-export type GetUserTagRPCResponseParams = GetUserTagResponseParams; // for backward compatibility
+export type GetUserTagRPCResponseParams = UserTagParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'create_app_session' RPC method.

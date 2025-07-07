@@ -130,6 +130,22 @@ export interface GetLedgerTransactionsRequest extends GenericRPCMessage {
     params: GetLedgerTransactionsRequestParams;
 }
 
+/**
+ * Represents the request parameters for the 'get_user_tag' RPC method.
+ */
+export interface GetUserTagRequestParams {
+    // This method takes no parameters - empty object
+}
+export type GetUserTagRPCRequestParams = GetUserTagRequestParams; // for backward compatibility
+
+/**
+ * Represents the request structure for the 'get_user_tag' RPC method.
+ */
+export interface GetUserTagRequest extends GenericRPCMessage {
+    method: RPCMethod.GetUserTag;
+    params: [];
+}
+
 /** Represents the allocation of assets within an application session.
  * This structure is used to define allocation of assets among participants.
  * It includes the participant's address, the asset (usdc, usdt, etc) being allocated, and the amount.
@@ -398,8 +414,10 @@ export interface PongRequest extends GenericRPCMessage {
  * Represents the request parameters for the 'transfer' RPC method.
  */
 export interface TransferRequestParams {
-    /** The destination address to transfer assets to. */
-    destination: Address;
+    /** The destination address to transfer assets to. Required if destination_user_tag is not provided. */
+    destination?: Address;
+    /** The destination user tag to transfer assets to. Required if destination is not provided. */
+    destination_user_tag?: string;
     /** The assets and amounts to transfer. */
     allocations: TransferAllocation[];
 }
@@ -425,6 +443,7 @@ export type RPCRequest =
     | GetLedgerBalancesRequest
     | GetLedgerEntriesRequest
     | GetLedgerTransactionsRequest
+    | GetUserTagRequest
     | CreateAppSessionRequest
     | SubmitAppStateRequest
     | CloseAppSessionRequest
@@ -451,6 +470,7 @@ export type RPCRequestParamsByMethod = {
     [RPCMethod.GetLedgerBalances]: GetLedgerBalancesRequestParams;
     [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRequestParams;
     [RPCMethod.GetLedgerTransactions]: GetLedgerTransactionsRequestParams;
+    [RPCMethod.GetUserTag]: [];
     [RPCMethod.CreateAppSession]: CreateAppSessionRequestParams;
     [RPCMethod.SubmitAppState]: SubmitAppStateRequestParams;
     [RPCMethod.CloseAppSession]: CloseAppSessionRequestParams;

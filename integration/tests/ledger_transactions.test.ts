@@ -1,11 +1,11 @@
-import { createAuthSessionWithClearnode } from "@/auth";
-import { DatabaseUtils } from "@/databaseUtils";
-import { Identity } from "@/identity";
-import { CONFIG } from "@/setup";
-import { getGetLedgerTransactionsPredicate, TestWebSocket } from "@/ws";
-import { createGetLedgerTransactionsMessage, rpcResponseParser, GetLedgerTransactionsFilters, TxType } from "@erc7824/nitrolite";
+import { createAuthSessionWithClearnode } from '@/auth';
+import { DatabaseUtils } from '@/databaseUtils';
+import { Identity } from '@/identity';
+import { CONFIG } from '@/setup';
+import { getGetLedgerTransactionsPredicate, TestWebSocket } from '@/ws';
+import { createGetLedgerTransactionsMessage, rpcResponseParser, GetLedgerTransactionsFilters, TxType } from '@erc7824/nitrolite';
 
-describe("Ledger Transactions Integration", () => {
+describe('Ledger Transactions Integration', () => {
     let ws: TestWebSocket;
     let identity: Identity;
     let databaseUtils: DatabaseUtils;
@@ -35,8 +35,8 @@ describe("Ledger Transactions Integration", () => {
         databaseUtils.close();
     });
 
-    describe("createGetLedgerTransactionsMessage", () => {
-        it("should successfully request ledger transactions with no filters", async () => {
+    describe('createGetLedgerTransactionsMessage', () => {
+        it('should successfully request ledger transactions with no filters', async () => {
             const accountId = identity.walletAddress;
             const msg = await createGetLedgerTransactionsMessage(identity.messageSigner, accountId);
 
@@ -50,10 +50,10 @@ describe("Ledger Transactions Integration", () => {
             expect(Array.isArray(parsedResponse.params)).toBe(true);
         });
 
-        it("should successfully request ledger transactions with asset filter", async () => {
+        it('should successfully request ledger transactions with asset filter', async () => {
             const accountId = identity.walletAddress;
             const filters: GetLedgerTransactionsFilters = {
-                asset: "usdc",
+                asset: 'usdc',
             };
 
             const msg = await createGetLedgerTransactionsMessage(identity.messageSigner, accountId, filters);
@@ -70,12 +70,12 @@ describe("Ledger Transactions Integration", () => {
             // If there are transactions, they should all be for usdc
             if (parsedResponse.params.length > 0) {
                 parsedResponse.params.forEach((transaction) => {
-                    expect(transaction.asset).toBe("usdc");
+                    expect(transaction.asset).toBe('usdc');
                 });
             }
         });
 
-        it("should successfully request ledger transactions with tx_type filter", async () => {
+        it('should successfully request ledger transactions with tx_type filter', async () => {
             const accountId = identity.walletAddress;
             const filters: GetLedgerTransactionsFilters = {
                 tx_type: TxType.Deposit,
@@ -100,7 +100,7 @@ describe("Ledger Transactions Integration", () => {
             }
         });
 
-        it("should successfully request ledger transactions with pagination", async () => {
+        it('should successfully request ledger transactions with pagination', async () => {
             const accountId = identity.walletAddress;
             const filters: GetLedgerTransactionsFilters = {
                 limit: 5,
@@ -122,10 +122,10 @@ describe("Ledger Transactions Integration", () => {
             expect(parsedResponse.params.length).toBeLessThanOrEqual(5);
         });
 
-        it("should successfully request ledger transactions with sort order", async () => {
+        it('should successfully request ledger transactions with sort order', async () => {
             const accountId = identity.walletAddress;
             const filters: GetLedgerTransactionsFilters = {
-                sort: "desc",
+                sort: 'desc',
                 limit: 10,
             };
 
@@ -150,14 +150,14 @@ describe("Ledger Transactions Integration", () => {
             }
         });
 
-        it("should successfully request ledger transactions with all filters", async () => {
+        it('should successfully request ledger transactions with all filters', async () => {
             const accountId = identity.walletAddress;
             const filters: GetLedgerTransactionsFilters = {
-                asset: "usdc",
+                asset: 'usdc',
                 tx_type: TxType.Deposit,
                 offset: 0,
                 limit: 3,
-                sort: "desc",
+                sort: 'desc',
             };
 
             const msg = await createGetLedgerTransactionsMessage(identity.messageSigner, accountId, filters);
@@ -176,15 +176,15 @@ describe("Ledger Transactions Integration", () => {
 
             // All transactions should match the filters
             parsedResponse.params.forEach((transaction) => {
-                expect(transaction.asset).toBe("usdc");
+                expect(transaction.asset).toBe('usdc');
                 expect(transaction.txType).toBe(TxType.Deposit);
             });
         });
 
-        it("should handle empty results gracefully", async () => {
+        it('should handle empty results gracefully', async () => {
             const accountId = identity.walletAddress;
             const filters: GetLedgerTransactionsFilters = {
-                asset: "NONEXISTENT_ASSET",
+                asset: 'NONEXISTENT_ASSET',
             };
 
             const msg = await createGetLedgerTransactionsMessage(identity.messageSigner, accountId, filters);
@@ -200,8 +200,8 @@ describe("Ledger Transactions Integration", () => {
             expect(parsedResponse.params.length).toBe(0);
         });
 
-        it("should handle invalid account ID gracefully", async () => {
-            const invalidAccountId = "0x0000000000000000000000000000000000000000";
+        it('should handle invalid account ID gracefully', async () => {
+            const invalidAccountId = '0x0000000000000000000000000000000000000000';
 
             const msg = await createGetLedgerTransactionsMessage(identity.messageSigner, invalidAccountId);
 

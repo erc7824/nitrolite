@@ -87,8 +87,7 @@ const GetLedgerTransactionsParamsSchema = z
         ),
     )
     .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0])
-    .transform((arr) => arr as GetLedgerTransactionsResponseParams[]);
+    .transform((arr) => arr[0] as GetLedgerTransactionsResponseParams[]);
 
 const BalanceUpdateParamsSchema = z
     .array(

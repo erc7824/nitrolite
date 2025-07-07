@@ -76,6 +76,7 @@ export const rpcResponseParser = {
     getLedgerBalances: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetLedgerBalances),
     getLedgerEntries: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetLedgerEntries),
     getLedgerTransactions: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetLedgerTransactions),
+    getUserTag: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetUserTag),
     createAppSession: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.CreateAppSession),
     submitAppState: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.SubmitAppState),
     closeAppSession: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.CloseAppSession),

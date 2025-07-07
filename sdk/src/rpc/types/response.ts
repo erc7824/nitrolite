@@ -375,7 +375,7 @@ export interface GetLedgerTransactionsResponse extends GenericRPCMessage {
  */
 export interface GetUserTagResponse extends GenericRPCMessage {
     method: RPCMethod.GetUserTag;
-    params: GetUserTagResponseParams;
+    params: UserTagParams;
 }
 
 /**

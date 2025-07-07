@@ -118,9 +118,13 @@ export interface GetLedgerTransactionsResponseParams {
     txType: TxType;
     /** The Ethereum address of the sender account. */
     fromAccount: Address;
+    /** The user tag for the sender account (empty if no tag exists or not a wallet account). */
+    fromAccountTag?: string;
     /** The Ethereum address of the recipient account. */
     toAccount: Address;
-    /** The asset symbol (e.g., "ETH", "USDC"). */
+    /** The user tag for the recipient account (empty if no tag exists or not a wallet account). */
+    toAccountTag?: string;
+    /** The asset symbol (e.g., "eth", "usdc"). */
     asset: string;
     /** The amount of the asset transferred. */
     amount: BigInt;

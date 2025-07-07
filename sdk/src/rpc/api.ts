@@ -233,6 +233,16 @@ export async function createGetLedgerEntriesMessage(
     return JSON.stringify(signedRequest);
 }
 
+/**
+ * Creates the signed, stringified message body for a 'get_ledger_transactions' request.
+ *
+ * @param signer - The function to sign the request payload.
+ * @param accountId - The account ID to get transactions for.
+ * @param filters - Optional filters to apply to the transactions.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ */
 export async function createGetLedgerTransactionsMessage(
     signer: MessageSigner,
     accountId: string,

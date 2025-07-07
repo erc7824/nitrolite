@@ -71,7 +71,7 @@ func GetUserTagByWallet(db *gorm.DB, wallet string) (string, error) {
 	var model UserTagModel
 	if err := db.Where("wallet = ?", wallet).First(&model).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return "", fmt.Errorf("user tag does not exist for wallet: %s", wallet)
+			return "", err
 		}
 		return "", fmt.Errorf("failed to retrieve record: %v", err)
 	}

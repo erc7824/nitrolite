@@ -268,11 +268,15 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			if err = ledger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
 				return fmt.Errorf("failed to credit destination account: %w", err)
 			}
-			transaction, err := RecordLedgerTransaction(tx, TransactionTypeTransfer, fromAccountID, toAccountID, alloc.AssetSymbol, alloc.Amount)
+			ledgerTransaction, err := RecordLedgerTransaction(tx, TransactionTypeTransfer, fromAccountID, toAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
 				return fmt.Errorf("failed to record transaction: %w", err)
 			}
-			transactions = append(transactions, transaction.JSON())
+			transaction, err := ledgerTransaction.FormatWithTags(tx)
+			if err != nil {
+				return err
+			}
+			transactions = append(transactions, transaction)
 		}
 		return nil
 	})
@@ -457,7 +461,7 @@ func (r *RPCRouter) HandleGetUserTag(c *RPCContext) {
 
 	tag, err := GetUserTagByWallet(r.DB, c.UserID)
 	if err != nil {
-		logger.Error("failed to get user tag", "error", err)
+		logger.Error("failed to get user tag", "error", err, "wallet", c.UserID)
 		c.Fail("failed to get user tag")
 		return
 	}

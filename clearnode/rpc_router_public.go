@@ -80,13 +80,15 @@ type BrokerConfig struct {
 }
 
 type TransactionResponse struct {
-	Id          uint            `json:"id"`
-	TxType      string          `json:"tx_type"`
-	FromAccount string          `json:"from_account"`
-	ToAccount   string          `json:"to_account"`
-	Asset       string          `json:"asset"`
-	Amount      decimal.Decimal `json:"amount"`
-	CreatedAt   time.Time       `json:"created_at"`
+	Id             uint            `json:"id"`
+	TxType         string          `json:"tx_type"`
+	FromAccount    string          `json:"from_account"`
+	FromAccountTag string          `json:"from_account_tag,omitempty"` // Optional tag for the source account
+	ToAccount      string          `json:"to_account"`
+	ToAccountTag   string          `json:"to_account_tag,omitempty"` // Optional tag for the destination account
+	Asset          string          `json:"asset"`
+	Amount         decimal.Decimal `json:"amount"`
+	CreatedAt      time.Time       `json:"created_at"`
 }
 
 func (r *RPCRouter) HandlePing(c *RPCContext) {
@@ -343,7 +345,13 @@ func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
 
 	resp := make([]TransactionResponse, len(transactions))
 	for i, tx := range transactions {
-		resp[i] = tx.JSON()
+		transaction, err := tx.FormatWithTags(r.DB)
+		if err != nil {
+			logger.Error("failed to format transaction with tags", "tx_id", tx.ID, "error", err)
+			c.Fail("failed to return transactions")
+			return
+		}
+		resp[i] = transaction
 	}
 
 	c.Succeed(req.Method, resp)

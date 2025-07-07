@@ -329,6 +329,18 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.Equal(t, recipientAddr.Hex(), transferResp[0].ToAccount)
 		require.False(t, transferResp[0].CreatedAt.IsZero(), "CreatedAt should be set")
 
+		// Verify user tags are empty (since no tags were created for these wallets)
+		require.Empty(t, transferResp[0].FromAccountTag, "FromAccountTag should be empty when no tag exists")
+		require.Empty(t, transferResp[0].ToAccountTag, "ToAccountTag should be empty when no tag exists")
+
+		// Verify that all transactions in response have the tag fields
+		for _, tx := range transferResp {
+			require.Equal(t, senderAddr.Hex(), tx.FromAccount)
+			require.Equal(t, recipientAddr.Hex(), tx.ToAccount)
+			require.Empty(t, tx.FromAccountTag, "FromAccountTag should be empty when no tag exists")
+			require.Empty(t, tx.ToAccountTag, "ToAccountTag should be empty when no tag exists")
+		}
+
 		// Check balances were updated correctly
 		// Sender should have 500 USDC and 3 ETH left
 		senderUSDC, err := GetWalletLedger(db, senderAddr).Balance(senderAccountID, "usdc")
@@ -457,6 +469,18 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.Equal(t, senderAddr.Hex(), targetTransaction.FromAccount)
 		require.Equal(t, recipientAddr.Hex(), targetTransaction.ToAccount)
 		require.False(t, targetTransaction.CreatedAt.IsZero(), "CreatedAt should be set")
+
+		// Verify user tag fields in transaction response
+		require.Empty(t, targetTransaction.FromAccountTag, "FromAccountTag should be empty since sender has no tag")
+		require.Equal(t, recipientTag.Tag, targetTransaction.ToAccountTag, "ToAccountTag should match recipient's tag")
+
+		// Verify all transactions have correct tag information
+		for _, tx := range transactionResponse {
+			require.Equal(t, senderAddr.Hex(), tx.FromAccount)
+			require.Equal(t, recipientAddr.Hex(), tx.ToAccount)
+			require.Empty(t, tx.FromAccountTag, "FromAccountTag should be empty since sender has no tag")
+			require.Equal(t, recipientTag.Tag, tx.ToAccountTag, "ToAccountTag should match recipient's tag")
+		}
 
 		// Check balances were updated correctly
 		// Sender should have 500 USDC and 3 ETH left

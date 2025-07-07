@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -32,16 +33,34 @@ type LedgerTransaction struct {
 	CreatedAt   time.Time
 }
 
-func (tx *LedgerTransaction) JSON() TransactionResponse {
-	return TransactionResponse{
-		Id:          tx.ID,
-		TxType:      tx.Type.String(),
-		FromAccount: tx.FromAccount,
-		ToAccount:   tx.ToAccount,
-		Asset:       tx.AssetSymbol,
-		Amount:      tx.Amount,
-		CreatedAt:   tx.CreatedAt,
+// FormatWithTags formats the ledger transaction into a response structure, including user tags for wallet accounts.
+func (tx *LedgerTransaction) FormatWithTags(db *gorm.DB) (TransactionResponse, error) {
+	var fromAccountTag, toAccountTag string
+	var err error
+	// Check for user tags only for wallet accounts
+	if common.IsHexAddress(tx.FromAccount) {
+		fromAccountTag, err = GetUserTagByWallet(db, tx.FromAccount)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return TransactionResponse{}, err
+		}
 	}
+	if common.IsHexAddress(tx.ToAccount) {
+		toAccountTag, err = GetUserTagByWallet(db, tx.ToAccount)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return TransactionResponse{}, err
+		}
+	}
+	return TransactionResponse{
+		Id:             tx.ID,
+		TxType:         tx.Type.String(),
+		FromAccount:    tx.FromAccount,
+		FromAccountTag: fromAccountTag,
+		ToAccount:      tx.ToAccount,
+		ToAccountTag:   toAccountTag,
+		Asset:          tx.AssetSymbol,
+		Amount:         tx.Amount,
+		CreatedAt:      tx.CreatedAt,
+	}, nil
 }
 
 func (LedgerTransaction) TableName() string {

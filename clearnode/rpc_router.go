@@ -72,13 +72,17 @@ func NewRPCRouter(
 
 	privGroup := r.Node.NewGroup("private")
 	privGroup.Use(r.AuthMiddleware)
-	privGroup.Use(r.HistoryMiddleware)
-	privGroup.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
-	privGroup.Handle("resize_channel", r.HandleResizeChannel)
-	privGroup.Handle("close_channel", r.HandleCloseChannel)
-	privGroup.Handle("get_user_tag", r.HandleGetUserTag)
 
-	appSessionGroup := privGroup.NewGroup("app_session")
+	privGroup.Handle("get_user_tag", r.HandleGetUserTag)
+	privGroup.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
+	privGroup.Handle("get_rpc_history", r.HandleGetRPCHistory)
+
+	historyGroup := privGroup.NewGroup("")
+	historyGroup.Use(r.HistoryMiddleware)
+	historyGroup.Handle("resize_channel", r.HandleResizeChannel)
+	historyGroup.Handle("close_channel", r.HandleCloseChannel)
+
+	appSessionGroup := historyGroup.NewGroup("app_session")
 	appSessionGroup.Use(r.BalanceUpdateMiddleware)
 	appSessionGroup.Handle("transfer", r.HandleTransfer)
 	appSessionGroup.Handle("create_app_session", r.HandleCreateApplication)

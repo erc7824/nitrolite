@@ -50,8 +50,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
 
     uint256 constant MIN_CHALLENGE_PERIOD = 1 hours;
 
-    bytes32 constant STATE_TYPEHASH = keccak256("AllowState(bytes32 stateHash)");
-    bytes32 constant CHALLENGE_STATE_TYPEHASH = keccak256("AllowChallengeState(bytes32 challengeStateHash)");
+    bytes32 constant CHALLENGE_STATE_TYPEHASH = keccak256("AllowChallengeStateHash(bytes32 channelId,uint8 intent,uint256 version,bytes data,Allocation[] allocations)Allocation(address destination,address token,uint256 amount)");
 
     // Recommended structure to keep track of states
     struct Metadata {
@@ -236,10 +235,9 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         channelId = Utils.getChannelId(ch);
         if (_channels[channelId].stage != ChannelStatus.VOID) revert InvalidStatus();
 
-        bytes32 stateHash = Utils.getStateHash(ch, initial);
         if (initial.sigs.length != 1) revert InvalidStateSignatures();
         // TODO: later we can lift the restriction that first sig must be from CLIENT
-        if (!Utils.verifySignature(_domainSeparatorV4(), STATE_TYPEHASH, stateHash, initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX])) {
+        if (!Utils.verifyStateSignature(_domainSeparatorV4(), channelId, initial, initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX])) {
             revert InvalidStateSignatures();
         }
 
@@ -314,8 +312,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         if (index != SERVER_IDX) revert InvalidParticipant();
         if (meta.actualDeposits[SERVER_IDX].amount != 0) revert DepositAlreadyFulfilled();
 
-        bytes32 stateHash = Utils.getStateHash(meta.chan, meta.lastValidState);
-        if (!Utils.verifySignature(_domainSeparatorV4(), STATE_TYPEHASH, stateHash, sig, meta.chan.participants[SERVER_IDX])) revert InvalidStateSignatures();
+        if (!Utils.verifyStateSignature(_domainSeparatorV4(), channelId, meta.lastValidState, sig, meta.chan.participants[SERVER_IDX])) revert InvalidStateSignatures();
 
         State memory lastValidState = meta.lastValidState;
         Signature[] memory sigs = new Signature[](PART_NUM);
@@ -410,7 +407,8 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         if (candidate.intent == StateIntent.FINALIZE) revert InvalidState();
 
         _requireChallengerIsParticipant(
-            Utils.getStateHash(meta.chan, candidate),
+            channelId,
+            candidate,
             meta.chan.participants,
             challengerSig
         );
@@ -649,35 +647,43 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
      * @return valid True if both signatures are valid
      */
     function _verifyAllSignatures(Channel memory chan, State memory state) internal view returns (bool valid) {
-        bytes32 stateHash = Utils.getStateHash(chan, state);
-
         if (state.sigs.length != PART_NUM) {
             return false;
         }
 
+        bytes32 channelId = Utils.getChannelId(chan);
+
         for (uint256 i = 0; i < PART_NUM; i++) {
-            if (!Utils.verifySignature(_domainSeparatorV4(), STATE_TYPEHASH, stateHash, state.sigs[i], chan.participants[i])) return false;
+            if (!Utils.verifyStateSignature(_domainSeparatorV4(), channelId, state, state.sigs[i], chan.participants[i])) return false;
         }
 
         return true;
     }
 
     function _requireChallengerIsParticipant(
-        bytes32 stateHash,
+        bytes32 channelId,
+        State memory state,
         address[] memory participants,
         Signature memory challengerSig
     ) internal view {
+        bytes32 stateHash = Utils.getStateHash(_channels[channelId].chan, state);
+        // NOTE: the "challenge" suffix substitution for raw ECDSA and EIP-191 signatures
         bytes32 challengeStateHash = keccak256(abi.encode(stateHash, "challenge"));
 
-        if (!Utils.verifySignatureOneOf(
-            _domainSeparatorV4(),
-            CHALLENGE_STATE_TYPEHASH,
-            challengeStateHash,
-            challengerSig,
-            participants
-        )) {
-            revert InvalidChallengerSignature();
+        if (Utils.addressArrayIncludes(participants, Utils.recoverRawECDSASigner(challengeStateHash, challengerSig))) {
+            return;
         }
+
+        if (Utils.addressArrayIncludes(participants, Utils.recoverEIP191Signer(challengeStateHash, challengerSig))) {
+            return;
+        }
+
+        // NOTE: the `CHALLENGE_STATE_TYPEHASH` is used to recover the EIP-712 signer
+        if (Utils.addressArrayIncludes(participants, Utils.recoverStateEIP712Signer(_domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig))) {
+            return;
+        }
+
+        revert InvalidChallengerSignature();
     }
 
     /**

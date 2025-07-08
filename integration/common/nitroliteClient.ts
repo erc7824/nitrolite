@@ -35,15 +35,17 @@ export class TestNitroliteClient extends NitroliteClient {
 
     createAndWaitForChannel = async (
         ws: TestWebSocket,
-        { tokenAddress, amount }: { tokenAddress: Address; amount: bigint }
+        { tokenAddress, amount, depositAmount }: { tokenAddress: Address; amount: bigint, depositAmount?: bigint }
     ) => {
+        depositAmount = depositAmount || amount;
+
         const openChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),
             undefined,
             5000
         );
 
-        const { initialState } = await this.depositAndCreateChannel(tokenAddress, amount, {
+        const { initialState } = await this.depositAndCreateChannel(tokenAddress, depositAmount, {
             initialAllocationAmounts: [amount, BigInt(0)],
             stateData: '0x',
         });

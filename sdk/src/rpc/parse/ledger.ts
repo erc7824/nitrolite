@@ -68,7 +68,7 @@ const GetLedgerTransactionsParamsSchema = z
                     from_account: addressSchema,
                     to_account: addressSchema,
                     asset: z.string(),
-                    amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
+                    amount: z.union([z.string(), z.number()]).transform((a) => a.toString()),
                     created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
                 })
                 .strict()

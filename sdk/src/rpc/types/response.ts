@@ -123,7 +123,7 @@ export interface GetLedgerTransactionsResponseParams {
     /** The asset symbol (e.g., "ETH", "USDC"). */
     asset: string;
     /** The amount of the asset transferred. */
-    amount: BigInt;
+    amount: string;
     /** The timestamp when the transaction was created. */
     createdAt: Date;
 }

@@ -724,6 +724,97 @@ func TestHandleClosedEvent(t *testing.T) {
 		assert.True(t, finalAmountDecimal.Equal(tx.Amount), "Transaction amount should match final amount")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
+
+	t.Run("Close Joining Channel After Challenge", func(t *testing.T) {
+		custody, db, cleanup := setupMockCustody(t)
+		defer cleanup()
+
+		channelAmount := decimal.NewFromInt(5000)
+		walletBalance := decimal.NewFromInt(1000000)
+
+		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
+		channelAccountID := NewAccountID(channelID)
+		walletAddr := newTestCommonAddress("0xWallet123")
+		walletAccountID := NewAccountID(walletAddr.Hex())
+		participantAddr := newTestCommonAddress("0xParticipant1")
+
+		initialChannel := Channel{
+			ChannelID:   channelID,
+			Wallet:      walletAddr.Hex(),
+			Participant: participantAddr.Hex(),
+			Status:      ChannelStatusJoining,
+			Token:       tokenAddress,
+			ChainID:     custody.chainID,
+			RawAmount:   channelAmount,
+			Nonce:       12345,
+			Version:     1,
+			Challenge:   3600,
+			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+		err := db.Create(&initialChannel).Error
+		require.NoError(t, err)
+
+		asset, err := GetAssetByToken(db, tokenAddress, custody.chainID)
+		require.NoError(t, err)
+
+		ledger := GetWalletLedger(db, walletAddr)
+		initialAmountDecimal := channelAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+
+		err = ledger.Record(walletAccountID, asset.Symbol, walletBalance)
+		require.NoError(t, err)
+		err = ledger.Record(channelAccountID, asset.Symbol, initialAmountDecimal)
+		require.NoError(t, err)
+
+		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, channelAmount.BigInt())
+
+		var balanceUpdateCalled bool
+		var capturedWallet string
+		custody.sendBalanceUpdate = func(wallet string) {
+			balanceUpdateCalled = true
+			capturedWallet = wallet
+		}
+
+		var channelUpdateCalled bool
+		var capturedChannel Channel
+		custody.sendChannelUpdate = func(ch Channel) {
+			channelUpdateCalled = true
+			capturedChannel = ch
+		}
+
+		beforeUpdate := time.Now()
+		logger := custody.logger.With("event", "Closed")
+		custody.handleClosed(logger, mockEvent)
+		afterUpdate := time.Now()
+
+		var updatedChannel Channel
+		err = db.Where("channel_id = ?", channelID).First(&updatedChannel).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, ChannelStatusClosed, updatedChannel.Status)
+		assert.Equal(t, decimal.Zero.String(), updatedChannel.RawAmount.String(), "Amount should be zero after closing")
+		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
+
+		assert.True(t, balanceUpdateCalled, "Balance update callback should be called")
+		assert.Equal(t, walletAddr.Hex(), capturedWallet)
+
+		assert.True(t, channelUpdateCalled, "Channel update callback should be called")
+		assert.Equal(t, channelID, capturedChannel.ChannelID)
+		assert.Equal(t, ChannelStatusClosed, capturedChannel.Status)
+
+		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
+		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
+		assert.True(t, updatedChannel.UpdatedAt.After(beforeUpdate) && updatedChannel.UpdatedAt.Before(afterUpdate))
+
+		ledgerWalletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)
+		require.NoError(t, err)
+
+		assert.Equal(t, walletBalance, ledgerWalletBalance)
+		channelBalance, err := ledger.Balance(channelAccountID, asset.Symbol)
+		require.NoError(t, err)
+		assert.True(t, channelBalance.IsZero(), "Channel balance should be zero after closing")
+	})
 }
 
 func TestHandleChallengedEvent(t *testing.T) {

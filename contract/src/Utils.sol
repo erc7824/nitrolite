@@ -66,6 +66,8 @@ library Utils {
 
     /**
      * @notice Recovers the signer of a state hash using EIP-191 format
+     * @dev NOTE: FIXME: inconsistent with EIP-712 state recovery, which receives channelId and state as "message", whereas EIP-191 receives
+     * stateHash directly. This breaks the principle of least astonishment, as in EIP-191 and EIP-712 contexts the message is different.
      * @param msgHash The hash of the message to verify the signature against
      * @param sig The signature to verify
      * @return The address of the signer

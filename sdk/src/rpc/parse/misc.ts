@@ -37,7 +37,10 @@ const GetConfigParamsSchema = z
     .refine((arr) => arr.length === 1)
     .transform((arr) => arr[0]);
 
-const ErrorParamsSchema = z.array(z.string().transform((raw) => ({ error: raw }) as ErrorResponseParams));
+const ErrorParamsSchema = z
+    .array(z.string().transform((raw) => ({ error: raw }) as ErrorResponseParams))
+    .refine((arr) => arr.length === 1)
+    .transform((arr) => arr[0]);
 
 const TransferParamsSchema = z
     .array(

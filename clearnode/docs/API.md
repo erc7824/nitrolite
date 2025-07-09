@@ -366,7 +366,7 @@ Retrieves the user's tag, which can be used for transfer operations. The tag is 
 {
   "res": [1, "get_user_tag", [
     {
-      "tag": "UX123D8C",
+      "tag": "UX123D",
     }], 1619123456789],
   "sig": ["0xabcd1234..."]
 }
@@ -404,7 +404,7 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 
 {
   "req": [1, "transfer", [{
-    "destination_user_tag": "UX123D8C",
+    "destination_user_tag": "UX123D",
     "allocations": [
       {
         "asset": "usdc",
@@ -429,7 +429,9 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
       "id": "1",
       "tx_type": "transfer",
       "from_account": "0x1234567890abcdef...",
+      "from_account_tag": "NQKO7C",
       "to_account": "0x9876543210abcdef...",
+      "to_account_tag": "UX123D",
       "asset": "usdc",
       "amount": "50.0",
       "created_at": "2023-05-01T12:00:00Z"
@@ -438,7 +440,9 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
       "id": "2",
       "tx_type": "transfer",
       "from_account": "0x1234567890abcdef...",
+      "from_account_tag": "NQKO7C",
       "to_account": "0x9876543210abcdef...",
+      "to_account_tag": "UX123D",
       "asset": "eth",
       "amount": "0.1",
       "created_at": "2023-05-01T12:00:00Z"
@@ -454,7 +458,9 @@ Each transaction includes:
 - `id`: Unique transaction reference
 - `tx_type`: Transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
 - `from_account`: The account that sent the funds
-- `to_account`: The account that received the funds
+- `from_account_tag`: The user tag for the sender account (empty if no tag exists or not a wallet account)
+- `to_account`: The account that received the funds  
+- `to_account_tag`: The user tag for the recipient account (empty if no tag exists or not a wallet account)
 - `asset`: The asset symbol that was transferred
 - `amount`: The amount transferred for this specific asset
 - `created_at`: When the transaction was created (ISO 8601 format)
@@ -573,7 +579,9 @@ Supports pagination and sorting.
       "id": "1",
       "tx_type": "transfer",
       "from_account": "0x1234567890abcdef...",
+      "from_account_tag": "NQKO7C",
       "to_account": "0x9876543210abcdef...",
+      "to_account_tag": "UX123D",
       "asset": "usdc",
       "amount": "50.0",
       "created_at": "2023-05-01T12:00:00Z"
@@ -581,8 +589,10 @@ Supports pagination and sorting.
     {
       "id": "2",
       "tx_type": "deposit",
-      "from_account": "0x9876543210abcdef...",
+      "from_account": "0x9876543210abcdef...", // Channel account
+      "from_account_tag": "", // Channel accounts does not have tags
       "to_account": "0x1234567890abcdef...",
+      "to_account_tag": "UX123D",
       "asset": "usdc",
       "amount": "25.0",
       "created_at": "2023-05-01T10:30:00Z"
@@ -593,10 +603,12 @@ Supports pagination and sorting.
 ```
 
 Each transaction response includes:
-- `if`: Unique transaction id reference.
+- `id`: Unique transaction id reference
 - `tx_type`: Transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
 - `from_account`: The account that sent the funds
+- `from_account_tag`: The user tag for the sender account (empty if no tag exists or not a wallet account)
 - `to_account`: The account that received the funds
+- `to_account_tag`: The user tag for the recipient account (empty if no tag exists or not a wallet account)
 - `asset`: The asset symbol (e.g., "usdc", "eth")
 - `amount`: The transaction amount
 - `created_at`: When the transaction was created (ISO 8601 format)

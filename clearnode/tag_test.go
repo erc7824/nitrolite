@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func Test_GetUserTagByWallet(t *testing.T) {
@@ -12,7 +13,7 @@ func Test_GetUserTagByWallet(t *testing.T) {
 
 	wallet := "0x1234567890abcdef1234567890abcdef12345678"
 	tag, err := GetUserTagByWallet(db, wallet)
-	require.Contains(t, err.Error(), "user tag does not exist for wallet")
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	require.Empty(t, tag, "Tag should be nil for non-existing wallet")
 
 	// Try to resolve the wallet by unassociated tag

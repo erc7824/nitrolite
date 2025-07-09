@@ -2,8 +2,10 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -30,18 +32,6 @@ type LedgerTransaction struct {
 	AssetSymbol string          `gorm:"column:asset_symbol;not null"`
 	Amount      decimal.Decimal `gorm:"column:amount;type:decimal(38,18);not null"`
 	CreatedAt   time.Time
-}
-
-func (tx *LedgerTransaction) JSON() TransactionResponse {
-	return TransactionResponse{
-		Id:          tx.ID,
-		TxType:      tx.Type.String(),
-		FromAccount: tx.FromAccount,
-		ToAccount:   tx.ToAccount,
-		Asset:       tx.AssetSymbol,
-		Amount:      tx.Amount,
-		CreatedAt:   tx.CreatedAt,
-	}
 }
 
 func (LedgerTransaction) TableName() string {
@@ -119,4 +109,56 @@ func parseLedgerTransactionType(s string) (TransactionType, error) {
 	default:
 		return 0, ErrInvalidLedgerTransactionType
 	}
+}
+
+// FormatTransactionsWithTags formats multiple transactions with user tags.
+func FormatTransactionsWithTags(db *gorm.DB, transactions []LedgerTransaction) ([]TransactionResponse, error) {
+	if len(transactions) == 0 {
+		return []TransactionResponse{}, nil
+	}
+
+	// Collect all unique wallet addresses from transactions
+	walletTags := make(map[string]string)
+	for _, tx := range transactions {
+		if common.IsHexAddress(tx.FromAccount) {
+			walletTags[tx.FromAccount] = ""
+		}
+		if common.IsHexAddress(tx.ToAccount) {
+			walletTags[tx.ToAccount] = ""
+		}
+	}
+
+	uniqueAccountAddresses := make([]string, 0, len(walletTags))
+	for addr := range walletTags {
+		uniqueAccountAddresses = append(uniqueAccountAddresses, addr)
+	}
+
+	var userTags []UserTagModel
+	if len(uniqueAccountAddresses) > 0 {
+		if err := db.Where("wallet IN ?", uniqueAccountAddresses).Find(&userTags).Error; err != nil {
+			return nil, fmt.Errorf("failed to fetch user tags: %w", err)
+		}
+	}
+
+	// Assign tags to wallet addresses where available
+	for _, tag := range userTags {
+		walletTags[tag.Wallet] = tag.Tag
+	}
+
+	responses := make([]TransactionResponse, len(transactions))
+	for i, tx := range transactions {
+		responses[i] = TransactionResponse{
+			Id:             tx.ID,
+			TxType:         tx.Type.String(),
+			FromAccount:    tx.FromAccount,
+			FromAccountTag: walletTags[tx.FromAccount], // Will be empty string if not found
+			ToAccount:      tx.ToAccount,
+			ToAccountTag:   walletTags[tx.ToAccount], // Will be empty string if not found
+			Asset:          tx.AssetSymbol,
+			Amount:         tx.Amount,
+			CreatedAt:      tx.CreatedAt,
+		}
+	}
+
+	return responses, nil
 }

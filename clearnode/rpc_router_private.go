@@ -233,7 +233,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 	fromWallet := c.UserID
-	var transactions []TransactionResponse
+	var resp []TransactionResponse
 	err := r.DB.Transaction(func(tx *gorm.DB) error {
 		if wallet := GetWalletBySigner(fromWallet); wallet != "" {
 			fromWallet = wallet
@@ -243,6 +243,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			return err
 		}
 
+		var transactions []LedgerTransaction
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsZero() || alloc.Amount.IsNegative() {
 				return fmt.Errorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
@@ -272,8 +273,14 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			if err != nil {
 				return fmt.Errorf("failed to record transaction: %w", err)
 			}
-			transactions = append(transactions, transaction.JSON())
+			transactions = append(transactions, *transaction)
 		}
+
+		formattedTransactions, err := FormatTransactionsWithTags(tx, transactions)
+		if err != nil {
+			return fmt.Errorf("failed to format transactions: %w", err)
+		}
+		resp = formattedTransactions
 		return nil
 	})
 
@@ -288,7 +295,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		r.SendBalanceUpdate(destinationAddress)
 	}
 
-	c.Succeed(req.Method, transactions)
+	c.Succeed(req.Method, resp)
 
 	logger.Info("transfer completed", "userID", c.UserID, "transferTo", params.Destination, "allocations", params.Allocations)
 }
@@ -457,7 +464,7 @@ func (r *RPCRouter) HandleGetUserTag(c *RPCContext) {
 
 	tag, err := GetUserTagByWallet(r.DB, c.UserID)
 	if err != nil {
-		logger.Error("failed to get user tag", "error", err)
+		logger.Error("failed to get user tag", "error", err, "wallet", c.UserID)
 		c.Fail("failed to get user tag")
 		return
 	}

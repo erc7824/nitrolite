@@ -563,15 +563,14 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 
 	var params GetRPCHistoryParams
 	if err := parseParams(req.Params, &params); err != nil {
-		c.Fail(err.Error())
+		c.Fail(err, "failed to parse parameters")
 		return
 	}
 
-	query := applyListOptions(r.DB, "timestamp", SortTypeDescending, &params.ListOptions)
-	var rpcHistory []RPCRecord
-	if err := query.Where("sender = ?", c.UserID).Find(&rpcHistory).Error; err != nil {
+	rpcHistory, err := r.RPCStore.GetRPCHistory(c.UserID, &params.ListOptions)
+	if err != nil {
 		logger.Error("failed to retrieve RPC history", "error", err)
-		c.Fail("failed to retrieve RPC history")
+		c.Fail(nil, "failed to retrieve RPC history")
 		return
 	}
 

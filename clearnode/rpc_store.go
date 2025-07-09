@@ -56,24 +56,10 @@ func (s *RPCStore) StoreMessage(sender string, req *RPCData, reqSig []string, re
 	return s.db.Create(msg).Error
 }
 
-// GetMessages retrieves RPC messages from the database with pagination
-func (s *RPCStore) GetMessages(limit int, offset int) (messages []RPCRecord, total int64, err error) {
-	// Get total count
-	if err := s.db.Model(&RPCRecord{}).Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	// Get paginated messages
-	err = s.db.Order("timestamp DESC").Offset(offset).Limit(limit).Find(&messages).Error
-	return messages, total, err
-}
-
-// GetMessageByID retrieves a specific RPC message by its request ID
-func (s *RPCStore) GetMessageByID(reqID uint64) (*RPCRecord, error) {
-	var message RPCRecord
-	err := s.db.Where("req_id = ?", reqID).First(&message).Error
-	if err != nil {
-		return nil, err
-	}
-	return &message, nil
+// GetRPCHistory retrieves RPC history for a specific user with pagination
+func (s *RPCStore) GetRPCHistory(userWallet string, options *ListOptions) ([]RPCRecord, error) {
+	query := applyListOptions(s.db, "timestamp", SortTypeDescending, options)
+	var rpcHistory []RPCRecord
+	err := query.Where("sender = ?", userWallet).Find(&rpcHistory).Error
+	return rpcHistory, err
 }

@@ -366,7 +366,7 @@ Retrieves the user's tag, which can be used for transfer operations. The tag is 
 {
   "res": [1, "get_user_tag", [
     {
-      "tag": "UX123D8C",
+      "tag": "UX123D",
     }], 1619123456789],
   "sig": ["0xabcd1234..."]
 }
@@ -404,7 +404,7 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 
 {
   "req": [1, "transfer", [{
-    "destination_user_tag": "UX123D8C",
+    "destination_user_tag": "UX123D",
     "allocations": [
       {
         "asset": "usdc",
@@ -429,9 +429,9 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
       "id": "1",
       "tx_type": "transfer",
       "from_account": "0x1234567890abcdef...",
-      "from_account_tag": "alice@example.com",
+      "from_account_tag": "NQKO7C",
       "to_account": "0x9876543210abcdef...",
-      "to_account_tag": "bob@example.com",
+      "to_account_tag": "UX123D",
       "asset": "usdc",
       "amount": "50.0",
       "created_at": "2023-05-01T12:00:00Z"
@@ -440,9 +440,9 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
       "id": "2",
       "tx_type": "transfer",
       "from_account": "0x1234567890abcdef...",
-      "from_account_tag": "alice@example.com",
+      "from_account_tag": "NQKO7C",
       "to_account": "0x9876543210abcdef...",
-      "to_account_tag": "bob@example.com",
+      "to_account_tag": "UX123D",
       "asset": "eth",
       "amount": "0.1",
       "created_at": "2023-05-01T12:00:00Z"
@@ -579,9 +579,9 @@ Supports pagination and sorting.
       "id": "1",
       "tx_type": "transfer",
       "from_account": "0x1234567890abcdef...",
-      "from_account_tag": "alice@example.com",
+      "from_account_tag": "NQKO7C",
       "to_account": "0x9876543210abcdef...",
-      "to_account_tag": "bob@example.com",
+      "to_account_tag": "UX123D",
       "asset": "usdc",
       "amount": "50.0",
       "created_at": "2023-05-01T12:00:00Z"
@@ -592,7 +592,7 @@ Supports pagination and sorting.
       "from_account": "0x9876543210abcdef...", // Channel account
       "from_account_tag": "", // Channel accounts does not have tags
       "to_account": "0x1234567890abcdef...",
-      "to_account_tag": "bob@example.com",
+      "to_account_tag": "UX123D",
       "asset": "usdc",
       "amount": "25.0",
       "created_at": "2023-05-01T10:30:00Z"

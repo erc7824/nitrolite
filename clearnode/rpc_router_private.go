@@ -215,6 +215,9 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
+	toAccountTag := params.DestinationUserTag
+	fromAccountTag := ""
+
 	destinationAddress := params.Destination
 	if destinationAddress == "" {
 		// Retrieve the destination address by Tag
@@ -227,14 +230,34 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 
 		destinationAddress = destinationAddr
 	}
+	if toAccountTag == "" {
+		// Even if destination tag is not specified, it should be included in the returned transaction in case it exists
+		tag, err := GetUserTagByWallet(r.DB, destinationAddress)
+		if err != nil && err != gorm.ErrRecordNotFound {
+			logger.Error("failed to get user tag by wallet", "wallet", destinationAddress, "error", err)
+			c.Fail(fmt.Sprintf("failed to get user tag for wallet: %s", destinationAddress))
+			return
+		}
+		toAccountTag = tag
+	}
 
 	if destinationAddress == c.UserID {
 		c.Fail("cannot transfer to self")
 		return
 	}
+
 	fromWallet := c.UserID
+	var err error
+	// Sender tag should be included in the returned transaction in case it exists
+	fromAccountTag, err = GetUserTagByWallet(r.DB, fromWallet)
+	if err != nil && err != gorm.ErrRecordNotFound {
+			logger.Error("failed to get user tag by wallet", "wallet", fromWallet, "error", err)
+			c.Fail(fmt.Sprintf("failed to get user tag for wallet: %s", fromWallet))
+		return
+	}
+
 	var resp []TransactionResponse
-	err := r.DB.Transaction(func(tx *gorm.DB) error {
+	err = r.DB.Transaction(func(tx *gorm.DB) error {
 		if wallet := GetWalletBySigner(fromWallet); wallet != "" {
 			fromWallet = wallet
 		}
@@ -243,7 +266,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			return err
 		}
 
-		var transactions []LedgerTransaction
+		var transactions []TransactionWithTags
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsZero() || alloc.Amount.IsNegative() {
 				return fmt.Errorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
@@ -273,10 +296,14 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			if err != nil {
 				return fmt.Errorf("failed to record transaction: %w", err)
 			}
-			transactions = append(transactions, *transaction)
+			transactions = append(transactions, TransactionWithTags{
+				LedgerTransaction: *transaction,
+				FromAccountTag:    fromAccountTag,
+				ToAccountTag:      toAccountTag,
+			})
 		}
 
-		formattedTransactions, err := FormatTransactionsWithTags(tx, transactions)
+		formattedTransactions, err := FormatTransactions(tx, transactions)
 		if err != nil {
 			return fmt.Errorf("failed to format transactions: %w", err)
 		}

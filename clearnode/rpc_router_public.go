@@ -345,7 +345,7 @@ func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
 
 	resp, err := FormatTransactions(r.DB, transactions)
 	if err != nil {
-		logger.Error("failed to format transactions with tags", "error", err)
+		logger.Error("failed to format transactions", "error", err)
 		c.Fail("failed to return transactions")
 		return
 	}

@@ -1,9 +1,10 @@
-package main
+package storage
 
 import (
 	"fmt"
 	"time"
 
+	"github.com/erc7824/nitrolite/examples/bridge/unisig"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -44,7 +45,7 @@ type PrivateKeyDTO struct {
 }
 
 func (s *Storage) AddPrivateKey(name, privateKeyHex string, isSigner bool) (*PrivateKeyDTO, error) {
-	_, address, err := decodePrivateKey(privateKeyHex)
+	_, address, err := unisig.DecodeEcdsaPrivateKey(privateKeyHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode private key: %w", err)
 	}
@@ -110,7 +111,7 @@ func (s *Storage) AddChainRPC(url string, chainID uint32) error {
 	dto := ChainRPCDTO{
 		URL:        url,
 		ChainID:    chainID,
-		LastUsedAt: time.Now().Add(-time.Hour * 24 * 365), // Set to a year ago to ensure it's considered unused
+		LastUsedAt: time.Unix(0, 0), // Initialize to zero time
 	}
 
 	if err := s.db.Create(&dto).Error; err != nil {
@@ -135,7 +136,7 @@ func (s *Storage) UpdateChainRPCUsage(url string) error {
 	}
 
 	if err := s.db.Model(&ChainRPCDTO{}).Where("url = ?", url).
-		Update("last_used_at", time.Now()).Error; err != nil {
+		Update("last_used_at", time.Now().UTC()).Error; err != nil {
 		return fmt.Errorf("failed to update chain RPC usage: %w", err)
 	}
 

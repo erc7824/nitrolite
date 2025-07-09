@@ -1,4 +1,4 @@
-package main
+package clearnet
 
 import (
 	"encoding/json"
@@ -26,7 +26,7 @@ func (c *ClearnodeClient) handleEvent(event RPCData) {
 	}
 }
 
-type Channel struct {
+type ChannelRes struct {
 	ChannelID   string   `json:"channel_id"`
 	Participant string   `json:"participant"`
 	Status      string   `json:"status"`
@@ -50,7 +50,7 @@ func (c *ClearnodeClient) handleChannelsEvent(event RPCData) {
 		return
 	}
 
-	channels := make([]Channel, 0)
+	channels := make([]ChannelRes, 0)
 	if err := json.Unmarshal(channelsData, &channels); err != nil {
 		fmt.Printf("Failed to parse channels: %s\n", err.Error())
 		return
@@ -109,7 +109,7 @@ func (c *ClearnodeClient) handleBalancesEvent(event RPCData) {
 	fmt.Println()
 }
 
-type Asset struct {
+type AssetRes struct {
 	Token    string `json:"token"`
 	ChainID  uint32 `json:"chain_id"`
 	Symbol   string `json:"symbol"`
@@ -128,18 +128,18 @@ func (c *ClearnodeClient) handleAssetsEvent(event RPCData) {
 		return
 	}
 
-	assets := make([]Asset, 0)
+	assets := make([]AssetRes, 0)
 	if err := json.Unmarshal(assetsData, &assets); err != nil {
 		fmt.Printf("Failed to parse assets: %s\n", err.Error())
 		return
 	}
 
-	assetsMap := make(map[string]map[uint32]Asset)
+	assetsMap := make(map[string]map[uint32]AssetRes)
 	assetSymbols := []string{}
 	assetChainIDs := []uint32{}
 	for _, asset := range assets {
 		if _, exists := assetsMap[asset.Symbol]; !exists {
-			assetsMap[asset.Symbol] = make(map[uint32]Asset)
+			assetsMap[asset.Symbol] = make(map[uint32]AssetRes)
 			assetSymbols = append(assetSymbols, asset.Symbol)
 		}
 		chainAssetMap := assetsMap[asset.Symbol]

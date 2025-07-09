@@ -37,7 +37,7 @@ export class TestNitroliteClient extends NitroliteClient {
         ws: TestWebSocket,
         { tokenAddress, amount, depositAmount }: { tokenAddress: Address; amount: bigint, depositAmount?: bigint }
     ) => {
-        depositAmount = depositAmount || amount;
+        depositAmount = depositAmount ?? amount;
 
         const openChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),

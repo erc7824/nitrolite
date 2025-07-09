@@ -40,13 +40,12 @@ describe('Resize channel', () => {
         await databaseUtils.close();
     });
 
-    it('should create nitrolite client to close channels', async () => {
+    it('should create nitrolite client to resize channels', async () => {
         client = new TestNitroliteClient(identity);
 
         expect(client).toBeDefined();
         expect(client).toHaveProperty('depositAndCreateChannel');
-        expect(client).toHaveProperty('closeChannel');
-        expect(client).toHaveProperty('withdrawal');
+        expect(client).toHaveProperty('resizeChannel');
     });
 
     it('should resize channel by adding funds from deposit to channel', async () => {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -407,7 +408,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Create transfer parameters
 		transferParams := TransferParams{
-			DestinationUserTag: recipientTag.Tag,
+			DestinationUserTag: strings.ToLower(recipientTag.Tag), // Verify that tag is case-insensitive
 			Allocations: []TransferAllocation{
 				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
 				{AssetSymbol: "eth", Amount: decimal.NewFromInt(2)},

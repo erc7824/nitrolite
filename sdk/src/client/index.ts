@@ -171,8 +171,7 @@ export class NitroliteClient {
                 const allowance = await this.erc20Service.getTokenAllowance(tokenAddress, owner, spender);
                 if (allowance < depositAmount) {
                     try {
-                        // approve only the required amount, so that `approved == depositAmount`
-                        const hash = await this.erc20Service.approve(tokenAddress, spender, depositAmount - allowance);
+                        const hash = await this.erc20Service.approve(tokenAddress, spender, depositAmount);
                         await waitForTransaction(this.publicClient, hash);
                     } catch (err) {
                         const error = new Errors.TokenError('Failed to approve tokens for deposit');

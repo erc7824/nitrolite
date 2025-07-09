@@ -7,13 +7,20 @@ import {
     erc20Abi,
     formatUnits,
     createTestClient,
+    TestClient,
+    Hex,
+    createWalletClient,
+    TransactionSerializable,
+    serializeTransaction,
+    Signature,
 } from 'viem';
 import { chain } from './setup';
+import { privateKeyToAccount } from 'viem/accounts';
 
 export class BlockchainUtils {
     private client = null;
-    private testClient = null;
-    private lastSnapshotId: string | null = null;
+    private testClient: TestClient = null;
+    private lastSnapshotId: Hex | null = null;
 
     constructor() {
         this.client = createPublicClient({
@@ -92,7 +99,7 @@ export class BlockchainUtils {
         }
     }
 
-    async makeSnapshot(): Promise<string> {
+    async makeSnapshot(): Promise<Hex> {
         try {
             const snapshotId = await this.testClient.snapshot();
             this.lastSnapshotId = snapshotId;
@@ -103,7 +110,7 @@ export class BlockchainUtils {
         }
     }
 
-    async resetSnapshot(snapshotId?: string): Promise<void> {
+    async resetSnapshot(snapshotId?: Hex): Promise<void> {
         try {
             if (!snapshotId && !this.lastSnapshotId) {
                 throw new Error('No snapshot ID provided and no last snapshot available');
@@ -113,6 +120,67 @@ export class BlockchainUtils {
             await this.testClient.revert({ id: snapshotId });
         } catch (error) {
             throw new Error(`Error resetting snapshot: ${error.message}`);
+        }
+    }
+
+    async pauseMining(): Promise<void> {
+        try {
+            await this.testClient.setAutomine(false);
+        } catch (error) {
+            throw new Error(`Error pausing mining: ${error.message}`);
+        }
+    }
+
+    async resumeMining(): Promise<void> {
+        try {
+            await this.testClient.setAutomine(true);
+        } catch (error) {
+            throw new Error(`Error pausing mining: ${error.message}`);
+        }
+    }
+
+    async mineBlock(): Promise<void> {
+        try {
+            await this.testClient.mine({ blocks: 1 });
+        } catch (error) {
+            throw new Error(`Error mining block: ${error.message}`);
+        }
+    }
+
+    async readTxPool() {
+        try {
+            const content = await this.testClient.getTxpoolContent();
+            return content;
+        } catch (error) {
+            throw new Error(`Error reading transaction pool: ${error.message}`);
+        }
+    }
+
+    async sendRawTransactionAs(pk: Hex, tx: TransactionSerializable, sig: Signature): Promise<Hash> {
+        try {
+            const account = privateKeyToAccount(pk);
+            const walletClient = createWalletClient({
+                account,
+                chain,
+                transport: http(),
+            });
+
+            const serializedTx = serializeTransaction(tx, sig);
+
+            const txHash = await walletClient.sendRawTransaction({
+                serializedTransaction: serializedTx,
+            });
+            return txHash;
+        } catch (error) {
+            throw new Error(`Error sending transaction: ${error.message}`);
+        }
+    }
+
+    async dropTxFromPool(txHash: Hash): Promise<void> {
+        try {
+            await this.testClient.dropTransaction({ hash: txHash });
+        } catch (error) {
+            throw new Error(`Error dropping transactions: ${error.message}`);
         }
     }
 }

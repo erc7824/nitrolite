@@ -1,13 +1,17 @@
-package main
+package clearnet
 
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gorilla/websocket"
+
+	"github.com/erc7824/nitrolite/examples/bridge/unisig"
 )
 
 const (
@@ -17,7 +21,7 @@ const (
 
 type ClearnodeClient struct {
 	conn   *websocket.Conn
-	signer *Signer // User's Signer
+	signer unisig.Signer // User's Signer
 
 	printEvents   bool
 	responseSinks map[uint64]chan *RPCResponse // Map of request IDs to response channels
@@ -57,10 +61,6 @@ func NewClearnodeClient(wsURL string) (*ClearnodeClient, error) {
 	return client, nil
 }
 
-func (c *ClearnodeClient) Signer() *Signer {
-	return c.signer
-}
-
 func (c *ClearnodeClient) GetConfig() (*BrokerConfig, error) {
 	res, err := c.request("get_config", nil)
 	if err != nil {
@@ -83,7 +83,7 @@ func (c *ClearnodeClient) GetConfig() (*BrokerConfig, error) {
 	return &config, nil
 }
 
-func (c *ClearnodeClient) GetSupportedAssets() ([]Asset, error) {
+func (c *ClearnodeClient) GetSupportedAssets() ([]AssetRes, error) {
 	res, err := c.request("get_assets", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch assets: %w", err)
@@ -97,7 +97,7 @@ func (c *ClearnodeClient) GetSupportedAssets() ([]Asset, error) {
 		return nil, fmt.Errorf("failed to marshal assets data: %w", err)
 	}
 
-	var assets []Asset
+	var assets []AssetRes
 	if err := json.Unmarshal(assetsJSON, &assets); err != nil {
 		return nil, fmt.Errorf("failed to parse assets: %w", err)
 	}
@@ -105,7 +105,7 @@ func (c *ClearnodeClient) GetSupportedAssets() ([]Asset, error) {
 	return assets, nil
 }
 
-func (c *ClearnodeClient) GetChannels(participant, status string) ([]Channel, error) {
+func (c *ClearnodeClient) GetChannels(participant, status string) ([]ChannelRes, error) {
 	params := map[string]any{
 		"participant": participant,
 		"status":      status,
@@ -124,7 +124,7 @@ func (c *ClearnodeClient) GetChannels(participant, status string) ([]Channel, er
 		return nil, fmt.Errorf("failed to marshal channels data: %w", err)
 	}
 
-	var channels []Channel
+	var channels []ChannelRes
 	if err := json.Unmarshal(channelsJSON, &channels); err != nil {
 		return nil, fmt.Errorf("failed to parse channels: %w", err)
 	}
@@ -132,71 +132,57 @@ func (c *ClearnodeClient) GetChannels(participant, status string) ([]Channel, er
 	return channels, nil
 }
 
-func (c *ClearnodeClient) Authenticate(wallet, signer *Signer) error {
-	if c.signer != nil {
-		return nil // Already authenticated
+type ChannelClosureRes struct {
+	ChannelID        string          `json:"channel_id"`
+	Intent           uint8           `json:"intent"`
+	Version          uint64          `json:"version"`
+	StateData        string          `json:"state_data"`
+	FinalAllocations []AllocationRes `json:"allocations"`
+	StateHash        string          `json:"state_hash"`
+	Signature        SignatureRes    `json:"server_signature"`
+}
+
+type AllocationRes struct {
+	Destination string   `json:"destination"`
+	Token       string   `json:"token"`
+	Amount      *big.Int `json:"amount"`
+}
+
+type SignatureRes struct {
+	V uint8  `json:"v,string"`
+	R string `json:"r,string"`
+	S string `json:"s,string"`
+}
+
+func (c *ClearnodeClient) RequestChannelClosure(walletAddress common.Address, channelID string) (*ChannelClosureRes, error) {
+	if c.signer == nil {
+		return nil, fmt.Errorf("client not authenticated")
 	}
 
-	ch := AuthChallenge{
-		Wallet:      wallet.Address().Hex(),
-		Participant: signer.Address().Hex(), // Using address as session key for simplicity
-		AppName:     "Yellow Bridge",
-		Allowances:  []any{},                // No allowances for now
-		Expire:      "",                     // No expiration for now
-		Scope:       "",                     // No specific scope for now
-		AppAddress:  wallet.Address().Hex(), // Using address as app address for simplicity
+	params := map[string]any{
+		"funds_destination": walletAddress.Hex(),
+		"channel_id":        channelID,
 	}
-	res, err := c.request("auth_request", nil,
-		ch.Wallet,
-		ch.Participant,
-		ch.AppName,
-		ch.Allowances,
-		ch.Expire,
-		ch.Scope,
-		ch.AppAddress,
-	)
+
+	res, err := c.request("close_channel", nil, params)
 	if err != nil {
-		return fmt.Errorf("authentication request failed: %w", err)
+		return nil, fmt.Errorf("failed to request channel closure: %w", err)
 	}
-	if res.Res.Method != "auth_challenge" || len(res.Res.Params) < 1 {
-		return fmt.Errorf("unexpected response to auth_request: %v", res.Res)
-	}
-
-	challengeMap, ok := res.Res.Params[0].(map[string]any)
-	if !ok {
-		return fmt.Errorf("invalid auth_challenge response format: %v", res.Res.Params[0])
-	}
-	challengeToken, ok := challengeMap["challenge_message"].(string)
-	if !ok {
-		return fmt.Errorf("challenge_message not found in auth_challenge response: %v", challengeMap)
+	if res.Res.Method != "close_channel" || len(res.Res.Params) < 1 {
+		return nil, fmt.Errorf("unexpected response to close_channel: %v", res.Res)
 	}
 
-	ch.Token = challengeToken
-	chSig, err := signChallenge(wallet, ch)
+	closureResJSON, err := json.Marshal(res.Res.Params[0])
 	if err != nil {
-		return fmt.Errorf("failed to sign challenge: %w", err)
-	}
-	authVerifyChallenge := map[string]any{
-		"challenge": challengeToken,
-	}
-	res, err = c.request("auth_verify", []string{hexutil.Encode(chSig)}, authVerifyChallenge)
-	if err != nil {
-		return fmt.Errorf("authentication verification failed: %w", err)
-	}
-	if res.Res.Method != "auth_verify" || len(res.Res.Params) < 1 {
-		return fmt.Errorf("unexpected response to auth_verify: %v", res.Res)
+		return nil, fmt.Errorf("failed to marshal closure response: %w", err)
 	}
 
-	verifyMap, ok := res.Res.Params[0].(map[string]any)
-	if !ok {
-		return fmt.Errorf("invalid auth_verify response format: %v", res.Res.Params[0])
-	}
-	if authSuccess, _ := verifyMap["success"].(bool); !authSuccess {
-		return fmt.Errorf("authentication failed: %v", verifyMap)
+	var closureRes ChannelClosureRes
+	if err := json.Unmarshal(closureResJSON, &closureRes); err != nil {
+		return nil, fmt.Errorf("failed to parse channels: %w", err)
 	}
 
-	c.signer = signer
-	return nil
+	return &closureRes, nil
 }
 
 func (c *ClearnodeClient) readMessages() {
@@ -247,18 +233,24 @@ func (c *ClearnodeClient) request(method string, sigs []string, params ...any) (
 		params = []any{} // Ensure params is never nil
 	}
 
-	if sigs == nil {
-		sigs = []string{} // Ensure sigs is never nil
+	reqID := uint64(time.Now().UnixMilli())
+	rpcData := RPCData{
+		RequestID: reqID,
+		Method:    method,
+		Params:    params,
+		Timestamp: uint64(time.Now().UnixMilli()),
 	}
 
-	reqID := uint64(time.Now().UnixMilli())
+	if len(sigs) == 0 && c.signer != nil {
+		sig, err := signRPCData(c.signer, rpcData)
+		if err != nil {
+			return nil, fmt.Errorf("error signing RPC data: %w", err)
+		}
+		sigs = []string{hexutil.Encode(sig)}
+	}
+
 	req := RPCRequest{
-		Req: RPCData{
-			RequestID: reqID,
-			Method:    method,
-			Params:    params,
-			Timestamp: uint64(time.Now().UnixMilli()),
-		},
+		Req: rpcData,
 		Sig: sigs,
 	}
 
@@ -286,63 +278,4 @@ func (c *ClearnodeClient) request(method string, sigs []string, params ...any) (
 	}
 
 	return res, nil
-}
-
-type RPCRequest struct {
-	Req RPCData  `json:"req"`
-	Sig []string `json:"sig"`
-}
-
-type RPCResponse struct {
-	Res RPCData  `json:"res"`
-	Sig []string `json:"sig"`
-}
-
-// RPCData represents the common structure for both requests and responses
-// Format: [request_id, method, params, ts]
-type RPCData struct {
-	RequestID uint64 `json:"request_id" validate:"required"`
-	Method    string `json:"method" validate:"required"`
-	Params    []any  `json:"params" validate:"required"`
-	Timestamp uint64 `json:"ts" validate:"required"`
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface for RPCMessage
-func (m *RPCData) UnmarshalJSON(data []byte) error {
-	var rawArr []json.RawMessage
-	if err := json.Unmarshal(data, &rawArr); err != nil {
-		return fmt.Errorf("error reading RPCData as array: %w", err)
-	}
-	if len(rawArr) != 4 {
-		return fmt.Errorf("invalid RPCData: expected 4 elements in array")
-	}
-
-	// Element 0: uint64 RequestID
-	if err := json.Unmarshal(rawArr[0], &m.RequestID); err != nil {
-		return fmt.Errorf("invalid request_id: %w", err)
-	}
-	// Element 1: string Method
-	if err := json.Unmarshal(rawArr[1], &m.Method); err != nil {
-		return fmt.Errorf("invalid method: %w", err)
-	}
-	// Element 2: []any Params
-	if err := json.Unmarshal(rawArr[2], &m.Params); err != nil {
-		return fmt.Errorf("invalid params: %w", err)
-	}
-	// Element 3: uint64 Timestamp
-	if err := json.Unmarshal(rawArr[3], &m.Timestamp); err != nil {
-		return fmt.Errorf("invalid timestamp: %w", err)
-	}
-
-	return nil
-}
-
-// MarshalJSON for RPCData always emits the array‐form [RequestID, Method, Params, Timestamp].
-func (m RPCData) MarshalJSON() ([]byte, error) {
-	return json.Marshal([]any{
-		m.RequestID,
-		m.Method,
-		m.Params,
-		m.Timestamp,
-	})
 }

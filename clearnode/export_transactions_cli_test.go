@@ -38,6 +38,8 @@ func TestTransactionExporter_ExportToCSV(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("Export", func(t *testing.T) {
+		t.Parallel()
+
 		var buf bytes.Buffer
 		options := ExportOptions{
 			AccountID: account1,
@@ -97,6 +99,8 @@ func TestTransactionExporter_ExportToCSV(t *testing.T) {
 	})
 
 	t.Run("ExportWithAssetFilter", func(t *testing.T) {
+		t.Parallel()
+
 		var buf bytes.Buffer
 		options := ExportOptions{
 			AccountID:   account1,
@@ -121,6 +125,8 @@ func TestTransactionExporter_ExportToCSV(t *testing.T) {
 	})
 
 	t.Run("ExportWithTypeFilter", func(t *testing.T) {
+		t.Parallel()
+
 		var buf bytes.Buffer
 		txType := TransactionTypeTransfer
 		options := ExportOptions{
@@ -144,6 +150,8 @@ func TestTransactionExporter_ExportToCSV(t *testing.T) {
 	})
 
 	t.Run("ExportNoTransactions", func(t *testing.T) {
+		t.Parallel()
+
 		var buf bytes.Buffer
 		options := ExportOptions{
 			AccountID: "0xNonExistentAccount",

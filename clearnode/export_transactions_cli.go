@@ -93,7 +93,7 @@ func (e *TransactionExporter) ExportToFile(options ExportOptions) (string, error
 
 func runExportTransactionsCli(logger Logger) {
 	logger = logger.NewSystem("export-transactions")
-	if len(os.Args) < 3 {
+	if len(os.Args) < 3 || len(os.Args) > 5 {
 		logger.Fatal("Usage: clearnode export-transactions <accountID> [asset] [txType]")
 	}
 

@@ -2,10 +2,8 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -53,10 +51,20 @@ func RecordLedgerTransaction(tx *gorm.DB, txType TransactionType, fromAccount, t
 	return transaction, err
 }
 
+type TransactionWithTags struct {
+	LedgerTransaction
+	FromAccountTag string `gorm:"column:from_tag"`
+	ToAccountTag   string `gorm:"column:to_tag"`
+}
+
 // GetLedgerTransactions retrieves ledger transactions based on the provided filters.
-func GetLedgerTransactions(tx *gorm.DB, accountID AccountID, assetSymbol string, txType *TransactionType) ([]LedgerTransaction, error) {
-	var transactions []LedgerTransaction
-	q := tx.Model(&LedgerTransaction{})
+func GetLedgerTransactionsWithTags(db *gorm.DB, accountID AccountID, assetSymbol string, txType *TransactionType) ([]TransactionWithTags, error) {
+	var transactions []TransactionWithTags
+
+	q := db.Model(&LedgerTransaction{}).
+		Joins("LEFT JOIN user_tags AS from_tags ON from_tags.wallet = ledger_transactions.from_account").
+		Joins("LEFT JOIN user_tags AS to_tags ON to_tags.wallet = ledger_transactions.to_account").
+		Select("ledger_transactions.*, from_tags.tag as from_tag, to_tags.tag as to_tag")
 
 	if accountID.String() != "" {
 		q = q.Where("from_account = ? OR to_account = ?", accountID.String(), accountID.String())
@@ -111,38 +119,10 @@ func parseLedgerTransactionType(s string) (TransactionType, error) {
 	}
 }
 
-// FormatTransactionsWithTags formats multiple transactions with user tags.
-func FormatTransactionsWithTags(db *gorm.DB, transactions []LedgerTransaction) ([]TransactionResponse, error) {
+// FormatTransactions formats multiple transactions with user tags.
+func FormatTransactions(db *gorm.DB, transactions []TransactionWithTags) ([]TransactionResponse, error) {
 	if len(transactions) == 0 {
 		return []TransactionResponse{}, nil
-	}
-
-	// Collect all unique wallet addresses from transactions
-	walletTags := make(map[string]string)
-	for _, tx := range transactions {
-		if common.IsHexAddress(tx.FromAccount) {
-			walletTags[tx.FromAccount] = ""
-		}
-		if common.IsHexAddress(tx.ToAccount) {
-			walletTags[tx.ToAccount] = ""
-		}
-	}
-
-	uniqueAccountAddresses := make([]string, 0, len(walletTags))
-	for addr := range walletTags {
-		uniqueAccountAddresses = append(uniqueAccountAddresses, addr)
-	}
-
-	var userTags []UserTagModel
-	if len(uniqueAccountAddresses) > 0 {
-		if err := db.Where("wallet IN ?", uniqueAccountAddresses).Find(&userTags).Error; err != nil {
-			return nil, fmt.Errorf("failed to fetch user tags: %w", err)
-		}
-	}
-
-	// Assign tags to wallet addresses where available
-	for _, tag := range userTags {
-		walletTags[tag.Wallet] = tag.Tag
 	}
 
 	responses := make([]TransactionResponse, len(transactions))
@@ -151,9 +131,9 @@ func FormatTransactionsWithTags(db *gorm.DB, transactions []LedgerTransaction) (
 			Id:             tx.ID,
 			TxType:         tx.Type.String(),
 			FromAccount:    tx.FromAccount,
-			FromAccountTag: walletTags[tx.FromAccount], // Will be empty string if not found
+			FromAccountTag: tx.FromAccountTag, // Will be empty string if not found
 			ToAccount:      tx.ToAccount,
-			ToAccountTag:   walletTags[tx.ToAccount], // Will be empty string if not found
+			ToAccountTag:   tx.ToAccountTag, // Will be empty string if not found
 			Asset:          tx.AssetSymbol,
 			Amount:         tx.Amount,
 			CreatedAt:      tx.CreatedAt,

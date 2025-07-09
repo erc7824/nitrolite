@@ -336,14 +336,14 @@ func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
 
 	userAccountID := NewAccountID(params.AccountID)
 	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
-	transactions, err := GetLedgerTransactions(query, userAccountID, params.Asset, txType)
+	transactions, err := GetLedgerTransactionsWithTags(query, userAccountID, params.Asset, txType)
 	if err != nil {
 		logger.Error("failed to get transactions", "error", err)
 		c.Fail("failed to get transactions")
 		return
 	}
 
-	resp, err := FormatTransactionsWithTags(r.DB, transactions)
+	resp, err := FormatTransactions(r.DB, transactions)
 	if err != nil {
 		logger.Error("failed to format transactions with tags", "error", err)
 		c.Fail("failed to return transactions")

@@ -250,8 +250,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	// Sender tag should be included in the returned transaction in case it exists
 	fromAccountTag, err = GetUserTagByWallet(r.DB, fromWallet)
 	if err != nil && err != gorm.ErrRecordNotFound {
-		logger.Error("failed to get user tag by wallet", "wallet", destinationAddress, "error", err)
-		c.Fail(fmt.Sprintf("failed to get user tag for wallet: %s", destinationAddress))
+			logger.Error("failed to get user tag by wallet", "wallet", fromWallet, "error", err)
+			c.Fail(fmt.Sprintf("failed to get user tag for wallet: %s", fromWallet))
 		return
 	}
 

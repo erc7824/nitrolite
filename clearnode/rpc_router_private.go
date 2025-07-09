@@ -14,6 +14,10 @@ type GetLedgerBalancesParams struct {
 	AccountID   string `json:"account_id,omitempty"`  // Optional account ID to filter balances
 }
 
+type GetRPCHistoryParams struct {
+	ListOptions
+}
+
 type TransferParams struct {
 	Destination        string               `json:"destination"`
 	DestinationUserTag string               `json:"destination_user_tag"`
@@ -549,6 +553,45 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 		"newVersion", resp.Version,
 		"fundsDestination", params.FundsDestination,
 	)
+}
+
+// HandleGetRPCHistory returns past RPC calls for a given participant
+func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+
+	var params GetRPCHistoryParams
+	if err := parseParams(req.Params, &params); err != nil {
+		c.Fail(err.Error())
+		return
+	}
+
+	query := applyListOptions(r.DB, "timestamp", SortTypeDescending, &params.ListOptions)
+	var rpcHistory []RPCRecord
+	if err := query.Where("sender = ?", c.UserID).Find(&rpcHistory).Error; err != nil {
+		logger.Error("failed to retrieve RPC history", "error", err)
+		c.Fail("failed to retrieve RPC history")
+		return
+	}
+
+	response := make([]RPCEntry, 0, len(rpcHistory))
+	for _, record := range rpcHistory {
+		response = append(response, RPCEntry{
+			ID:        record.ID,
+			Sender:    record.Sender,
+			ReqID:     record.ReqID,
+			Method:    record.Method,
+			Params:    string(record.Params),
+			Timestamp: record.Timestamp,
+			ReqSig:    record.ReqSig,
+			ResSig:    record.ResSig,
+			Result:    string(record.Response),
+		})
+	}
+
+	c.Succeed(req.Method, response)
+	logger.Info("RPC history retrieved", "userID", c.UserID, "entryCount", len(response))
 }
 
 func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {

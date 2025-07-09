@@ -229,7 +229,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		}
 
 		destinationAddress = destinationAddr
-	} else {
+	}
+	if toAccountTag == "" {
 		// Even if destination tag is not specified, it should be included in the returned transaction in case it exists
 		tag, err := GetUserTagByWallet(r.DB, destinationAddress)
 		if err != nil && err != gorm.ErrRecordNotFound {
@@ -296,7 +297,9 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 				return fmt.Errorf("failed to record transaction: %w", err)
 			}
 			transactions = append(transactions, TransactionWithTags{
-				*transaction, fromAccountTag, toAccountTag,
+				LedgerTransaction: *transaction,
+				FromAccountTag:    fromAccountTag,
+				ToAccountTag:      toAccountTag,
 			})
 		}
 

@@ -56,7 +56,7 @@ const TransferParamsSchema = z
                     to_account: addressSchema,
                     to_account_tag: z.string().optional(),
                     asset: z.string(),
-                    amount: z.union([z.string(), z.number()]).transform((a) => a.toString()),
+                    amount: z.string(),
                     created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
                 })
                 .transform(

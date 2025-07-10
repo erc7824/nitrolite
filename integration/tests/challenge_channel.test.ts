@@ -80,16 +80,24 @@ describe('Close channel', () => {
         await depositTxPromise;
 
         const { lastValidState } = await client.getChannelData(channelId);
-        const poolWithJoin: GetTxpoolContentReturnType = await new Promise((resolve) => {
+        const poolWithJoin: GetTxpoolContentReturnType = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                clearInterval(interval);
+                reject(new Error('Timed out waiting for pending transaction in txpool'));
+            }, 5000);
+
             const interval = setInterval(async () => {
                 const pool = await blockUtils.readTxPool();
                 if (Object.keys(pool.pending).length > 0) {
                     clearInterval(interval);
+                    clearTimeout(timeout);
                     resolve(pool);
                 }
             }, 200);
         });
 
+        // TODO: this approach is very brittle, and could fail if there are multiple pending transactions
+        // which usually doesn't happen in tests, but still
         const txKey = Object.keys(poolWithJoin.pending)[0];
         const txIndex = Object.keys(poolWithJoin.pending[txKey])[0];
         const joinTx = poolWithJoin.pending[txKey][txIndex];

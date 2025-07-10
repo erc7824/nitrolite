@@ -13,6 +13,7 @@ import {
     TransactionSerializable,
     serializeTransaction,
     Signature,
+    GetTxpoolContentReturnType,
 } from 'viem';
 import { chain } from './setup';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -135,7 +136,7 @@ export class BlockchainUtils {
         try {
             await this.testClient.setAutomine(true);
         } catch (error) {
-            throw new Error(`Error pausing mining: ${error.message}`);
+            throw new Error(`Error resuming mining: ${error.message}`);
         }
     }
 
@@ -147,7 +148,7 @@ export class BlockchainUtils {
         }
     }
 
-    async readTxPool() {
+    async readTxPool(): Promise<GetTxpoolContentReturnType> {
         try {
             const content = await this.testClient.getTxpoolContent();
             return content;

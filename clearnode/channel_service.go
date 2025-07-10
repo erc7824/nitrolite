@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -53,14 +54,14 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 	}
 
 	if params.ResizeAmount == nil {
-		params.ResizeAmount = big.NewInt(0)
+		params.ResizeAmount = &decimal.Zero
 	}
 	if params.AllocateAmount == nil {
-		params.AllocateAmount = big.NewInt(0)
+		params.AllocateAmount = &decimal.Zero
 	}
 
 	// Prevent no-op resize operations
-	if params.ResizeAmount.Cmp(big.NewInt(0)) == 0 && params.AllocateAmount.Cmp(big.NewInt(0)) == 0 {
+	if params.ResizeAmount.Cmp(decimal.Zero) == 0 && params.AllocateAmount.Cmp(decimal.Zero) == 0 {
 		return ResizeChannelResponse{}, RPCErrorf("resize operation requires non-zero ResizeAmount or AllocateAmount")
 	}
 
@@ -73,14 +74,14 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		return ResizeChannelResponse{}, RPCErrorf("failed to check participant balance for asset %s", asset.Symbol)
 	}
 
-	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
-	newChannelRawAmount := new(big.Int).Add(channel.RawAmount.BigInt(), params.AllocateAmount)
+	rawBalance := balance.Shift(int32(asset.Decimals))
+	newChannelRawAmount := channel.RawAmount.Add(*params.AllocateAmount)
 
 	if rawBalance.Cmp(newChannelRawAmount) < 0 {
 		return ResizeChannelResponse{}, RPCErrorf("insufficient unified balance for channel %s: required %s, available %s", channel.ChannelID, newChannelRawAmount.String(), rawBalance.String())
 	}
-	newChannelRawAmount.Add(newChannelRawAmount, params.ResizeAmount)
-	if newChannelRawAmount.Cmp(big.NewInt(0)) < 0 {
+	newChannelRawAmount = newChannelRawAmount.Add(*params.ResizeAmount)
+	if newChannelRawAmount.Cmp(decimal.Zero) < 0 {
 		return ResizeChannelResponse{}, RPCErrorf("new channel amount must be positive: %s", newChannelRawAmount.String())
 	}
 
@@ -88,7 +89,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		{
 			Destination: common.HexToAddress(params.FundsDestination),
 			Token:       common.HexToAddress(channel.Token),
-			Amount:      newChannelRawAmount,
+			Amount:      newChannelRawAmount.BigInt(),
 		},
 		{
 			Destination: s.signer.GetAddress(),
@@ -97,7 +98,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		},
 	}
 
-	resizeAmounts := []*big.Int{params.ResizeAmount, params.AllocateAmount}
+	resizeAmounts := []*big.Int{params.ResizeAmount.BigInt(), params.AllocateAmount.BigInt()}
 
 	intentionType, err := abi.NewType("int256[]", "", nil)
 	if err != nil {
@@ -142,7 +143,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		resp.Allocations = append(resp.Allocations, Allocation{
 			Participant:  alloc.Destination.Hex(),
 			TokenAddress: alloc.Token.Hex(),
-			RawAmount:    alloc.Amount,
+			RawAmount:    decimal.NewFromBigInt(alloc.Amount, 0),
 		})
 	}
 	return resp, nil
@@ -245,7 +246,7 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 		resp.FinalAllocations = append(resp.FinalAllocations, Allocation{
 			Participant:  alloc.Destination.Hex(),
 			TokenAddress: alloc.Token.Hex(),
-			RawAmount:    alloc.Amount,
+			RawAmount:    decimal.NewFromBigInt(alloc.Amount, 0),
 		})
 	}
 

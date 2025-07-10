@@ -590,12 +590,22 @@ export interface PongResponse extends GenericRPCMessage {
  * Represents the parameters for the 'transfer' RPC method.
  */
 export interface TransferRPCResponseParams {
+    /** Unique identifier for the transfer. */
+    id: number;
+    /** The type of transaction. */
+    txType: TxType;
     /** The source address from which assets were transferred. */
-    from: Address;
+    fromAccount: Address;
+    /** The user tag for the source account (optional). */
+    fromAccountTag?: string;
     /** The destination address to which assets were transferred. */
-    to: Address;
-    /** The assets and amounts that were transferred. */
-    allocations: TransferAllocation[];
+    toAccount: Address;
+    /** The user tag for the destination account (optional). */
+    toAccountTag?: string;
+    /** The asset symbol that was transferred. */
+    asset: string;
+    /** The amount that was transferred. */
+    amount: string;
     /** The timestamp when the transfer was created. */
     createdAt: Date;
 }

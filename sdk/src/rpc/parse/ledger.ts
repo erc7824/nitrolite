@@ -56,7 +56,7 @@ const GetLedgerEntriesParamsSchema = z
     .transform((arr) => arr[0])
     .transform((arr) => arr as GetLedgerEntriesResponseParams[]);
 
-const txTypeEnum = z.enum(Object.values(TxType) as [string, ...string[]]);
+export const txTypeEnum = z.enum(Object.values(TxType) as [string, ...string[]]);
 
 const GetLedgerTransactionsParamsSchema = z
     .array(

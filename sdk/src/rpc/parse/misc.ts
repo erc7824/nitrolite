@@ -9,6 +9,7 @@ import {
     UserTagParams,
 } from '../types';
 import { hexSchema, addressSchema, ParamsParser, ParserParamsMissingError } from './common';
+import { txTypeEnum } from './ledger';
 
 const NetworkInfoSchema = z.object({
     name: z.string(),
@@ -45,27 +46,34 @@ const ErrorParamsSchema = z
 
 const TransferParamsSchema = z
     .array(
-        z
-            .object({
-                from: addressSchema,
-                to: addressSchema,
-                allocations: z.array(
-                    z.object({
-                        asset: z.string(),
-                        amount: z.union([z.string(), z.number()]).transform((a) => a.toString()),
-                    }),
+        z.array(
+            z
+                .object({
+                    id: z.number(),
+                    tx_type: txTypeEnum,
+                    from_account: addressSchema,
+                    from_account_tag: z.string().optional(),
+                    to_account: addressSchema,
+                    to_account_tag: z.string().optional(),
+                    asset: z.string(),
+                    amount: z.string(),
+                    created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
+                })
+                .transform(
+                    (raw) =>
+                        ({
+                            id: raw.id,
+                            txType: raw.tx_type,
+                            fromAccount: raw.from_account as Address,
+                            fromAccountTag: raw.from_account_tag,
+                            toAccount: raw.to_account as Address,
+                            toAccountTag: raw.to_account_tag,
+                            asset: raw.asset,
+                            amount: raw.amount,
+                            createdAt: raw.created_at,
+                        }) as TransferRPCResponseParams,
                 ),
-                created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-            })
-            .transform(
-                (raw) =>
-                    ({
-                        from: raw.from as Address,
-                        to: raw.to as Address,
-                        allocations: raw.allocations,
-                        createdAt: raw.created_at,
-                    }) as TransferRPCResponseParams,
-            ),
+        ),
     )
     .refine((arr) => arr.length === 1)
     .transform((arr) => arr[0]);

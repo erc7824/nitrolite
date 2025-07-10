@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
-
-	"github.com/shopspring/decimal"
 )
 
 func (c *ClearnodeClient) handleEvent(event RPCData) {
@@ -75,11 +73,6 @@ func (c *ClearnodeClient) handleChannelsEvent(event RPCData) {
 	fmt.Println()
 }
 
-type Balance struct {
-	Asset  string          `json:"asset"`
-	Amount decimal.Decimal `json:"amount"`
-}
-
 func (c *ClearnodeClient) handleBalancesEvent(event RPCData) {
 	if len(event.Params) < 1 {
 		fmt.Println("Invalid channels event format")
@@ -92,7 +85,7 @@ func (c *ClearnodeClient) handleBalancesEvent(event RPCData) {
 		return
 	}
 
-	balances := make([]Balance, 0)
+	balances := make([]BalanceRes, 0)
 	if err := json.Unmarshal(channelsData, &balances); err != nil {
 		fmt.Printf("Failed to parse channels: %s\n", err.Error())
 		return

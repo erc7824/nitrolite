@@ -49,7 +49,6 @@ func (c *CustodyClient) OpenChannel(
 		return fmt.Errorf("challenge period must be at least %d seconds", minCustodyChallengePeriod)
 	}
 
-	txOpts := signerTxOpts(wallet, chainID)
 	channel := Channel{
 		Adjudicator:  adjudicatorAddress,
 		Participants: []common.Address{signer.Address(), brokerAddress},
@@ -90,6 +89,7 @@ func (c *CustodyClient) OpenChannel(
 	}
 	initial.Sigs = []Signature{sig}
 
+	txOpts := signerTxOpts(wallet, chainID)
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to suggest gas price: %w", err)
@@ -128,8 +128,6 @@ func (c *CustodyClient) CloseChannel(
 		return err
 	}
 
-	txOpts := signerTxOpts(wallet, chainID)
-
 	state := State{
 		Intent:      3, // IntentFINALIZE
 		Version:     version,
@@ -147,6 +145,7 @@ func (c *CustodyClient) CloseChannel(
 	}
 	state.Sigs = []Signature{userSig, brokerSig}
 
+	txOpts := signerTxOpts(wallet, chainID)
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return fmt.Errorf("failed to suggest gas price: %w", err)
@@ -164,6 +163,198 @@ func (c *CustodyClient) CloseChannel(
 
 	fmt.Printf("Channel closed successfully: %s\n", tx.Hash().Hex())
 	return nil
+}
+
+func (c *CustodyClient) Resize(
+	wallet, signer unisig.Signer,
+	chainID uint32, chainRPC string,
+	custodyAddress common.Address,
+	channelID common.Hash,
+	version *big.Int,
+	data []byte,
+	allocations []Allocation,
+	brokerSig Signature,
+) error {
+	client, err := ethclient.Dial(chainRPC)
+	if err != nil {
+		return err
+	}
+
+	custody, err := NewCustody(custodyAddress, client)
+	if err != nil {
+		return err
+	}
+
+	channelData, err := custody.GetChannelData(&bind.CallOpts{}, channelID)
+	if err != nil {
+		return fmt.Errorf("failed to get channel data: %w", err)
+	}
+
+	state := State{
+		Intent:      2, // IntentRESIZE
+		Version:     version,
+		Data:        data,
+		Allocations: allocations,
+	}
+	stateData, err := EncodeState(channelID, state)
+	if err != nil {
+		return fmt.Errorf("failed to encode initial state: %w", err)
+	}
+
+	userSig, err := signNitroData(signer, stateData)
+	if err != nil {
+		return fmt.Errorf("failed to sign initial state: %w", err)
+	}
+	state.Sigs = []Signature{userSig, brokerSig}
+
+	txOpts := signerTxOpts(wallet, chainID)
+	gasPrice, err := client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to suggest gas price: %w", err)
+	}
+	txOpts.GasPrice = gasPrice.Add(gasPrice, gasPrice)
+
+	tx, err := custody.Resize(txOpts, channelID, state, []State{channelData.LastValidState})
+	if err != nil {
+		return fmt.Errorf("failed to resize custody channel: %w", err)
+	}
+
+	if _, err := bind.WaitMined(context.Background(), client, tx.Hash()); err != nil {
+		return err
+	}
+
+	fmt.Printf("Channel resized successfully: %s\n", tx.Hash().Hex())
+	return nil
+}
+
+func (c *CustodyClient) Deposit(
+	wallet unisig.Signer,
+	chainID uint32, chainRPC string,
+	custodyAddress, tokenAddress common.Address,
+	amount *big.Int,
+) error {
+	client, err := ethclient.Dial(chainRPC)
+	if err != nil {
+		return err
+	}
+
+	custody, err := NewCustody(custodyAddress, client)
+	if err != nil {
+		return err
+	}
+
+	txOpts := signerTxOpts(wallet, chainID)
+	gasPrice, err := client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to suggest gas price: %w", err)
+	}
+	txOpts.GasPrice = gasPrice.Add(gasPrice, gasPrice)
+
+	tx, err := custody.Deposit(txOpts, wallet.Address(), tokenAddress, amount)
+	if err != nil {
+		return fmt.Errorf("failed to deposit into custody: %w", err)
+	}
+
+	if _, err := bind.WaitMined(context.Background(), client, tx.Hash()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *CustodyClient) Withdraw(
+	wallet unisig.Signer,
+	chainID uint32, chainRPC string,
+	custodyAddress, tokenAddress common.Address,
+	amount *big.Int,
+) error {
+	client, err := ethclient.Dial(chainRPC)
+	if err != nil {
+		return err
+	}
+
+	custody, err := NewCustody(custodyAddress, client)
+	if err != nil {
+		return err
+	}
+
+	txOpts := signerTxOpts(wallet, chainID)
+	gasPrice, err := client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to suggest gas price: %w", err)
+	}
+	txOpts.GasPrice = gasPrice.Add(gasPrice, gasPrice)
+
+	tx, err := custody.Withdraw(txOpts, tokenAddress, amount)
+	if err != nil {
+		return fmt.Errorf("failed to deposit into custody: %w", err)
+	}
+
+	if _, err := bind.WaitMined(context.Background(), client, tx.Hash()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *CustodyClient) GetLedgerBalance(
+	chainID uint32, chainRPC string,
+	custodyAddress, walletAddress, tokenAddress common.Address,
+) (*big.Int, error) {
+	client, err := ethclient.Dial(chainRPC)
+	if err != nil {
+		return nil, err
+	}
+
+	custody, err := NewCustody(custodyAddress, client)
+	if err != nil {
+		return nil, err
+	}
+
+	balances, err := custody.GetAccountsBalances(
+		&bind.CallOpts{},
+		[]common.Address{walletAddress},
+		[]common.Address{tokenAddress},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account balances: %w", err)
+	}
+	if len(balances) == 0 || len(balances[0]) == 0 {
+		return nil, fmt.Errorf("no balances found for wallet %s on custody %s", walletAddress.Hex(), custodyAddress.Hex())
+	}
+
+	return balances[0][0], nil
+}
+
+func (c *CustodyClient) GetChannelBalance(
+	chainID uint32, chainRPC string,
+	custodyAddress common.Address,
+	channelID common.Hash,
+	tokenAddress common.Address,
+) (*big.Int, error) {
+	client, err := ethclient.Dial(chainRPC)
+	if err != nil {
+		return nil, err
+	}
+
+	custody, err := NewCustody(custodyAddress, client)
+	if err != nil {
+		return nil, err
+	}
+
+	balances, err := custody.GetChannelBalances(
+		&bind.CallOpts{},
+		channelID,
+		[]common.Address{tokenAddress},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get account balances: %w", err)
+	}
+	if len(balances) == 0 {
+		return nil, fmt.Errorf("no balances found for channel %s on custody %s", channelID.Hex(), custodyAddress.Hex())
+	}
+
+	return balances[0], nil
 }
 
 // EncodeState encodes channel state into a byte array using channelID, intent, version, state data, and allocations.

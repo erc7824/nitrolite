@@ -63,3 +63,7 @@ func main() {
 		operator.Execute(t)
 	}
 }
+
+func emptyCompleter(d prompt.Document) []prompt.Suggest {
+	return []prompt.Suggest{}
+}

@@ -46,6 +46,9 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			{Text: "authenticate", Description: "Authenticate to the Clearnode using your wallet private key"},
 			{Text: "enable", Description: "Enable a chain for the current wallet"},
 			{Text: "disable", Description: "Disable a chain for the current wallet"},
+			{Text: "resize", Description: "Resize a channel on a chain"},
+			{Text: "deposit", Description: "Deposit assets to a chain"},
+			{Text: "withdraw", Description: "Withdraw assets from a chain"},
 			{Text: "exit", Description: "Exit the application"},
 		}
 	}
@@ -72,12 +75,18 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			}
 
 			return o.getChainSuggestions(-1) // Suggest only disabled chains
-		case "disable":
+		case "resize", "disable":
 			if !o.isUserAuthenticated() {
 				return nil
 			}
 
 			return o.getChainSuggestions(1) // Suggest only enabled chains
+		case "deposit", "withdraw":
+			if !o.isUserAuthenticated() {
+				return nil
+			}
+
+			return o.getChainSuggestions(0) // Suggest all chains
 		default:
 			return nil // No suggestions for other commands
 		}
@@ -100,12 +109,18 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			}
 
 			return o.getAssetSuggestions(args[1], -1) // Suggest only disabled assets for the specified chain
-		case "disable":
+		case "resize", "disable":
 			if !o.isUserAuthenticated() {
 				return nil
 			}
 
 			return o.getAssetSuggestions(args[1], 1) // Suggest only enabled assets for the specified chain
+		case "deposit", "withdraw":
+			if !o.isUserAuthenticated() {
+				return nil
+			}
+
+			return o.getAssetSuggestions(args[1], 0) // Suggest all assets for the specified chain
 		default:
 			return nil // No suggestions for other commands
 		}
@@ -160,12 +175,26 @@ func (o *Operator) Execute(s string) {
 		o.handleEnableChain(args)
 	case "disable":
 		o.handleDisableChain(args)
+	case "resize":
+		o.handleResizeChain(args)
+	case "deposit":
+		o.handleDepositChain(args)
+	case "withdraw":
+		o.handleWithdrawChain(args)
 	case "exit":
 		fmt.Println("Exiting...")
 		os.Exit(0)
 	default:
 		fmt.Printf("Unknown command: %s\n", s)
 	}
+}
+
+func (o *Operator) readExtraArg(name string) string {
+	promptPrefix := fmt.Sprintf("{%s}>>> ", name)
+	return prompt.Input(promptPrefix, emptyCompleter,
+		prompt.OptionTitle("Cerebro CLI"),
+		prompt.OptionPrefixTextColor(prompt.Yellow),
+	)
 }
 
 func (o *Operator) reloadConfig() {

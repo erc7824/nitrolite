@@ -643,7 +643,9 @@ export function createEIP712AuthMessageSigner(
 export function createECDSAMessageSigner(privateKey: Hex): MessageSigner {
     return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
         try {
-            const messageBytes = keccak256(stringToBytes(JSON.stringify(payload, (_, v) => (typeof v === 'bigint' ? v.toString() : v))));
+            const messageBytes = keccak256(
+                stringToBytes(JSON.stringify(payload, (_, v) => (typeof v === 'bigint' ? v.toString() : v))),
+            );
             const flatSignature = await privateKeyToAccount(privateKey).sign({ hash: messageBytes });
 
             return flatSignature as Hex;

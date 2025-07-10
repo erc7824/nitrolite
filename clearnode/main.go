@@ -56,12 +56,13 @@ func main() {
 		logger.Fatal("failed to initialize auth manager", "error", err)
 	}
 
-	appSessionService := NewAppSessionService(db)
+	rpcNode := NewRPCNode(signer, logger)
+	wsNotifier := NewWSNotifier(rpcNode.Notify)
+
+	appSessionService := NewAppSessionService(db, wsNotifier)
 	channelService := NewChannelService(db, signer)
 
-	rpcNode := NewRPCNode(signer, logger)
-	rpcRouter := NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, logger)
-	appSessionService.SetPublishBalanceUpdateCallback(rpcRouter.SendBalanceUpdate)
+	NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, wsNotifier, logger)
 
 	rpcListenAddr := ":8000"
 	rpcListenEndpoint := "/ws"
@@ -74,7 +75,7 @@ func main() {
 	}
 
 	for name, network := range config.networks {
-		client, err := NewCustody(signer, db, rpcRouter.SendBalanceUpdate, rpcRouter.SendChannelUpdate, network.InfuraURL, network.CustodyAddress, network.AdjudicatorAddress, network.BalanceCHeckerAddress, network.ChainID, network.BlockStep, logger)
+		client, err := NewCustody(signer, db, wsNotifier, network.InfuraURL, network.CustodyAddress, network.AdjudicatorAddress, network.BalanceCHeckerAddress, network.ChainID, network.BlockStep, logger)
 		if err != nil {
 			logger.Warn("failed to initialize blockchain client", "network", name, "error", err)
 			continue

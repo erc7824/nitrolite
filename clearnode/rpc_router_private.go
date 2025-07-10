@@ -321,6 +321,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	r.SendBalanceUpdate(fromWallet)
 	if common.IsHexAddress(destinationAddress) {
 		r.SendBalanceUpdate(destinationAddress)
+		r.SendTransferNotification(destinationAddress, resp)
 	}
 
 	c.Succeed(req.Method, resp)

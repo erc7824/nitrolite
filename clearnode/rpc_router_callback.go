@@ -7,17 +7,17 @@ import (
 )
 
 // SendBalanceUpdate sends balance updates to the client
-func (r *RPCRouter) SendBalanceUpdate(sender string) {
-	senderAddress := common.HexToAddress(sender)
-	senderAccountID := NewAccountID(sender)
+func (r *RPCRouter) SendBalanceUpdate(destinationWallet string) {
+	senderAddress := common.HexToAddress(destinationWallet)
+	senderAccountID := NewAccountID(destinationWallet)
 	balances, err := GetWalletLedger(r.DB, senderAddress).GetBalances(senderAccountID)
 	if err != nil {
-		r.lg.Error("error getting balances", "sender", sender, "error", err)
+		r.lg.Error("error getting balances", "userID", destinationWallet, "error", err)
 		return
 	}
 
-	r.Node.Notify(sender, "bu", balances)
-	r.lg.Info("balance update sent", "userID", sender, "balances", balances)
+	r.Node.Notify(destinationWallet, "bu", balances)
+	r.lg.Info("balance update sent", "userID", destinationWallet, "balances", balances)
 }
 
 // SendChannelUpdate sends a single channel update to the client
@@ -44,4 +44,10 @@ func (r *RPCRouter) SendChannelUpdate(channel Channel) {
 		"participant", channel.Participant,
 		"status", channel.Status,
 	)
+}
+
+// SendTransferNotification sends a transfer notification to the client
+func (r *RPCRouter) SendTransferNotification(destinationWallet string, transferedAllocations []TransactionResponse) {
+	r.Node.Notify(destinationWallet, "transfer", transferedAllocations)
+	r.lg.Info("transfer notification sent", "userID", destinationWallet, "transfered allocations", transferedAllocations)
 }

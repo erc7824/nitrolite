@@ -80,9 +80,9 @@ func GetUserTagByWallet(db *gorm.DB, wallet string) (string, error) {
 }
 
 // GetWalletByTag retrieves the wallet address associated with a given user tag.
-func GetWalletByTag(db *gorm.DB, tag string) (string, error) {
+func GetWalletByTag(db *gorm.DB, tag string) (UserTagModel, error) {
 	if tag == "" {
-		return "", fmt.Errorf("tag cannot be empty")
+		return UserTagModel{}, fmt.Errorf("tag cannot be empty")
 	}
 
 	tag = strings.ToUpper(tag)
@@ -90,11 +90,11 @@ func GetWalletByTag(db *gorm.DB, tag string) (string, error) {
 	var model UserTagModel
 	if err := db.Where("tag = ?", tag).First(&model).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return "", fmt.Errorf("no associated wallet for tag: %s", tag)
+			return UserTagModel{}, fmt.Errorf("no associated wallet for tag: %s", tag)
 		}
-		return "", fmt.Errorf("failed to retrieve record: %v", err)
+		return UserTagModel{}, fmt.Errorf("failed to retrieve record: %v", err)
 	}
-	return model.Wallet, nil
+	return model, nil
 }
 
 // GenerateRandomAlphanumericTag generates a random alphanumeric tag of length 6.

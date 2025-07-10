@@ -221,14 +221,15 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	destinationAddress := params.Destination
 	if destinationAddress == "" {
 		// Retrieve the destination address by Tag
-		destinationAddr, err := GetWalletByTag(r.DB, params.DestinationUserTag)
+		destinationWallet, err := GetWalletByTag(r.DB, params.DestinationUserTag)
 		if err != nil {
 			logger.Error("failed to get wallet by tag", "tag", params.DestinationUserTag, "error", err)
 			c.Fail(fmt.Sprintf("failed to get wallet by tag: %s", params.DestinationUserTag))
 			return
 		}
 
-		destinationAddress = destinationAddr
+		destinationAddress = destinationWallet.Wallet
+		toAccountTag = destinationWallet.Tag
 	}
 	if toAccountTag == "" {
 		// Even if destination tag is not specified, it should be included in the returned transaction in case it exists
@@ -251,8 +252,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	// Sender tag should be included in the returned transaction in case it exists
 	fromAccountTag, err = GetUserTagByWallet(r.DB, fromWallet)
 	if err != nil && err != gorm.ErrRecordNotFound {
-			logger.Error("failed to get user tag by wallet", "wallet", fromWallet, "error", err)
-			c.Fail(fmt.Sprintf("failed to get user tag for wallet: %s", fromWallet))
+		logger.Error("failed to get user tag by wallet", "wallet", fromWallet, "error", err)
+		c.Fail(fmt.Sprintf("failed to get user tag for wallet: %s", fromWallet))
 		return
 	}
 

@@ -30,7 +30,7 @@ config:
 
 image:
   repository: ghcr.io/erc7824/nitrolite/clearnode
-  tag: 0.0.1-rc.96
+  tag: 0.0.2-rc.12
 
 service:
   http:

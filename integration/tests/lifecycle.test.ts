@@ -11,14 +11,18 @@ import {
     getGetAppSessionsPredicate,
     getSubmitAppStatePredicate,
     TestWebSocket,
+    getResizeChannelPredicate,
+    getCloseChannelPredicate,
 } from '@/ws';
 import {
     AppDefinition,
     AppSessionAllocation,
     createAppSessionMessage,
     createCloseAppSessionMessage,
+    createCloseChannelMessage,
     createGetAppSessionsMessage,
     createGetLedgerBalancesMessage,
+    createResizeChannelMessage,
     createSubmitAppStateMessage,
     RPCChannelStatus,
     rpcResponseParser,
@@ -69,41 +73,45 @@ describe('Close channel', () => {
 
         return {
             appSession,
-            sessionData: JSON.parse(appSession.sessionData!)
+            sessionData: JSON.parse(appSession.sessionData!),
         };
     };
 
-    const GAME_TYPE = "chess";
+    const GAME_TYPE = 'chess';
     const TIME_CONTROL = { initial: 600, increment: 5 };
 
     const SESSION_DATA_WAITING = {
         gameType: GAME_TYPE,
         timeControl: TIME_CONTROL,
-        gameState: "waiting"
+        gameState: 'waiting',
     };
 
     const SESSION_DATA_ACTIVE = {
         gameType: GAME_TYPE,
         timeControl: TIME_CONTROL,
-        gameState: "active",
-        currentMove: "e2e4",
-        moveCount: 1
+        gameState: 'active',
+        currentMove: 'e2e4',
+        moveCount: 1,
     };
 
     const SESSION_DATA_FINISHED = {
         gameType: GAME_TYPE,
         timeControl: TIME_CONTROL,
-        gameState: "finished",
-        winner: "white",
-        endCondition: "checkmate"
+        gameState: 'finished',
+        winner: 'white',
+        endCondition: 'checkmate',
     };
 
-    const submitAppStateUpdate = async (allocations: AppSessionAllocation[], sessionData: object, expectedVersion: number) => {
+    const submitAppStateUpdate = async (
+        allocations: AppSessionAllocation[],
+        sessionData: object,
+        expectedVersion: number
+    ) => {
         const submitAppStateMsg = await createSubmitAppStateMessage(appIdentity.messageSigner, [
             {
                 app_session_id: appSessionId as Hex,
                 allocations,
-                session_data: JSON.stringify(sessionData)
+                session_data: JSON.stringify(sessionData),
             },
         ]);
 
@@ -122,12 +130,16 @@ describe('Close channel', () => {
         return submitAppStateParsedResponse;
     };
 
-    const closeAppSessionWithState = async (allocations: AppSessionAllocation[], sessionData: object, expectedVersion: number) => {
+    const closeAppSessionWithState = async (
+        allocations: AppSessionAllocation[],
+        sessionData: object,
+        expectedVersion: number
+    ) => {
         const closeAppSessionMsg = await createCloseAppSessionMessage(appIdentity.messageSigner, [
             {
                 app_session_id: appSessionId as Hex,
                 allocations,
-                session_data: JSON.stringify(sessionData)
+                session_data: JSON.stringify(sessionData),
             },
         ]);
 
@@ -233,9 +245,7 @@ describe('Close channel', () => {
         expect(getLedgerBalancesParsedResponse).toBeDefined();
         expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
         expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
-        expect(getLedgerBalancesParsedResponse.params[0].amount).toBe(
-            (decimalDepositAmount * BigInt(10)).toString()
-        );
+        expect(getLedgerBalancesParsedResponse.params[0].amount).toBe((decimalDepositAmount * BigInt(10)).toString());
         expect(getLedgerBalancesParsedResponse.params[0].asset).toBe('USDC');
     });
 
@@ -266,7 +276,7 @@ describe('Close channel', () => {
             {
                 definition,
                 allocations,
-                session_data: JSON.stringify(SESSION_DATA_WAITING)
+                session_data: JSON.stringify(SESSION_DATA_WAITING),
             },
         ]);
         const createAppSessionResponse = await appWS.sendAndWaitForResponse(
@@ -332,12 +342,12 @@ describe('Close channel', () => {
         expect(sessionData).toEqual(SESSION_DATA_FINISHED);
     });
 
-    it('should update ledger balances', async () => {
+    it('should update ledger balances for providing side', async () => {
         const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
-            appIdentity.messageSigner,
-            appIdentity.walletAddress
+            identity.messageSigner,
+            identity.walletAddress
         );
-        const getLedgerBalancesResponse = await appWS.sendAndWaitForResponse(
+        const getLedgerBalancesResponse = await ws.sendAndWaitForResponse(
             getLedgerBalancesMsg,
             getGetLedgerBalancesPredicate(),
             1000
@@ -346,16 +356,189 @@ describe('Close channel', () => {
         const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
         expect(getLedgerBalancesParsedResponse).toBeDefined();
         expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
-        expect(getLedgerBalancesParsedResponse.params[0].amount).toBe((decimalDepositAmount * BigInt(9)).toString());
+        expect(getLedgerBalancesParsedResponse.params[0].amount).toBe((decimalDepositAmount * BigInt(9)).toString()); // 1000 - 100
         expect(getLedgerBalancesParsedResponse.params[0].asset).toBe('USDC');
     });
 
-    // TODO: fix multiple ws connection and add resize
-    // it('should close and withdraw both channels', async () => {
-    //     // TODO: connect to ws to overwrite app ws session
-    //     await createAuthSessionWithClearnode(ws, identity);
+    it('should update ledger balances for receiving side', async () => {
+        const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
+            cpIdentity.messageSigner,
+            cpIdentity.walletAddress
+        );
+        const getLedgerBalancesResponse = await cpWS.sendAndWaitForResponse(
+            getLedgerBalancesMsg,
+            getGetLedgerBalancesPredicate(),
+            1000
+        );
 
-    //     await client.closeAndWithdrawChannel(ws, channelId);
-    //     await cpClient.closeAndWithdrawChannel(cpWS, cpChannelId);
-    // });
+        const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
+        expect(getLedgerBalancesParsedResponse).toBeDefined();
+        expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
+        expect(getLedgerBalancesParsedResponse.params[0].amount).toBe((decimalDepositAmount * BigInt(11)).toString()); // 1000 + 100
+        expect(getLedgerBalancesParsedResponse.params[0].asset).toBe('USDC');
+    });
+
+    it('should close channel and withdraw without app funds', async () => {
+        const msg = await createCloseChannelMessage(identity.messageSigner, channelId, identity.walletAddress);
+
+        const closeResponse = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
+        expect(closeResponse).toBeDefined();
+
+        const { params: closeResponseParams } = rpcResponseParser.closeChannel(closeResponse);
+        const closeChannelTxHash = await client.closeChannel({
+            finalState: {
+                intent: closeResponseParams.intent,
+                channelId: closeResponseParams.channelId,
+                data: closeResponseParams.stateData as Hex,
+                allocations: closeResponseParams.allocations,
+                version: BigInt(closeResponseParams.version),
+                serverSignature: closeResponseParams.serverSignature,
+            },
+            stateData: closeResponseParams.stateData as Hex,
+        });
+        expect(closeChannelTxHash).toBeDefined();
+
+        const closeReceipt = await blockUtils.waitForTransaction(closeChannelTxHash);
+        expect(closeReceipt).toBeDefined();
+
+        const postCloseAccountBalance = await client.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(postCloseAccountBalance).toBe(depositAmount * BigInt(9)); // 1000 - 100
+    });
+
+    it('should resize channel by withdrawing received funds from app to channel', async () => {
+        const msg = await createResizeChannelMessage(cpIdentity.messageSigner, [
+            {
+                channel_id: cpChannelId,
+                // TODO: use bigint after updating API
+                // @ts-ignore
+                allocate_amount: +depositAmount.toString(),
+                funds_destination: cpIdentity.walletAddress,
+            },
+        ]);
+
+        const resizeResponse = await cpWS.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
+        const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
+
+        expect(resizeResponseParams.allocations).toBeDefined();
+        expect(resizeResponseParams.allocations).toHaveLength(2);
+        expect(String(resizeResponseParams.allocations[0].destination)).toBe(cpIdentity.walletAddress);
+        expect(String(resizeResponseParams.allocations[0].amount)).toBe(
+            (depositAmount * BigInt(11)).toString() // 1000 + 100
+        );
+        expect(String(resizeResponseParams.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.allocations[1].amount)).toBe('0');
+
+        const resizeChannelTxHash = await cpClient.resizeChannel({
+            resizeState: {
+                channelId: resizeResponseParams.channelId as Hex,
+                intent: resizeResponseParams.intent,
+                version: BigInt(resizeResponseParams.version),
+                data: resizeResponseParams.stateData as Hex,
+                allocations: resizeResponseParams.allocations,
+                serverSignature: resizeResponseParams.serverSignature,
+            },
+            proofStates: [
+                // NOTE: Dummy adjudicator doesn't validate proofs, so we can pass any valid (from Custody POV) state
+                {
+                    intent: 1, // StateIntent.INITIALIZE
+                    version: BigInt(0),
+                    data: '0x',
+                    allocations: [
+                        {
+                            destination: cpIdentity.walletAddress,
+                            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+                            amount: depositAmount * BigInt(10),
+                        },
+                        {
+                            destination: CONFIG.ADDRESSES.GUEST_ADDRESS,
+                            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+                            amount: BigInt(0),
+                        },
+                    ],
+                    sigs: [],
+                },
+            ],
+        });
+        expect(resizeChannelTxHash).toBeDefined();
+
+        const resizeReceipt = await blockUtils.waitForTransaction(resizeChannelTxHash);
+        expect(resizeReceipt).toBeDefined();
+    });
+
+    it('should close channel and withdraw with app funds', async () => {
+        const msg = await createCloseChannelMessage(cpIdentity.messageSigner, cpChannelId, cpIdentity.walletAddress);
+
+        const closeResponse = await cpWS.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
+        expect(closeResponse).toBeDefined();
+
+        const { params: closeResponseParams } = rpcResponseParser.closeChannel(closeResponse);
+        const closeChannelTxHash = await cpClient.closeChannel({
+            finalState: {
+                intent: closeResponseParams.intent,
+                channelId: closeResponseParams.channelId,
+                data: closeResponseParams.stateData as Hex,
+                allocations: closeResponseParams.allocations,
+                version: BigInt(closeResponseParams.version),
+                serverSignature: closeResponseParams.serverSignature,
+            },
+            stateData: closeResponseParams.stateData as Hex,
+        });
+        expect(closeChannelTxHash).toBeDefined();
+
+        const closeReceipt = await blockUtils.waitForTransaction(closeChannelTxHash);
+        expect(closeReceipt).toBeDefined();
+
+        const postCloseAccountBalance = await cpClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(postCloseAccountBalance).toBe(depositAmount * BigInt(11)); // 1000 + 100
+    });
+
+    it('should withdraw funds from channel for providing side', async () => {
+        const preWithdrawalBalance = await blockUtils.getErc20Balance(
+            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            identity.walletAddress
+        );
+
+        const withdrawalTxHash = await client.withdrawal(
+            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            depositAmount * BigInt(9)
+        );
+        expect(withdrawalTxHash).toBeDefined();
+
+        const withdrawalReceipt = await blockUtils.waitForTransaction(withdrawalTxHash);
+        expect(withdrawalReceipt).toBeDefined();
+
+        const postWithdrawalBalance = await blockUtils.getErc20Balance(
+            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            identity.walletAddress
+        );
+        expect(postWithdrawalBalance.rawBalance - preWithdrawalBalance.rawBalance).toBe(depositAmount * BigInt(9)); // + 900
+
+        const accountBalance = await client.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(accountBalance).toBe(BigInt(0));
+    });
+
+    it('should withdraw funds from channel for receiving side', async () => {
+        const preWithdrawalBalance = await blockUtils.getErc20Balance(
+            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            cpIdentity.walletAddress
+        );
+
+        const withdrawalTxHash = await cpClient.withdrawal(
+            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            depositAmount * BigInt(11)
+        );
+        expect(withdrawalTxHash).toBeDefined();
+
+        const withdrawalReceipt = await blockUtils.waitForTransaction(withdrawalTxHash);
+        expect(withdrawalReceipt).toBeDefined();
+
+        const postWithdrawalBalance = await blockUtils.getErc20Balance(
+            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            cpIdentity.walletAddress
+        );
+        expect(postWithdrawalBalance.rawBalance - preWithdrawalBalance.rawBalance).toBe(depositAmount * BigInt(11)); // + 1100
+
+        const accountBalance = await cpClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(accountBalance).toBe(BigInt(0));
+    });
 });

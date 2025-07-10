@@ -243,7 +243,7 @@ export interface RPCAllocation {
     /** The token contract address. */
     token: Address;
     /** The amount to allocate. */
-    amount: BigInt;
+    amount: bigint;
 }
 
 /**

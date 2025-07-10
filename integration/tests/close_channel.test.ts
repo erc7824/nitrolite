@@ -5,8 +5,8 @@ import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import { getCloseChannelPredicate, TestWebSocket } from '@/ws';
-import { Allocation, createCloseChannelMessage, rpcResponseParser } from '@erc7824/nitrolite';
-import { Address, Hex, parseUnits } from 'viem';
+import { createCloseChannelMessage, rpcResponseParser } from '@erc7824/nitrolite';
+import { Hex, parseUnits } from 'viem';
 
 describe('Close channel', () => {
     const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
@@ -78,24 +78,9 @@ describe('Close channel', () => {
                 intent: closeParsedResponse.params.intent,
                 channelId: closeParsedResponse.params.channelId,
                 data: closeParsedResponse.params.stateData as Hex,
-                allocations: [
-                    {
-                        destination: closeParsedResponse.params.allocations[0].destination as Address,
-                        token: closeParsedResponse.params.allocations[0].token as Address,
-                        amount: closeParsedResponse.params.allocations[0].amount,
-                    },
-                    {
-                        destination: closeParsedResponse.params.allocations[1].destination as Address,
-                        token: closeParsedResponse.params.allocations[1].token as Address,
-                        amount: closeParsedResponse.params.allocations[1].amount,
-                    },
-                ] as [Allocation, Allocation],
+                allocations: closeParsedResponse.params.allocations,
                 version: BigInt(closeParsedResponse.params.version),
-                serverSignature: {
-                    v: +closeParsedResponse.params.serverSignature.v,
-                    r: closeParsedResponse.params.serverSignature.r as Hex,
-                    s: closeParsedResponse.params.serverSignature.s as Hex,
-                },
+                serverSignature: closeParsedResponse.params.serverSignature,
             },
             stateData: closeParsedResponse.params.stateData as Hex,
         });

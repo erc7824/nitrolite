@@ -27,7 +27,7 @@ func (r *RPCRouter) SendChannelUpdate(channel Channel) {
 		Participant: channel.Participant,
 		Status:      channel.Status,
 		Token:       channel.Token,
-		RawAmount:   channel.RawAmount.BigInt(),
+		RawAmount:   channel.RawAmount,
 		ChainID:     channel.ChainID,
 		Adjudicator: channel.Adjudicator,
 		Challenge:   channel.Challenge,

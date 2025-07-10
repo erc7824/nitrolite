@@ -67,11 +67,8 @@ describe('Resize channel', () => {
         const msg = await createResizeChannelMessage(identity.messageSigner, [
             {
                 channel_id: createResponseParams.channelId,
-                // TODO: use bigint after updating API
-                // @ts-ignore
-                resize_amount: +depositAmount.toString(),
-                // @ts-ignore
-                allocate_amount: +parseUnits('0', 6).toString(),
+                resize_amount: depositAmount,
+                allocate_amount: parseUnits('0', 6),
                 funds_destination: identity.walletAddress,
             },
         ]);
@@ -165,11 +162,8 @@ describe('Resize channel', () => {
         const msg = await createResizeChannelMessage(identity.messageSigner, [
             {
                 channel_id: createResponseParams.channelId,
-                // TODO: use bigint after updating API
-                // @ts-ignore
-                resize_amount: -depositAmount.toString(),
-                // @ts-ignore
-                allocate_amount: +parseUnits('0', 6).toString(),
+                resize_amount: -depositAmount,
+                allocate_amount: parseUnits('0', 6),
                 funds_destination: identity.walletAddress,
             },
         ]);
@@ -250,11 +244,8 @@ describe('Resize channel', () => {
         const msg = await createResizeChannelMessage(identity.messageSigner, [
             {
                 channel_id: createResponseParams.channelId,
-                // TODO: use bigint after updating API
-                // @ts-ignore
-                resize_amount: +parseUnits('0', 6).toString(),
-                // @ts-ignore
-                allocate_amount: -depositAmount.toString(),
+                resize_amount: parseUnits('0', 6),
+                allocate_amount: -depositAmount,
                 funds_destination: identity.walletAddress,
             },
         ]);

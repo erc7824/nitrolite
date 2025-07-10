@@ -73,8 +73,8 @@ type AppSessionResponse struct {
 
 type ResizeChannelParams struct {
 	ChannelID        string           `json:"channel_id"                          validate:"required"`
-	AllocateAmount   *decimal.Decimal `json:"allocate_amount,omitempty,string"           validate:"required_without=ResizeAmount"`
-	ResizeAmount     *decimal.Decimal `json:"resize_amount,omitempty,string"             validate:"required_without=AllocateAmount"`
+	AllocateAmount   *decimal.Decimal `json:"allocate_amount,omitempty,string"           validate:"omitempty,required_without=ResizeAmount,bigint"`
+	ResizeAmount     *decimal.Decimal `json:"resize_amount,omitempty,string"             validate:"omitempty,required_without=AllocateAmount,bigint"`
 	FundsDestination string           `json:"funds_destination"                   validate:"required"`
 }
 

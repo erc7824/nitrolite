@@ -243,5 +243,5 @@ func parseParams(params []any, unmarshalTo any) error {
 			return err
 		}
 	}
-	return validate.Struct(unmarshalTo)
+	return getValidator().Struct(unmarshalTo)
 }

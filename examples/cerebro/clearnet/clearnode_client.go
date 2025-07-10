@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gorilla/websocket"
+	"github.com/shopspring/decimal"
 
 	"github.com/erc7824/nitrolite/examples/bridge/unisig"
 )
@@ -105,6 +106,33 @@ func (c *ClearnodeClient) GetSupportedAssets() ([]AssetRes, error) {
 	return assets, nil
 }
 
+type BalanceRes struct {
+	Asset  string          `json:"asset"`
+	Amount decimal.Decimal `json:"amount"`
+}
+
+func (c *ClearnodeClient) GetLedgerBalances() ([]BalanceRes, error) {
+	res, err := c.request("get_ledger_balances", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch balances: %w", err)
+	}
+	if res.Res.Method != "get_ledger_balances" || len(res.Res.Params) < 1 {
+		return nil, fmt.Errorf("unexpected response to get_ledger_balances request: %v", res.Res)
+	}
+
+	assetsJSON, err := json.Marshal(res.Res.Params[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal assets data: %w", err)
+	}
+
+	var balances []BalanceRes
+	if err := json.Unmarshal(assetsJSON, &balances); err != nil {
+		return nil, fmt.Errorf("failed to parse assets: %w", err)
+	}
+
+	return balances, nil
+}
+
 func (c *ClearnodeClient) GetChannels(participant, status string) ([]ChannelRes, error) {
 	params := map[string]any{
 		"participant": participant,
@@ -183,6 +211,49 @@ func (c *ClearnodeClient) RequestChannelClosure(walletAddress common.Address, ch
 	}
 
 	return &closureRes, nil
+}
+
+type ChannelResizeRes struct {
+	ChannelID   string          `json:"channel_id"`
+	Intent      uint8           `json:"intent"`
+	Version     uint64          `json:"version"`
+	StateData   string          `json:"state_data"`
+	Allocations []AllocationRes `json:"allocations"`
+	StateHash   string          `json:"state_hash"`
+	Signature   SignatureRes    `json:"server_signature"`
+}
+
+func (c *ClearnodeClient) RequestChannelResize(walletAddress common.Address, channelID string, allocateAmount, resizeAmount *big.Int) (*ChannelResizeRes, error) {
+	if c.signer == nil {
+		return nil, fmt.Errorf("client not authenticated")
+	}
+
+	params := map[string]any{
+		"funds_destination": walletAddress.Hex(),
+		"channel_id":        channelID,
+		"allocate_amount":   allocateAmount,
+		"resize_amount":     resizeAmount,
+	}
+
+	res, err := c.request("resize_channel", nil, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to request channel resize: %w", err)
+	}
+	if res.Res.Method != "resize_channel" || len(res.Res.Params) < 1 {
+		return nil, fmt.Errorf("unexpected response to resize_channel: %v", res.Res)
+	}
+
+	resizeResJSON, err := json.Marshal(res.Res.Params[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal closure response: %w", err)
+	}
+
+	var resizeRes ChannelResizeRes
+	if err := json.Unmarshal(resizeResJSON, &resizeRes); err != nil {
+		return nil, fmt.Errorf("failed to parse channels: %w", err)
+	}
+
+	return &resizeRes, nil
 }
 
 func (c *ClearnodeClient) readMessages() {

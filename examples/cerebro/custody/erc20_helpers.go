@@ -12,6 +12,26 @@ import (
 	"github.com/erc7824/nitrolite/examples/bridge/unisig"
 )
 
+func GetTokenBalance(chainID uint32, chainRPC string,
+	tokenAddress, walletAddress common.Address) (*big.Int, error) {
+	client, err := ethclient.Dial(chainRPC)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := NewIERC20(tokenAddress, client)
+	if err != nil {
+		return nil, err
+	}
+
+	balance, err := token.BalanceOf(&bind.CallOpts{}, walletAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	return balance, nil
+}
+
 func ApproveAllowance(wallet unisig.Signer, chainID uint32, chainRPC string,
 	tokenAddress, spenderAddress common.Address, amount *big.Int) error {
 	client, err := ethclient.Dial(chainRPC)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
@@ -215,16 +216,16 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
-	toAccountTag := params.DestinationUserTag
+	toAccountTag := strings.ToUpper(params.DestinationUserTag)
 	fromAccountTag := ""
 
 	destinationAddress := params.Destination
 	if destinationAddress == "" {
 		// Retrieve the destination address by Tag
-		destinationAddr, err := GetWalletByTag(r.DB, params.DestinationUserTag)
+		destinationAddr, err := GetWalletByTag(r.DB, toAccountTag)
 		if err != nil {
-			logger.Error("failed to get wallet by tag", "tag", params.DestinationUserTag, "error", err)
-			c.Fail(fmt.Sprintf("failed to get wallet by tag: %s", params.DestinationUserTag))
+			logger.Error("failed to get wallet by tag", "tag", toAccountTag, "error", err)
+			c.Fail(fmt.Sprintf("failed to get wallet by tag: %s", toAccountTag))
 			return
 		}
 
@@ -251,8 +252,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	// Sender tag should be included in the returned transaction in case it exists
 	fromAccountTag, err = GetUserTagByWallet(r.DB, fromWallet)
 	if err != nil && err != gorm.ErrRecordNotFound {
-			logger.Error("failed to get user tag by wallet", "wallet", fromWallet, "error", err)
-			c.Fail(fmt.Sprintf("failed to get user tag for wallet: %s", fromWallet))
+		logger.Error("failed to get user tag by wallet", "wallet", fromWallet, "error", err)
+		c.Fail(fmt.Sprintf("failed to get user tag for wallet: %s", fromWallet))
 		return
 	}
 

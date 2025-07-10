@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -83,6 +84,8 @@ func GetWalletByTag(db *gorm.DB, tag string) (string, error) {
 	if tag == "" {
 		return "", fmt.Errorf("tag cannot be empty")
 	}
+
+	tag = strings.ToUpper(tag)
 
 	var model UserTagModel
 	if err := db.Where("tag = ?", tag).First(&model).Error; err != nil {

@@ -45,7 +45,7 @@ func Test_GetUserTagByWallet(t *testing.T) {
 	// Retrieve wallet by tag
 	walletRetrieved, err = GetWalletByTag(db, model.Tag)
 	require.NoError(t, err)
-	require.Equal(t, wallet, walletRetrieved, "Retrieved wallet should match the original wallet")
+	require.Equal(t, wallet, walletRetrieved.Wallet, "Retrieved wallet should match the original wallet")
 }
 
 func Test_GenerateRandomAlphaNumericTag(t *testing.T) {

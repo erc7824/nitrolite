@@ -74,7 +74,9 @@ func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, infuraURL, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to bind custody contract: %w", err)
 	}
-
+	if wsNotifier == nil {
+		wsNotifier = BlankWSNotifier()
+	}
 	return &Custody{
 		client:             client,
 		custody:            custody,

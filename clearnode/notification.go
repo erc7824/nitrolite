@@ -20,11 +20,19 @@ func NewWSNotifier(notifyFunc func(userID string, method string, params ...any),
 	}
 }
 
+func BlankWSNotifier() *WSNotifier {
+	return NewWSNotifier(func(userID, method string, params ...any) {
+		fmt.Println("WSNotifier is not initialized, no WS notifications will be sent")
+	}, nil)
+}
+
 func (n *WSNotifier) Notify(notifications ...*Notification) {
 	for _, notification := range notifications {
 		if notification != nil {
 			n.notify(notification.userID, notification.eventType.String(), notification.data)
-			n.logger.Info(fmt.Sprintf("%s notification sent", notification.eventType), "userID", notification.userID, "data", notification.data)
+			if n.logger != nil {
+				n.logger.Info(fmt.Sprintf("%s notification sent", notification.eventType), "userID", notification.userID, "data", notification.data)
+			}
 		}
 	}
 }

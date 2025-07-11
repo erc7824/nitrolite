@@ -48,6 +48,6 @@ func (r *RPCRouter) SendChannelUpdate(channel Channel) {
 
 // SendTransferNotification sends a transfer notification to the client
 func (r *RPCRouter) SendTransferNotification(destinationWallet string, transferredAllocations []TransactionResponse) {
-	r.Node.Notify(destinationWallet, "transfer_notification", transferredAllocations)
+	r.Node.Notify(destinationWallet, "tr", transferredAllocations)
 	r.lg.Info("transfer notification sent", "userID", destinationWallet, "transferred allocations", transferredAllocations)
 }

@@ -38,13 +38,12 @@ type Custody struct {
 	signer             *Signer
 	adjudicatorAddress common.Address
 	blockStep          uint64
-	sendBalanceUpdate  func(string)
-	sendChannelUpdate  func(Channel)
+	wsNotifier         *WSNotifier
 	logger             Logger
 }
 
 // NewCustody initializes the Ethereum client and custody contract wrapper.
-func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sendChannelUpdate func(Channel), infuraURL, custodyAddressStr, adjudicatorAddr, balanceCheckerAddr string, chain uint32, blockStep uint64, logger Logger) (*Custody, error) {
+func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, infuraURL, custodyAddressStr, adjudicatorAddr, balanceCheckerAddr string, chain uint32, blockStep uint64, logger Logger) (*Custody, error) {
 	client, err := ethclient.Dial(infuraURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to blockchain node: %w", err)
@@ -75,7 +74,9 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 	if err != nil {
 		return nil, fmt.Errorf("failed to bind custody contract: %w", err)
 	}
-
+	if wsNotifier == nil {
+		wsNotifier = BlankWSNotifier()
+	}
 	return &Custody{
 		client:             client,
 		custody:            custody,
@@ -86,8 +87,7 @@ func NewCustody(signer *Signer, db *gorm.DB, sendBalanceUpdate func(string), sen
 		chainID:            uint32(chainID.Int64()),
 		signer:             signer,
 		adjudicatorAddress: common.HexToAddress(adjudicatorAddr),
-		sendBalanceUpdate:  sendBalanceUpdate,
-		sendChannelUpdate:  sendChannelUpdate,
+		wsNotifier:         wsNotifier,
 		blockStep:          blockStep,
 		logger:             logger.NewSystem("custody").With("chainID", chainID.Int64()).With("custodyAddress", custodyAddressStr),
 	}, nil
@@ -302,7 +302,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		return
 	}
 
-	c.sendChannelUpdate(ch)
+	c.wsNotifier.Notify(NewChannelNotification(ch))
 
 	logger.Info("successfully initiated join for channel", "channelId", channelID, "txHash", txHash.Hex())
 }
@@ -370,8 +370,10 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 		return
 	}
 
-	c.sendBalanceUpdate(channel.Wallet)
-	c.sendChannelUpdate(channel)
+	c.wsNotifier.Notify(
+		NewBalanceNotification(channel.Wallet, c.db),
+		NewChannelNotification(channel),
+	)
 }
 
 func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenged) {
@@ -408,7 +410,7 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 		return
 	}
 
-	c.sendChannelUpdate(channel)
+	c.wsNotifier.Notify(NewChannelNotification(channel))
 }
 
 func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
@@ -511,8 +513,10 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 		return
 	}
 
-	c.sendBalanceUpdate(channel.Wallet)
-	c.sendChannelUpdate(channel)
+	c.wsNotifier.Notify(
+		NewBalanceNotification(channel.Wallet, c.db),
+		NewChannelNotification(channel),
+	)
 }
 
 func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
@@ -593,8 +597,10 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		return
 	}
 
-	c.sendBalanceUpdate(channel.Wallet)
-	c.sendChannelUpdate(channel)
+	c.wsNotifier.Notify(
+		NewBalanceNotification(channel.Wallet, c.db),
+		NewChannelNotification(channel),
+	)
 }
 
 // UpdateBalanceMetrics fetches the broker's account information from the smart contract and updates metrics

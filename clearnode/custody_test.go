@@ -328,9 +328,13 @@ func TestHandleCreatedEvent(t *testing.T) {
 				Initial:   initialState,
 			}
 
-			var capturedChannel Channel
-			custody.sendChannelUpdate = func(ch Channel) {
-				capturedChannel = ch
+			var capturedNotifications []Notification
+			custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+				capturedNotifications = append(capturedNotifications, Notification{
+					userID:    userID,
+					eventType: EventType(method),
+					data:      params,
+				})
 			}
 
 			logger := custody.logger
@@ -356,8 +360,7 @@ func TestHandleCreatedEvent(t *testing.T) {
 			require.NoError(t, entriesErr)
 			assert.NotEmpty(t, entries)
 
-			assert.Equal(t, capturedChannel.ChannelID, channelIDStr)
-			assert.Equal(t, capturedChannel.Wallet, mockEvent.Wallet.Hex())
+			assert.Equal(t, capturedNotifications[0].userID, mockEvent.Wallet.Hex())
 			assert.Equal(t, dbChannel.ChainID, uint32(custody.chainID))
 			assert.False(t, dbChannel.CreatedAt.IsZero())
 			assert.False(t, dbChannel.UpdatedAt.IsZero())

@@ -42,3 +42,42 @@ go run . <clearnode_ws_url>
 - Go 1.24.3+
 - Ethereum client libraries
 - SQLite for local storage
+
+## Roadmap
+
+### Planned Features
+
+- **Enhanced Logging**
+  - Proper logger/printer with error redirection to stderr
+  - Structured logging with different verbosity levels
+
+- **Improved User Experience**
+  - Comprehensive `help` command with detailed documentation for each command
+  - Visual demonstration GIF in README showing CLI in action
+
+- **Extended Import/Export Functionality**
+  - Export capabilities for all importable items (wallets, signers, chain configurations)
+  - Remove functionality for imported items with proper cleanup
+
+- **Simplified Bridge Operations**
+  - Single `bridge` command that executes the full bridging flow:
+    1. Deposit to custody
+    2. Resize channel (+1)
+    3. Resize channel (-1)
+    4. Withdraw from custody
+
+- **Cross-Platform Configuration**
+  - Store local database in OS-appropriate config directories:
+    - Linux: `~/.config/cerebro/`
+    - macOS: `~/Library/Application Support/cerebro/`
+    - Windows: `%APPDATA%\cerebro\`
+
+- **Enhanced Security**
+  - Encrypted local database storage
+  - Password-protected wallet access
+
+- **Comprehensive Balance Tracking**
+  - Show on-chain balances
+  - Display custody balances
+  - View custody channel balances
+  - Unified balance view across Clearnode network

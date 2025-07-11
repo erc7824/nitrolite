@@ -114,7 +114,7 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, *gorm.DB, func()) {
 
 	// Create an instance of RPCRouter
 	router := &RPCRouter{
-		Node:              NewRPCNode(signer, logger),
+		Node:              node,
 		Signer:            signer,
 		AppSessionService: NewAppSessionService(db, wsNotifier),
 		ChannelService:    channelService,

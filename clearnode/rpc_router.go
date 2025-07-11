@@ -38,7 +38,7 @@ func NewRPCRouter(
 	authManager *AuthManager,
 	metrics *Metrics,
 	rpcStore *RPCStore,
-	WSNotifier *WSNotifier,
+	wsNotifier *WSNotifier,
 	logger Logger,
 ) *RPCRouter {
 	r := &RPCRouter{
@@ -48,6 +48,7 @@ func NewRPCRouter(
 		AppSessionService: appSessionService,
 		ChannelService:    channelService,
 		DB:                db,
+		wsNotifier:        wsNotifier,
 		AuthManager:       authManager,
 		Metrics:           metrics,
 		RPCStore:          rpcStore,

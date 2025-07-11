@@ -51,33 +51,3 @@ func (r *RPCRouter) SendTransferNotification(destinationWallet string, transferr
 	r.Node.Notify(destinationWallet, "tr", transferredAllocations)
 	r.lg.Info("transfer notification sent", "userID", destinationWallet, "transferred allocations", transferredAllocations)
 }
-
-// SendApplicationUpdate sends application update to all participants in the app session
-func (r *RPCRouter) SendApplicationUpdate(appSession AppSession, allocations []AppAllocation) {
-	for _, participant := range appSession.Participants {
-		walletAddress := participant
-		if wallet := GetWalletBySigner(participant); wallet != "" {
-			walletAddress = wallet
-		}
-
-		appUpdate := struct {
-			SessionID   string          `json:"session_id"`
-			Allocations []AppAllocation `json:"allocations"`
-			AppVersion  uint64          `json:"app_version"`
-			// More fields can be added as needed
-		}{
-			SessionID:   appSession.SessionID,
-			Allocations: allocations,
-			AppVersion:  appSession.Version,
-		}
-
-		r.Node.Notify(walletAddress, "app_upd", appUpdate)
-		r.lg.Info("app update sent",
-			"userID", walletAddress,
-			"participant", participant,
-			"sessionID", appSession.SessionID,
-			"version", appSession.Version,
-			"allocations", allocations,
-		)
-	}
-}

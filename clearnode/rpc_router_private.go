@@ -258,7 +258,6 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	}
 
 	var appSession AppSession
-	var newAppAllocations []AppAllocation
 	fromWallet := c.UserID
 	var err error
 	// Sender tag should be included in the returned transaction in case it exists
@@ -363,26 +362,6 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			return fmt.Errorf("failed to format transactions: %w", err)
 		}
 		resp = formattedTransactions
-		// Calculate the new allocations after all transfers have been processed.
-		if isAppDeposit {
-			appAccountID := NewAccountID(params.Destination)
-			for walletAddr := range participantWallets {
-				ledger := GetWalletLedger(tx, common.HexToAddress(walletAddr))
-				balances, err := ledger.GetBalances(appAccountID)
-				if err != nil {
-					return fmt.Errorf("failed to fetch final app balance for participant %s: %w", walletAddr, err)
-				}
-				for _, balance := range balances {
-					if !balance.Amount.IsZero() {
-						newAppAllocations = append(newAppAllocations, AppAllocation{
-							Participant: walletAddr,
-							AssetSymbol: balance.Asset,
-							Amount:      balance.Amount,
-						})
-					}
-				}
-			}
-		}
 
 		return nil
 	})
@@ -398,8 +377,6 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	if common.IsHexAddress(destinationAccount) {
 		r.SendBalanceUpdate(destinationAccount)
 		r.SendTransferNotification(destinationAccount, resp)
-	} else if isAppSessionID(params.Destination) {
-		r.SendApplicationUpdate(appSession, newAppAllocations)
 	}
 
 	r.Metrics.TransferAttemptsSuccess.Inc()

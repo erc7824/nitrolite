@@ -23,6 +23,11 @@ type Metrics struct {
 	AuthAttempsSuccess *prometheus.CounterVec
 	AuthAttempsFail    *prometheus.CounterVec
 
+	// Transfer metrics
+	TransferAttemptsTotal   prometheus.Counter
+	TransferAttemptsSuccess prometheus.Counter
+	TransferAttemptsFail    prometheus.Counter
+
 	// Channel & app sessions metrics
 	Channels    *prometheus.GaugeVec
 	AppSessions *prometheus.GaugeVec
@@ -40,82 +45,104 @@ type Metrics struct {
 
 // NewMetrics initializes and registers Prometheus metrics
 func NewMetrics() *Metrics {
+	return NewMetricsWithRegistry(nil)
+}
+
+// NewMetricsWithRegistry initializes and registers Prometheus metrics with a custom registry
+func NewMetricsWithRegistry(registry prometheus.Registerer) *Metrics {
+	if registry == nil {
+		registry = prometheus.DefaultRegisterer
+	}
+	factory := promauto.With(registry)
+
 	metrics := &Metrics{
-		ConnectedClients: promauto.NewGauge(prometheus.GaugeOpts{
+		ConnectedClients: factory.NewGauge(prometheus.GaugeOpts{
 			Name: "clearnet_connected_clients",
 			Help: "The current number of connected clients",
 		}),
-		ConnectionsTotal: promauto.NewCounter(prometheus.CounterOpts{
+		ConnectionsTotal: factory.NewCounter(prometheus.CounterOpts{
 			Name: "clearnet_connections_total",
 			Help: "The total number of WebSocket connections made since server start",
 		}),
-		MessageReceived: promauto.NewCounter(prometheus.CounterOpts{
+		MessageReceived: factory.NewCounter(prometheus.CounterOpts{
 			Name: "clearnet_ws_messages_received_total",
 			Help: "The total number of WebSocket messages received",
 		}),
-		MessageSent: promauto.NewCounter(prometheus.CounterOpts{
+		MessageSent: factory.NewCounter(prometheus.CounterOpts{
 			Name: "clearnet_ws_messages_sent_total",
 			Help: "The total number of WebSocket messages sent",
 		}),
-		AuthRequests: promauto.NewCounter(prometheus.CounterOpts{
+		AuthRequests: factory.NewCounter(prometheus.CounterOpts{
 			Name: "clearnet_auth_requests_total",
 			Help: "The total number of auth_requests (get challenge code)",
 		}),
-		AuthAttemptsTotal: promauto.NewCounterVec(
+		AuthAttemptsTotal: factory.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "clearnet_auth_attempts_total",
 				Help: "The total number of authentication attempts",
 			},
 			[]string{"auth_method"},
 		),
-		AuthAttempsSuccess: promauto.NewCounterVec(
+		AuthAttempsSuccess: factory.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "clearnet_auth_attempts_success",
 				Help: "The total number of successfull authentication attempts",
 			},
 			[]string{"auth_method"},
 		),
-		AuthAttempsFail: promauto.NewCounterVec(
+		AuthAttempsFail: factory.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "clearnet_auth_attempts_fail",
 				Help: "The total number of failed authentication attempts",
 			},
 			[]string{"auth_method"},
 		),
-		Channels: promauto.NewGaugeVec(prometheus.GaugeOpts{
+		TransferAttemptsTotal: factory.NewCounter(prometheus.CounterOpts{
+			Name: "clearnet_transfer_attempts_total",
+			Help: "The total number of transfer attempts",
+		}),
+		TransferAttemptsSuccess: factory.NewCounter(prometheus.CounterOpts{
+			Name: "clearnet_transfer_attempts_success",
+			Help: "The total number of successful transfer attempts",
+		}),
+		TransferAttemptsFail: factory.NewCounter(prometheus.CounterOpts{
+			Name: "clearnet_transfer_attempts_fail",
+			Help: "The total number of failed transfer attempts",
+		}),
+		Channels: factory.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "clearnet_channels",
 			Help: "The number of channels",
 		},
 			[]string{"status"},
 		),
-		AppSessions: promauto.NewGaugeVec(prometheus.GaugeOpts{
+		AppSessions: factory.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "clearnet_app_sessions",
 			Help: "The number of application sessions",
 		},
 			[]string{"status"},
 		),
-		RPCRequests: promauto.NewCounterVec(
+		RPCRequests: factory.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "clearnet_rpc_requests_total",
 				Help: "The total number of RPC requests by method",
 			},
 			[]string{"method", "status"},
 		),
-		BrokerBalanceAvailable: promauto.NewGaugeVec(
+		BrokerBalanceAvailable: factory.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "clearnet_broker_balance_available",
 				Help: "Available balance of the broker on the custody contract",
 			},
 			[]string{"network", "token", "asset"},
 		),
-		BrokerChannelCount: promauto.NewGaugeVec(
+		BrokerChannelCount: factory.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "clearnet_broker_channel_count",
 				Help: "Number of channels for the broker on the custody contract",
 			},
 			[]string{"network"},
 		),
-		BrokerWalletBalance: promauto.NewGaugeVec(
+		BrokerWalletBalance: factory.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "clearnet_broker_wallet_balance",
 				Help: "Broker wallet balance",
@@ -168,6 +195,7 @@ func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[stri
 		}
 	}
 }
+
 func (m *Metrics) UpdateChannelMetrics(db *gorm.DB) {
 	type StatusCount struct {
 		Status string

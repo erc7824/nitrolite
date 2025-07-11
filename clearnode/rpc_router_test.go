@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	container "github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -117,6 +118,7 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, func()) {
 		ChannelService:    channelService,
 		DB:                db,
 		lg:                logger.NewSystem("rpc-router"),
+		Metrics:           NewMetricsWithRegistry(prometheus.NewRegistry()),
 	}
 
 	router.AppSessionService.SetPublishBalanceUpdateCallback(router.SendBalanceUpdate)

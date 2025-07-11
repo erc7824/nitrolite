@@ -10,11 +10,13 @@ import (
 
 type WSNotifier struct {
 	notify func(userID string, method string, params ...any)
+	logger Logger
 }
 
-func NewWSNotifier(notifyFunc func(userID string, method string, params ...any)) *WSNotifier {
+func NewWSNotifier(notifyFunc func(userID string, method string, params ...any), logger Logger) *WSNotifier {
 	return &WSNotifier{
 		notify: notifyFunc,
+		logger: logger,
 	}
 }
 
@@ -22,13 +24,12 @@ func (n *WSNotifier) Notify(notifications ...*Notification) {
 	for _, notification := range notifications {
 		if notification != nil {
 			n.notify(notification.userID, notification.eventType.String(), notification.data)
-			notification.logger.Info(fmt.Sprintf("%s notification sent", notification.eventType), "userID", notification.userID, "data", notification.data)
+			n.logger.Info(fmt.Sprintf("%s notification sent", notification.eventType), "userID", notification.userID, "data", notification.data)
 		}
 	}
 }
 
 type Notification struct {
-	logger    Logger
 	userID    string
 	eventType EventType
 	data      any
@@ -39,7 +40,7 @@ type EventType string
 const (
 	BalanceUpdateEventType EventType = "bu"
 	ChannelUpdateEventType EventType = "cu"
-	TransferEventType      EventType = "transfer"
+	TransferEventType      EventType = "tr"
 )
 
 func (e EventType) String() string {
@@ -47,16 +48,9 @@ func (e EventType) String() string {
 }
 
 // NewBalanceNotification fetches the balance for a given wallet and creates a notification
-func NewBalanceNotification(logger Logger, wallet string, db *gorm.DB) *Notification {
-	senderAddress := common.HexToAddress(wallet)
-	senderAccountID := NewAccountID(wallet)
-	balances, err := GetWalletLedger(db, senderAddress).GetBalances(senderAccountID)
-	if err != nil {
-		logger.Error("error getting balances", "userID", wallet, "error", err)
-		return nil
-	}
+func NewBalanceNotification(wallet string, db *gorm.DB) *Notification {
+	balances, _ := GetWalletLedger(db, common.HexToAddress(wallet)).GetBalances(NewAccountID(wallet))
 	return &Notification{
-		logger:    logger,
 		userID:    wallet,
 		eventType: BalanceUpdateEventType,
 		data:      balances,
@@ -64,9 +58,8 @@ func NewBalanceNotification(logger Logger, wallet string, db *gorm.DB) *Notifica
 }
 
 // NewChannelNotification creates a notification for a channel update event
-func NewChannelNotification(logger Logger, channel Channel) *Notification {
+func NewChannelNotification(channel Channel) *Notification {
 	return &Notification{
-		logger:    logger,
 		userID:    channel.Wallet,
 		eventType: ChannelUpdateEventType,
 		data: ChannelResponse{
@@ -87,9 +80,8 @@ func NewChannelNotification(logger Logger, channel Channel) *Notification {
 }
 
 // NewTransferNotification creates a notification for a transfer event
-func NewTransferNotification(logger Logger, wallet string, transferredAllocations []TransactionResponse) *Notification {
+func NewTransferNotification(wallet string, transferredAllocations []TransactionResponse) *Notification {
 	return &Notification{
-		logger:    logger,
 		userID:    wallet,
 		eventType: TransferEventType,
 		data:      transferredAllocations,

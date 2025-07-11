@@ -366,7 +366,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 		return
 	}
 
-	appSession, err := r.AppSessionService.CreateApplication(logger, &params, rpcSigners)
+	appSession, err := r.AppSessionService.CreateApplication(&params, rpcSigners, logger)
 	if err != nil {
 		logger.Error("failed to create application session", "error", err)
 		c.Fail(err, "failed to create application session")
@@ -408,7 +408,7 @@ func (r *RPCRouter) HandleSubmitAppState(c *RPCContext) {
 		return
 	}
 
-	newVersion, err := r.AppSessionService.SubmitAppState(logger, &params, rpcSigners)
+	newVersion, err := r.AppSessionService.SubmitAppState(&params, rpcSigners, logger)
 	if err != nil {
 		logger.Error("failed to submit app state", "error", err)
 		c.Fail(err, "failed to submit app state")
@@ -447,7 +447,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 		return
 	}
 
-	finalVersion, err := r.AppSessionService.CloseApplication(logger, &params, rpcSigners)
+	finalVersion, err := r.AppSessionService.CloseApplication(&params, rpcSigners, logger)
 	if err != nil {
 		logger.Error("failed to close application session", "error", err)
 		c.Fail(err, "failed to close application session")

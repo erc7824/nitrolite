@@ -332,13 +332,13 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	}
 
 	r.wsNotifier.Notify(
-		NewBalanceNotification(logger, fromWallet, r.DB),
-		NewTransferNotification(logger, fromWallet, resp),
+		NewBalanceNotification(fromWallet, r.DB),
+		NewTransferNotification(fromWallet, resp),
 	)
 	if common.IsHexAddress(destinationAddress) {
 		r.wsNotifier.Notify(
-			NewBalanceNotification(logger, destinationAddress, r.DB),
-			NewTransferNotification(logger, destinationAddress, resp),
+			NewBalanceNotification(destinationAddress, r.DB),
+			NewTransferNotification(destinationAddress, resp),
 		)
 	}
 
@@ -366,7 +366,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 		return
 	}
 
-	appSession, err := r.AppSessionService.CreateApplication(&params, rpcSigners, logger)
+	appSession, err := r.AppSessionService.CreateApplication(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to create application session", "error", err)
 		c.Fail(err, "failed to create application session")
@@ -408,7 +408,7 @@ func (r *RPCRouter) HandleSubmitAppState(c *RPCContext) {
 		return
 	}
 
-	newVersion, err := r.AppSessionService.SubmitAppState(&params, rpcSigners, logger)
+	newVersion, err := r.AppSessionService.SubmitAppState(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to submit app state", "error", err)
 		c.Fail(err, "failed to submit app state")
@@ -447,7 +447,7 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 		return
 	}
 
-	finalVersion, err := r.AppSessionService.CloseApplication(&params, rpcSigners, logger)
+	finalVersion, err := r.AppSessionService.CloseApplication(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to close application session", "error", err)
 		c.Fail(err, "failed to close application session")

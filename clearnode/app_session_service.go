@@ -23,7 +23,7 @@ func NewAppSessionService(db *gorm.DB, wsNotifier *WSNotifier) *AppSessionServic
 	return &AppSessionService{db: db, wsNotifier: wsNotifier}
 }
 
-func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}, logger Logger) (*AppSession, error) {
+func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}) (*AppSession, error) {
 	if len(params.Definition.ParticipantWallets) < 2 {
 		return nil, RPCErrorf("invalid number of participants")
 	}
@@ -110,13 +110,13 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 	}
 
 	for participant := range participants {
-		s.wsNotifier.Notify(NewBalanceNotification(logger, participant, s.db))
+		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
 	}
 
 	return &AppSession{SessionID: appSessionID, Version: 1, Status: ChannelStatusOpen}, nil
 }
 
-func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSigners map[string]struct{}, logger Logger) (uint64, error) {
+func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSigners map[string]struct{}) (uint64, error) {
 	var newVersion uint64
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
@@ -188,7 +188,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 }
 
 // CloseApplication closes a virtual app session and redistributes funds to participants
-func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcSigners map[string]struct{}, logger Logger) (uint64, error) {
+func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcSigners map[string]struct{}) (uint64, error) {
 	if params.AppSessionID == "" || len(params.Allocations) == 0 {
 		return 0, errors.New("missing required parameters: app_id or allocations")
 	}
@@ -269,7 +269,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 	}
 
 	for participant := range participants {
-		s.wsNotifier.Notify(NewBalanceNotification(logger, participant, s.db))
+		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
 	}
 
 	return newVersion, nil

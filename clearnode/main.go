@@ -57,7 +57,7 @@ func main() {
 	}
 
 	rpcNode := NewRPCNode(signer, logger)
-	wsNotifier := NewWSNotifier(rpcNode.Notify)
+	wsNotifier := NewWSNotifier(rpcNode.Notify, logger)
 
 	appSessionService := NewAppSessionService(db, wsNotifier)
 	channelService := NewChannelService(db, signer)

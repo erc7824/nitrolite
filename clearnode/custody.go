@@ -300,7 +300,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		return
 	}
 
-	c.wsNotifier.Notify(NewChannelNotification(logger, ch))
+	c.wsNotifier.Notify(NewChannelNotification(ch))
 
 	logger.Info("successfully initiated join for channel", "channelId", channelID, "txHash", txHash.Hex())
 }
@@ -369,8 +369,8 @@ func (c *Custody) handleJoined(logger Logger, ev *nitrolite.CustodyJoined) {
 	}
 
 	c.wsNotifier.Notify(
-		NewBalanceNotification(logger, channel.Wallet, c.db),
-		NewChannelNotification(logger, channel),
+		NewBalanceNotification(channel.Wallet, c.db),
+		NewChannelNotification(channel),
 	)
 }
 
@@ -408,7 +408,7 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 		return
 	}
 
-	c.wsNotifier.Notify(NewChannelNotification(logger, channel))
+	c.wsNotifier.Notify(NewChannelNotification(channel))
 }
 
 func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
@@ -512,8 +512,8 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 	}
 
 	c.wsNotifier.Notify(
-		NewBalanceNotification(logger, channel.Wallet, c.db),
-		NewChannelNotification(logger, channel),
+		NewBalanceNotification(channel.Wallet, c.db),
+		NewChannelNotification(channel),
 	)
 }
 
@@ -596,8 +596,8 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 	}
 
 	c.wsNotifier.Notify(
-		NewBalanceNotification(logger, channel.Wallet, c.db),
-		NewChannelNotification(logger, channel),
+		NewBalanceNotification(channel.Wallet, c.db),
+		NewChannelNotification(channel),
 	)
 }
 

@@ -28,10 +28,10 @@ func (s *AppSessionService) SetPublishBalanceUpdateCallback(callback func(destin
 }
 
 func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}) (*AppSession, error) {
-	if len(params.Definition.ParticipantWallets) < 2 {
+	if len(params.Definition.Participants) < 2 {
 		return nil, RPCErrorf("invalid number of participants")
 	}
-	if len(params.Definition.Weights) != len(params.Definition.ParticipantWallets) {
+	if len(params.Definition.Weights) != len(params.Definition.Participants) {
 		return nil, RPCErrorf("number of weights must be equal to participants")
 	}
 	if params.Definition.Nonce == 0 {
@@ -50,15 +50,15 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsPositive() {
-				if _, ok := rpcSigners[alloc.ParticipantWallet]; !ok {
-					return RPCErrorf("missing signature for participant %s", alloc.ParticipantWallet)
+				if _, ok := rpcSigners[alloc.Participant]; !ok {
+					return RPCErrorf("missing signature for participant %s", alloc.Participant)
 				}
 			}
 			if alloc.Amount.IsNegative() {
 				return RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
-			walletAddress := alloc.ParticipantWallet
-			if wallet := GetWalletBySigner(alloc.ParticipantWallet); wallet != "" {
+			walletAddress := alloc.Participant
+			if wallet := GetWalletBySigner(alloc.Participant); wallet != "" {
 				walletAddress = wallet
 			}
 
@@ -92,15 +92,15 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 		}
 
 		session := &AppSession{
-			Protocol:           params.Definition.Protocol,
-			SessionID:          appSessionID,
-			ParticipantWallets: params.Definition.ParticipantWallets,
-			Status:             ChannelStatusOpen,
-			Challenge:          params.Definition.Challenge,
-			Weights:            params.Definition.Weights,
-			Quorum:             params.Definition.Quorum,
-			Nonce:              params.Definition.Nonce,
-			Version:            1,
+			Protocol:     params.Definition.Protocol,
+			SessionID:    appSessionID,
+			Participants: params.Definition.Participants,
+			Status:       ChannelStatusOpen,
+			Challenge:    params.Definition.Challenge,
+			Weights:      params.Definition.Weights,
+			Quorum:       params.Definition.Quorum,
+			Nonce:        params.Definition.Nonce,
+			Version:      1,
 		}
 		if params.SessionData != nil {
 			session.SessionData = *params.SessionData
@@ -142,9 +142,9 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 				return fmt.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 
-			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
+			walletAddress := GetWalletBySigner(alloc.Participant)
 			if walletAddress == "" {
-				walletAddress = alloc.ParticipantWallet
+				walletAddress = alloc.Participant
 			}
 
 			if _, ok := participantWeights[walletAddress]; !ok {
@@ -219,9 +219,9 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 				return fmt.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 
-			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
+			walletAddress := GetWalletBySigner(alloc.Participant)
 			if walletAddress == "" {
-				walletAddress = alloc.ParticipantWallet
+				walletAddress = alloc.Participant
 			}
 
 			if _, ok := participantWeights[walletAddress]; !ok {
@@ -321,8 +321,8 @@ func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct
 		return AppSession{}, nil, RPCErrorf("virtual app %s is not opened", appSessionID)
 	}
 
-	participantWeights := make(map[string]int64, len(session.ParticipantWallets))
-	for i, addr := range session.ParticipantWallets {
+	participantWeights := make(map[string]int64, len(session.Participants))
+	for i, addr := range session.Participants {
 		participantWeights[addr] = session.Weights[i]
 	}
 

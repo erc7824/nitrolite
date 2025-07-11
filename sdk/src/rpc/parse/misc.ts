@@ -4,12 +4,10 @@ import {
     RPCMethod,
     GetConfigResponseParams,
     ErrorResponseParams,
-    TransferRPCResponseParams,
     GetRPCHistoryResponseParams,
     UserTagParams,
 } from '../types';
 import { hexSchema, addressSchema, ParamsParser, ParserParamsMissingError } from './common';
-import { txTypeEnum } from './ledger';
 
 const NetworkInfoSchema = z.object({
     name: z.string(),
@@ -41,40 +39,6 @@ const GetConfigParamsSchema = z
 
 const ErrorParamsSchema = z
     .array(z.string().transform((raw) => ({ error: raw }) as ErrorResponseParams))
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
-
-const TransferParamsSchema = z
-    .array(
-        z.array(
-            z
-                .object({
-                    id: z.number(),
-                    tx_type: txTypeEnum,
-                    from_account: addressSchema,
-                    from_account_tag: z.string().optional(),
-                    to_account: addressSchema,
-                    to_account_tag: z.string().optional(),
-                    asset: z.string(),
-                    amount: z.string(),
-                    created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-                })
-                .transform(
-                    (raw) =>
-                        ({
-                            id: raw.id,
-                            txType: raw.tx_type,
-                            fromAccount: raw.from_account as Address,
-                            fromAccountTag: raw.from_account_tag,
-                            toAccount: raw.to_account as Address,
-                            toAccountTag: raw.to_account_tag,
-                            asset: raw.asset,
-                            amount: raw.amount,
-                            createdAt: raw.created_at,
-                        }) as TransferRPCResponseParams,
-                ),
-        ),
-    )
     .refine((arr) => arr.length === 1)
     .transform((arr) => arr[0]);
 
@@ -133,7 +97,6 @@ const parseMessageParams: ParamsParser<unknown> = (params) => {
 export const miscParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.GetConfig]: (params) => GetConfigParamsSchema.parse(params),
     [RPCMethod.Error]: (params) => ErrorParamsSchema.parse(params),
-    [RPCMethod.Transfer]: (params) => TransferParamsSchema.parse(params),
     [RPCMethod.GetRPCHistory]: (params) => GetRPCHistoryParamsSchema.parse(params),
     [RPCMethod.GetUserTag]: (params) => GetUserTagParamsSchema.parse(params),
     [RPCMethod.Message]: parseMessageParams,

@@ -338,4 +338,6 @@ export enum RPCMethod {
     Ping = 'ping',
     Pong = 'pong',
     Transfer = 'transfer',
+    TransferNotification = 'transfer_notification',
+
 }

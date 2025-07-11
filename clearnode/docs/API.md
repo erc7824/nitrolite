@@ -1080,7 +1080,7 @@ Transfer notifications are sent as unsolicited server messages with the "transfe
 
 ```json
 {
-  "res": [1234567890123, "transfer", [[
+  "res": [1234567890123, "transfer_notification", [[
     {
       "id": "1",
       "tx_type": "transfer",

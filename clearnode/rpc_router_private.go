@@ -125,8 +125,8 @@ type ChannelResponse struct {
 
 type Signature struct {
 	V uint8  `json:"v,string"`
-	R string `json:"r,string"`
-	S string `json:"s,string"`
+	R string `json:"r"`
+	S string `json:"s"`
 }
 
 type Balance struct {

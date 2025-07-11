@@ -325,9 +325,34 @@ func (c *RPCContext) Succeed(method string, params ...any) {
 	}
 }
 
-// Fail sets an error message for response
-// If the error is an RPCError, its message will be used; otherwise, the fallbackMessage is used.
-// This should be called by handlers to indicate an error occurred during processing.
+// Fail sets an error response for the RPC request. This method should be called by handlers
+// when an error occurs during request processing.
+//
+// Error handling behavior:
+//   - If err is an RPCError: The exact error message is sent to the client
+//   - If err is any other error type: The fallbackMessage is sent to the client
+//   - If both err is nil/non-RPCError AND fallbackMessage is empty: A generic error message is sent
+//
+// This design allows handlers to control what error information is exposed to clients:
+//   - Use RPCError for client-safe, descriptive error messages
+//   - Use regular errors with a fallbackMessage to hide internal error details
+//
+// Usage examples:
+//
+//	// Hide internal error details from client
+//	balance, err := ledger.GetBalance(account)
+//	if err != nil {
+//		c.Fail(err, "failed to retrieve balance")
+//		return
+//	}
+//
+//	// Validation error with no internal error
+//	if len(params) < 3 {
+//		c.Fail(nil, "invalid parameters: expected at least 3")
+//		return
+//	}
+//
+// The response will have Method="error" and Params containing the error message.
 func (c *RPCContext) Fail(err error, fallbackMessage string) {
 	message := fallbackMessage
 	if _, ok := err.(RPCError); ok {

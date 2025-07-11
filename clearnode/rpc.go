@@ -104,13 +104,43 @@ func CreateResponse(id uint64, method string, responseParams []any) *RPCMessage 
 	}
 }
 
-// RPCError represents an error in the RPC protocol
-// It should be used when we want this precise error to be inside RPCMessage's response.
+// RPCError represents an error in the RPC protocol that should be sent back to the client
+// in the RPC response. Unlike generic errors, RPCError messages are guaranteed to be
+// included in the error response sent to the client.
+//
+// Use RPCError when you want to provide specific, user-facing error messages in RPC responses.
+// For internal errors that should not be exposed to clients, use regular errors instead.
+//
+// Example:
+//
+//	// Client will receive this exact error message
+//	return RPCErrorf("invalid wallet address: %s", addr)
+//
+//	// Client will receive a generic error message
+//	return fmt.Errorf("database connection failed")
 type RPCError struct {
 	err error
 }
 
-// RPCErrorf creates a new RPCError with the given message
+// RPCErrorf creates a new RPCError with a formatted error message that will be sent
+// to the client in the RPC response. This is the preferred way to create client-facing
+// errors in RPC handlers.
+//
+// The error message should be clear, actionable, and safe to expose to external clients.
+// Avoid including sensitive information like internal system details, file paths, or
+// database specifics.
+//
+// Usage in RPC handlers:
+//
+//	// In a handler function that returns an error
+//	if amount.IsNegative() {
+//		return RPCErrorf("invalid amount: cannot be negative")
+//	}
+//
+//	// With formatting for specific details
+//	if balance.LessThan(amount) {
+//		return RPCErrorf("insufficient balance: need %s but have %s", amount, balance)
+//	}
 func RPCErrorf(format string, args ...any) RPCError {
 	return RPCError{
 		err: fmt.Errorf(format, args...),

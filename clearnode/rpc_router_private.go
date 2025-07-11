@@ -329,8 +329,10 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	}
 
 	r.SendBalanceUpdate(fromWallet)
+	r.SendTransferNotification(fromWallet, resp)
 	if common.IsHexAddress(destinationAddress) {
 		r.SendBalanceUpdate(destinationAddress)
+		r.SendTransferNotification(destinationAddress, resp)
 	}
 
 	r.Metrics.TransferAttemptsSuccess.Inc()

@@ -1072,6 +1072,54 @@ Individual channel updates are sent as unsolicited server messages with the "cu"
 
 The channel update contains the complete current state of a specific channel, allowing clients to maintain an up-to-date view of their channels without explicitly requesting them through the `get_channels` method.
 
+### Transfer Notifications
+
+The server automatically sends transfer notifications to clients when funds are transferred to their account. These notifications inform the recipient about incoming transfers.
+
+Transfer notifications are sent as unsolicited server messages with the "transfer" method:
+
+```json
+{
+  "res": [1234567890123, "tr", [[
+    {
+      "id": "1",
+      "tx_type": "transfer",
+      "from_account": "0x9876543210abcdef...",
+      "from_account_tag": "ABC123",
+      "to_account": "0x1234567890abcdef...",
+      "to_account_tag": "XYZ789",
+      "asset": "usdc",
+      "amount": "50.0",
+      "created_at": "2023-05-01T12:00:00Z"
+    },
+    {
+      "id": "2",
+      "tx_type": "transfer",
+      "from_account": "0x9876543210abcdef...",
+      "from_account_tag": "ABC123",
+      "to_account": "0x1234567890abcdef...",
+      "to_account_tag": "XYZ789",
+      "asset": "weth",
+      "amount": "0.1",
+      "created_at": "2023-05-01T12:00:00Z"
+    }
+  ]], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+The transfer notification contains an array of transaction objects representing the incoming transfers. Each transaction includes:
+
+- `id`: Unique transaction reference
+- `tx_type`: Transaction type (currently only "transfer" for these notifications)
+- `from_account`: The account that sent the funds
+- `from_account_tag`: The user tag for the sender account (empty if no tag exists)
+- `to_account`: The account that received the funds (the notification recipient)
+- `to_account_tag`: The user tag for the recipient account (empty if no tag exists)
+- `asset`: The asset symbol that was transferred
+- `amount`: The amount transferred for this specific asset
+- `created_at`: When the transaction was created (ISO 8601 format)
+
 ### Get Configuration
 
 Retrieves broker configuration information including supported networks.

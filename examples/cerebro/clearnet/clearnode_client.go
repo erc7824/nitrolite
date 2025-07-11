@@ -178,8 +178,8 @@ type AllocationRes struct {
 
 type SignatureRes struct {
 	V uint8  `json:"v,string"`
-	R string `json:"r,string"`
-	S string `json:"s,string"`
+	R string `json:"r"`
+	S string `json:"s"`
 }
 
 func (c *ClearnodeClient) RequestChannelClosure(walletAddress common.Address, channelID string) (*ChannelClosureRes, error) {

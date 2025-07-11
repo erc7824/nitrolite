@@ -14,7 +14,7 @@ import { hexSchema, addressSchema, statusEnum, ParamsParser } from './common';
 const RPCAllocationSchema = z.object({
     destination: addressSchema,
     token: addressSchema,
-    amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
+    amount: z.string().transform((a) => BigInt(a)),
 });
 
 const ServerSignatureSchema = z.object({
@@ -95,49 +95,6 @@ const CloseChannelParamsSchema = z
     .refine((arr) => arr.length === 1)
     .transform((arr) => arr[0]);
 
-const GetChannelsParamsSchema = z
-    .array(
-        z.array(
-            z
-                .object({
-                    channel_id: hexSchema,
-                    participant: addressSchema,
-                    status: statusEnum,
-                    token: addressSchema,
-                    wallet: addressSchema,
-                    amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
-                    chain_id: z.number(),
-                    adjudicator: addressSchema,
-                    challenge: z.number(),
-                    nonce: z.number(),
-                    version: z.number(),
-                    created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-                    updated_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-                })
-                .transform(
-                    (c) =>
-                        ({
-                            channelId: c.channel_id as Hex,
-                            participant: c.participant as Address,
-                            status: c.status as RPCChannelStatus,
-                            token: c.token as Address,
-                            wallet: c.wallet as Address,
-                            amount: c.amount,
-                            chainId: c.chain_id,
-                            adjudicator: c.adjudicator as Address,
-                            challenge: c.challenge,
-                            nonce: c.nonce,
-                            version: c.version,
-                            createdAt: c.created_at,
-                            updatedAt: c.updated_at,
-                        }) as ChannelUpdate,
-                ),
-        ),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0])
-    .transform((arr) => arr as GetChannelsResponseParams);
-
 const ChannelUpdateObjectSchema = z
     .object({
         channel_id: hexSchema,
@@ -145,7 +102,7 @@ const ChannelUpdateObjectSchema = z
         status: statusEnum,
         token: addressSchema,
         wallet: z.union([addressSchema, z.literal('')]),
-        amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
+        amount: z.string().transform((a) => BigInt(a)),
         chain_id: z.number(),
         adjudicator: addressSchema,
         challenge: z.number(),
@@ -172,6 +129,12 @@ const ChannelUpdateObjectSchema = z
                 updatedAt: c.updated_at,
             }) as ChannelUpdateResponseParams,
     );
+
+const GetChannelsParamsSchema = z
+    .array(z.array(ChannelUpdateObjectSchema))
+    .refine((arr) => arr.length === 1)
+    .transform((arr) => arr[0])
+    .transform((arr) => arr as GetChannelsResponseParams);
 
 const ChannelUpdateParamsSchema = z
     .array(ChannelUpdateObjectSchema)

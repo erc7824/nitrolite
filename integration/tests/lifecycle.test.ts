@@ -409,9 +409,7 @@ describe('Close channel', () => {
         const msg = await createResizeChannelMessage(cpIdentity.messageSigner, [
             {
                 channel_id: cpChannelId,
-                // TODO: use bigint after updating API
-                // @ts-ignore
-                allocate_amount: +depositAmount.toString(),
+                allocate_amount: depositAmount,
                 funds_destination: cpIdentity.walletAddress,
             },
         ]);

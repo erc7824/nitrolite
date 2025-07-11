@@ -242,14 +242,13 @@ func (am *AuthManager) GenerateJWT(address string, sessionKey string, scope stri
 }
 
 func (am *AuthManager) VerifyJWT(tokenString string) (*JWTClaims, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &JWTClaims{}, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
 			return nil, nil
 		}
 
 		return &am.authSigningKey.PublicKey, nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

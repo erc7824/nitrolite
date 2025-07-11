@@ -23,6 +23,11 @@ type Metrics struct {
 	AuthAttempsSuccess *prometheus.CounterVec
 	AuthAttempsFail    *prometheus.CounterVec
 
+	// Transfer metrics
+	TransferAttemptsTotal   prometheus.Counter
+	TransferAttemptsSuccess prometheus.Counter
+	TransferAttempsFail     prometheus.Counter
+
 	// Channel & app sessions metrics
 	Channels    *prometheus.GaugeVec
 	AppSessions *prometheus.GaugeVec
@@ -82,6 +87,18 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"auth_method"},
 		),
+		TransferAttemptsTotal: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "clearnet_transfer_attempts_total",
+			Help: "The total number of transfer attempts",
+		}),
+		TransferAttemptsSuccess: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "clearnet_transfer_attempts_success",
+			Help: "The total number of successful transfer attempts",
+		}),
+		TransferAttempsFail: promauto.NewCounter(prometheus.CounterOpts{
+			Name: "clearnet_transfer_attempts_fail",
+			Help: "The total number of failed transfer attempts",
+		}),
 		Channels: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "clearnet_channels",
 			Help: "The number of channels",

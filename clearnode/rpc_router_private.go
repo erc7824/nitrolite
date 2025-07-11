@@ -190,8 +190,11 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
 
+	r.Metrics.TransferAttemptsTotal.Inc()
+
 	var params TransferParams
 	if err := parseParams(req.Params, &params); err != nil {
+		r.Metrics.TransferAttempsFail.Inc()
 		c.Fail(err.Error())
 		return
 	}
@@ -199,17 +202,21 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	// Allow only ledger accounts as destination at the current stage. In the future we'll unlock application accounts.
 	switch {
 	case params.Destination == "" && params.DestinationUserTag == "":
+		r.Metrics.TransferAttempsFail.Inc()
 		c.Fail("destination or destination_tag must be provided")
 		return
 	case params.Destination != "" && !common.IsHexAddress(params.Destination):
+		r.Metrics.TransferAttempsFail.Inc()
 		c.Fail(fmt.Sprintf("invalid destination account: %s", params.Destination))
 		return
 	case len(params.Allocations) == 0:
+		r.Metrics.TransferAttempsFail.Inc()
 		c.Fail("allocations cannot be empty")
 		return
 	}
 
 	if err := verifySigner(&c.Message, c.UserID); err != nil {
+		r.Metrics.TransferAttempsFail.Inc()
 		logger.Error("failed to verify signer", "error", err)
 		c.Fail(err.Error())
 		return
@@ -223,6 +230,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		// Retrieve the destination address by Tag
 		destinationWallet, err := GetWalletByTag(r.DB, params.DestinationUserTag)
 		if err != nil {
+			r.Metrics.TransferAttempsFail.Inc()
 			logger.Error("failed to get wallet by tag", "tag", params.DestinationUserTag, "error", err)
 			c.Fail(fmt.Sprintf("failed to get wallet by tag: %s", params.DestinationUserTag))
 			return
@@ -235,6 +243,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		// Even if destination tag is not specified, it should be included in the returned transaction in case it exists
 		tag, err := GetUserTagByWallet(r.DB, destinationAddress)
 		if err != nil && err != gorm.ErrRecordNotFound {
+			r.Metrics.TransferAttempsFail.Inc()
 			logger.Error("failed to get user tag by wallet", "wallet", destinationAddress, "error", err)
 			c.Fail(fmt.Sprintf("failed to get user tag for wallet: %s", destinationAddress))
 			return
@@ -243,6 +252,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	}
 
 	if destinationAddress == c.UserID {
+		r.Metrics.TransferAttempsFail.Inc()
 		c.Fail("cannot transfer to self")
 		return
 	}
@@ -252,6 +262,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	// Sender tag should be included in the returned transaction in case it exists
 	fromAccountTag, err = GetUserTagByWallet(r.DB, fromWallet)
 	if err != nil && err != gorm.ErrRecordNotFound {
+		r.Metrics.TransferAttempsFail.Inc()
 		logger.Error("failed to get user tag by wallet", "wallet", fromWallet, "error", err)
 		c.Fail(fmt.Sprintf("failed to get user tag for wallet: %s", fromWallet))
 		return
@@ -311,8 +322,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		resp = formattedTransactions
 		return nil
 	})
-
 	if err != nil {
+		r.Metrics.TransferAttempsFail.Inc()
 		logger.Error("failed to process transfer", "error", err)
 		c.Fail(err.Error())
 		return
@@ -323,8 +334,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		r.SendBalanceUpdate(destinationAddress)
 	}
 
+	r.Metrics.TransferAttemptsSuccess.Inc()
 	c.Succeed(req.Method, resp)
-
 	logger.Info("transfer completed", "userID", c.UserID, "transferTo", params.Destination, "allocations", params.Allocations)
 }
 

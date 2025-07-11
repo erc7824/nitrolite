@@ -18,6 +18,10 @@ import (
 var validate = validator.New()
 
 const (
+	defaultRPCErrorMessage = "an error occurred while processing the request"
+)
+
+const (
 	// rpcNodeGroupHandlerPrefix is the prefix used for all handler group IDs
 	rpcNodeGroupHandlerPrefix = "group."
 	// rpcNodeGroupRoot is the identifier for the root handler group
@@ -321,9 +325,44 @@ func (c *RPCContext) Succeed(method string, params ...any) {
 	}
 }
 
-// Fail sets an error response with the given error message.
-// This should be called by handlers to indicate processing failure.
-func (c *RPCContext) Fail(message string) {
+// Fail sets an error response for the RPC request. This method should be called by handlers
+// when an error occurs during request processing.
+//
+// Error handling behavior:
+//   - If err is an RPCError: The exact error message is sent to the client
+//   - If err is any other error type: The fallbackMessage is sent to the client
+//   - If both err is nil/non-RPCError AND fallbackMessage is empty: A generic error message is sent
+//
+// This design allows handlers to control what error information is exposed to clients:
+//   - Use RPCError for client-safe, descriptive error messages
+//   - Use regular errors with a fallbackMessage to hide internal error details
+//
+// Usage examples:
+//
+//	// Hide internal error details from client
+//	balance, err := ledger.GetBalance(account)
+//	if err != nil {
+//		c.Fail(err, "failed to retrieve balance")
+//		return
+//	}
+//
+//	// Validation error with no internal error
+//	if len(params) < 3 {
+//		c.Fail(nil, "invalid parameters: expected at least 3")
+//		return
+//	}
+//
+// The response will have Method="error" and Params containing the error message.
+func (c *RPCContext) Fail(err error, fallbackMessage string) {
+	message := fallbackMessage
+	if _, ok := err.(RPCError); ok {
+		message = err.Error()
+		fmt.Println(err)
+	}
+	if message == "" {
+		message = defaultRPCErrorMessage
+	}
+
 	c.Message.Res = &RPCData{
 		RequestID: c.Message.Req.RequestID,
 		Method:    "error",

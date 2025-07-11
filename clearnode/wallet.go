@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
 	"gorm.io/gorm"
@@ -46,7 +45,7 @@ func AddSigner(db *gorm.DB, wallet, signer string) error {
 		if w.(string) == wallet {
 			return nil
 		}
-		return fmt.Errorf("signer is already in use for another wallet")
+		return RPCErrorf("signer is already in use for another wallet")
 	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
@@ -62,7 +61,7 @@ func AddSigner(db *gorm.DB, wallet, signer string) error {
 			return err
 		}
 		if count > 0 {
-			return fmt.Errorf("cannot use a wallet as a signer")
+			return RPCErrorf("cannot use a wallet as a signer")
 		}
 
 		// Address can't be used as a wallet if it is already a signer for another wallet.
@@ -70,7 +69,7 @@ func AddSigner(db *gorm.DB, wallet, signer string) error {
 			return err
 		}
 		if count > 0 {
-			return fmt.Errorf("wallet is already in use as a signer")
+			return RPCErrorf("wallet is already in use as a signer")
 		}
 
 		// Signer cannot be used for another wallet if it already exists.
@@ -82,7 +81,7 @@ func AddSigner(db *gorm.DB, wallet, signer string) error {
 				walletCache.Store(signer, wallet)
 				return nil
 			}
-			return fmt.Errorf("signer is already in use for another wallet")
+			return RPCErrorf("signer is already in use for another wallet")
 
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			sw := &SignerWallet{Signer: signer, Wallet: wallet}

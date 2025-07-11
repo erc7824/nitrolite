@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/big"
 	"syscall"
 
 	"golang.org/x/term"
@@ -42,16 +41,16 @@ func (o *Operator) handleImportPKey(args []string) {
 
 func (o *Operator) handleImportRPC(args []string) {
 	if len(args) < 3 {
-		fmt.Println("Usage: import rpc <chain_id>")
+		fmt.Println("Usage: import rpc <chain_name>")
 		return
 	}
+	chainName := args[2]
 
-	bigChainID, ok := new(big.Int).SetString(args[2], 10)
-	if !ok {
-		fmt.Printf("Invalid chain ID: %s\n", args[2])
+	network := o.config.GetNetworkByName(chainName)
+	if network == nil {
+		fmt.Printf("Unknown chain: %s.\n", chainName)
 		return
 	}
-	chainID := uint32(bigChainID.Uint64())
 
 	fmt.Println("Paste chain RPC URL:")
 	rpcURL, err := term.ReadPassword(int(syscall.Stdin))
@@ -60,9 +59,9 @@ func (o *Operator) handleImportRPC(args []string) {
 		return
 	}
 
-	if err := o.store.AddChainRPC(string(rpcURL), chainID); err != nil {
+	if err := o.store.AddChainRPC(string(rpcURL), network.ChainID); err != nil {
 		fmt.Printf("Failed to import chain RPC: %s\n", err.Error())
 		return
 	}
-	fmt.Printf("RPC URL for chain(%d) imported successfully!\n", chainID)
+	fmt.Printf("RPC URL for %s imported successfully!\n", chainName)
 }

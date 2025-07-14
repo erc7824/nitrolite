@@ -19,6 +19,10 @@ contract SimpleConsensusTest is Test {
 
     SimpleConsensus public adjudicator;
 
+    // Mockup constructor parameters
+    address mockedOwner = address(0x456);
+    address mockedChannelImpl = address(0x123);
+
     address public host;
     address public guest;
     uint256 public hostPrivateKey;
@@ -31,7 +35,7 @@ contract SimpleConsensusTest is Test {
     uint256 private constant GUEST = 1;
 
     function setUp() public {
-        adjudicator = new SimpleConsensus();
+        adjudicator = new SimpleConsensus(mockedOwner, mockedChannelImpl);
 
         hostPrivateKey = 0x1;
         guestPrivateKey = 0x2;

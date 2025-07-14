@@ -80,11 +80,7 @@ func (conn *RPCConnection) Serve(parentCtx context.Context, abortParents func())
 	// Close the WebSocket connection
 	if err := conn.websocketConn.Close(); err != nil {
 		conn.logger.Error("error closing WebSocket connection", "error", err)
-	} else {
-		conn.logger.Info("WebSocket connection closed", "connectionID", conn.ConnectionID())
 	}
-
-	conn.logger.Info("RPCConnection Serve finished", "connectionID", conn.ConnectionID)
 }
 
 // ConnectionID returns the unique identifier for this connection.
@@ -247,6 +243,39 @@ func (hub *rpcConnectionHub) Add(conn *RPCConnection) error {
 
 	// Update the mapping for this user
 	hub.authMapping[userID][connID] = true
+	return nil
+}
+
+// Reauthenticate updates the UserID for an existing connection.
+func (hub *rpcConnectionHub) Reauthenticate(connID, userID string) error {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	conn, exists := hub.connections[connID]
+	if !exists {
+		return fmt.Errorf("connection with ID %s does not exist", connID)
+	}
+
+	// Remove the old user mapping if it exists
+	oldUserID := conn.UserID()
+	if oldUserID != "" {
+		if userConns, ok := hub.authMapping[oldUserID]; ok {
+			delete(userConns, connID)
+			if len(userConns) == 0 {
+				delete(hub.authMapping, oldUserID) // Remove user mapping if no connections left
+			}
+		}
+	}
+
+	// Set the new UserID
+	conn.SetUserID(userID)
+
+	// Update the auth mapping for the new UserID
+	if _, ok := hub.authMapping[userID]; !ok {
+		hub.authMapping[userID] = make(map[string]bool)
+	}
+	hub.authMapping[userID][connID] = true
+
 	return nil
 }
 

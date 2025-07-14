@@ -1,9 +1,7 @@
 FROM golang:1.24.3-alpine AS builder
 
 WORKDIR /build
-ENV GOOS=linux \
-    GOARCH=amd64 \
-    CGO_ENABLED=1
+ENV CGO_ENABLED=1
 
 RUN apk add --no-cache gcc musl-dev sqlite-dev
 

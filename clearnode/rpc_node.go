@@ -212,8 +212,8 @@ read_loop:
 
 		// Handle re-authentication
 		if rpcConn.UserID() != ctx.UserID {
-			// If the user ID changed during processing, update the connection
-			rpcConn.SetUserID(ctx.UserID)
+			// If the user ID changed during processing, do the re-authentication
+			n.connHub.Reauthenticate(rpcConn.ConnectionID(), ctx.UserID)
 
 			// Notify authenticated handlers about the new user ID
 			for _, handler := range n.onAuthenticatedHandlers {

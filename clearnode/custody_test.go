@@ -41,9 +41,6 @@ func setupMockCustody(t *testing.T) (*Custody, *gorm.DB, func()) {
 
 	logger := NewLoggerIPFS("custody_test")
 
-	sendBalanceUpdate := func(wallet string) {}
-	sendChannelUpdate := func(channel Channel) {}
-
 	if custodyAbi == nil {
 		var err error
 		custodyAbi, err = nitrolite.CustodyMetaData.GetAbi()
@@ -88,8 +85,7 @@ func setupMockCustody(t *testing.T) (*Custody, *gorm.DB, func()) {
 		custody:            contract,
 		chainID:            uint32(chainID.Int64()),
 		adjudicatorAddress: newTestCommonAddress("0xAdjudicatorAddress"),
-		sendBalanceUpdate:  sendBalanceUpdate,
-		sendChannelUpdate:  sendChannelUpdate,
+		wsNotifier:         BlankWSNotifier(),
 		logger:             logger,
 	}
 
@@ -418,18 +414,13 @@ func TestHandleJoinedEvent(t *testing.T) {
 
 		_, mockEvent := createMockJoinedEvent(t)
 
-		var balanceUpdateCalled bool
-		var capturedWallet string
-		custody.sendBalanceUpdate = func(wallet string) {
-			balanceUpdateCalled = true
-			capturedWallet = wallet
-		}
-
-		var channelUpdateCalled bool
-		var capturedChannel Channel
-		custody.sendChannelUpdate = func(ch Channel) {
-			channelUpdateCalled = true
-			capturedChannel = ch
+		var capturedNotifications []Notification
+		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+			capturedNotifications = append(capturedNotifications, Notification{
+				userID:    userID,
+				eventType: EventType(method),
+				data:      params,
+			})
 		}
 
 		beforeUpdate := time.Now()
@@ -453,12 +444,8 @@ func TestHandleJoinedEvent(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, entries)
 
-		assert.True(t, balanceUpdateCalled, "Balance update callback should be called")
-		assert.Equal(t, walletAddr.Hex(), capturedWallet)
-
-		assert.True(t, channelUpdateCalled, "Channel update callback should be called")
-		assert.Equal(t, channelID, capturedChannel.ChannelID)
-		assert.Equal(t, ChannelStatusOpen, capturedChannel.Status)
+		assert.Equal(t, walletAddr.Hex(), capturedNotifications[0].userID)
+		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[1].eventType)
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix())
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt))
@@ -508,22 +495,20 @@ func TestHandleJoinedEvent(t *testing.T) {
 
 		_, mockEvent := createMockJoinedEvent(t)
 
-		var balanceUpdateCalled bool
-		custody.sendBalanceUpdate = func(wallet string) {
-			balanceUpdateCalled = true
-		}
-
-		var channelUpdateCalled bool
-		custody.sendChannelUpdate = func(ch Channel) {
-			channelUpdateCalled = true
+		var capturedNotifications []Notification
+		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+			capturedNotifications = append(capturedNotifications, Notification{
+				userID:    userID,
+				eventType: EventType(method),
+				data:      params,
+			})
 		}
 
 		logger := custody.logger.With("event", "Joined")
 		custody.handleJoined(logger, mockEvent)
 
 		// Event should be ignored, and no callbacks should be called
-		assert.False(t, balanceUpdateCalled, "Balance update should not be called for non-existent channel")
-		assert.False(t, channelUpdateCalled, "Channel update should not be called for non-existent channel")
+		assert.Equal(t, 0, len(capturedNotifications), "No notifications should be sent")
 
 		// Initial channel should remain unmodified
 		var checkChannel Channel
@@ -576,18 +561,13 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, finalAmount)
 
-		var balanceUpdateCalled bool
-		var capturedWallet string
-		custody.sendBalanceUpdate = func(wallet string) {
-			balanceUpdateCalled = true
-			capturedWallet = wallet
-		}
-
-		var channelUpdateCalled bool
-		var capturedChannel Channel
-		custody.sendChannelUpdate = func(ch Channel) {
-			channelUpdateCalled = true
-			capturedChannel = ch
+		var capturedNotifications []Notification
+		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+			capturedNotifications = append(capturedNotifications, Notification{
+				userID:    userID,
+				eventType: EventType(method),
+				data:      params,
+			})
 		}
 
 		beforeUpdate := time.Now()
@@ -608,12 +588,8 @@ func TestHandleClosedEvent(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, entries)
 
-		assert.True(t, balanceUpdateCalled, "Balance update callback should be called")
-		assert.Equal(t, walletAddr.Hex(), capturedWallet)
-
-		assert.True(t, channelUpdateCalled, "Channel update callback should be called")
-		assert.Equal(t, channelID, capturedChannel.ChannelID)
-		assert.Equal(t, ChannelStatusClosed, capturedChannel.Status)
+		assert.Equal(t, walletAddr.Hex(), capturedNotifications[0].userID)
+		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[1].eventType)
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
@@ -645,7 +621,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
 
-	t.Run("Success Equal Final aAmount", func(t *testing.T) {
+	t.Run("Success Equal Final Amount", func(t *testing.T) {
 		custody, db, cleanup := setupMockCustody(t)
 		defer cleanup()
 
@@ -772,18 +748,13 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, channelAmount.BigInt())
 
-		var balanceUpdateCalled bool
-		var capturedWallet string
-		custody.sendBalanceUpdate = func(wallet string) {
-			balanceUpdateCalled = true
-			capturedWallet = wallet
-		}
-
-		var channelUpdateCalled bool
-		var capturedChannel Channel
-		custody.sendChannelUpdate = func(ch Channel) {
-			channelUpdateCalled = true
-			capturedChannel = ch
+		var capturedNotifications []Notification
+		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+			capturedNotifications = append(capturedNotifications, Notification{
+				userID:    userID,
+				eventType: EventType(method),
+				data:      params,
+			})
 		}
 
 		beforeUpdate := time.Now()
@@ -799,12 +770,8 @@ func TestHandleClosedEvent(t *testing.T) {
 		assert.Equal(t, decimal.Zero.String(), updatedChannel.RawAmount.String(), "Amount should be zero after closing")
 		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
 
-		assert.True(t, balanceUpdateCalled, "Balance update callback should be called")
-		assert.Equal(t, walletAddr.Hex(), capturedWallet)
-
-		assert.True(t, channelUpdateCalled, "Channel update callback should be called")
-		assert.Equal(t, channelID, capturedChannel.ChannelID)
-		assert.Equal(t, ChannelStatusClosed, capturedChannel.Status)
+		assert.Equal(t, walletAddr.Hex(), capturedNotifications[0].userID)
+		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[1].eventType)
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
@@ -851,11 +818,13 @@ func TestHandleChallengedEvent(t *testing.T) {
 
 		_, mockEvent := createMockChallengedEvent(t, custody.signer, tokenAddress, amount.BigInt())
 
-		var channelUpdateCalled bool
-		var capturedChannel Channel
-		custody.sendChannelUpdate = func(ch Channel) {
-			channelUpdateCalled = true
-			capturedChannel = ch
+		var capturedNotifications []Notification
+		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+			capturedNotifications = append(capturedNotifications, Notification{
+				userID:    userID,
+				eventType: EventType(method),
+				data:      params,
+			})
 		}
 
 		beforeUpdate := time.Now()
@@ -875,9 +844,7 @@ func TestHandleChallengedEvent(t *testing.T) {
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
 		assert.True(t, updatedChannel.UpdatedAt.After(beforeUpdate) && updatedChannel.UpdatedAt.Before(afterUpdate))
 
-		assert.True(t, channelUpdateCalled, "Channel update callback should be called for challenged event")
-		assert.Equal(t, channelID, capturedChannel.ChannelID)
-		assert.Equal(t, ChannelStatusChallenged, capturedChannel.Status)
+		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[0].eventType)
 	})
 }
 
@@ -925,18 +892,13 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		_, mockEvent := createMockResizedEvent(t, deltaAmount.BigInt())
 
-		var balanceUpdateCalled bool
-		var capturedWallet string
-		custody.sendBalanceUpdate = func(wallet string) {
-			balanceUpdateCalled = true
-			capturedWallet = wallet
-		}
-
-		var channelUpdateCalled bool
-		var capturedChannel Channel
-		custody.sendChannelUpdate = func(ch Channel) {
-			channelUpdateCalled = true
-			capturedChannel = ch
+		var capturedNotifications []Notification
+		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+			capturedNotifications = append(capturedNotifications, Notification{
+				userID:    userID,
+				eventType: EventType(method),
+				data:      params,
+			})
 		}
 
 		beforeUpdate := time.Now()
@@ -956,12 +918,8 @@ func TestHandleResizedEvent(t *testing.T) {
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
 		assert.True(t, updatedChannel.UpdatedAt.After(beforeUpdate) && updatedChannel.UpdatedAt.Before(afterUpdate))
 
-		assert.True(t, balanceUpdateCalled, "Balance update callback should be called")
-		assert.Equal(t, walletAddr.Hex(), capturedWallet)
-
-		assert.True(t, channelUpdateCalled, "Channel update callback should be called")
-		assert.Equal(t, channelID, capturedChannel.ChannelID)
-		assert.Equal(t, expectedAmount, capturedChannel.RawAmount)
+		assert.Equal(t, walletAddr.Hex(), capturedNotifications[0].userID)
+		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[1].eventType)
 
 		walletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)
 		require.NoError(t, err)
@@ -1093,22 +1051,20 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		_, mockEvent := createMockResizedEvent(t, big.NewInt(500000))
 
-		var balanceUpdateCalled bool
-		custody.sendBalanceUpdate = func(wallet string) {
-			balanceUpdateCalled = true
-		}
-
-		var channelUpdateCalled bool
-		custody.sendChannelUpdate = func(ch Channel) {
-			channelUpdateCalled = true
+		var capturedNotifications []Notification
+		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+			capturedNotifications = append(capturedNotifications, Notification{
+				userID:    userID,
+				eventType: EventType(method),
+				data:      params,
+			})
 		}
 
 		logger := custody.logger.With("event", "Resized")
 		custody.handleResized(logger, mockEvent)
 
 		// Event should be ignored, and no callbacks should be called
-		assert.False(t, balanceUpdateCalled, "Balance update should not be called for non-existent channel")
-		assert.False(t, channelUpdateCalled, "Channel update should not be called for non-existent channel")
+		assert.Equal(t, 0, len(capturedNotifications), "No notifications should be sent")
 
 		// Initial channel should remain unmodified
 		var checkChannel Channel

@@ -110,7 +110,7 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, func()) {
 
 	channelService := NewChannelService(db, signer)
 	node := NewRPCNode(signer, logger)
-	wsNotifier := NewWSNotifier(node.Notify)
+	wsNotifier := NewWSNotifier(node.Notify, logger)
 
 	// Create an instance of RPCRouter
 	router := &RPCRouter{

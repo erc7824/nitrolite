@@ -108,29 +108,7 @@ export interface GetLedgerEntriesResponseParams {
 }
 export type GetLedgerEntriesRPCResponseParams = GetLedgerEntriesResponseParams; // for backward compatibility
 
-/**
- * Represents the parameters for the 'get_transactions' RPC method.
- */
-export interface GetLedgerTransactionsResponseParams {
-    /** The transaction hash. */
-    id: number;
-    /** The type of transaction. */
-    txType: TxType;
-    /** The Ethereum address of the sender account. */
-    fromAccount: Address;
-    /** The user tag for the sender account (empty if no tag exists or not a wallet account). */
-    fromAccountTag?: string;
-    /** The Ethereum address of the recipient account. */
-    toAccount: Address;
-    /** The user tag for the recipient account (empty if no tag exists or not a wallet account). */
-    toAccountTag?: string;
-    /** The asset symbol (e.g., "eth", "usdc"). */
-    asset: string;
-    /** The amount of the asset transferred. */
-    amount: string;
-    /** The timestamp when the transaction was created. */
-    createdAt: Date;
-}
+export type GetLedgerTransactionsResponseParams = Transaction[];
 
 /**
  * Represents the parameters for the 'get_user_tag' RPC method.
@@ -371,7 +349,7 @@ export interface GetLedgerEntriesResponse extends GenericRPCMessage {
  */
 export interface GetLedgerTransactionsResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerTransactions;
-    params: GetLedgerTransactionsResponseParams[];
+    params: GetLedgerTransactionsResponseParams;
 }
 
 /**
@@ -587,9 +565,9 @@ export interface PongResponse extends GenericRPCMessage {
 }
 
 /**
- * Represents the parameters for the 'transfer' RPC method.
+ * Represents the parameters for the transfer transaction.
  */
-export interface TransferRPCResponseParams {
+export interface Transaction {
     /** Unique identifier for the transfer. */
     id: number;
     /** The type of transaction. */
@@ -611,11 +589,29 @@ export interface TransferRPCResponseParams {
 }
 
 /**
+ * Represents the parameters for the 'transfer' RPC method.
+ */
+export type TransferResponseParams = Transaction[];
+
+/**
  * Represents the response structure for the 'transfer' RPC method.
  */
-export interface TransferRPCResponse extends GenericRPCMessage {
+export interface TransferResponse extends GenericRPCMessage {
     method: RPCMethod.Transfer;
-    params: TransferRPCResponseParams;
+    params: TransferResponseParams;
+}
+
+/**
+ * Represents the parameters for the 'transfer_notification' RPC method.
+ */
+export type TransferNotificationResponseParams = Transaction[];
+
+/**
+ * Represents the response structure for the 'transfer_notification' RPC method.
+ */
+export interface TransferNotificationResponse extends GenericRPCMessage {
+    method: RPCMethod.TransferNotification;
+    params: TransferNotificationResponseParams;
 }
 
 /**
@@ -649,7 +645,8 @@ export type RPCResponse =
     | BalanceUpdateResponse
     | ChannelsUpdateResponse
     | ChannelUpdateResponse
-    | TransferRPCResponse;
+    | TransferResponse
+    | TransferNotificationResponse;
 
 /**
  * Maps RPC methods to their corresponding parameter types.

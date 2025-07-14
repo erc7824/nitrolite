@@ -22,6 +22,7 @@ import {Utils} from "./Utils.sol";
 contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using SafeERC20 for IERC20;
+    using Utils for State;
 
     // Errors
     // TODO: sort errors
@@ -237,7 +238,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
 
         if (initial.sigs.length != 1) revert InvalidStateSignatures();
         // TODO: later we can lift the restriction that first sig must be from CLIENT
-        if (!Utils.verifyStateSignature(_domainSeparatorV4(), channelId, initial, initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX])) {
+        if (!initial.verifyStateSignature(channelId, _domainSeparatorV4(), initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX])) {
             revert InvalidStateSignatures();
         }
 
@@ -312,7 +313,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         if (index != SERVER_IDX) revert InvalidParticipant();
         if (meta.actualDeposits[SERVER_IDX].amount != 0) revert DepositAlreadyFulfilled();
 
-        if (!Utils.verifyStateSignature(_domainSeparatorV4(), channelId, meta.lastValidState, sig, meta.chan.participants[SERVER_IDX])) revert InvalidStateSignatures();
+        if (!meta.lastValidState.verifyStateSignature(channelId, _domainSeparatorV4(), sig, meta.chan.participants[SERVER_IDX])) revert InvalidStateSignatures();
 
         State memory lastValidState = meta.lastValidState;
         Signature[] memory sigs = new Signature[](PART_NUM);
@@ -654,7 +655,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         bytes32 channelId = Utils.getChannelId(chan);
 
         for (uint256 i = 0; i < PART_NUM; i++) {
-            if (!Utils.verifyStateSignature(_domainSeparatorV4(), channelId, state, state.sigs[i], chan.participants[i])) return false;
+            if (!state.verifyStateSignature(channelId, _domainSeparatorV4(), state.sigs[i], chan.participants[i])) return false;
         }
 
         return true;

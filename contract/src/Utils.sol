@@ -17,6 +17,8 @@ library Utils {
     uint256 constant CLIENT = 0;
     uint256 constant SERVER = 1;
 
+    bytes32 constant NO_EIP712_SUPPORT = keccak256("NoEIP712Support");
+
     /**
      * @notice Compute the unique identifier for a channel
      * @param ch The channel struct
@@ -78,12 +80,12 @@ library Utils {
 
     /**
      * @notice Recovers the signer of a state hash using the EIP-712 format
-     * @param domainSeparator The EIP-712 domain separator
      * @param structHash The hash of the struct to verify the signature against
+     * @param domainSeparator The EIP-712 domain separator
      * @param sig The signature to verify
      * @return The address of the signer
      */
-    function recoverEIP712Signer(bytes32 domainSeparator, bytes32 structHash, Signature memory sig)
+    function recoverEIP712Signer(bytes32 structHash, bytes32 domainSeparator, Signature memory sig)
         internal
         pure
         returns (address)
@@ -93,14 +95,14 @@ library Utils {
 
     /**
      * @notice Recovers the signer of a state using EIP-712 format
-     * @param domainSeparator The EIP-712 domain separator
      * @param typeHash The type hash for the state structure
      * @param channelId The unique identifier for the channel
+     * @param domainSeparator The EIP-712 domain separator
      * @param state The state to verify
      * @param sig The signature to verify
      * @return The address of the signer
      */
-    function recoverStateEIP712Signer(bytes32 domainSeparator, bytes32 typeHash, bytes32 channelId, State memory state, Signature memory sig)
+    function recoverStateEIP712Signer(bytes32 typeHash, bytes32 channelId, bytes32 domainSeparator, State memory state, Signature memory sig)
         internal
         pure
         returns (address)
@@ -110,13 +112,14 @@ library Utils {
 
         /**
      * @notice Verifies that a message hash is signed by the specified participant
-     * @param channelId The ID of the channel
      * @param state The state to verify
+     * @param channelId The ID of the channel
+     * @param domainSeparator The EIP-712 domain separator for the channel
      * @param sig The signature to verify
      * @param signer The address of the expected signer
      * @return True if the signature is valid, false otherwise
      */
-    function verifyStateSignature(bytes32 domainSeparator, bytes32 channelId, State memory state, Signature memory sig, address signer) internal pure returns (bool) {
+    function verifyStateSignature(State memory state, bytes32 channelId, bytes32 domainSeparator, Signature memory sig, address signer) internal pure returns (bool) {
         bytes32 stateHash = Utils.getStateHashShort(channelId, state);
 
         address rawECDSASigner = Utils.recoverRawECDSASigner(stateHash, sig);
@@ -129,12 +132,55 @@ library Utils {
             return true;
         }
 
-        address eip712Signer = Utils.recoverStateEIP712Signer(domainSeparator, STATE_TYPEHASH, channelId, state, sig);
+        if (domainSeparator == NO_EIP712_SUPPORT) {
+            return false;
+        }
+
+        address eip712Signer = Utils.recoverStateEIP712Signer(STATE_TYPEHASH, channelId, domainSeparator, state, sig);
         if (eip712Signer == signer) {
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * @notice Validates that a state is a valid initial state for a channel
+     * @dev Initial states must have version 0 and INITIALIZE intent
+     * @param state The state to validate
+     * @param chan The channel configuration
+     * @param domainSeparator The EIP-712 domain separator for the channel
+     * @return True if the state is a valid initial state, false otherwise
+     */
+    function validateInitialState(State memory state, Channel memory chan, bytes32 domainSeparator) internal view returns (bool) {
+        if (state.version != 0) {
+            return false;
+        }
+
+        if (state.intent != StateIntent.INITIALIZE) {
+            return false;
+        }
+
+        return validateUnanimousStateSignatures(state, chan, domainSeparator);
+    }
+
+    /**
+     * @notice Validates that a state has signatures from both participants
+     * @dev For 2-participant channels, both must sign to establish unanimous consent
+     * @param state The state to validate
+     * @param chan The channel configuration
+     * @param domainSeparator The EIP-712 domain separator for the channel
+     * @return True if the state has valid signatures from both participants, false otherwise
+     */
+    function validateUnanimousStateSignatures(State memory state, Channel memory chan, bytes32 domainSeparator) internal view returns (bool) {
+        if (state.sigs.length != 2) {
+            return false;
+        }
+
+        bytes32 channelId = getChannelId(chan);
+
+        return Utils.verifyStateSignature(state, channelId, domainSeparator, state.sigs[0], chan.participants[CLIENT])
+            && Utils.verifyStateSignature(state, channelId, domainSeparator, state.sigs[1], chan.participants[SERVER]);
     }
 
     /**

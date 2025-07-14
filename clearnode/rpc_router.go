@@ -232,37 +232,6 @@ func (r *RPCRouter) HistoryMiddleware(c *RPCContext) {
 	}
 }
 
-// HandleGetRPCHistory returns past RPC calls for a given participant
-func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
-	ctx := c.Context
-	logger := LoggerFromContext(ctx)
-
-	var rpcHistory []RPCRecord
-	if err := r.RPCStore.db.Where("sender = ?", c.UserID).Order("timestamp DESC").Find(&rpcHistory).Error; err != nil {
-		logger.Error("failed to retrieve RPC history", "error", err)
-		c.Fail(nil, "failed to retrieve RPC history")
-		return
-	}
-
-	response := make([]RPCEntry, 0, len(rpcHistory))
-	for _, record := range rpcHistory {
-		response = append(response, RPCEntry{
-			ID:        record.ID,
-			Sender:    record.Sender,
-			ReqID:     record.ReqID,
-			Method:    record.Method,
-			Params:    string(record.Params),
-			Timestamp: record.Timestamp,
-			ReqSig:    record.ReqSig,
-			ResSig:    record.ResSig,
-			Result:    string(record.Response),
-		})
-	}
-
-	c.Succeed(c.Message.Req.Method, response)
-	logger.Info("RPC history retrieved", "userID", c.UserID, "entryCount", len(response))
-}
-
 func parseParams(params []any, unmarshalTo any) error {
 	if len(params) > 0 {
 		paramsJSON, err := json.Marshal(params[0])

@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -71,87 +72,140 @@ func TestRPCRouterHandleGetRPCHistory(t *testing.T) {
 	signer := Signer{privateKey: rawKey}
 	participantAddr := signer.GetAddress().Hex()
 	rpcStore := NewRPCStore(router.DB)
-	timestamp := uint64(time.Now().Unix())
+	baseTime := uint64(time.Now().Unix())
 
 	router.RPCStore = rpcStore
+
+	// Create 11 test records for pagination testing
 	records := []RPCRecord{
-		{
-			Sender:    participantAddr,
-			ReqID:     1,
-			Method:    "ping",
-			Params:    []byte(`[null]`),
-			Timestamp: timestamp - 3600,
-			ReqSig:    []string{"sig1"},
-			Response:  []byte(`{"res":[1,"pong",[],1621234567890]}`),
-			ResSig:    []string{},
-		},
-		{
-			Sender:    participantAddr,
-			ReqID:     2,
-			Method:    "get_config",
-			Params:    []byte(`[]`),
-			Timestamp: timestamp - 1800,
-			ReqSig:    []string{"sig2"},
-			Response:  []byte(`{"res":[2,"get_config",[{"broker_address":"0xBroker"}],1621234597890]}`),
-			ResSig:    []string{},
-		},
-		{
-			Sender:    participantAddr,
-			ReqID:     3,
-			Method:    "get_channels",
-			Params:    []byte(fmt.Sprintf(`[{"participant":"%s"}]`, participantAddr)),
-			Timestamp: timestamp - 900,
-			ReqSig:    []string{"sig3"},
-			Response:  []byte(`{"res":[3,"get_channels",[[]],1621234627890]}`),
-			ResSig:    []string{},
-		},
+		{Sender: participantAddr, ReqID: 1, Method: "ping", Params: []byte(`[null]`), Timestamp: baseTime - 10, ReqSig: []string{"sig1"}, Response: []byte(`{"res":[1,"pong",[],1621234567890]}`), ResSig: []string{}},
+		{Sender: participantAddr, ReqID: 2, Method: "get_config", Params: []byte(`[]`), Timestamp: baseTime - 9, ReqSig: []string{"sig2"}, Response: []byte(`{"res":[2,"get_config",[{"broker_address":"0xBroker"}],1621234597890]}`), ResSig: []string{}},
+		{Sender: participantAddr, ReqID: 3, Method: "get_channels", Params: []byte(fmt.Sprintf(`[{"participant":"%s"}]`, participantAddr)), Timestamp: baseTime - 8, ReqSig: []string{"sig3"}, Response: []byte(`{"res":[3,"get_channels",[[]],1621234627890]}`), ResSig: []string{}},
+		{Sender: participantAddr, ReqID: 4, Method: "transfer", Params: []byte(`[{"destination":"0xDest","allocations":[{"asset":"USDC","amount":"100"}]}]`), Timestamp: baseTime - 7, ReqSig: []string{"sig4"}, Response: []byte(`{"res":[4,"transfer",[],1621234657890]}`), ResSig: []string{}},
+		{Sender: participantAddr, ReqID: 5, Method: "get_ledger_balances", Params: []byte(`[]`), Timestamp: baseTime - 6, ReqSig: []string{"sig5"}, Response: []byte(`{"res":[5,"get_ledger_balances",[],1621234687890]}`), ResSig: []string{}},
+		{Sender: participantAddr, ReqID: 6, Method: "create_application", Params: []byte(`[{"definition":{"protocol":"test"}}]`), Timestamp: baseTime - 5, ReqSig: []string{"sig6"}, Response: []byte(`{"res":[6,"create_application",[],1621234717890]}`), ResSig: []string{}},
+		{Sender: participantAddr, ReqID: 7, Method: "submit_app_state", Params: []byte(`[{"app_session_id":"123"}]`), Timestamp: baseTime - 4, ReqSig: []string{"sig7"}, Response: []byte(`{"res":[7,"submit_app_state",[],1621234747890]}`), ResSig: []string{}},
+		{Sender: participantAddr, ReqID: 8, Method: "close_application", Params: []byte(`[{"app_session_id":"123"}]`), Timestamp: baseTime - 3, ReqSig: []string{"sig8"}, Response: []byte(`{"res":[8,"close_application",[],1621234777890]}`), ResSig: []string{}},
+		{Sender: participantAddr, ReqID: 9, Method: "resize_channel", Params: []byte(`[{"channel_id":"ch123"}]`), Timestamp: baseTime - 2, ReqSig: []string{"sig9"}, Response: []byte(`{"res":[9,"resize_channel",[],1621234807890]}`), ResSig: []string{}},
+		{Sender: participantAddr, ReqID: 10, Method: "close_channel", Params: []byte(`[{"channel_id":"ch123"}]`), Timestamp: baseTime - 1, ReqSig: []string{"sig10"}, Response: []byte(`{"res":[10,"close_channel",[],1621234837890]}`), ResSig: []string{}},
+		{Sender: participantAddr, ReqID: 11, Method: "get_user_tag", Params: []byte(`[]`), Timestamp: baseTime, ReqSig: []string{"sig11"}, Response: []byte(`{"res":[11,"get_user_tag",[],1621234867890]}`), ResSig: []string{}},
 	}
 
 	for _, record := range records {
 		require.NoError(t, router.DB.Create(&record).Error)
 	}
 
+	// Create record for different participant to test filtering
 	otherRecord := RPCRecord{
 		Sender:    "0xOtherParticipant",
-		ReqID:     4,
+		ReqID:     12,
 		Method:    "ping",
 		Params:    []byte(`[null]`),
-		Timestamp: timestamp,
-		ReqSig:    []string{"sig4"},
-		Response:  []byte(`{"res":[4,"pong",[],1621234657890]}`),
+		Timestamp: baseTime + 1,
+		ReqSig:    []string{"sig12"},
+		Response:  []byte(`{"res":[12,"pong",[],1621234897890]}`),
 		ResSig:    []string{},
 	}
 	require.NoError(t, router.DB.Create(&otherRecord).Error)
 
-	c := &RPCContext{
-		Context: context.TODO(),
-		UserID:  participantAddr,
-		Message: RPCMessage{
-			Req: &RPCData{
-				RequestID: 100,
-				Method:    "get_rpc_history",
-				Params:    []any{},
-				Timestamp: timestamp,
-			},
+	// Expected record IDs in descending order (newest first)
+	expectedReqIDs := []uint64{11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1}
+
+	testCases := []struct {
+		name               string
+		params             map[string]interface{}
+		expectedReqIDs     []uint64
+		expectedRecordCount int
+	}{
+		{
+			name:               "No params (default pagination)",
+			params:             map[string]interface{}{},
+			expectedReqIDs:     expectedReqIDs[:10], // Default limit is 10
+			expectedRecordCount: 10,
+		},
+		{
+			name:               "Offset only",
+			params:             map[string]interface{}{"offset": float64(2)},
+			expectedReqIDs:     expectedReqIDs[2:], // Skip first 2
+			expectedRecordCount: 9,
+		},
+		{
+			name:               "Limit only",
+			params:             map[string]interface{}{"limit": float64(5)},
+			expectedReqIDs:     expectedReqIDs[:5], // First 5 records
+			expectedRecordCount: 5,
+		},
+		{
+			name:               "Offset and limit",
+			params:             map[string]interface{}{"offset": float64(2), "limit": float64(3)},
+			expectedReqIDs:     expectedReqIDs[2:5], // Skip 2, take 3
+			expectedRecordCount: 3,
+		},
+		{
+			name:               "Pagination with sort asc",
+			params:             map[string]interface{}{"offset": float64(1), "limit": float64(3), "sort": "asc"},
+			expectedReqIDs:     []uint64{2, 3, 4}, // Ascending order, skip 1, take 3
+			expectedRecordCount: 3,
+		},
+		{
+			name:               "Pagination with sort desc (default)",
+			params:             map[string]interface{}{"offset": float64(1), "limit": float64(3), "sort": "desc"},
+			expectedReqIDs:     expectedReqIDs[1:4], // Descending order, skip 1, take 3
+			expectedRecordCount: 3,
+		},
+		{
+			name:               "Offset beyond available records",
+			params:             map[string]interface{}{"offset": float64(20)},
+			expectedReqIDs:     []uint64{}, // No records
+			expectedRecordCount: 0,
+		},
+		{
+			name:               "Limit exceeds max limit",
+			params:             map[string]interface{}{"limit": float64(200)},
+			expectedReqIDs:     expectedReqIDs, // Should be capped at MaxLimit (100), but we only have 11 records
+			expectedRecordCount: 11,
 		},
 	}
 
-	// Call handler
-	router.HandleGetRPCHistory(c)
-	res := c.Message.Res
-	require.NotNil(t, res)
+	for idx, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			paramsJSON, err := json.Marshal(tc.params)
+			require.NoError(t, err)
 
-	require.Equal(t, "get_rpc_history", res.Method)
-	require.Equal(t, uint64(100), res.RequestID)
+			c := &RPCContext{
+				Context: context.TODO(),
+				UserID:  participantAddr,
+				Message: RPCMessage{
+					Req: &RPCData{
+						RequestID: uint64(idx + 100),
+						Method:    "get_rpc_history",
+						Params:    []any{json.RawMessage(paramsJSON)},
+						Timestamp: baseTime,
+					},
+				},
+			}
 
-	require.Len(t, res.Params, 1, "Response should contain RPCEntry entries")
-	rpcHistory, ok := res.Params[0].([]RPCEntry)
-	require.True(t, ok, "Response parameter should be a slice of RPCEntry")
-	require.Len(t, rpcHistory, 3, "Should return 3 records for the participant")
+			router.HandleGetRPCHistory(c)
+			res := c.Message.Res
+			require.NotNil(t, res)
 
-	require.Equal(t, uint64(3), rpcHistory[0].ReqID, "First record should be the newest")
-	require.Equal(t, uint64(2), rpcHistory[1].ReqID, "Second record should be the middle one")
-	require.Equal(t, uint64(1), rpcHistory[2].ReqID, "Third record should be the oldest")
+			require.Equal(t, "get_rpc_history", res.Method)
+			require.Equal(t, uint64(idx+100), res.RequestID)
+
+			require.Len(t, res.Params, 1, "Response should contain an array")
+			rpcHistory, ok := res.Params[0].([]RPCEntry)
+			require.True(t, ok, "Response parameter should be a slice of RPCEntry")
+			assert.Len(t, rpcHistory, tc.expectedRecordCount, "Should return expected number of records")
+
+			// Check records are in expected order
+			for i, record := range rpcHistory {
+				if i < len(tc.expectedReqIDs) {
+					assert.Equal(t, tc.expectedReqIDs[i], record.ReqID, "Record %d should have expected ReqID", i)
+					assert.Equal(t, participantAddr, record.Sender, "All records should belong to the requesting participant")
+				}
+			}
+		})
+	}
 }
 
 func TestRPCRouterHandleGetUserTag(t *testing.T) {

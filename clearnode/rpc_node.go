@@ -12,7 +12,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"golang.org/x/sync/errgroup"
 )
 
 var validate = validator.New()
@@ -99,27 +98,24 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	errorGroup, parentCtx := errgroup.WithContext(r.Context())
 	connectionID := uuid.NewString()
-	messageSink := make(chan []byte, 10)
-	n.connHub.Set(&RPCConnection{
-		ConnectionID: connectionID,
-		WriteSink:    messageSink,
-		Storage:      NewSafeStorage(),
-	})
+	rpcConnection := NewRPCConnection(connectionID, "", conn, n.logger, n.onMessageSentHandlers...)
+	if err := n.connHub.Add(rpcConnection); err != nil {
+		n.logger.Error("failed to add connection to hub", "error", err, "connectionID", connectionID)
+		return
+	}
 
+	// Notify all onConnect handlers about the new connection
 	for _, handler := range n.onConnectHandlers {
-		handler(n.getSendMessageFunc(messageSink))
+		handler(n.getSendMessageFunc(rpcConnection))
 	}
 
 	// Cleanup function executed when connection closes
 	defer func() {
-		userID := ""
-		if rpcConn := n.connHub.Get(connectionID); rpcConn != nil {
-			userID = rpcConn.UserID
-		}
+		userID := rpcConnection.UserID()
 		n.connHub.Remove(connectionID)
 
+		// Notify all onDisconnect handlers about the closed connection
 		for _, handler := range n.onDisconnectHandlers {
 			handler(userID)
 		}
@@ -127,152 +123,103 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 		n.logger.Info("connection closed", "connectionID", connectionID, "userID", userID)
 	}()
 
-	// readMesages handles incoming messages from the WebSocket connection.
-	// It validates messages, routes them to appropriate handlers, and manages authentication.
-	readMesages := func() error {
-		authHandlerExecuted := false
-		handleAuthenticated := func(userID string) {
-			if authHandlerExecuted {
-				return
-			}
-			authHandlerExecuted = true
+	parentCtx, cancel := context.WithCancel(r.Context())
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+	abortOthers := func() {
+		cancel()  // Trigger exit on other goroutines
+		wg.Done() // Decrement the wait group counter
+	}
 
-			for _, handler := range n.onAuthenticatedHandlers {
-				handler(userID, n.getSendMessageFunc(messageSink))
+	go rpcConnection.Serve(parentCtx, abortOthers)
+	go n.processMessages(rpcConnection, parentCtx, abortOthers)
+
+	wg.Wait()
+}
+
+// processMesages handles incoming messages from the RPCConnection.
+// It validates messages, routes them to appropriate handlers, and manages authentication.
+func (n *RPCNode) processMessages(rpcConn *RPCConnection, ctx context.Context, abortOthers context.CancelFunc) {
+	defer abortOthers() // Stop other goroutines when done
+	safeStorage := NewSafeStorage()
+
+read_loop:
+	for {
+		var messageBytes []byte
+		select {
+		case <-ctx.Done():
+			n.logger.Debug("context done, stopping message processing")
+			return
+		case messageBytes = <-rpcConn.ProcessSink():
+			if len(messageBytes) == 0 {
+				return // Exit if the message is empty (connection closed)
 			}
 		}
-		postProcessContext := func(c *RPCContext) {
-			if c.UserID != "" {
-				handleAuthenticated(c.UserID)
-			}
+
+		var msg RPCMessage
+		if err := json.Unmarshal(messageBytes, &msg); err != nil {
+			n.logger.Debug("invalid message format", "error", err, "message", string(messageBytes))
+			n.sendErrorResponse(rpcConn, 0, "invalid message format")
+			continue
 		}
 
-	read_loop:
-		for {
-			rpcConn := n.connHub.Get(connectionID)
-			if rpcConn == nil {
-				n.logger.Error("connection not found in hub", "connectionID", connectionID)
-				return fmt.Errorf("connection not found in hub for ID %s", connectionID)
-			}
+		if err := validate.Struct(&msg); err != nil {
+			n.logger.Debug("message validation failed", "error", err, "message", string(messageBytes))
+			n.sendErrorResponse(rpcConn, msg.Req.RequestID, "message validation failed")
+			continue
+		}
 
-			select {
-			case <-parentCtx.Done():
-				n.logger.Info("context done, stopping message processing")
-				close(rpcConn.WriteSink)
-				return nil
-			default:
-			}
+		methodRoute, ok := n.routes[msg.Req.Method]
+		if !ok || len(methodRoute) == 0 {
+			n.logger.Debug("no handler found for method", "method", msg.Req.Method)
+			n.sendErrorResponse(rpcConn, msg.Req.RequestID, fmt.Sprintf("unknown method: %s", msg.Req.Method))
+			continue
+		}
 
-			_, messageBytes, err := conn.ReadMessage()
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					n.logger.Error("WebSocket connection closed with unexpected reason", "error", err)
-				} else {
-					err = nil
-				}
-
-				close(rpcConn.WriteSink)
-				return err
-			}
-
-			var msg RPCMessage
-			if err := json.Unmarshal(messageBytes, &msg); err != nil {
-				n.logger.Debug("invalid message format", "error", err, "message", string(messageBytes))
-				n.sendErrorResponse(rpcConn, 0, "invalid message format")
-				continue
-			}
-
-			if err := validate.Struct(&msg); err != nil {
-				n.logger.Debug("message validation failed", "error", err, "message", string(messageBytes))
-				n.sendErrorResponse(rpcConn, msg.Req.RequestID, "message validation failed")
-				continue
-			}
-
-			methodRoute, ok := n.routes[msg.Req.Method]
-			if !ok || len(methodRoute) == 0 {
-				n.logger.Debug("no handler found for method", "method", msg.Req.Method)
+		var routeHandlers []RPCHandler
+		for _, handlersId := range methodRoute {
+			handlers, exists := n.handlerChain[handlersId]
+			if !exists || len(handlers) == 0 {
+				n.logger.Error("no handlers found for id", "id", handlersId)
 				n.sendErrorResponse(rpcConn, msg.Req.RequestID, fmt.Sprintf("unknown method: %s", msg.Req.Method))
-				continue
+				continue read_loop
 			}
 
-			var routeHandlers []RPCHandler
-			for _, handlersId := range methodRoute {
-				handlers, exists := n.handlerChain[handlersId]
-				if !exists || len(handlers) == 0 {
-					n.logger.Error("no handlers found for id", "id", handlersId)
-					n.sendErrorResponse(rpcConn, msg.Req.RequestID, fmt.Sprintf("unknown method: %s", msg.Req.Method))
-					continue read_loop
-				}
-
-				routeHandlers = append(routeHandlers, handlers...)
-			}
-			n.logger.Info("processing message",
-				"requestID", msg.Req.RequestID,
-				"userID", rpcConn.UserID,
-				"method", msg.Req.Method,
-				"route", methodRoute)
-
-			ctx := &RPCContext{
-				Context:  context.Background(),
-				UserID:   rpcConn.UserID,
-				Signer:   n.signer,
-				Message:  msg,
-				handlers: routeHandlers,
-				Storage:  rpcConn.Storage,
-			}
-			ctx.Next() // Start processing the handlers
-
-			responseBytes, err := ctx.GetRawResponse()
-			if err != nil {
-				n.logger.Error("failed to prepare response", "error", err, "method", msg.Req.Method)
-				continue
-			}
-			writeRPCMessageWithTimeout(rpcConn.WriteSink, responseBytes)
-
-			postProcessContext(ctx)
-
-			n.connHub.Set(&RPCConnection{
-				ConnectionID: rpcConn.ConnectionID,
-				UserID:       ctx.UserID,
-				WriteSink:    rpcConn.WriteSink,
-				Storage:      ctx.Storage,
-			})
+			routeHandlers = append(routeHandlers, handlers...)
 		}
-	}
+		n.logger.Info("processing message",
+			"requestID", msg.Req.RequestID,
+			"userID", rpcConn.UserID,
+			"method", msg.Req.Method,
+			"route", methodRoute)
 
-	// writeMessages handles outgoing messages to the WebSocket connection.
-	// It reads from the message sink channel and writes to the WebSocket.
-	writeMessages := func() error {
-		for messageBytes := range messageSink {
-			w, err := conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				n.logger.Error("error getting writer for response", "error", err)
-				continue
-			}
+		ctx := &RPCContext{
+			Context:  context.Background(),
+			UserID:   rpcConn.UserID(),
+			Signer:   n.signer,
+			Message:  msg,
+			handlers: routeHandlers,
+			Storage:  safeStorage,
+		}
+		ctx.Next() // Start processing the handlers
 
-			if _, err := w.Write(messageBytes); err != nil {
-				n.logger.Error("error writing response", "error", err)
-				w.Close()
-				continue
-			}
+		responseBytes, err := ctx.GetRawResponse()
+		if err != nil {
+			n.logger.Error("failed to prepare response", "error", err, "method", msg.Req.Method)
+			continue
+		}
+		rpcConn.Write(responseBytes)
 
-			if err := w.Close(); err != nil {
-				n.logger.Error("error closing writer for response", "error", err)
-				continue
-			}
+		// Handle re-authentication
+		if rpcConn.UserID() != ctx.UserID {
+			// If the user ID changed during processing, do the re-authentication
+			n.connHub.Reauthenticate(rpcConn.ConnectionID(), ctx.UserID)
 
-			for _, handler := range n.onMessageSentHandlers {
-				handler()
+			// Notify authenticated handlers about the new user ID
+			for _, handler := range n.onAuthenticatedHandlers {
+				handler(ctx.UserID, n.getSendMessageFunc(rpcConn))
 			}
 		}
-
-		return nil
-	}
-
-	errorGroup.Go(readMesages)
-	errorGroup.Go(writeMessages)
-	if err := errorGroup.Wait(); err != nil && parentCtx.Err() == nil {
-		n.logger.Error("error in WebSocket message handling", "error", err)
 	}
 }
 
@@ -517,7 +464,7 @@ func (wn *RPCNode) Notify(userID, method string, params ...any) {
 
 // getSendMessageFunc creates a SendRPCMessageFunc for a specific connection.
 // The returned function can be used to send notifications to that connection.
-func (wn *RPCNode) getSendMessageFunc(writeSink chan<- []byte) SendRPCMessageFunc {
+func (wn *RPCNode) getSendMessageFunc(conn *RPCConnection) SendRPCMessageFunc {
 	return func(method string, params ...any) {
 		message, err := prepareRawNotification(wn.signer, method, params...)
 		if err != nil {
@@ -525,12 +472,12 @@ func (wn *RPCNode) getSendMessageFunc(writeSink chan<- []byte) SendRPCMessageFun
 			return
 		}
 
-		if writeSink == nil {
-			wn.logger.Error("write sink is nil, cannot send message", "method", method)
+		if conn == nil {
+			wn.logger.Error("RPCConnection is nil, cannot send message", "method", method)
 			return
 		}
 
-		writeRPCMessageWithTimeout(writeSink, message)
+		conn.Write(message)
 	}
 }
 
@@ -558,7 +505,7 @@ func (wn *RPCNode) sendErrorResponse(conn *RPCConnection, requestID uint64, mess
 		return
 	}
 
-	writeRPCMessageWithTimeout(conn.WriteSink, responseBytes)
+	conn.Write(responseBytes)
 }
 
 // RPCHandlerGroup represents a collection of handlers with shared middleware.
@@ -595,97 +542,6 @@ func (hg *RPCHandlerGroup) Use(middleware RPCHandler) {
 	hg.root.use(hg.groupId, middleware)
 }
 
-// RPCConnection represents an active WebSocket connection.
-// It tracks the authentication, stores session data, and provides communication channels.
-type RPCConnection struct {
-	// ConnectionID is a unique identifier for this connection
-	ConnectionID string
-	// UserID is the authenticated user's identifier (empty if not authenticated)
-	UserID string
-	// WriteSink is the channel for sending messages to this connection
-	WriteSink chan<- []byte
-	// Storage provides per-connection storage for session data
-	Storage *SafeStorage
-}
-
-// rpcConnectionHub manages all active WebSocket connections.
-// It provides thread-safe operations for connection tracking and user mapping.
-type rpcConnectionHub struct {
-	// connections maps connection IDs to RPCConnection instances
-	connections map[string]*RPCConnection
-	// authMapping maps user IDs to connection IDs for authenticated users
-	authMapping map[string]string
-	// mu protects concurrent access to the maps
-	mu sync.RWMutex
-}
-
-// newRPCConnectionHub creates a new instance of rpcConnectionHub.
-// The hub is used internally by RPCNode to manage connections.
-func newRPCConnectionHub() *rpcConnectionHub {
-	return &rpcConnectionHub{
-		connections: make(map[string]*RPCConnection),
-		authMapping: make(map[string]string),
-	}
-}
-
-// Set adds or updates a connection in the hub.
-// If the connection has a UserID, it also updates the user mapping.
-func (hub *rpcConnectionHub) Set(conn *RPCConnection) {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
-	hub.connections[conn.ConnectionID] = conn
-
-	if conn.UserID != "" {
-		hub.authMapping[conn.UserID] = conn.ConnectionID
-	}
-}
-
-// Get retrieves a connection by its connection ID.
-// Returns nil if the connection doesn't exist.
-func (hub *rpcConnectionHub) Get(connID string) *RPCConnection {
-	hub.mu.RLock()
-	defer hub.mu.RUnlock()
-
-	conn, ok := hub.connections[connID]
-	if !ok {
-		return nil
-	}
-
-	return conn
-}
-
-// Remove deletes a connection from the hub.
-// It also removes any associated user mapping.
-func (hub *rpcConnectionHub) Remove(connID string) {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
-	conn, ok := hub.connections[connID]
-	if !ok {
-		return
-	}
-
-	delete(hub.connections, connID)
-	delete(hub.authMapping, conn.UserID)
-}
-
-// Publish sends a message to a specific authenticated user.
-// If the user is not connected, the message is silently dropped.
-func (hub *rpcConnectionHub) Publish(userID string, message []byte) {
-	hub.mu.RLock()
-	defer hub.mu.RUnlock()
-	connID, ok := hub.authMapping[userID]
-	if !ok {
-		return
-	}
-
-	conn, ok := hub.connections[connID]
-	if !ok {
-		return
-	}
-
-	writeRPCMessageWithTimeout(conn.WriteSink, message)
-}
-
 // SafeStorage provides thread-safe key-value storage for connection-specific data.
 // It's used to store session information, authentication policies, and other per-connection state.
 type SafeStorage struct {
@@ -718,14 +574,4 @@ func (s *SafeStorage) Get(key string) (any, bool) {
 	defer s.mu.RUnlock()
 
 	return s.storage[key], s.storage[key] != nil
-}
-
-func writeRPCMessageWithTimeout(writeSink chan<- []byte, message []byte) {
-	select {
-	case <-time.After(defaultRPCMessageWriteDuration):
-		// TODO: implement retry mechanism
-		return
-	case writeSink <- message:
-		return
-	}
 }

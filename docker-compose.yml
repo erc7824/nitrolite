@@ -129,7 +129,6 @@ services:
         condition: service_completed_successfully
 
   clearnode:
-    platform: linux/amd64
     build:
       context: ./clearnode
       dockerfile: Dockerfile

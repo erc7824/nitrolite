@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/erc7824/nitrolite/examples/bridge/custody"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/shopspring/decimal"
+
+	"github.com/erc7824/nitrolite/examples/cerebro/custody"
 )
 
 func (o *Operator) handleDepositChain(args []string) {

@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	"github.com/erc7824/nitrolite/examples/bridge/unisig"
+	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
 )
 
 func GetTokenBalance(chainID uint32, chainRPC string,

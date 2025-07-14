@@ -13,7 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	"github.com/erc7824/nitrolite/examples/bridge/unisig"
+	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
 )
 
 const (

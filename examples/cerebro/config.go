@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/erc7824/nitrolite/examples/bridge/unisig"
+	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
 )
 
 type OperatorConfig struct {
@@ -20,6 +20,20 @@ func (c OperatorConfig) GetNetworkByName(name string) *NetworkConfig {
 		}
 	}
 	return nil
+}
+
+func (c OperatorConfig) GetSymbolsOfEnabledAssets() []string {
+	var symbols []string
+	var alreadyAdded = make(map[string]bool)
+	for _, network := range c.Networks {
+		for _, asset := range network.Assets {
+			if asset.IsEnabled() && !alreadyAdded[asset.Symbol] {
+				symbols = append(symbols, asset.Symbol)
+				alreadyAdded[asset.Symbol] = true
+			}
+		}
+	}
+	return symbols
 }
 
 type NetworkConfig struct {

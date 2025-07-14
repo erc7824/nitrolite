@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/erc7824/nitrolite/examples/bridge/unisig"
+	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
 )
 
 func (o *Operator) handleAuthenticate(args []string) {

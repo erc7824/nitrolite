@@ -12,7 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/shopspring/decimal"
 
-	"github.com/erc7824/nitrolite/examples/bridge/unisig"
+	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
 )
 
 const (
@@ -254,6 +254,68 @@ func (c *ClearnodeClient) RequestChannelResize(walletAddress common.Address, cha
 	}
 
 	return &resizeRes, nil
+}
+
+type TransferReq struct {
+	Destination        string               `json:"destination"`
+	DestinationUserTag string               `json:"destination_user_tag"`
+	Allocations        []TransferAllocation `json:"allocations"`
+}
+
+type TransferAllocation struct {
+	AssetSymbol string          `json:"asset"`
+	Amount      decimal.Decimal `json:"amount"`
+}
+
+type TransactionResponse struct {
+	Id             uint            `json:"id"`
+	TxType         string          `json:"tx_type"`
+	FromAccount    string          `json:"from_account"`
+	FromAccountTag string          `json:"from_account_tag,omitempty"` // Optional tag for the source account
+	ToAccount      string          `json:"to_account"`
+	ToAccountTag   string          `json:"to_account_tag,omitempty"` // Optional tag for the destination account
+	Asset          string          `json:"asset"`
+	Amount         decimal.Decimal `json:"amount"`
+	CreatedAt      time.Time       `json:"created_at"`
+}
+
+func (c *ClearnodeClient) Transfer(destinationTag, assetSymbol string, amount decimal.Decimal) (*TransactionResponse, error) {
+	if c.signer == nil {
+		return nil, fmt.Errorf("client not authenticated")
+	}
+
+	params := TransferReq{
+		DestinationUserTag: destinationTag,
+		Allocations: []TransferAllocation{
+			{
+				AssetSymbol: assetSymbol,
+				Amount:      amount,
+			},
+		},
+	}
+
+	res, err := c.request("transfer", nil, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transfer: %w", err)
+	}
+	if res.Res.Method != "transfer" || len(res.Res.Params) < 1 {
+		return nil, fmt.Errorf("unexpected response to transfer: %v", res.Res)
+	}
+
+	resizeResJSON, err := json.Marshal(res.Res.Params[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal closure response: %w", err)
+	}
+
+	var txs []TransactionResponse
+	if err := json.Unmarshal(resizeResJSON, &txs); err != nil {
+		return nil, fmt.Errorf("failed to parse channels: %w", err)
+	}
+	if len(txs) == 0 {
+		return nil, fmt.Errorf("no transactions returned from transfer request")
+	}
+
+	return &txs[0], nil
 }
 
 func (c *ClearnodeClient) readMessages() {

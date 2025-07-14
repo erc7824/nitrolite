@@ -8,9 +8,9 @@ import (
 	"github.com/c-bata/go-prompt"
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/erc7824/nitrolite/examples/bridge/clearnet"
-	"github.com/erc7824/nitrolite/examples/bridge/custody"
-	"github.com/erc7824/nitrolite/examples/bridge/storage"
+	"github.com/erc7824/nitrolite/examples/cerebro/clearnet"
+	"github.com/erc7824/nitrolite/examples/cerebro/custody"
+	"github.com/erc7824/nitrolite/examples/cerebro/storage"
 )
 
 type Operator struct {
@@ -49,6 +49,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			{Text: "resize", Description: "Resize a channel on a chain"},
 			{Text: "deposit", Description: "Deposit assets to a chain"},
 			{Text: "withdraw", Description: "Withdraw assets from a chain"},
+			{Text: "transfer", Description: "Transfer assets to someone else"},
 			{Text: "exit", Description: "Exit the application"},
 		}
 	}
@@ -87,6 +88,12 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			}
 
 			return o.getChainSuggestions(0) // Suggest all chains
+		case "transfer":
+			if !o.isUserAuthenticated() {
+				return nil
+			}
+
+			return o.getAssetSuggestions("", 0) // Suggest all assets for the current wallet
 		default:
 			return nil // No suggestions for other commands
 		}
@@ -181,6 +188,8 @@ func (o *Operator) Execute(s string) {
 		o.handleDepositChain(args)
 	case "withdraw":
 		o.handleWithdrawChain(args)
+	case "transfer":
+		o.handleTransfer(args)
 	case "exit":
 		fmt.Println("Exiting...")
 		os.Exit(0)
@@ -271,7 +280,23 @@ func (o *Operator) getChainSuggestions(filterEnabled int) []prompt.Suggest {
 	return suggestions
 }
 
+// getAssetSuggestions returns a list of asset suggestions for a specific chain.
+// chainName is the name of the chain, and filterEnabled can be 0 (all assets),
+// >0 (only enabled assets), or <0 (only disabled assets).
 func (o *Operator) getAssetSuggestions(chainName string, filterEnabled int) []prompt.Suggest {
+	if chainName == "" {
+		assetSymbols := o.config.GetSymbolsOfEnabledAssets()
+		suggestions := make([]prompt.Suggest, len(assetSymbols))
+		for i, symbol := range assetSymbols {
+			suggestions[i] = prompt.Suggest{
+				Text:        symbol,
+				Description: fmt.Sprintf("Asset %s", strings.ToUpper(symbol)),
+			}
+		}
+
+		return suggestions
+	}
+
 	network := o.config.GetNetworkByName(chainName)
 	if network == nil {
 		return nil
@@ -294,6 +319,7 @@ func (o *Operator) getAssetSuggestions(chainName string, filterEnabled int) []pr
 	return suggestions
 }
 
+// getWalletSuggestions returns a list of wallet suggestions from the storage.
 func (o *Operator) getWalletSuggestions() []prompt.Suggest {
 	walletDTOs, err := o.store.GetPrivateKeys(false)
 	if err != nil {
@@ -311,6 +337,7 @@ func (o *Operator) getWalletSuggestions() []prompt.Suggest {
 	return s
 }
 
+// getSignerSuggestions returns a list of signer suggestions from the storage.
 func (o *Operator) getSignerSuggestions() []prompt.Suggest {
 	signerDTOs, err := o.store.GetPrivateKeys(true)
 	if err != nil {

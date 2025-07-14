@@ -35,6 +35,7 @@ go run . <clearnode_ws_url>
 - `deposit` - Deposit assets from your wallet to the custody ledger
 - `withdraw` - Withdraw assets from the custody ledger to your wallet
 - `resize` - Resize payment channels by moving funds from ledger to channel
+- `transfer` - Transfer assets to another Clearnode user
 - `exit` - Exit the application
 
 ## Dependencies

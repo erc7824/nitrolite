@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/erc7824/nitrolite/examples/bridge/unisig"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
 )
 
 const (
-	defaultDBPath = "bridge.db"
+	defaultDBPath = "cerebro.db"
 )
 
 type Storage struct {

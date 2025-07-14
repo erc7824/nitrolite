@@ -11,8 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/shopspring/decimal"
 
-	"github.com/erc7824/nitrolite/examples/bridge/clearnet"
-	"github.com/erc7824/nitrolite/examples/bridge/custody"
+	"github.com/erc7824/nitrolite/examples/cerebro/clearnet"
+	"github.com/erc7824/nitrolite/examples/cerebro/custody"
 )
 
 func (o *Operator) handleEnableChain(args []string) {

@@ -7,8 +7,8 @@ import (
 	"github.com/c-bata/go-prompt"
 	"golang.org/x/term"
 
-	"github.com/erc7824/nitrolite/examples/bridge/clearnet"
-	"github.com/erc7824/nitrolite/examples/bridge/storage"
+	"github.com/erc7824/nitrolite/examples/cerebro/clearnet"
+	"github.com/erc7824/nitrolite/examples/cerebro/storage"
 )
 
 func main() {

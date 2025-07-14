@@ -1,4 +1,4 @@
-module github.com/erc7824/nitrolite/examples/bridge
+module github.com/erc7824/nitrolite/examples/cerebro
 
 go 1.24.3
 

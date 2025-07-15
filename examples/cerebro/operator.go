@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/c-bata/go-prompt"
@@ -18,6 +17,8 @@ type Operator struct {
 	custody   *custody.CustodyClient
 	store     *storage.Storage
 	config    *OperatorConfig
+
+	exitCh chan struct{}
 }
 
 func NewOperator(clearnode *clearnet.ClearnodeClient, store *storage.Storage) (*Operator, error) {
@@ -26,6 +27,7 @@ func NewOperator(clearnode *clearnet.ClearnodeClient, store *storage.Storage) (*
 		custody:   custody.NewCustodyClient(),
 		store:     store,
 		config:    &OperatorConfig{},
+		exitCh:    make(chan struct{}),
 	}
 	operator.reloadConfig()
 
@@ -191,11 +193,19 @@ func (o *Operator) Execute(s string) {
 	case "transfer":
 		o.handleTransfer(args)
 	case "exit":
-		fmt.Println("Exiting...")
-		os.Exit(0)
+		o.exit()
 	default:
 		fmt.Printf("Unknown command: %s\n", s)
 	}
+}
+
+func (o *Operator) Wait() {
+	// Wait for exit signal
+	<-o.exitCh
+}
+
+func (o *Operator) exit() {
+	close(o.exitCh)
 }
 
 func (o *Operator) readExtraArg(name string) string {

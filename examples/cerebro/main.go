@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/c-bata/go-prompt"
 	"golang.org/x/term"
@@ -37,31 +38,48 @@ func main() {
 	}
 
 	initialState, _ := term.GetState(int(os.Stdin.Fd()))
-	defer term.Restore(int(os.Stdin.Fd()), initialState)
-
-	for {
-		t := prompt.Input(">>> ", operator.Complete,
-			prompt.OptionTitle("Cerebro CLI"),
-			prompt.OptionPrefixTextColor(prompt.Yellow),
-			prompt.OptionPreviewSuggestionTextColor(prompt.Cyan),
-
-			prompt.OptionSuggestionTextColor(prompt.White),
-			prompt.OptionSuggestionBGColor(prompt.DarkBlue),
-
-			prompt.OptionDescriptionTextColor(prompt.Black),
-			prompt.OptionDescriptionBGColor(prompt.Yellow),
-
-			prompt.OptionSelectedSuggestionTextColor(prompt.Black),
-			prompt.OptionSelectedSuggestionBGColor(prompt.Yellow),
-
-			prompt.OptionSelectedDescriptionTextColor(prompt.White),
-			prompt.OptionSelectedDescriptionBGColor(prompt.DarkBlue),
-
-			prompt.OptionShowCompletionAtStart(),
-		)
-
-		operator.Execute(t)
+	handleExit := func() {
+		term.Restore(int(os.Stdin.Fd()), initialState)
+		exec.Command("stty", "sane").Run()
 	}
+
+	p := prompt.New(
+		operator.Execute,
+		operator.Complete,
+		prompt.OptionPrefix(">>> "),
+
+		prompt.OptionTitle("Cerebro CLI"),
+		prompt.OptionPrefixTextColor(prompt.Yellow),
+		prompt.OptionPreviewSuggestionTextColor(prompt.Cyan),
+
+		prompt.OptionSuggestionTextColor(prompt.White),
+		prompt.OptionSuggestionBGColor(prompt.DarkBlue),
+
+		prompt.OptionDescriptionTextColor(prompt.Black),
+		prompt.OptionDescriptionBGColor(prompt.Yellow),
+
+		prompt.OptionSelectedSuggestionTextColor(prompt.Black),
+		prompt.OptionSelectedSuggestionBGColor(prompt.Yellow),
+
+		prompt.OptionSelectedDescriptionTextColor(prompt.White),
+		prompt.OptionSelectedDescriptionBGColor(prompt.DarkBlue),
+
+		prompt.OptionShowCompletionAtStart(),
+		prompt.OptionAddKeyBind(prompt.KeyBind{
+			Key: prompt.ControlC,
+			Fn: func(buf *prompt.Buffer) {
+				fmt.Println("Exiting Cerebro CLI.")
+				handleExit()
+				os.Exit(0)
+			},
+		}),
+	)
+
+	go p.Run()
+
+	operator.Wait()
+	handleExit()
+	fmt.Println("Exiting Cerebro CLI.")
 }
 
 func emptyCompleter(d prompt.Document) []prompt.Suggest {

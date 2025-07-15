@@ -145,6 +145,8 @@ func runCli(logger Logger, name string) {
 		runExportTransactionsCli(logger)
 	case "jsonschema":
 		runExportJsonSchemaCli(logger)
+	case "zod-generator":
+		runZodGeneratorCli(logger)
 	default:
 		logger.Fatal("Unknown CLI command", "name", name)
 	}

@@ -98,7 +98,7 @@ func setupTestDB(t testing.TB) (*gorm.DB, func()) {
 	return db, cleanup
 }
 
-func setupTestRPCRouter(t *testing.T) (*RPCRouter, func()) {
+func setupTestRPCRouter(t *testing.T) (*RPCRouter, *gorm.DB, func()) {
 	db, dbCleanup := setupTestDB(t)
 
 	// Use a test private key
@@ -123,7 +123,7 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, func()) {
 
 	router.AppSessionService.SetPublishBalanceUpdateCallback(router.SendBalanceUpdate)
 
-	return router, func() {
+	return router, router.DB, func() {
 		dbCleanup()
 	}
 }

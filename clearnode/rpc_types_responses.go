@@ -21,11 +21,17 @@ type ResponseGenerator struct {
 
 // NewResponseGenerator creates a new response generator
 func NewResponseGenerator(responseDefs map[string]SchemaProperty, responseTypes map[string]string, commonDefs map[string]SchemaProperty, sortedDefNames func(map[string]SchemaProperty) []string, rpcMethodToEnum func(string) string) *ResponseGenerator {
+	zodGenerator, err := NewZodSchemaGenerator()
+	if err != nil {
+		// Fallback to basic generator if template creation fails
+		zodGenerator = &ZodSchemaGenerator{}
+	}
+	
 	return &ResponseGenerator{
 		responseDefs:    responseDefs,
 		responseTypes:   responseTypes,
 		commonDefs:      commonDefs,
-		zodGenerator:    &ZodSchemaGenerator{},
+		zodGenerator:    zodGenerator,
 		sortedDefNames:  sortedDefNames,
 		rpcMethodToEnum: rpcMethodToEnum,
 	}
@@ -117,33 +123,76 @@ func (r *ResponseGenerator) generateResponseParsers() string {
 
 // GenerateResponseTypesFile generates sdk/src/rpc/types/response.ts with TypeScript interfaces
 func (r *ResponseGenerator) GenerateResponseTypesFile(sdkRootDir string) error {
+	content, err := r.buildResponseTypeScriptFileContent()
+	if err != nil {
+		return err
+	}
+	
+	return r.writeResponseTypesFile(sdkRootDir, content)
+}
+
+// buildResponseTypeScriptFileContent builds the complete TypeScript content for response types
+func (r *ResponseGenerator) buildResponseTypeScriptFileContent() (string, error) {
 	var sb strings.Builder
 
-	// Add header comment
-	sb.WriteString("// Auto-generated TypeScript response types with camelCase field names\n")
-	sb.WriteString("// Generated from JSON schemas\n\n")
-
-	// Add viem imports
-	sb.WriteString("import type { Address, Hex } from 'viem';\n")
-	sb.WriteString("import {RPCMethod, GenericRPCMessage} from '.';\n\n")
+	// Add header and imports
+	sb.WriteString(r.generateResponseFileHeader())
 
 	// Generate common type interfaces
+	commonInterfaces, err := r.generateCommonTypeInterfaces()
+	if err != nil {
+		return "", err
+	}
+	sb.WriteString(commonInterfaces)
+
+	// Generate response-specific type interfaces
+	responseInterfaces, err := r.generateResponseTypeInterfaces()
+	if err != nil {
+		return "", err
+	}
+	sb.WriteString(responseInterfaces)
+
+	// Generate RPCResponse union type and helper types
+	sb.WriteString(r.generateRPCResponseUnionType())
+
+	return sb.String(), nil
+}
+
+// generateResponseFileHeader generates the file header with imports
+func (r *ResponseGenerator) generateResponseFileHeader() string {
+	var sb strings.Builder
+	sb.WriteString("// Auto-generated TypeScript response types with camelCase field names\n")
+	sb.WriteString("// Generated from JSON schemas\n\n")
+	sb.WriteString("import type { Address, Hex } from 'viem';\n")
+	sb.WriteString("import {RPCMethod, GenericRPCMessage} from '.';\n\n")
+	return sb.String()
+}
+
+// generateCommonTypeInterfaces generates interfaces for common types
+func (r *ResponseGenerator) generateCommonTypeInterfaces() (string, error) {
+	var sb strings.Builder
 	commonNames := r.sortedDefNames(r.commonDefs)
+	
 	for _, name := range commonNames {
 		def := r.commonDefs[name]
-		// Skip generating interfaces for special types that should be handled as primitives
 		if r.shouldSkipInterfaceGeneration(name) {
 			continue
 		}
+		
 		tsInterface := r.generateTypeScriptInterface(name, def)
 		sb.WriteString(tsInterface)
 	}
+	
+	return sb.String(), nil
+}
 
-	// Generate response-specific type interfaces
+// generateResponseTypeInterfaces generates interfaces for response-specific types
+func (r *ResponseGenerator) generateResponseTypeInterfaces() (string, error) {
+	var sb strings.Builder
 	definitionNames := r.sortedDefNames(r.responseDefs)
+	
 	for _, name := range definitionNames {
 		def := r.responseDefs[name]
-		// Skip generating interfaces for special types that should be handled as primitives
 		if r.shouldSkipInterfaceGeneration(name) {
 			continue
 		}
@@ -158,19 +207,19 @@ func (r *ResponseGenerator) GenerateResponseTypesFile(sdkRootDir string) error {
 		tsInterface := r.generateTypeScriptInterface(name, def)
 		sb.WriteString(tsInterface)
 	}
+	
+	return sb.String(), nil
+}
 
-	// Generate RPCResponse union type and helper types
-	sb.WriteString(r.generateRPCResponseUnionType())
-
-	// Ensure directory exists
+// writeResponseTypesFile writes the TypeScript content to the response types file
+func (r *ResponseGenerator) writeResponseTypesFile(sdkRootDir string, content string) error {
 	outputDir := filepath.Join(sdkRootDir, "src", "rpc", "types")
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", outputDir, err)
 	}
 
-	// Write to file
 	outputPath := filepath.Join(outputDir, "response.ts")
-	return os.WriteFile(outputPath, []byte(sb.String()), 0o644)
+	return os.WriteFile(outputPath, []byte(content), 0o644)
 }
 
 // shouldSkipInterfaceGeneration checks if a type should skip interface generation

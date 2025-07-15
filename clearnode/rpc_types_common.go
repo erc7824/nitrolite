@@ -10,7 +10,11 @@ import (
 // generateCommonFile generates the common_gen.ts file with shared schemas
 func (g *ZodGenerator) generateCommonFile(sdkRootDir string) error {
 	var sb strings.Builder
-	zodGen := &ZodSchemaGenerator{}
+	zodGen, err := NewZodSchemaGenerator()
+	if err != nil {
+		// Fallback to basic generator if template creation fails
+		zodGen = &ZodSchemaGenerator{}
+	}
 
 	// Add imports
 	sb.WriteString("import { z } from 'zod';\n")

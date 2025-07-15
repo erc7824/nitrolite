@@ -19,11 +19,17 @@ type RequestGenerator struct {
 
 // NewRequestGenerator creates a new request generator
 func NewRequestGenerator(requestDefs map[string]SchemaProperty, requestTypes map[string]string, commonDefs map[string]SchemaProperty, sortedDefNames func(map[string]SchemaProperty) []string, rpcMethodToEnum func(string) string) *RequestGenerator {
+	zodGenerator, err := NewZodSchemaGenerator()
+	if err != nil {
+		// Fallback to basic generator if template creation fails
+		zodGenerator = &ZodSchemaGenerator{}
+	}
+	
 	return &RequestGenerator{
 		requestDefs:     requestDefs,
 		requestTypes:    requestTypes,
 		commonDefs:      commonDefs,
-		zodGenerator:    &ZodSchemaGenerator{},
+		zodGenerator:    zodGenerator,
 		sortedDefNames:  sortedDefNames,
 		rpcMethodToEnum: rpcMethodToEnum,
 	}

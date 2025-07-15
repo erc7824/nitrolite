@@ -375,7 +375,15 @@ Retrieves the user's tag, which can be used for transfer operations. The tag is 
 
 This method allows a user to transfer assets from their unified balance to another account. The user must have sufficient funds for each asset being transferred. The operation will fail if any of the specified assets have insufficient funds.
 
-User may specify the `destination` (wallet address) or `destination_user_tag` (user tag) to identify the recipient. `destination_user_tag` is used if and only if the `destination` field is empty.
+User may specify the `destination` (wallet address or app_session_id) or `destination_user_tag` (user tag) to identify the recipient. `destination_user_tag` is used if and only if the `destination` field is empty.
+
+**Deposit to App Sessions:**
+When transferring to an app session the system validates:
+- The app session must be open
+- The user must be a participant in the session
+- The session version is automatically incremented upon successful deposit
+
+**Request (Transfer to another user's unified account):**
 
 CAUTION: Invalid destination address may result in loss of funds.
 Currently, `Transfer` supports ledger account of another user as destination (wallet address is identifier).
@@ -400,7 +408,7 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
   "sig": ["0x9876fedcba..."]
 }
 
-// OR
+// OR (transfer by user tag)
 
 {
   "req": [1, "transfer", [{
@@ -413,6 +421,21 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
       {
         "asset": "eth",
         "amount": "0.1"
+      }
+    ]
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+
+// OR (deposit into virtual app)
+
+{
+  "req": [1, "transfer", [{
+    "destination": "0x3456789012abcdef...", // App session ID
+    "allocations": [
+      {
+        "asset": "usdc",
+        "amount": "100.0"
       }
     ]
   }], 1619123456789],

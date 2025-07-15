@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // CodeFileGenerator centralizes code file generation logic
@@ -83,9 +86,6 @@ func (generator *CodeFileGenerator) buildCommonSchemaContent() string {
 	contentBuilder.WriteString("import { Address } from 'viem';\n\n")
 	contentBuilder.WriteString("// Common schemas used by both requests and responses\n\n")
 
-	// Add built-in schemas
-	contentBuilder.WriteString(generator.zodSchemaBuilder.GenerateBuiltinSchemas())
-
 	// Add common definitions
 	sortedDefinitions := generator.dependencies.DefinitionSorter(generator.dependencies.CommonDefinitions)
 	contentBuilder.WriteString(generator.zodSchemaBuilder.GenerateSchemaDefinitions(sortedDefinitions, generator.dependencies.CommonDefinitions))
@@ -100,7 +100,7 @@ func (generator *CodeFileGenerator) buildRequestSchemaContent() string {
 	// Add imports
 	contentBuilder.WriteString("import { z } from 'zod';\n")
 	contentBuilder.WriteString("import { RPCMethod } from '../types';\n")
-	contentBuilder.WriteString("import { addressSchema, hexSchema } from './common_gen';\n")
+	contentBuilder.WriteString("import { AddressSchema, hexSchema } from './common_gen';\n")
 
 	// Add common schema imports
 	commonDefinitions := generator.dependencies.DefinitionSorter(generator.dependencies.CommonDefinitions)
@@ -126,7 +126,7 @@ func (generator *CodeFileGenerator) buildResponseSchemaContent() string {
 	// Add imports
 	contentBuilder.WriteString("import { z } from 'zod';\n")
 	contentBuilder.WriteString("import { RPCMethod } from '../types';\n")
-	contentBuilder.WriteString("import { addressSchema, hexSchema } from './common_gen';\n")
+	contentBuilder.WriteString("import { AddressSchema, HexSchema } from './common_gen';\n")
 
 	// Add TypeScript type imports
 	contentBuilder.WriteString("import type {\n")
@@ -165,8 +165,8 @@ func (generator *CodeFileGenerator) buildTypeScriptTypesContent() string {
 	var contentBuilder strings.Builder
 
 	// Add header
-	contentBuilder.WriteString("// Auto-generated TypeScript response types with camelCase field names\n")
-	contentBuilder.WriteString("// Generated from JSON schemas\n\n")
+	contentBuilder.WriteString("// Auto-generated response types.\n")
+	contentBuilder.WriteString("// Generated from JSON schemas.\n\n")
 	contentBuilder.WriteString("import type { Address, Hex } from 'viem';\n")
 	contentBuilder.WriteString("import {RPCMethod, GenericRPCMessage} from '.';\n\n")
 
@@ -348,7 +348,7 @@ func (generator *CodeFileGenerator) buildEnumInterface(name string, property Sch
 func (generator *CodeFileGenerator) buildParserMapping(generationType string, typeMappings map[string]RPCMethod) string {
 	var contentBuilder strings.Builder
 
-	contentBuilder.WriteString(fmt.Sprintf("// %s parser mapping\n", strings.Title(generationType)))
+	contentBuilder.WriteString(fmt.Sprintf("// %s parser mapping\n", cases.Title(language.English).String(generationType)))
 	contentBuilder.WriteString(fmt.Sprintf("export const %sParsers: Record<string, (params: any) => any> = {\n", generationType))
 
 	for typeName, rpcMethod := range typeMappings {

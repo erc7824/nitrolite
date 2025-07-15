@@ -22,12 +22,12 @@ func getTypeMappings() map[string]TypeMapping {
 			TypeScriptType:     "bigint",
 		},
 		"Address": {
-			ZodSchemaForFormat: "addressSchema",
+			ZodSchemaForFormat: "z.string().refine((val) => /^0x[0-9a-fA-F]{40}$/.test(val), {\n  message: 'Must be a 0x-prefixed hex string of 40 hex chars (EVM address)',\n})",
 			ZodSchemaForRef:    "AddressSchema",
 			TypeScriptType:     "Address",
 		},
 		"Hex": {
-			ZodSchemaForFormat: "hexSchema",
+			ZodSchemaForFormat: "z.string().refine((val) => /^0x[0-9a-fA-F]*$/.test(val), {\n  message: 'Must be a 0x-prefixed hex string',\n})",
 			ZodSchemaForRef:    "HexSchema",
 			TypeScriptType:     "Hex",
 		},
@@ -236,7 +236,7 @@ func (builder *ZodSchemaBuilder) getMappedZodSchemaForRef(defName string) string
 func (builder *ZodSchemaBuilder) GenerateCommonImports() string {
 	var sb strings.Builder
 	sb.WriteString("import { z } from 'zod';\n")
-	sb.WriteString("import { addressSchema, hexSchema } from './common_gen';\n")
+	sb.WriteString("import { AddressSchema, HexSchema } from './common_gen';\n")
 	return sb.String()
 }
 
@@ -256,20 +256,6 @@ func (builder *ZodSchemaBuilder) GenerateCommonSchemaImports(commonNames []strin
 		sb.WriteString("\n")
 	}
 	sb.WriteString("} from './common_gen';\n")
-	return sb.String()
-}
-
-// GenerateBuiltinSchemas generates built-in common schemas (address, hex)
-func (builder *ZodSchemaBuilder) GenerateBuiltinSchemas() string {
-	var sb strings.Builder
-	sb.WriteString("export const addressSchema = z.string().refine((val) => /^0x[0-9a-fA-F]{40}$/.test(val), {\n")
-	sb.WriteString("  message: 'Must be a 0x-prefixed hex string of 40 hex chars (EVM address)',\n")
-	sb.WriteString("});\n\n")
-
-	sb.WriteString("export const hexSchema = z.string().refine((val) => /^0x[0-9a-fA-F]*$/.test(val), {\n")
-	sb.WriteString("  message: 'Must be a 0x-prefixed hex string',\n")
-	sb.WriteString("});\n\n")
-
 	return sb.String()
 }
 

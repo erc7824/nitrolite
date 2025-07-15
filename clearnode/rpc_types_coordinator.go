@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type SchemaOrchestrator struct {
@@ -223,7 +226,7 @@ func (orchestrator *SchemaOrchestrator) topologicalSort(dependencyGraph map[stri
 func (orchestrator *SchemaOrchestrator) convertRPCMethodToEnumName(rpcMethod string) string {
 	methodParts := strings.Split(rpcMethod, "_")
 	for i, part := range methodParts {
-		methodParts[i] = strings.Title(part)
+		methodParts[i] = cases.Title(language.English).String(part)
 	}
 	return strings.Join(methodParts, "")
 }

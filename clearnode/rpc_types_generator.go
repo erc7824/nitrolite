@@ -99,12 +99,14 @@ func (g *ZodGenerator) GenerateAllFiles(outDir string) error {
 	}
 
 	// Generate request definitions
-	if err := g.generateRequestFile(outDir); err != nil {
+	requestGen := g.NewRequestGenerator()
+	if err := requestGen.GenerateRequestsFile(outDir); err != nil {
 		return err
 	}
 
 	// Generate response definitions
-	if err := g.generateResponseFile(outDir); err != nil {
+	responseGen := g.NewResponseGenerator()
+	if err := responseGen.GenerateResponsesFile(outDir); err != nil {
 		return err
 	}
 
@@ -163,4 +165,14 @@ func (g *ZodGenerator) rpcMethodToEnumName(method string) string {
 		parts[i] = strings.Title(part)
 	}
 	return strings.Join(parts, "")
+}
+
+// NewRequestGenerator creates a new request generator with this generator's data
+func (g *ZodGenerator) NewRequestGenerator() *RequestGenerator {
+	return NewRequestGenerator(g.requestDefs, g.requestTypes, g.commonDefs, g.getSortedDefinitionNames, g.rpcMethodToEnumName)
+}
+
+// NewResponseGenerator creates a new response generator with this generator's data
+func (g *ZodGenerator) NewResponseGenerator() *ResponseGenerator {
+	return NewResponseGenerator(g.responseDefs, g.responseTypes, g.commonDefs, g.getSortedDefinitionNames, g.rpcMethodToEnumName)
 }

@@ -53,60 +53,25 @@ type SignMessageFn = (args: { message: { raw: Hex } }) => Promise<Hex>;
  * @dev `signMessage` function should NOT add an EIP-191 prefix to the stateHash. See {@link SignMessageFn}.
  * @param stateHash The hash of the state to sign.
  * @param signer An object with a `signMessage` method compatible with Viem's interface (e.g., WalletClient, Account).
- * @returns The signature object { v, r, s }
+ * @returns The signature over the state hash.
  * @throws If the signer cannot sign messages or signing/parsing fails.
  */
 export async function signState(
     stateHash: StateHash,
     signMessage: SignMessageFn,
-): Promise<{
-    r: Hex;
-    s: Hex;
-    v: number;
-}> {
+): Promise<Signature> {
     try {
-        const signatureHex = await signMessage({ message: { raw: stateHash } });
-        const parsedSig = parseSignature(signatureHex);
-
-        // Handle both legacy (27/28) and EIP-155 (0/1) v values
-        let v: number;
-        if (parsedSig.v !== undefined) {
-            v = Number(parsedSig.v);
-        } else if (parsedSig.yParity !== undefined) {
-            v = parsedSig.yParity + 27;
-        } else {
-            throw new Error('Invalid signature format: missing v or yParity value');
-        }
-
-        return {
-            r: parsedSig.r,
-            s: parsedSig.s,
-            v,
-        };
+        return await signMessage({ message: { raw: stateHash } });
     } catch (error) {
         console.error('Error signing state hash:', error);
         throw new Error(`Failed to sign state hash: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 
-export function removeQuotesFromRS(input: Signature): Signature {
-    const output = { ...input };
-
-    if (typeof output.r === 'string') {
-        output.r = output.r.replace(/^"(.*)"$/, '$1') as Hex;
-    }
-
-    if (typeof output.s === 'string') {
-        output.s = output.s.replace(/^"(.*)"$/, '$1') as Hex;
-    }
-
-    return output;
-}
-
 /**
  * Verifies that a state hash was signed by the expected signer.
  * @param stateHash The hash of the state.
- * @param signature The signature object { v, r, s }.
+ * @param signature The signature to verify.
  * @param expectedSigner The address of the participant expected to have signed.
  * @returns True if the signature is valid and recovers to the expected signer, false otherwise.
  */
@@ -116,14 +81,9 @@ export async function verifySignature(
     expectedSigner: Address,
 ): Promise<boolean> {
     try {
-        // Reconstruct the flat hex signature needed by recoverMessageAddress
-        // Ensure v is adjusted if necessary (e.g., some signers might return 0/1 instead of 27/28)
-        const vNormalized = signature.v < 27 ? signature.v + 27 : signature.v;
-        const signatureHex = `${signature.r}${signature.s.slice(2)}${vNormalized.toString(16).padStart(2, '0')}` as Hex;
-
         const recoveredAddress = await recoverMessageAddress({
             message: { raw: stateHash },
-            signature: signatureHex,
+            signature: signature,
         });
 
         return recoveredAddress.toLowerCase() === expectedSigner.toLowerCase();

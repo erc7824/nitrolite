@@ -11,12 +11,9 @@ describe('NitroliteClient', () => {
         waitForTransactionReceipt: jest.fn(() => Promise.resolve({ status: 'success' })),
     } as any;
     const mockAccount = { address: '0x1234567890123456789012345678901234567890' as Address };
+    const mockSignature = '0x' + '1234567890abcdef'.repeat(8) + '1b'; // 128 hex chars, v = 27
     const mockSignMessage = jest.fn(() =>
-        Promise.resolve(
-            '0x' +
-                '1234567890abcdef'.repeat(8) + // 128 hex chars
-                '1b', // v = 27
-        ),
+        Promise.resolve(mockSignature),
     );
     const mockWalletClient = {
         account: mockAccount,
@@ -260,7 +257,7 @@ describe('NitroliteClient', () => {
                 params.channelId,
                 params.candidateState,
                 params.proofStates,
-                expect.any(Object), // the signature
+                mockSignature, // the signature
             );
             expect(tx).toBe('0xCHL');
         });

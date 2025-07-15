@@ -59,7 +59,7 @@ contract Counter is IAdjudicator {
         // proof is Initialize State
         if (candidate.version == 1) {
             return proofs[0].validateTransitionTo(candidate) && _validateAppTransitionTo(proofs[0].data, candidate.data)
-                && proofs[0].validateInitialState(chan) && _validateStateSig(chan, candidate);
+                && proofs[0].validateInitialState(chan, Utils.NO_EIP712_SUPPORT) && _validateStateSig(chan, candidate);
         }
 
         bytes memory proofData = proofs[0].data;
@@ -97,6 +97,6 @@ contract Counter is IAdjudicator {
             signerIdx = 1; // guest signer
         }
 
-        return Utils.verifySignature(Utils.getStateHash(chan, state), state.sigs[0], chan.participants[signerIdx]);
+        return state.verifyStateSignature(Utils.getChannelId(chan), Utils.NO_EIP712_SUPPORT, state.sigs[0], chan.participants[signerIdx]);
     }
 }

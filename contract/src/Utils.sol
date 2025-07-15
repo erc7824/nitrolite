@@ -2,7 +2,9 @@
 pragma solidity ^0.8.13;
 
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import {Channel, State, Signature, StateIntent} from "./interfaces/Types.sol";
+import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
+import {EIP712} from "lib/openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
+import {STATE_TYPEHASH, Channel, State, Signature, StateIntent} from "./interfaces/Types.sol";
 
 /**
  * @title Channel Utilities
@@ -10,9 +12,12 @@ import {Channel, State, Signature, StateIntent} from "./interfaces/Types.sol";
  */
 library Utils {
     using ECDSA for bytes32;
+    using MessageHashUtils for bytes32;
 
     uint256 constant CLIENT = 0;
     uint256 constant SERVER = 1;
+
+    bytes32 constant NO_EIP712_SUPPORT = keccak256("NoEIP712Support");
 
     /**
      * @notice Compute the unique identifier for a channel
@@ -40,26 +45,142 @@ library Utils {
     }
 
     /**
-     * @notice Recovers the signer of a state hash from a signature
-     * @param stateHash The hash of the state to verify (computed using the canonical form)
-     * @param sig The signature to verify
-     * @return The address of the signer
+     * @notice Compute the hash of a channel state in a canonical way (ignoring the signature)
+     * @param channelId The unique identifier for the channel
+     * @param state The state struct
+     * @return The state hash as bytes32
+     * @dev The state hash is computed according to the specification in the README, using channelId, data, version, and allocations
      */
-    function recoverSigner(bytes32 stateHash, Signature memory sig) internal pure returns (address) {
-        // Verify the signature directly on the stateHash without using EIP-191
-        return ECDSA.recover(stateHash, sig.v, sig.r, sig.s);
+    function getStateHashShort(bytes32 channelId, State memory state) internal pure returns (bytes32) {
+        return keccak256(abi.encode(channelId, state.intent, state.version, state.data, state.allocations));
     }
 
     /**
-     * @notice Verifies that a state is signed by the specified participant
-     * @param stateHash The hash of the state to verify (computed using the canonical form)
+     * @notice Recovers the signer of a state hash from a signature
+     * @param msgHash The hash of the message to verify the signature against
+     * @param sig The signature to verify
+     * @return The address of the signer
+     */
+    function recoverRawECDSASigner(bytes32 msgHash, Signature memory sig) internal pure returns (address) {
+        // Verify the signature directly on the stateHash without using EIP-191
+        return msgHash.recover(sig.v, sig.r, sig.s);
+    }
+
+    /**
+     * @notice Recovers the signer of a state hash using EIP-191 format
+     * @dev NOTE: FIXME: inconsistent with EIP-712 state recovery, which receives channelId and state as "message", whereas EIP-191 receives
+     * stateHash directly. This breaks the principle of least astonishment, as in EIP-191 and EIP-712 contexts the message is different.
+     * @param msgHash The hash of the message to verify the signature against
+     * @param sig The signature to verify
+     * @return The address of the signer
+     */
+    function recoverEIP191Signer(bytes32 msgHash, Signature memory sig) internal pure returns (address) {
+        return msgHash.toEthSignedMessageHash().recover(sig.v, sig.r, sig.s);
+    }
+
+    /**
+     * @notice Recovers the signer of a state hash using the EIP-712 format
+     * @param domainSeparator The EIP-712 domain separator
+     * @param structHash The hash of the struct to verify the signature against
+     * @param sig The signature to verify
+     * @return The address of the signer
+     */
+    function recoverEIP712Signer(bytes32 domainSeparator, bytes32 structHash, Signature memory sig)
+        internal
+        pure
+        returns (address)
+    {
+        return domainSeparator.toTypedDataHash(structHash).recover(sig.v, sig.r, sig.s);
+    }
+
+    /**
+     * @notice Recovers the signer of a state using EIP-712 format
+     * @param typeHash The type hash for the state structure
+     * @param channelId The unique identifier for the channel
+     * @param domainSeparator The EIP-712 domain separator
+     * @param state The state to verify
+     * @param sig The signature to verify
+     * @return The address of the signer
+     */
+    function recoverStateEIP712Signer(bytes32 typeHash, bytes32 channelId, bytes32 domainSeparator, State memory state, Signature memory sig)
+        internal
+        pure
+        returns (address)
+    {
+        return Utils.recoverEIP712Signer(domainSeparator, keccak256(abi.encode(typeHash, channelId, state.intent, state.version, keccak256(state.data), keccak256(abi.encode(state.allocations)))), sig);
+    }
+
+        /**
+     * @notice Verifies that a message hash is signed by the specified participant
+     * @param state The state to verify
+     * @param channelId The ID of the channel
+     * @param domainSeparator The EIP-712 domain separator for the channel
      * @param sig The signature to verify
      * @param signer The address of the expected signer
      * @return True if the signature is valid, false otherwise
      */
-    function verifySignature(bytes32 stateHash, Signature memory sig, address signer) internal pure returns (bool) {
-        address recoveredSigner = recoverSigner(stateHash, sig);
-        return recoveredSigner == signer;
+    function verifyStateSignature(State memory state, bytes32 channelId, bytes32 domainSeparator, Signature memory sig, address signer) internal pure returns (bool) {
+        bytes32 stateHash = Utils.getStateHashShort(channelId, state);
+
+        address rawECDSASigner = Utils.recoverRawECDSASigner(stateHash, sig);
+        if (rawECDSASigner == signer) {
+            return true;
+        }
+
+        address eip191Signer = Utils.recoverEIP191Signer(stateHash, sig);
+        if (eip191Signer == signer) {
+            return true;
+        }
+
+        if (domainSeparator == NO_EIP712_SUPPORT) {
+            return false;
+        }
+
+        address eip712Signer = Utils.recoverStateEIP712Signer(STATE_TYPEHASH, channelId, domainSeparator, state, sig);
+        if (eip712Signer == signer) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @notice Validates that a state is a valid initial state for a channel
+     * @dev Initial states must have version 0 and INITIALIZE intent
+     * @param state The state to validate
+     * @param chan The channel configuration
+     * @param domainSeparator The EIP-712 domain separator for the channel
+     * @return True if the state is a valid initial state, false otherwise
+     */
+    function validateInitialState(State memory state, Channel memory chan, bytes32 domainSeparator) internal view returns (bool) {
+        if (state.version != 0) {
+            return false;
+        }
+
+        if (state.intent != StateIntent.INITIALIZE) {
+            return false;
+        }
+
+        return validateUnanimousStateSignatures(state, chan, domainSeparator);
+    }
+
+    /**
+     * @notice Validates that a state has signatures from both participants
+     * @dev For 2-participant channels, both must sign to establish unanimous consent
+     * @param state The state to validate
+     * @param chan The channel configuration
+     * @param domainSeparator The EIP-712 domain separator for the channel
+     * @return True if the state has valid signatures from both participants, false otherwise
+     */
+    function validateUnanimousStateSignatures(State memory state, Channel memory chan, bytes32 domainSeparator) internal view returns (bool) {
+        if (state.sigs.length != 2) {
+            return false;
+        }
+
+        bytes32 channelId = getChannelId(chan);
+
+        return Utils.verifyStateSignature(state, channelId, domainSeparator, state.sigs[0], chan.participants[CLIENT])
+            && Utils.verifyStateSignature(state, channelId, domainSeparator, state.sigs[1], chan.participants[SERVER]);
     }
 
     /**
@@ -70,44 +191,6 @@ library Utils {
      */
     function statesAreEqual(State memory a, State memory b) internal pure returns (bool) {
         return keccak256(abi.encode(a)) == keccak256(abi.encode(b));
-    }
-
-    /**
-     * @notice Validates that a state is a valid initial state for a channel
-     * @dev Initial states must have version 0 and INITIALIZE intent
-     * @param state The state to validate
-     * @param chan The channel configuration
-     * @return True if the state is a valid initial state, false otherwise
-     */
-    function validateInitialState(State memory state, Channel memory chan) internal view returns (bool) {
-        if (state.version != 0) {
-            return false;
-        }
-
-        if (state.intent != StateIntent.INITIALIZE) {
-            return false;
-        }
-
-        return validateUnanimousSignatures(state, chan);
-    }
-
-    /**
-     * @notice Validates that a state has signatures from both participants
-     * @dev For 2-participant channels, both must sign to establish unanimous consent
-     * @param state The state to validate
-     * @param chan The channel configuration
-     * @return True if the state has valid signatures from both participants, false otherwise
-     */
-    function validateUnanimousSignatures(State memory state, Channel memory chan) internal view returns (bool) {
-        if (state.sigs.length != 2) {
-            return false;
-        }
-
-        // Compute the state hash for signature verification.
-        bytes32 stateHash = getStateHash(chan, state);
-
-        return verifySignature(stateHash, state.sigs[0], chan.participants[CLIENT])
-            && verifySignature(stateHash, state.sigs[1], chan.participants[SERVER]);
     }
 
     /**
@@ -130,5 +213,14 @@ library Utils {
         }
 
         return true;
+    }
+
+    function addressArrayIncludes(address[] memory arr, address addr) internal pure returns (bool) {
+        for (uint256 i = 0; i < arr.length; i++) {
+            if (arr[i] == addr) {
+                return true;
+            }
+        }
+        return false;
     }
 }

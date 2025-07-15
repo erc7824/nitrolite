@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import {EIP712} from "lib/openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableSet.sol";
@@ -18,9 +19,10 @@ import {Utils} from "./Utils.sol";
  * @notice A simple custody contract for state channels that delegates most state transition logic to an adjudicator
  * @dev This implementation currently only supports 2 participant channels (CLIENT and SERVER)
  */
-contract Custody is IChannel, IDeposit, IChannelReader {
+contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using SafeERC20 for IERC20;
+    using Utils for State;
 
     // Errors
     // TODO: sort errors
@@ -49,6 +51,8 @@ contract Custody is IChannel, IDeposit, IChannelReader {
 
     uint256 constant MIN_CHALLENGE_PERIOD = 1 hours;
 
+    bytes32 constant CHALLENGE_STATE_TYPEHASH = keccak256("AllowChallengeStateHash(bytes32 channelId,uint8 intent,uint256 version,bytes data,Allocation[] allocations)Allocation(address destination,address token,uint256 amount)");
+
     // Recommended structure to keep track of states
     struct Metadata {
         Channel chan; // Opener define channel configuration
@@ -70,6 +74,12 @@ contract Custody is IChannel, IDeposit, IChannelReader {
 
     mapping(bytes32 channelId => Metadata chMeta) internal _channels;
     mapping(address account => Ledger ledger) internal _ledgers;
+
+    // ========== Constructor ==========
+    // TODO: make sure the last nitrolite sdk npm package version used
+    constructor() EIP712("Nitrolite:Custody", "0.2.24") {
+        // No state initialization needed
+    }
 
     // ========== Read methods ==========
 
@@ -226,10 +236,9 @@ contract Custody is IChannel, IDeposit, IChannelReader {
         channelId = Utils.getChannelId(ch);
         if (_channels[channelId].stage != ChannelStatus.VOID) revert InvalidStatus();
 
-        bytes32 stateHash = Utils.getStateHash(ch, initial);
         if (initial.sigs.length != 1) revert InvalidStateSignatures();
         // TODO: later we can lift the restriction that first sig must be from CLIENT
-        if (!Utils.verifySignature(stateHash, initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX])) {
+        if (!initial.verifyStateSignature(channelId, _domainSeparatorV4(), initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX])) {
             revert InvalidStateSignatures();
         }
 
@@ -304,8 +313,7 @@ contract Custody is IChannel, IDeposit, IChannelReader {
         if (index != SERVER_IDX) revert InvalidParticipant();
         if (meta.actualDeposits[SERVER_IDX].amount != 0) revert DepositAlreadyFulfilled();
 
-        bytes32 stateHash = Utils.getStateHash(meta.chan, meta.lastValidState);
-        if (!Utils.verifySignature(stateHash, sig, meta.chan.participants[SERVER_IDX])) revert InvalidStateSignatures();
+        if (!meta.lastValidState.verifyStateSignature(channelId, _domainSeparatorV4(), sig, meta.chan.participants[SERVER_IDX])) revert InvalidStateSignatures();
 
         State memory lastValidState = meta.lastValidState;
         Signature[] memory sigs = new Signature[](PART_NUM);
@@ -400,8 +408,9 @@ contract Custody is IChannel, IDeposit, IChannelReader {
         if (candidate.intent == StateIntent.FINALIZE) revert InvalidState();
 
         _requireChallengerIsParticipant(
-            Utils.getStateHash(meta.chan, candidate),
-            [meta.chan.participants[CLIENT_IDX], meta.chan.participants[SERVER_IDX]],
+            channelId,
+            candidate,
+            meta.chan.participants,
             challengerSig
         );
 
@@ -639,29 +648,43 @@ contract Custody is IChannel, IDeposit, IChannelReader {
      * @return valid True if both signatures are valid
      */
     function _verifyAllSignatures(Channel memory chan, State memory state) internal view returns (bool valid) {
-        bytes32 stateHash = Utils.getStateHash(chan, state);
-
         if (state.sigs.length != PART_NUM) {
             return false;
         }
 
+        bytes32 channelId = Utils.getChannelId(chan);
+
         for (uint256 i = 0; i < PART_NUM; i++) {
-            if (!Utils.verifySignature(stateHash, state.sigs[i], chan.participants[i])) return false;
+            if (!state.verifyStateSignature(channelId, _domainSeparatorV4(), state.sigs[i], chan.participants[i])) return false;
         }
 
         return true;
     }
 
     function _requireChallengerIsParticipant(
-        bytes32 challengedStateHash,
-        address[2] memory participants,
+        bytes32 channelId,
+        State memory state,
+        address[] memory participants,
         Signature memory challengerSig
-    ) internal pure {
-        address challenger = Utils.recoverSigner(keccak256(abi.encode(challengedStateHash, "challenge")), challengerSig);
+    ) internal view {
+        bytes32 stateHash = Utils.getStateHash(_channels[channelId].chan, state);
+        // NOTE: the "challenge" suffix substitution for raw ECDSA and EIP-191 signatures
+        bytes32 challengeStateHash = keccak256(abi.encode(stateHash, "challenge"));
 
-        if (challenger != participants[CLIENT_IDX] && challenger != participants[SERVER_IDX]) {
-            revert InvalidChallengerSignature();
+        if (Utils.addressArrayIncludes(participants, Utils.recoverRawECDSASigner(challengeStateHash, challengerSig))) {
+            return;
         }
+
+        if (Utils.addressArrayIncludes(participants, Utils.recoverEIP191Signer(challengeStateHash, challengerSig))) {
+            return;
+        }
+
+        // NOTE: the `CHALLENGE_STATE_TYPEHASH` is used to recover the EIP-712 signer
+        if (Utils.addressArrayIncludes(participants, Utils.recoverStateEIP712Signer(_domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig))) {
+            return;
+        }
+
+        revert InvalidChallengerSignature();
     }
 
     /**

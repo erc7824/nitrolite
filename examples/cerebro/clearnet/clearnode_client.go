@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net"
 	"sync"
 	"time"
 
@@ -27,6 +28,7 @@ type ClearnodeClient struct {
 	printEvents   bool
 	responseSinks map[uint64]chan *RPCResponse // Map of request IDs to response channels
 	mu            sync.RWMutex                 // Mutex to protect access to responseSinks
+	exitCh        chan struct{}                // Channel to signal client exit
 }
 
 type NetworkInfo struct {
@@ -55,6 +57,7 @@ func NewClearnodeClient(wsURL string) (*ClearnodeClient, error) {
 	client := &ClearnodeClient{
 		conn:          conn,
 		responseSinks: make(map[uint64]chan *RPCResponse),
+		exitCh:        make(chan struct{}),
 	}
 	go client.readMessages()
 	go client.pingPeriodically()
@@ -319,9 +322,14 @@ func (c *ClearnodeClient) Transfer(destinationTag, assetSymbol string, amount de
 }
 
 func (c *ClearnodeClient) readMessages() {
+	defer c.exit() // Ensure exit channel is closed when done
+
 	for {
 		_, messageBytes, err := c.conn.ReadMessage()
-		if err != nil {
+		if _, ok := err.(net.Error); ok {
+			fmt.Println("Websocket connection timeout")
+			return
+		} else if err != nil {
 			fmt.Printf("Error reading message: %s\n", err.Error())
 			return
 		}
@@ -346,6 +354,7 @@ func (c *ClearnodeClient) readMessages() {
 func (c *ClearnodeClient) pingPeriodically() {
 	ticker := time.NewTicker(pingInterval)
 	defer ticker.Stop()
+	defer c.exit() // Ensure exit channel is closed when done
 
 	for range ticker.C {
 		res, err := c.request("ping", nil)
@@ -411,4 +420,12 @@ func (c *ClearnodeClient) request(method string, sigs []string, params ...any) (
 	}
 
 	return res, nil
+}
+
+func (c *ClearnodeClient) WaitCh() <-chan struct{} {
+	return c.exitCh
+}
+
+func (c *ClearnodeClient) exit() {
+	close(c.exitCh)
 }

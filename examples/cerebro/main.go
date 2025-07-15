@@ -77,7 +77,12 @@ func main() {
 
 	go p.Run()
 
-	operator.Wait()
+	select {
+	case <-clearnode.WaitCh():
+		fmt.Println("Clearnode client disconnected.")
+	case <-operator.Wait():
+		fmt.Println("Operator exited.")
+	}
 	handleExit()
 	fmt.Println("Exiting Cerebro CLI.")
 }

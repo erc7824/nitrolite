@@ -199,9 +199,9 @@ func (o *Operator) Execute(s string) {
 	}
 }
 
-func (o *Operator) Wait() {
+func (o *Operator) Wait() <-chan struct{} {
 	// Wait for exit signal
-	<-o.exitCh
+	return o.exitCh
 }
 
 func (o *Operator) exit() {

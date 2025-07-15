@@ -47,7 +47,7 @@ func NewZodSchemaBuilder() (*ZodSchemaBuilder, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &ZodSchemaBuilder{
 		codeBuilder:    codeBuilder,
 		propertySorter: NewPropertySorter(),
@@ -116,7 +116,7 @@ func (builder *ZodSchemaBuilder) generateZodObjectSchema(prop SchemaProperty) st
 		// Fallback to basic object schema if template fails
 		return "z.object({})"
 	}
-	
+
 	return zodSchema
 }
 
@@ -124,21 +124,21 @@ func (builder *ZodSchemaBuilder) generateZodObjectSchema(prop SchemaProperty) st
 func (builder *ZodSchemaBuilder) createPropertyDataForZodSchema(prop SchemaProperty) []PropertyData {
 	sortedNames := builder.propertySorter.SortPropertyNames(prop.Properties)
 	properties := make([]PropertyData, 0, len(sortedNames))
-	
+
 	for i, name := range sortedNames {
 		propDef := prop.Properties[name]
 		zodSchema := builder.GenerateZodSchema(propDef)
-		
+
 		propertyData := PropertyData{
 			Name:       name,
 			ZodSchema:  zodSchema,
 			IsRequired: slices.Contains(prop.Required, name),
 			IsLast:     i == len(sortedNames)-1,
 		}
-		
+
 		properties = append(properties, propertyData)
 	}
-	
+
 	return properties
 }
 
@@ -154,7 +154,7 @@ func (builder *ZodSchemaBuilder) GenerateObjectSchemaWithTransform(prop SchemaPr
 		// Fallback to basic object schema if template fails
 		return builder.generateZodObjectSchema(prop)
 	}
-	
+
 	return zodSchema
 }
 
@@ -162,11 +162,11 @@ func (builder *ZodSchemaBuilder) GenerateObjectSchemaWithTransform(prop SchemaPr
 func (builder *ZodSchemaBuilder) createPropertyDataForZodTransform(prop SchemaProperty) []PropertyData {
 	sortedNames := builder.propertySorter.SortPropertyNames(prop.Properties)
 	properties := make([]PropertyData, 0, len(sortedNames))
-	
+
 	for i, name := range sortedNames {
 		propDef := prop.Properties[name]
 		zodSchema := builder.GenerateZodSchema(propDef)
-		
+
 		propertyData := PropertyData{
 			Name:       name,
 			CamelName:  builder.stringUtils.ToCamelCase(name),
@@ -174,10 +174,10 @@ func (builder *ZodSchemaBuilder) createPropertyDataForZodTransform(prop SchemaPr
 			IsRequired: slices.Contains(prop.Required, name),
 			IsLast:     i == len(sortedNames)-1,
 		}
-		
+
 		properties = append(properties, propertyData)
 	}
-	
+
 	return properties
 }
 
@@ -289,4 +289,3 @@ func toCamelCase(s string) string {
 	stringUtils := NewStringUtils()
 	return stringUtils.ToCamelCase(s)
 }
-

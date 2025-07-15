@@ -65,8 +65,8 @@ type LedgerEntryResponse struct {
 
 type GetLedgerTransactionsParams struct {
 	ListOptions
-	AccountID Address           `json:"account_id,omitempty"` // Optional account ID to filter transactions
-	Asset     string            `json:"asset,omitempty"`      // Optional asset to filter transactions
+	AccountID Address          `json:"account_id,omitempty"` // Optional account ID to filter transactions
+	Asset     string           `json:"asset,omitempty"`      // Optional asset to filter transactions
 	TxType    *TransactionType `json:"tx_type,omitempty"`    // Optional transaction type to filter transactions
 }
 

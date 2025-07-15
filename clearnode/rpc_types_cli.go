@@ -8,7 +8,7 @@ import (
 
 func runZodGeneratorCli(cliLogger Logger) {
 	systemLogger := cliLogger.NewSystem("zod-generator")
-	
+
 	config, err := parseCommandLineArguments()
 	if err != nil {
 		systemLogger.Fatal("Invalid command line arguments", "err", err)
@@ -19,21 +19,18 @@ func runZodGeneratorCli(cliLogger Logger) {
 	// Load schemas from request and response directories
 	requestSchemaPath := filepath.Join(config.SchemaDirectoryPath, "request")
 	responseSchemaPath := filepath.Join(config.SchemaDirectoryPath, "response")
-
 	if err := codeGenerator.LoadSchemas(requestSchemaPath, responseSchemaPath); err != nil {
 		systemLogger.Fatal("Failed to load schemas", "err", err)
 	}
 
-	// Categorize definitions
+	// Generate files
 	codeGenerator.CategorizeDefinitions()
-
-	// Generate TypeScript files
 	if err := codeGenerator.GenerateAllFiles(config.SchemaDirectoryPath, config.SdkRootDirectoryPath); err != nil {
 		systemLogger.Fatal("Failed to generate TypeScript files", "err", err)
 	}
 
-	systemLogger.Info("Generated Zod TypeScript files", 
-		"schema_directory", config.SchemaDirectoryPath, 
+	systemLogger.Info("Generated Zod TypeScript files",
+		"schema_directory", config.SchemaDirectoryPath,
 		"sdk_root_directory", config.SdkRootDirectoryPath)
 }
 

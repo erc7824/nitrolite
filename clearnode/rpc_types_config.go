@@ -40,8 +40,8 @@ type GeneratorDependencies struct {
 	RequestDefinitions   map[string]SchemaProperty
 	ResponseDefinitions  map[string]SchemaProperty
 	CommonDefinitions    map[string]SchemaProperty
-	RequestTypeMappings  map[string]string // typeName -> rpcMethod
-	ResponseTypeMappings map[string]string // typeName -> rpcMethod
+	RequestTypeMappings  map[string]RPCMethod // typeName -> rpcMethod
+	ResponseTypeMappings map[string]RPCMethod // typeName -> rpcMethod
 	DefinitionSorter     func(map[string]SchemaProperty) []string
 	EnumNameConverter    func(string) string
 }

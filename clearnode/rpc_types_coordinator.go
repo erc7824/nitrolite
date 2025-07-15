@@ -7,14 +7,14 @@ import (
 )
 
 type SchemaOrchestrator struct {
-	schemas                map[string]SchemaInfo
-	allDefinitions         map[string]SchemaProperty
-	commonDefinitions      map[string]SchemaProperty
-	requestDefinitions     map[string]SchemaProperty
-	responseDefinitions    map[string]SchemaProperty
-	requestTypeMappings    map[string]string // typeName -> rpcMethod
-	responseTypeMappings   map[string]string // typeName -> rpcMethod
-	codeFileGenerator      *CodeFileGenerator
+	schemas              map[string]SchemaInfo
+	allDefinitions       map[string]SchemaProperty
+	commonDefinitions    map[string]SchemaProperty
+	requestDefinitions   map[string]SchemaProperty
+	responseDefinitions  map[string]SchemaProperty
+	requestTypeMappings  map[string]RPCMethod // typeName -> rpcMethod
+	responseTypeMappings map[string]RPCMethod // typeName -> rpcMethod
+	codeFileGenerator    *CodeFileGenerator
 }
 
 func NewSchemaOrchestrator() *SchemaOrchestrator {
@@ -24,8 +24,8 @@ func NewSchemaOrchestrator() *SchemaOrchestrator {
 		commonDefinitions:    make(map[string]SchemaProperty),
 		requestDefinitions:   make(map[string]SchemaProperty),
 		responseDefinitions:  make(map[string]SchemaProperty),
-		requestTypeMappings:  make(map[string]string),
-		responseTypeMappings: make(map[string]string),
+		requestTypeMappings:  make(map[string]RPCMethod),
+		responseTypeMappings: make(map[string]RPCMethod),
 	}
 }
 
@@ -59,7 +59,7 @@ func (orchestrator *SchemaOrchestrator) GenerateAllFiles(schemaDirectoryPath str
 	}
 
 	errorCollector := NewErrorCollector()
-	
+
 	// Generate all files using the code file generator
 	errorCollector.Add(codeFileGenerator.GenerateCommonSchemaFile(config))
 	errorCollector.Add(codeFileGenerator.GenerateRequestSchemaFile(config))
@@ -160,20 +160,20 @@ func (orchestrator *SchemaOrchestrator) getSortedDefinitionNames(definitions map
 // buildDependencyGraph builds a dependency graph for definitions
 func (orchestrator *SchemaOrchestrator) buildDependencyGraph(definitions map[string]SchemaProperty) map[string][]string {
 	dependencyGraph := make(map[string][]string)
-	
+
 	for definitionName, definition := range definitions {
 		dependencies := GetDependencies(definition)
 		var validDependencies []string
-		
+
 		for _, dependency := range dependencies {
 			if _, exists := definitions[dependency]; exists {
 				validDependencies = append(validDependencies, dependency)
 			}
 		}
-		
+
 		dependencyGraph[definitionName] = validDependencies
 	}
-	
+
 	return dependencyGraph
 }
 
@@ -227,4 +227,3 @@ func (orchestrator *SchemaOrchestrator) convertRPCMethodToEnumName(rpcMethod str
 	}
 	return strings.Join(methodParts, "")
 }
-

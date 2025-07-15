@@ -22,13 +22,13 @@ func NewCodeFileGenerator(deps *GeneratorDependencies) (*CodeFileGenerator, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to create code builder: %w", err)
 	}
-	
+
 	zodSchemaBuilder, err := NewZodSchemaBuilder()
 	if err != nil {
 		// Fallback to basic generator
 		zodSchemaBuilder = &ZodSchemaBuilder{}
 	}
-	
+
 	return &CodeFileGenerator{
 		codeBuilder:      codeBuilder,
 		zodSchemaBuilder: zodSchemaBuilder,
@@ -77,115 +77,115 @@ func (generator *CodeFileGenerator) GenerateTypeScriptTypesFile(config *Generati
 // buildCommonSchemaContent builds the content for common schema file
 func (generator *CodeFileGenerator) buildCommonSchemaContent() string {
 	var contentBuilder strings.Builder
-	
+
 	// Add imports
 	contentBuilder.WriteString("import { z } from 'zod';\n")
 	contentBuilder.WriteString("import { Address } from 'viem';\n\n")
 	contentBuilder.WriteString("// Common schemas used by both requests and responses\n\n")
-	
+
 	// Add built-in schemas
 	contentBuilder.WriteString(generator.zodSchemaBuilder.GenerateBuiltinSchemas())
-	
+
 	// Add common definitions
 	sortedDefinitions := generator.dependencies.DefinitionSorter(generator.dependencies.CommonDefinitions)
 	contentBuilder.WriteString(generator.zodSchemaBuilder.GenerateSchemaDefinitions(sortedDefinitions, generator.dependencies.CommonDefinitions))
-	
+
 	return contentBuilder.String()
 }
 
 // buildRequestSchemaContent builds the content for request schema file
 func (generator *CodeFileGenerator) buildRequestSchemaContent() string {
 	var contentBuilder strings.Builder
-	
+
 	// Add imports
 	contentBuilder.WriteString("import { z } from 'zod';\n")
 	contentBuilder.WriteString("import { RPCMethod } from '../types';\n")
 	contentBuilder.WriteString("import { addressSchema, hexSchema } from './common_gen';\n")
-	
+
 	// Add common schema imports
 	commonDefinitions := generator.dependencies.DefinitionSorter(generator.dependencies.CommonDefinitions)
 	if len(commonDefinitions) > 0 {
 		contentBuilder.WriteString(generator.zodSchemaBuilder.GenerateCommonSchemaImports(commonDefinitions))
 	}
 	contentBuilder.WriteString("\n// Request schemas\n\n")
-	
+
 	// Add request-specific definitions
 	requestDefinitions := generator.dependencies.DefinitionSorter(generator.dependencies.RequestDefinitions)
 	contentBuilder.WriteString(generator.zodSchemaBuilder.GenerateSchemaDefinitions(requestDefinitions, generator.dependencies.RequestDefinitions))
-	
+
 	// Add parser mapping
 	contentBuilder.WriteString(generator.buildParserMapping("request", generator.dependencies.RequestTypeMappings))
-	
+
 	return contentBuilder.String()
 }
 
 // buildResponseSchemaContent builds the content for response schema file
 func (generator *CodeFileGenerator) buildResponseSchemaContent() string {
 	var contentBuilder strings.Builder
-	
+
 	// Add imports
 	contentBuilder.WriteString("import { z } from 'zod';\n")
 	contentBuilder.WriteString("import { RPCMethod } from '../types';\n")
 	contentBuilder.WriteString("import { addressSchema, hexSchema } from './common_gen';\n")
-	
+
 	// Add TypeScript type imports
 	contentBuilder.WriteString("import type {\n")
-	
+
 	// Import common types
 	commonDefinitions := generator.dependencies.DefinitionSorter(generator.dependencies.CommonDefinitions)
 	for _, name := range commonDefinitions {
 		contentBuilder.WriteString(fmt.Sprintf("  %s,\n", name))
 	}
-	
+
 	// Import response-specific types
 	responseDefinitions := generator.dependencies.DefinitionSorter(generator.dependencies.ResponseDefinitions)
 	for _, name := range responseDefinitions {
 		contentBuilder.WriteString(fmt.Sprintf("  %s,\n", name))
 	}
-	
+
 	contentBuilder.WriteString("} from '../types/response';\n")
-	
+
 	// Add common schema imports
 	if len(commonDefinitions) > 0 {
 		contentBuilder.WriteString(generator.zodSchemaBuilder.GenerateCommonSchemaImports(commonDefinitions))
 	}
 	contentBuilder.WriteString("\n// Response schemas with camelCase transforms\n\n")
-	
+
 	// Add response schemas with transforms
 	contentBuilder.WriteString(generator.buildResponseSchemasWithTransforms(responseDefinitions))
-	
+
 	// Add parser mapping
 	contentBuilder.WriteString(generator.buildParserMapping("response", generator.dependencies.ResponseTypeMappings))
-	
+
 	return contentBuilder.String()
 }
 
 // buildTypeScriptTypesContent builds the content for TypeScript types file
 func (generator *CodeFileGenerator) buildTypeScriptTypesContent() string {
 	var contentBuilder strings.Builder
-	
+
 	// Add header
 	contentBuilder.WriteString("// Auto-generated TypeScript response types with camelCase field names\n")
 	contentBuilder.WriteString("// Generated from JSON schemas\n\n")
 	contentBuilder.WriteString("import type { Address, Hex } from 'viem';\n")
 	contentBuilder.WriteString("import {RPCMethod, GenericRPCMessage} from '.';\n\n")
-	
+
 	// Add common type interfaces
 	contentBuilder.WriteString(generator.buildTypeScriptInterfaces(generator.dependencies.CommonDefinitions, false))
-	
+
 	// Add response type interfaces
 	contentBuilder.WriteString(generator.buildTypeScriptInterfaces(generator.dependencies.ResponseDefinitions, true))
-	
+
 	// Add union type and helpers
 	contentBuilder.WriteString(generator.buildUnionTypeAndHelpers())
-	
+
 	return contentBuilder.String()
 }
 
 // buildResponseSchemasWithTransforms builds response schemas with camelCase transforms
 func (generator *CodeFileGenerator) buildResponseSchemasWithTransforms(definitions []string) string {
 	var contentBuilder strings.Builder
-	
+
 	for _, name := range definitions {
 		definition := generator.dependencies.ResponseDefinitions[name]
 		if definition.Type == "object" {
@@ -196,24 +196,24 @@ func (generator *CodeFileGenerator) buildResponseSchemasWithTransforms(definitio
 			contentBuilder.WriteString(fmt.Sprintf("export const %sSchema = %s;\n\n", name, zodSchema))
 		}
 	}
-	
+
 	return contentBuilder.String()
 }
 
 // buildTypeScriptInterfaces builds TypeScript interfaces for definitions
 func (generator *CodeFileGenerator) buildTypeScriptInterfaces(definitions map[string]SchemaProperty, includeRequestStructures bool) string {
 	var contentBuilder strings.Builder
-	
+
 	sortedDefinitions := generator.dependencies.DefinitionSorter(definitions)
-	
+
 	for _, name := range sortedDefinitions {
 		definition := definitions[name]
-		
+
 		// Skip interface generation for special types
 		if generator.shouldSkipInterfaceGeneration(name) {
 			continue
 		}
-		
+
 		// Generate Request structure first for responses
 		if includeRequestStructures {
 			if rpcMethod, exists := generator.dependencies.ResponseTypeMappings[name]; exists {
@@ -221,27 +221,27 @@ func (generator *CodeFileGenerator) buildTypeScriptInterfaces(definitions map[st
 				contentBuilder.WriteString(requestInterface)
 			}
 		}
-		
+
 		// Generate Params interface
 		interfaceCode := generator.buildTypeScriptInterface(name, definition)
 		contentBuilder.WriteString(interfaceCode)
 	}
-	
+
 	return contentBuilder.String()
 }
 
 // buildRequestInterface builds a request interface for RPC responses
-func (generator *CodeFileGenerator) buildRequestInterface(name string, rpcMethod string) string {
-	enumValue := generator.dependencies.EnumNameConverter(rpcMethod)
+func (generator *CodeFileGenerator) buildRequestInterface(name string, rpcMethod RPCMethod) string {
+	enumValue := generator.dependencies.EnumNameConverter(string(rpcMethod))
 	jsDocComment := fmt.Sprintf("Represents the response structure for the {@link RPCMethod.%s} RPC method.", enumValue)
-	
+
 	requestInterface, err := generator.codeBuilder.BuildRequestInterface(name, enumValue, jsDocComment)
 	if err != nil {
 		// Fallback to manual construction
-		return fmt.Sprintf("export interface %sResponse extends GenericRPCMessage {\n    method: RPCMethod.%s;\n    params: %sResponseParams;\n}\n\n", 
+		return fmt.Sprintf("export interface %sResponse extends GenericRPCMessage {\n    method: RPCMethod.%s;\n    params: %sResponseParams;\n}\n\n",
 			strings.TrimSuffix(name, "Response"), enumValue, name)
 	}
-	
+
 	return requestInterface
 }
 
@@ -260,13 +260,13 @@ func (generator *CodeFileGenerator) buildTypeScriptInterface(name string, proper
 // buildObjectInterface builds a TypeScript interface for object types
 func (generator *CodeFileGenerator) buildObjectInterface(name string, property SchemaProperty) string {
 	properties := generator.createPropertyDataListForInterfaces(property.Properties, property.Required)
-	
+
 	interfaceCode, err := generator.codeBuilder.BuildTypeScriptInterface(name, properties)
 	if err != nil {
 		// Fallback to manual construction
 		return fmt.Sprintf("export interface %sParams {\n  // Interface generation failed\n}\n\n", name)
 	}
-	
+
 	return interfaceCode
 }
 
@@ -335,27 +335,27 @@ func (generator *CodeFileGenerator) buildEnumInterface(name string, property Sch
 	if len(property.Enum) == 0 {
 		return ""
 	}
-	
+
 	var enumValues []string
 	for _, val := range property.Enum {
 		enumValues = append(enumValues, fmt.Sprintf("\"%s\"", val))
 	}
-	
+
 	return fmt.Sprintf("export type %s = %s;\n\n", name, strings.Join(enumValues, " | "))
 }
 
 // buildParserMapping builds parser mapping for requests or responses
-func (generator *CodeFileGenerator) buildParserMapping(generationType string, typeMappings map[string]string) string {
+func (generator *CodeFileGenerator) buildParserMapping(generationType string, typeMappings map[string]RPCMethod) string {
 	var contentBuilder strings.Builder
-	
+
 	contentBuilder.WriteString(fmt.Sprintf("// %s parser mapping\n", strings.Title(generationType)))
 	contentBuilder.WriteString(fmt.Sprintf("export const %sParsers: Record<string, (params: any) => any> = {\n", generationType))
-	
+
 	for typeName, rpcMethod := range typeMappings {
-		enumValue := generator.dependencies.EnumNameConverter(rpcMethod)
+		enumValue := generator.dependencies.EnumNameConverter(string(rpcMethod))
 		contentBuilder.WriteString(fmt.Sprintf("  [RPCMethod.%s]: (params) => %sSchema.parse(params),\n", enumValue, typeName))
 	}
-	
+
 	contentBuilder.WriteString("};\n")
 	return contentBuilder.String()
 }
@@ -363,14 +363,14 @@ func (generator *CodeFileGenerator) buildParserMapping(generationType string, ty
 // buildUnionTypeAndHelpers builds the RPCResponse union type and helper types
 func (generator *CodeFileGenerator) buildUnionTypeAndHelpers() string {
 	var contentBuilder strings.Builder
-	
+
 	// Generate RPCResponse union type
 	contentBuilder.WriteString("/**\n")
 	contentBuilder.WriteString(" * Union type for all possible RPC response types.\n")
 	contentBuilder.WriteString(" * This allows for type-safe handling of different response structures.\n")
 	contentBuilder.WriteString(" */\n")
 	contentBuilder.WriteString("export type RPCResponse =\n")
-	
+
 	// Get all response types with RPC methods
 	var unionTypes []string
 	for name := range generator.dependencies.ResponseDefinitions {
@@ -381,7 +381,7 @@ func (generator *CodeFileGenerator) buildUnionTypeAndHelpers() string {
 			}
 		}
 	}
-	
+
 	if len(unionTypes) > 0 {
 		for i, unionType := range unionTypes {
 			if i == 0 {
@@ -394,18 +394,18 @@ func (generator *CodeFileGenerator) buildUnionTypeAndHelpers() string {
 		contentBuilder.WriteString("    | never\n")
 	}
 	contentBuilder.WriteString(";\n\n")
-	
+
 	// Add helper types
 	contentBuilder.WriteString("/**\n")
 	contentBuilder.WriteString(" * Maps RPC methods to their corresponding parameter types.\n")
 	contentBuilder.WriteString(" */\n")
-	contentBuilder.WriteString("// Helper type to extract the response type for a given method\n")
 	contentBuilder.WriteString("export type ExtractResponseByMethod<M extends RPCMethod> = Extract<RPCResponse, { method: M }>;\n\n")
+	contentBuilder.WriteString("// Helper type to extract the response type for a given method\n")
 	contentBuilder.WriteString("export type RPCResponseParams = ExtractResponseByMethod<RPCMethod>['params'];\n\n")
 	contentBuilder.WriteString("export type RPCResponseParamsByMethod = {\n")
 	contentBuilder.WriteString("    [M in RPCMethod]: ExtractResponseByMethod<M>['params'];\n")
 	contentBuilder.WriteString("};\n\n")
-	
+
 	return contentBuilder.String()
 }
 
@@ -422,6 +422,6 @@ func (generator *CodeFileGenerator) writeFileWithDirectoryCreation(filePath stri
 	if err := os.MkdirAll(directoryPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", directoryPath, err)
 	}
-	
+
 	return os.WriteFile(filePath, []byte(content), 0o644)
 }

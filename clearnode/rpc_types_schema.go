@@ -13,7 +13,6 @@ type JSONSchema struct {
 	Schema string                    `json:"$schema"`
 	Ref    string                    `json:"$ref"`
 	Defs   map[string]SchemaProperty `json:"$defs"`
-	Extras map[string]any            `json:",inline"`
 }
 
 type SchemaProperty struct {
@@ -28,7 +27,7 @@ type SchemaProperty struct {
 
 type SchemaInfo struct {
 	Schema    JSONSchema
-	RPCMethod string
+	RPCMethod RPCMethod
 	IsRequest bool
 	MainType  string
 }
@@ -69,9 +68,7 @@ func LoadSchemas(requestDir, responseDir string) (map[string]SchemaInfo, map[str
 			}
 
 			// Extract RPC method from schema extras
-			rpcMethod := ""
-
-			// First, try to unmarshal into a map to get the rpc_method
+			var rpcMethod string
 			var schemaMap map[string]any
 			if err := json.Unmarshal(data, &schemaMap); err == nil {
 				if method, ok := schemaMap["rpc_method"].(string); ok {
@@ -90,7 +87,7 @@ func LoadSchemas(requestDir, responseDir string) (map[string]SchemaInfo, map[str
 
 			schemas[file.Name()] = SchemaInfo{
 				Schema:    schema,
-				RPCMethod: rpcMethod,
+				RPCMethod: RPCMethod(rpcMethod),
 				IsRequest: dir.isRequest,
 				MainType:  mainType,
 			}

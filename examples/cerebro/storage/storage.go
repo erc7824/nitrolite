@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
 )
@@ -26,7 +27,10 @@ func NewStorage(path string) (*Storage, error) {
 	dsn := fmt.Sprintf("file:%s?cache=shared", path)
 
 	dial := sqlite.Open(dsn)
-	db, err := gorm.Open(dial)
+	dbConf := &gorm.Config{
+		Logger: logger.Default.LogMode(logger.LogLevel(0)), // Disable logging
+	}
+	db, err := gorm.Open(dial, dbConf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to SQLite database: %w", err)
 	}
@@ -40,8 +44,8 @@ func NewStorage(path string) (*Storage, error) {
 
 type PrivateKeyDTO struct {
 	Address    string `gorm:"column:address;primaryKey"`
-	Name       string `gorm:"column:name;not null"`
-	PrivateKey string `gorm:"column:private_key;not null"`
+	Name       string `gorm:"column:name;not null;unique"`
+	PrivateKey string `gorm:"column:private_key;not null;unique"`
 	IsSigner   bool   `gorm:"column:is_signer;not null"`
 }
 

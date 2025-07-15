@@ -22,7 +22,6 @@ func runExportJsonSchemaCli(logger Logger) {
 	}
 	responses := []any{
 		&TransactionResponse{},
-		&ResizeChannelResponse{},
 	}
 
 	for _, typ := range requests {

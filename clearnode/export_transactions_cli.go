@@ -68,7 +68,7 @@ func (e *TransactionExporter) ExportToCSV(writer io.Writer, options ExportOption
 
 // ExportToFile exports transactions to a CSV file
 func (e *TransactionExporter) ExportToFile(options ExportOptions) (string, error) {
-	if err := os.MkdirAll(options.OutputDir, 0755); err != nil {
+	if err := os.MkdirAll(options.OutputDir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create directory %s: %w", options.OutputDir, err)
 	}
 

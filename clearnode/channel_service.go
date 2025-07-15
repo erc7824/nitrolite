@@ -130,7 +130,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		Intent:    uint8(nitrolite.IntentRESIZE),
 		Version:   channel.Version + 1,
 		StateData: hexutil.Encode(encodedIntentions),
-		StateHash: stateHash,
+		StateHash: Hex(stateHash),
 		Signature: Signature{
 			V: sig.V,
 			R: hexutil.Encode(sig.R[:]),

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/invopop/jsonschema"
 	"github.com/shopspring/decimal"
 )
 
@@ -62,7 +65,7 @@ type LedgerEntryResponse struct {
 
 type GetLedgerTransactionsParams struct {
 	ListOptions
-	AccountID string          `json:"account_id,omitempty"` // Optional account ID to filter transactions
+	AccountID Address         `json:"account_id,omitempty"` // Optional account ID to filter transactions
 	Asset     string          `json:"asset,omitempty"`      // Optional asset to filter transactions
 	TxType    TransactionType `json:"tx_type,omitempty"`    // Optional transaction type to filter transactions
 }
@@ -81,14 +84,67 @@ type BrokerConfig struct {
 
 type TransactionResponse struct {
 	Id             uint            `json:"id"`
-	TxType         string          `json:"tx_type"`
-	FromAccount    string          `json:"from_account"`
+	TxType         TransactionType `json:"tx_type"`
+	FromAccount    Address         `json:"from_account"`
 	FromAccountTag string          `json:"from_account_tag,omitempty"` // Optional tag for the source account
-	ToAccount      string          `json:"to_account"`
+	ToAccount      Address         `json:"to_account"`
 	ToAccountTag   string          `json:"to_account_tag,omitempty"` // Optional tag for the destination account
 	Asset          string          `json:"asset"`
-	Amount         decimal.Decimal `json:"amount"`
+	Amount         BigNumber       `json:"amount"`
 	CreatedAt      time.Time       `json:"created_at"`
+}
+
+type Address string
+
+func (a Address) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(a))
+}
+
+func (a *Address) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+
+	if !common.IsHexAddress(str) {
+		return fmt.Errorf("not an address: %s", str)
+	}
+
+	*a = Address(common.HexToAddress(str).Hex())
+	return nil
+}
+
+func (Address) JSONSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{Type: "string", Format: "address"}
+}
+
+type Hex string
+
+func (h Hex) MarshalJSON() ([]byte, error) {
+	return json.Marshal(string(h))
+}
+
+func (h *Hex) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	*h = Hex(str)
+	return nil
+}
+
+func (Hex) JSONSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{Type: "string", Format: "hex"}
+}
+
+type BigNumber string
+
+func NewBigNumber(v decimal.Decimal) BigNumber {
+	return BigNumber(v.String())
+}
+
+func (BigNumber) JSONSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{Type: "string", Format: "bignumber"}
 }
 
 func (r *RPCRouter) HandlePing(c *RPCContext) {
@@ -324,17 +380,7 @@ func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
 		return
 	}
 
-	var txType *TransactionType
-	if params.TxType != "" {
-		parsedType, err := parseLedgerTransactionType(params.TxType)
-		if err != nil {
-			c.Fail(err, "failed to parse transaction type")
-			return
-		}
-		txType = &parsedType
-	}
-
-	userAccountID := NewAccountID(params.AccountID)
+	userAccountID := NewAccountID(string(params.AccountID))
 	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
 	transactions, err := GetLedgerTransactionsWithTags(query, userAccountID, params.Asset, &params.TxType)
 	if err != nil {

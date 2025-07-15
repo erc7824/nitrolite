@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"sync"
 	"time"
@@ -14,7 +15,18 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var validate = validator.New()
+func getValidator() *validator.Validate {
+	validate := validator.New()
+
+	if err := validate.RegisterValidation("bigint", func(fl validator.FieldLevel) bool {
+		n := new(big.Int)
+		_, ok := n.SetString(fmt.Sprint(fl.Field()), 10)
+		return ok
+	}); err != nil {
+		panic(fmt.Sprintf("failed to register bigint validation: %v", err))
+	}
+	return validate
+}
 
 const (
 	defaultRPCErrorMessage = "an error occurred while processing the request"
@@ -163,7 +175,7 @@ read_loop:
 			continue
 		}
 
-		if err := validate.Struct(&msg); err != nil {
+		if err := getValidator().Struct(&msg); err != nil {
 			n.logger.Debug("message validation failed", "error", err, "message", string(messageBytes))
 			n.sendErrorResponse(rpcConn, msg.Req.RequestID, "message validation failed")
 			continue

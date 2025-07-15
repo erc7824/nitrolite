@@ -176,7 +176,7 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 			Status:      channel.Status,
 			Token:       channel.Token,
 			Wallet:      channel.Wallet,
-			RawAmount:   channel.RawAmount.BigInt(),
+			RawAmount:   channel.RawAmount,
 			ChainID:     channel.ChainID,
 			Adjudicator: channel.Adjudicator,
 			Challenge:   channel.Challenge,

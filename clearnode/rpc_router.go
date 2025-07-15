@@ -133,7 +133,7 @@ func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) 
 			Participant: ch.Participant,
 			Status:      ch.Status,
 			Token:       ch.Token,
-			RawAmount:   ch.RawAmount.BigInt(),
+			RawAmount:   ch.RawAmount,
 			ChainID:     ch.ChainID,
 			Adjudicator: ch.Adjudicator,
 			Challenge:   ch.Challenge,
@@ -243,5 +243,5 @@ func parseParams(params []any, unmarshalTo any) error {
 			return err
 		}
 	}
-	return validate.Struct(unmarshalTo)
+	return getValidator().Struct(unmarshalTo)
 }

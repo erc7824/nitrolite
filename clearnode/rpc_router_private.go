@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
@@ -73,10 +72,10 @@ type AppSessionResponse struct {
 }
 
 type ResizeChannelParams struct {
-	ChannelID        string   `json:"channel_id"                          validate:"required"`
-	AllocateAmount   *big.Int `json:"allocate_amount,omitempty"           validate:"required_without=ResizeAmount"`
-	ResizeAmount     *big.Int `json:"resize_amount,omitempty"             validate:"required_without=AllocateAmount"`
-	FundsDestination string   `json:"funds_destination"                   validate:"required"`
+	ChannelID        string           `json:"channel_id"                          validate:"required"`
+	AllocateAmount   *decimal.Decimal `json:"allocate_amount,omitempty,string"           validate:"omitempty,required_without=ResizeAmount,bigint"`
+	ResizeAmount     *decimal.Decimal `json:"resize_amount,omitempty,string"             validate:"omitempty,required_without=AllocateAmount,bigint"`
+	FundsDestination string           `json:"funds_destination"                   validate:"required"`
 }
 
 type ResizeChannelResponse struct {
@@ -90,9 +89,9 @@ type ResizeChannelResponse struct {
 }
 
 type Allocation struct {
-	Participant  string   `json:"destination"`
-	TokenAddress string   `json:"token"`
-	RawAmount    *big.Int `json:"amount,string"`
+	Participant  string          `json:"destination"`
+	TokenAddress string          `json:"token"`
+	RawAmount    decimal.Decimal `json:"amount,string"`
 }
 
 type CloseChannelParams struct {
@@ -111,19 +110,19 @@ type CloseChannelResponse struct {
 }
 
 type ChannelResponse struct {
-	ChannelID   string        `json:"channel_id"`
-	Participant string        `json:"participant"`
-	Status      ChannelStatus `json:"status"`
-	Token       string        `json:"token"`
-	Wallet      string        `json:"wallet"`
-	RawAmount   *big.Int      `json:"amount"` // Total amount in the channel (user + broker)
-	ChainID     uint32        `json:"chain_id"`
-	Adjudicator string        `json:"adjudicator"`
-	Challenge   uint64        `json:"challenge"`
-	Nonce       uint64        `json:"nonce"`
-	Version     uint64        `json:"version"`
-	CreatedAt   string        `json:"created_at"`
-	UpdatedAt   string        `json:"updated_at"`
+	ChannelID   string          `json:"channel_id"`
+	Participant string          `json:"participant"`
+	Status      ChannelStatus   `json:"status"`
+	Token       string          `json:"token"`
+	Wallet      string          `json:"wallet"`
+	RawAmount   decimal.Decimal `json:"amount,string"` // Total amount in the channel (user + broker)
+	ChainID     uint32          `json:"chain_id"`
+	Adjudicator string          `json:"adjudicator"`
+	Challenge   uint64          `json:"challenge"`
+	Nonce       uint64          `json:"nonce"`
+	Version     uint64          `json:"version"`
+	CreatedAt   string          `json:"created_at"`
+	UpdatedAt   string          `json:"updated_at"`
 }
 
 type Signature struct {

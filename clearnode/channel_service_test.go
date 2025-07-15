@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -50,9 +49,10 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		assert.Equal(t, decimal.NewFromInt(1500), initialBalance)
 
 		service := NewChannelService(db, &signer)
+		allocateAmount := decimal.NewFromInt(200)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
-			AllocateAmount:   big.NewInt(200),
+			AllocateAmount:   &allocateAmount,
 			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{
@@ -68,8 +68,8 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 
 		// New channel amount should be initial + 200
 		expected := initialRawAmount.Add(decimal.NewFromInt(200))
-		assert.Equal(t, 0, response.Allocations[0].RawAmount.Cmp(expected.BigInt()), "Allocated amount mismatch")
-		assert.Equal(t, 0, response.Allocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		assert.Equal(t, 0, response.Allocations[0].RawAmount.Cmp(expected), "Allocated amount mismatch")
+		assert.Equal(t, 0, response.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
@@ -114,9 +114,10 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(500)))
 
 		service := NewChannelService(db, &signer)
+		allocateAmount := decimal.NewFromInt(-300)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
-			AllocateAmount:   big.NewInt(-300),
+			AllocateAmount:   &allocateAmount,
 			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{
@@ -128,7 +129,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 
 		// Channel amount should decrease
 		expected := initialRawAmount.Sub(decimal.NewFromInt(300))
-		assert.Equal(t, 0, response.Allocations[0].RawAmount.Cmp(expected.BigInt()), "Decreased amount mismatch")
+		assert.Equal(t, 0, response.Allocations[0].RawAmount.Cmp(expected), "Decreased amount mismatch")
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, "usdc")
@@ -146,9 +147,10 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		userAddress := signer.GetAddress()
 
 		service := NewChannelService(db, &signer)
+		allocateAmount := decimal.NewFromInt(100)
 		params := &ResizeChannelParams{
 			ChannelID:        "0xNonExistentChannel",
-			AllocateAmount:   big.NewInt(100),
+			AllocateAmount:   &allocateAmount,
 			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
@@ -183,9 +185,10 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		service := NewChannelService(db, &signer)
+		allocateAmount := decimal.NewFromInt(100)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
-			AllocateAmount:   big.NewInt(100),
+			AllocateAmount:   &allocateAmount,
 			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
@@ -220,9 +223,10 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		service := NewChannelService(db, &signer)
+		allocateAmount := decimal.NewFromInt(100)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
-			AllocateAmount:   big.NewInt(100),
+			AllocateAmount:   &allocateAmount,
 			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
@@ -268,9 +272,10 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		service := NewChannelService(db, &signer)
+		allocateAmount := decimal.NewFromInt(100)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
-			AllocateAmount:   big.NewInt(100),
+			AllocateAmount:   &allocateAmount,
 			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
@@ -311,9 +316,10 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromFloat(0.000001)))
 
 		service := NewChannelService(db, &signer)
+		allocateAmount := decimal.NewFromInt(200)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
-			AllocateAmount:   big.NewInt(200),
+			AllocateAmount:   &allocateAmount,
 			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
@@ -348,9 +354,10 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		require.NoError(t, db.Create(&ch).Error)
 
 		service := NewChannelService(db, &signer)
+		allocateAmount := decimal.NewFromInt(100)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
-			AllocateAmount:   big.NewInt(100),
+			AllocateAmount:   &allocateAmount,
 			FundsDestination: userAddress.Hex(),
 		}
 		rpcSigners := map[string]struct{}{} // Empty signers
@@ -414,8 +421,8 @@ func TestChannelService_CloseChannel(t *testing.T) {
 		assert.Equal(t, ch.Version+1, response.Version)
 
 		// Final allocation should send full balance to destination
-		assert.Equal(t, 0, response.FinalAllocations[0].RawAmount.Cmp(initialRawAmount.BigInt()), "Primary allocation mismatch")
-		assert.Equal(t, 0, response.FinalAllocations[1].RawAmount.Cmp(big.NewInt(0)), "Broker allocation should be zero")
+		assert.Equal(t, 0, response.FinalAllocations[0].RawAmount.Cmp(initialRawAmount), "Primary allocation mismatch")
+		assert.Equal(t, 0, response.FinalAllocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 	})
 
 	t.Run("ErrorOtherChallengedChannel", func(t *testing.T) {

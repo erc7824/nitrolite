@@ -95,4 +95,5 @@ export const rpcResponseParser = {
     ping: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Ping),
     pong: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Pong),
     transfer: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Transfer),
+    transferNotification: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.TransferNotification),
 };

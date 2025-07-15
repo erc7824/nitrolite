@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -143,9 +144,7 @@ func (g *ZodGenerator) LoadSchemas(requestDir, responseDir string) error {
 			}
 
 			// Merge definitions
-			for name, def := range schema.Defs {
-				g.allDefs[name] = def
-			}
+			maps.Copy(g.allDefs, schema.Defs)
 		}
 	}
 
@@ -517,4 +516,3 @@ func (g *ZodGenerator) getDependencies(prop SchemaProperty) []string {
 
 	return deps
 }
-

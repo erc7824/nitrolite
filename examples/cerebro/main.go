@@ -89,15 +89,25 @@ func main() {
 				os.Exit(0)
 			},
 		}),
+		prompt.OptionAddKeyBind(prompt.KeyBind{
+			Key: prompt.ControlD,
+			Fn:  func(buf *prompt.Buffer) {},
+		}),
 	)
 
-	go p.Run()
+	promptExitCh := make(chan struct{})
+	go func() {
+		p.Run()
+		close(promptExitCh)
+	}()
 
 	select {
 	case <-clearnode.WaitCh():
 		fmt.Println("Clearnode client disconnected.")
 	case <-operator.Wait():
 		fmt.Println("Operator exited.")
+	case <-promptExitCh:
+		fmt.Println("Prompt exited.")
 	}
 	handleExit()
 	fmt.Println("Exiting Cerebro CLI.")

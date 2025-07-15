@@ -19,6 +19,10 @@ contract ConsensusTransitionTest is Test {
 
     ConsensusTransition public adjudicator;
 
+    // Mockup constructor parameters
+    address mockedOwner = address(0x456);
+    address mockedChannelImpl = address(0x123);
+
     // Test accounts
     address public host;
     address public guest;
@@ -35,7 +39,7 @@ contract ConsensusTransitionTest is Test {
 
     function setUp() public {
         // Deploy the adjudicator contract
-        adjudicator = new ConsensusTransition();
+        adjudicator = new ConsensusTransition(mockedOwner, mockedChannelImpl);
 
         // Generate private keys and addresses for the participants
         hostPrivateKey = 0x1;
@@ -56,29 +60,6 @@ contract ConsensusTransitionTest is Test {
             challenge: 3600, // 1 hour challenge period
             nonce: 1
         });
-    }
-
-    // Test case: Basic signing test to verify our signature approach
-    // using foundry's vm.sign and correctly formatted message for ecrecover
-    function test_BasicSignatureVerification() public view {
-        // Simple message to sign
-        bytes32 message = keccak256("test message");
-
-        // Sign the message directly without EIP-191 prefix
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, hostPrivateKey, message);
-
-        // Recover the signer using direct recovery (no prefix)
-        address recovered = ECDSA.recover(message, v, r, s);
-
-        // This should pass - verifying our signing approach
-        assertEq(recovered, host);
-
-        // Now test with Utils.verifySignature
-        Signature memory signature = Signature({v: v, r: r, s: s});
-        bool isValid = Utils.verifySignature(message, signature, host);
-
-        // This should also pass with our updated Utils.verifySignature
-        assertTrue(isValid);
     }
 
     // Helper function to create test allocations

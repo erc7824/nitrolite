@@ -8,9 +8,10 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 
 import {TestUtils} from "../TestUtils.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
+import {MockEIP712} from "../mocks/MockEIP712.sol";
 
 import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature, StateIntent} from "../../src/interfaces/Types.sol";
+import {Channel, State, Allocation, Signature, StateIntent, STATE_TYPEHASH} from "../../src/interfaces/Types.sol";
 import {SimpleConsensus} from "../../src/adjudicators/SimpleConsensus.sol";
 import {Utils} from "../../src/Utils.sol";
 
@@ -18,6 +19,10 @@ contract SimpleConsensusTest is Test {
     using ECDSA for bytes32;
 
     SimpleConsensus public adjudicator;
+    MockEIP712 public mockedChannelImpl;
+
+    // Mockup constructor parameters
+    address mockedOwner = address(0x456);
 
     address public host;
     address public guest;
@@ -31,7 +36,8 @@ contract SimpleConsensusTest is Test {
     uint256 private constant GUEST = 1;
 
     function setUp() public {
-        adjudicator = new SimpleConsensus();
+        mockedChannelImpl = new MockEIP712("TestChannelImpl", "1.0");
+        adjudicator = new SimpleConsensus(mockedOwner, address(mockedChannelImpl));
 
         hostPrivateKey = 0x1;
         guestPrivateKey = 0x2;
@@ -104,7 +110,28 @@ contract SimpleConsensusTest is Test {
         return Signature({v: v, r: r, s: s});
     }
 
-    function test_adjudicate_firstState_valid() public view {
+    function _signStateEIP191(State memory state, uint256 privateKey) internal view returns (Signature memory) {
+        bytes32 stateHash = Utils.getStateHash(channel, state);
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP191(vm, privateKey, stateHash);
+        return Signature({v: v, r: r, s: s});
+    }
+
+    function _signStateEIP712(State memory state, uint256 privateKey) internal view returns (Signature memory) {
+        bytes32 channelId = Utils.getChannelId(channel);
+        bytes32 domainSeparator = mockedChannelImpl.domainSeparator();
+        bytes32 structHash = keccak256(abi.encode(
+            STATE_TYPEHASH,
+            channelId,
+            state.intent,
+            state.version,
+            keccak256(state.data),
+            keccak256(abi.encode(state.allocations))
+        ));
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP712(vm, privateKey, domainSeparator, structHash);
+        return Signature({v: v, r: r, s: s});
+    }
+
+    function test_adjudicate_firstState_valid_withRawECDSASignatures() public view {
         State memory initialState = _createInitialState("initial state");
         initialState.sigs = new Signature[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
@@ -112,6 +139,26 @@ contract SimpleConsensusTest is Test {
 
         bool valid = adjudicator.adjudicate(channel, initialState, new State[](0));
         assertTrue(valid, "Valid first state transition should be accepted");
+    }
+
+    function test_adjudicate_firstState_valid_withEIP191Signatures() public view {
+        State memory initialState = _createInitialState("initial state");
+        initialState.sigs = new Signature[](2);
+        initialState.sigs[HOST] = _signStateEIP191(initialState, hostPrivateKey);
+        initialState.sigs[GUEST] = _signStateEIP191(initialState, guestPrivateKey);
+
+        bool valid = adjudicator.adjudicate(channel, initialState, new State[](0));
+        assertTrue(valid, "Valid first state transition with EIP191 signatures should be accepted");
+    }
+
+    function test_adjudicate_firstState_valid_withEIP712Signatures() public view {
+        State memory initialState = _createInitialState("initial state");
+        initialState.sigs = new Signature[](2);
+        initialState.sigs[HOST] = _signStateEIP712(initialState, hostPrivateKey);
+        initialState.sigs[GUEST] = _signStateEIP712(initialState, guestPrivateKey);
+
+        bool valid = adjudicator.adjudicate(channel, initialState, new State[](0));
+        assertTrue(valid, "Valid first state transition with EIP712 signatures should be accepted");
     }
 
     function test_adjudicate_firstState_revert_whenMissingParticipantSignature() public view {

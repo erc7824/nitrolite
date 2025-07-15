@@ -59,35 +59,35 @@ func NewRPCRouter(
 
 	r.Node.Use(r.LoggerMiddleware)
 	r.Node.Use(r.MetricsMiddleware)
-	r.Node.Handle("ping", r.HandlePing)
-	r.Node.Handle("get_config", r.HandleGetConfig)
-	r.Node.Handle("get_assets", r.HandleGetAssets)
-	r.Node.Handle("get_app_definition", r.HandleGetAppDefinition)
-	r.Node.Handle("get_app_sessions", r.HandleGetAppSessions)
-	r.Node.Handle("get_channels", r.HandleGetChannels)
-	r.Node.Handle("get_ledger_entries", r.HandleGetLedgerEntries)
-	r.Node.Handle("get_ledger_transactions", r.HandleGetLedgerTransactions)
-	r.Node.Handle("auth_request", r.HandleAuthRequest)
-	r.Node.Handle("auth_verify", r.HandleAuthVerify)
+	r.Node.Handle(RPCMethodPing.String(), r.HandlePing)
+	r.Node.Handle(RPCMethodGetConfig.String(), r.HandleGetConfig)
+	r.Node.Handle(RPCMethodGetAssets.String(), r.HandleGetAssets)
+	r.Node.Handle(RPCMethodGetAppDefinition.String(), r.HandleGetAppDefinition)
+	r.Node.Handle(RPCMethodGetAppSessions.String(), r.HandleGetAppSessions)
+	r.Node.Handle(RPCMethodGetChannels.String(), r.HandleGetChannels)
+	r.Node.Handle(RPCMethodGetLedgerEntries.String(), r.HandleGetLedgerEntries)
+	r.Node.Handle(RPCMethodGetLedgerTransactions.String(), r.HandleGetLedgerTransactions)
+	r.Node.Handle(RPCMethodAuthRequest.String(), r.HandleAuthRequest)
+	r.Node.Handle(RPCMethodAuthVerify.String(), r.HandleAuthVerify)
 
 	privGroup := r.Node.NewGroup("private")
 	privGroup.Use(r.AuthMiddleware)
 
-	privGroup.Handle("get_user_tag", r.HandleGetUserTag)
-	privGroup.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
-	privGroup.Handle("get_rpc_history", r.HandleGetRPCHistory)
+	privGroup.Handle(RPCMethodGetUserTag.String(), r.HandleGetUserTag)
+	privGroup.Handle(RPCMethodGetLedgerBalances.String(), r.HandleGetLedgerBalances)
+	privGroup.Handle(RPCMethodGetRPCHistory.String(), r.HandleGetRPCHistory)
 
 	historyGroup := privGroup.NewGroup("")
 	historyGroup.Use(r.HistoryMiddleware)
-	historyGroup.Handle("resize_channel", r.HandleResizeChannel)
-	historyGroup.Handle("close_channel", r.HandleCloseChannel)
+	historyGroup.Handle(RPCMethodResizeChannel.String(), r.HandleResizeChannel)
+	historyGroup.Handle(RPCMethodCloseChannel.String(), r.HandleCloseChannel)
 
 	appSessionGroup := historyGroup.NewGroup("app_session")
 	appSessionGroup.Use(r.BalanceUpdateMiddleware)
-	appSessionGroup.Handle("transfer", r.HandleTransfer)
-	appSessionGroup.Handle("create_app_session", r.HandleCreateApplication)
-	appSessionGroup.Handle("submit_app_state", r.HandleSubmitAppState)
-	appSessionGroup.Handle("close_app_session", r.HandleCloseApplication)
+	appSessionGroup.Handle(RPCMethodTransfer.String(), r.HandleTransfer)
+	appSessionGroup.Handle(RPCMethodCreateAppSession.String(), r.HandleCreateApplication)
+	appSessionGroup.Handle(RPCMethodSubmitAppState.String(), r.HandleSubmitAppState)
+	appSessionGroup.Handle(RPCMethodCloseAppSession.String(), r.HandleCloseApplication)
 
 	return r
 }
@@ -110,7 +110,7 @@ func (r *RPCRouter) HandleConnect(send SendRPCMessageFunc) {
 		response = append(response, GetAssetsResponse(asset))
 	}
 
-	send("assets", response)
+	send(RPCMethodAssets.String(), response)
 }
 
 func (r *RPCRouter) HandleDisconnect(userID string) {
@@ -145,7 +145,7 @@ func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) 
 	}
 
 	// Send channel updates
-	send("channels", resp)
+	send(RPCMethodChannelsUpdate.String(), resp)
 
 	// Send initial balances
 	balances, err := GetWalletLedger(r.DB, common.HexToAddress(walletAddress)).GetBalances(NewAccountID(walletAddress))
@@ -153,7 +153,7 @@ func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) 
 		r.lg.Error("error getting balances", "sender", walletAddress, "error", err)
 		return
 	}
-	send("bu", balances)
+	send(RPCMethodBalanceUpdate.String(), balances)
 }
 
 func (r *RPCRouter) HandleMessageSent() {
@@ -176,7 +176,7 @@ func (r *RPCRouter) LoggerMiddleware(c *RPCContext) {
 		return
 	}
 
-	if c.Message.Res.Method == "error" {
+	if c.Message.Res.Method == RPCMethodError.String() {
 		logger.Warn("failed to handle RPC request",
 			"userID", c.UserID,
 			"method", c.Message.Req.Method,
@@ -193,7 +193,7 @@ func (r *RPCRouter) MetricsMiddleware(c *RPCContext) {
 	c.Next()
 
 	status := "success"
-	if c.Message.Res.Method == "error" {
+	if c.Message.Res.Method == RPCMethodError.String() {
 		status = "failure"
 	}
 

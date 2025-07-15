@@ -12,7 +12,7 @@ go run . <clearnode_ws_url>
 
 ### Environment Variables
 
-- `CEREBRO_STORE_PATH` - Path to the database file (optional, defaults to `bridge.db`)
+- `CEREBRO_STORE_PATH` - Path to the database file (optional, defaults to `cerebro.db`)
 
 ## Features
 

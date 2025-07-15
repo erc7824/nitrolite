@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-type ZodGenerator struct {
+type SchemaOrchestrator struct {
 	schemas                map[string]SchemaInfo
 	allDefinitions         map[string]SchemaProperty
 	commonDefinitions      map[string]SchemaProperty
@@ -14,11 +14,11 @@ type ZodGenerator struct {
 	responseDefinitions    map[string]SchemaProperty
 	requestTypeMappings    map[string]string // typeName -> rpcMethod
 	responseTypeMappings   map[string]string // typeName -> rpcMethod
-	unifiedGenerator       *UnifiedGenerator
+	codeFileGenerator      *CodeFileGenerator
 }
 
-func NewZodGenerator() *ZodGenerator {
-	return &ZodGenerator{
+func NewSchemaOrchestrator() *SchemaOrchestrator {
+	return &SchemaOrchestrator{
 		schemas:              make(map[string]SchemaInfo),
 		allDefinitions:       make(map[string]SchemaProperty),
 		commonDefinitions:    make(map[string]SchemaProperty),
@@ -29,52 +29,52 @@ func NewZodGenerator() *ZodGenerator {
 	}
 }
 
-func (g *ZodGenerator) LoadSchemas(requestDirectoryPath, responseDirectoryPath string) error {
+func (orchestrator *SchemaOrchestrator) LoadSchemas(requestDirectoryPath, responseDirectoryPath string) error {
 	loadedSchemas, allDefinitions, err := LoadSchemas(requestDirectoryPath, responseDirectoryPath)
 	if err != nil {
 		return fmt.Errorf("failed to load schemas: %w", err)
 	}
 
-	g.schemas = loadedSchemas
-	g.allDefinitions = allDefinitions
+	orchestrator.schemas = loadedSchemas
+	orchestrator.allDefinitions = allDefinitions
 	return nil
 }
 
-func (g *ZodGenerator) CategorizeDefinitions() {
-	requestUsageMap, responseUsageMap := g.createUsageTracker()
-	g.categorizeDefinitionsByUsage(requestUsageMap, responseUsageMap)
-	g.buildRPCMethodMappings()
+func (orchestrator *SchemaOrchestrator) CategorizeDefinitions() {
+	requestUsageMap, responseUsageMap := orchestrator.createUsageTracker()
+	orchestrator.categorizeDefinitionsByUsage(requestUsageMap, responseUsageMap)
+	orchestrator.buildRPCMethodMappings()
 }
 
-func (g *ZodGenerator) GenerateAllFiles(schemaDirectoryPath string, sdkRootDirectoryPath string) error {
+func (orchestrator *SchemaOrchestrator) GenerateAllFiles(schemaDirectoryPath string, sdkRootDirectoryPath string) error {
 	config, err := NewGenerationConfig(schemaDirectoryPath, sdkRootDirectoryPath)
 	if err != nil {
 		return fmt.Errorf("failed to create generation config: %w", err)
 	}
 
-	dependencies := g.createGeneratorDependencies()
-	unifiedGenerator, err := NewUnifiedGenerator(dependencies)
+	dependencies := orchestrator.createGeneratorDependencies()
+	codeFileGenerator, err := NewCodeFileGenerator(dependencies)
 	if err != nil {
-		return fmt.Errorf("failed to create unified generator: %w", err)
+		return fmt.Errorf("failed to create code file generator: %w", err)
 	}
 
 	errorCollector := NewErrorCollector()
 	
-	// Generate all files using the unified generator
-	errorCollector.Add(unifiedGenerator.GenerateCommonSchemaFile(config))
-	errorCollector.Add(unifiedGenerator.GenerateRequestSchemaFile(config))
-	errorCollector.Add(unifiedGenerator.GenerateResponseSchemaFile(config))
-	errorCollector.Add(unifiedGenerator.GenerateTypeScriptTypesFile(config))
+	// Generate all files using the code file generator
+	errorCollector.Add(codeFileGenerator.GenerateCommonSchemaFile(config))
+	errorCollector.Add(codeFileGenerator.GenerateRequestSchemaFile(config))
+	errorCollector.Add(codeFileGenerator.GenerateResponseSchemaFile(config))
+	errorCollector.Add(codeFileGenerator.GenerateTypeScriptTypesFile(config))
 
 	return errorCollector.CombinedError()
 }
 
 // createUsageTracker creates maps to track definition usage
-func (g *ZodGenerator) createUsageTracker() (map[string]bool, map[string]bool) {
+func (orchestrator *SchemaOrchestrator) createUsageTracker() (map[string]bool, map[string]bool) {
 	requestUsageMap := make(map[string]bool)
 	responseUsageMap := make(map[string]bool)
 
-	for _, schemaInfo := range g.schemas {
+	for _, schemaInfo := range orchestrator.schemas {
 		var targetUsageMap map[string]bool
 		if schemaInfo.IsRequest {
 			targetUsageMap = requestUsageMap
@@ -88,14 +88,14 @@ func (g *ZodGenerator) createUsageTracker() (map[string]bool, map[string]bool) {
 		}
 
 		// Track dependencies
-		g.markDependenciesAsUsed(schemaInfo.Schema.Defs, targetUsageMap)
+		orchestrator.markDependenciesAsUsed(schemaInfo.Schema.Defs, targetUsageMap)
 	}
 
 	return requestUsageMap, responseUsageMap
 }
 
 // markDependenciesAsUsed marks all dependencies as used in the usage map
-func (g *ZodGenerator) markDependenciesAsUsed(definitions map[string]SchemaProperty, usageMap map[string]bool) {
+func (orchestrator *SchemaOrchestrator) markDependenciesAsUsed(definitions map[string]SchemaProperty, usageMap map[string]bool) {
 	for _, definition := range definitions {
 		dependencies := GetDependencies(definition)
 		for _, dependency := range dependencies {
@@ -105,60 +105,60 @@ func (g *ZodGenerator) markDependenciesAsUsed(definitions map[string]SchemaPrope
 }
 
 // categorizeDefinitionsByUsage categorizes definitions based on usage patterns
-func (g *ZodGenerator) categorizeDefinitionsByUsage(requestUsageMap, responseUsageMap map[string]bool) {
-	for definitionName, definition := range g.allDefinitions {
+func (orchestrator *SchemaOrchestrator) categorizeDefinitionsByUsage(requestUsageMap, responseUsageMap map[string]bool) {
+	for definitionName, definition := range orchestrator.allDefinitions {
 		usedInRequests := requestUsageMap[definitionName]
 		usedInResponses := responseUsageMap[definitionName]
 
 		switch {
 		case usedInRequests && usedInResponses:
-			g.commonDefinitions[definitionName] = definition
+			orchestrator.commonDefinitions[definitionName] = definition
 		case usedInRequests:
-			g.requestDefinitions[definitionName] = definition
+			orchestrator.requestDefinitions[definitionName] = definition
 		case usedInResponses:
-			g.responseDefinitions[definitionName] = definition
+			orchestrator.responseDefinitions[definitionName] = definition
 		default:
 			// Default to common if usage is unclear
-			g.commonDefinitions[definitionName] = definition
+			orchestrator.commonDefinitions[definitionName] = definition
 		}
 	}
 }
 
 // buildRPCMethodMappings builds mappings from type names to RPC methods
-func (g *ZodGenerator) buildRPCMethodMappings() {
-	for _, schemaInfo := range g.schemas {
+func (orchestrator *SchemaOrchestrator) buildRPCMethodMappings() {
+	for _, schemaInfo := range orchestrator.schemas {
 		if schemaInfo.MainType == "" || schemaInfo.RPCMethod == "" {
 			continue
 		}
 
 		if schemaInfo.IsRequest {
-			g.requestTypeMappings[schemaInfo.MainType] = schemaInfo.RPCMethod
+			orchestrator.requestTypeMappings[schemaInfo.MainType] = schemaInfo.RPCMethod
 		} else {
-			g.responseTypeMappings[schemaInfo.MainType] = schemaInfo.RPCMethod
+			orchestrator.responseTypeMappings[schemaInfo.MainType] = schemaInfo.RPCMethod
 		}
 	}
 }
 
-// createGeneratorDependencies creates dependencies for the unified generator
-func (g *ZodGenerator) createGeneratorDependencies() *GeneratorDependencies {
+// createGeneratorDependencies creates dependencies for the code file generator
+func (orchestrator *SchemaOrchestrator) createGeneratorDependencies() *GeneratorDependencies {
 	return &GeneratorDependencies{
-		RequestDefinitions:   g.requestDefinitions,
-		ResponseDefinitions:  g.responseDefinitions,
-		CommonDefinitions:    g.commonDefinitions,
-		RequestTypeMappings:  g.requestTypeMappings,
-		ResponseTypeMappings: g.responseTypeMappings,
-		DefinitionSorter:     g.getSortedDefinitionNames,
-		EnumNameConverter:    g.convertRPCMethodToEnumName,
+		RequestDefinitions:   orchestrator.requestDefinitions,
+		ResponseDefinitions:  orchestrator.responseDefinitions,
+		CommonDefinitions:    orchestrator.commonDefinitions,
+		RequestTypeMappings:  orchestrator.requestTypeMappings,
+		ResponseTypeMappings: orchestrator.responseTypeMappings,
+		DefinitionSorter:     orchestrator.getSortedDefinitionNames,
+		EnumNameConverter:    orchestrator.convertRPCMethodToEnumName,
 	}
 }
 
-func (g *ZodGenerator) getSortedDefinitionNames(definitions map[string]SchemaProperty) []string {
-	dependencyGraph := g.buildDependencyGraph(definitions)
-	return g.topologicalSort(dependencyGraph, definitions)
+func (orchestrator *SchemaOrchestrator) getSortedDefinitionNames(definitions map[string]SchemaProperty) []string {
+	dependencyGraph := orchestrator.buildDependencyGraph(definitions)
+	return orchestrator.topologicalSort(dependencyGraph, definitions)
 }
 
 // buildDependencyGraph builds a dependency graph for definitions
-func (g *ZodGenerator) buildDependencyGraph(definitions map[string]SchemaProperty) map[string][]string {
+func (orchestrator *SchemaOrchestrator) buildDependencyGraph(definitions map[string]SchemaProperty) map[string][]string {
 	dependencyGraph := make(map[string][]string)
 	
 	for definitionName, definition := range definitions {
@@ -178,7 +178,7 @@ func (g *ZodGenerator) buildDependencyGraph(definitions map[string]SchemaPropert
 }
 
 // topologicalSort performs topological sort on the dependency graph
-func (g *ZodGenerator) topologicalSort(dependencyGraph map[string][]string, definitions map[string]SchemaProperty) []string {
+func (orchestrator *SchemaOrchestrator) topologicalSort(dependencyGraph map[string][]string, definitions map[string]SchemaProperty) []string {
 	visitedNodes := make(map[string]bool)
 	visitingNodes := make(map[string]bool)
 	sortedResult := make([]string, 0, len(definitions))
@@ -220,7 +220,7 @@ func (g *ZodGenerator) topologicalSort(dependencyGraph map[string][]string, defi
 	return sortedResult
 }
 
-func (g *ZodGenerator) convertRPCMethodToEnumName(rpcMethod string) string {
+func (orchestrator *SchemaOrchestrator) convertRPCMethodToEnumName(rpcMethod string) string {
 	methodParts := strings.Split(rpcMethod, "_")
 	for i, part := range methodParts {
 		methodParts[i] = strings.Title(part)

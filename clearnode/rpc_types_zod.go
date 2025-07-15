@@ -34,21 +34,21 @@ func getTypeMappings() map[string]TypeMapping {
 	}
 }
 
-// ZodSchemaGenerator provides common Zod schema generation utilities
-type ZodSchemaGenerator struct {
+// ZodSchemaBuilder provides common Zod schema building utilities
+type ZodSchemaBuilder struct {
 	codeBuilder    *CodeBuilder
 	propertySorter *PropertySorter
 	stringUtils    *StringUtils
 }
 
-// NewZodSchemaGenerator creates a new Zod schema generator with utilities
-func NewZodSchemaGenerator() (*ZodSchemaGenerator, error) {
+// NewZodSchemaBuilder creates a new Zod schema builder with utilities
+func NewZodSchemaBuilder() (*ZodSchemaBuilder, error) {
 	codeBuilder, err := NewCodeBuilder()
 	if err != nil {
 		return nil, err
 	}
 	
-	return &ZodSchemaGenerator{
+	return &ZodSchemaBuilder{
 		codeBuilder:    codeBuilder,
 		propertySorter: NewPropertySorter(),
 		stringUtils:    NewStringUtils(),
@@ -56,35 +56,35 @@ func NewZodSchemaGenerator() (*ZodSchemaGenerator, error) {
 }
 
 // GenerateZodSchema converts a SchemaProperty to a Zod schema string
-func (z *ZodSchemaGenerator) GenerateZodSchema(prop SchemaProperty) string {
+func (builder *ZodSchemaBuilder) GenerateZodSchema(prop SchemaProperty) string {
 	switch prop.Type {
 	case "string":
-		return z.generateZodStringSchema(prop)
+		return builder.generateZodStringSchema(prop)
 	case "integer":
 		return "z.number()"
 	case "object":
-		return z.generateZodObjectSchema(prop)
+		return builder.generateZodObjectSchema(prop)
 	case "enum":
-		return z.generateZodEnumSchema(prop)
+		return builder.generateZodEnumSchema(prop)
 	default:
 		if prop.Ref != "" {
-			return z.generateZodRefSchema(prop.Ref)
+			return builder.generateZodRefSchema(prop.Ref)
 		}
 		return "z.unknown()"
 	}
 }
 
 // generateZodStringSchema handles string type with various formats
-func (z *ZodSchemaGenerator) generateZodStringSchema(prop SchemaProperty) string {
-	if zodSchema := z.getMappedZodSchemaForFormat(prop.Format); zodSchema != "" {
+func (builder *ZodSchemaBuilder) generateZodStringSchema(prop SchemaProperty) string {
+	if zodSchema := builder.getMappedZodSchemaForFormat(prop.Format); zodSchema != "" {
 		return zodSchema
 	}
 
-	return z.getSpecialFormatZodSchema(prop.Format)
+	return builder.getSpecialFormatZodSchema(prop.Format)
 }
 
 // getMappedZodSchemaForFormat retrieves Zod schema for mapped type formats
-func (z *ZodSchemaGenerator) getMappedZodSchemaForFormat(format string) string {
+func (builder *ZodSchemaBuilder) getMappedZodSchemaForFormat(format string) string {
 	typeMappings := getTypeMappings()
 	for typeName, mapping := range typeMappings {
 		if strings.ToLower(typeName) == format {
@@ -95,7 +95,7 @@ func (z *ZodSchemaGenerator) getMappedZodSchemaForFormat(format string) string {
 }
 
 // getSpecialFormatZodSchema handles special formats not in type mappings
-func (z *ZodSchemaGenerator) getSpecialFormatZodSchema(format string) string {
+func (builder *ZodSchemaBuilder) getSpecialFormatZodSchema(format string) string {
 	switch format {
 	case "date-time":
 		return "z.union([z.string(), z.date()]).transform((v) => new Date(v))"
@@ -105,13 +105,13 @@ func (z *ZodSchemaGenerator) getSpecialFormatZodSchema(format string) string {
 }
 
 // generateZodObjectSchema handles object type with properties and required fields
-func (z *ZodSchemaGenerator) generateZodObjectSchema(prop SchemaProperty) string {
+func (builder *ZodSchemaBuilder) generateZodObjectSchema(prop SchemaProperty) string {
 	if len(prop.Properties) == 0 {
 		return "z.object({})"
 	}
 
-	properties := z.createPropertyDataForZodSchema(prop)
-	zodSchema, err := z.codeBuilder.BuildZodObjectSchema(properties)
+	properties := builder.createPropertyDataForZodSchema(prop)
+	zodSchema, err := builder.codeBuilder.BuildZodObjectSchema(properties)
 	if err != nil {
 		// Fallback to basic object schema if template fails
 		return "z.object({})"
@@ -121,13 +121,13 @@ func (z *ZodSchemaGenerator) generateZodObjectSchema(prop SchemaProperty) string
 }
 
 // createPropertyDataForZodSchema creates PropertyData list for Zod schema generation
-func (z *ZodSchemaGenerator) createPropertyDataForZodSchema(prop SchemaProperty) []PropertyData {
-	sortedNames := z.propertySorter.SortPropertyNames(prop.Properties)
+func (builder *ZodSchemaBuilder) createPropertyDataForZodSchema(prop SchemaProperty) []PropertyData {
+	sortedNames := builder.propertySorter.SortPropertyNames(prop.Properties)
 	properties := make([]PropertyData, 0, len(sortedNames))
 	
 	for i, name := range sortedNames {
 		propDef := prop.Properties[name]
-		zodSchema := z.GenerateZodSchema(propDef)
+		zodSchema := builder.GenerateZodSchema(propDef)
 		
 		propertyData := PropertyData{
 			Name:       name,
@@ -143,33 +143,33 @@ func (z *ZodSchemaGenerator) createPropertyDataForZodSchema(prop SchemaProperty)
 }
 
 // GenerateObjectSchemaWithTransform generates object schema with camelCase transform
-func (z *ZodSchemaGenerator) GenerateObjectSchemaWithTransform(prop SchemaProperty, typeName string) string {
+func (builder *ZodSchemaBuilder) GenerateObjectSchemaWithTransform(prop SchemaProperty, typeName string) string {
 	if len(prop.Properties) == 0 {
 		return "z.object({})"
 	}
 
-	properties := z.createPropertyDataForZodTransform(prop)
-	zodSchema, err := z.codeBuilder.BuildZodSchemaWithTransform(typeName, properties)
+	properties := builder.createPropertyDataForZodTransform(prop)
+	zodSchema, err := builder.codeBuilder.BuildZodSchemaWithTransform(typeName, properties)
 	if err != nil {
 		// Fallback to basic object schema if template fails
-		return z.generateZodObjectSchema(prop)
+		return builder.generateZodObjectSchema(prop)
 	}
 	
 	return zodSchema
 }
 
 // createPropertyDataForZodTransform creates PropertyData list for Zod transform generation
-func (z *ZodSchemaGenerator) createPropertyDataForZodTransform(prop SchemaProperty) []PropertyData {
-	sortedNames := z.propertySorter.SortPropertyNames(prop.Properties)
+func (builder *ZodSchemaBuilder) createPropertyDataForZodTransform(prop SchemaProperty) []PropertyData {
+	sortedNames := builder.propertySorter.SortPropertyNames(prop.Properties)
 	properties := make([]PropertyData, 0, len(sortedNames))
 	
 	for i, name := range sortedNames {
 		propDef := prop.Properties[name]
-		zodSchema := z.GenerateZodSchema(propDef)
+		zodSchema := builder.GenerateZodSchema(propDef)
 		
 		propertyData := PropertyData{
 			Name:       name,
-			CamelName:  z.stringUtils.ToCamelCase(name),
+			CamelName:  builder.stringUtils.ToCamelCase(name),
 			ZodSchema:  zodSchema,
 			IsRequired: slices.Contains(prop.Required, name),
 			IsLast:     i == len(sortedNames)-1,
@@ -182,16 +182,16 @@ func (z *ZodSchemaGenerator) createPropertyDataForZodTransform(prop SchemaProper
 }
 
 // generateZodEnumSchema handles enum type with proper validation
-func (z *ZodSchemaGenerator) generateZodEnumSchema(prop SchemaProperty) string {
+func (builder *ZodSchemaBuilder) generateZodEnumSchema(prop SchemaProperty) string {
 	if len(prop.Enum) == 0 {
 		return "z.string()"
 	}
 
-	return z.buildZodEnumSchema(prop.Enum)
+	return builder.buildZodEnumSchema(prop.Enum)
 }
 
 // buildZodEnumSchema creates a Zod enum schema from string values
-func (z *ZodSchemaGenerator) buildZodEnumSchema(enumValues []string) string {
+func (builder *ZodSchemaBuilder) buildZodEnumSchema(enumValues []string) string {
 	quotedValues := make([]string, len(enumValues))
 	for i, val := range enumValues {
 		quotedValues[i] = fmt.Sprintf("\"%s\"", val)
@@ -201,13 +201,13 @@ func (z *ZodSchemaGenerator) buildZodEnumSchema(enumValues []string) string {
 }
 
 // generateZodRefSchema handles reference type with mapped type support
-func (z *ZodSchemaGenerator) generateZodRefSchema(ref string) string {
-	defName := z.extractDefinitionNameFromRef(ref)
+func (builder *ZodSchemaBuilder) generateZodRefSchema(ref string) string {
+	defName := builder.extractDefinitionNameFromRef(ref)
 	if defName == "" {
 		return "z.unknown()"
 	}
 
-	if zodSchema := z.getMappedZodSchemaForRef(defName); zodSchema != "" {
+	if zodSchema := builder.getMappedZodSchemaForRef(defName); zodSchema != "" {
 		return zodSchema
 	}
 
@@ -215,7 +215,7 @@ func (z *ZodSchemaGenerator) generateZodRefSchema(ref string) string {
 }
 
 // extractDefinitionNameFromRef extracts the definition name from a JSON schema reference
-func (z *ZodSchemaGenerator) extractDefinitionNameFromRef(ref string) string {
+func (builder *ZodSchemaBuilder) extractDefinitionNameFromRef(ref string) string {
 	parts := strings.Split(ref, "/")
 	if len(parts) < 3 {
 		return ""
@@ -224,7 +224,7 @@ func (z *ZodSchemaGenerator) extractDefinitionNameFromRef(ref string) string {
 }
 
 // getMappedZodSchemaForRef retrieves Zod schema for mapped reference types
-func (z *ZodSchemaGenerator) getMappedZodSchemaForRef(defName string) string {
+func (builder *ZodSchemaBuilder) getMappedZodSchemaForRef(defName string) string {
 	typeMappings := getTypeMappings()
 	if mapping, exists := typeMappings[defName]; exists {
 		return mapping.ZodSchemaForRef
@@ -233,7 +233,7 @@ func (z *ZodSchemaGenerator) getMappedZodSchemaForRef(defName string) string {
 }
 
 // GenerateCommonImports generates common import statements for Zod files
-func (z *ZodSchemaGenerator) GenerateCommonImports() string {
+func (builder *ZodSchemaBuilder) GenerateCommonImports() string {
 	var sb strings.Builder
 	sb.WriteString("import { z } from 'zod';\n")
 	sb.WriteString("import { addressSchema, hexSchema } from './common_gen';\n")
@@ -241,7 +241,7 @@ func (z *ZodSchemaGenerator) GenerateCommonImports() string {
 }
 
 // GenerateCommonSchemaImports generates import statements for common schemas
-func (z *ZodSchemaGenerator) GenerateCommonSchemaImports(commonNames []string) string {
+func (builder *ZodSchemaBuilder) GenerateCommonSchemaImports(commonNames []string) string {
 	if len(commonNames) == 0 {
 		return ""
 	}
@@ -260,7 +260,7 @@ func (z *ZodSchemaGenerator) GenerateCommonSchemaImports(commonNames []string) s
 }
 
 // GenerateBuiltinSchemas generates built-in common schemas (address, hex)
-func (z *ZodSchemaGenerator) GenerateBuiltinSchemas() string {
+func (builder *ZodSchemaBuilder) GenerateBuiltinSchemas() string {
 	var sb strings.Builder
 	sb.WriteString("export const addressSchema = z.string().refine((val) => /^0x[0-9a-fA-F]{40}$/.test(val), {\n")
 	sb.WriteString("  message: 'Must be a 0x-prefixed hex string of 40 hex chars (EVM address)',\n")
@@ -274,11 +274,11 @@ func (z *ZodSchemaGenerator) GenerateBuiltinSchemas() string {
 }
 
 // GenerateSchemaDefinitions generates schema definitions for a set of definitions
-func (z *ZodSchemaGenerator) GenerateSchemaDefinitions(definitionNames []string, defs map[string]SchemaProperty) string {
+func (builder *ZodSchemaBuilder) GenerateSchemaDefinitions(definitionNames []string, defs map[string]SchemaProperty) string {
 	var sb strings.Builder
 	for _, name := range definitionNames {
 		def := defs[name]
-		zodSchema := z.GenerateZodSchema(def)
+		zodSchema := builder.GenerateZodSchema(def)
 		sb.WriteString(fmt.Sprintf("export const %sSchema = %s;\n\n", name, zodSchema))
 	}
 	return sb.String()

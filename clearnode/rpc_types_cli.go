@@ -14,7 +14,7 @@ func runZodGeneratorCli(cliLogger Logger) {
 		systemLogger.Fatal("Invalid command line arguments", "err", err)
 	}
 
-	codeGenerator := NewZodGenerator()
+	codeGenerator := NewSchemaOrchestrator()
 
 	// Load schemas from request and response directories
 	requestSchemaPath := filepath.Join(config.SchemaDirectoryPath, "request")

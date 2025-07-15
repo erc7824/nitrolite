@@ -92,26 +92,26 @@ func (g *ZodGenerator) CategorizeDefinitions() {
 	}
 }
 
-func (g *ZodGenerator) GenerateAllFiles(outDir string) error {
-	// Generate common definitions
-	if err := g.generateCommonFile(outDir); err != nil {
+func (g *ZodGenerator) GenerateAllFiles(schemasDir string, sdkRootDir string) error {
+	// Generate common definitions (in SDK parse directory)
+	if err := g.generateCommonFile(sdkRootDir); err != nil {
 		return err
 	}
 
-	// Generate request definitions
+	// Generate request definitions (in SDK parse directory)
 	requestGen := g.NewRequestGenerator()
-	if err := requestGen.GenerateRequestsFile(outDir); err != nil {
+	if err := requestGen.GenerateRequestsFile(sdkRootDir); err != nil {
 		return err
 	}
 
-	// Generate response definitions
+	// Generate response definitions (in SDK parse directory)
 	responseGen := g.NewResponseGenerator()
-	if err := responseGen.GenerateResponsesFile(outDir); err != nil {
+	if err := responseGen.GenerateResponsesFile(sdkRootDir); err != nil {
 		return err
 	}
 
-	// Generate TypeScript response types
-	if err := responseGen.GenerateResponseTypesFile(outDir); err != nil {
+	// Generate TypeScript response types (in SDK types directory)
+	if err := responseGen.GenerateResponseTypesFile(sdkRootDir); err != nil {
 		return err
 	}
 

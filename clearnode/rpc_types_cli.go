@@ -7,16 +7,17 @@ import (
 
 func runZodGeneratorCli(logger Logger) {
 	logger = logger.NewSystem("zod-generator")
-	if len(os.Args) < 3 {
-		logger.Fatal("Usage: clearnode zod-generator <out_dir>")
+	if len(os.Args) < 4 {
+		logger.Fatal("Usage: clearnode zod-generator <schemas_dir> <sdk_root_dir>")
 	}
 
-	outDir := os.Args[2]
+	schemasDir := os.Args[2]
+	sdkRootDir := os.Args[3]
 	generator := NewZodGenerator()
 
 	// Load schemas from request and response directories
-	requestDir := filepath.Join(outDir, "request")
-	responseDir := filepath.Join(outDir, "response")
+	requestDir := filepath.Join(schemasDir, "request")
+	responseDir := filepath.Join(schemasDir, "response")
 
 	if err := generator.LoadSchemas(requestDir, responseDir); err != nil {
 		logger.Fatal("Failed to load schemas", "err", err)
@@ -26,9 +27,9 @@ func runZodGeneratorCli(logger Logger) {
 	generator.CategorizeDefinitions()
 
 	// Generate TypeScript files
-	if err := generator.GenerateAllFiles(outDir); err != nil {
+	if err := generator.GenerateAllFiles(schemasDir, sdkRootDir); err != nil {
 		logger.Fatal("Failed to generate TypeScript files", "err", err)
 	}
 
-	logger.Info("Generated Zod TypeScript files", "dir", outDir)
+	logger.Info("Generated Zod TypeScript files", "schemas_dir", schemasDir, "sdk_root_dir", sdkRootDir)
 }

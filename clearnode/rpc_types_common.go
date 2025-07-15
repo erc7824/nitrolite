@@ -1,13 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 // generateCommonFile generates the common_gen.ts file with shared schemas
-func (g *ZodGenerator) generateCommonFile(outDir string) error {
+func (g *ZodGenerator) generateCommonFile(sdkRootDir string) error {
 	var sb strings.Builder
 	zodGen := &ZodSchemaGenerator{}
 
@@ -25,7 +26,13 @@ func (g *ZodGenerator) generateCommonFile(outDir string) error {
 	definitionNames := g.getSortedDefinitionNames(g.commonDefs)
 	sb.WriteString(zodGen.GenerateSchemaDefinitions(definitionNames, g.commonDefs))
 
+	// Ensure directory exists
+	outputDir := filepath.Join(sdkRootDir, "src", "rpc", "parse")
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", outputDir, err)
+	}
+
 	// Write to file
-	outputPath := filepath.Join(outDir, "common_gen.ts")
+	outputPath := filepath.Join(outputDir, "common_gen.ts")
 	return os.WriteFile(outputPath, []byte(sb.String()), 0o644)
 }

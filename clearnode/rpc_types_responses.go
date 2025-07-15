@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -31,12 +32,12 @@ func NewResponseGenerator(responseDefs map[string]SchemaProperty, responseTypes 
 }
 
 // GenerateResponsesFile generates the response_gen.ts file
-func (r *ResponseGenerator) GenerateResponsesFile(outDir string) error {
+func (r *ResponseGenerator) GenerateResponsesFile(sdkRootDir string) error {
 	var sb strings.Builder
 
 	// Add imports
 	sb.WriteString("import { z } from 'zod';\n")
-	sb.WriteString("import { RPCMethod } from '../sdk/src/rpc/types';\n")
+	sb.WriteString("import { RPCMethod } from '../types';\n")
 	sb.WriteString("import { addressSchema, hexSchema } from './common_gen';\n")
 
 	// Import TypeScript types for transforms
@@ -54,7 +55,7 @@ func (r *ResponseGenerator) GenerateResponsesFile(outDir string) error {
 		sb.WriteString(fmt.Sprintf("  %s,\n", name))
 	}
 
-	sb.WriteString("} from '../sdk/src/rpc/types/response';\n")
+	sb.WriteString("} from '../types/response';\n")
 
 	// Import common schemas
 	if len(commonNames) > 0 {
@@ -70,8 +71,14 @@ func (r *ResponseGenerator) GenerateResponsesFile(outDir string) error {
 	// Generate parser mapping
 	sb.WriteString(r.generateResponseParsers())
 
+	// Ensure directory exists
+	outputDir := filepath.Join(sdkRootDir, "src", "rpc", "parse")
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", outputDir, err)
+	}
+
 	// Write to file
-	outputPath := filepath.Join(outDir, "response_gen.ts")
+	outputPath := filepath.Join(outputDir, "response_gen.ts")
 	return os.WriteFile(outputPath, []byte(sb.String()), 0o644)
 }
 
@@ -109,7 +116,7 @@ func (r *ResponseGenerator) generateResponseParsers() string {
 }
 
 // GenerateResponseTypesFile generates sdk/src/rpc/types/response.ts with TypeScript interfaces
-func (r *ResponseGenerator) GenerateResponseTypesFile(outDir string) error {
+func (r *ResponseGenerator) GenerateResponseTypesFile(sdkRootDir string) error {
 	var sb strings.Builder
 
 	// Add header comment
@@ -117,7 +124,8 @@ func (r *ResponseGenerator) GenerateResponseTypesFile(outDir string) error {
 	sb.WriteString("// Generated from JSON schemas\n\n")
 
 	// Add viem imports
-	sb.WriteString("import type { Address, Hex } from 'viem';\n\n")
+	sb.WriteString("import type { Address, Hex } from 'viem';\n")
+	sb.WriteString("import {RPCMethod, GenericRPCMessage} from '.';\n\n")
 
 	// Generate common type interfaces
 	commonNames := r.sortedDefNames(r.commonDefs)
@@ -139,12 +147,23 @@ func (r *ResponseGenerator) GenerateResponseTypesFile(outDir string) error {
 		if r.shouldSkipInterfaceGeneration(name) {
 			continue
 		}
+
+		// Generate Request structure first
+		if rpcMethod, exists := r.responseTypes[name]; exists {
+			requestInterface := r.generateRequestInterface(name, rpcMethod)
+			sb.WriteString(requestInterface)
+		}
+
+		// Then generate Params interface
 		tsInterface := r.generateTypeScriptInterface(name, def)
 		sb.WriteString(tsInterface)
 	}
 
+	// Generate RPCResponse union type and helper types
+	sb.WriteString(r.generateRPCResponseUnionType())
+
 	// Ensure directory exists
-	outputDir := filepath.Join(outDir, "sdk", "src", "rpc", "types")
+	outputDir := filepath.Join(sdkRootDir, "src", "rpc", "types")
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", outputDir, err)
 	}
@@ -161,12 +180,112 @@ func (r *ResponseGenerator) shouldSkipInterfaceGeneration(name string) bool {
 	return exists
 }
 
+// generateRequestInterface generates a Request structure for RPC responses
+func (r *ResponseGenerator) generateRequestInterface(name string, rpcMethod string) string {
+	var sb strings.Builder
+
+	// Generate JSDoc comment
+	enumValue := r.rpcMethodToEnum(rpcMethod)
+	sb.WriteString(fmt.Sprintf("/**\n"))
+	sb.WriteString(fmt.Sprintf(" * Represents the response structure for the {@link RPCMethod.%s} RPC method.\n", enumValue))
+	sb.WriteString(fmt.Sprintf(" */\n"))
+
+	// Generate the Request interface
+	requestName := strings.TrimSuffix(name, "Response") + "Response"
+	paramsName := name + "Params"
+
+	sb.WriteString(fmt.Sprintf("export interface %s extends GenericRPCMessage {\n", requestName))
+	sb.WriteString(fmt.Sprintf("    method: RPCMethod.%s;\n", enumValue))
+	sb.WriteString(fmt.Sprintf("    params: %s;\n", paramsName))
+	sb.WriteString("}\n\n")
+
+	return sb.String()
+}
+
+// generateRPCResponseUnionType generates the RPCResponse union type and helper types
+func (r *ResponseGenerator) generateRPCResponseUnionType() string {
+	var sb strings.Builder
+	
+	// Generate RPCResponse union type
+	sb.WriteString("/**\n")
+	sb.WriteString(" * Union type for all possible RPC response types.\n")
+	sb.WriteString(" * This allows for type-safe handling of different response structures.\n")
+	sb.WriteString(" */\n")
+	sb.WriteString("export type RPCResponse =\n")
+	
+	// Get all generated response types sorted by name
+	definitionNames := r.sortedDefNames(r.responseDefs)
+	var responseNames []string
+	for _, name := range definitionNames {
+		if !r.shouldSkipInterfaceGeneration(name) {
+			// Only include if it has an associated RPC method (meaning it's actually a response type)
+			if _, hasRPCMethod := r.responseTypes[name]; hasRPCMethod {
+				requestName := strings.TrimSuffix(name, "Response") + "Response"
+				responseNames = append(responseNames, requestName)
+			}
+		}
+	}
+	
+	// Also include common types that might be generated (if they have RPC methods)
+	commonNames := r.sortedDefNames(r.commonDefs)
+	for _, name := range commonNames {
+		if !r.shouldSkipInterfaceGeneration(name) {
+			// Only include if it has an associated RPC method
+			if _, hasRPCMethod := r.responseTypes[name]; hasRPCMethod {
+				requestName := strings.TrimSuffix(name, "Response") + "Response"
+				responseNames = append(responseNames, requestName)
+			}
+		}
+	}
+	
+	// Remove duplicates and sort
+	uniqueResponseTypes := make(map[string]bool)
+	for _, name := range responseNames {
+		uniqueResponseTypes[name] = true
+	}
+	
+	var unionTypes []string
+	for name := range uniqueResponseTypes {
+		unionTypes = append(unionTypes, name)
+	}
+	sort.Strings(unionTypes)
+	
+	// Generate union type - only if we have types to generate
+	if len(unionTypes) > 0 {
+		for i, name := range unionTypes {
+			if i == 0 {
+				sb.WriteString(fmt.Sprintf("    | %s\n", name))
+			} else {
+				sb.WriteString(fmt.Sprintf("    | %s\n", name))
+			}
+		}
+	} else {
+		// Fallback if no types are generated
+		sb.WriteString("    | never\n")
+	}
+	sb.WriteString(";\n\n")
+	
+	// Generate helper types
+	sb.WriteString("/**\n")
+	sb.WriteString(" * Maps RPC methods to their corresponding parameter types.\n")
+	sb.WriteString(" */\n")
+	sb.WriteString("// Helper type to extract the response type for a given method\n")
+	sb.WriteString("export type ExtractResponseByMethod<M extends RPCMethod> = Extract<RPCResponse, { method: M }>;\n\n")
+	sb.WriteString("export type RPCResponseParams = ExtractResponseByMethod<RPCMethod>['params'];\n\n")
+	sb.WriteString("export type RPCResponseParamsByMethod = {\n")
+	sb.WriteString("    [M in RPCMethod]: ExtractResponseByMethod<M>['params'];\n")
+	sb.WriteString("};\n\n")
+	
+	return sb.String()
+}
+
 // generateTypeScriptInterface generates a TypeScript interface from a schema property
 func (r *ResponseGenerator) generateTypeScriptInterface(name string, prop SchemaProperty) string {
 	var sb strings.Builder
 
-	if prop.Type == "object" {
-		sb.WriteString(fmt.Sprintf("export interface %s {\n", name))
+	switch prop.Type {
+	case "object":
+		sb.WriteString(fmt.Sprintf("export interface %sParams {\n", name))
 
 		// Sort property names for consistent output
 		var propertyNames []string
@@ -180,17 +299,8 @@ func (r *ResponseGenerator) generateTypeScriptInterface(name string, prop Schema
 			camelCaseName := toCamelCase(propName)
 			tsType := r.generateTypeScriptType(propDef)
 
-			// Check if property is required
-			isRequired := false
-			for _, required := range prop.Required {
-				if required == propName {
-					isRequired = true
-					break
-				}
-			}
-
 			optional := ""
-			if !isRequired {
+			if !slices.Contains(prop.Required, propName) {
 				optional = "?"
 			}
 
@@ -202,7 +312,7 @@ func (r *ResponseGenerator) generateTypeScriptInterface(name string, prop Schema
 		}
 
 		sb.WriteString("}\n\n")
-	} else if prop.Type == "enum" {
+	case "enum":
 		// Generate type union for enums
 		if len(prop.Enum) > 0 {
 			sb.WriteString(fmt.Sprintf("export type %s = ", name))
@@ -241,7 +351,7 @@ func (r *ResponseGenerator) generateTypeScriptType(prop SchemaProperty) string {
 	case "integer":
 		return "number"
 	case "object":
-		return "object" // Could be more specific based on properties
+		return "object"
 	case "enum":
 		if len(prop.Enum) > 0 {
 			var enumValues []string
@@ -268,4 +378,3 @@ func (r *ResponseGenerator) generateTypeScriptType(prop SchemaProperty) string {
 		return "any"
 	}
 }
-

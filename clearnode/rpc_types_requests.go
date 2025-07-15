@@ -30,12 +30,12 @@ func NewRequestGenerator(requestDefs map[string]SchemaProperty, requestTypes map
 }
 
 // GenerateRequestsFile generates the requests_gen.ts file
-func (r *RequestGenerator) GenerateRequestsFile(outDir string) error {
+func (r *RequestGenerator) GenerateRequestsFile(sdkRootDir string) error {
 	var sb strings.Builder
 
 	// Add imports
 	sb.WriteString("import { z } from 'zod';\n")
-	sb.WriteString("import { RPCMethod } from '../sdk/src/rpc/types';\n")
+	sb.WriteString("import { RPCMethod } from '../types';\n")
 	sb.WriteString("import { addressSchema, hexSchema } from './common_gen';\n")
 
 	// Import common schemas
@@ -54,8 +54,14 @@ func (r *RequestGenerator) GenerateRequestsFile(outDir string) error {
 	// Generate parser mapping
 	sb.WriteString(r.generateRequestParsers())
 
+	// Ensure directory exists
+	outputDir := filepath.Join(sdkRootDir, "src", "rpc", "parse")
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", outputDir, err)
+	}
+
 	// Write to file
-	outputPath := filepath.Join(outDir, "requests_gen.ts")
+	outputPath := filepath.Join(outputDir, "requests_gen.ts")
 	return os.WriteFile(outputPath, []byte(sb.String()), 0o644)
 }
 

@@ -148,7 +148,7 @@ func (z *ZodSchemaGenerator) GenerateObjectSchemaWithTransform(prop SchemaProper
 
 	// Add transform to convert snake_case to camelCase
 	if typeName != "" {
-		sb.WriteString(fmt.Sprintf("\n    .transform((raw) => ({\n"))
+		sb.WriteString("\n    .transform((raw) => ({\n")
 		for i, name := range propertyNames {
 			camelCaseName := toCamelCase(name)
 			sb.WriteString(fmt.Sprintf("      %s: raw.%s", camelCaseName, name))

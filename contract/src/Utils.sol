@@ -80,12 +80,12 @@ library Utils {
 
     /**
      * @notice Recovers the signer of a state hash using the EIP-712 format
-     * @param structHash The hash of the struct to verify the signature against
      * @param domainSeparator The EIP-712 domain separator
+     * @param structHash The hash of the struct to verify the signature against
      * @param sig The signature to verify
      * @return The address of the signer
      */
-    function recoverEIP712Signer(bytes32 structHash, bytes32 domainSeparator, Signature memory sig)
+    function recoverEIP712Signer(bytes32 domainSeparator, bytes32 structHash, Signature memory sig)
         internal
         pure
         returns (address)
@@ -107,7 +107,7 @@ library Utils {
         pure
         returns (address)
     {
-        return Utils.recoverEIP712Signer(domainSeparator, keccak256(abi.encode(typeHash, channelId, state.intent, state.version, state.data, state.allocations)), sig);
+        return Utils.recoverEIP712Signer(domainSeparator, keccak256(abi.encode(typeHash, channelId, state.intent, state.version, keccak256(state.data), keccak256(abi.encode(state.allocations)))), sig);
     }
 
         /**

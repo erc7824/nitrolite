@@ -3,6 +3,7 @@ package main
 import (
 	"time"
 
+	"github.com/invopop/jsonschema"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -17,9 +18,49 @@ const (
 	TransactionTypeAppWithdrawal TransactionType = 302
 )
 
-var (
-	ErrInvalidLedgerTransactionType = RPCErrorf("invalid ledger transaction type")
-)
+var transactionTypeValues = map[string]TransactionType{
+	"transfer":       TransactionTypeTransfer,
+	"deposit":        TransactionTypeDeposit,
+	"withdrawal":     TransactionTypeWithdrawal,
+	"app_deposit":    TransactionTypeAppDeposit,
+	"app_withdrawal": TransactionTypeAppWithdrawal,
+}
+var ErrInvalidLedgerTransactionType = RPCErrorf("invalid ledger transaction type")
+
+func (t TransactionType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.String())
+}
+
+func (t *TransactionType) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+
+	typ, ok := transactionTypeValues[str]
+	if !ok {
+		return ErrInvalidLedgerTransactionType
+	}
+	*t = typ
+	return nil
+}
+
+func (t TransactionType) String() string {
+	for str, typ := range transactionTypeValues {
+		if t == typ {
+			return str
+		}
+	}
+	return ""
+}
+
+func (TransactionType) JSONSchema() *jsonschema.Schema {
+	schema := &jsonschema.Schema{Type: "enum"}
+	for enum := range transactionTypeValues {
+		schema.Enum = append(schema.Enum, enum)
+	}
+	return schema
+}
 
 type LedgerTransaction struct {
 	ID          uint            `gorm:"primaryKey"`

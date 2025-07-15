@@ -62,9 +62,9 @@ type LedgerEntryResponse struct {
 
 type GetLedgerTransactionsParams struct {
 	ListOptions
-	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter transactions
-	Asset     string `json:"asset,omitempty"`      // Optional asset to filter transactions
-	TxType    string `json:"tx_type,omitempty"`    // Optional transaction type to filter transactions
+	AccountID string          `json:"account_id,omitempty"` // Optional account ID to filter transactions
+	Asset     string          `json:"asset,omitempty"`      // Optional asset to filter transactions
+	TxType    TransactionType `json:"tx_type,omitempty"`    // Optional transaction type to filter transactions
 }
 
 type NetworkInfo struct {
@@ -336,7 +336,7 @@ func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
 
 	userAccountID := NewAccountID(params.AccountID)
 	query := applyListOptions(r.DB, "created_at", SortTypeDescending, &params.ListOptions)
-	transactions, err := GetLedgerTransactionsWithTags(query, userAccountID, params.Asset, txType)
+	transactions, err := GetLedgerTransactionsWithTags(query, userAccountID, params.Asset, &params.TxType)
 	if err != nil {
 		logger.Error("failed to get transactions", "error", err)
 		c.Fail(err, "failed to get transactions")

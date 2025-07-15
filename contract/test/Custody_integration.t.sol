@@ -1,0 +1,300 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import {Test} from "lib/forge-std/src/Test.sol";
+import {console} from "lib/forge-std/src/console.sol";
+
+import {TestUtils} from "./TestUtils.sol";
+import {MockERC20} from "./mocks/MockERC20.sol";
+import {MockEIP712} from "./mocks/MockEIP712.sol";
+
+import {Custody} from "../src/Custody.sol";
+import {SimpleConsensus} from "../src/adjudicators/SimpleConsensus.sol";
+import {Utils} from "../src/Utils.sol";
+import {ChannelStatus, Channel, State, Allocation, Signature, StateIntent, STATE_TYPEHASH} from "../src/interfaces/Types.sol";
+
+contract CustodyIntegrationTest is Test {
+    Custody public custody;
+    SimpleConsensus public adjudicator;
+    MockERC20 public token;
+
+    // Test participants
+    address public participant1;
+    address public participant2;
+    uint256 public participant1PrivateKey;
+    uint256 public participant2PrivateKey;
+
+    // Test parameters
+    uint256 constant DEPOSIT_AMOUNT = 1000;
+    uint256 constant INITIAL_BALANCE = 10000;
+    uint64 constant CHALLENGE_DURATION = 3600; // 1 hour
+    uint64 constant NONCE = 1;
+
+    // Channel and state tracking
+    Channel public channel;
+    bytes32 public channelId;
+
+    // Constants for participant ordering
+    uint256 private constant PARTICIPANT_1 = 0;
+    uint256 private constant PARTICIPANT_2 = 1;
+
+    function setUp() public {
+        // Deploy contracts
+        custody = new Custody();
+        adjudicator = new SimpleConsensus(address(this), address(custody));
+        token = new MockERC20("Test Token", "TEST", 18);
+
+        // Set up participants
+        participant1PrivateKey = vm.createWallet("participant1").privateKey;
+        participant2PrivateKey = vm.createWallet("participant2").privateKey;
+        participant1 = vm.addr(participant1PrivateKey);
+        participant2 = vm.addr(participant2PrivateKey);
+
+        // Fund participants
+        token.mint(participant1, INITIAL_BALANCE);
+        token.mint(participant2, INITIAL_BALANCE);
+
+        // Approve token transfers
+        vm.prank(participant1);
+        token.approve(address(custody), INITIAL_BALANCE);
+
+        vm.prank(participant2);
+        token.approve(address(custody), INITIAL_BALANCE);
+
+        // Create channel
+        address[] memory participants = new address[](2);
+        participants[PARTICIPANT_1] = participant1;
+        participants[PARTICIPANT_2] = participant2;
+
+        channel = Channel({
+            participants: participants,
+            adjudicator: address(adjudicator),
+            challenge: CHALLENGE_DURATION,
+            nonce: NONCE
+        });
+
+        channelId = Utils.getChannelId(channel);
+    }
+
+    // ==================== SIGNATURE HELPERS ====================
+
+    function _signStateRaw(State memory state, uint256 privateKey) internal view returns (Signature memory) {
+        bytes32 stateHash = Utils.getStateHash(channel, state);
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, stateHash);
+        return Signature({v: v, r: r, s: s});
+    }
+
+    function _signStateEIP191(State memory state, uint256 privateKey) internal view returns (Signature memory) {
+        bytes32 stateHash = Utils.getStateHash(channel, state);
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP191(vm, privateKey, stateHash);
+        return Signature({v: v, r: r, s: s});
+    }
+
+    function _signStateEIP712(State memory state, uint256 privateKey) internal view returns (Signature memory) {
+        (,string memory name, string memory version, uint256 chainId, address verifyingContract,,) = custody.eip712Domain();
+        bytes32 domainSeparator = keccak256(abi.encode(
+            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+            keccak256(bytes(name)),
+            keccak256(bytes(version)),
+            chainId,
+            verifyingContract
+        ));
+        bytes32 structHash = keccak256(abi.encode(
+            STATE_TYPEHASH,
+            channelId,
+            state.intent,
+            state.version,
+            keccak256(state.data),
+            keccak256(abi.encode(state.allocations))
+        ));
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP712(vm, privateKey, domainSeparator, structHash);
+        return Signature({v: v, r: r, s: s});
+    }
+
+    function _signChallenge(State memory state, uint256 privateKey) internal view returns (Signature memory) {
+        bytes32 stateHash = Utils.getStateHash(channel, state);
+        bytes32 challengeHash = keccak256(abi.encode(stateHash, "challenge"));
+        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, challengeHash);
+        return Signature({v: v, r: r, s: s});
+    }
+
+    // ==================== STATE CREATION HELPERS ====================
+
+    function _createState(
+        StateIntent intent,
+        uint256 version,
+        bytes memory data,
+        uint256 amount1,
+        uint256 amount2
+    ) internal view returns (State memory) {
+        Allocation[] memory allocations = new Allocation[](2);
+        allocations[PARTICIPANT_1] = Allocation({
+            destination: participant1,
+            token: address(token),
+            amount: amount1
+        });
+        allocations[PARTICIPANT_2] = Allocation({
+            destination: participant2,
+            token: address(token),
+            amount: amount2
+        });
+
+        return State({
+            intent: intent,
+            version: version,
+            data: data,
+            allocations: allocations,
+            sigs: new Signature[](0)
+        });
+    }
+
+    function _createInitialState() internal view returns (State memory) {
+        return _createState(
+            StateIntent.INITIALIZE,
+            0,
+            bytes(""),
+            DEPOSIT_AMOUNT,
+            DEPOSIT_AMOUNT
+        );
+    }
+
+    function _createOperateState(uint256 version, bytes memory data) internal view returns (State memory) {
+        return _createState(
+            StateIntent.OPERATE,
+            version,
+            data,
+            DEPOSIT_AMOUNT,
+            DEPOSIT_AMOUNT
+        );
+    }
+
+    function _createFinalState(uint256 version) internal view returns (State memory) {
+        return _createState(
+            StateIntent.FINALIZE,
+            version,
+            bytes(""),
+            DEPOSIT_AMOUNT,
+            DEPOSIT_AMOUNT
+        );
+    }
+
+    // ==================== MAIN INTEGRATION TEST ====================
+
+    function test_fullChannelLifecycle_withMixedSignatures() public {
+        // ==================== 1. CREATE CHANNEL ====================
+
+        // Create initial state - participant1 uses EIP191
+        State memory initialState = _createInitialState();
+        initialState.sigs = new Signature[](1);
+        initialState.sigs[0] = _signStateEIP191(initialState, participant1PrivateKey);
+
+        // Participant1 deposits and creates channel
+        vm.prank(participant1);
+        custody.depositAndCreate(address(token), DEPOSIT_AMOUNT, channel, initialState);
+
+        (,ChannelStatus status,,,) = custody.getChannelData(channelId);
+
+        // Verify channel is created
+        assertTrue(status == ChannelStatus.INITIAL, "Channel should be in INITIAL status");
+
+        // ==================== 2. JOIN CHANNEL ====================
+
+        // Participant2 deposits
+        vm.prank(participant2);
+        custody.deposit(participant2, address(token), DEPOSIT_AMOUNT);
+
+        // Participant2 joins with raw ECDSA signature
+        Signature memory participant2JoinSig = _signStateRaw(initialState, participant2PrivateKey);
+
+        vm.prank(participant2);
+        custody.join(channelId, 1, participant2JoinSig);
+
+        (,status,,,) = custody.getChannelData(channelId);
+
+        // Verify channel is now active
+        assertTrue(status == ChannelStatus.ACTIVE, "Channel should be in ACTIVE status");
+
+        // ==================== 3. CHALLENGE CHANNEL ====================
+
+        // Create challenge state - participant1 uses EIP712, participant2 uses raw ECDSA
+        State memory challengeState = _createOperateState(1, bytes("challenge data"));
+        challengeState.sigs = new Signature[](2);
+        challengeState.sigs[PARTICIPANT_1] = _signStateEIP712(challengeState, participant1PrivateKey);
+        challengeState.sigs[PARTICIPANT_2] = _signStateRaw(challengeState, participant2PrivateKey);
+
+        // Participant1 challenges with EIP191 challenger signature
+        Signature memory challengerSig = _signChallenge(challengeState, participant1PrivateKey);
+
+        vm.prank(participant1);
+        custody.challenge(channelId, challengeState, new State[](0), challengerSig);
+
+        uint256 challengeExpiry;
+        (,status,,challengeExpiry,) = custody.getChannelData(channelId);
+
+        // Verify channel is in challenge state
+        assertTrue(status == ChannelStatus.DISPUTE, "Channel should be in DISPUTE status");
+        assertTrue(challengeExpiry > block.timestamp, "Channel should have challengeExpiry set in future");
+
+        // ==================== 4. CHECKPOINT TO RESOLVE CHALLENGE ====================
+
+        // Create checkpoint state with higher version - participant1 uses raw ECDSA, participant2 uses raw ECDSA
+        State memory checkpointState = _createOperateState(2, bytes("checkpoint data"));
+        checkpointState.sigs = new Signature[](2);
+        checkpointState.sigs[PARTICIPANT_1] = _signStateRaw(checkpointState, participant1PrivateKey);
+        checkpointState.sigs[PARTICIPANT_2] = _signStateRaw(checkpointState, participant2PrivateKey);
+
+        // Participant2 checkpoints to resolve challenge
+        vm.prank(participant2);
+        custody.checkpoint(channelId, checkpointState, new State[](0));
+
+        (,status,,challengeExpiry,) = custody.getChannelData(channelId);
+
+        // Verify channel is back to active
+        assertTrue(status == ChannelStatus.ACTIVE, "Channel should be back to ACTIVE status after checkpoint");
+        assertEq(challengeExpiry, 0, "Channel should have no challengeExpiry after checkpoint");
+
+        // ==================== 5. CLOSE CHANNEL ====================
+
+        // Create final state - participant1 uses EIP191, participant2 uses raw ECDSA
+        State memory finalState = _createFinalState(3);
+        finalState.sigs = new Signature[](2);
+        finalState.sigs[PARTICIPANT_1] = _signStateEIP191(finalState, participant1PrivateKey);
+        finalState.sigs[PARTICIPANT_2] = _signStateRaw(finalState, participant2PrivateKey);
+
+        // Close channel cooperatively
+        vm.prank(participant1);
+        custody.close(channelId, finalState, new State[](0));
+
+        // Verify channel is closed
+        (,status,,,) = custody.getChannelData(channelId);
+
+        // Verify channel is closed
+        assertTrue(status == ChannelStatus.VOID, "Channel should have VOID status after close (channel data deleted)");
+
+        // ==================== 6. VERIFY FINAL BALANCES ====================
+
+        // Check that participants got their tokens back
+        address[] memory users = new address[](2);
+        users[0] = participant1;
+        users[1] = participant2;
+
+        address[] memory tokens = new address[](1);
+        tokens[0] = address(token);
+
+        uint256[][] memory balances = custody.getAccountsBalances(users, tokens);
+
+        assertEq(balances[0][0], DEPOSIT_AMOUNT, "Participant1 should have deposit amount available");
+        assertEq(balances[1][0], DEPOSIT_AMOUNT, "Participant2 should have deposit amount available");
+
+        // Verify no channels remain
+        bytes32[][] memory channels = custody.getOpenChannels(users);
+        assertEq(channels[0].length, 0, "Participant1 should have no open channels");
+        assertEq(channels[1].length, 0, "Participant2 should have no open channels");
+    }
+
+    // ==================== HELPER FUNCTION FOR VERIFICATION ====================
+
+    function skipChallengeTime() internal {
+        skip(CHALLENGE_DURATION + 1);
+    }
+}

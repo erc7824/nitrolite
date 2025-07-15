@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
 import {IComparable} from "../interfaces/IComparable.sol";
 import {Channel, State, Allocation, Signature, Amount, StateIntent} from "../interfaces/Types.sol";
+import {EIP712AdjudicatorBase} from "./EIP712AdjudicatorBase.sol";
 import {Utils} from "../Utils.sol";
 
 /**
@@ -13,16 +14,16 @@ import {Utils} from "../Utils.sol";
  *      This prevents forging "more balance out of thin air" since only the person giving up funds
  *      needs to sign, making it secure for two-party channels with single allocations per party
  */
-contract RemittanceAdjudicator is IAdjudicator, IComparable {
+contract RemittanceAdjudicator is IAdjudicator, IComparable, EIP712AdjudicatorBase {
     using Utils for State;
 
     uint8 constant CREATOR = 0;
     uint8 constant BROKER = 1;
 
     /**
-     * @dev Remittance represents a payment transfer from one participant to another
-     * @param sender Index of the participant sending funds (0 for CREATOR, 1 for BROKER)
-     * @param amount Amount and token being transferred
+     * @dev Remittance represents a payment transfer from one participant to another.
+     * @param sender Index of the participant sending funds (0 for CREATOR, 1 for BROKER).
+     * @param amount Amount and token being transferred.
      */
     struct Remittance {
         uint8 sender; // Index of the participant sending funds
@@ -30,12 +31,19 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
     }
 
     /**
-     * @notice Validates state transitions based on the principle that only the sender needs to sign
-     * @param chan The channel configuration
-     * @param candidate The proposed state
-     * @param proofs Array containing previous states in increasing order up to a starting state, which is either INITIALIZE, RESIZE or state signed by the other party
+     * @notice Constructor for the Remittance adjudicator.
+     * @param owner The owner of the adjudicator contract.
+     * @param channelImpl The address of the channel implementation contract.
+     */
+    constructor(address owner, address channelImpl) EIP712AdjudicatorBase(owner, channelImpl) {}
+
+    /**
+     * @notice Validates state transitions based on the principle that only the sender needs to sign.
+     * @param chan The channel configuration.
+     * @param candidate The proposed state.
+     * @param proofs Array containing previous states in increasing order up to a starting state, which is either INITIALIZE, RESIZE or state signed by the other party.
      * I.e. if the same party has consequently been signing Remittances, they should supply all their subsequent states, based on a starting state.
-     * @return valid True if the state transition is valid, false otherwise
+     * @return valid True if the state transition is valid, false otherwise.
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
@@ -48,6 +56,8 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
             return false;
         }
 
+        bytes32 channelImplDomainSeparator = getChannelImplDomainSeparator();
+
         Remittance memory candidateRemittance = abi.decode(candidate.data, (Remittance));
 
         // The last proof must be either INITIALIZE, RESIZE, or signed by the other party
@@ -55,11 +65,11 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
 
         // Check if the last proof is a valid starting point
         if (earliestProof.intent == StateIntent.INITIALIZE) {
-            if (!earliestProof.validateInitialState(chan)) {
+            if (!earliestProof.validateInitialState(chan, channelImplDomainSeparator)) {
                 return false;
             }
         } else if (earliestProof.intent == StateIntent.RESIZE) {
-            if (!earliestProof.validateUnanimousSignatures(chan)) {
+            if (!earliestProof.validateUnanimousStateSignatures(chan, channelImplDomainSeparator)) {
                 return false;
             }
             // NOTE: "extract" resize amounts, keep only the RESIZE state data
@@ -76,8 +86,7 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
             uint8 otherParty = candidateRemittance.sender == CREATOR ? BROKER : CREATOR;
 
             // Verify the other party signed the last proof
-            bytes32 lastProofHash = Utils.getStateHash(chan, earliestProof);
-            if (!Utils.verifySignature(lastProofHash, earliestProof.sigs[0], chan.participants[otherParty])) {
+            if (!earliestProof.verifyStateSignature(Utils.getChannelId(chan), channelImplDomainSeparator, earliestProof.sigs[0], chan.participants[otherParty])) {
                 return false;
             }
         } else {
@@ -89,7 +98,7 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
         uint256 proofsLength = proofs.length;
 
         if (proofsLength == 0) {
-            if (!_validateRemittanceState(chan, candidate)) {
+            if (!_validateRemittanceState(channelImplDomainSeparator, chan, candidate)) {
                 return false;
             }
 
@@ -102,7 +111,7 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
             previousState = currentState;
             currentState = proofs[currIdx];
 
-            if (!_validateRemittanceState(chan, currentState)) {
+            if (!_validateRemittanceState(channelImplDomainSeparator, chan, currentState)) {
                 return false;
             }
 
@@ -114,7 +123,7 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
         return true;
     }
 
-    function _validateRemittanceState(Channel calldata chan, State memory state) internal view returns (bool) {
+    function _validateRemittanceState(bytes32 domainSeparator, Channel calldata chan, State memory state) internal view returns (bool) {
         if (state.intent != StateIntent.OPERATE) {
             return false;
         }
@@ -134,8 +143,7 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
         }
 
         // Verify signature is from the sender
-        bytes32 stateHash = Utils.getStateHash(chan, state);
-        return Utils.verifySignature(stateHash, state.sigs[0], chan.participants[currentRemittance.sender]);
+        return state.verifyStateSignature(Utils.getChannelId(chan), domainSeparator, state.sigs[0], chan.participants[currentRemittance.sender]);
     }
 
     function _validateRemittanceTransition(State memory previousState, State memory currentState)
@@ -144,7 +152,7 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
         returns (bool)
     {
         // basic validations: version, allocations sum
-        if (!previousState.validateTransitionTo(currentState)) {
+        if (!Utils.validateTransitionTo(previousState, currentState)) {
             return false;
         }
 
@@ -188,9 +196,9 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable {
     }
 
     /**
-     * @notice Compares two states to determine their relative ordering
-     * @param candidate The state being evaluated
-     * @param previous The reference state to compare against
+     * @notice Compares two states to determine their relative ordering.
+     * @param candidate The state being evaluated.
+     * @param previous The reference state to compare against.
      * @return result The comparison result:
      *         -1: candidate < previous (candidate is older)
      *          0: candidate == previous (same recency)

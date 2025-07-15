@@ -6,6 +6,9 @@ pragma solidity ^0.8.13;
  * @notice Shared types used in the Nitrolite state channel system
  */
 
+/// @dev EIP-712 domain separator type hash for state channel protocol
+bytes32 constant STATE_TYPEHASH = keccak256("AllowStateHash(bytes32 channelId,uint8 intent,uint256 version,bytes data,Allocation[] allocations)Allocation(address destination,address token,uint256 amount)");
+
 /**
  * @notice Signature structure for digital signatures
  * @dev Used for off-chain signatures verification in the state channel protocol

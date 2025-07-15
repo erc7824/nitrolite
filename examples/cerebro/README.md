@@ -12,7 +12,7 @@ go run . <clearnode_ws_url>
 
 ### Environment Variables
 
-- `CEREBRO_STORE_PATH` - Path to the database file (optional, defaults to `cerebro.db`)
+- `CEREBRO_CONFIG_DIR` - Path to the configuration directory (optional, defaults to OS-specific config directory)
 
 ## Features
 
@@ -66,12 +66,6 @@ go run . <clearnode_ws_url>
     2. Resize channel (+1)
     3. Resize channel (-1)
     4. Withdraw from custody
-
-- **Cross-Platform Configuration**
-  - Store local database in OS-appropriate config directories:
-    - Linux: `~/.config/cerebro/`
-    - macOS: `~/Library/Application Support/cerebro/`
-    - Windows: `%APPDATA%\cerebro\`
 
 - **Enhanced Security**
   - Encrypted local database storage

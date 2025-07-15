@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 
 	"github.com/c-bata/go-prompt"
 	"golang.org/x/term"
@@ -25,7 +26,22 @@ func main() {
 		return
 	}
 
-	store, err := storage.NewStorage(os.Getenv("CEREBRO_STORE_PATH"))
+	userConfDir, err := os.UserConfigDir()
+	if err != nil {
+		fmt.Printf("Failed to get user config directory: %s\n", err.Error())
+		return
+	}
+	configDir := path.Join(userConfDir, "cerebro")
+	if customDir := os.Getenv("CEREBRO_CONFIG_DIR"); customDir != "" {
+		configDir = customDir
+	}
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		fmt.Printf("Failed to create config directory: %s\n", err.Error())
+		return
+	}
+
+	storagePath := path.Join(configDir, "storage.db")
+	store, err := storage.NewStorage(storagePath)
 	if err != nil {
 		fmt.Printf("Failed to initialize storage: %s\n", err.Error())
 		return

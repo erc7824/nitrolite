@@ -7,6 +7,34 @@ import (
 	"strings"
 )
 
+// TypeMapping defines how special types should be handled across different generators
+type TypeMapping struct {
+	ZodSchemaForFormat string // Zod schema for format-based types (e.g., "bignumber")
+	ZodSchemaForRef    string // Zod schema for reference-based types (e.g., "#/$defs/BigNumber")
+	TypeScriptType     string // TypeScript type in interfaces
+}
+
+// getTypeMappings returns the centralized type mappings
+func getTypeMappings() map[string]TypeMapping {
+	return map[string]TypeMapping{
+		"BigNumber": {
+			ZodSchemaForFormat: "z.string().transform((v) => BigInt(v))",
+			ZodSchemaForRef:    "BigNumberSchema",
+			TypeScriptType:     "bigint",
+		},
+		"Address": {
+			ZodSchemaForFormat: "addressSchema",
+			ZodSchemaForRef:    "AddressSchema",
+			TypeScriptType:     "Address",
+		},
+		"Hex": {
+			ZodSchemaForFormat: "hexSchema",
+			ZodSchemaForRef:    "HexSchema",
+			TypeScriptType:     "Hex",
+		},
+	}
+}
+
 // ZodSchemaGenerator provides common Zod schema generation utilities
 type ZodSchemaGenerator struct{}
 
@@ -31,15 +59,18 @@ func (z *ZodSchemaGenerator) GenerateZodSchema(prop SchemaProperty) string {
 
 // generateStringSchema handles string type with various formats
 func (z *ZodSchemaGenerator) generateStringSchema(prop SchemaProperty) string {
+	// Check if this is a mapped type based on format
+	typeMappings := getTypeMappings()
+	for typeName, mapping := range typeMappings {
+		if strings.ToLower(typeName) == prop.Format {
+			return mapping.ZodSchemaForFormat
+		}
+	}
+
+	// Handle special formats not in type mappings
 	switch prop.Format {
-	case "address":
-		return "addressSchema"
-	case "hex":
-		return "hexSchema"
 	case "date-time":
 		return "z.union([z.string(), z.date()]).transform((v) => new Date(v))"
-	case "bignumber":
-		return "z.string().transform((v) => BigInt(v))"
 	default:
 		return "z.string()"
 	}
@@ -81,6 +112,57 @@ func (z *ZodSchemaGenerator) generateObjectSchema(prop SchemaProperty) string {
 	return sb.String()
 }
 
+// GenerateObjectSchemaWithTransform generates object schema with camelCase transform
+func (z *ZodSchemaGenerator) GenerateObjectSchemaWithTransform(prop SchemaProperty, typeName string) string {
+	if len(prop.Properties) == 0 {
+		return "z.object({})"
+	}
+
+	var sb strings.Builder
+	sb.WriteString("z.object({\n")
+
+	propertyNames := make([]string, 0, len(prop.Properties))
+	for name := range prop.Properties {
+		propertyNames = append(propertyNames, name)
+	}
+	sort.Strings(propertyNames)
+
+	for i, name := range propertyNames {
+		propDef := prop.Properties[name]
+		zodSchema := z.GenerateZodSchema(propDef)
+
+		// Check if property is required
+		isRequired := slices.Contains(prop.Required, name)
+		if !isRequired {
+			zodSchema += ".optional()"
+		}
+
+		sb.WriteString(fmt.Sprintf("  %s: %s", name, zodSchema))
+		if i < len(propertyNames)-1 {
+			sb.WriteString(",")
+		}
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString("})")
+
+	// Add transform to convert snake_case to camelCase
+	if typeName != "" {
+		sb.WriteString(fmt.Sprintf("\n    .transform((raw) => ({\n"))
+		for i, name := range propertyNames {
+			camelCaseName := toCamelCase(name)
+			sb.WriteString(fmt.Sprintf("      %s: raw.%s", camelCaseName, name))
+			if i < len(propertyNames)-1 {
+				sb.WriteString(",")
+			}
+			sb.WriteString("\n")
+		}
+		sb.WriteString(fmt.Sprintf("    }) as %s)", typeName))
+	}
+
+	return sb.String()
+}
+
 // generateEnumSchema handles enum type
 func (z *ZodSchemaGenerator) generateEnumSchema(prop SchemaProperty) string {
 	if len(prop.Enum) == 0 {
@@ -104,6 +186,13 @@ func (z *ZodSchemaGenerator) generateRefSchema(ref string) string {
 	}
 
 	defName := parts[len(parts)-1]
+
+	// Check if this is a mapped type
+	typeMappings := getTypeMappings()
+	if mapping, exists := typeMappings[defName]; exists {
+		return mapping.ZodSchemaForRef
+	}
+
 	return fmt.Sprintf("%sSchema", defName)
 }
 
@@ -158,3 +247,24 @@ func (z *ZodSchemaGenerator) GenerateSchemaDefinitions(definitionNames []string,
 	}
 	return sb.String()
 }
+
+// toCamelCase converts snake_case to camelCase
+func toCamelCase(s string) string {
+	if s == "" {
+		return s
+	}
+
+	parts := strings.Split(s, "_")
+	if len(parts) == 1 {
+		return s
+	}
+
+	result := parts[0]
+	for i := 1; i < len(parts); i++ {
+		if len(parts[i]) > 0 {
+			result += strings.ToUpper(parts[i][:1]) + parts[i][1:]
+		}
+	}
+	return result
+}
+

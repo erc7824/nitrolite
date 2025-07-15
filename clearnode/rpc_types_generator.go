@@ -110,6 +110,11 @@ func (g *ZodGenerator) GenerateAllFiles(outDir string) error {
 		return err
 	}
 
+	// Generate TypeScript response types
+	if err := responseGen.GenerateResponseTypesFile(outDir); err != nil {
+		return err
+	}
+
 	return nil
 }
 

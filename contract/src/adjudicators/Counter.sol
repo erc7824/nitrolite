@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature, StateIntent} from "../interfaces/Types.sol";
+import {Channel, State, Allocation, StateIntent} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
 
 /**

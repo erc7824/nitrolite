@@ -11,7 +11,7 @@ import {IChannelReader} from "./interfaces/IChannelReader.sol";
 import {IComparable} from "./interfaces/IComparable.sol";
 import {IChannel} from "./interfaces/IChannel.sol";
 import {IDeposit} from "./interfaces/IDeposit.sol";
-import {Channel, State, Allocation, ChannelStatus, StateIntent, Signature, Amount} from "./interfaces/Types.sol";
+import {Channel, State, Allocation, ChannelStatus, StateIntent, Amount} from "./interfaces/Types.sol";
 import {Utils} from "./Utils.sol";
 
 /**
@@ -303,7 +303,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
      * @param sig Signature of SERVER on the funding state
      * @return The channelId of the joined channel
      */
-    function join(bytes32 channelId, uint256 index, Signature calldata sig) external returns (bytes32) {
+    function join(bytes32 channelId, uint256 index, bytes calldata sig) external returns (bytes32) {
         Metadata storage meta = _channels[channelId];
 
         // checks
@@ -316,7 +316,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         if (!meta.lastValidState.verifyStateSignature(channelId, _domainSeparatorV4(), sig, meta.chan.participants[SERVER_IDX])) revert InvalidStateSignatures();
 
         State memory lastValidState = meta.lastValidState;
-        Signature[] memory sigs = new Signature[](PART_NUM);
+        bytes[] memory sigs = new bytes[](PART_NUM);
         sigs[CLIENT_IDX] = lastValidState.sigs[CLIENT_IDX];
         sigs[SERVER_IDX] = sig;
         lastValidState.sigs = sigs;
@@ -398,7 +398,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         bytes32 channelId,
         State calldata candidate,
         State[] calldata proofs,
-        Signature calldata challengerSig
+        bytes calldata challengerSig
     ) external {
         Metadata storage meta = _channels[channelId];
 
@@ -665,7 +665,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         bytes32 channelId,
         State memory state,
         address[] memory participants,
-        Signature memory challengerSig
+        bytes memory challengerSig
     ) internal view {
         bytes32 stateHash = Utils.getStateHash(_channels[channelId].chan, state);
         // NOTE: the "challenge" suffix substitution for raw ECDSA and EIP-191 signatures

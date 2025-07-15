@@ -231,7 +231,7 @@ func (ps *PropertySorter) CreatePropertyDataList(
 	props map[string]SchemaProperty,
 	requiredFields []string,
 	zodGenerator *ZodSchemaGenerator,
-	responseGenerator *ResponseGenerator,
+	typeScriptTypeGenerator func(SchemaProperty) string,
 ) []PropertyData {
 	sortedNames := ps.SortPropertyNames(props)
 	propertyList := make([]PropertyData, 0, len(sortedNames))
@@ -243,7 +243,7 @@ func (ps *PropertySorter) CreatePropertyDataList(
 			Name:           name,
 			CamelName:      toCamelCase(name),
 			ZodSchema:      zodGenerator.GenerateZodSchema(propDef),
-			TypeScriptType: responseGenerator.generateTypeScriptType(propDef),
+			TypeScriptType: typeScriptTypeGenerator(propDef),
 			IsRequired:     slices.Contains(requiredFields, name),
 			IsLast:         i == len(sortedNames)-1,
 		}

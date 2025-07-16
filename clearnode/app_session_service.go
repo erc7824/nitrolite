@@ -20,9 +20,6 @@ type AppSessionService struct {
 
 // NewAppSessionService creates a new AppSessionService.
 func NewAppSessionService(db *gorm.DB, wsNotifier *WSNotifier) *AppSessionService {
-	if wsNotifier == nil {
-		wsNotifier = BlankWSNotifier()
-	}
 	return &AppSessionService{db: db, wsNotifier: wsNotifier}
 }
 

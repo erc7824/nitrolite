@@ -85,7 +85,7 @@ func setupMockCustody(t *testing.T) (*Custody, *gorm.DB, func()) {
 		custody:            contract,
 		chainID:            uint32(chainID.Int64()),
 		adjudicatorAddress: newTestCommonAddress("0xAdjudicatorAddress"),
-		wsNotifier:         BlankWSNotifier(),
+		wsNotifier:         NewWSNotifier(func(userID string, method string, params ...any) {}, logger),
 		logger:             logger,
 	}
 

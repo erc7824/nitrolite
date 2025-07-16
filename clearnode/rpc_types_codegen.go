@@ -50,7 +50,6 @@ func (generator *CodeFileGenerator) GenerateCommonSchemaFile(config *GenerationC
 	)
 }
 
-
 // GenerateRequestTypesFile generates TypeScript interfaces for request types
 func (generator *CodeFileGenerator) GenerateRequestTypesFile(config *GenerationConfig) error {
 	content := generator.buildRequestTypesContent()
@@ -94,51 +93,25 @@ func (generator *CodeFileGenerator) buildCommonSchemaContent() string {
 	return contentBuilder.String()
 }
 
-// buildRequestSchemaContent builds the content for request schema file
-func (generator *CodeFileGenerator) buildRequestSchemaContent() string {
-	var contentBuilder strings.Builder
-
-	// Add imports
-	contentBuilder.WriteString("import { z } from 'zod';\n")
-	contentBuilder.WriteString("import { RPCMethod } from '../types';\n")
-	contentBuilder.WriteString("import { AddressSchema, hexSchema } from './common_gen';\n")
-
-	// Add common schema imports
-	commonDefinitions := generator.dependencies.DefinitionSorter(generator.dependencies.CommonDefinitions)
-	if len(commonDefinitions) > 0 {
-		contentBuilder.WriteString(generator.zodSchemaBuilder.GenerateCommonSchemaImports(commonDefinitions))
-	}
-	contentBuilder.WriteString("\n// Request schemas\n\n")
-
-	// Add request-specific definitions
-	requestDefinitions := generator.dependencies.DefinitionSorter(generator.dependencies.RequestDefinitions)
-	contentBuilder.WriteString(generator.zodSchemaBuilder.GenerateSchemaDefinitions(requestDefinitions, generator.dependencies.RequestDefinitions))
-
-	// Add parser mapping
-	contentBuilder.WriteString(generator.buildParserMapping("request", generator.dependencies.RequestTypeMappings))
-
-	return contentBuilder.String()
-}
-
 // buildRequestTypesContent builds the content for request types file
 func (generator *CodeFileGenerator) buildRequestTypesContent() string {
 	var contentBuilder strings.Builder
-	
+
 	// Add header
 	contentBuilder.WriteString("// Auto-generated request types.\n")
 	contentBuilder.WriteString("// Generated from JSON schemas.\n\n")
 	contentBuilder.WriteString("import type { Address, Hex } from 'viem';\n")
 	contentBuilder.WriteString("import {RPCMethod, GenericRPCMessage} from '.';\n\n")
-	
+
 	// Add common type interfaces
 	contentBuilder.WriteString(generator.buildTypeScriptInterfaces(generator.dependencies.CommonDefinitions, false))
-	
+
 	// Add request type interfaces
 	contentBuilder.WriteString(generator.buildTypeScriptInterfaces(generator.dependencies.RequestDefinitions, true))
-	
+
 	// Add union type and helpers for requests
 	contentBuilder.WriteString(generator.buildRequestUnionTypeAndHelpers())
-	
+
 	return contentBuilder.String()
 }
 
@@ -241,12 +214,12 @@ func (generator *CodeFileGenerator) buildTypeScriptInterfaces(definitions map[st
 		if includeRPCStructures {
 			// Check if this is a response type
 			if rpcMethod, exists := generator.dependencies.ResponseTypeMappings[name]; exists {
-				rpcInterface := generator.buildRPCInterface(name, rpcMethod, "Response")
+				rpcInterface := generator.buildRPCInterface(rpcMethod, "Response")
 				contentBuilder.WriteString(rpcInterface)
 			}
 			// Check if this is a request type
 			if rpcMethod, exists := generator.dependencies.RequestTypeMappings[name]; exists {
-				rpcInterface := generator.buildRPCInterface(name, rpcMethod, "Request")
+				rpcInterface := generator.buildRPCInterface(rpcMethod, "Request")
 				contentBuilder.WriteString(rpcInterface)
 			}
 		}
@@ -263,7 +236,7 @@ func (generator *CodeFileGenerator) buildTypeScriptInterfaces(definitions map[st
 				paramsInterfaceName = enumValue + "Response"
 			}
 		}
-		
+
 		interfaceCode := generator.buildTypeScriptInterface(paramsInterfaceName, definition)
 		contentBuilder.WriteString(interfaceCode)
 	}
@@ -272,13 +245,13 @@ func (generator *CodeFileGenerator) buildTypeScriptInterfaces(definitions map[st
 }
 
 // buildRPCInterface builds an RPC interface for requests or responses
-func (generator *CodeFileGenerator) buildRPCInterface(name string, rpcMethod RPCMethod, rpcType string) string {
+func (generator *CodeFileGenerator) buildRPCInterface(rpcMethod RPCMethod, rpcType string) string {
 	enumValue := generator.dependencies.EnumNameConverter(string(rpcMethod))
 	jsDocComment := fmt.Sprintf("Represents the %s structure for the {@link RPCMethod.%s} RPC method.", strings.ToLower(rpcType), enumValue)
 
 	// Use the RPC method name as the base for the interface name, not the schema name
 	baseName := enumValue
-	
+
 	rpcInterface, err := generator.codeBuilder.BuildRequestInterface(baseName, enumValue, rpcType, jsDocComment)
 	if err != nil {
 		// Fallback to manual construction using RPC method name as base

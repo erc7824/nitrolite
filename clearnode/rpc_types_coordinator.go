@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	
+
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -17,7 +17,6 @@ type SchemaOrchestrator struct {
 	responseDefinitions  map[string]SchemaProperty
 	requestTypeMappings  map[string]RPCMethod // typeName -> rpcMethod
 	responseTypeMappings map[string]RPCMethod // typeName -> rpcMethod
-	codeFileGenerator    *CodeFileGenerator
 }
 
 func NewSchemaOrchestrator() *SchemaOrchestrator {

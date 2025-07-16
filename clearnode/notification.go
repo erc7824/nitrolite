@@ -20,12 +20,6 @@ func NewWSNotifier(notifyFunc func(userID string, method string, params ...any),
 	}
 }
 
-func BlankWSNotifier() *WSNotifier {
-	return NewWSNotifier(func(userID, method string, params ...any) {
-		fmt.Println("WSNotifier is not initialized, no WS notifications will be sent")
-	}, nil)
-}
-
 func (n *WSNotifier) Notify(notifications ...*Notification) {
 	for _, notification := range notifications {
 		if notification != nil {
@@ -75,7 +69,7 @@ func NewChannelNotification(channel Channel) *Notification {
 			Participant: channel.Participant,
 			Status:      channel.Status,
 			Token:       channel.Token,
-			RawAmount:   channel.RawAmount.BigInt(),
+			RawAmount:   channel.RawAmount,
 			ChainID:     channel.ChainID,
 			Adjudicator: channel.Adjudicator,
 			Challenge:   channel.Challenge,

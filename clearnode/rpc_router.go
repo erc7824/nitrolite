@@ -41,9 +41,6 @@ func NewRPCRouter(
 	wsNotifier *WSNotifier,
 	logger Logger,
 ) *RPCRouter {
-	if wsNotifier == nil {
-		wsNotifier = BlankWSNotifier()
-	}
 	r := &RPCRouter{
 		Node:              node,
 		Config:            conf,

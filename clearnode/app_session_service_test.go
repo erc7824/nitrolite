@@ -111,7 +111,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(50))) // Not enough
 
-		service := NewAppSessionService(db, BlankWSNotifier())
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -142,7 +142,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			Status: ChannelStatusChallenged,
 		}).Error)
 
-		service := NewAppSessionService(db, BlankWSNotifier())
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -169,7 +169,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
 
-		service := NewAppSessionService(db, BlankWSNotifier())
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -202,7 +202,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, BlankWSNotifier())
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session",
 			Protocol:           "test-proto",
@@ -252,7 +252,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, BlankWSNotifier())
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-negative",
 			Protocol:           "test-proto",
@@ -449,7 +449,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, BlankWSNotifier())
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-close-negative",
 			Protocol:           "test-proto",

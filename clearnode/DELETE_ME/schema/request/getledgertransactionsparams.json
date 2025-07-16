@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/GetLedgerTransactionsParams",
+  "$defs": {
+    "Address": {
+      "type": "string",
+      "format": "address"
+    },
+    "GetLedgerTransactionsParams": {
+      "properties": {
+        "offset": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "sort": {
+          "$ref": "#/$defs/SortType"
+        },
+        "account_id": {
+          "$ref": "#/$defs/Address"
+        },
+        "asset": {
+          "type": "string"
+        },
+        "tx_type": {
+          "$ref": "#/$defs/TransactionType"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "SortType": {
+      "type": "enum",
+      "enum": [
+        "asc",
+        "desc"
+      ]
+    },
+    "TransactionType": {
+      "type": "enum",
+      "enum": [
+        "transfer",
+        "deposit",
+        "withdrawal",
+        "app_deposit",
+        "app_withdrawal"
+      ]
+    }
+  },
+  "rpc_method": "get_ledger_transactions"
+}

@@ -105,20 +105,7 @@ func NewSigner(privateKeyHex string) (*Signer, error) {
 
 // Sign creates an ECDSA signature for the provided data
 func (s *Signer) Sign(data []byte) ([]byte, error) {
-	sig, err := nitrolite.Sign(data, s.privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	signature := make([]byte, 65)
-	copy(signature[0:32], sig.R[:])
-	copy(signature[32:64], sig.S[:])
-
-	// EIP-155 style V: subtract 27 if needed
-	if sig.V >= 27 {
-		signature[64] = sig.V - 27
-	}
-	return signature, nil
+	return nitrolite.Sign(data, s.privateKey)
 }
 
 // GetAddress returns the address derived from the signer's public key

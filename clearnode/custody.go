@@ -119,7 +119,7 @@ func (c *Custody) Join(channelID string, lastStateData []byte) (common.Hash, err
 	// The broker will always join as participant with index 1 (second participant)
 	index := big.NewInt(1)
 
-	sig, err := c.signer.NitroSign(lastStateData)
+	sig, err := c.signer.Sign(lastStateData)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed to sign data: %w", err)
 	}

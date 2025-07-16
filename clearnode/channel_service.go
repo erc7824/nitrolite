@@ -120,7 +120,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		return ResizeChannelResponse{}, fmt.Errorf("failed to encode state hash")
 	}
 	stateHash := crypto.Keccak256Hash(encodedState).Hex()
-	sig, err := s.signer.NitroSign(encodedState)
+	sig, err := s.signer.Sign(encodedState)
 	if err != nil {
 		logger.Error("failed to sign state", "error", err)
 		return ResizeChannelResponse{}, fmt.Errorf("failed to sign state")
@@ -132,11 +132,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		Version:   channel.Version + 1,
 		StateData: hexutil.Encode(encodedIntentions),
 		StateHash: stateHash,
-		Signature: Signature{
-			V: sig.V,
-			R: hexutil.Encode(sig.R[:]),
-			S: hexutil.Encode(sig.S[:]),
-		},
+		Signature: sig,
 	}
 
 	for _, alloc := range allocations {
@@ -223,7 +219,7 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 		return CloseChannelResponse{}, fmt.Errorf("failed to encode state hash")
 	}
 	stateHash := crypto.Keccak256Hash(encodedState).Hex()
-	sig, err := s.signer.NitroSign(encodedState)
+	sig, err := s.signer.Sign(encodedState)
 	if err != nil {
 		logger.Error("failed to sign state", "error", err)
 		return CloseChannelResponse{}, fmt.Errorf("failed to sign state")
@@ -235,11 +231,7 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 		Version:   channel.Version + 1,
 		StateData: stateDataHex,
 		StateHash: stateHash,
-		Signature: Signature{
-			V: sig.V,
-			R: hexutil.Encode(sig.R[:]),
-			S: hexutil.Encode(sig.S[:]),
-		},
+		Signature: sig,
 	}
 
 	for _, alloc := range allocations {

@@ -16,6 +16,7 @@ type TemplateData struct {
 	EnumValues       []string
 	UnionTypes       []string
 	RPCMethod        string
+	RPCType          string
 	JSDocComment     string
 	TransformLogic   string
 }
@@ -78,9 +79,9 @@ func NewCodeTemplates() (*CodeTemplates, error) {
 	requestTemplate := `/**
  * {{.JSDocComment}}
  */
-export interface {{.TypeName}}Response extends GenericRPCMessage {
+export interface {{.TypeName}}{{.RPCType}} extends GenericRPCMessage {
     method: RPCMethod.{{.RPCMethod}};
-    params: {{.TypeName}}ResponseParams;
+    params: {{.TypeName}}{{.RPCType}}Params;
 }
 
 `
@@ -193,10 +194,11 @@ func (cb *CodeBuilder) BuildUnionType(unionTypes []string) (string, error) {
 }
 
 // BuildRequestInterface generates a request interface using templates
-func (cb *CodeBuilder) BuildRequestInterface(typeName string, rpcMethod string, jsDocComment string) (string, error) {
+func (cb *CodeBuilder) BuildRequestInterface(typeName string, rpcMethod string, rpcType string, jsDocComment string) (string, error) {
 	data := TemplateData{
 		TypeName:     typeName,
 		RPCMethod:    rpcMethod,
+		RPCType:      rpcType,
 		JSDocComment: jsDocComment,
 	}
 

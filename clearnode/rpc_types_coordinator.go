@@ -65,7 +65,7 @@ func (orchestrator *SchemaOrchestrator) GenerateAllFiles(schemaDirectoryPath str
 
 	// Generate all files using the code file generator
 	errorCollector.Add(codeFileGenerator.GenerateCommonSchemaFile(config))
-	errorCollector.Add(codeFileGenerator.GenerateRequestSchemaFile(config))
+	errorCollector.Add(codeFileGenerator.GenerateRequestTypesFile(config))
 	errorCollector.Add(codeFileGenerator.GenerateResponseSchemaFile(config))
 	errorCollector.Add(codeFileGenerator.GenerateTypeScriptTypesFile(config))
 

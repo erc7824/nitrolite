@@ -1048,9 +1048,9 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
 	defer cleanup()
 
-	account1 := "0xAccount1"
-	account2 := "0xAccount2"
-	account3 := "0xAccount3"
+	account1 := "0x1234567890123456789012345678901234567890"
+	account2 := "0x2345678901234567890123456789012345678901"
+	account3 := "0x3456789012345678901234567890123456789012"
 
 	// Create and seed test transactions
 	testTransactions := []LedgerTransaction{
@@ -1082,7 +1082,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 				require.True(t, txs[1].CreatedAt.After(txs[2].CreatedAt))
 				// Verify account1 is always involved
 				for _, tx := range txs {
-					assert.True(t, tx.FromAccount == account1 || tx.ToAccount == account1)
+					assert.True(t, string(tx.FromAccount) == account1 || string(tx.ToAccount) == account1)
 				}
 			},
 		},
@@ -1093,7 +1093,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				for _, tx := range txs {
 					assert.Equal(t, "usdc", tx.Asset)
-					assert.True(t, tx.FromAccount == account1 || tx.ToAccount == account1)
+					assert.True(t, string(tx.FromAccount) == account1 || string(tx.ToAccount) == account1)
 				}
 			},
 		},
@@ -1103,8 +1103,8 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			expectedLen: 1,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				assert.Equal(t, "eth", txs[0].Asset)
-				assert.Equal(t, account1, txs[0].FromAccount)
-				assert.Equal(t, account3, txs[0].ToAccount)
+				assert.Equal(t, account1, string(txs[0].FromAccount))
+				assert.Equal(t, account3, string(txs[0].ToAccount))
 			},
 		},
 		{
@@ -1114,8 +1114,8 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				foundAccounts := make(map[string]bool)
 				for _, tx := range txs {
-					foundAccounts[tx.FromAccount] = true
-					foundAccounts[tx.ToAccount] = true
+					foundAccounts[string(tx.FromAccount)] = true
+					foundAccounts[string(tx.ToAccount)] = true
 				}
 				assert.True(t, foundAccounts[account1])
 				assert.True(t, foundAccounts[account2])
@@ -1124,7 +1124,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 		},
 		{
 			name:        "Account with no transactions",
-			params:      map[string]any{"account_id": "0xNonExistentAccount"},
+			params:      map[string]any{"account_id": "0x4567890123456789012345678901234567890123"},
 			expectedLen: 0,
 			assertions:  nil, // No extra assertions needed beyond length check
 		},
@@ -1140,7 +1140,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			expectedLen: 2,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				for _, tx := range txs {
-					assert.Equal(t, "transfer", tx.TxType)
+					assert.Equal(t, "transfer", tx.TxType.String())
 				}
 			},
 		},
@@ -1149,9 +1149,9 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			params:      map[string]any{"tx_type": "deposit"},
 			expectedLen: 1,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
-				assert.Equal(t, "deposit", txs[0].TxType)
-				assert.Equal(t, account2, txs[0].FromAccount)
-				assert.Equal(t, account1, txs[0].ToAccount)
+				assert.Equal(t, "deposit", txs[0].TxType.String())
+				assert.Equal(t, account2, string(txs[0].FromAccount))
+				assert.Equal(t, account1, string(txs[0].ToAccount))
 			},
 		},
 		{
@@ -1159,9 +1159,9 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			params:      map[string]any{"tx_type": "withdrawal"},
 			expectedLen: 1,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
-				assert.Equal(t, "withdrawal", txs[0].TxType)
-				assert.Equal(t, account3, txs[0].FromAccount)
-				assert.Equal(t, account2, txs[0].ToAccount)
+				assert.Equal(t, "withdrawal", txs[0].TxType.String())
+				assert.Equal(t, account3, string(txs[0].FromAccount))
+				assert.Equal(t, account2, string(txs[0].ToAccount))
 			},
 		},
 		{
@@ -1170,8 +1170,8 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			expectedLen: 2,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				for _, tx := range txs {
-					assert.Equal(t, "transfer", tx.TxType)
-					assert.True(t, tx.FromAccount == account1 || tx.ToAccount == account1)
+					assert.Equal(t, "transfer", tx.TxType.String())
+					assert.True(t, string(tx.FromAccount) == account1 || string(tx.ToAccount) == account1)
 				}
 			},
 		},
@@ -1181,7 +1181,7 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 			expectedLen: 1,
 			assertions: func(t *testing.T, txs []TransactionResponse) {
 				assert.Equal(t, "usdc", txs[0].Asset)
-				assert.Equal(t, "deposit", txs[0].TxType)
+				assert.Equal(t, "deposit", txs[0].TxType.String())
 			},
 		},
 	}
@@ -1271,9 +1271,9 @@ func TestRPCRouterHandleGetLedgerTransactions_Pagination(t *testing.T) {
 	router, cleanup := setupTestRPCRouter(t)
 	defer cleanup()
 
-	account1 := "0xAccount1"
-	account2 := "0xAccount2"
-	account3 := "0xAccount3"
+	account1 := "0x1234567890123456789012345678901234567890"
+	account2 := "0x2345678901234567890123456789012345678901"
+	account3 := "0x3456789012345678901234567890123456789012"
 
 	// Create 11 test transactions for pagination testing
 	testTransactions := []LedgerTransaction{

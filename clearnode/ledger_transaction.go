@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"time"
 
+	"github.com/invopop/jsonschema"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -17,9 +19,54 @@ const (
 	TransactionTypeAppWithdrawal TransactionType = 302
 )
 
-var (
-	ErrInvalidLedgerTransactionType = RPCErrorf("invalid ledger transaction type")
-)
+var transactionTypeValues = map[string]TransactionType{
+	"transfer":       TransactionTypeTransfer,
+	"deposit":        TransactionTypeDeposit,
+	"withdrawal":     TransactionTypeWithdrawal,
+	"app_deposit":    TransactionTypeAppDeposit,
+	"app_withdrawal": TransactionTypeAppWithdrawal,
+}
+var ErrInvalidLedgerTransactionType = RPCErrorf("invalid ledger transaction type")
+
+func (t TransactionType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.String())
+}
+
+func (t *TransactionType) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+
+	typ, err := parseLedgerTransactionType(str)
+	*t = typ
+	return err
+}
+
+func parseLedgerTransactionType(v string) (TransactionType, error) {
+	typ, ok := transactionTypeValues[v]
+	if !ok {
+		return TransactionType(0), ErrInvalidLedgerTransactionType
+	}
+	return typ, nil
+}
+
+func (t TransactionType) String() string {
+	for str, typ := range transactionTypeValues {
+		if t == typ {
+			return str
+		}
+	}
+	return ""
+}
+
+func (TransactionType) JSONSchema() *jsonschema.Schema {
+	schema := &jsonschema.Schema{Type: "enum"}
+	for enum := range transactionTypeValues {
+		schema.Enum = append(schema.Enum, enum)
+	}
+	return schema
+}
 
 type LedgerTransaction struct {
 	ID          uint            `gorm:"primaryKey"`
@@ -82,42 +129,6 @@ func GetLedgerTransactionsWithTags(db *gorm.DB, accountID AccountID, assetSymbol
 	return transactions, nil
 }
 
-// TransactionTypeToString converts integer transaction type to string
-func (t TransactionType) String() string {
-	switch t {
-	case TransactionTypeTransfer:
-		return "transfer"
-	case TransactionTypeDeposit:
-		return "deposit"
-	case TransactionTypeWithdrawal:
-		return "withdrawal"
-	case TransactionTypeAppDeposit:
-		return "app_deposit"
-	case TransactionTypeAppWithdrawal:
-		return "app_withdrawal"
-	default:
-		return ""
-	}
-}
-
-// parseLedgerTransactionType converts string transaction type to integer
-func parseLedgerTransactionType(s string) (TransactionType, error) {
-	switch s {
-	case "transfer":
-		return TransactionTypeTransfer, nil
-	case "deposit":
-		return TransactionTypeDeposit, nil
-	case "withdrawal":
-		return TransactionTypeWithdrawal, nil
-	case "app_deposit":
-		return TransactionTypeAppDeposit, nil
-	case "app_withdrawal":
-		return TransactionTypeAppWithdrawal, nil
-	default:
-		return 0, ErrInvalidLedgerTransactionType
-	}
-}
-
 // FormatTransactions formats multiple transactions with user tags.
 func FormatTransactions(db *gorm.DB, transactions []TransactionWithTags) ([]TransactionResponse, error) {
 	if len(transactions) == 0 {
@@ -128,13 +139,13 @@ func FormatTransactions(db *gorm.DB, transactions []TransactionWithTags) ([]Tran
 	for i, tx := range transactions {
 		responses[i] = TransactionResponse{
 			Id:             tx.ID,
-			TxType:         tx.Type.String(),
-			FromAccount:    tx.FromAccount,
+			TxType:         tx.Type,
+			FromAccount:    Address(tx.FromAccount),
 			FromAccountTag: tx.FromAccountTag, // Will be empty string if not found
-			ToAccount:      tx.ToAccount,
+			ToAccount:      Address(tx.ToAccount),
 			ToAccountTag:   tx.ToAccountTag, // Will be empty string if not found
 			Asset:          tx.AssetSymbol,
-			Amount:         tx.Amount,
+			Amount:         NewBigNumber(tx.Amount),
 			CreatedAt:      tx.CreatedAt,
 		}
 	}

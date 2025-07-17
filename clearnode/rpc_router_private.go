@@ -84,7 +84,7 @@ type ResizeChannelResponse struct {
 	Intent      uint8        `json:"intent"`
 	Version     uint64       `json:"version"`
 	Allocations []Allocation `json:"allocations"`
-	StateHash   string       `json:"state_hash"`
+	StateHash   Hex          `json:"state_hash"`
 	Signature   Signature    `json:"server_signature"`
 }
 

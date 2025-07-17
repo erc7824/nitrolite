@@ -112,57 +112,57 @@ func TestRPCRouterHandleGetRPCHistory(t *testing.T) {
 	expectedReqIDs := []uint64{11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1}
 
 	testCases := []struct {
-		name               string
-		params             map[string]interface{}
-		expectedReqIDs     []uint64
+		name                string
+		params              map[string]interface{}
+		expectedReqIDs      []uint64
 		expectedRecordCount int
 	}{
 		{
-			name:               "No params (default pagination)",
-			params:             map[string]interface{}{},
-			expectedReqIDs:     expectedReqIDs[:10], // Default limit is 10
+			name:                "No params (default pagination)",
+			params:              map[string]interface{}{},
+			expectedReqIDs:      expectedReqIDs[:10], // Default limit is 10
 			expectedRecordCount: 10,
 		},
 		{
-			name:               "Offset only",
-			params:             map[string]interface{}{"offset": float64(2)},
-			expectedReqIDs:     expectedReqIDs[2:], // Skip first 2
+			name:                "Offset only",
+			params:              map[string]interface{}{"offset": float64(2)},
+			expectedReqIDs:      expectedReqIDs[2:], // Skip first 2
 			expectedRecordCount: 9,
 		},
 		{
-			name:               "Limit only",
-			params:             map[string]interface{}{"limit": float64(5)},
-			expectedReqIDs:     expectedReqIDs[:5], // First 5 records
+			name:                "Limit only",
+			params:              map[string]interface{}{"limit": float64(5)},
+			expectedReqIDs:      expectedReqIDs[:5], // First 5 records
 			expectedRecordCount: 5,
 		},
 		{
-			name:               "Offset and limit",
-			params:             map[string]interface{}{"offset": float64(2), "limit": float64(3)},
-			expectedReqIDs:     expectedReqIDs[2:5], // Skip 2, take 3
+			name:                "Offset and limit",
+			params:              map[string]interface{}{"offset": float64(2), "limit": float64(3)},
+			expectedReqIDs:      expectedReqIDs[2:5], // Skip 2, take 3
 			expectedRecordCount: 3,
 		},
 		{
-			name:               "Pagination with sort asc",
-			params:             map[string]interface{}{"offset": float64(1), "limit": float64(3), "sort": "asc"},
-			expectedReqIDs:     []uint64{2, 3, 4}, // Ascending order, skip 1, take 3
+			name:                "Pagination with sort asc",
+			params:              map[string]interface{}{"offset": float64(1), "limit": float64(3), "sort": "asc"},
+			expectedReqIDs:      []uint64{2, 3, 4}, // Ascending order, skip 1, take 3
 			expectedRecordCount: 3,
 		},
 		{
-			name:               "Pagination with sort desc (default)",
-			params:             map[string]interface{}{"offset": float64(1), "limit": float64(3), "sort": "desc"},
-			expectedReqIDs:     expectedReqIDs[1:4], // Descending order, skip 1, take 3
+			name:                "Pagination with sort desc (default)",
+			params:              map[string]interface{}{"offset": float64(1), "limit": float64(3), "sort": "desc"},
+			expectedReqIDs:      expectedReqIDs[1:4], // Descending order, skip 1, take 3
 			expectedRecordCount: 3,
 		},
 		{
-			name:               "Offset beyond available records",
-			params:             map[string]interface{}{"offset": float64(20)},
-			expectedReqIDs:     []uint64{}, // No records
+			name:                "Offset beyond available records",
+			params:              map[string]interface{}{"offset": float64(20)},
+			expectedReqIDs:      []uint64{}, // No records
 			expectedRecordCount: 0,
 		},
 		{
-			name:               "Limit exceeds max limit",
-			params:             map[string]interface{}{"limit": float64(200)},
-			expectedReqIDs:     expectedReqIDs, // Should be capped at MaxLimit (100), but we only have 11 records
+			name:                "Limit exceeds max limit",
+			params:              map[string]interface{}{"limit": float64(200)},
+			expectedReqIDs:      expectedReqIDs, // Should be capped at MaxLimit (100), but we only have 11 records
 			expectedRecordCount: 11,
 		},
 	}
@@ -312,6 +312,7 @@ func TestRPCRouterHandleGetUserTag(t *testing.T) {
 		require.Contains(t, res.Params[0], "failed to get user tag")
 	})
 }
+
 func TestRPCRouterHandleTransfer(t *testing.T) {
 	// Create signers
 	senderKey, _ := crypto.GenerateKey()
@@ -380,8 +381,8 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		// Verify response structure
 		transferResp, ok := res.Params[0].([]TransactionResponse)
 		require.True(t, ok, "Response should be a slice of TransactionResponse")
-		require.Equal(t, senderAddr.Hex(), transferResp[0].FromAccount)
-		require.Equal(t, recipientAddr.Hex(), transferResp[0].ToAccount)
+		require.Equal(t, senderAddr.Hex(), string(transferResp[0].FromAccount))
+		require.Equal(t, recipientAddr.Hex(), string(transferResp[0].ToAccount))
 		require.False(t, transferResp[0].CreatedAt.IsZero(), "CreatedAt should be set")
 
 		// Verify user tags are empty (since no tags were created for these wallets)
@@ -390,8 +391,8 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Verify that all transactions in response have the tag fields
 		for _, tx := range transferResp {
-			require.Equal(t, senderAddr.Hex(), tx.FromAccount)
-			require.Equal(t, recipientAddr.Hex(), tx.ToAccount)
+			require.Equal(t, senderAddr.Hex(), string(tx.FromAccount))
+			require.Equal(t, recipientAddr.Hex(), string(tx.ToAccount))
 			require.Empty(t, tx.FromAccountTag, "FromAccountTag should be empty when no tag exists")
 			require.Empty(t, tx.ToAccountTag, "ToAccountTag should be empty when no tag exists")
 		}
@@ -424,8 +425,8 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		// Verify transaction details
 		for _, tx := range transactions {
 			require.Equal(t, TransactionTypeTransfer, tx.Type, "Transaction type should be transfer")
-			require.Equal(t, senderAddr.Hex(), tx.FromAccount, "From account should match")
-			require.Equal(t, recipientAddr.Hex(), tx.ToAccount, "To account should match")
+			require.Equal(t, senderAddr.Hex(), string(tx.FromAccount), "From account should match")
+			require.Equal(t, recipientAddr.Hex(), string(tx.ToAccount), "To account should match")
 			require.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 
 			// Check asset-specific amounts
@@ -446,11 +447,11 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 			err = db.Where("id = ?", responseTx.Id).First(&dbTx).Error
 			require.NoError(t, err, "Response transaction should exist in database")
 
-			require.Equal(t, dbTx.Type.String(), responseTx.TxType, "Transaction type should match")
-			require.Equal(t, dbTx.FromAccount, responseTx.FromAccount, "From account should match")
-			require.Equal(t, dbTx.ToAccount, responseTx.ToAccount, "To account should match")
+			require.Equal(t, dbTx.Type.String(), responseTx.TxType.String(), "Transaction type should match")
+			require.Equal(t, dbTx.FromAccount, string(responseTx.FromAccount), "From account should match")
+			require.Equal(t, dbTx.ToAccount, string(responseTx.ToAccount), "To account should match")
 			require.Equal(t, dbTx.AssetSymbol, responseTx.Asset, "Asset should match")
-			require.Equal(t, dbTx.Amount, responseTx.Amount, "Amount should match")
+			require.Equal(t, dbTx.Amount.String(), string(responseTx.Amount), "Amount should match")
 		}
 	})
 
@@ -521,8 +522,8 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		targetTransaction := transactionResponse[0]
 
 		require.Len(t, transactionResponse, 2, "Should have 2 transaction entries for the transfer")
-		require.Equal(t, senderAddr.Hex(), targetTransaction.FromAccount)
-		require.Equal(t, recipientAddr.Hex(), targetTransaction.ToAccount)
+		require.Equal(t, senderAddr.Hex(), string(targetTransaction.FromAccount))
+		require.Equal(t, recipientAddr.Hex(), string(targetTransaction.ToAccount))
 		require.False(t, targetTransaction.CreatedAt.IsZero(), "CreatedAt should be set")
 
 		// Verify user tag fields in transaction response
@@ -531,8 +532,8 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		// Verify all transactions have correct tag information
 		for _, tx := range transactionResponse {
-			require.Equal(t, senderAddr.Hex(), tx.FromAccount)
-			require.Equal(t, recipientAddr.Hex(), tx.ToAccount)
+			require.Equal(t, senderAddr.Hex(), string(tx.FromAccount))
+			require.Equal(t, recipientAddr.Hex(), string(tx.ToAccount))
 			require.Empty(t, tx.FromAccountTag, "FromAccountTag should be empty since sender has no tag")
 			require.Equal(t, recipientTag.Tag, tx.ToAccountTag, "ToAccountTag should match recipient's tag")
 		}

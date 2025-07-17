@@ -143,6 +143,10 @@ func runCli(logger Logger, name string) {
 		runReconcileCli(logger)
 	case "export-transactions":
 		runExportTransactionsCli(logger)
+	case "jsonschema":
+		runExportJsonSchemaCli(logger)
+	case "zod-generator":
+		runZodGeneratorCli(logger)
 	default:
 		logger.Fatal("Unknown CLI command", "name", name)
 	}

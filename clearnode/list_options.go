@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 
+	"github.com/invopop/jsonschema"
 	"gorm.io/gorm"
 )
 
@@ -13,16 +14,25 @@ const (
 	SortTypeDescending SortType = "desc"
 )
 
-func (s SortType) ToString() string {
+func (s SortType) String() string {
 	return strings.ToUpper(string(s))
+}
+
+func (SortType) JSONSchema() *jsonschema.Schema {
+	schema := &jsonschema.Schema{Type: "enum"}
+	values := []SortType{SortTypeAscending, SortTypeDescending}
+	for _, enum := range values {
+		schema.Enum = append(schema.Enum, enum)
+	}
+	return schema
 }
 
 func applySort(db *gorm.DB, sortBy string, defaultSort SortType, sortType *SortType) *gorm.DB {
 	if sortType == nil {
-		return db.Order(sortBy + " " + defaultSort.ToString())
+		return db.Order(sortBy + " " + defaultSort.String())
 	}
 
-	return db.Order(sortBy + " " + sortType.ToString())
+	return db.Order(sortBy + " " + sortType.String())
 }
 
 const (

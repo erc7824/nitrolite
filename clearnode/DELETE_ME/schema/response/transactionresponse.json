@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$ref": "#/$defs/TransactionResponse",
+  "$defs": {
+    "Address": {
+      "type": "string",
+      "format": "address"
+    },
+    "BigNumber": {
+      "type": "string",
+      "format": "bignumber"
+    },
+    "TransactionResponse": {
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "tx_type": {
+          "$ref": "#/$defs/TransactionType"
+        },
+        "from_account": {
+          "$ref": "#/$defs/Address"
+        },
+        "from_account_tag": {
+          "type": "string"
+        },
+        "to_account": {
+          "$ref": "#/$defs/Address"
+        },
+        "to_account_tag": {
+          "type": "string"
+        },
+        "asset": {
+          "type": "string"
+        },
+        "amount": {
+          "$ref": "#/$defs/BigNumber"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "tx_type",
+        "from_account",
+        "to_account",
+        "asset",
+        "amount",
+        "created_at"
+      ]
+    },
+    "TransactionType": {
+      "type": "enum",
+      "enum": [
+        "transfer",
+        "deposit",
+        "withdrawal",
+        "app_deposit",
+        "app_withdrawal"
+      ]
+    }
+  },
+  "rpc_method": "get_ledger_transactions"
+}

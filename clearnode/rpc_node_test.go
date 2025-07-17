@@ -37,6 +37,15 @@ func TestRPCNode(t *testing.T) {
 	previousExecMethodKey := "previous_exec_method"
 	authMethod := "auth.test"
 
+	paramsUserIDKey := "userID"
+	paramsPrevMethodKey := "prev"
+	paramsRootMwKey := "rootMw"
+	paramsGroupAMwKey := "groupA"
+	paramsGroupBMwKey := "groupB"
+	paramsErrorKey := "error"
+	paramsOnConnectCounts := "onConnectCounts"
+	paramsOnAuthCounts := "onAuthCounts"
+
 	onConnectMethod := "on_connect.test"
 	onConnectCounts := 0
 	node.OnConnect(func(send SendRPCMessageFunc) {
@@ -44,7 +53,10 @@ func TestRPCNode(t *testing.T) {
 		defer mu.Unlock()
 
 		onConnectCounts++
-		send(onConnectMethod, onConnectCounts)
+		params := map[string]any{
+			paramsOnConnectCounts: onConnectCounts,
+		}
+		send(onConnectMethod, params)
 	})
 
 	onDisconnectSignal := newTestSignal()
@@ -65,7 +77,11 @@ func TestRPCNode(t *testing.T) {
 		defer mu.Unlock()
 
 		onAuthenticatedCounts++
-		send(onAuthenticatedMethod, onAuthenticatedCounts, userID)
+		params := map[string]any{
+			paramsOnAuthCounts: onAuthenticatedCounts,
+			paramsUserIDKey:    userID,
+		}
+		send(onAuthenticatedMethod, params)
 	})
 
 	onMessageSentSignal := newTestSignal()
@@ -110,7 +126,14 @@ func TestRPCNode(t *testing.T) {
 					groupBMwValue = false
 				}
 			}
-			c.Succeed(method, c.UserID, prevMethod, rootMwValue, groupAMwValue, groupBMwValue)
+			params := map[string]any{
+				paramsUserIDKey:     c.UserID,
+				paramsPrevMethodKey: prevMethod,
+				paramsRootMwKey:     rootMwValue,
+				paramsGroupAMwKey:   groupAMwValue,
+				paramsGroupBMwKey:   groupBMwValue,
+			}
+			c.Succeed(method, params)
 			c.Storage.Set(previousExecMethodKey, method)
 		}
 	}
@@ -128,7 +151,10 @@ func TestRPCNode(t *testing.T) {
 	node.Handle(rootMethod, createDummyHandler(rootMethod))
 	node.Handle(authMethod, func(c *RPCContext) {
 		logger.Debug("executing auth handler")
-		c.Succeed(authMethod, authenticatedUserID)
+		params := map[string]any{
+			paramsUserIDKey: authenticatedUserID,
+		}
+		c.Succeed(authMethod, params)
 		c.UserID = authenticatedUserID // Simulate authenticated user
 	})
 
@@ -177,7 +203,7 @@ func TestRPCNode(t *testing.T) {
 	}
 
 	// Helper function to send request and receive response
-	sendAndReceive := func(t *testing.T, RequestID uint64, method string, params ...interface{}) *RPCMessage {
+	sendAndReceive := func(t *testing.T, RequestID uint64, method string, params RPCDataParams) *RPCMessage {
 		if params == nil {
 			params = []interface{}{}
 		}
@@ -218,7 +244,7 @@ func TestRPCNode(t *testing.T) {
 
 	// Test root handler
 	t.Run("root handler", func(t *testing.T) {
-		resp := sendAndReceive(t, 1, rootMethod)
+		resp := sendAndReceive(t, 1, rootMethod, nil)
 
 		mu.Lock()
 		defer mu.Unlock()
@@ -227,17 +253,21 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, rootMethod, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 5)
 		assert.Len(t, resp.Sig, 1)
-		assert.Equal(t, "", resp.Res.Params[0])     // not authenticated
-		assert.Equal(t, "", resp.Res.Params[1])     // previous dummy method empty
-		assert.Equal(t, true, resp.Res.Params[2])   // root middleware executed
-		assert.Equal(t, false, resp.Res.Params[3])  // group A middleware not executed
-		assert.Equal(t, false, resp.Res.Params[4])  // group B middleware not executed
-		assert.True(t, onMessageSentSignal.await()) // on message sent signal
+
+		params, ok := resp.Res.Params.(map[string]any)
+		require.True(t, ok, "params should be a map[string]any")
+
+		assert.Equal(t, "", params[paramsUserIDKey])      // not authenticated
+		assert.Equal(t, "", params[paramsPrevMethodKey])  // previous dummy method empty
+		assert.Equal(t, true, params[paramsRootMwKey])    // root middleware executed
+		assert.Equal(t, false, params[paramsGroupAMwKey]) // group A middleware not executed
+		assert.Equal(t, false, params[paramsGroupBMwKey]) // group B middleware not executed
+		assert.True(t, onMessageSentSignal.await())       // on message sent signal
 	})
 
 	// Test auth handler
 	t.Run("auth handler", func(t *testing.T) {
-		resp := sendAndReceive(t, 1, authMethod)
+		resp := sendAndReceive(t, 1, authMethod, nil)
 
 		// So we definitely receive both authMethod and onAuthenticatedMethod
 		time.Sleep(100 * time.Millisecond)
@@ -247,8 +277,12 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, authMethod, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 1)
 		assert.Len(t, resp.Sig, 1)
-		assert.Equal(t, authenticatedUserID, resp.Res.Params[0]) // authenticated user ID
-		assert.True(t, onMessageSentSignal.await())              // on message sent signal
+
+		params, ok := resp.Res.Params.(map[string]any)
+		require.True(t, ok, "params should be a map[string]any")
+
+		assert.Equal(t, authenticatedUserID, params[paramsUserIDKey]) // authenticated user ID
+		assert.True(t, onMessageSentSignal.await())                   // on message sent signal
 		mu.Unlock()
 
 		// on authenticated method executed
@@ -259,15 +293,20 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, onAuthenticatedMethod, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 2)
 		assert.Len(t, resp.Sig, 1)
-		assert.Equal(t, 1, onAuthenticatedCounts)                // on authenticated counts
-		assert.Equal(t, authenticatedUserID, resp.Res.Params[1]) // authenticated user ID
-		assert.True(t, onMessageSentSignal.await())              // on message sent signal
+		assert.Equal(t, 1, onAuthenticatedCounts) // on authenticated counts
+
+		params, ok = resp.Res.Params.(map[string]any)
+		require.True(t, ok, "params should be a map[string]any")
+
+		assert.Equal(t, authenticatedUserID, params[paramsUserIDKey]) // authenticated user ID
+		assert.True(t, onMessageSentSignal.await())                   // on message sent signal
+
 		mu.Unlock()
 	})
 
 	// Test group handler 1
 	t.Run("group handler 1", func(t *testing.T) {
-		resp := sendAndReceive(t, 2, groupMethodA)
+		resp := sendAndReceive(t, 2, groupMethodA, nil)
 
 		mu.Lock()
 		defer mu.Unlock()
@@ -276,17 +315,21 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, groupMethodA, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 5)
 		assert.Len(t, resp.Sig, 1)
-		assert.Equal(t, authenticatedUserID, resp.Res.Params[0]) // this method
-		assert.Equal(t, rootMethod, resp.Res.Params[1])          // previous dummy method root
-		assert.Equal(t, true, resp.Res.Params[2])                // root middleware executed
-		assert.Equal(t, true, resp.Res.Params[3])                // group A middleware executed
-		assert.Equal(t, false, resp.Res.Params[4])               // group B middleware not executed
-		assert.True(t, onMessageSentSignal.await())              // on message sent signal
+
+		params, ok := resp.Res.Params.(map[string]any)
+		require.True(t, ok, "params should be a map[string]any")
+
+		assert.Equal(t, authenticatedUserID, params[paramsUserIDKey]) // this method
+		assert.Equal(t, rootMethod, params[paramsPrevMethodKey])      // previous dummy method root
+		assert.Equal(t, true, params[paramsRootMwKey])                // root middleware executed
+		assert.Equal(t, true, params[paramsGroupAMwKey])              // group A middleware executed
+		assert.Equal(t, false, params[paramsGroupBMwKey])             // group B middleware not executed
+		assert.True(t, onMessageSentSignal.await())                   // on message sent signal
 	})
 
 	// Test group handler 2
 	t.Run("group handler 2", func(t *testing.T) {
-		resp := sendAndReceive(t, 3, groupMethodB)
+		resp := sendAndReceive(t, 3, groupMethodB, nil)
 
 		mu.Lock()
 		defer mu.Unlock()
@@ -295,17 +338,21 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, groupMethodB, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 5)
 		assert.Len(t, resp.Sig, 1)
-		assert.Equal(t, authenticatedUserID, resp.Res.Params[0]) // this method
-		assert.Equal(t, groupMethodA, resp.Res.Params[1])        // previous dummy method root
-		assert.Equal(t, true, resp.Res.Params[2])                // root middleware executed
-		assert.Equal(t, true, resp.Res.Params[3])                // group A middleware executed
-		assert.Equal(t, true, resp.Res.Params[4])                // group B middleware executed
-		assert.True(t, onMessageSentSignal.await())              // on message sent signal
+
+		params, ok := resp.Res.Params.(map[string]any)
+		require.True(t, ok, "params should be a map[string]any")
+
+		assert.Equal(t, authenticatedUserID, params[paramsUserIDKey]) // this method
+		assert.Equal(t, groupMethodA, params[paramsPrevMethodKey])    // previous dummy method root
+		assert.Equal(t, true, params[paramsRootMwKey])                // root middleware executed
+		assert.Equal(t, true, params[paramsGroupAMwKey])              // group A middleware executed
+		assert.Equal(t, true, params[paramsGroupBMwKey])              // group B middleware executed
+		assert.True(t, onMessageSentSignal.await())                   // on message sent signal
 	})
 
 	// Test unknown method
 	t.Run("unknown method", func(t *testing.T) {
-		resp := sendAndReceive(t, 4, "unknown.method")
+		resp := sendAndReceive(t, 4, "unknown.method", nil)
 
 		mu.Lock()
 		defer mu.Unlock()
@@ -313,7 +360,11 @@ func TestRPCNode(t *testing.T) {
 		require.NotNil(t, resp.Res)
 		assert.Equal(t, "error", resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 1)
-		assert.Contains(t, resp.Res.Params[0], "unknown method")
+
+		params, ok := resp.Res.Params.(map[string]any)
+		require.True(t, ok, "params should be a map[string]any")
+
+		assert.Contains(t, params[paramsErrorKey], "unknown method")
 		assert.True(t, onMessageSentSignal.await()) // on message sent signal
 	})
 
@@ -333,7 +384,11 @@ func TestRPCNode(t *testing.T) {
 
 		require.NotNil(t, respMsg.Res)
 		assert.Equal(t, "error", respMsg.Res.Method)
-		assert.Contains(t, respMsg.Res.Params[0], "invalid message format")
+
+		params, ok := respMsg.Res.Params.(map[string]any)
+		require.True(t, ok, "params should be a map[string]any")
+
+		assert.Contains(t, params[paramsErrorKey], "invalid message format")
 		assert.True(t, onMessageSentSignal.await()) // on message sent signal
 	})
 

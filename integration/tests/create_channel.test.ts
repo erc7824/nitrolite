@@ -5,7 +5,7 @@ import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import { getChannelUpdatePredicateWithStatus, TestWebSocket } from '@/ws';
-import { RPCChannelStatus, rpcResponseParser } from '@erc7824/nitrolite';
+import { parseChannelUpdateResponse, RPCChannelStatus } from '@erc7824/nitrolite';
 import { parseUnits } from 'viem';
 
 describe('Create channel', () => {
@@ -89,7 +89,7 @@ describe('Create channel', () => {
         const openResponse = await openChannelPromise;
         expect(openResponse).toBeDefined();
 
-        const openParsedResponse = rpcResponseParser.channelUpdate(openResponse);
+        const openParsedResponse = parseChannelUpdateResponse(openResponse);
         const responseChannel = openParsedResponse.params;
 
         expect(responseChannel.adjudicator).toBe(CONFIG.ADDRESSES.DUMMY_ADJUDICATOR_ADDRESS);
@@ -158,7 +158,7 @@ describe('Create channel', () => {
         const openResponse = await openChannelPromise;
         expect(openResponse).toBeDefined();
 
-        const openParsedResponse = rpcResponseParser.channelUpdate(openResponse);
+        const openParsedResponse = parseChannelUpdateResponse(openResponse);
         const responseChannel = openParsedResponse.params;
 
         expect(responseChannel.adjudicator).toBe(CONFIG.ADDRESSES.DUMMY_ADJUDICATOR_ADDRESS);

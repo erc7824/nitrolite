@@ -5,10 +5,11 @@ import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import { getChannelUpdatePredicateWithStatus, TestWebSocket, getGetLedgerEntriesPredicate } from '@/ws';
-import { createGetLedgerEntriesMessage, RPCChannelStatus, rpcResponseParser } from '@erc7824/nitrolite';
+import { createGetLedgerEntriesMessage, parseGetLedgerEntriesResponse, RPCChannelStatus } from '@erc7824/nitrolite';
 import { parseUnits, GetTxpoolContentReturnType, Hash } from 'viem';
 
-describe('Close channel', () => {
+// TODO: this test could stuck anvil if is not gracefully closed
+describe.skip('Close channel', () => {
     const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
     const decimalDepositAmount = 100;
 
@@ -144,7 +145,7 @@ describe('Close channel', () => {
         const msg = await createGetLedgerEntriesMessage(identity.messageSigner, channelId);
         const response = await ws.sendAndWaitForResponse(msg, getGetLedgerEntriesPredicate(), 5000);
 
-        const { params: parsedResponseParams } = rpcResponseParser.getLedgerEntries(response);
+        const { params: parsedResponseParams } = parseGetLedgerEntriesResponse(response);
         expect(parsedResponseParams).toBeDefined();
 
         expect(parsedResponseParams).toHaveLength(2);

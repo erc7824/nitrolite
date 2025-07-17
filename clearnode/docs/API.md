@@ -2,28 +2,28 @@
 
 ## API Endpoints
 
-| Method | Description | Access |
-|--------|-------------|------------|
-| `auth_request` | Initiates authentication with the server | Public |
-| `auth_challenge` | Server response with authentication challenge | Public |
-| `auth_verify` | Completes authentication with a challenge response | Public |
-| `ping` | Simple connectivity check | Public |
-| `get_config` | Retrieves broker configuration and supported networks | Public |
-| `get_assets` | Retrieves all supported assets (optionally filtered by chain_id) | Public |
-| `get_channels` | Lists all channels for a participant with their status across all chains | Public |
-| `get_app_definition` | Retrieves application definition for a ledger account | Public |
-| `get_app_sessions` | Lists virtual applications for a participant with optional status filter | Public |
-| `get_ledger_entries` | Retrieves detailed ledger entries for a participant | Public |
-| `get_ledger_transactions` | Retrieves transaction history with optional filtering | Public |
-| `get_user_tag` | Retrieves user's tag| Private |
-| `get_rpc_history` | Retrieves all RPC message history for a participant | Private |
-| `get_ledger_balances` | Lists participants and their balances for a ledger account | Private |
-| `transfer` | Transfers funds from user's unified balance to another account | Private |
-| `create_app_session` | Creates a new virtual application on a ledger | Private |
-| `submit_app_state` | Submits an intermediate state into a virtual application | Private |
-| `close_app_session` | Closes a virtual application | Private |
-| `close_channel` | Closes a payment channel | Private |
-| `resize_channel` | Adjusts channel capacity | Private |
+| Method                    | Description                                                              | Access  |
+| ------------------------- | ------------------------------------------------------------------------ | ------- |
+| `auth_request`            | Initiates authentication with the server                                 | Public  |
+| `auth_challenge`          | Server response with authentication challenge                            | Public  |
+| `auth_verify`             | Completes authentication with a challenge response                       | Public  |
+| `ping`                    | Simple connectivity check                                                | Public  |
+| `get_config`              | Retrieves broker configuration and supported networks                    | Public  |
+| `get_assets`              | Retrieves all supported assets (optionally filtered by chain_id)         | Public  |
+| `get_channels`            | Lists all channels for a participant with their status across all chains | Public  |
+| `get_app_definition`      | Retrieves application definition for a ledger account                    | Public  |
+| `get_app_sessions`        | Lists virtual applications for a participant with optional status filter | Public  |
+| `get_ledger_entries`      | Retrieves detailed ledger entries for a participant                      | Public  |
+| `get_ledger_transactions` | Retrieves transaction history with optional filtering                    | Public  |
+| `get_user_tag`            | Retrieves user's tag                                                     | Private |
+| `get_rpc_history`         | Retrieves all RPC message history for a participant                      | Private |
+| `get_ledger_balances`     | Lists participants and their balances for a ledger account               | Private |
+| `transfer`                | Transfers funds from user's unified balance to another account           | Private |
+| `create_app_session`      | Creates a new virtual application on a ledger                            | Private |
+| `submit_app_state`        | Submits an intermediate state into a virtual application                 | Private |
+| `close_app_session`       | Closes a virtual application                                             | Private |
+| `close_channel`           | Closes a payment channel                                                 | Private |
+| `resize_channel`          | Adjusts channel capacity                                                 | Private |
 
 ## Authentication
 
@@ -35,20 +35,20 @@ Initiates authentication with the server.
 
 ```json
 {
-  "req": [1, "auth_request", [{
+  "req": [1, "auth_request", {
     "address": "0x1234567890abcdef...",
     "session_key": "0x9876543210fedcba...", // If specified, enables delegation to this key
     "app_name": "Example App", // Application name for analytics
     "allowances": [ // Asset allowances for the session
-      [
-        "usdc", 
-        "100.0"
-      ]
+      {
+        "asset": "usdc", 
+        "amount": "100.0"
+      }
     ],
     "scope": "app.create", // Permission scope (e.g., "app.create", "ledger.readonly")
     "expire": "3600", //  Session expiration
     "application": "0xApp1234567890abcdef..." // Application public address
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x5432abcdef..."] // Client's signature of the entire 'req' object
 }
 ```
@@ -61,9 +61,9 @@ Server response with a challenge token for the client to sign.
 
 ```json
 {
-  "res": [1, "auth_challenge", [{
+  "res": [1, "auth_challenge", {
     "challenge_message": "550e8400-e29b-41d4-a716-446655440000"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."] // Server's signature of the entire 'res' object
 }
 ```
@@ -76,9 +76,9 @@ Completes authentication with a challenge response.
 
 ```json
 {
-  "req": [2, "auth_verify", [{
+  "req": [2, "auth_verify", {
     "challenge": "550e8400-e29b-41d4-a716-446655440000"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x2345bcdef..."] // Client's EIP-712 signatures of the challenge data object
 }
 ```
@@ -87,11 +87,11 @@ Completes authentication with a challenge response.
 
 ```json
 {
-  "res": [2, "auth_verify", [{
+  "res": [2, "auth_verify", {
     "address": "0x1234567890abcdef...",
     "success": true,
     "jwt_token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..." // JWT token for subsequent requests
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."] // Server's signature of the entire 'res' object
 }
 ```
@@ -112,7 +112,7 @@ The JWT token has a default validity period of 24 hours and must be refreshed by
 ### Get Channels
 
 Retrieves all channels for a participant (both open, closed, and joining), ordered by creation date (newest first). This method returns channels across all supported chains. If no participant is specified, it returns all channels.
-Supports pagination and sorting.
+Supports pagination and sorting by providing optional request parameters and metadata fields in response.
 
 > Sorted descending by `created_at` by default.
 
@@ -120,9 +120,7 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_channels", [{
-    "participant": "0x1234567890abcdef...",
-  }], 1619123456789],
+  "req": [1, "get_channels", {}, 1619123456789],
   "sig": []
 }
 ```
@@ -131,13 +129,13 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_channels", [{
-    "participant": "0x1234567890abcdef...",
+  "req": [1, "get_channels", {
+    "participant": "0x1234567890abcdef...", // Optional: filter by participant
     "status":"open", // Optional filter
     "offset": 42, // Optional: pagination offset
     "limit": 10, // Optional: number of channels to return
     "sort": "desc" // Optional: sort asc or desc by created_at
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": []
 }
 ```
@@ -146,38 +144,46 @@ Supports pagination and sorting.
 
 ```json
 {
-  "res": [1, "get_channels", [[
-    {
-      "channel_id": "0xfedcba9876543210...",
-      "participant": "0x1234567890abcdef...",
-      "wallet": "0x1234567890abcdef...",
-      "status": "open",
-      "token": "0xeeee567890abcdef...",
-      "amount": "100000",
-      "chain_id": 137,
-      "adjudicator": "0xAdjudicatorContractAddress...",
-      "challenge": 86400,
-      "nonce": 1,
-      "version": 2,
-      "created_at": "2023-05-01T12:00:00Z",
-      "updated_at": "2023-05-01T12:30:00Z"
-    },
-    {
-      "channel_id": "0xabcdef1234567890...",
-      "participant": "0x1234567890abcdef...",
-      "wallet": "0x1234567890abcdef...",
-      "status": "closed",
-      "token": "0xeeee567890abcdef...",
-      "amount": "50000",
-      "chain_id": 42220,
-      "adjudicator": "0xAdjudicatorContractAddress...",
-      "challenge": 86400,
-      "nonce": 1,
-      "version": 3,
-      "created_at": "2023-04-15T10:00:00Z",
-      "updated_at": "2023-04-20T14:30:00Z"
+  "res": [1, "get_channels", {
+    "channels" : [
+      {
+        "channel_id": "0xfedcba9876543210...",
+        "participant": "0x1234567890abcdef...",
+        "wallet": "0x1234567890abcdef...",
+        "status": "open",
+        "token": "0xeeee567890abcdef...",
+        "amount": "100000",
+        "chain_id": 137,
+        "adjudicator": "0xAdjudicatorContractAddress...",
+        "challenge": 86400,
+        "nonce": 1,
+        "version": 2,
+        "created_at": "2023-05-01T12:00:00Z",
+        "updated_at": "2023-05-01T12:30:00Z"
+      },
+      {
+        "channel_id": "0xabcdef1234567890...",
+        "participant": "0x1234567890abcdef...",
+        "wallet": "0x1234567890abcdef...",
+        "status": "closed",
+        "token": "0xeeee567890abcdef...",
+        "amount": "50000",
+        "chain_id": 42220,
+        "adjudicator": "0xAdjudicatorContractAddress...",
+        "challenge": 86400,
+        "nonce": 1,
+        "version": 3,
+        "created_at": "2023-04-15T10:00:00Z",
+        "updated_at": "2023-04-20T14:30:00Z"
+      }
+    ],
+    "metadata": {
+      "page": 5,
+      "per_page": 10,
+      "total_count": 56,
+      "page_count": 6
     }
-  ]], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -199,6 +205,13 @@ Each channel response includes:
 - `version`: Current version of the channel state
 - `created_at`: When the channel was created (ISO 8601 format)
 - `updated_at`: When the channel was last updated (ISO 8601 format)
+  
+Metadata fields provide pagination information:
+
+- `page`: Current page number
+- `per_page`: Number of channels per page
+- `total_count`: Total number of channels available
+- `page_count`: Total number of pages based on the `per_page` limit
 
 ### Get App Definition
 
@@ -208,9 +221,9 @@ Retrieves the application definition for a specific ledger account.
 
 ```json
 {
-  "req": [1, "get_app_definition", [{
+  "req": [1, "get_app_definition", {
     "app_session_id": "0x1234567890abcdef..."
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -219,19 +232,17 @@ Retrieves the application definition for a specific ledger account.
 
 ```json
 {
-  "res": [1, "get_app_definition", [
-    {
-      "protocol": "NitroRPC/0.2",
-      "participants": [
-        "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
-        "0x00112233445566778899AaBbCcDdEeFf00112233"
-      ],
-      "weights": [50, 50],
-      "quorum": 100,
-      "challenge": 86400,
-      "nonce": 1
-    }
-  ], 1619123456789],
+  "res": [1, "get_app_definition", {
+    "protocol": "NitroRPC/0.2",
+    "participants": [
+      "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
+      "0x00112233445566778899AaBbCcDdEeFf00112233"
+    ],
+    "weights": [50, 50],
+    "quorum": 100,
+    "challenge": 86400,
+    "nonce": 1
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -247,9 +258,7 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_app_sessions", [{
-    "participant": "0x1234567890abcdef..."
-  }], 1619123456789],
+  "req": [1, "get_app_sessions", {}, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -258,13 +267,13 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_app_sessions", [{
-    "participant": "0x1234567890abcdef...",
+  "req": [1, "get_app_sessions", {
+    "participant": "0x1234567890abcdef...",  // Optional: filter by participant
     "status": "open",  // Optional: filter by status
     "offset": 42, // Optional: pagination offset
     "limit": 10, // Optional: number of sessions to return
     "sort": "asc", // Optional: sort asc or desc
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -273,38 +282,46 @@ Supports pagination and sorting.
 
 ```json
 {
-  "res": [1, "get_app_sessions", [[
-    {
-      "app_session_id": "0x3456789012abcdef...",
-      "status": "open",
-      "participants": [
-        "0x1234567890abcdef...",
-        "0x00112233445566778899AaBbCcDdEeFf00112233"
-      ],
-      "session_data": "{\"gameType\":\"rps\",\"rounds\":5,\"currentRound\":3,\"scores\":{\"0x1234567890abcdef\":2,\"0x00112233445566778899AaBbCcDdEeFf00112233\":1}}",
-      "protocol": "NitroAura",
-      "challenge": 86400,
-      "weights": [50, 50],
-      "quorum": 100,
-      "version": 1,
-      "nonce": 123456789
-    },
-    {
-      "app_session_id": "0x7890123456abcdef...",
-      "status": "open",
-      "participants": [
-        "0x1234567890abcdef...",
-        "0xAaBbCcDdEeFf0011223344556677889900aAbBcC"
-      ],
-      "session_data": "{\"gameType\":\"snake\",\"boardSize\":20,\"snakeLength\":5,\"score\":150,\"level\":3,\"gameState\":\"active\"}",
-      "protocol": "NitroSnake",
-      "challenge": 86400,
-      "weights": [70, 30],
-      "quorum": 100,
-      "version": 1,
-      "nonce": 123456790
+  "res": [1, "get_app_sessions", {
+    "app_sessions" : [
+      {
+        "app_session_id": "0x3456789012abcdef...",
+        "status": "open",
+        "participants": [
+          "0x1234567890abcdef...",
+          "0x00112233445566778899AaBbCcDdEeFf00112233"
+        ],
+        "session_data": "{\"gameType\":\"rps\",\"rounds\":5,\"currentRound\":3,\"scores\":{\"0x1234567890abcdef\":2,\"0x00112233445566778899AaBbCcDdEeFf00112233\":1}}",
+        "protocol": "NitroAura",
+        "challenge": 86400,
+        "weights": [50, 50],
+        "quorum": 100,
+        "version": 1,
+        "nonce": 123456789
+      },
+      {
+        "app_session_id": "0x7890123456abcdef...",
+        "status": "open",
+        "participants": [
+          "0x1234567890abcdef...",
+          "0xAaBbCcDdEeFf0011223344556677889900aAbBcC"
+        ],
+        "session_data": "{\"gameType\":\"snake\",\"boardSize\":20,\"snakeLength\":5,\"score\":150,\"level\":3,\"gameState\":\"active\"}",
+        "protocol": "NitroSnake",
+        "challenge": 86400,
+        "weights": [70, 30],
+        "quorum": 100,
+        "version": 1,
+        "nonce": 123456790
+      }
+    ],
+    "metadata": {
+      "page": 5,
+      "per_page": 10,
+      "total_count": 56,
+      "page_count": 6
     }
-  ]], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -317,11 +334,11 @@ Retrieves the balances of all participants in a specific ledger account.
 
 ```json
 {
-  "req": [1, "get_ledger_balances", [{
+  "req": [1, "get_ledger_balances", {
     "participant": "0x1234567890abcdef...", // TO BE DEPRECATED
     // OR
     "account_id": "0x1234567890abcdef..."
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -333,16 +350,18 @@ To get balance in a specific virtual app session, specify `app_session_id` as ac
 
 ```json
 {
-  "res": [1, "get_ledger_balances", [[
-    {
-      "asset": "usdc",
-      "amount": "100.0"
-    },
-    {
-      "asset": "eth",
-      "amount": "0.5"
-    }
-  ]], 1619123456789],
+  "res": [1, "get_ledger_balances", {
+    "ledger_balances": [
+      {
+        "asset": "usdc",
+        "amount": "100.0"
+      },
+      {
+        "asset": "eth",
+        "amount": "0.5"
+      }
+    ],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -355,7 +374,7 @@ Retrieves the user's tag, which can be used for transfer operations. The tag is 
 
 ```json
 {
-  "req": [1, "get_user_tag", [], 1619123456789],
+  "req": [1, "get_user_tag", {}, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -364,13 +383,13 @@ Retrieves the user's tag, which can be used for transfer operations. The tag is 
 
 ```json
 {
-  "res": [1, "get_user_tag", [
-    {
-      "tag": "UX123D",
-    }], 1619123456789],
+  "res": [1, "get_user_tag", {
+    "tag": "UX123D",
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
+
 ### Transfer Funds
 
 This method allows a user to transfer assets from their unified balance to another account. The user must have sufficient funds for each asset being transferred. The operation will fail if any of the specified assets have insufficient funds.
@@ -384,7 +403,7 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 
 ```json
 {
-  "req": [1, "transfer", [{
+  "req": [1, "transfer", {
     "destination": "0x9876543210abcdef...",
     "allocations": [
       {
@@ -396,14 +415,14 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
         "amount": "0.1"
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 
 // OR
 
 {
-  "req": [1, "transfer", [{
+  "req": [1, "transfer", {
     "destination_user_tag": "UX123D",
     "allocations": [
       {
@@ -415,7 +434,7 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
         "amount": "0.1"
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -424,34 +443,37 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 
 ```json
 {
-  "res": [1, "transfer", [[
-    {
-      "id": "1",
-      "tx_type": "transfer",
-      "from_account": "0x1234567890abcdef...",
-      "from_account_tag": "NQKO7C",
-      "to_account": "0x9876543210abcdef...",
-      "to_account_tag": "UX123D",
-      "asset": "usdc",
-      "amount": "50.0",
-      "created_at": "2023-05-01T12:00:00Z"
-    },
-    {
-      "id": "2",
-      "tx_type": "transfer",
-      "from_account": "0x1234567890abcdef...",
-      "from_account_tag": "NQKO7C",
-      "to_account": "0x9876543210abcdef...",
-      "to_account_tag": "UX123D",
-      "asset": "eth",
-      "amount": "0.1",
-      "created_at": "2023-05-01T12:00:00Z"
-    }
-  ]], 1619123456789],
+  "res": [1, "transfer", {
+    "transactions" : [
+      {
+        "id": "1",
+        "tx_type": "transfer",
+        "from_account": "0x1234567890abcdef...",
+        "from_account_tag": "NQKO7C",
+        "to_account": "0x9876543210abcdef...",
+        "to_account_tag": "UX123D",
+        "asset": "usdc",
+        "amount": "50.0",
+        "created_at": "2023-05-01T12:00:00Z"
+      },
+      {
+        "id": "2",
+        "tx_type": "transfer",
+        "from_account": "0x1234567890abcdef...",
+        "from_account_tag": "NQKO7C",
+        "to_account": "0x9876543210abcdef...",
+        "to_account_tag": "UX123D",
+        "asset": "eth",
+        "amount": "0.1",
+        "created_at": "2023-05-01T12:00:00Z"
+      }
+    ]
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
-The response returns an array of transaction objects, with one transaction for each asset being transferred. 
+
+The response returns an array of transaction objects, with one transaction for each asset being transferred.
 
 Each transaction includes:
 
@@ -476,7 +498,7 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_ledger_entries", [], 1619123456789],
+  "req": [1, "get_ledger_entries", {}, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -485,14 +507,14 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_ledger_entries", [{
-    "account_id": "0x1234567890abcdef...",
+  "req": [1, "get_ledger_entries", {
+    "account_id": "0x1234567890abcdef...", // Optional: filter by account ID
     "wallet": "0x1234567890abcdef...", // Optional: filter by participant
     "asset": "usdc", // Optional: filter by asset
     "offset": 42, // Optional: pagination offset
     "limit": 10, // Optional: number of entries to return
     "sort": "desc" // Optional: sort asc or desc by created_at
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -501,28 +523,36 @@ Supports pagination and sorting.
 
 ```json
 {
-  "res": [1, "get_ledger_entries", [[
-    {
-      "id": 123,
-      "account_id": "0x1234567890abcdef...",
-      "account_type": 0,
-      "asset": "usdc",
-      "participant": "0x1234567890abcdef...",
-      "credit": "100.0",
-      "debit": "0.0",
-      "created_at": "2023-05-01T12:00:00Z"
-    },
-    {
-      "id": 124,
-      "account_id": "0x1234567890abcdef...",
-      "account_type": 0,
-      "asset": "usdc",
-      "participant": "0x1234567890abcdef...",
-      "credit": "0.0",
-      "debit": "25.0",
-      "created_at": "2023-05-01T14:30:00Z"
+  "res": [1, "get_ledger_entries", {
+    "ledger_entries": [
+      {
+        "id": 123,
+        "account_id": "0x1234567890abcdef...",
+        "account_type": 0,
+        "asset": "usdc",
+        "participant": "0x1234567890abcdef...",
+        "credit": "100.0",
+        "debit": "0.0",
+        "created_at": "2023-05-01T12:00:00Z"
+      },
+      {
+        "id": 124,
+        "account_id": "0x1234567890abcdef...",
+        "account_type": 0,
+        "asset": "usdc",
+        "participant": "0x1234567890abcdef...",
+        "credit": "0.0",
+        "debit": "25.0",
+        "created_at": "2023-05-01T14:30:00Z"
+      }
+    ],
+    "metadata": {
+      "page": 5,
+      "per_page": 10,
+      "total_count": 56,
+      "page_count": 6
     }
-  ]], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -535,6 +565,7 @@ Supports pagination and sorting.
 > Sorted descending by `created_at` by default.
 
 **Available Transaction Types:**
+
 - `transfer`: Direct transfers between unified accounts
 - `deposit`: Funds deposited to a unified account
 - `withdrawal`: Funds withdrawn from a unified account
@@ -545,11 +576,7 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_ledger_transactions", [{
-    "account_id": "0x1234567890abcdef...",
-    "asset": "usdc",     // Optional: filter by asset
-    "tx_type": "transfer" // Optional: filter by transaction type
-  }], 1619123456789],
+  "req": [1, "get_ledger_transactions", {}, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -558,14 +585,14 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_ledger_transactions", [{
-    "account_id": "0x1234567890abcdef...",
+  "req": [1, "get_ledger_transactions", {
+    "account_id": "0x1234567890abcdef...", // Optional: filter by account ID
     "asset": "usdc",     // Optional: filter by asset
     "tx_type": "transfer", // Optional: filter by transaction type
     "offset": 42, // Optional: pagination offset
     "limit": 10, // Optional: number of transactions to return
     "sort": "desc" // Optional: sort asc or desc by created_at
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -574,35 +601,44 @@ Supports pagination and sorting.
 
 ```json
 {
-  "res": [1, "get_ledger_transactions", [[
-    {
-      "id": "1",
-      "tx_type": "transfer",
-      "from_account": "0x1234567890abcdef...",
-      "from_account_tag": "NQKO7C",
-      "to_account": "0x9876543210abcdef...",
-      "to_account_tag": "UX123D",
-      "asset": "usdc",
-      "amount": "50.0",
-      "created_at": "2023-05-01T12:00:00Z"
-    },
-    {
-      "id": "2",
-      "tx_type": "deposit",
-      "from_account": "0x9876543210abcdef...", // Channel account
-      "from_account_tag": "", // Channel accounts does not have tags
-      "to_account": "0x1234567890abcdef...",
-      "to_account_tag": "UX123D",
-      "asset": "usdc",
-      "amount": "25.0",
-      "created_at": "2023-05-01T10:30:00Z"
+  "res": [1, "get_ledger_transactions", {
+    "ledger_transactions":[
+      {
+        "id": "1",
+        "tx_type": "transfer",
+        "from_account": "0x1234567890abcdef...",
+        "from_account_tag": "NQKO7C",
+        "to_account": "0x9876543210abcdef...",
+        "to_account_tag": "UX123D",
+        "asset": "usdc",
+        "amount": "50.0",
+        "created_at": "2023-05-01T12:00:00Z"
+      },
+      {
+        "id": "2",
+        "tx_type": "deposit",
+        "from_account": "0x9876543210abcdef...", // Channel account
+        "from_account_tag": "", // Channel accounts does not have tags
+        "to_account": "0x1234567890abcdef...",
+        "to_account_tag": "UX123D",
+        "asset": "usdc",
+        "amount": "25.0",
+        "created_at": "2023-05-01T10:30:00Z"
+      }
+    ],
+    "metadata": {
+      "page": 5,
+      "per_page": 10,
+      "total_count": 56,
+      "page_count": 6
     }
-  ]], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
 
 Each transaction response includes:
+
 - `id`: Unique transaction id reference
 - `tx_type`: Transaction type (transfer/deposit/withdrawal/app_deposit/app_withdrawal)
 - `from_account`: The account that sent the funds
@@ -623,7 +659,7 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
 
 ```json
 {
-  "req": [4, "get_rpc_history", [], 1619123456789],
+  "req": [4, "get_rpc_history", {}, 1619123456789],
   "sig": []
 }
 ```
@@ -632,30 +668,32 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
 
 ```json
 {
-  "res": [4, "get_rpc_history", [[
-    {
-      "id": 123,
-      "sender": "0x1234567890abcdef...",
-      "req_id": 42,
-      "method": "get_channels",
-      "params": "[{\"participant\":\"0x1234567890abcdef...\"}]",
-      "timestamp": 1619123456789,
-      "req_sig": ["0x9876fedcba..."],
-      "response": "{\"res\":[42,\"get_channels\",[[...]],1619123456799]}",
-      "res_sig": ["0xabcd1234..."]
-    },
-    {
-      "id": 122,
-      "sender": "0x1234567890abcdef...",
-      "req_id": 41,
-      "method": "ping",
-      "params": "[null]",
-      "timestamp": 1619123446789,
-      "req_sig": ["0x8765fedcba..."],
-      "response": "{\"res\":[41,\"pong\",[],1619123446799]}",
-      "res_sig": ["0xdcba4321..."]
-    }
-  ]], 1619123456789],
+  "res": [4, "get_rpc_history", {
+    "rpc_entries": [
+      {
+        "id": 123,
+        "sender": "0x1234567890abcdef...",
+        "req_id": 42,
+        "method": "get_channels",
+        "params": "[{\"participant\":\"0x1234567890abcdef...\"}]",
+        "timestamp": 1619123456789,
+        "req_sig": ["0x9876fedcba..."],
+        "response": "{\"res\":[42,\"get_channels\",[[...]],1619123456799]}",
+        "res_sig": ["0xabcd1234..."]
+      },
+      {
+        "id": 122,
+        "sender": "0x1234567890abcdef...",
+        "req_id": 41,
+        "method": "ping",
+        "params": "[null]",
+        "timestamp": 1619123446789,
+        "req_sig": ["0x8765fedcba..."],
+        "response": "{\"res\":[41,\"pong\",[],1619123446799]}",
+        "res_sig": ["0xdcba4321..."]
+      }
+    ]
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -673,7 +711,7 @@ The optional `session_data` field can be used to store application-specific data
 
 ```json
 {
-  "req": [1, "create_app_session", [{
+  "req": [1, "create_app_session", {
     "definition": {
       "protocol": "NitroRPC/0.2",
       "participants": [
@@ -698,7 +736,7 @@ The optional `session_data` field can be used to store application-specific data
       }
     ],
     "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"waiting\"}"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -707,14 +745,15 @@ The optional `session_data` field can be used to store application-specific data
 
 ```json
 {
-  "res": [1, "create_app_session", [{
+  "res": [1, "create_app_session", {
     "app_session_id": "0x3456789012abcdef...",
     "version": "1",
     "status": "open"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
+
 ### Submit Application State
 
 Submits an intermediate state into a virtual application and redistributes funds in an app session.
@@ -727,7 +766,7 @@ The optional `session_data` field can be used to update application-specific dat
 
 ```json
 {
-  "req": [1, "submit_app_state", [{
+  "req": [1, "submit_app_state", {
     "app_session_id": "0x3456789012abcdef...",
     "allocations": [
       {
@@ -742,7 +781,7 @@ The optional `session_data` field can be used to update application-specific dat
       }
     ],
     "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"finished\",\"winner\":\"0x00112233445566778899AaBbCcDdEeFf00112233\",\"endCondition\":\"checkmate\"}" // Optional
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba...", "0x8765fedcba..."]
 }
 ```
@@ -751,11 +790,11 @@ The optional `session_data` field can be used to update application-specific dat
 
 ```json
 {
-  "res": [1, "submit_app_state", [{
+  "res": [1, "submit_app_state", {
     "app_session_id": "0x3456789012abcdef...",
     "version": "567",
     "status": "open"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -772,7 +811,7 @@ The optional `session_data` field can be used to provide final application-speci
 
 ```json
 {
-  "req": [1, "close_app_session", [{
+  "req": [1, "close_app_session", {
     "app_session_id": "0x3456789012abcdef...",
     "allocations": [
       {
@@ -787,7 +826,7 @@ The optional `session_data` field can be used to provide final application-speci
       }
     ],
     "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"closed\",\"winner\":\"0x00112233445566778899AaBbCcDdEeFf00112233\",\"endCondition\":\"checkmate\",\"moveHistory\":[\"e2e4\",\"e7e5\",\"Nf3\",\"Nc6\"]}"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba...", "0x8765fedcba..."]
 }
 ```
@@ -796,11 +835,11 @@ The optional `session_data` field can be used to provide final application-speci
 
 ```json
 {
-  "res": [1, "close_app_session", [{
+  "res": [1, "close_app_session", {
     "app_session_id": "0x3456789012abcdef...",
     "version": "3",
     "status": "closed"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -808,16 +847,16 @@ The optional `session_data` field can be used to provide final application-speci
 ### Close Channel
 
 To close a channel, the user must request the final state signed by the broker and then submit it to the smart contract.
-Only an open channel can be closed. In case the user does not agree with the final state provided by the broker, they can call the `challenge` method directly on the smart contract. 
+Only an open channel can be closed. In case the user does not agree with the final state provided by the broker, they can call the `challenge` method directly on the smart contract.
 
 **Request:**
 
 ```json
 {
-  "req": [1, "close_channel", [{
+  "req": [1, "close_channel", {
     "channel_id": "0x4567890123abcdef...",
     "funds_destination": "0x1234567890abcdef..."
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -828,7 +867,7 @@ In the request, the user must specify funds destination. After the channel is cl
 
 ```json
 {
-  "res": [1, "close_channel", [{
+  "res": [1, "close_channel", {
     "channel_id": "0x4567890123abcdef...",
     "intent": 3, // IntentFINALIZE - constant specifying that this is a final state
     "version": 123,
@@ -846,7 +885,7 @@ In the request, the user must specify funds destination. After the channel is cl
       }
     ],
     "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c",
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -859,20 +898,21 @@ Adjusts the capacity of a channel.
 
 ```json
 {
-  "req": [1, "resize_channel", [{
+  "req": [1, "resize_channel", {
     "channel_id": "0x4567890123abcdef...",
     "allocate_amount": "200000000",
     "resize_amount": "1000000000",
     "funds_destination": "0x1234567890abcdef..."
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
 
 `allocate_amount` is how much more token user wants to allocate to this token-network specific channel from his unified balance.
-`resize_amount` is how much user wants to deposit or withdraw from a token-network speecific channel.
+`resize_amount` is how much user wants to deposit or withdraw from a token-network specific channel.
 
 Example:
+
 - Initial state: user an open channel on Polygon with 20 usdc, and a channel on Celo with 5 usdc.
 - User wants to deposit 75 usdc on Celo. User calls `resize_channel`, with `allocate_amount=0` and `resize_amount=75`.
 - Now user's unified balance is 100 usdc (20 on Polygon and 80 on Celo).
@@ -883,7 +923,7 @@ Example:
 
 ```json
 {
-  "res": [1, "resize_channel", [{
+  "res": [1, "resize_channel", {
     "channel_id": "0x4567890123abcdef...",
     "state_data": "0xdeadbeef",
     "intent": 2, // IntentRESIZE
@@ -901,7 +941,7 @@ Example:
       }
     ],
     "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c",
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -918,9 +958,9 @@ Sends a message to all participants in a virtual app session.
 
 ```json
 {
-  "req": [1, "your_custom_method", [{
+  "req": [1, "your_custom_method", {
     "your_custom_field": "Hello, application participants!"
-  }], 1619123456789],
+  }, 1619123456789],
   "sid": "0x3456789012abcdef...", // Virtual App Session ID
   "sig": ["0x9876fedcba..."]
 }
@@ -932,9 +972,9 @@ Responses can also be forwarded to all participants in a virtual application by 
 
 ```json
 {
-  "res": [1, "your_custom_method", [{
+  "res": [1, "your_custom_method", {
     "your_custom_field": "I confirm that I have received your message!"
-  }], 1619123456789],
+  }, 1619123456789],
   "sid": "0x3456789012abcdef...", // Virtual App Session ID
   "sig": ["0x9876fedcba..."]
 }
@@ -950,7 +990,7 @@ Simple ping to check connectivity.
 
 ```json
 {
-  "req": [1, "ping", [], 1619123456789],
+  "req": [1, "ping", {}, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -959,7 +999,7 @@ Simple ping to check connectivity.
 
 ```json
 {
-  "res": [1, "pong", [], 1619123456789],
+  "res": [1, "pong", {}, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -967,6 +1007,7 @@ Simple ping to check connectivity.
 ### Balance Updates
 
 The server automatically sends balance updates to clients in these scenarios:
+
 1. After successful authentication (as a welcome message)
 2. After channel operations (open, close, resize)
 3. After application operations (create, close)
@@ -975,16 +1016,18 @@ Balance updates are sent as unsolicited server messages with the "bu" method:
 
 ```json
 {
-  "res": [1234567890123, "bu", [[
-    {
-      "asset": "usdc",
-      "amount": "100.0"
-    },
-    {
-      "asset": "eth",
-      "amount": "0.5"
-    }
-  ]], 1619123456789],
+  "res": [1234567890123, "bu", {
+    "balance_updates": [
+      {
+        "asset": "usdc",
+        "amount": "100.0"
+      },
+      {
+        "asset": "eth",
+        "amount": "0.5"
+      }
+    ]
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -997,36 +1040,38 @@ The server automatically sends all open channels as a batch update to clients af
 
 ```json
 {
-  "res": [1234567890123, "channels", [[
-    {
-      "channel_id": "0xfedcba9876543210...",
-      "participant": "0x1234567890abcdef...",
-      "status": "open",
-      "token": "0xeeee567890abcdef...",
-      "amount": "100000",
-      "chain_id": 137,
-      "adjudicator": "0xAdjudicatorContractAddress...",
-      "challenge": 86400,
-      "nonce": 1,
-      "version": 2,
-      "created_at": "2023-05-01T12:00:00Z",
-      "updated_at": "2023-05-01T12:30:00Z"
-    },
-    {
-      "channel_id": "0xabcdef1234567890...",
-      "participant": "0x1234567890abcdef...",
-      "status": "open",
-      "token": "0xeeee567890abcdef...",
-      "amount": "50000",
-      "chain_id": 42220,
-      "adjudicator": "0xAdjudicatorContractAddress...",
-      "challenge": 86400,
-      "nonce": 1,
-      "version": 3,
-      "created_at": "2023-04-15T10:00:00Z",
-      "updated_at": "2023-04-20T14:30:00Z"
-    }
-  ]], 1619123456789],
+  "res": [1234567890123, "channels", {
+    "channels": [
+      {
+        "channel_id": "0xfedcba9876543210...",
+        "participant": "0x1234567890abcdef...",
+        "status": "open",
+        "token": "0xeeee567890abcdef...",
+        "amount": "100000",
+        "chain_id": 137,
+        "adjudicator": "0xAdjudicatorContractAddress...",
+        "challenge": 86400,
+        "nonce": 1,
+        "version": 2,
+        "created_at": "2023-05-01T12:00:00Z",
+        "updated_at": "2023-05-01T12:30:00Z"
+      },
+      {
+        "channel_id": "0xabcdef1234567890...",
+        "participant": "0x1234567890abcdef...",
+        "status": "open",
+        "token": "0xeeee567890abcdef...",
+        "amount": "50000",
+        "chain_id": 42220,
+        "adjudicator": "0xAdjudicatorContractAddress...",
+        "challenge": 86400,
+        "nonce": 1,
+        "version": 3,
+        "created_at": "2023-04-15T10:00:00Z",
+        "updated_at": "2023-04-20T14:30:00Z"
+      }
+    ]
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1034,6 +1079,7 @@ The server automatically sends all open channels as a batch update to clients af
 ### Channel Updates
 
 For channel updates, the server sends them in these scenarios:
+
 1. When a channel is created
 2. When a channel's status changes (open, joined, closed)
 3. When a channel is resized
@@ -1042,7 +1088,7 @@ Individual channel updates are sent as unsolicited server messages with the "cu"
 
 ```json
 {
-  "res": [1234567890123, "cu", [{
+  "res": [1234567890123, "cu", {
     "channel_id": "0xfedcba9876543210...",
     "participant": "0x1234567890abcdef...",
     "status": "open",
@@ -1055,7 +1101,7 @@ Individual channel updates are sent as unsolicited server messages with the "cu"
     "version": 2,
     "created_at": "2023-05-01T12:00:00Z",
     "updated_at": "2023-05-01T12:30:00Z"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1070,30 +1116,32 @@ Transfer notifications are sent as unsolicited server messages with the "transfe
 
 ```json
 {
-  "res": [1234567890123, "tr", [[
-    {
-      "id": "1",
-      "tx_type": "transfer",
-      "from_account": "0x9876543210abcdef...",
-      "from_account_tag": "ABC123",
-      "to_account": "0x1234567890abcdef...",
-      "to_account_tag": "XYZ789",
-      "asset": "usdc",
-      "amount": "50.0",
-      "created_at": "2023-05-01T12:00:00Z"
-    },
-    {
-      "id": "2",
-      "tx_type": "transfer",
-      "from_account": "0x9876543210abcdef...",
-      "from_account_tag": "ABC123",
-      "to_account": "0x1234567890abcdef...",
-      "to_account_tag": "XYZ789",
-      "asset": "weth",
-      "amount": "0.1",
-      "created_at": "2023-05-01T12:00:00Z"
-    }
-  ]], 1619123456789],
+  "res": [1234567890123, "tr", {
+    "transactions": [
+      {
+        "id": "1",
+        "tx_type": "transfer",
+        "from_account": "0x9876543210abcdef...",
+        "from_account_tag": "ABC123",
+        "to_account": "0x1234567890abcdef...",
+        "to_account_tag": "XYZ789",
+        "asset": "usdc",
+        "amount": "50.0",
+        "created_at": "2023-05-01T12:00:00Z"
+      },
+      {
+        "id": "2",
+        "tx_type": "transfer",
+        "from_account": "0x9876543210abcdef...",
+        "from_account_tag": "ABC123",
+        "to_account": "0x1234567890abcdef...",
+        "to_account_tag": "XYZ789",
+        "asset": "weth",
+        "amount": "0.1",
+        "created_at": "2023-05-01T12:00:00Z"
+      }
+    ]
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1118,7 +1166,7 @@ Retrieves broker configuration information including supported networks.
 
 ```json
 {
-  "req": [1, "get_config", [], 1619123456789],
+  "req": [1, "get_config", {}, 1619123456789],
   "sig": []
 }
 ```
@@ -1127,7 +1175,7 @@ Retrieves broker configuration information including supported networks.
 
 ```json
 {
-  "res": [1, "get_config", [{
+  "res": [1, "get_config", {
     "broker_address": "0xbbbb567890abcdef...",
     "networks": [
       {
@@ -1149,7 +1197,7 @@ Retrieves broker configuration information including supported networks.
         "adjudicator_address":"0xCustodyContractAddress1..."
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1164,7 +1212,7 @@ Retrieves all supported assets. Optionally, you can filter the assets by chain_i
 
 ```json
 {
-  "req": [1, "get_assets", [], 1619123456789],
+  "req": [1, "get_assets", {}, 1619123456789],
   "sig": []
 }
 ```
@@ -1173,9 +1221,9 @@ Retrieves all supported assets. Optionally, you can filter the assets by chain_i
 
 ```json
 {
-  "req": [1, "get_assets", [{
+  "req": [1, "get_assets", {
     "chain_id": 137
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": []
 }
 ```
@@ -1184,24 +1232,28 @@ Retrieves all supported assets. Optionally, you can filter the assets by chain_i
 
 ```json
 {
-  "res": [1, "get_assets", [[{
-    "token": "0xeeee567890abcdef...",
-    "chain_id": 137,
-    "symbol": "usdc",
-    "decimals": 6
-  },
-  {
-    "token": "0xffff567890abcdef...",
-    "chain_id": 137,
-    "symbol": "weth",
-    "decimals": 18
-  },
-  {
-    "token": "0xaaaa567890abcdef...",
-    "chain_id": 42220,
-    "symbol": "celo",
-    "decimals": 18
-  }]], 1619123456789],
+  "res": [1, "get_assets", {
+    "assets": [
+      {
+        "token": "0xeeee567890abcdef...",
+        "chain_id": 137,
+        "symbol": "usdc",
+        "decimals": 6
+      },
+      {
+        "token": "0xffff567890abcdef...",
+        "chain_id": 137,
+        "symbol": "weth",
+        "decimals": 18
+      },
+      {
+        "token": "0xaaaa567890abcdef...",
+        "chain_id": 42220,
+        "symbol": "celo",
+        "decimals": 18
+      }
+    ]
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1212,9 +1264,9 @@ When an error occurs, the server responds with an error message:
 
 ```json
 {
-  "res": [REQUEST_ID, "error", [{
+  "res": [REQUEST_ID, "error", {
     "error": "Error message describing what went wrong"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```

@@ -3,7 +3,7 @@ import {
     createAuthRequestMessage,
     createAuthVerifyMessage,
     AuthRequestParams,
-    rpcResponseParser,
+    parseAuthChallengeResponse,
 } from '@erc7824/nitrolite';
 import { Identity } from './identity';
 import { getAuthChallengePredicate, getAuthVerifyPredicate, TestWebSocket } from './ws';
@@ -14,8 +14,8 @@ export const createAuthSessionWithClearnode = async (
     authRequestParams?: AuthRequestParams
 ) => {
     authRequestParams = authRequestParams || {
-        wallet: identity.walletAddress,
-        participant: identity.sessionAddress,
+        address: identity.walletAddress,
+        session_key: identity.sessionAddress,
         app_name: 'Test Domain',
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
@@ -28,7 +28,7 @@ export const createAuthSessionWithClearnode = async (
         {
             scope: authRequestParams.scope,
             application: authRequestParams.application,
-            participant: authRequestParams.participant,
+            participant: authRequestParams.session_key,
             expire: authRequestParams.expire,
             allowances: authRequestParams.allowances,
         },
@@ -40,7 +40,7 @@ export const createAuthSessionWithClearnode = async (
     const authRequestMsg = await createAuthRequestMessage(authRequestParams);
     const authRequestResponse = await ws.sendAndWaitForResponse(authRequestMsg, getAuthChallengePredicate(), 1000);
 
-    const authRequestParsedResponse = rpcResponseParser.authChallenge(authRequestResponse);
+    const authRequestParsedResponse = parseAuthChallengeResponse(authRequestResponse);
 
     const authVerifyMsg = await createAuthVerifyMessage(eip712MessageSigner, authRequestParsedResponse);
     await ws.sendAndWaitForResponse(authVerifyMsg, getAuthVerifyPredicate(), 1000);

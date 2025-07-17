@@ -5,7 +5,7 @@ import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import { getCloseChannelPredicate, TestWebSocket } from '@/ws';
-import { createCloseChannelMessage, rpcResponseParser } from '@erc7824/nitrolite';
+import { createCloseChannelMessage, parseCloseChannelResponse } from '@erc7824/nitrolite';
 import { Hex, parseUnits } from 'viem';
 
 describe('Close channel', () => {
@@ -71,7 +71,7 @@ describe('Close channel', () => {
         const closeResponse = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();
 
-        const closeParsedResponse = rpcResponseParser.closeChannel(closeResponse);
+        const closeParsedResponse = parseCloseChannelResponse(closeResponse);
 
         const closeChannelTxHash = await client.closeChannel({
             finalState: {

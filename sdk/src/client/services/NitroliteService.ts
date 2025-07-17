@@ -156,11 +156,7 @@ export class NitroliteService {
                 token: alloc.token,
                 amount: alloc.amount,
             })),
-            sigs: contractState.sigs.map((sig: any) => ({
-                v: sig.v,
-                r: sig.r,
-                s: sig.s,
-            })),
+            sigs: contractState.sigs,
         };
     }
 

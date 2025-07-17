@@ -1,12 +1,48 @@
 {
   "name": "create-nitrolite-app",
   "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {},
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "description": "CLI tool to create new Nitrolite applications",
+  "type": "module",
+  "main": "dist/index.js",
   "bin": {
-    "create-nitrolite-app": "index.ts"
-  }
+    "create-nitrolite-app": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.tsx",
+    "start": "node dist/index.js",
+    "test": "jest"
+  },
+  "keywords": ["nitrolite", "cli", "scaffold", "websocket", "blockchain"],
+  "author": "Nitrolite Team",
+  "license": "ISC",
+  "dependencies": {
+    "ink": "^4.4.1",
+    "react": "^18.2.0",
+    "chalk": "^5.3.0",
+    "fs-extra": "^11.2.0",
+    "path": "^0.12.7",
+    "mustache": "^4.2.0",
+    "commander": "^11.1.0",
+    "inquirer": "^9.2.12",
+    "ora": "^7.0.1",
+    "boxen": "^7.1.1",
+    "figures": "^5.0.0",
+    "execa": "^8.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.0",
+    "@types/fs-extra": "^11.0.4",
+    "@types/mustache": "^4.2.5",
+    "@types/inquirer": "^9.0.7",
+    "typescript": "^5.3.0",
+    "tsx": "^4.6.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0"
+  },
+  "files": [
+    "dist/**/*",
+    "templates/**/*"
+  ]
 }

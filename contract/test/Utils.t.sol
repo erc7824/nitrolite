@@ -7,7 +7,7 @@ import {TestUtils} from "./TestUtils.sol";
 import {MockEIP712} from "./mocks/MockEIP712.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {Utils} from "../src/Utils.sol";
-import {Channel, State, Allocation, Signature, StateIntent, STATE_TYPEHASH} from "../src/interfaces/Types.sol";
+import {Channel, State, Allocation, StateIntent, STATE_TYPEHASH} from "../src/interfaces/Types.sol";
 
 contract UtilsTest_Signatures is Test {
     MockEIP712 public mockEIP712;
@@ -52,7 +52,7 @@ contract UtilsTest_Signatures is Test {
             version: 0,
             data: bytes("test data"),
             allocations: allocations,
-            sigs: new Signature[](0)
+            sigs: new bytes[](0)
         });
     }
 
@@ -60,8 +60,7 @@ contract UtilsTest_Signatures is Test {
 
     function test_recoverRawECDSASigner_returnsCorrectSigner() public view {
         bytes32 messageHash = keccak256("test message");
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, signerPrivateKey, messageHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, messageHash);
 
         address recoveredSigner = Utils.recoverRawECDSASigner(messageHash, sig);
 
@@ -71,8 +70,7 @@ contract UtilsTest_Signatures is Test {
     function test_recoverRawECDSASigner_returnsWrongSignerForDifferentMessage() public view {
         bytes32 messageHash = keccak256("test message");
         bytes32 differentMessageHash = keccak256("different message");
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, signerPrivateKey, messageHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, messageHash);
 
         address recoveredSigner = Utils.recoverRawECDSASigner(differentMessageHash, sig);
 
@@ -83,8 +81,7 @@ contract UtilsTest_Signatures is Test {
 
     function test_recoverEIP191Signer_returnsCorrectSigner() public view {
         bytes32 messageHash = keccak256("test message");
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP191(vm, signerPrivateKey, messageHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, messageHash);
 
         address recoveredSigner = Utils.recoverEIP191Signer(messageHash, sig);
 
@@ -94,8 +91,7 @@ contract UtilsTest_Signatures is Test {
     function test_recoverEIP191Signer_returnsWrongSigner_forDifferentMessage() public view {
         bytes32 messageHash = keccak256("test message");
         bytes32 differentMessageHash = keccak256("different message");
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP191(vm, signerPrivateKey, messageHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, messageHash);
 
         address recoveredSigner = Utils.recoverEIP191Signer(differentMessageHash, sig);
 
@@ -105,8 +101,7 @@ contract UtilsTest_Signatures is Test {
     function test_recoverEIP191Signer_returnsWrongSigner_forRawSignature() public view {
         bytes32 messageHash = keccak256("test message");
         // Sign with raw ECDSA instead of EIP191
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, signerPrivateKey, messageHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, messageHash);
 
         address recoveredSigner = Utils.recoverEIP191Signer(messageHash, sig);
 
@@ -118,8 +113,7 @@ contract UtilsTest_Signatures is Test {
     function test_recoverEIP712Signer_returnsCorrectSigner() public view {
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 structHash = keccak256("test struct");
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         address recoveredSigner = Utils.recoverEIP712Signer(domainSeparator, structHash, sig);
 
@@ -130,8 +124,7 @@ contract UtilsTest_Signatures is Test {
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 differentDomainSeparator = keccak256("different domain");
         bytes32 structHash = keccak256("test struct");
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         address recoveredSigner = Utils.recoverEIP712Signer(differentDomainSeparator, structHash, sig);
 
@@ -151,8 +144,7 @@ contract UtilsTest_Signatures is Test {
             keccak256(testState.data),
             keccak256(abi.encode(testState.allocations))
         ));
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         address recoveredSigner = Utils.recoverStateEIP712Signer(
             STATE_TYPEHASH,
@@ -178,8 +170,7 @@ contract UtilsTest_Signatures is Test {
             keccak256(testState.data),
             keccak256(abi.encode(testState.allocations))
         ));
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         // Create different state
         State memory differentState = testState;
@@ -202,8 +193,7 @@ contract UtilsTest_Signatures is Test {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 stateHash = Utils.getStateHashShort(channelId, testState);
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, signerPrivateKey, stateHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
 
@@ -214,8 +204,7 @@ contract UtilsTest_Signatures is Test {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 stateHash = Utils.getStateHashShort(channelId, testState);
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP191(vm, signerPrivateKey, stateHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, stateHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
 
@@ -233,8 +222,7 @@ contract UtilsTest_Signatures is Test {
             keccak256(testState.data),
             keccak256(abi.encode(testState.allocations))
         ));
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
 
@@ -245,8 +233,7 @@ contract UtilsTest_Signatures is Test {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 stateHash = Utils.getStateHashShort(channelId, testState);
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, signerPrivateKey, stateHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, wrongSigner);
 
@@ -257,8 +244,7 @@ contract UtilsTest_Signatures is Test {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 stateHash = Utils.getStateHashShort(channelId, testState);
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP191(vm, signerPrivateKey, stateHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, stateHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, wrongSigner);
 
@@ -276,8 +262,7 @@ contract UtilsTest_Signatures is Test {
             keccak256(testState.data),
             keccak256(abi.encode(testState.allocations))
         ));
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, wrongSigner);
 
@@ -295,8 +280,7 @@ contract UtilsTest_Signatures is Test {
             keccak256(testState.data),
             keccak256(abi.encode(testState.allocations))
         ));
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP712(vm, signerPrivateKey, mockEIP712.domainSeparator(), structHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, mockEIP712.domainSeparator(), structHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
 
@@ -307,8 +291,7 @@ contract UtilsTest_Signatures is Test {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = Utils.NO_EIP712_SUPPORT;
         bytes32 stateHash = Utils.getStateHashShort(channelId, testState);
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, signerPrivateKey, stateHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
 
@@ -326,8 +309,7 @@ contract UtilsTest_Signatures is Test {
             keccak256(testState.data),
             keccak256(abi.encode(testState.allocations))
         ));
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
-        Signature memory sig = Signature({v: v, r: r, s: s});
+        bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, Utils.NO_EIP712_SUPPORT, sig, signer);
 

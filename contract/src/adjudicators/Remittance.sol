@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
 import {IComparable} from "../interfaces/IComparable.sol";
-import {Channel, State, Allocation, Signature, Amount, StateIntent} from "../interfaces/Types.sol";
+import {Channel, State, Allocation, Amount, StateIntent} from "../interfaces/Types.sol";
 import {EIP712AdjudicatorBase} from "./EIP712AdjudicatorBase.sol";
 import {Utils} from "../Utils.sol";
 

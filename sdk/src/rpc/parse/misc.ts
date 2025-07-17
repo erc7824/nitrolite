@@ -1,97 +1,92 @@
 import { z } from 'zod';
-import { Address } from 'viem';
 import {
     RPCMethod,
     GetConfigResponseParams,
     ErrorResponseParams,
     GetRPCHistoryResponseParams,
-    UserTagParams,
+    RPCNetworkInfo,
+    RPCHistoryEntry,
+    GetUserTagResponseParams,
 } from '../types';
-import { hexSchema, addressSchema, ParamsParser, ParserParamsMissingError } from './common';
+import { hexSchema, addressSchema, ParamsParser } from './common';
 
-const NetworkInfoSchema = z.object({
-    name: z.string(),
-    chain_id: z.number(),
-    custody_address: addressSchema,
-    adjudicator_address: addressSchema,
-});
+const NetworkInfoObjectSchema = z
+    .object({
+        name: z.string(),
+        chain_id: z.number(),
+        custody_address: addressSchema,
+        adjudicator_address: addressSchema,
+    })
+    .transform(
+        (raw): RPCNetworkInfo => ({
+            name: raw.name,
+            chainId: raw.chain_id,
+            custodyAddress: raw.custody_address,
+            adjudicatorAddress: raw.adjudicator_address,
+        }),
+    );
 
 const GetConfigParamsSchema = z
-    .array(
-        z
-            .object({ broker_address: addressSchema, networks: z.array(NetworkInfoSchema) })
-            .strict()
-            .transform(
-                (raw) =>
-                    ({
-                        brokerAddress: raw.broker_address as Address,
-                        networks: raw.networks.map((n) => ({
-                            name: n.name,
-                            chainId: n.chain_id,
-                            custodyAddress: n.custody_address as Address,
-                            adjudicatorAddress: n.adjudicator_address as Address,
-                        })),
-                    }) as GetConfigResponseParams,
-            ),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
+    .object({ broker_address: addressSchema, networks: z.array(NetworkInfoObjectSchema) })
+    .strict()
+    .transform(
+        (raw): GetConfigResponseParams => ({
+            brokerAddress: raw.broker_address,
+            networks: raw.networks,
+        }),
+    );
 
 const ErrorParamsSchema = z
-    .array(z.string().transform((raw) => ({ error: raw }) as ErrorResponseParams))
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
+    .object({ error: z.string() })
+    // Validate received type with linter
+    .transform((raw): ErrorResponseParams => raw);
+
+const RPCEntryObjectSchema = z
+    .object({
+        id: z.number(),
+        sender: addressSchema,
+        req_id: z.number(),
+        method: z.string(),
+        params: z.string(),
+        timestamp: z.number(),
+        req_sig: z.array(hexSchema),
+        res_sig: z.array(hexSchema),
+        response: z.string(),
+    })
+    .transform(
+        (raw): RPCHistoryEntry => ({
+            id: raw.id,
+            sender: raw.sender,
+            reqId: raw.req_id,
+            method: raw.method,
+            params: raw.params,
+            timestamp: raw.timestamp,
+            reqSig: raw.req_sig,
+            resSig: raw.res_sig,
+            response: raw.response,
+        }),
+    );
 
 const GetRPCHistoryParamsSchema = z
-    .array(
-        z.array(
-            z
-                .object({
-                    id: z.number(),
-                    sender: addressSchema,
-                    req_id: z.number(),
-                    method: z.string(),
-                    params: z.string(),
-                    timestamp: z.number(),
-                    req_sig: z.array(hexSchema),
-                    res_sig: z.array(hexSchema),
-                    response: z.string(),
-                })
-                .transform(
-                    (h) =>
-                        ({
-                            id: h.id,
-                            sender: h.sender as Address,
-                            reqId: h.req_id,
-                            method: h.method,
-                            params: h.params,
-                            timestamp: h.timestamp,
-                            reqSig: h.req_sig as any,
-                            resSig: h.res_sig as any,
-                            response: h.response,
-                        }) as GetRPCHistoryResponseParams,
-                ),
-        ),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0])
-    .transform((arr) => arr as GetRPCHistoryResponseParams[]);
+    .object({
+        rpc_entries: z.array(RPCEntryObjectSchema),
+    })
+    .transform(
+        (raw): GetRPCHistoryResponseParams => ({
+            rpcEntries: raw.rpc_entries,
+        }),
+    );
 
 const GetUserTagParamsSchema = z
-    .array(
-        z
-            .object({
-                tag: z.string(),
-            })
-            .strict()
-            .transform((raw) => ({ tag: raw.tag }) as UserTagParams),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
+    .object({
+        tag: z.string(),
+    })
+    .strict()
+    // Validate received type with linter
+    .transform((raw): GetUserTagResponseParams => raw);
 
 const parseMessageParams: ParamsParser<unknown> = (params) => {
-    if (!Array.isArray(params) || params.length === 0) throw new ParserParamsMissingError(RPCMethod.Message);
-    return params[0];
+    return params;
 };
 
 export const miscParamsParsers: Record<string, ParamsParser<unknown>> = {

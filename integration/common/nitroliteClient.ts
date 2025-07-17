@@ -5,8 +5,9 @@ import {
     createCloseChannelMessage,
     createCreateChannelMessage,
     NitroliteClient,
+    parseChannelUpdateResponse,
+    parseCloseChannelResponse,
     RPCChannelStatus,
-    rpcResponseParser,
 } from '@erc7824/nitrolite';
 import { Identity } from './identity';
 import { Address, createPublicClient, Hex, http } from 'viem';
@@ -74,7 +75,7 @@ export class TestNitroliteClient extends NitroliteClient {
 
         const openResponse = await openChannelPromise;
 
-        const openParsedResponse = rpcResponseParser.channelUpdate(openResponse);
+        const openParsedResponse = parseChannelUpdateResponse(openResponse);
         const responseChannel = openParsedResponse.params;
 
         return { params: responseChannel, initialState };
@@ -88,7 +89,7 @@ export class TestNitroliteClient extends NitroliteClient {
         );
 
         const closeResponse = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
-        const closeParsedResponse = rpcResponseParser.closeChannel(closeResponse);
+        const closeParsedResponse = parseCloseChannelResponse(closeResponse);
 
         const closeChannelUpdateChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Closed),
@@ -120,7 +121,7 @@ export class TestNitroliteClient extends NitroliteClient {
         });
 
         const closeChannelUpdateResponse = await closeChannelUpdateChannelPromise;
-        const closeChannelUpdateParsedResponse = rpcResponseParser.channelUpdate(closeChannelUpdateResponse);
+        const closeChannelUpdateParsedResponse = parseChannelUpdateResponse(closeChannelUpdateResponse);
         const responseChannel = closeChannelUpdateParsedResponse.params;
 
         return { params: responseChannel };

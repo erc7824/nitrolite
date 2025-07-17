@@ -23,6 +23,7 @@ type RPCRouter struct {
 	AuthManager       *AuthManager
 	Metrics           *Metrics
 	RPCStore          *RPCStore
+	wsNotifier        *WSNotifier
 
 	lg Logger
 }
@@ -37,6 +38,7 @@ func NewRPCRouter(
 	authManager *AuthManager,
 	metrics *Metrics,
 	rpcStore *RPCStore,
+	wsNotifier *WSNotifier,
 	logger Logger,
 ) *RPCRouter {
 	r := &RPCRouter{
@@ -46,6 +48,7 @@ func NewRPCRouter(
 		AppSessionService: appSessionService,
 		ChannelService:    channelService,
 		DB:                db,
+		wsNotifier:        wsNotifier,
 		AuthManager:       authManager,
 		Metrics:           metrics,
 		RPCStore:          rpcStore,

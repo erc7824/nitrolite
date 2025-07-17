@@ -30,13 +30,14 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
 		require.NoError(t, GetWalletLedger(db, userAddressB).Record(userAccountIDB, "usdc", decimal.NewFromInt(200)))
 
-		var balanceUpdates []string
-		publishBalanceUpdate := func(wallet string) {
-			balanceUpdates = append(balanceUpdates, wallet)
-		}
-
-		service := NewAppSessionService(db)
-		service.SetPublishBalanceUpdateCallback(publishBalanceUpdate)
+		var capturedNotifications []Notification
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
+			capturedNotifications = append(capturedNotifications, Notification{
+				userID:    userID,
+				eventType: EventType(method),
+				data:      params,
+			})
+		}, nil))
 
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
@@ -66,9 +67,9 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		sessionAccountID := NewAccountID(appSession.SessionID)
 
-		assert.Len(t, balanceUpdates, 2)
-		assert.Contains(t, balanceUpdates, userAddressA.Hex())
-		assert.Contains(t, balanceUpdates, userAddressB.Hex())
+		assert.Len(t, capturedNotifications, 2)
+		assert.Equal(t, capturedNotifications[0].userID, userAddressA.Hex())
+		assert.Equal(t, capturedNotifications[1].userID, userAddressB.Hex())
 
 		// Verify balances
 		balA, err := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
@@ -110,7 +111,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(50))) // Not enough
 
-		service := NewAppSessionService(db)
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -141,7 +142,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			Status: ChannelStatusChallenged,
 		}).Error)
 
-		service := NewAppSessionService(db)
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -168,7 +169,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
 
-		service := NewAppSessionService(db)
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -201,7 +202,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db)
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session",
 			Protocol:           "test-proto",
@@ -251,7 +252,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db)
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-negative",
 			Protocol:           "test-proto",
@@ -299,13 +300,14 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		var balanceUpdates []string
-		publishBalanceUpdate := func(wallet string) {
-			balanceUpdates = append(balanceUpdates, wallet)
-		}
-
-		service := NewAppSessionService(db)
-		service.SetPublishBalanceUpdateCallback(publishBalanceUpdate)
+		var capturedNotifications []Notification
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
+			capturedNotifications = append(capturedNotifications, Notification{
+				userID:    userID,
+				eventType: EventType(method),
+				data:      params,
+			})
+		}, nil))
 
 		session := &AppSession{
 			SessionID:          "test-session-close",
@@ -340,9 +342,9 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), newVersion)
 
-		assert.Len(t, balanceUpdates, 2)
-		assert.Contains(t, balanceUpdates, userAddressA.Hex())
-		assert.Contains(t, balanceUpdates, userAddressB.Hex())
+		assert.Len(t, capturedNotifications, 2)
+		assert.Equal(t, capturedNotifications[0].userID, userAddressA.Hex())
+		assert.Equal(t, capturedNotifications[1].userID, userAddressB.Hex())
 
 		var closedSession AppSession
 		require.NoError(t, db.First(&closedSession, "session_id = ?", session.SessionID).Error)
@@ -385,13 +387,14 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		var balanceUpdates []string
-		publishBalanceUpdate := func(wallet string) {
-			balanceUpdates = append(balanceUpdates, wallet)
-		}
-
-		service := NewAppSessionService(db)
-		service.SetPublishBalanceUpdateCallback(publishBalanceUpdate)
+		var capturedNotifications []Notification
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
+			capturedNotifications = append(capturedNotifications, Notification{
+				userID:    userID,
+				eventType: EventType(method),
+				data:      params,
+			})
+		}, nil))
 
 		session := &AppSession{
 			SessionID:          "test-session-close",
@@ -439,14 +442,14 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, walletBalA.IsZero())
 
-		assert.Len(t, balanceUpdates, 0)
+		assert.Len(t, capturedNotifications, 0)
 	})
 
 	t.Run("ErrorNegativeAllocation", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db)
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-close-negative",
 			Protocol:           "test-proto",

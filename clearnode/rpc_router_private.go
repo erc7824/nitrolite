@@ -9,6 +9,7 @@ import (
 )
 
 type GetLedgerBalancesParams struct {
+	// TODO: add XOR validation
 	Participant string `json:"participant,omitempty"` // Optional participant address to filter balances
 	AccountID   string `json:"account_id,omitempty"`  // Optional account ID to filter balances
 }

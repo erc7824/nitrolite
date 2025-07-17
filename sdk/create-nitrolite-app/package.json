@@ -1,0 +1,12 @@
+{
+  "name": "create-nitrolite-app",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {},
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "bin": {
+    "create-nitrolite-app": "index.ts"
+  }
+}

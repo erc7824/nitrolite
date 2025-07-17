@@ -76,3 +76,29 @@ go run . <clearnode_ws_url>
   - Display custody balances
   - View custody channel balances
   - Unified balance view across Clearnode network
+
+- **Operator Architecture Refactoring**
+  - Refactor `operator.Complete` and `operator.Execute` to use `gin.Router` pattern
+  - Treat user commands like HTTP endpoints with middleware support
+  - Enable pre/post action hooks for common command patterns
+
+- **Chains and Channels Separation**
+  - Separate chain and channel concepts for clearer user experience
+  - Replace enable/disable chain with open/close channel operations
+  - Update `list chains` command:
+    - Remove `enabled` column
+    - Add `balance` column showing current user balance of chain asset
+  - New `list channels` command with columns: `Chain`, `Asset`, `ChannelID`, `Status`, `Balance`
+
+- **Enhanced Deposit/Withdraw Commands**
+  - Clarify deposit/withdraw destination with more intuitive naming like `deposit/withdraw custody`
+  - Make it clear which balances are affected by each operation
+
+- **Improved Balance Visibility**
+  - `list custodies` showing: `Chain`, `Custody Address`, `Asset`, `Balance`
+  - `list unified-balances` showing: `Asset`, `Balance`
+
+- **Resize Command Redesign**
+  - Review and simplify the `resize` command
+  - Clarify how it affects custody, channel, and unified balances
+  - Provide better usage guidance and examples

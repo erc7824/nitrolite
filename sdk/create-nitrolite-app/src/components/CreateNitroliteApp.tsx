@@ -100,41 +100,55 @@ export default function CreateNitroliteApp({
     );
   }
 
-  switch (step) {
-    case 'welcome':
-      return <WelcomeScreen onComplete={handleWelcomeComplete} />;
-    
-    case 'setup':
-      return (
-        <ProjectSetup
-          initialPath={config.projectPath}
-          gitAvailable={config.gitAvailable}
-          onComplete={handleSetupComplete}
-          onError={handleError}
-        />
-      );
-    
-    case 'template':
-      return (
-        <TemplateSelector
-          currentTemplate={config.template}
-          onSelect={handleTemplateSelected}
-        />
-      );
-    
-    case 'generate':
-      return (
-        <ProjectGenerator
-          config={config}
-          onComplete={handleGenerationComplete}
-          onError={handleError}
-        />
-      );
-    
-    case 'complete':
-      return <CompletionScreen config={config} />;
-    
-    default:
-      return <Text>Unknown step</Text>;
+  const renderCurrentStep = () => {
+    switch (step) {
+      case 'welcome':
+        return <WelcomeScreen onComplete={handleWelcomeComplete} />;
+      
+      case 'setup':
+        return (
+          <ProjectSetup
+            initialPath={config.projectPath}
+            gitAvailable={config.gitAvailable}
+            onComplete={handleSetupComplete}
+            onError={handleError}
+          />
+        );
+      
+      case 'template':
+        return (
+          <TemplateSelector
+            currentTemplate={config.template}
+            onSelect={handleTemplateSelected}
+          />
+        );
+      
+      case 'generate':
+        return (
+          <ProjectGenerator
+            config={config}
+            onComplete={handleGenerationComplete}
+            onError={handleError}
+          />
+        );
+      
+      case 'complete':
+        return <CompletionScreen config={config} />;
+      
+      default:
+        return <Text>Unknown step</Text>;
+    }
+  };
+
+  // Show welcome screen once, then keep it persistent with prompts below
+  if (step === 'welcome') {
+    return renderCurrentStep();
   }
+
+  return (
+    <Box flexDirection="column">
+      <WelcomeScreen onComplete={() => {}} interactive={false} />
+      {renderCurrentStep()}
+    </Box>
+  );
 }

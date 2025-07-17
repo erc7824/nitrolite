@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import React from 'react';
 import { Text, Box, Newline, useInput } from 'ink';
 
 interface WelcomeScreenProps {
     onComplete: () => void;
+    interactive?: boolean;
 }
 
 const ART = `
@@ -18,24 +19,16 @@ const ART = `
 const WELCOME_TEXTS = {
     title: '🚀 Welcome to Nitrolite!',
     subtitle: 'The fastest way to create Nitrolite applications',
-    instruction: 'Press Enter or Space to continue, or wait 2 seconds...',
+    instruction: 'Press Enter or Space to continue...',
 };
 
-export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
+export function WelcomeScreen({ onComplete, interactive = true }: WelcomeScreenProps) {
+    // Handle input for interactive mode
     useInput((input, key) => {
-        if (key.return || input === ' ') {
+        if (interactive && (key.return || input === ' ')) {
             onComplete();
         }
     });
-
-    useEffect(() => {
-        // Auto-advance after 2 seconds or wait for user input
-        const timer = setTimeout(() => {
-            onComplete();
-        }, 2000);
-
-        return () => clearTimeout(timer);
-    }, [onComplete]);
 
     // Calculate the maximum content width
     const titleLength = WELCOME_TEXTS.title.length;
@@ -118,8 +111,12 @@ export function WelcomeScreen({ onComplete }: WelcomeScreenProps) {
                 {createSubtitleLine()}
                 <Text color="cyan">│{createEmptyLine()}│</Text>
                 <Text color="cyan">└{createHorizontalBorder()}┘</Text>
-                <Newline />
-                <Text color="gray">{WELCOME_TEXTS.instruction}</Text>
+                {interactive && (
+                    <>
+                        <Newline />
+                        <Text color="gray">{WELCOME_TEXTS.instruction}</Text>
+                    </>
+                )}
             </Box>
         </Box>
     );

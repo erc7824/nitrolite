@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {EIP712} from "lib/openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
-import {STATE_TYPEHASH, Channel, State, Signature, StateIntent} from "./interfaces/Types.sol";
+import {STATE_TYPEHASH, Channel, State, StateIntent} from "./interfaces/Types.sol";
 
 /**
  * @title Channel Utilities
@@ -61,9 +61,9 @@ library Utils {
      * @param sig The signature to verify
      * @return The address of the signer
      */
-    function recoverRawECDSASigner(bytes32 msgHash, Signature memory sig) internal pure returns (address) {
+    function recoverRawECDSASigner(bytes32 msgHash, bytes memory sig) internal pure returns (address) {
         // Verify the signature directly on the stateHash without using EIP-191
-        return msgHash.recover(sig.v, sig.r, sig.s);
+        return msgHash.recover(sig);
     }
 
     /**
@@ -74,8 +74,8 @@ library Utils {
      * @param sig The signature to verify
      * @return The address of the signer
      */
-    function recoverEIP191Signer(bytes32 msgHash, Signature memory sig) internal pure returns (address) {
-        return msgHash.toEthSignedMessageHash().recover(sig.v, sig.r, sig.s);
+    function recoverEIP191Signer(bytes32 msgHash, bytes memory sig) internal pure returns (address) {
+        return msgHash.toEthSignedMessageHash().recover(sig);
     }
 
     /**
@@ -85,12 +85,12 @@ library Utils {
      * @param sig The signature to verify
      * @return The address of the signer
      */
-    function recoverEIP712Signer(bytes32 domainSeparator, bytes32 structHash, Signature memory sig)
+    function recoverEIP712Signer(bytes32 domainSeparator, bytes32 structHash, bytes memory sig)
         internal
         pure
         returns (address)
     {
-        return domainSeparator.toTypedDataHash(structHash).recover(sig.v, sig.r, sig.s);
+        return domainSeparator.toTypedDataHash(structHash).recover(sig);
     }
 
     /**
@@ -102,7 +102,7 @@ library Utils {
      * @param sig The signature to verify
      * @return The address of the signer
      */
-    function recoverStateEIP712Signer(bytes32 typeHash, bytes32 channelId, bytes32 domainSeparator, State memory state, Signature memory sig)
+    function recoverStateEIP712Signer(bytes32 typeHash, bytes32 channelId, bytes32 domainSeparator, State memory state, bytes memory sig)
         internal
         pure
         returns (address)
@@ -119,7 +119,7 @@ library Utils {
      * @param signer The address of the expected signer
      * @return True if the signature is valid, false otherwise
      */
-    function verifyStateSignature(State memory state, bytes32 channelId, bytes32 domainSeparator, Signature memory sig, address signer) internal pure returns (bool) {
+    function verifyStateSignature(State memory state, bytes32 channelId, bytes32 domainSeparator, bytes memory sig, address signer) internal pure returns (bool) {
         bytes32 stateHash = Utils.getStateHashShort(channelId, state);
 
         address rawECDSASigner = Utils.recoverRawECDSASigner(stateHash, sig);

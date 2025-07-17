@@ -10,7 +10,7 @@ import {TestUtils} from "../TestUtils.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 
 import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature, StateIntent} from "../../src/interfaces/Types.sol";
+import {Channel, State, Allocation, StateIntent} from "../../src/interfaces/Types.sol";
 import {ConsensusTransition} from "../../src/adjudicators/ConsensusTransition.sol";
 import {Utils} from "../../src/Utils.sol";
 
@@ -86,7 +86,7 @@ contract ConsensusTransitionTest is Test {
         state.allocations = new Allocation[](2);
         state.allocations[HOST] = allocations[HOST];
         state.allocations[GUEST] = allocations[GUEST];
-        state.sigs = new Signature[](0);
+        state.sigs = new bytes[](0);
 
         return state;
     }
@@ -104,7 +104,7 @@ contract ConsensusTransitionTest is Test {
         state.allocations = new Allocation[](2);
         state.allocations[HOST] = allocations[HOST];
         state.allocations[GUEST] = allocations[GUEST];
-        state.sigs = new Signature[](0);
+        state.sigs = new bytes[](0);
 
         return state;
     }
@@ -126,16 +126,15 @@ contract ConsensusTransitionTest is Test {
         state.allocations = new Allocation[](2);
         state.allocations[HOST] = allocations[HOST];
         state.allocations[GUEST] = allocations[GUEST];
-        state.sigs = new Signature[](0);
+        state.sigs = new bytes[](0);
 
         return state;
     }
 
     // Helper to sign a state
-    function _signState(State memory state, uint256 privateKey) internal view returns (Signature memory) {
+    function _signState(State memory state, uint256 privateKey) internal view returns (bytes memory) {
         bytes32 stateHash = Utils.getStateHash(channel, state);
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, stateHash);
-        return Signature({v: v, r: r, s: s});
+        return TestUtils.sign(vm, privateKey, stateHash);
     }
 
     // -------------------- FIRST STATE TRANSITION TESTS --------------------
@@ -143,13 +142,13 @@ contract ConsensusTransitionTest is Test {
     function test_adjudicate_firstState_valid() public view {
         // Create initial state with both signatures
         State memory initialState = _createInitialState("initial state");
-        initialState.sigs = new Signature[](2);
+        initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 
         // Create first operate state with both signatures
         State memory firstState = _createOperateState("first state", 1);
-        firstState.sigs = new Signature[](2);
+        firstState.sigs = new bytes[](2);
         firstState.sigs[HOST] = _signState(firstState, hostPrivateKey);
         firstState.sigs[GUEST] = _signState(firstState, guestPrivateKey);
 
@@ -165,13 +164,13 @@ contract ConsensusTransitionTest is Test {
     function test_adjudicate_firstState_revert_whenMissingParticipantSignature() public view {
         // Create initial state with both signatures
         State memory initialState = _createInitialState("initial state");
-        initialState.sigs = new Signature[](2);
+        initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 
         // Create first operate state with only one signature
         State memory firstState = _createOperateState("first state", 1);
-        firstState.sigs = new Signature[](1);
+        firstState.sigs = new bytes[](1);
         firstState.sigs[0] = _signState(firstState, hostPrivateKey);
 
         // Provide the initial state as proof
@@ -186,13 +185,13 @@ contract ConsensusTransitionTest is Test {
     function test_adjudicate_firstState_revert_whenIncorrectVersion() public view {
         // Create initial state with both signatures
         State memory initialState = _createInitialState("initial state");
-        initialState.sigs = new Signature[](2);
+        initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 
         // Create first operate state with incorrect version (2 instead of 1)
         State memory firstState = _createOperateState("first state", 2);
-        firstState.sigs = new Signature[](2);
+        firstState.sigs = new bytes[](2);
         firstState.sigs[HOST] = _signState(firstState, hostPrivateKey);
         firstState.sigs[GUEST] = _signState(firstState, guestPrivateKey);
 
@@ -210,13 +209,13 @@ contract ConsensusTransitionTest is Test {
     function test_adjudicate_laterState_valid() public view {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
         // Create state 2 with both signatures
         State memory state2 = _createOperateState("state 2", 2);
-        state2.sigs = new Signature[](2);
+        state2.sigs = new bytes[](2);
         state2.sigs[HOST] = _signState(state2, hostPrivateKey);
         state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
 
@@ -232,13 +231,13 @@ contract ConsensusTransitionTest is Test {
     function test_adjudicate_laterState_revert_whenIncorrectVersionIncrement() public view {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
         // Create state 3 with both signatures (skipping version 2)
         State memory state3 = _createOperateState("state 3", 3);
-        state3.sigs = new Signature[](2);
+        state3.sigs = new bytes[](2);
         state3.sigs[HOST] = _signState(state3, hostPrivateKey);
         state3.sigs[GUEST] = _signState(state3, guestPrivateKey);
 
@@ -254,7 +253,7 @@ contract ConsensusTransitionTest is Test {
     function test_adjudicate_laterState_revert_whenAllocationSumChanged() public view {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
@@ -262,7 +261,7 @@ contract ConsensusTransitionTest is Test {
         State memory state2 = _createOperateState("state 2", 2);
         state2.allocations[HOST].amount = 60; // Changed from 50
         state2.allocations[GUEST].amount = 50; // Kept at 50, total sum is now 110 instead of 100
-        state2.sigs = new Signature[](2);
+        state2.sigs = new bytes[](2);
         state2.sigs[HOST] = _signState(state2, hostPrivateKey);
         state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
 
@@ -278,7 +277,7 @@ contract ConsensusTransitionTest is Test {
     function test_adjudicate_revert_whenNoStateProof() public view {
         // Create state 2 without providing a proof
         State memory state2 = _createOperateState("state 2", 2);
-        state2.sigs = new Signature[](2);
+        state2.sigs = new bytes[](2);
         state2.sigs[HOST] = _signState(state2, hostPrivateKey);
         state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
 
@@ -293,13 +292,13 @@ contract ConsensusTransitionTest is Test {
     function test_adjudicate_revert_whenTooManyProofs() public view {
         // Create state 1
         State memory state1 = _createOperateState("state 1", 1);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
         // Create state 2
         State memory state2 = _createOperateState("state 2", 2);
-        state2.sigs = new Signature[](2);
+        state2.sigs = new bytes[](2);
         state2.sigs[HOST] = _signState(state2, hostPrivateKey);
         state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
 
@@ -318,7 +317,7 @@ contract ConsensusTransitionTest is Test {
     function test_adjudicate_afterResize_valid() public view {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
@@ -327,13 +326,13 @@ contract ConsensusTransitionTest is Test {
         resizeAmounts[HOST] = 10;
         resizeAmounts[GUEST] = -10;
         State memory resizeState = _createResizeState("resize state", 2, resizeAmounts);
-        resizeState.sigs = new Signature[](2);
+        resizeState.sigs = new bytes[](2);
         resizeState.sigs[HOST] = _signState(resizeState, hostPrivateKey);
         resizeState.sigs[GUEST] = _signState(resizeState, guestPrivateKey);
 
         // Create state 3 after resize
         State memory state3 = _createOperateState("state 3", 3);
-        state3.sigs = new Signature[](2);
+        state3.sigs = new bytes[](2);
         state3.sigs[HOST] = _signState(state3, hostPrivateKey);
         state3.sigs[GUEST] = _signState(state3, guestPrivateKey);
 
@@ -350,7 +349,7 @@ contract ConsensusTransitionTest is Test {
     function test_WrongSignerRejected() public view {
         // Create state with signatures from wrong participants
         State memory state = _createOperateState("state", 1);
-        state.sigs = new Signature[](2);
+        state.sigs = new bytes[](2);
 
         // Use guest's signature for both slots
         state.sigs[HOST] = _signState(state, guestPrivateKey); // Should be host, but using guest
@@ -358,7 +357,7 @@ contract ConsensusTransitionTest is Test {
 
         // Create a valid initial state as proof
         State memory initialState = _createInitialState("initial state");
-        initialState.sigs = new Signature[](2);
+        initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 

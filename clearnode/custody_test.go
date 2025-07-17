@@ -139,7 +139,7 @@ func createMockCreatedEvent(t *testing.T, signer *Signer, token string, amount *
 		Version:     big.NewInt(0),
 		Data:        []byte{},
 		Allocations: allocation,
-		Sigs:        []nitrolite.Signature{},
+		Sigs:        [][]byte{},
 	}
 
 	event := &nitrolite.CustodyCreated{
@@ -193,7 +193,7 @@ func createMockClosedEvent(t *testing.T, signer *Signer, token string, amount *b
 		Version:     big.NewInt(1),
 		Data:        []byte{},
 		Allocations: allocation,
-		Sigs:        []nitrolite.Signature{},
+		Sigs:        [][]byte{},
 	}
 
 	event := &nitrolite.CustodyClosed{
@@ -230,7 +230,7 @@ func createMockChallengedEvent(t *testing.T, signer *Signer, token string, amoun
 		Version:     big.NewInt(2),
 		Data:        []byte{},
 		Allocations: allocation,
-		Sigs:        []nitrolite.Signature{},
+		Sigs:        [][]byte{},
 	}
 
 	event := &nitrolite.CustodyChallenged{
@@ -318,7 +318,7 @@ func TestHandleCreatedEvent(t *testing.T) {
 				Version:     big.NewInt(0),
 				Data:        []byte{},
 				Allocations: allocation,
-				Sigs:        []nitrolite.Signature{},
+				Sigs:        [][]byte{},
 			}
 
 			mockEvent := &nitrolite.CustodyCreated{

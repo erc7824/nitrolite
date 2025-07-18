@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Text, Box, Newline } from 'ink';
 import { generateProject } from '../utils/projectGenerator.js';
 
@@ -38,9 +38,9 @@ export function ProjectGenerator({ config, onComplete, onError }: ProjectGenerat
           onError: (err) => {
             setError(err);
             onError(err);
-          }
+          },
         });
-        
+
         setCurrentStep('complete');
         setTimeout(onComplete, 1000);
       } catch (err) {
@@ -66,7 +66,7 @@ export function ProjectGenerator({ config, onComplete, onError }: ProjectGenerat
       templating: 1,
       git: 2,
       installing: 3,
-      complete: 4
+      complete: 4,
     };
     return order[step];
   };
@@ -92,7 +92,7 @@ export function ProjectGenerator({ config, onComplete, onError }: ProjectGenerat
     const width = 30;
     const filled = Math.round((percent / 100) * width);
     const empty = width - filled;
-    
+
     return (
       <Box>
         <Text color="green">{'█'.repeat(filled)}</Text>
@@ -114,32 +114,29 @@ export function ProjectGenerator({ config, onComplete, onError }: ProjectGenerat
     <Box flexDirection="column" padding={1}>
       <Text color="cyan">🚀 Generating Project</Text>
       <Newline />
-      <Text>Creating <Text color="green">{config.projectName}</Text> with <Text color="blue">{config.template}</Text> template...</Text>
+      <Text>
+        Creating <Text color="green">{config.projectName}</Text> with{' '}
+        <Text color="blue">{config.template}</Text> template...
+      </Text>
       <Newline />
-      
-      {steps.map((step, index) => (
+
+      {steps.map((step) => (
         <Box key={step} flexDirection="column" marginBottom={1}>
           <Box>
             <Text>{getStepIcon(step)} </Text>
-            <Text color={step === currentStep ? 'cyan' : 'gray'}>
-              {getStepText(step)}
-            </Text>
+            <Text color={step === currentStep ? 'cyan' : 'gray'}>{getStepText(step)}</Text>
           </Box>
-          {step === currentStep && !error && (
-            <Box paddingLeft={2}>
-              {renderProgressBar(progress)}
-            </Box>
-          )}
+          {step === currentStep && !error && <Box paddingLeft={2}>{renderProgressBar(progress)}</Box>}
         </Box>
       ))}
-      
+
       {error && (
         <>
           <Newline />
           <Text color="red">❌ Error: {error}</Text>
         </>
       )}
-      
+
       {currentStep === 'complete' && (
         <>
           <Newline />

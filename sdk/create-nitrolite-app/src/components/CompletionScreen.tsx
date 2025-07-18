@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Text, Box, Newline } from 'ink';
 
 interface ProjectConfig {

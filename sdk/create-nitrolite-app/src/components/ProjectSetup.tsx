@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Text, Box, Newline } from 'ink';
 import { useInput } from 'ink';
 import path from 'path';
@@ -8,22 +8,13 @@ import { validateProjectName } from '../utils/validation.js';
 interface ProjectSetupProps {
   initialPath: string;
   gitAvailable: boolean;
-  onComplete: (config: {
-    projectPath: string;
-    projectName: string;
-    initGit: boolean;
-  }) => void;
+  onComplete: (config: { projectPath: string; projectName: string; initGit: boolean }) => void;
   onError: (error: string) => void;
 }
 
 type SetupStep = 'path' | 'git' | 'confirm';
 
-export function ProjectSetup({ 
-  initialPath, 
-  gitAvailable, 
-  onComplete, 
-  onError 
-}: ProjectSetupProps) {
+export function ProjectSetup({ initialPath, gitAvailable, onComplete, onError }: ProjectSetupProps) {
   const [step, setStep] = useState<SetupStep>('path');
   const [projectPath, setProjectPath] = useState(initialPath || '');
   const [projectName, setProjectName] = useState('');
@@ -45,7 +36,7 @@ export function ProjectSetup({
     if (key.return) {
       handleEnter();
     } else if (key.backspace || key.delete) {
-      setInputBuffer(prev => prev.slice(0, -1));
+      setInputBuffer((prev) => prev.slice(0, -1));
     } else if (key.ctrl && input === 'c') {
       process.exit(0);
     } else if (step === 'git' && (input === 'y' || input === 'n')) {
@@ -61,7 +52,7 @@ export function ProjectSetup({
         setError('');
       }
     } else if (step === 'path' && input && !key.ctrl) {
-      setInputBuffer(prev => prev + input);
+      setInputBuffer((prev) => prev + input);
     }
   });
 
@@ -69,14 +60,14 @@ export function ProjectSetup({
     if (step === 'path') {
       const pathInput = inputBuffer.trim() || 'my-nitrolite-app';
       const validatedName = validateProjectName(pathInput);
-      
+
       if (!validatedName) {
         setError('Invalid project name. Use only letters, numbers, hyphens, and underscores.');
         return;
       }
 
       const fullPath = path.resolve(process.cwd(), pathInput);
-      
+
       if (fs.existsSync(fullPath)) {
         setError(`Directory "${pathInput}" already exists. Please choose a different name.`);
         return;
@@ -93,7 +84,7 @@ export function ProjectSetup({
     onComplete({
       projectPath,
       projectName,
-      initGit
+      initGit,
     });
   };
 
@@ -116,7 +107,9 @@ export function ProjectSetup({
         </>
       )}
       <Newline />
-      <Text color="gray">Press <Text color="white">Ctrl+C</Text> to exit</Text>
+      <Text color="gray">
+        Press <Text color="white">Ctrl+C</Text> to exit
+      </Text>
     </Box>
   );
 
@@ -133,7 +126,9 @@ export function ProjectSetup({
         <Text color="gray"> (y/n)</Text>
       </Box>
       <Newline />
-      <Text color="gray">Press <Text color="white">y</Text> for yes, <Text color="white">n</Text> for no</Text>
+      <Text color="gray">
+        Press <Text color="white">y</Text> for yes, <Text color="white">n</Text> for no
+      </Text>
     </Box>
   );
 
@@ -141,9 +136,15 @@ export function ProjectSetup({
     <Box flexDirection="column">
       <Text color="cyan">✅ Confirm Project Setup</Text>
       <Newline />
-      <Text>Project directory: <Text color="green">{projectPath}</Text></Text>
-      <Text>Package name: <Text color="green">{projectName}</Text></Text>
-      <Text>Initialize git: <Text color={initGit ? 'green' : 'red'}>{initGit ? 'Yes' : 'No'}</Text></Text>
+      <Text>
+        Project directory: <Text color="green">{projectPath}</Text>
+      </Text>
+      <Text>
+        Package name: <Text color="green">{projectName}</Text>
+      </Text>
+      <Text>
+        Initialize git: <Text color={initGit ? 'green' : 'red'}>{initGit ? 'Yes' : 'No'}</Text>
+      </Text>
       <Newline />
       <Text>Create project with these settings?</Text>
       <Newline />
@@ -152,7 +153,9 @@ export function ProjectSetup({
         <Text color="gray">(y/n)</Text>
       </Box>
       <Newline />
-      <Text color="gray">Press <Text color="white">y</Text> to continue, <Text color="white">n</Text> to go back</Text>
+      <Text color="gray">
+        Press <Text color="white">y</Text> to continue, <Text color="white">n</Text> to go back
+      </Text>
     </Box>
   );
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Text, Box, Newline } from 'ink';
 import { WelcomeScreen } from './WelcomeScreen.js';
 import { ProjectSetup } from './ProjectSetup.js';
@@ -31,7 +31,7 @@ export default function CreateNitroliteApp({
   template = 'react-vite',
   skipGit = false,
   skipInstall = false,
-  skipPrompts = false
+  skipPrompts = false,
 }: CreateNitroliteAppProps) {
   const [step, setStep] = useState<Step>('welcome');
   const [config, setConfig] = useState<ProjectConfig>({
@@ -40,14 +40,14 @@ export default function CreateNitroliteApp({
     template,
     initGit: !skipGit,
     installDeps: !skipInstall,
-    gitAvailable: false
+    gitAvailable: false,
   });
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
     // Check git availability on startup
-    checkGitAvailability().then(available => {
-      setConfig(prev => ({ ...prev, gitAvailable: available }));
+    checkGitAvailability().then((available) => {
+      setConfig((prev) => ({ ...prev, gitAvailable: available }));
     });
   }, []);
 
@@ -56,10 +56,10 @@ export default function CreateNitroliteApp({
     if (skipPrompts && projectDirectory) {
       const projectName = validateProjectName(projectDirectory);
       if (projectName) {
-        setConfig(prev => ({
+        setConfig((prev) => ({
           ...prev,
           projectName,
-          projectPath: projectDirectory
+          projectPath: projectDirectory,
         }));
         setStep('generate');
       } else {
@@ -73,12 +73,12 @@ export default function CreateNitroliteApp({
   };
 
   const handleSetupComplete = (setupConfig: Partial<ProjectConfig>) => {
-    setConfig(prev => ({ ...prev, ...setupConfig }));
+    setConfig((prev) => ({ ...prev, ...setupConfig }));
     setStep('template');
   };
 
   const handleTemplateSelected = (selectedTemplate: string) => {
-    setConfig(prev => ({ ...prev, template: selectedTemplate }));
+    setConfig((prev) => ({ ...prev, template: selectedTemplate }));
     setStep('generate');
   };
 
@@ -104,7 +104,7 @@ export default function CreateNitroliteApp({
     switch (step) {
       case 'welcome':
         return <WelcomeScreen onComplete={handleWelcomeComplete} />;
-      
+
       case 'setup':
         return (
           <ProjectSetup
@@ -114,27 +114,16 @@ export default function CreateNitroliteApp({
             onError={handleError}
           />
         );
-      
+
       case 'template':
-        return (
-          <TemplateSelector
-            currentTemplate={config.template}
-            onSelect={handleTemplateSelected}
-          />
-        );
-      
+        return <TemplateSelector currentTemplate={config.template} onSelect={handleTemplateSelected} />;
+
       case 'generate':
-        return (
-          <ProjectGenerator
-            config={config}
-            onComplete={handleGenerationComplete}
-            onError={handleError}
-          />
-        );
-      
+        return <ProjectGenerator config={config} onComplete={handleGenerationComplete} onError={handleError} />;
+
       case 'complete':
         return <CompletionScreen config={config} />;
-      
+
       default:
         return <Text>Unknown step</Text>;
     }
@@ -147,7 +136,7 @@ export default function CreateNitroliteApp({
 
   return (
     <Box flexDirection="column">
-      <WelcomeScreen onComplete={() => {}} interactive={false} />
+      <WelcomeScreen onComplete={() => { }} interactive={false} />
       {renderCurrentStep()}
     </Box>
   );

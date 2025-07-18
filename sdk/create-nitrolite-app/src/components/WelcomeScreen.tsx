@@ -1,4 +1,3 @@
-import React from 'react';
 import { Text, Box, Newline, useInput } from 'ink';
 
 interface WelcomeScreenProps {
@@ -33,11 +32,11 @@ export function WelcomeScreen({ onComplete, interactive = true }: WelcomeScreenP
     // Calculate the maximum content width
     const titleLength = WELCOME_TEXTS.title.length;
     const subtitleLength = WELCOME_TEXTS.subtitle.length;
-    
+
     // Get the width of the ASCII art (find the longest line)
     const artLines = ART.trim().split('\n');
-    const artWidth = Math.max(...artLines.map(line => line.length));
-    
+    const artWidth = Math.max(...artLines.map((line) => line.length));
+
     const maxContentWidth = Math.max(titleLength, subtitleLength, artWidth);
 
     // Add padding (4 characters: 2 spaces + 2 border chars)

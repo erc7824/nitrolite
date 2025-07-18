@@ -137,6 +137,18 @@ type Balance struct {
 	Amount decimal.Decimal `json:"amount"`
 }
 
+type GetLedgerBalancesResponse struct {
+	LedgerBalances []Balance `json:"ledger_balances"`
+}
+
+type TransferResponse struct {
+	Transactions []TransactionResponse `json:"transactions"`
+}
+
+type GetRPCHistoryResponse struct {
+	RPCEntries []RPCEntry `json:"rpc_entries"`
+}
+
 func (r *RPCRouter) BalanceUpdateMiddleware(c *RPCContext) {
 	logger := LoggerFromContext(c.Context)
 	userAddress := common.HexToAddress(c.UserID)
@@ -183,7 +195,11 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 		return
 	}
 
-	c.Succeed(req.Method, balances)
+	resp := GetLedgerBalancesResponse{
+		LedgerBalances: balances,
+	}
+
+	c.Succeed(req.Method, resp)
 	logger.Info("ledger balances retrieved", "userID", c.UserID, "accountID", userAccountID)
 }
 
@@ -271,7 +287,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
-	var resp []TransactionResponse
+	var respTransactions []TransactionResponse
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
 		if wallet := GetWalletBySigner(fromWallet); wallet != "" {
 			fromWallet = wallet
@@ -322,7 +338,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		if err != nil {
 			return fmt.Errorf("failed to format transactions: %w", err)
 		}
-		resp = formattedTransactions
+		respTransactions = formattedTransactions
 		return nil
 	})
 	if err != nil {
@@ -330,6 +346,10 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		logger.Error("failed to process transfer", "error", err)
 		c.Fail(err, "failed to process transfer")
 		return
+	}
+
+	resp := TransferResponse{
+		Transactions: respTransactions,
 	}
 
 	r.SendBalanceUpdate(fromWallet)
@@ -574,9 +594,9 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 		return
 	}
 
-	response := make([]RPCEntry, 0, len(rpcHistory))
+	respRPCEntries := make([]RPCEntry, 0, len(rpcHistory))
 	for _, record := range rpcHistory {
-		response = append(response, RPCEntry{
+		respRPCEntries = append(respRPCEntries, RPCEntry{
 			ID:        record.ID,
 			Sender:    record.Sender,
 			ReqID:     record.ReqID,
@@ -589,8 +609,12 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 		})
 	}
 
-	c.Succeed(req.Method, response)
-	logger.Info("RPC history retrieved", "userID", c.UserID, "entryCount", len(response))
+	resp := GetRPCHistoryResponse{
+		RPCEntries: respRPCEntries,
+	}
+
+	c.Succeed(req.Method, resp)
+	logger.Info("RPC history retrieved", "userID", c.UserID, "entryCount", len(respRPCEntries))
 }
 
 func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {

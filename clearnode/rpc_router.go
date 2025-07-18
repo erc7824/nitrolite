@@ -105,12 +105,12 @@ func (r *RPCRouter) HandleConnect(send SendRPCMessageFunc) {
 	}
 
 	// Convert to AssetResponse format
-	response := make([]GetAssetsResponse, 0, len(assets))
+	respAssets := make([]AssetResponse, 0, len(assets))
 	for _, asset := range assets {
-		response = append(response, GetAssetsResponse(asset))
+		respAssets = append(respAssets, AssetResponse(asset))
 	}
 
-	send("assets", response)
+	send("assets", AssetsResponse{Assets: respAssets})
 }
 
 func (r *RPCRouter) HandleDisconnect(userID string) {
@@ -126,9 +126,9 @@ func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) 
 		r.lg.Error("error retrieving channels for participant", "error", err)
 	}
 
-	resp := []ChannelResponse{}
+	respChannels := []ChannelResponse{}
 	for _, ch := range channels {
-		resp = append(resp, ChannelResponse{
+		respChannels = append(respChannels, ChannelResponse{
 			ChannelID:   ch.ChannelID,
 			Participant: ch.Participant,
 			Status:      ch.Status,
@@ -145,7 +145,7 @@ func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) 
 	}
 
 	// Send channel updates
-	send("channels", resp)
+	send("channels", ChannelsResponse{Channels: respChannels})
 
 	// Send initial balances
 	balances, err := GetWalletLedger(r.DB, common.HexToAddress(walletAddress)).GetBalances(NewAccountID(walletAddress))
@@ -153,7 +153,7 @@ func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) 
 		r.lg.Error("error getting balances", "sender", walletAddress, "error", err)
 		return
 	}
-	send("bu", balances)
+	send("bu", BalanceUpdatesResponse{BalanceUpdates: balances})
 }
 
 func (r *RPCRouter) HandleMessageSent() {

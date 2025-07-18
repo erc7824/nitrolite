@@ -59,28 +59,9 @@ func main() {
 		exec.Command("stty", "sane").Run()
 	}
 
-	p := prompt.New(
-		operator.Execute,
-		operator.Complete,
+	options := append(getStyleOptions(),
 		prompt.OptionPrefix(">>> "),
 
-		prompt.OptionTitle("Cerebro CLI"),
-		prompt.OptionPrefixTextColor(prompt.Yellow),
-		prompt.OptionPreviewSuggestionTextColor(prompt.Cyan),
-
-		prompt.OptionSuggestionTextColor(prompt.White),
-		prompt.OptionSuggestionBGColor(prompt.DarkBlue),
-
-		prompt.OptionDescriptionTextColor(prompt.Black),
-		prompt.OptionDescriptionBGColor(prompt.Yellow),
-
-		prompt.OptionSelectedSuggestionTextColor(prompt.Black),
-		prompt.OptionSelectedSuggestionBGColor(prompt.Yellow),
-
-		prompt.OptionSelectedDescriptionTextColor(prompt.White),
-		prompt.OptionSelectedDescriptionBGColor(prompt.DarkBlue),
-
-		prompt.OptionShowCompletionAtStart(),
 		prompt.OptionAddKeyBind(prompt.KeyBind{
 			Key: prompt.ControlC,
 			Fn: func(buf *prompt.Buffer) {
@@ -93,6 +74,11 @@ func main() {
 			Key: prompt.ControlD,
 			Fn:  func(buf *prompt.Buffer) {},
 		}),
+	)
+	p := prompt.New(
+		operator.Execute,
+		operator.Complete,
+		options...,
 	)
 
 	promptExitCh := make(chan struct{})
@@ -115,4 +101,26 @@ func main() {
 
 func emptyCompleter(d prompt.Document) []prompt.Suggest {
 	return []prompt.Suggest{}
+}
+
+func getStyleOptions() []prompt.Option {
+	return []prompt.Option{
+		prompt.OptionTitle("Cerebro CLI"),
+		prompt.OptionPrefixTextColor(prompt.Yellow),
+		prompt.OptionPreviewSuggestionTextColor(prompt.Cyan),
+
+		prompt.OptionSuggestionTextColor(prompt.White),
+		prompt.OptionSuggestionBGColor(prompt.DarkBlue),
+
+		prompt.OptionDescriptionTextColor(prompt.Black),
+		prompt.OptionDescriptionBGColor(prompt.Yellow),
+
+		prompt.OptionSelectedSuggestionTextColor(prompt.Black),
+		prompt.OptionSelectedSuggestionBGColor(prompt.Yellow),
+
+		prompt.OptionSelectedDescriptionTextColor(prompt.White),
+		prompt.OptionSelectedDescriptionBGColor(prompt.DarkBlue),
+
+		prompt.OptionShowCompletionAtStart(),
+	}
 }

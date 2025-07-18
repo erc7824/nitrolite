@@ -3,7 +3,6 @@ package clearnet
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"sort"
 )
 
@@ -25,15 +24,15 @@ func (c *ClearnodeClient) handleEvent(event RPCData) {
 }
 
 type ChannelRes struct {
-	ChannelID   string   `json:"channel_id"`
-	Participant string   `json:"participant"`
-	Status      string   `json:"status"`
-	Token       string   `json:"token"`
-	RawAmount   *big.Int `json:"amount"` // Total amount in the channel (user + broker)
-	ChainID     uint32   `json:"chain_id"`
-	Adjudicator string   `json:"adjudicator"`
-	Challenge   uint64   `json:"challenge"`
-	UpdatedAt   string   `json:"updated_at"`
+	ChannelID   string `json:"channel_id"`
+	Participant string `json:"participant"`
+	Status      string `json:"status"`
+	Token       string `json:"token"`
+	RawAmount   string `json:"amount"` // Total amount in the channel (user + broker)
+	ChainID     uint32 `json:"chain_id"`
+	Adjudicator string `json:"adjudicator"`
+	Challenge   uint64 `json:"challenge"`
+	UpdatedAt   string `json:"updated_at"`
 }
 
 func (c *ClearnodeClient) handleChannelsEvent(event RPCData) {
@@ -65,7 +64,7 @@ func (c *ClearnodeClient) handleChannelsEvent(event RPCData) {
 		// fmt.Printf("  Participant: %s\n", channel.Participant)
 		fmt.Printf("  Status: %s\n", channel.Status)
 		fmt.Printf("  Token: %s\n", channel.Token)
-		fmt.Printf("  Amount: %s\n", channel.RawAmount.String())
+		fmt.Printf("  Amount: %s\n", channel.RawAmount)
 		// fmt.Printf("  Adjudicator: %s\n", channel.Adjudicator)
 		// fmt.Printf("  Challenge: %d\n", channel.Challenge)
 		// fmt.Printf("  Updated At: %s\n", channel.UpdatedAt)

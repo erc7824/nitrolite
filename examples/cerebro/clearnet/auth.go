@@ -22,15 +22,15 @@ type AuthChallenge struct {
 	Allowances  []any
 }
 
-func (c *ClearnodeClient) Authenticate(wallet, signer unisig.Signer) error {
+func (c *ClearnodeClient) Authenticate(wallet, signer unisig.Signer) (string, error) {
 	if c.signer != nil {
-		return nil // Already authenticated
+		return "", nil // Already authenticated
 	}
 
 	ch := AuthChallenge{
 		Wallet:      wallet.Address().Hex(),
 		Participant: signer.Address().Hex(), // Using address as session key for simplicity
-		AppName:     "Yellow Bridge",
+		AppName:     "Cerebro CLI",
 		Allowances:  []any{},                // No allowances for now
 		Expire:      "",                     // No expiration for now
 		Scope:       "",                     // No specific scope for now
@@ -46,47 +46,61 @@ func (c *ClearnodeClient) Authenticate(wallet, signer unisig.Signer) error {
 		ch.AppAddress,
 	)
 	if err != nil {
-		return fmt.Errorf("authentication request failed: %w", err)
+		return "", fmt.Errorf("authentication request failed: %w", err)
 	}
 	if res.Res.Method != "auth_challenge" || len(res.Res.Params) < 1 {
-		return fmt.Errorf("unexpected response to auth_request: %v", res.Res)
+		return "", fmt.Errorf("unexpected response to auth_request: %v", res.Res)
 	}
 
 	challengeMap, ok := res.Res.Params[0].(map[string]any)
 	if !ok {
-		return fmt.Errorf("invalid auth_challenge response format: %v", res.Res.Params[0])
+		return "", fmt.Errorf("invalid auth_challenge response format: %v", res.Res.Params[0])
 	}
 	challengeToken, ok := challengeMap["challenge_message"].(string)
 	if !ok {
-		return fmt.Errorf("challenge_message not found in auth_challenge response: %v", challengeMap)
+		return "", fmt.Errorf("challenge_message not found in auth_challenge response: %v", challengeMap)
 	}
 
 	ch.Token = challengeToken
 	chSig, err := signChallenge(wallet, ch)
 	if err != nil {
-		return fmt.Errorf("failed to sign challenge: %w", err)
+		return "", fmt.Errorf("failed to sign challenge: %w", err)
 	}
 	authVerifyChallenge := map[string]any{
 		"challenge": challengeToken,
 	}
 	res, err = c.request("auth_verify", []string{hexutil.Encode(chSig)}, authVerifyChallenge)
 	if err != nil {
-		return fmt.Errorf("authentication verification failed: %w", err)
+		return "", fmt.Errorf("authentication verification failed: %w", err)
 	}
 	if res.Res.Method != "auth_verify" || len(res.Res.Params) < 1 {
-		return fmt.Errorf("unexpected response to auth_verify: %v", res.Res)
+		return "", fmt.Errorf("unexpected response to auth_verify: %v", res.Res)
 	}
 
 	verifyMap, ok := res.Res.Params[0].(map[string]any)
 	if !ok {
-		return fmt.Errorf("invalid auth_verify response format: %v", res.Res.Params[0])
+		return "", fmt.Errorf("invalid auth_verify response format: %v", res.Res.Params[0])
 	}
 	if authSuccess, _ := verifyMap["success"].(bool); !authSuccess {
-		return fmt.Errorf("authentication failed: %v", verifyMap)
+		return "", fmt.Errorf("authentication failed: %v", verifyMap)
 	}
 
+	res, err = c.request("get_user_tag", nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to get user tag: %w", err)
+	}
+	if res.Res.Method != "get_user_tag" || len(res.Res.Params) < 1 {
+		return "", fmt.Errorf("unexpected response to get_user_tag: %v", res.Res)
+	}
+
+	tagMap, ok := res.Res.Params[0].(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("invalid auth_verify response format: %v", res.Res.Params[0])
+	}
+	userTag, _ := tagMap["tag"].(string)
+
 	c.signer = signer
-	return nil
+	return userTag, nil
 }
 
 func signChallenge(s unisig.Signer, c AuthChallenge) ([]byte, error) {

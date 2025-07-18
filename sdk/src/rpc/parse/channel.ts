@@ -17,8 +17,6 @@ const RPCAllocationSchema = z.object({
     amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
 });
 
-const ServerSignatureSchema = hexSchema;
-
 const ResizeChannelParamsSchema = z
     .array(
         z
@@ -29,7 +27,7 @@ const ResizeChannelParamsSchema = z
                 version: z.number(),
                 allocations: z.array(RPCAllocationSchema),
                 state_hash: hexSchema,
-                server_signature: ServerSignatureSchema,
+                server_signature: hexSchema,
             })
             .transform(
                 (raw) =>
@@ -61,7 +59,7 @@ const CloseChannelParamsSchema = z
                 version: z.number(),
                 allocations: z.array(RPCAllocationSchema),
                 state_hash: hexSchema,
-                server_signature: ServerSignatureSchema,
+                server_signature: hexSchema,
             })
             .transform(
                 (raw) =>

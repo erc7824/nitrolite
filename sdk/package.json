@@ -10,6 +10,7 @@
     ],
     "scripts": {
         "build": "npm run codegen && npm run test && tsc",
+        "build:force": "tsc",
         "build:prod": "npm run codegen && npm run test && npm run validate && tsc -p tsconfig.prod.json",
         "build:full": "npm run validate && npm run build",
         "codegen": "ts-node scripts/generate-abi.ts",

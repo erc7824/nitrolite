@@ -33,6 +33,26 @@ func (s Signature) String() string {
 	return hexutil.Encode(s)
 }
 
+func SignaturesToStrings(signatures []Signature) []string {
+	strs := make([]string, len(signatures))
+	for i, sig := range signatures {
+		strs[i] = sig.String()
+	}
+	return strs
+}
+
+func SignaturesFromStrings(strs []string) ([]Signature, error) {
+	signatures := make([]Signature, len(strs))
+	for i, str := range strs {
+		sig, err := hexutil.Decode(str)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode signature %d (%s): %w", i, str, err)
+		}
+		signatures[i] = sig
+	}
+	return signatures, nil
+}
+
 // Sign hashes the provided data using Keccak256 and signs it with the given private key.
 func Sign(data []byte, privateKey *ecdsa.PrivateKey) (Signature, error) {
 	if privateKey == nil {

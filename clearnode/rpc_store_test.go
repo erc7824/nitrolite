@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,17 +72,8 @@ func TestRPCStoreStoreMessage(t *testing.T) {
 	assert.Equal(t, method, record.Method)
 	assert.Equal(t, timestamp, record.Timestamp)
 
-	reqSigStrs := make([]string, len(reqSig))
-	for i, sig := range reqSig {
-		reqSigStrs[i] = sig.String()
-	}
-	assert.ElementsMatch(t, reqSigStrs, record.ReqSig)
-
-	resSigStrs := make([]string, len(resSig))
-	for i, sig := range resSig {
-		resSigStrs[i] = sig.String()
-	}
-	assert.ElementsMatch(t, resSigStrs, record.ResSig)
+	assert.ElementsMatch(t, nitrolite.SignaturesToStrings(reqSig), record.ReqSig)
+	assert.ElementsMatch(t, nitrolite.SignaturesToStrings(resSig), record.ResSig)
 	assert.Equal(t, resBytes, record.Response)
 
 	// Verify params were stored correctly

@@ -45,8 +45,11 @@ func assertErrorResponse(t *testing.T, ctx *RPCContext, expectedContains string)
 	res := ctx.Message.Res
 	require.NotNil(t, res)
 	require.Equal(t, "error", res.Method)
-	require.Len(t, res.Params, 1)
-	require.Contains(t, res.Params[0], expectedContains)
+
+	errorParams, ok := res.Params.(ErrorResponse)
+	require.True(t, ok, "Response parameter should be an ErrorResponse")
+
+	require.Contains(t, errorParams.Error, expectedContains)
 }
 
 func TestRPCRouterHandleGetRPCHistory(t *testing.T) {
@@ -149,8 +152,7 @@ func TestRPCRouterHandleGetRPCHistory(t *testing.T) {
 				res := assertResponse(t, ctx, "get_rpc_history")
 
 				require.Equal(t, uint64(idx+100), res.RequestID)
-				require.Len(t, res.Params, 1, "Response should contain an array")
-				rpcHistory, ok := res.Params[0].([]RPCEntry)
+				rpcHistory, ok := res.Params.([]RPCEntry)
 				require.True(t, ok, "Response parameter should be a slice of RPCEntry")
 				assert.Len(t, rpcHistory, tc.expectedRecordCount, "Should return expected number of records")
 
@@ -184,7 +186,7 @@ func TestRPCRouterHandleGetLedgerBalances(t *testing.T) {
 		router.HandleGetLedgerBalances(ctx)
 
 		res := assertResponse(t, ctx, "get_ledger_balances")
-		balancesArray, ok := res.Params[0].([]Balance)
+		balancesArray, ok := res.Params.([]Balance)
 		require.True(t, ok)
 		require.Len(t, balancesArray, 1)
 		require.Equal(t, "usdc", balancesArray[0].Asset)
@@ -211,7 +213,7 @@ func TestRPCRouterHandleGetUserTag(t *testing.T) {
 		router.HandleGetUserTag(ctx)
 
 		assertResponse(t, ctx, "get_user_tag")
-		getTagResponse, ok := ctx.Message.Res.Params[0].(GetUserTagResponse)
+		getTagResponse, ok := ctx.Message.Res.Params.(GetUserTagResponse)
 		require.True(t, ok, "Response should be a GetUserTagResponse")
 		require.Equal(t, userTag.Tag, getTagResponse.Tag)
 	})
@@ -228,6 +230,7 @@ func TestRPCRouterHandleGetUserTag(t *testing.T) {
 		assertErrorResponse(t, ctx, "failed to get user tag")
 	})
 }
+
 func TestRPCRouterHandleTransfer(t *testing.T) {
 	senderKey, _ := crypto.GenerateKey()
 	senderSigner := Signer{privateKey: senderKey}
@@ -261,7 +264,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router.HandleTransfer(ctx)
 
 		res := assertResponse(t, ctx, "transfer")
-		transferResp, ok := res.Params[0].([]TransactionResponse)
+		transferResp, ok := res.Params.([]TransactionResponse)
 		require.True(t, ok, "Response should be a slice of TransactionResponse")
 		require.Equal(t, senderAddr.Hex(), transferResp[0].FromAccount)
 		require.Equal(t, recipientAddr.Hex(), transferResp[0].ToAccount)
@@ -366,7 +369,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router.HandleTransfer(ctx)
 
 		res := assertResponse(t, ctx, "transfer")
-		transactionResponse, ok := res.Params[0].([]TransactionResponse)
+		transactionResponse, ok := res.Params.([]TransactionResponse)
 		require.True(t, ok, "Response should be a TransactionResponse")
 
 		targetTransaction := transactionResponse[0]
@@ -639,7 +642,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		router.HandleCreateApplication(ctx)
 
 		res := assertResponse(t, ctx, "create_app_session")
-		appResp, ok := res.Params[0].(AppSessionResponse)
+		appResp, ok := res.Params.(AppSessionResponse)
 		require.True(t, ok)
 		require.Equal(t, string(ChannelStatusOpen), appResp.Status)
 		require.Equal(t, uint64(1), appResp.Version)
@@ -776,7 +779,7 @@ func TestRPCRouterHandleSubmitAppState(t *testing.T) {
 		router.HandleSubmitAppState(ctx)
 
 		res := assertResponse(t, ctx, "submit_app_state")
-		appResp, ok := res.Params[0].(AppSessionResponse)
+		appResp, ok := res.Params.(AppSessionResponse)
 		require.True(t, ok)
 		require.Equal(t, string(ChannelStatusOpen), appResp.Status)
 		require.Equal(t, uint64(2), appResp.Version)
@@ -863,7 +866,7 @@ func TestRPCRouterHandleCloseAppSession(t *testing.T) {
 		router.HandleCloseApplication(ctx)
 
 		res := assertResponse(t, ctx, "close_app_session")
-		appResp, ok := res.Params[0].(AppSessionResponse)
+		appResp, ok := res.Params.(AppSessionResponse)
 		require.True(t, ok)
 		require.Equal(t, string(ChannelStatusClosed), appResp.Status)
 		require.Equal(t, uint64(3), appResp.Version)
@@ -942,7 +945,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params.(ResizeChannelResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
 		require.Equal(t, ch.Version+1, resObj.Version)
@@ -1002,7 +1005,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params.(ResizeChannelResponse)
 		require.True(t, ok)
 
 		// Channel amount should decrease
@@ -1279,7 +1282,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params.(ResizeChannelResponse)
 		require.True(t, ok)
 
 		// Should be initial amount (1000) + allocate amount (0) + resize amount (100) = 1100
@@ -1326,7 +1329,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params.(ResizeChannelResponse)
 		require.True(t, ok)
 
 		// Should be initial amount (1000) + allocate amount (0) - resize amount (100) = 900
@@ -1445,7 +1448,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params.(ResizeChannelResponse)
 		require.True(t, ok)
 
 		// Verify the large allocation was processed correctly
@@ -1500,7 +1503,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params.(ResizeChannelResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
 		require.Equal(t, ch.Version+1, resObj.Version)
@@ -1570,7 +1573,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params.(ResizeChannelResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
 		require.Equal(t, ch.Version+1, resObj.Version)
@@ -1640,7 +1643,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		router.HandleCloseChannel(ctx)
 
 		res := assertResponse(t, ctx, "close_channel")
-		resObj, ok := res.Params[0].(CloseChannelResponse)
+		resObj, ok := res.Params.(CloseChannelResponse)
 		require.True(t, ok, "Response should be CloseChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
 		require.Equal(t, ch.Version+1, resObj.Version)

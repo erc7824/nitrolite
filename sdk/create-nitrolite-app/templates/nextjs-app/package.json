@@ -9,9 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@erc7824/nitrolite": "^0.2.30",
+    "@privy-io/react-auth": "2.18.5",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.4.1"
+    "next": "15.4.1",
+    "valtio": "2.1.5",
+    "viem": "2.31.3"
   },
   "devDependencies": {
     "typescript": "^5",

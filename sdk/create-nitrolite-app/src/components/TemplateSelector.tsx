@@ -14,7 +14,7 @@ const TEMPLATES: Template[] = [
     id: 'nextjs-app',
     name: 'Next.js App Router',
     description: 'Next.js with App Router, TypeScript, and TailwindCSS',
-    features: ['Next.js 14', 'App Router', 'TypeScript', 'TailwindCSS', 'SSR support'],
+    features: ['Next.js 15', 'App Router', 'TypeScript', 'TailwindCSS', 'SSR support'],
   },
   {
     id: 'minimal-sdk',

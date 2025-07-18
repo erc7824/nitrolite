@@ -91,8 +91,12 @@ type TransactionResponse struct {
 	CreatedAt      time.Time       `json:"created_at"`
 }
 
+type ErrorResponse struct {
+	Error string `json:"error"` // The error message to send back to the client
+}
+
 func (r *RPCRouter) HandlePing(c *RPCContext) {
-	c.Succeed("pong")
+	c.Succeed("pong", nil)
 }
 
 // HandleGetConfig returns the broker configuration

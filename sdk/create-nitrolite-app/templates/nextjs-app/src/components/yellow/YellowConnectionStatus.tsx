@@ -16,10 +16,10 @@ export const YellowConnectionStatus = ({ className = '', showDetails = false }: 
     };
 
     const getStatusText = () => {
-        if (isConnected) return 'Connected';
-        if (isConnecting) return 'Connecting...';
-        if (error) return 'Connection Error';
-        return 'Disconnected';
+        if (isConnected) return 'Connected to Yellow';
+        if (isConnecting) return 'Connecting to Yellow...';
+        if (error) return 'Failed to connect to Yellow';
+        return 'Disconnected from Yellow';
     };
 
     const getStatusIcon = () => {

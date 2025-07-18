@@ -8,10 +8,11 @@ import (
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
+
+type Signature = nitrolite.Signature
 
 // Allowance represents allowances for connection
 type Allowance struct {
@@ -39,7 +40,7 @@ func NewSigner(privateKeyHex string) (*Signer, error) {
 }
 
 // Sign creates an ECDSA signature for the provided data
-func (s *Signer) Sign(data []byte) ([]byte, error) {
+func (s *Signer) Sign(data []byte) (Signature, error) {
 	return nitrolite.Sign(data, s.privateKey)
 }
 
@@ -59,11 +60,7 @@ func (s *Signer) GetAddress() common.Address {
 }
 
 // RecoverAddress takes the original message and its hex-encoded signature, and returns the address
-func RecoverAddress(message []byte, signatureHex string) (string, error) {
-	sig, err := hexutil.Decode(signatureHex)
-	if err != nil {
-		return "", fmt.Errorf("invalid signature hex: %w", err)
-	}
+func RecoverAddress(message []byte, sig Signature) (string, error) {
 	if len(sig) != 65 {
 		return "", fmt.Errorf("invalid signature length: got %d, want 65", len(sig))
 	}
@@ -92,7 +89,7 @@ func RecoverAddressFromEip712Signature(
 	scope string,
 	application string,
 	expire string,
-	signatureHex string) (string, error) {
+	sig Signature) (string, error) {
 	convertedAllowances := convertAllowances(allowances)
 
 	typedData := apitypes.TypedData{
@@ -134,18 +131,12 @@ func RecoverAddressFromEip712Signature(
 		return "", err
 	}
 
-	// 2. Example signature
-	sig, err := hexutil.Decode(signatureHex)
-	if err != nil {
-		return "", err
-	}
-
-	// 3. Fix V if needed (Ethereum uses 27/28, go-ethereum expects 0/1)
+	// 2. Fix V if needed (Ethereum uses 27/28, go-ethereum expects 0/1)
 	if sig[64] >= 27 {
 		sig[64] -= 27
 	}
 
-	// 4. Recover public key
+	// 3. Recover public key
 	pubKey, err := crypto.SigToPub(typedDataHash, sig)
 	if err != nil {
 		return "", err

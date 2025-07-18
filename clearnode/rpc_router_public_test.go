@@ -26,7 +26,7 @@ func TestRPCRouterHandlePing(t *testing.T) {
 				Params:    []any{nil},
 				Timestamp: uint64(time.Now().Unix()),
 			},
-			Sig: []string{"dummy-signature"},
+			Sig: []Signature{Signature([]byte("dummy-signature"))},
 		},
 	}
 
@@ -74,7 +74,7 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 				Params:    []any{},
 				Timestamp: uint64(time.Now().Unix()),
 			},
-			Sig: []string{"dummy-signature"},
+			Sig: []Signature{Signature([]byte("dummy-signature"))},
 		},
 	}
 
@@ -159,7 +159,7 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 						Params:    []any{json.RawMessage(paramsJSON)},
 						Timestamp: uint64(time.Now().Unix()),
 					},
-					Sig: []string{"dummy-signature"},
+					Sig: []Signature{Signature([]byte("dummy-signature"))},
 				},
 			}
 
@@ -304,7 +304,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 						Params:    []any{json.RawMessage(paramsJSON)},
 						Timestamp: uint64(time.Now().Unix()),
 					},
-					Sig: []string{"dummy-signature"},
+					Sig: []Signature{Signature([]byte("dummy-signature"))},
 				},
 			}
 
@@ -405,7 +405,7 @@ func TestRPCRouterHandleGetChannels_Pagination(t *testing.T) {
 						Params:    []any{json.RawMessage(paramsJSON)},
 						Timestamp: uint64(time.Now().Unix()),
 					},
-					Sig: []string{"dummy-signature"},
+					Sig: []Signature{Signature([]byte("dummy-signature"))},
 				},
 			}
 
@@ -651,7 +651,7 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 						Params:    []any{json.RawMessage(paramsJSON)},
 						Timestamp: uint64(time.Now().Unix()),
 					},
-					Sig: []string{"dummy-signature"},
+					Sig: []Signature{Signature([]byte("dummy-signature"))},
 				},
 			}
 
@@ -756,7 +756,7 @@ func TestRPCRouterHandleGetAppSessions_Pagination(t *testing.T) {
 						Params:    []any{json.RawMessage(paramsJSON)},
 						Timestamp: uint64(time.Now().Unix()),
 					},
-					Sig: []string{"dummy-signature"},
+					Sig: []Signature{Signature([]byte("dummy-signature"))},
 				},
 			}
 
@@ -919,7 +919,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 						Params:    []any{json.RawMessage(paramsJSON)},
 						Timestamp: uint64(time.Now().Unix()),
 					},
-					Sig: []string{"dummy-signature"},
+					Sig: []Signature{Signature([]byte("dummy-signature"))},
 				},
 			}
 
@@ -1021,7 +1021,7 @@ func TestRPCRouterHandleGetLedgerEntries_Pagination(t *testing.T) {
 						Params:    []any{json.RawMessage(paramsJSON)},
 						Timestamp: uint64(time.Now().Unix()),
 					},
-					Sig: []string{"dummy-signature"},
+					Sig: []Signature{Signature([]byte("dummy-signature"))},
 				},
 			}
 

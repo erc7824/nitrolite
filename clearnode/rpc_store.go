@@ -36,10 +36,19 @@ func NewRPCStore(db *gorm.DB) *RPCStore {
 }
 
 // StoreMessage stores an RPC message in the database
-func (s *RPCStore) StoreMessage(sender string, req *RPCData, reqSig []string, resBytes []byte, resSig []string) error {
+func (s *RPCStore) StoreMessage(sender string, req *RPCData, reqSigs []Signature, resBytes []byte, resSigs []Signature) error {
 	paramsBytes, err := json.Marshal(req.Params)
 	if err != nil {
 		return err
+	}
+
+	reqSigStrs := make([]string, len(reqSigs))
+	for i, sig := range reqSigs {
+		reqSigStrs[i] = sig.String()
+	}
+	resSigStrs := make([]string, len(resSigs))
+	for i, sig := range resSigs {
+		resSigStrs[i] = sig.String()
 	}
 
 	msg := &RPCRecord{
@@ -48,8 +57,8 @@ func (s *RPCStore) StoreMessage(sender string, req *RPCData, reqSig []string, re
 		Method:    req.Method,
 		Params:    paramsBytes,
 		Response:  resBytes,
-		ReqSig:    reqSig,
-		ResSig:    resSig,
+		ReqSig:    reqSigStrs,
+		ResSig:    resSigStrs,
 		Timestamp: req.Timestamp,
 	}
 

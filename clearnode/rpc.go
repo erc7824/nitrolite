@@ -9,10 +9,10 @@ import (
 
 // RPCMessage represents a complete message in the RPC protocol, including data and signatures
 type RPCMessage struct {
-	Req          *RPCData `json:"req,omitempty" validate:"required_without=Res,excluded_with=Res"`
-	Res          *RPCData `json:"res,omitempty" validate:"required_without=Req,excluded_with=Req"`
-	AppSessionID string   `json:"sid,omitempty"`
-	Sig          []string `json:"sig"`
+	Req          *RPCData    `json:"req,omitempty" validate:"required_without=Res,excluded_with=Res"`
+	Res          *RPCData    `json:"res,omitempty" validate:"required_without=Req,excluded_with=Req"`
+	AppSessionID string      `json:"sid,omitempty"`
+	Sig          []Signature `json:"sig"`
 }
 
 // ParseRPCMessage parses a JSON string into an RPCMessage
@@ -100,6 +100,6 @@ func CreateResponse(id uint64, method string, responseParams []any) *RPCMessage 
 			Params:    responseParams,
 			Timestamp: uint64(time.Now().UnixMilli()),
 		},
-		Sig: []string{},
+		Sig: []Signature{},
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
@@ -38,7 +37,7 @@ func TestRPCRouterHandleGetLedgerBalances(t *testing.T) {
 				Params:    []any{json.RawMessage(paramsJSON)},
 				Timestamp: uint64(time.Now().Unix()),
 			},
-			Sig: []string{"dummy-signature"},
+			Sig: []Signature{Signature([]byte("0xdummySignature"))},
 		},
 	}
 
@@ -197,7 +196,7 @@ func TestRPCRouterHandleGetUserTag(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := userSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleGetUserTag(c)
@@ -245,7 +244,7 @@ func TestRPCRouterHandleGetUserTag(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := userSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleGetUserTag(c)
@@ -312,7 +311,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleTransfer(c)
@@ -401,7 +400,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000)))
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "eth", decimal.NewFromInt(5)))
 
-		// Setup user tag for receipient
+		// Setup user tag for recipient
 		recipientTag, err := GenerateOrRetrieveUserTag(db, recipientAddr.Hex())
 		require.NoError(t, err)
 
@@ -437,7 +436,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleTransfer(c)
@@ -521,7 +520,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleTransfer(c)
@@ -577,7 +576,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleTransfer(c)
@@ -633,7 +632,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleTransfer(c)
@@ -684,7 +683,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleTransfer(c)
@@ -740,7 +739,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleTransfer(c)
@@ -796,7 +795,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := senderSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleTransfer(c)
@@ -854,7 +853,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		wrongSigner := Signer{privateKey: wrongKey}
 		sigBytes, err := wrongSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleTransfer(c)
@@ -942,7 +941,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		require.NoError(t, err)
 		sigB, err := signerB.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigA), hexutil.Encode(sigB)}
+		c.Message.Sig = []Signature{sigA, sigB}
 
 		// Call handler
 		router.HandleCreateApplication(c)
@@ -1038,7 +1037,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		require.NoError(t, err)
 		sigB, err := signerB.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigA), hexutil.Encode(sigB)}
+		c.Message.Sig = []Signature{sigA, sigB}
 
 		// Call handler
 		router.HandleCreateApplication(c)
@@ -1129,7 +1128,7 @@ func TestRPCRouterHandleSubmitAppState(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleSubmitAppState(c)
@@ -1235,7 +1234,7 @@ func TestRPCRouterHandleCloseApplication(t *testing.T) {
 	// 2) Sign rawReq directly
 	sigBytes, err := signer.Sign(rawReq)
 	require.NoError(t, err)
-	c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+	c.Message.Sig = []Signature{sigBytes}
 
 	// Call handler
 	router.HandleCloseApplication(c)
@@ -1334,7 +1333,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -1424,7 +1423,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -1480,7 +1479,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -1544,7 +1543,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -1608,7 +1607,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -1683,7 +1682,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -1753,7 +1752,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -1821,7 +1820,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -1893,7 +1892,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -1967,7 +1966,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -2035,7 +2034,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -2104,7 +2103,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly with wrong signer
 		sigBytes, err := wrongSigner.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -2174,7 +2173,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -2256,7 +2255,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -2355,7 +2354,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleResizeChannel(c)
@@ -2451,7 +2450,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleCloseChannel(c)
@@ -2545,7 +2544,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		// 2) Sign rawReq directly
 		sigBytes, err := signer.Sign(rawReq)
 		require.NoError(t, err)
-		c.Message.Sig = []string{hexutil.Encode(sigBytes)}
+		c.Message.Sig = []Signature{sigBytes}
 
 		// Call handler
 		router.HandleCloseChannel(c)

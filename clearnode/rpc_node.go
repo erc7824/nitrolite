@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -357,7 +356,7 @@ func prepareRawRPCResponse(signer *Signer, data *RPCData) ([]byte, error) {
 
 	responseMessage := &RPCMessage{
 		Res: data,
-		Sig: []string{hexutil.Encode(signature)},
+		Sig: []Signature{signature},
 	}
 	resMessageBytes, err := json.Marshal(responseMessage)
 	if err != nil {

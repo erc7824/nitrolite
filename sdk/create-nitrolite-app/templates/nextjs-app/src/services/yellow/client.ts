@@ -367,8 +367,6 @@ export class YellowWebSocketClient {
             };
 
             const handleMessage = async (event: MessageEvent) => {
-                console.log('testing 123123auth_verify');
-
                 try {
                     // First, try to parse as raw JSON to check for Yellow error format
                     let rawJsonMessage;

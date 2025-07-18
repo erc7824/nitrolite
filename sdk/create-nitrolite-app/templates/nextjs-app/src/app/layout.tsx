@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { YellowWebSocketProvider } from "@/components/yellow/YellowWebSocketProvider";
+import { PrivyProviderWrapper } from "@/components/PrivyProviderWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,9 +29,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <YellowWebSocketProvider>
-          {children}
-        </YellowWebSocketProvider>
+        <PrivyProviderWrapper>
+          <YellowWebSocketProvider>
+            {children}
+          </YellowWebSocketProvider>
+        </PrivyProviderWrapper>
       </body>
     </html>
   );

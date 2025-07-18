@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { createWalletClient, custom, type Address } from 'viem';
 import { mainnet } from 'viem/chains';
@@ -14,18 +14,13 @@ export const useYellowWebSocket = (options: UseYellowWebSocketOptions = {}) => {
     const { wallets } = useWallets();
     const [status, setStatus] = useState<WSStatus>('disconnected');
     const [error, setError] = useState<string | null>(null);
-    const [privyWalletReady, setPrivyWalletReady] = useState(false);
     const clientRef = useRef<YellowWebSocketClient | null>(null);
     const [isAutoApprovingChallenge, setIsAutoApprovingChallenge] = useState(false);
 
     // Check if Privy embedded wallet is ready
-    useEffect(() => {
+    const privyWalletReady = useMemo(() => {
         const embeddedPrivyWallet = wallets.find((wallet) => wallet.walletClientType === 'privy');
-        if (ready && authenticated && embeddedPrivyWallet) {
-            setPrivyWalletReady(true);
-        } else {
-            setPrivyWalletReady(false);
-        }
+        return ready && authenticated && !!embeddedPrivyWallet;
     }, [ready, authenticated, wallets]);
 
     // Auto-approve challenges when they are received (but only once per challenge)

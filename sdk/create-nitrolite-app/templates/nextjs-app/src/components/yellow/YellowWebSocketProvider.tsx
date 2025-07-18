@@ -57,7 +57,6 @@ export const YellowWebSocketProvider = ({ children }: YellowWebSocketProviderPro
         connect,
         disconnect,
         ping,
-        privyWalletReady,
     } = useYellowWebSocket({
         onMessage: handleYellowMessage,
         onConnect: () => {
@@ -122,7 +121,6 @@ export const YellowWebSocketProvider = ({ children }: YellowWebSocketProviderPro
             ready,
             userWalletAddress: user?.wallet?.address,
             embeddedPrivyWallet: !!embeddedPrivyWallet,
-            privyWalletReady,
             isConnected,
             isConnecting,
             connectionAttempted: connectionAttempted.current,
@@ -136,7 +134,6 @@ export const YellowWebSocketProvider = ({ children }: YellowWebSocketProviderPro
             authenticated &&
             ready &&
             user?.wallet?.address &&
-            privyWalletReady && // Use the hook's wallet ready state
             !isConnected &&
             !isConnecting &&
             !connectionAttempted.current &&
@@ -149,10 +146,36 @@ export const YellowWebSocketProvider = ({ children }: YellowWebSocketProviderPro
             lastWalletAddress.current = walletAddress;
             connectionAttempted.current = true;
             console.log('🔌 Attempting to connect to Yellow WebSocket with address:', walletAddress);
-            connect(walletAddress).catch((error) => {
-                console.error('❌ Failed to connect to Yellow WebSocket:', error);
-                connectionAttempted.current = false;
-            });
+
+            // Add a progressive delay to ensure wallet is fully initialized
+            let retryCount = 0;
+            const maxRetries = 5;
+
+            const attemptConnection = (delay: number) => {
+                setTimeout(() => {
+                    connect(walletAddress).catch((error) => {
+                        console.error(
+                            `❌ Failed to connect to Yellow WebSocket (attempt ${retryCount + 1}/${maxRetries}):`,
+                            error,
+                        );
+
+                        // If it's a wallet not ready error, retry with progressive delay
+                        if (error.message.includes('Privy wallet not ready') && retryCount < maxRetries - 1) {
+                            retryCount++;
+                            const nextDelay = Math.min(2000 * retryCount, 10000); // Progressive delay: 2s, 4s, 6s, 8s, 10s
+                            console.log(
+                                `🔄 Wallet not ready, retrying in ${nextDelay / 1000} seconds... (${retryCount}/${maxRetries})`,
+                            );
+                            attemptConnection(nextDelay);
+                        } else {
+                            console.error('❌ Max retries reached or different error occurred');
+                            connectionAttempted.current = false;
+                        }
+                    });
+                }, delay);
+            };
+
+            attemptConnection(2000); // Initial delay of 2 seconds
         }
     }, [
         isLoggedIn,
@@ -161,7 +184,6 @@ export const YellowWebSocketProvider = ({ children }: YellowWebSocketProviderPro
         ready,
         user?.wallet?.address,
         wallets,
-        privyWalletReady,
         isConnected,
         isConnecting,
         connect,

@@ -89,7 +89,7 @@ func (o *Operator) handleDepositCustody(args []string) {
 }
 
 func (o *Operator) handleWithdrawCustody(args []string) {
-	if len(args) < 3 {
+	if len(args) < 4 {
 		fmt.Println("Usage: withdraw custody <chain_name> <token_symbol>")
 		return
 	}

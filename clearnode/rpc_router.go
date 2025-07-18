@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"gorm.io/gorm"
 )
 
@@ -243,24 +243,16 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 
 	response := make([]RPCEntry, 0, len(rpcHistory))
 	for _, record := range rpcHistory {
-		reqSigs := make([]Signature, len(record.ReqSig))
-		for i, sig := range record.ReqSig {
-			var err error
-			reqSigs[i], err = hexutil.Decode(sig)
-			if err != nil {
-				logger.Error("failed to decode request signature", "error", err, "signature", sig)
-				continue
-			}
+		reqSigs, err := nitrolite.SignaturesFromStrings(record.ReqSig)
+		if err != nil {
+			logger.Error("failed to decode request signatures", "error", err, "signatures", record.ReqSig)
+			continue
 		}
 
-		resSigs := make([]Signature, len(record.ResSig))
-		for i, sig := range record.ResSig {
-			var err error
-			resSigs[i], err = hexutil.Decode(sig)
-			if err != nil {
-				logger.Error("failed to decode response signature", "error", err, "signature", sig)
-				continue
-			}
+		resSigs, err := nitrolite.SignaturesFromStrings(record.ResSig)
+		if err != nil {
+			logger.Error("failed to decode response signatures", "error", err, "signatures", record.ResSig)
+			continue
 		}
 
 		response = append(response, RPCEntry{

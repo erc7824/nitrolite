@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 
+	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
@@ -42,23 +43,14 @@ func (s *RPCStore) StoreMessage(sender string, req *RPCData, reqSigs []Signature
 		return err
 	}
 
-	reqSigStrs := make([]string, len(reqSigs))
-	for i, sig := range reqSigs {
-		reqSigStrs[i] = sig.String()
-	}
-	resSigStrs := make([]string, len(resSigs))
-	for i, sig := range resSigs {
-		resSigStrs[i] = sig.String()
-	}
-
 	msg := &RPCRecord{
 		ReqID:     req.RequestID,
 		Sender:    sender,
 		Method:    req.Method,
 		Params:    paramsBytes,
 		Response:  resBytes,
-		ReqSig:    reqSigStrs,
-		ResSig:    resSigStrs,
+		ReqSig:    nitrolite.SignaturesToStrings(reqSigs),
+		ResSig:    nitrolite.SignaturesToStrings(resSigs),
 		Timestamp: req.Timestamp,
 	}
 

@@ -234,6 +234,19 @@ func (o *Operator) readExtraArg(name string) string {
 	)
 }
 
+func (o *Operator) readSelectionArg(name string, suggestions []prompt.Suggest) string {
+	completer := func(d prompt.Document) []prompt.Suggest {
+		args := strings.Split(d.TextBeforeCursor(), " ")
+		if len(args) > 1 {
+			return []prompt.Suggest{} // No suggestions if more than one argument
+		}
+		return prompt.FilterHasPrefix(suggestions, d.GetWordBeforeCursor(), true)
+	}
+
+	promptPrefix := fmt.Sprintf("{%s}>>> ", name)
+	return prompt.Input(promptPrefix, completer, getStyleOptions()...)
+}
+
 func (o *Operator) reloadConfig() {
 	brokerConfig, err := o.clearnode.GetConfig()
 	if err != nil {

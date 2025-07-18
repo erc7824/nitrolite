@@ -281,19 +281,23 @@ type TransactionResponse struct {
 	CreatedAt      time.Time       `json:"created_at"`
 }
 
-func (c *ClearnodeClient) Transfer(destinationTag, assetSymbol string, amount decimal.Decimal) (*TransactionResponse, error) {
+func (c *ClearnodeClient) Transfer(transferByTag bool, destinationValue string, assetSymbol string, amount decimal.Decimal) (*TransactionResponse, error) {
 	if c.signer == nil {
 		return nil, fmt.Errorf("client not authenticated")
 	}
 
 	params := TransferReq{
-		DestinationUserTag: destinationTag,
 		Allocations: []TransferAllocation{
 			{
 				AssetSymbol: assetSymbol,
 				Amount:      amount,
 			},
 		},
+	}
+	if transferByTag {
+		params.DestinationUserTag = destinationValue
+	} else {
+		params.Destination = destinationValue
 	}
 
 	res, err := c.request("transfer", nil, params)

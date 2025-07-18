@@ -75,7 +75,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			return o.getWalletSuggestions()
 		case "open", "resize", "close":
 			return []prompt.Suggest{
-				{Text: "channel", Description: "Enable, resize or disable a channel on a chain"},
+				{Text: "channel", Description: "Open, resize or close a channel on a chain"},
 			}
 		case "deposit", "withdraw":
 			return []prompt.Suggest{

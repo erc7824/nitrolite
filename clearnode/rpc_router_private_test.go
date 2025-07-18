@@ -152,12 +152,12 @@ func TestRPCRouterHandleGetRPCHistory(t *testing.T) {
 				res := assertResponse(t, ctx, "get_rpc_history")
 
 				require.Equal(t, uint64(idx+100), res.RequestID)
-				rpcHistory, ok := res.Params.([]RPCEntry)
-				require.True(t, ok, "Response parameter should be a slice of RPCEntry")
-				assert.Len(t, rpcHistory, tc.expectedRecordCount, "Should return expected number of records")
+				rpcHistory, ok := res.Params.(GetRPCHistoryResponse)
+				require.True(t, ok, "Response parameter should be a GetRPCHistoryResponse")
+				assert.Len(t, rpcHistory.RPCEntries, tc.expectedRecordCount, "Should return expected number of records")
 
 				// Check records are in expected order
-				for i, record := range rpcHistory {
+				for i, record := range rpcHistory.RPCEntries {
 					if i < len(tc.expectedReqIDs) {
 						assert.Equal(t, tc.expectedReqIDs[i], record.ReqID, "Record %d should have expected ReqID", i)
 						assert.Equal(t, userAddress, record.Sender, "All records should belong to the requesting participant")
@@ -186,7 +186,8 @@ func TestRPCRouterHandleGetLedgerBalances(t *testing.T) {
 		router.HandleGetLedgerBalances(ctx)
 
 		res := assertResponse(t, ctx, "get_ledger_balances")
-		balancesArray, ok := res.Params.([]Balance)
+		balancesResp, ok := res.Params.(GetLedgerBalancesResponse)
+		balancesArray := balancesResp.LedgerBalances
 		require.True(t, ok)
 		require.Len(t, balancesArray, 1)
 		require.Equal(t, "usdc", balancesArray[0].Asset)
@@ -264,18 +265,21 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router.HandleTransfer(ctx)
 
 		res := assertResponse(t, ctx, "transfer")
-		transferResp, ok := res.Params.([]TransactionResponse)
+		transferResp, ok := res.Params.(TransferResponse)
+		require.Len(t, transferResp.Transactions, 2, "Response should contain 2 transaction objects")
+
+		transferTransaction := transferResp.Transactions[0]
 		require.True(t, ok, "Response should be a slice of TransactionResponse")
-		require.Equal(t, senderAddr.Hex(), transferResp[0].FromAccount)
-		require.Equal(t, recipientAddr.Hex(), transferResp[0].ToAccount)
-		require.False(t, transferResp[0].CreatedAt.IsZero(), "CreatedAt should be set")
+		require.Equal(t, senderAddr.Hex(), transferTransaction.FromAccount)
+		require.Equal(t, recipientAddr.Hex(), transferTransaction.ToAccount)
+		require.False(t, transferTransaction.CreatedAt.IsZero(), "CreatedAt should be set")
 
 		// Verify user tags are empty (since no tags were created for these wallets)
-		require.Empty(t, transferResp[0].FromAccountTag, "FromAccountTag should be empty when no tag exists")
-		require.Empty(t, transferResp[0].ToAccountTag, "ToAccountTag should be empty when no tag exists")
+		require.Empty(t, transferTransaction.FromAccountTag, "FromAccountTag should be empty when no tag exists")
+		require.Empty(t, transferTransaction.ToAccountTag, "ToAccountTag should be empty when no tag exists")
 
 		// Verify that all transactions in response have the tag fields
-		for _, tx := range transferResp {
+		for _, tx := range transferResp.Transactions {
 			require.Equal(t, senderAddr.Hex(), tx.FromAccount)
 			require.Equal(t, recipientAddr.Hex(), tx.ToAccount)
 			require.Empty(t, tx.FromAccountTag, "FromAccountTag should be empty when no tag exists")
@@ -326,8 +330,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		}
 
 		// Verify response transactions match database transactions
-		require.Len(t, transferResp, 2, "Response should contain 2 transaction objects")
-		for _, responseTx := range transferResp {
+		for _, responseTx := range transferResp.Transactions {
 			// Find matching transaction in database
 			var dbTx LedgerTransaction
 			err = db.Where("id = ?", responseTx.Id).First(&dbTx).Error
@@ -369,12 +372,12 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router.HandleTransfer(ctx)
 
 		res := assertResponse(t, ctx, "transfer")
-		transactionResponse, ok := res.Params.([]TransactionResponse)
+		transactionResponse, ok := res.Params.(TransferResponse)
 		require.True(t, ok, "Response should be a TransactionResponse")
+		require.Len(t, transactionResponse.Transactions, 2, "Should have 2 transaction entries for the transfer")
 
-		targetTransaction := transactionResponse[0]
+		targetTransaction := transactionResponse.Transactions[0]
 
-		require.Len(t, transactionResponse, 2, "Should have 2 transaction entries for the transfer")
 		require.Equal(t, senderAddr.Hex(), targetTransaction.FromAccount)
 		require.Equal(t, recipientAddr.Hex(), targetTransaction.ToAccount)
 		require.False(t, targetTransaction.CreatedAt.IsZero(), "CreatedAt should be set")
@@ -384,7 +387,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.Equal(t, recipientTag.Tag, targetTransaction.ToAccountTag, "ToAccountTag should match recipient's tag")
 
 		// Verify all transactions have correct tag information
-		for _, tx := range transactionResponse {
+		for _, tx := range transactionResponse.Transactions {
 			require.Equal(t, senderAddr.Hex(), tx.FromAccount)
 			require.Equal(t, recipientAddr.Hex(), tx.ToAccount)
 			require.Empty(t, tx.FromAccountTag, "FromAccountTag should be empty since sender has no tag")

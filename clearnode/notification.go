@@ -55,7 +55,7 @@ func NewBalanceNotification(wallet string, db *gorm.DB) *Notification {
 	return &Notification{
 		userID:    wallet,
 		eventType: BalanceUpdateEventType,
-		data:      balances,
+		data:      BalanceUpdatesResponse{BalanceUpdates: balances},
 	}
 }
 
@@ -82,7 +82,7 @@ func NewChannelNotification(channel Channel) *Notification {
 }
 
 // NewTransferNotification creates a notification for a transfer event
-func NewTransferNotification(wallet string, transferredAllocations []TransactionResponse) *Notification {
+func NewTransferNotification(wallet string, transferredAllocations TransferResponse) *Notification {
 	return &Notification{
 		userID:    wallet,
 		eventType: TransferEventType,

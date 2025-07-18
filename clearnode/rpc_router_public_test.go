@@ -115,11 +115,11 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 			router.HandleGetAssets(ctx)
 
 			res := assertResponse(t, ctx, "get_assets")
-			responseAssets, ok := res.Params.([]GetAssetsResponse)
-			require.True(t, ok, "Response parameter should be a slice of AssetResponse")
-			assert.Len(t, responseAssets, len(tc.expectedTokenNames), "Should return expected number of assets")
+			responseAssets, ok := res.Params.(GetAssetsResponse)
+			require.True(t, ok, "Response parameter should be a GetAssetsResponse")
+			assert.Len(t, responseAssets.Assets, len(tc.expectedTokenNames), "Should return expected number of assets")
 
-			for idx, asset := range responseAssets {
+			for idx, asset := range responseAssets.Assets {
 				assert.True(t, asset.Token == tc.expectedTokenNames[idx], "Should include token %s", tc.expectedTokenNames[idx])
 			}
 		})
@@ -239,11 +239,11 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 				router.HandleGetChannels(ctx)
 
 				res := assertResponse(t, ctx, "get_channels")
-				responseChannels, ok := res.Params.([]ChannelResponse)
-				require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
-				assert.Len(t, responseChannels, len(tc.expectedChannelIDs), "Should return expected number of channels")
+				responseChannels, ok := res.Params.(GetChannelsResponse)
+				require.True(t, ok, "Response parameter should be a GetChannelsResponse")
+				assert.Len(t, responseChannels.Channels, len(tc.expectedChannelIDs), "Should return expected number of channels")
 
-				for idx, channel := range responseChannels {
+				for idx, channel := range responseChannels.Channels {
 					assert.True(t, channel.ChannelID == tc.expectedChannelIDs[idx], "%d-th result (%s) should equal %s", idx, channel.ChannelID, tc.expectedChannelIDs[idx])
 				}
 			})
@@ -321,12 +321,12 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 				router.HandleGetChannels(ctx)
 
 				res := assertResponse(t, ctx, "get_channels")
-				responseChannels, ok := res.Params.([]ChannelResponse)
-				require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
-				assert.Len(t, responseChannels, len(tc.expectedChannelIDs), "Should return expected number of channels")
+				responseChannels, ok := res.Params.(GetChannelsResponse)
+				require.True(t, ok, "Response parameter should be a GetChannelsResponse")
+				assert.Len(t, responseChannels.Channels, len(tc.expectedChannelIDs), "Should return expected number of channels")
 
 				// Check channel IDs are included in expected order
-				for idx, channel := range responseChannels {
+				for idx, channel := range responseChannels.Channels {
 					assert.Equal(t, tc.expectedChannelIDs[idx], channel.ChannelID, "Should include channel %s at position %d", tc.expectedChannelIDs[idx], idx)
 				}
 			})
@@ -505,11 +505,11 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 				res := assertResponse(t, ctx, "get_app_sessions")
 				assert.Equal(t, uint64(idx), res.RequestID)
 
-				sessionResponses, ok := res.Params.([]AppSessionResponse)
-				require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
-				assert.Len(t, sessionResponses, len(tc.expectedSessionIDs), "Should return expected number of app sessions")
+				sessionResponses, ok := res.Params.(GetAppSessionsResponse)
+				require.True(t, ok, "Response parameter should be a GetAppSessionsResponse")
+				assert.Len(t, sessionResponses.AppSessions, len(tc.expectedSessionIDs), "Should return expected number of app sessions")
 
-				for idx, sessionResponse := range sessionResponses {
+				for idx, sessionResponse := range sessionResponses.AppSessions {
 					assert.True(t, sessionResponse.AppSessionID == tc.expectedSessionIDs[idx], "Should include session %s", tc.expectedSessionIDs[idx])
 				}
 			})
@@ -591,12 +591,12 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 				router.HandleGetAppSessions(ctx)
 
 				res := assertResponse(t, ctx, "get_app_sessions")
-				responseSessions, ok := res.Params.([]AppSessionResponse)
-				require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
-				assert.Len(t, responseSessions, len(tc.expectedSessionIDs), "Should return expected number of sessions")
+				responseSessions, ok := res.Params.(GetAppSessionsResponse)
+				require.True(t, ok, "Response parameter should be a GetAppSessionsResponse")
+				assert.Len(t, responseSessions.AppSessions, len(tc.expectedSessionIDs), "Should return expected number of sessions")
 
 				// Check session IDs are in expected order
-				for idx, session := range responseSessions {
+				for idx, session := range responseSessions.AppSessions {
 					assert.True(t, session.AppSessionID == tc.expectedSessionIDs[idx], "Retrieved %d-th session ID should be equal %s", idx, tc.expectedSessionIDs[idx])
 				}
 			})
@@ -741,11 +741,11 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 				res := assertResponse(t, ctx, "get_ledger_entries")
 				assert.Equal(t, uint64(idx+1), res.RequestID)
 
-				entries, ok := res.Params.([]LedgerEntryResponse)
-				require.True(t, ok, "Response parameter should be a slice of Entry")
-				assert.Len(t, entries, tc.expectedCount, "Should return expected number of entries")
+				entries, ok := res.Params.(GetLedgerEntriesResponse)
+				require.True(t, ok, "Response parameter should be a GetLedgerEntriesResponse")
+				assert.Len(t, entries.LedgerEntries, tc.expectedCount, "Should return expected number of entries")
 
-				tc.validateFunc(t, entries)
+				tc.validateFunc(t, entries.LedgerEntries)
 			})
 		}
 	})
@@ -823,12 +823,12 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 				router.HandleGetLedgerEntries(c)
 
 				res := assertResponse(t, c, "get_ledger_entries")
-				responseEntries, ok := res.Params.([]LedgerEntryResponse)
-				require.True(t, ok, "Response parameter should be a slice of LedgerEntryResponse")
-				assert.Len(t, responseEntries, len(tc.expectedToken), "Should return expected number of entries")
+				responseEntries, ok := res.Params.(GetLedgerEntriesResponse)
+				require.True(t, ok, "Response parameter should be a GetLedgerEntriesResponse")
+				assert.Len(t, responseEntries.LedgerEntries, len(tc.expectedToken), "Should return expected number of entries")
 
 				// Check token names are included in expected order
-				for idx, entry := range responseEntries {
+				for idx, entry := range responseEntries.LedgerEntries {
 					assert.Equal(t, tc.expectedToken[idx], entry.Asset, "Should include token %s at position %d", tc.expectedToken[idx], idx)
 				}
 			})
@@ -991,13 +991,15 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 				res := assertResponse(t, c, "get_ledger_transactions")
 
 				// Unmarshal the actual transaction data
-				var transactions []TransactionResponse
+				var resp GetLedgerTransactionsResponse
+				require.NotNil(t, res.Params, "Response parameter should not be nil")
 				// We need to marshal the interface{} back to JSON, then unmarshal into our concrete type.
 				respBytes, err := json.Marshal(res.Params)
 				require.NoError(t, err)
-				err = json.Unmarshal(respBytes, &transactions)
-				require.NoError(t, err, "Response parameter should be a slice of TransactionResponse")
+				err = json.Unmarshal(respBytes, &resp)
+				require.NoError(t, err, "Response parameter should be a GetLedgerTransactionsResponse")
 
+				transactions := resp.LedgerTransactions
 				// Assert the expected number of transactions were returned
 				assert.Len(t, transactions, tc.expectedLen)
 
@@ -1111,12 +1113,13 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 
 				res := assertResponse(t, ctx, "get_ledger_transactions")
 
-				var transactions []TransactionResponse
+				var resp GetLedgerTransactionsResponse
 				respBytes, err := json.Marshal(res.Params)
 				require.NoError(t, err)
-				err = json.Unmarshal(respBytes, &transactions)
+				err = json.Unmarshal(respBytes, &resp)
 				require.NoError(t, err)
 
+				transactions := resp.LedgerTransactions
 				assert.Len(t, transactions, tc.expectedCount, "Should return expected number of transactions")
 
 				// For non-filter tests, verify order

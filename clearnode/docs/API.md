@@ -602,7 +602,7 @@ Supports pagination and sorting.
 ```json
 {
   "res": [1, "get_ledger_transactions", {
-    "ledger_transaction":[
+    "ledger_transactions":[
       {
         "id": "1",
         "tx_type": "transfer",
@@ -669,7 +669,7 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
 ```json
 {
   "res": [4, "get_rpc_history", {
-    "rpc_history": [
+    "rpc_entries": [
       {
         "id": 123,
         "sender": "0x1234567890abcdef...",
@@ -1127,7 +1127,7 @@ Transfer notifications are sent as unsolicited server messages with the "transfe
 ```json
 {
   "res": [1234567890123, "tr", {
-    "transfer_notifications": [
+    "transactions": [
       {
         "id": "1",
         "tx_type": "transfer",

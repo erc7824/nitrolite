@@ -325,8 +325,7 @@ func (c *RPCContext) Fail(err error, fallbackMessage string) {
 	c.Message.Res = &RPCData{
 		RequestID: c.Message.Req.RequestID,
 		Method:    "error",
-		// TODO: send messages according to API.md: Params: [{"error": message}]
-		Params:    []any{message},
+		Params:    ErrorResponse{Error: message},
 		Timestamp: uint64(time.Now().UnixMilli()),
 	}
 }

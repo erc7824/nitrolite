@@ -1,4 +1,5 @@
 import { Text, Box, Newline, useInput } from 'ink';
+import { useEffect } from 'react';
 
 interface WelcomeScreenProps {
     onComplete: () => void;
@@ -22,7 +23,17 @@ const WELCOME_TEXTS = {
 };
 
 export function WelcomeScreen({ onComplete, interactive = true }: WelcomeScreenProps) {
-    // Handle input for interactive mode
+    // Auto-proceed after showing welcome screen
+    useEffect(() => {
+        if (interactive) {
+            const timer = setTimeout(() => {
+                onComplete();
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [interactive, onComplete]);
+
+    // Handle input for interactive mode (keeping for backwards compatibility)
     useInput((input, key) => {
         if (interactive && (key.return || input === ' ')) {
             onComplete();
@@ -110,12 +121,6 @@ export function WelcomeScreen({ onComplete, interactive = true }: WelcomeScreenP
                 {createSubtitleLine()}
                 <Text color="cyan">│{createEmptyLine()}│</Text>
                 <Text color="cyan">└{createHorizontalBorder()}┘</Text>
-                {interactive && (
-                    <>
-                        <Newline />
-                        <Text color="gray">{WELCOME_TEXTS.instruction}</Text>
-                    </>
-                )}
             </Box>
         </Box>
     );

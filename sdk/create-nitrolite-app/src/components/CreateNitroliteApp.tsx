@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Text, Box, Newline } from 'ink';
 import { WelcomeScreen } from './WelcomeScreen.js';
 import { ProjectSetup } from './ProjectSetup.js';
-import { TemplateSelector } from './TemplateSelector.js';
+import { ConfirmationScreen } from './ConfirmationScreen.js';
 import { ProjectGenerator } from './ProjectGenerator.js';
 import { CompletionScreen } from './CompletionScreen.js';
 import { validateProjectName, checkGitAvailability } from '../utils/validation.js';
@@ -15,7 +15,7 @@ interface CreateNitroliteAppProps {
   skipPrompts?: boolean;
 }
 
-type Step = 'welcome' | 'setup' | 'template' | 'generate' | 'complete';
+type Step = 'welcome' | 'setup' | 'confirmation' | 'generate' | 'complete';
 
 interface ProjectConfig {
   projectPath: string;
@@ -74,12 +74,15 @@ export default function CreateNitroliteApp({
 
   const handleSetupComplete = (setupConfig: Partial<ProjectConfig>) => {
     setConfig((prev) => ({ ...prev, ...setupConfig }));
-    setStep('template');
+    setStep('confirmation');
   };
 
-  const handleTemplateSelected = (selectedTemplate: string) => {
-    setConfig((prev) => ({ ...prev, template: selectedTemplate }));
+  const handleConfirmationComplete = () => {
     setStep('generate');
+  };
+
+  const handleConfirmationCancel = () => {
+    setStep('setup');
   };
 
   const handleGenerationComplete = () => {
@@ -115,8 +118,14 @@ export default function CreateNitroliteApp({
           />
         );
 
-      case 'template':
-        return <TemplateSelector currentTemplate={config.template} onSelect={handleTemplateSelected} />;
+      case 'confirmation':
+        return (
+          <ConfirmationScreen
+            config={config}
+            onConfirm={handleConfirmationComplete}
+            onCancel={handleConfirmationCancel}
+          />
+        );
 
       case 'generate':
         return <ProjectGenerator config={config} onComplete={handleGenerationComplete} onError={handleError} />;

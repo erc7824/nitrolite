@@ -1,3 +1,5 @@
+'use client';
+
 import { useYellowWebSocketContext } from './YellowWebSocketProvider';
 
 interface YellowConnectionStatusProps {

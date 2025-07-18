@@ -5,20 +5,44 @@ import path from 'path';
 import fs from 'fs-extra';
 import { validateProjectName } from '../utils/validation.js';
 
+interface Template {
+  id: string;
+  name: string;
+  description: string;
+  features: string[];
+}
+
+const TEMPLATES: Template[] = [
+  {
+    id: 'nextjs-app',
+    name: 'Next.js App Router',
+    description: 'Next.js with App Router, TypeScript, and TailwindCSS',
+    features: ['Next.js 15', 'App Router', 'TypeScript', 'TailwindCSS', 'SSR support'],
+  },
+  {
+    id: 'minimal-sdk',
+    name: 'Minimal SDK Integration',
+    description: 'Minimal setup with just the Nitrolite SDK',
+    features: ['TypeScript', 'Minimal setup', 'WebSocket client', 'SDK only'],
+  },
+];
+
 interface ProjectSetupProps {
   initialPath: string;
   gitAvailable: boolean;
-  onComplete: (config: { projectPath: string; projectName: string; initGit: boolean }) => void;
+  onComplete: (config: { projectPath: string; projectName: string; initGit: boolean; template: string }) => void;
   onError: (error: string) => void;
 }
 
-type SetupStep = 'path' | 'git' | 'confirm';
+type SetupStep = 'path' | 'git' | 'template';
 
 export function ProjectSetup({ initialPath, gitAvailable, onComplete, onError }: ProjectSetupProps) {
   const [step, setStep] = useState<SetupStep>('path');
   const [projectPath, setProjectPath] = useState(initialPath || '');
   const [projectName, setProjectName] = useState('');
   const [initGit, setInitGit] = useState(gitAvailable);
+  const [template, setTemplate] = useState('nextjs-app');
+  const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
   const [inputBuffer, setInputBuffer] = useState('');
   const [error, setError] = useState('');
 
@@ -27,32 +51,34 @@ export function ProjectSetup({ initialPath, gitAvailable, onComplete, onError }:
       const name = validateProjectName(initialPath);
       if (name) {
         setProjectName(name);
-        setStep(gitAvailable ? 'git' : 'confirm');
+        setStep(gitAvailable ? 'git' : 'template');
       }
     }
   }, [initialPath, gitAvailable]);
 
   useInput((input, key) => {
-    if (key.return) {
-      handleEnter();
-    } else if (key.backspace || key.delete) {
-      setInputBuffer((prev) => prev.slice(0, -1));
-    } else if (key.ctrl && input === 'c') {
+    if (key.ctrl && input === 'c') {
       process.exit(0);
+    } else if (step === 'path') {
+      if (key.return) {
+        handleEnter();
+      } else if (key.backspace || key.delete) {
+        setInputBuffer((prev) => prev.slice(0, -1));
+      } else if (input && !key.ctrl) {
+        setInputBuffer((prev) => prev + input);
+      }
     } else if (step === 'git' && (input === 'y' || input === 'n')) {
       setInitGit(input === 'y');
-      setStep('confirm');
-    } else if (step === 'confirm' && (input === 'y' || input === 'n')) {
-      if (input === 'y') {
+      setStep('template');
+    } else if (step === 'template') {
+      if (key.upArrow) {
+        setSelectedTemplateIndex((prev) => (prev > 0 ? prev - 1 : TEMPLATES.length - 1));
+      } else if (key.downArrow) {
+        setSelectedTemplateIndex((prev) => (prev < TEMPLATES.length - 1 ? prev + 1 : 0));
+      } else if (key.return) {
+        setTemplate(TEMPLATES[selectedTemplateIndex].id);
         handleComplete();
-      } else {
-        // Go back to path input
-        setStep('path');
-        setInputBuffer('');
-        setError('');
       }
-    } else if (step === 'path' && input && !key.ctrl) {
-      setInputBuffer((prev) => prev + input);
     }
   });
 
@@ -76,7 +102,7 @@ export function ProjectSetup({ initialPath, gitAvailable, onComplete, onError }:
       setProjectPath(pathInput);
       setProjectName(validatedName);
       setError('');
-      setStep(gitAvailable ? 'git' : 'confirm');
+      setStep(gitAvailable ? 'git' : 'template');
     }
   };
 
@@ -85,6 +111,7 @@ export function ProjectSetup({ initialPath, gitAvailable, onComplete, onError }:
       projectPath,
       projectName,
       initGit,
+      template,
     });
   };
 
@@ -132,29 +159,41 @@ export function ProjectSetup({ initialPath, gitAvailable, onComplete, onError }:
     </Box>
   );
 
-  const renderConfirmation = () => (
+  const renderTemplateSelection = () => (
     <Box flexDirection="column">
-      <Text color="cyan">✅ Confirm Project Setup</Text>
+      <Text color="cyan">🎨 Select Template</Text>
       <Newline />
-      <Text>
-        Project directory: <Text color="green">{projectPath}</Text>
-      </Text>
-      <Text>
-        Package name: <Text color="green">{projectName}</Text>
-      </Text>
-      <Text>
-        Initialize git: <Text color={initGit ? 'green' : 'red'}>{initGit ? 'Yes' : 'No'}</Text>
-      </Text>
+      <Text>Choose a template for your Nitrolite application:</Text>
       <Newline />
-      <Text>Create project with these settings?</Text>
-      <Newline />
-      <Box>
-        <Text color="green">❯ </Text>
-        <Text color="gray">(y/n)</Text>
-      </Box>
+
+      {TEMPLATES.map((template, index) => (
+        <Box key={template.id} flexDirection="column" marginBottom={1}>
+          <Box>
+            <Text color={index === selectedTemplateIndex ? 'green' : 'gray'}>
+              {index === selectedTemplateIndex ? '❯ ' : '  '}
+            </Text>
+            <Text color={index === selectedTemplateIndex ? 'green' : 'white'} bold={index === selectedTemplateIndex}>
+              {template.name}
+            </Text>
+          </Box>
+          {index === selectedTemplateIndex && (
+            <Box flexDirection="column" paddingLeft={2}>
+              <Text color="gray">{template.description}</Text>
+              <Box flexDirection="row" flexWrap="wrap" gap={1}>
+                {template.features.map((feature, featureIndex) => (
+                  <Text key={featureIndex} color="blue">
+                    • {feature}
+                  </Text>
+                ))}
+              </Box>
+            </Box>
+          )}
+        </Box>
+      ))}
+
       <Newline />
       <Text color="gray">
-        Press <Text color="white">y</Text> to continue, <Text color="white">n</Text> to go back
+        Use <Text color="white">↑↓</Text> arrows to navigate, <Text color="white">Enter</Text> to select
       </Text>
     </Box>
   );
@@ -164,8 +203,8 @@ export function ProjectSetup({ initialPath, gitAvailable, onComplete, onError }:
       return renderPathInput();
     case 'git':
       return renderGitInput();
-    case 'confirm':
-      return renderConfirmation();
+    case 'template':
+      return renderTemplateSelection();
     default:
       return <Text>Unknown step</Text>;
   }

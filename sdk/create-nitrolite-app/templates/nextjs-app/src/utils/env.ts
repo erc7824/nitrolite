@@ -1,13 +1,13 @@
-export const isDevelopment = import.meta.env.DEV;
-export const isProduction = import.meta.env.PROD;
+export const isDevelopment = process.env.NODE_ENV === 'development';
+export const isProduction = process.env.NODE_ENV === 'production';
 
 export const config = {
   isDev: isDevelopment,
   isProd: isProduction,
-  yellowWsUrl: import.meta.env.VITE_YELLOW_WS_URL || 'wss://clearnet.yellow.com/ws',
-  asset: import.meta.env.VITE_ASSET || 'usdc',
+  yellowWsUrl: process.env.NEXT_PUBLIC_YELLOW_WS_URL || 'wss://clearnet.yellow.com/ws',
+  asset: process.env.NEXT_PUBLIC_ASSET || 'usdc',
   vApp: {
-    name: import.meta.env.VITE_VAPP_NAME || '',
-    scope: import.meta.env.VITE_VAPP_SCOPE || '',
+    name: process.env.NEXT_PUBLIC_VAPP_NAME || '',
+    scope: process.env.NEXT_PUBLIC_VAPP_SCOPE || '',
   },
 } as const;

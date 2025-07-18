@@ -1,3 +1,5 @@
+'use client';
+
 import { createContext, useContext, useEffect, useRef } from 'react';
 import type { Children } from 'react';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
@@ -97,13 +99,13 @@ export const YellowWebSocketProvider = ({ children }: YellowWebSocketProviderPro
         },
         onChallengeReceived: (challengeData) => {
             // Challenge received - button should now be visible
-            if (import.meta.env.DEV) {
+            if (process.env.NODE_ENV === 'development') {
                 console.log('Challenge received:', challengeData);
             }
         },
         onVerifyFailed: (error) => {
             // Verification failed - keep connection alive
-            if (import.meta.env.DEV) {
+            if (process.env.NODE_ENV === 'development') {
                 console.log('Verification failed:', error);
             }
         },
@@ -188,7 +190,7 @@ export const YellowWebSocketProvider = ({ children }: YellowWebSocketProviderPro
             case RPCMethod.AuthChallenge:
                 // Forward auth_challenge to the client for proper handling
                 if (client) {
-                    if (import.meta.env.DEV) {
+                    if (process.env.NODE_ENV === 'development') {
                         console.log('YellowWebSocketProvider forwarding auth_challenge to client');
                     }
                     // Manually trigger the client's challenge handling
@@ -223,7 +225,7 @@ export const YellowWebSocketProvider = ({ children }: YellowWebSocketProviderPro
                 handleTransferNotification(res.params);
                 break;
             default:
-                if (import.meta.env.DEV) {
+                if (process.env.NODE_ENV === 'development') {
                     console.log('Unknown Yellow message:', data);
                 }
         }

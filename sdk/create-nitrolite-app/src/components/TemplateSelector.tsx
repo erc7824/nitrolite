@@ -11,18 +11,6 @@ interface Template {
 
 const TEMPLATES: Template[] = [
   {
-    id: 'react-vite',
-    name: 'React + Vite',
-    description: 'Modern React setup with Vite, TypeScript, and TailwindCSS',
-    features: ['React 18', 'Vite', 'TypeScript', 'TailwindCSS', 'WebSocket integration']
-  },
-  {
-    id: 'vue-composition',
-    name: 'Vue 3 + Composition API',
-    description: 'Vue 3 with Composition API, Vite, and TypeScript',
-    features: ['Vue 3', 'Composition API', 'Vite', 'TypeScript', 'WebSocket integration']
-  },
-  {
     id: 'nextjs-app',
     name: 'Next.js App Router',
     description: 'Next.js with App Router, TypeScript, and TailwindCSS',

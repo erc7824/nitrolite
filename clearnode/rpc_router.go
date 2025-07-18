@@ -235,16 +235,16 @@ func (r *RPCRouter) HistoryMiddleware(c *RPCContext) {
 	}
 }
 
-func parseParams(params []any, unmarshalTo any) error {
-	if len(params) > 0 {
-		paramsJSON, err := json.Marshal(params[0])
-		if err != nil {
-			return fmt.Errorf("failed to parse parameters: %w", err)
-		}
-		err = json.Unmarshal(paramsJSON, &unmarshalTo)
-		if err != nil {
-			return err
-		}
+func parseParams(params any, unmarshalTo any) error {
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return fmt.Errorf("failed to parse parameters: %w", err)
 	}
+
+	err = json.Unmarshal(paramsJSON, &unmarshalTo)
+	if err != nil {
+		return err
+	}
+
 	return getValidator().Struct(unmarshalTo)
 }

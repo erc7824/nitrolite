@@ -40,67 +40,9 @@ func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 
 	// Parse the parameters
 	var authParams AuthRequestParams
-	// TODO: change params format to a single object and use the commented code below
-	// if err := parseParams(req.Params, &authParams); err != nil {
-	// 	c.Fail(err.Error())
-	// 	return
-	// }
-
-	if len(req.Params) < 7 {
-		c.Fail(nil, "invalid parameters: expected 7 parameters")
+	if err := parseParams(req.Params, &authParams); err != nil {
+		c.Fail(err, "failed to parse auth parameters")
 		return
-	}
-
-	addr, ok := req.Params[0].(string)
-	if !ok || addr == "" {
-		c.Fail(nil, fmt.Sprintf("invalid address: %v", req.Params[0]))
-		return
-	}
-
-	sessionKey, ok := req.Params[1].(string)
-	if !ok || sessionKey == "" {
-		c.Fail(nil, fmt.Sprintf("invalid session key: %v", req.Params[1]))
-		return
-	}
-
-	appName, ok := req.Params[2].(string)
-	if !ok || appName == "" {
-		c.Fail(nil, fmt.Sprintf("invalid application name: %v", req.Params[2]))
-		return
-	}
-
-	rawAllowances := req.Params[3]
-	allowances, err := parseAllowances(rawAllowances)
-	if err != nil {
-		c.Fail(err, fmt.Sprintf("invalid allowances: %s", err.Error()))
-		return
-	}
-
-	expire, ok := req.Params[4].(string)
-	if !ok {
-		c.Fail(nil, fmt.Sprintf("invalid expiration time: %v", req.Params[4]))
-		return
-	}
-
-	scope, ok := req.Params[5].(string)
-	if !ok {
-		c.Fail(nil, fmt.Sprintf("invalid scope: %v", req.Params[5]))
-		return
-	}
-
-	applicationAddress, ok := req.Params[6].(string)
-	if !ok {
-		c.Fail(nil, fmt.Sprintf("invalid application address: %v", req.Params[6]))
-	}
-
-	authParams = AuthRequestParams{
-		Address:            addr,
-		SessionKey:         sessionKey,
-		AppName:            appName,
-		Allowances:         allowances,
-		Expire:             expire,
-		Scope:              scope,
-		ApplicationAddress: applicationAddress,
 	}
 
 	logger.Debug("incoming auth request",
@@ -308,36 +250,4 @@ func ValidateTimestamp(ts uint64, expirySeconds int) error {
 		return fmt.Errorf("timestamp expired: %s older than %d s", t.Format(time.RFC3339Nano), expirySeconds)
 	}
 	return nil
-}
-
-func parseAllowances(rawAllowances any) ([]Allowance, error) {
-	outerSlice, ok := rawAllowances.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("input is not a list of allowances")
-	}
-
-	result := make([]Allowance, len(outerSlice))
-
-	for i, item := range outerSlice {
-		innerSlice, ok := item.([]interface{})
-		if !ok {
-			return nil, fmt.Errorf("allowance at index %d is not a list", i)
-		}
-		if len(innerSlice) != 2 {
-			return nil, fmt.Errorf("allowance at index %d must have exactly 2 elements (asset, amount)", i)
-		}
-
-		asset, ok1 := innerSlice[0].(string)
-		amount, ok2 := innerSlice[1].(string)
-		if !ok1 || !ok2 {
-			return nil, fmt.Errorf("allowance at index %d has non-string asset or amount", i)
-		}
-
-		result[i] = Allowance{
-			Asset:  asset,
-			Amount: amount,
-		}
-	}
-
-	return result, nil
 }

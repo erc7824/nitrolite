@@ -4,10 +4,16 @@
 
 A powerful Go-based CLI tool for interacting with Clearnode networks and orchestrating cross-chain operations. Originally designed as a simple bridge, Cerebro has evolved into a comprehensive interface for the Clearnode protocol.
 
+## Installation
+
+```bash
+go install github.com/erc7824/nitrolite/examples/cerebro@latest
+```
+
 ## Usage
 
 ```bash
-go run . <clearnode_ws_url>
+cerebro <clearnode_ws_url>
 ```
 
 ### Environment Variables
@@ -17,32 +23,59 @@ go run . <clearnode_ws_url>
 ## Features
 
 - **Wallet Management**: Import and manage wallets and signers across multiple chains
-- **Chain Operations**: Enable/disable chains for cross-chain operations
-- **Authentication**: Secure authentication with Clearnode using wallet private keys
-- **Asset Bridging**: Seamlessly transfer assets between supported blockchain networks
+- **Authentication**: Secure authentication with Clearnode using wallet private keys and signers
 - **Custody Operations**: Deposit and withdraw assets to/from the custody ledger
-- **Channel Resizing**: Dynamically resize payment channels for optimal liquidity management
+- **Payment Channels**: 
+  - Open channels for specific assets on supported chains
+  - Close channels to withdraw locked funds
+  - Resize channels to adjust liquidity between custody and channel balances
+- **Real-time Events**: WebSocket-based event handling for live updates on assets, channels, and balances
+- **Balance Tracking**: View custody, channel, and unified balances across the Clearnode network
 - **Interactive CLI**: User-friendly command-line interface with intelligent auto-completion
 - **Protocol Extensions**: Expandable architecture for future Clearnode protocol features
 
 ## Commands
 
 - `import` - Import a wallet, signer or chain RPC URL
-- `list` - List available chains, wallets, or signers
-- `authenticate` - Authenticate to the Clearnode using your wallet private key
-- `enable` - Enable a chain for the current wallet
-- `disable` - Disable a chain for the current wallet
-- `deposit` - Deposit assets from your wallet to the custody ledger
-- `withdraw` - Withdraw assets from the custody ledger to your wallet
-- `resize` - Resize payment channels by moving funds from ledger to channel
+- `list` - List available chains, wallets, signers, or channels
+- `authenticate` - Authenticate to the Clearnode using your wallet private key and signer
+- `deposit custody` - Deposit assets from your wallet to the custody ledger
+- `withdraw custody` - Withdraw assets from the custody ledger to your wallet
+- `open channel` - Open a payment channel for a specific asset on a chain
+- `close channel` - Close a payment channel and unlock funds
+- `resize channel` - Resize payment channels by adjusting allocations between custody ledger, channel, and unified balance
 - `transfer` - Transfer assets to another Clearnode user
 - `exit` - Exit the application
+
+## Channel Operations Workflow
+
+1. **Opening a Channel**
+   ```bash
+   open channel <chain_name> <token_symbol>
+   ```
+   Creates a new payment channel for the specified asset on the given chain.
+
+2. **Resizing a Channel**
+   ```bash
+   resize channel <chain_name> <token_symbol>
+   ```
+   Adjusts channel allocations by:
+   - Moving funds from custody ledger to channel (resize amount)
+   - Moving funds from unified balance to channel (allocate amount)
+   - Displays current balances before operation for clarity
+
+3. **Closing a Channel**
+   ```bash
+   close channel <chain_name> <token_symbol>
+   ```
+   Requests channel closure and withdraws unlocked funds back to custody.
 
 ## Dependencies
 
 - Go 1.24.3+
 - Ethereum client libraries
 - SQLite for local storage
+- WebSocket support for real-time events
 
 ## Roadmap
 
@@ -71,34 +104,11 @@ go run . <clearnode_ws_url>
   - Encrypted local database storage
   - Password-protected wallet access
 
-- **Comprehensive Balance Tracking**
-  - Show on-chain balances
-  - Display custody balances
-  - View custody channel balances
-  - Unified balance view across Clearnode network
-
 - **Operator Architecture Refactoring**
   - Refactor `operator.Complete` and `operator.Execute` to use `gin.Router` pattern
   - Treat user commands like HTTP endpoints with middleware support
   - Enable pre/post action hooks for common command patterns
 
-- **Chains and Channels Separation**
-  - Separate chain and channel concepts for clearer user experience
-  - Replace enable/disable chain with open/close channel operations
-  - Update `list chains` command:
-    - Remove `enabled` column
-    - Add `balance` column showing current user balance of chain asset
-  - New `list channels` command with columns: `Chain`, `Asset`, `ChannelID`, `Status`, `Balance`
-
-- **Enhanced Deposit/Withdraw Commands**
-  - Clarify deposit/withdraw destination with more intuitive naming like `deposit/withdraw custody`
-  - Make it clear which balances are affected by each operation
-
 - **Improved Balance Visibility**
   - `list custodies` showing: `Chain`, `Custody Address`, `Asset`, `Balance`
   - `list unified-balances` showing: `Asset`, `Balance`
-
-- **Resize Command Redesign**
-  - Review and simplify the `resize` command
-  - Clarify how it affects custody, channel, and unified balances
-  - Provide better usage guidance and examples

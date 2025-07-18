@@ -3,7 +3,6 @@ package clearnet
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"net"
 	"sync"
 	"time"
@@ -174,9 +173,9 @@ type ChannelClosureRes struct {
 }
 
 type AllocationRes struct {
-	Destination string   `json:"destination"`
-	Token       string   `json:"token"`
-	Amount      *big.Int `json:"amount"`
+	Destination string          `json:"destination"`
+	Token       string          `json:"token"`
+	Amount      decimal.Decimal `json:"amount"`
 }
 
 type SignatureRes struct {
@@ -226,7 +225,7 @@ type ChannelResizeRes struct {
 	Signature   SignatureRes    `json:"server_signature"`
 }
 
-func (c *ClearnodeClient) RequestChannelResize(walletAddress common.Address, channelID string, allocateAmount, resizeAmount *big.Int) (*ChannelResizeRes, error) {
+func (c *ClearnodeClient) RequestChannelResize(walletAddress common.Address, channelID string, allocateAmount, resizeAmount decimal.Decimal) (*ChannelResizeRes, error) {
 	if c.signer == nil {
 		return nil, fmt.Errorf("client not authenticated")
 	}

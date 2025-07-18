@@ -16,7 +16,7 @@ func TestRPCMessageValidate(t *testing.T) {
 			Params:    []any{"param1", 2},
 			Timestamp: uint64(time.Now().Unix()),
 		},
-		Sig: []string{"0x1234567890abcdef"},
+		Sig: []Signature{Signature([]byte("0x1234567890abcdef"))},
 	}
 
 	if err := validate.Struct(rpcMsg); err != nil {

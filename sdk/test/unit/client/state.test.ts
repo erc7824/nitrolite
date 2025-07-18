@@ -105,7 +105,7 @@ describe('_prepareAndSignInitialState', () => {
 
 describe('_prepareAndSignFinalState', () => {
     let deps: any;
-    const serverSigRaw = '"srvSig"';
+    const serverSig = 'srvSig';
     const channelIdArg = 'cid' as Hex;
     const allocations = [{ destination: '0xA' as Hex, token: '0xT' as Hex, amount: 5n }];
     const version = 7n;
@@ -134,7 +134,7 @@ describe('_prepareAndSignFinalState', () => {
                 channelId: channelIdArg,
                 allocations,
                 version,
-                serverSignature: serverSigRaw,
+                serverSignature: serverSig,
             },
         };
         const { finalStateWithSigs, channelId } = await _prepareAndSignFinalState(deps, params as any);
@@ -156,7 +156,6 @@ describe('_prepareAndSignFinalState', () => {
             sigs: [],
         });
         expect(utils.signState).toHaveBeenCalledWith('hsh', deps.stateWalletClient.signMessage);
-        expect(utils.removeQuotesFromRS).toHaveBeenCalledWith(serverSigRaw);
     });
 
     test('throws if no stateData', async () => {
@@ -166,7 +165,7 @@ describe('_prepareAndSignFinalState', () => {
                 channelId: channelIdArg,
                 allocations,
                 version,
-                serverSignature: serverSigRaw,
+                serverSignature: serverSig,
             },
         };
         await expect(_prepareAndSignFinalState(deps, params as any)).rejects.toThrow(Errors.MissingParameterError);

@@ -1,6 +1,6 @@
 import { Address, encodeAbiParameters, Hex, keccak256 } from 'viem';
 import * as Errors from '../errors';
-import { generateChannelNonce, getChannelId, getStateHash, removeQuotesFromRS, signState } from '../utils';
+import { generateChannelNonce, getChannelId, getStateHash, signState } from '../utils';
 import { PreparerDependencies } from './prepare';
 import {
     ChallengeChannelParams,
@@ -138,7 +138,6 @@ export async function _prepareAndSignResizeState(
     }
 
     const channelId = resizeState.channelId;
-    const serverSignature = removeQuotesFromRS(resizeState.serverSignature);
 
     const stateToSign: State = {
         data: resizeState.data,
@@ -155,7 +154,7 @@ export async function _prepareAndSignResizeState(
     // Create a new state with signatures in the requested style
     const resizeStateWithSigs: State = {
         ...stateToSign,
-        sigs: [accountSignature, serverSignature],
+        sigs: [accountSignature, resizeState.serverSignature],
     };
 
     let proofs: State[] = [...proofStates];
@@ -181,7 +180,6 @@ export async function _prepareAndSignFinalState(
     }
 
     const channelId = finalState.channelId;
-    const serverSignature = removeQuotesFromRS(finalState.serverSignature);
 
     const stateToSign: State = {
         data: stateData,
@@ -198,7 +196,7 @@ export async function _prepareAndSignFinalState(
     // Create a new state with signatures in the requested style
     const finalStateWithSigs: State = {
         ...stateToSign,
-        sigs: [accountSignature, serverSignature],
+        sigs: [accountSignature, finalState.serverSignature],
     };
 
     return { finalStateWithSigs, channelId };

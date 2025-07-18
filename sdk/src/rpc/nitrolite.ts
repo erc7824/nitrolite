@@ -35,7 +35,7 @@ export class NitroliteRPC {
         timestamp: number = getCurrentTimestamp(),
     ): NitroliteRPCMessage {
         const requestData: RequestData = [requestId, method, params, timestamp];
-        const message: NitroliteRPCMessage = { req: requestData };
+        const message: NitroliteRPCMessage = { req: requestData, sig: [] };
         return message;
     }
 

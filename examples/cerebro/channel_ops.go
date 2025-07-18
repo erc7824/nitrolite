@@ -254,7 +254,8 @@ func (o *Operator) handleResizeChannel(args []string) {
 	t.AppendRow(table.Row{"Unified On Clearnode", decUnifiedBalance.String()})
 	t.Render()
 
-	fmt.Printf("How much %s do you want to resize (+)into/(-)out channel?", assetSymbol)
+	fmt.Printf("How much %s do you want to resize (+)into/(-)out channel?\n", assetSymbol)
+	fmt.Println("That's the amount moved between custody ledger and channel.")
 	resizeAmountStr := o.readExtraArg("resize_amount")
 
 	decResizeAmount, err := decimal.NewFromString(resizeAmountStr)
@@ -270,8 +271,8 @@ func (o *Operator) handleResizeChannel(args []string) {
 	}
 	resizeAmount := decResizeAmount.Shift(int32(asset.Decimals))
 
-	fmt.Printf("How much %s do you want to allocate to channel?\n", assetSymbol)
-	fmt.Println("That's the amount moved from unified balance to channel.")
+	fmt.Printf("How much %s do you want to allocate (+)into/(-)out channel?\n", assetSymbol)
+	fmt.Println("That's the amount moved between unified balance and channel.")
 	allocateAmountStr := o.readExtraArg("allocate_amount")
 
 	decAllocateAmount, err := decimal.NewFromString(allocateAmountStr)

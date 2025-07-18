@@ -103,19 +103,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			}
 		case "authenticate":
 			return o.getSignerSuggestions()
-		case "open":
-			if !o.isUserAuthenticated() {
-				return nil
-			}
-
-			return o.getChainSuggestions(-1) // Suggest only disabled chains
-		case "resize", "close":
-			if !o.isUserAuthenticated() {
-				return nil
-			}
-
-			return o.getChainSuggestions(1) // Suggest only enabled chains
-		case "deposit", "withdraw":
+		case "open", "resize", "close", "deposit", "withdraw":
 			if !o.isUserAuthenticated() {
 				return nil
 			}
@@ -128,19 +116,7 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 
 	if len(args) < 5 {
 		switch args[0] {
-		case "open":
-			if !o.isUserAuthenticated() {
-				return nil
-			}
-
-			return o.getAssetSuggestions(args[2], -1) // Suggest only disabled assets for the specified chain
-		case "resize", "close":
-			if !o.isUserAuthenticated() {
-				return nil
-			}
-
-			return o.getAssetSuggestions(args[2], 1) // Suggest only enabled assets for the specified chain
-		case "deposit", "withdraw":
+		case "open", "resize", "close", "deposit", "withdraw":
 			if !o.isUserAuthenticated() {
 				return nil
 			}

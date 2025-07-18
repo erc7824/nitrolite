@@ -6,6 +6,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+type BalanceUpdatesResponse struct {
+	BalanceUpdates []Balance `json:"balance_updates"`
+}
+
+type ChannelsResponse struct {
+	Channels []ChannelResponse `json:"channels"`
+}
+
+type AssetsResponse struct {
+	Assets []AssetResponse `json:"assets"`
+}
+
 // SendBalanceUpdate sends balance updates to the client
 func (r *RPCRouter) SendBalanceUpdate(destinationWallet string) {
 	senderAddress := common.HexToAddress(destinationWallet)
@@ -16,7 +28,7 @@ func (r *RPCRouter) SendBalanceUpdate(destinationWallet string) {
 		return
 	}
 
-	r.Node.Notify(destinationWallet, "bu", balances)
+	r.Node.Notify(destinationWallet, "bu", BalanceUpdatesResponse{BalanceUpdates: balances})
 	r.lg.Info("balance update sent", "userID", destinationWallet, "balances", balances)
 }
 
@@ -46,8 +58,9 @@ func (r *RPCRouter) SendChannelUpdate(channel Channel) {
 	)
 }
 
+// TODO: make adequate notifications response/type
 // SendTransferNotification sends a transfer notification to the client
-func (r *RPCRouter) SendTransferNotification(destinationWallet string, transferredAllocations []TransactionResponse) {
+func (r *RPCRouter) SendTransferNotification(destinationWallet string, transferredAllocations TransferResponse) {
 	r.Node.Notify(destinationWallet, "tr", transferredAllocations)
 	r.lg.Info("transfer notification sent", "userID", destinationWallet, "transferred allocations", transferredAllocations)
 }

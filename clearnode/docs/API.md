@@ -35,7 +35,7 @@ Initiates authentication with the server.
 
 ```json
 {
-  "req": [1, "auth_request", [{
+  "req": [1, "auth_request", {
     "address": "0x1234567890abcdef...",
     "session_key": "0x9876543210fedcba...", // If specified, enables delegation to this key
     "app_name": "Example App", // Application name for analytics
@@ -48,7 +48,7 @@ Initiates authentication with the server.
     "scope": "app.create", // Permission scope (e.g., "app.create", "ledger.readonly")
     "expire": "3600", //  Session expiration
     "application": "0xApp1234567890abcdef..." // Application public address
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x5432abcdef..."] // Client's signature of the entire 'req' object
 }
 ```
@@ -61,9 +61,9 @@ Server response with a challenge token for the client to sign.
 
 ```json
 {
-  "res": [1, "auth_challenge", [{
+  "res": [1, "auth_challenge", {
     "challenge_message": "550e8400-e29b-41d4-a716-446655440000"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."] // Server's signature of the entire 'res' object
 }
 ```
@@ -76,9 +76,9 @@ Completes authentication with a challenge response.
 
 ```json
 {
-  "req": [2, "auth_verify", [{
+  "req": [2, "auth_verify", {
     "challenge": "550e8400-e29b-41d4-a716-446655440000"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x2345bcdef..."] // Client's EIP-712 signatures of the challenge data object
 }
 ```
@@ -87,11 +87,11 @@ Completes authentication with a challenge response.
 
 ```json
 {
-  "res": [2, "auth_verify", [{
+  "res": [2, "auth_verify", {
     "address": "0x1234567890abcdef...",
     "success": true,
     "jwt_token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..." // JWT token for subsequent requests
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."] // Server's signature of the entire 'res' object
 }
 ```
@@ -120,7 +120,7 @@ Supports pagination and sorting by providing optional request parameters and met
 
 ```json
 {
-  "req": [1, "get_channels", [], 1619123456789],
+  "req": [1, "get_channels", {}, 1619123456789],
   "sig": []
 }
 ```
@@ -129,13 +129,13 @@ Supports pagination and sorting by providing optional request parameters and met
 
 ```json
 {
-  "req": [1, "get_channels", [{
+  "req": [1, "get_channels", {
     "participant": "0x1234567890abcdef...", // Optional: filter by participant
     "status":"open", // Optional filter
     "offset": 42, // Optional: pagination offset
     "limit": 10, // Optional: number of channels to return
     "sort": "desc" // Optional: sort asc or desc by created_at
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": []
 }
 ```
@@ -144,7 +144,7 @@ Supports pagination and sorting by providing optional request parameters and met
 
 ```json
 {
-  "res": [1, "get_channels", [{
+  "res": [1, "get_channels", {
     "channels" : [
       {
         "channel_id": "0xfedcba9876543210...",
@@ -183,7 +183,7 @@ Supports pagination and sorting by providing optional request parameters and met
       "total_count": 56,
       "page_count": 6
     }
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -221,9 +221,9 @@ Retrieves the application definition for a specific ledger account.
 
 ```json
 {
-  "req": [1, "get_app_definition", [{
+  "req": [1, "get_app_definition", {
     "app_session_id": "0x1234567890abcdef..."
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -232,7 +232,7 @@ Retrieves the application definition for a specific ledger account.
 
 ```json
 {
-  "res": [1, "get_app_definition", [{
+  "res": [1, "get_app_definition", {
     "protocol": "NitroRPC/0.2",
     "participants": [
       "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
@@ -242,7 +242,7 @@ Retrieves the application definition for a specific ledger account.
     "quorum": 100,
     "challenge": 86400,
     "nonce": 1
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -258,7 +258,7 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_app_sessions", [], 1619123456789],
+  "req": [1, "get_app_sessions", {}, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -267,13 +267,13 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_app_sessions", [{
+  "req": [1, "get_app_sessions", {
     "participant": "0x1234567890abcdef...",  // Optional: filter by participant
     "status": "open",  // Optional: filter by status
     "offset": 42, // Optional: pagination offset
     "limit": 10, // Optional: number of sessions to return
     "sort": "asc", // Optional: sort asc or desc
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -282,7 +282,7 @@ Supports pagination and sorting.
 
 ```json
 {
-  "res": [1, "get_app_sessions", [{
+  "res": [1, "get_app_sessions", {
     "app_sessions" : [
       {
         "app_session_id": "0x3456789012abcdef...",
@@ -321,7 +321,7 @@ Supports pagination and sorting.
       "total_count": 56,
       "page_count": 6
     }
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -334,11 +334,11 @@ Retrieves the balances of all participants in a specific ledger account.
 
 ```json
 {
-  "req": [1, "get_ledger_balances", [{
+  "req": [1, "get_ledger_balances", {
     "participant": "0x1234567890abcdef...", // TO BE DEPRECATED
     // OR
     "account_id": "0x1234567890abcdef..."
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -350,7 +350,7 @@ To get balance in a specific virtual app session, specify `app_session_id` as ac
 
 ```json
 {
-  "res": [1, "get_ledger_balances", [{
+  "res": [1, "get_ledger_balances", {
     "ledger_balances": [
       {
         "asset": "usdc",
@@ -361,7 +361,7 @@ To get balance in a specific virtual app session, specify `app_session_id` as ac
         "amount": "0.5"
       }
     ],
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -374,7 +374,7 @@ Retrieves the user's tag, which can be used for transfer operations. The tag is 
 
 ```json
 {
-  "req": [1, "get_user_tag", [], 1619123456789],
+  "req": [1, "get_user_tag", {}, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -383,10 +383,9 @@ Retrieves the user's tag, which can be used for transfer operations. The tag is 
 
 ```json
 {
-  "res": [1, "get_user_tag", [
-    {
-      "tag": "UX123D",
-    }], 1619123456789],
+  "res": [1, "get_user_tag", {
+    "tag": "UX123D",
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -404,7 +403,7 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 
 ```json
 {
-  "req": [1, "transfer", [{
+  "req": [1, "transfer", {
     "destination": "0x9876543210abcdef...",
     "allocations": [
       {
@@ -416,14 +415,14 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
         "amount": "0.1"
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 
 // OR
 
 {
-  "req": [1, "transfer", [{
+  "req": [1, "transfer", {
     "destination_user_tag": "UX123D",
     "allocations": [
       {
@@ -435,7 +434,7 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
         "amount": "0.1"
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -444,7 +443,7 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
 
 ```json
 {
-  "res": [1, "transfer", [{
+  "res": [1, "transfer", {
     "transactions" : [
       {
         "id": "1",
@@ -469,12 +468,12 @@ Currently, `Transfer` supports ledger account of another user as destination (wa
         "created_at": "2023-05-01T12:00:00Z"
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
 
-The response returns an array of transaction objects, with one transaction for each asset being transferred. 
+The response returns an array of transaction objects, with one transaction for each asset being transferred.
 
 Each transaction includes:
 
@@ -499,7 +498,7 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_ledger_entries", [], 1619123456789],
+  "req": [1, "get_ledger_entries", {}, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -508,14 +507,14 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_ledger_entries", [{
+  "req": [1, "get_ledger_entries", {
     "account_id": "0x1234567890abcdef...", // Optional: filter by account ID
     "wallet": "0x1234567890abcdef...", // Optional: filter by participant
     "asset": "usdc", // Optional: filter by asset
     "offset": 42, // Optional: pagination offset
     "limit": 10, // Optional: number of entries to return
     "sort": "desc" // Optional: sort asc or desc by created_at
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -524,7 +523,7 @@ Supports pagination and sorting.
 
 ```json
 {
-  "res": [1, "get_ledger_entries", [{
+  "res": [1, "get_ledger_entries", {
     "ledger_entries": [
       {
         "id": 123,
@@ -553,7 +552,7 @@ Supports pagination and sorting.
       "total_count": 56,
       "page_count": 6
     }
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -577,7 +576,7 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_ledger_transactions", [], 1619123456789],
+  "req": [1, "get_ledger_transactions", {}, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -586,14 +585,14 @@ Supports pagination and sorting.
 
 ```json
 {
-  "req": [1, "get_ledger_transactions", [{
+  "req": [1, "get_ledger_transactions", {
     "account_id": "0x1234567890abcdef...", // Optional: filter by account ID
     "asset": "usdc",     // Optional: filter by asset
     "tx_type": "transfer", // Optional: filter by transaction type
     "offset": 42, // Optional: pagination offset
     "limit": 10, // Optional: number of transactions to return
     "sort": "desc" // Optional: sort asc or desc by created_at
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -602,7 +601,7 @@ Supports pagination and sorting.
 
 ```json
 {
-  "res": [1, "get_ledger_transactions", [{
+  "res": [1, "get_ledger_transactions", {
     "ledger_transaction":[
       {
         "id": "1",
@@ -633,7 +632,7 @@ Supports pagination and sorting.
       "total_count": 56,
       "page_count": 6
     }
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -660,7 +659,7 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
 
 ```json
 {
-  "req": [4, "get_rpc_history", [], 1619123456789],
+  "req": [4, "get_rpc_history", {}, 1619123456789],
   "sig": []
 }
 ```
@@ -669,7 +668,7 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
 
 ```json
 {
-  "res": [4, "get_rpc_history", [{
+  "res": [4, "get_rpc_history", {
     "rpc_history": [
       {
         "id": 123,
@@ -694,7 +693,7 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
         "res_sig": ["0xdcba4321..."]
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -712,7 +711,7 @@ The optional `session_data` field can be used to store application-specific data
 
 ```json
 {
-  "req": [1, "create_app_session", [{
+  "req": [1, "create_app_session", {
     "definition": {
       "protocol": "NitroRPC/0.2",
       "participants": [
@@ -737,7 +736,7 @@ The optional `session_data` field can be used to store application-specific data
       }
     ],
     "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"waiting\"}"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -746,11 +745,11 @@ The optional `session_data` field can be used to store application-specific data
 
 ```json
 {
-  "res": [1, "create_app_session", [{
+  "res": [1, "create_app_session", {
     "app_session_id": "0x3456789012abcdef...",
     "version": "1",
     "status": "open"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -767,7 +766,7 @@ The optional `session_data` field can be used to update application-specific dat
 
 ```json
 {
-  "req": [1, "submit_app_state", [{
+  "req": [1, "submit_app_state", {
     "app_session_id": "0x3456789012abcdef...",
     "allocations": [
       {
@@ -782,7 +781,7 @@ The optional `session_data` field can be used to update application-specific dat
       }
     ],
     "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"finished\",\"winner\":\"0x00112233445566778899AaBbCcDdEeFf00112233\",\"endCondition\":\"checkmate\"}" // Optional
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba...", "0x8765fedcba..."]
 }
 ```
@@ -791,11 +790,11 @@ The optional `session_data` field can be used to update application-specific dat
 
 ```json
 {
-  "res": [1, "submit_app_state", [{
+  "res": [1, "submit_app_state", {
     "app_session_id": "0x3456789012abcdef...",
     "version": "567",
     "status": "open"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -812,7 +811,7 @@ The optional `session_data` field can be used to provide final application-speci
 
 ```json
 {
-  "req": [1, "close_app_session", [{
+  "req": [1, "close_app_session", {
     "app_session_id": "0x3456789012abcdef...",
     "allocations": [
       {
@@ -827,7 +826,7 @@ The optional `session_data` field can be used to provide final application-speci
       }
     ],
     "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"closed\",\"winner\":\"0x00112233445566778899AaBbCcDdEeFf00112233\",\"endCondition\":\"checkmate\",\"moveHistory\":[\"e2e4\",\"e7e5\",\"Nf3\",\"Nc6\"]}"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba...", "0x8765fedcba..."]
 }
 ```
@@ -836,11 +835,11 @@ The optional `session_data` field can be used to provide final application-speci
 
 ```json
 {
-  "res": [1, "close_app_session", [{
+  "res": [1, "close_app_session", {
     "app_session_id": "0x3456789012abcdef...",
     "version": "3",
     "status": "closed"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -848,16 +847,16 @@ The optional `session_data` field can be used to provide final application-speci
 ### Close Channel
 
 To close a channel, the user must request the final state signed by the broker and then submit it to the smart contract.
-Only an open channel can be closed. In case the user does not agree with the final state provided by the broker, they can call the `challenge` method directly on the smart contract. 
+Only an open channel can be closed. In case the user does not agree with the final state provided by the broker, they can call the `challenge` method directly on the smart contract.
 
 **Request:**
 
 ```json
 {
-  "req": [1, "close_channel", [{
+  "req": [1, "close_channel", {
     "channel_id": "0x4567890123abcdef...",
     "funds_destination": "0x1234567890abcdef..."
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -868,7 +867,7 @@ In the request, the user must specify funds destination. After the channel is cl
 
 ```json
 {
-  "res": [1, "close_channel", [{
+  "res": [1, "close_channel", {
     "channel_id": "0x4567890123abcdef...",
     "intent": 3, // IntentFINALIZE - constant magic number for closing channel
     "version": 123,
@@ -891,7 +890,7 @@ In the request, the user must specify funds destination. After the channel is cl
       "r": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
       "s": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
     }
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -904,18 +903,18 @@ Adjusts the capacity of a channel.
 
 ```json
 {
-  "req": [1, "resize_channel", [{
+  "req": [1, "resize_channel", {
     "channel_id": "0x4567890123abcdef...",
     "allocate_amount": "200000000",
     "resize_amount": "1000000000",
     "funds_destination": "0x1234567890abcdef..."
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
 
 `allocate_amount` is how much more token user wants to allocate to this token-network specific channel from his unified balance.
-`resize_amount` is how much user wants to deposit or withdraw from a token-network speecific channel.
+`resize_amount` is how much user wants to deposit or withdraw from a token-network specific channel.
 
 Example:
 
@@ -929,7 +928,7 @@ Example:
 
 ```json
 {
-  "res": [1, "resize_channel", [{
+  "res": [1, "resize_channel", {
     "channel_id": "0x4567890123abcdef...",
     "state_data": "0x0000000000000000000000000000000000000000000000000000000000002ec7",
     "intent": 2, // IntentRESIZE
@@ -952,7 +951,7 @@ Example:
       "r": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
       "s": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
     }
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -969,9 +968,9 @@ Sends a message to all participants in a virtual app session.
 
 ```json
 {
-  "req": [1, "your_custom_method", [{
+  "req": [1, "your_custom_method", {
     "your_custom_field": "Hello, application participants!"
-  }], 1619123456789],
+  }, 1619123456789],
   "sid": "0x3456789012abcdef...", // Virtual App Session ID
   "sig": ["0x9876fedcba..."]
 }
@@ -983,9 +982,9 @@ Responses can also be forwarded to all participants in a virtual application by 
 
 ```json
 {
-  "res": [1, "your_custom_method", [{
+  "res": [1, "your_custom_method", {
     "your_custom_field": "I confirm that I have received your message!"
-  }], 1619123456789],
+  }, 1619123456789],
   "sid": "0x3456789012abcdef...", // Virtual App Session ID
   "sig": ["0x9876fedcba..."]
 }
@@ -1001,7 +1000,7 @@ Simple ping to check connectivity.
 
 ```json
 {
-  "req": [1, "ping", [], 1619123456789],
+  "req": [1, "ping", {}, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -1010,7 +1009,7 @@ Simple ping to check connectivity.
 
 ```json
 {
-  "res": [1, "pong", [], 1619123456789],
+  "res": [1, "pong", {}, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1027,7 +1026,7 @@ Balance updates are sent as unsolicited server messages with the "bu" method:
 
 ```json
 {
-  "res": [1234567890123, "bu", [{
+  "res": [1234567890123, "bu", {
     "balance_updates": [
       {
         "asset": "usdc",
@@ -1038,7 +1037,7 @@ Balance updates are sent as unsolicited server messages with the "bu" method:
         "amount": "0.5"
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1051,7 +1050,7 @@ The server automatically sends all open channels as a batch update to clients af
 
 ```json
 {
-  "res": [1234567890123, "channels", [{
+  "res": [1234567890123, "channels", {
     "channels": [
       {
         "channel_id": "0xfedcba9876543210...",
@@ -1082,7 +1081,7 @@ The server automatically sends all open channels as a batch update to clients af
         "updated_at": "2023-04-20T14:30:00Z"
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1099,7 +1098,7 @@ Individual channel updates are sent as unsolicited server messages with the "cu"
 
 ```json
 {
-  "res": [1234567890123, "cu", [{
+  "res": [1234567890123, "cu", {
     "channel_id": "0xfedcba9876543210...",
     "participant": "0x1234567890abcdef...",
     "status": "open",
@@ -1112,7 +1111,7 @@ Individual channel updates are sent as unsolicited server messages with the "cu"
     "version": 2,
     "created_at": "2023-05-01T12:00:00Z",
     "updated_at": "2023-05-01T12:30:00Z"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1127,7 +1126,7 @@ Transfer notifications are sent as unsolicited server messages with the "transfe
 
 ```json
 {
-  "res": [1234567890123, "tr", [{
+  "res": [1234567890123, "tr", {
     "transfer_notifications": [
       {
         "id": "1",
@@ -1152,7 +1151,7 @@ Transfer notifications are sent as unsolicited server messages with the "transfe
         "created_at": "2023-05-01T12:00:00Z"
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1177,7 +1176,7 @@ Retrieves broker configuration information including supported networks.
 
 ```json
 {
-  "req": [1, "get_config", [], 1619123456789],
+  "req": [1, "get_config", {}, 1619123456789],
   "sig": []
 }
 ```
@@ -1186,7 +1185,7 @@ Retrieves broker configuration information including supported networks.
 
 ```json
 {
-  "res": [1, "get_config", [{
+  "res": [1, "get_config", {
     "broker_address": "0xbbbb567890abcdef...",
     "networks": [
       {
@@ -1208,7 +1207,7 @@ Retrieves broker configuration information including supported networks.
         "adjudicator_address":"0xCustodyContractAddress1..."
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1223,7 +1222,7 @@ Retrieves all supported assets. Optionally, you can filter the assets by chain_i
 
 ```json
 {
-  "req": [1, "get_assets", [], 1619123456789],
+  "req": [1, "get_assets", {}, 1619123456789],
   "sig": []
 }
 ```
@@ -1232,9 +1231,9 @@ Retrieves all supported assets. Optionally, you can filter the assets by chain_i
 
 ```json
 {
-  "req": [1, "get_assets", [{
+  "req": [1, "get_assets", {
     "chain_id": 137
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": []
 }
 ```
@@ -1243,7 +1242,7 @@ Retrieves all supported assets. Optionally, you can filter the assets by chain_i
 
 ```json
 {
-  "res": [1, "get_assets", [{
+  "res": [1, "get_assets", {
     "assets": [
       {
         "token": "0xeeee567890abcdef...",
@@ -1264,7 +1263,7 @@ Retrieves all supported assets. Optionally, you can filter the assets by chain_i
         "decimals": 18
       }
     ]
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
@@ -1275,9 +1274,9 @@ When an error occurs, the server responds with an error message:
 
 ```json
 {
-  "res": [REQUEST_ID, "error", [{
+  "res": [REQUEST_ID, "error", {
     "error": "Error message describing what went wrong"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```

@@ -1,4 +1,12 @@
 import { execSync } from 'child_process';
+import { 
+  DEFAULTS, 
+  RESERVED_NAMES, 
+  VALIDATION_PATTERNS, 
+  ERROR_MESSAGES 
+} from '../constants/defaults.js';
+import { isSafePath } from './pathResolver.js';
+import { Result, createSuccess, createError, isErrorResult } from './errorHandler.js';
 
 /**
  * Validates a project name and returns a sanitized package name
@@ -11,14 +19,13 @@ export function validateProjectName(name: string): string | null {
   // Remove leading/trailing whitespace
   const trimmed = name.trim();
   
-  // Check for valid characters (letters, numbers, hyphens, underscores)
-  const validNameRegex = /^[a-zA-Z0-9_-]+$/;
-  if (!validNameRegex.test(trimmed)) {
+  // Check for valid characters
+  if (!VALIDATION_PATTERNS.VALID_NAME.test(trimmed)) {
     return null;
   }
 
   // Check length (npm package name limits)
-  if (trimmed.length > 214) {
+  if (trimmed.length > DEFAULTS.MAX_PACKAGE_NAME_LENGTH) {
     return null;
   }
 
@@ -26,37 +33,7 @@ export function validateProjectName(name: string): string | null {
   const packageName = trimmed.toLowerCase();
   
   // Check for reserved names
-  const reservedNames = [
-    'node_modules',
-    'favicon.ico',
-    'package',
-    'package.json',
-    'npm',
-    'con',
-    'prn',
-    'aux',
-    'nul',
-    'com1',
-    'com2',
-    'com3',
-    'com4',
-    'com5',
-    'com6',
-    'com7',
-    'com8',
-    'com9',
-    'lpt1',
-    'lpt2',
-    'lpt3',
-    'lpt4',
-    'lpt5',
-    'lpt6',
-    'lpt7',
-    'lpt8',
-    'lpt9'
-  ];
-  
-  if (reservedNames.includes(packageName)) {
+  if (RESERVED_NAMES.includes(packageName)) {
     return null;
   }
 
@@ -81,28 +58,43 @@ export async function checkGitAvailability(): Promise<boolean> {
 }
 
 /**
- * Validates if a directory is safe to create
+ * Validates if a directory is safe to create (improved version with Result type)
  */
-export function validateProjectPath(projectPath: string): {
-  isValid: boolean;
-  error?: string;
-} {
-  // Check for absolute paths
-  if (projectPath.startsWith('/') || projectPath.includes('..')) {
-    return {
-      isValid: false,
-      error: 'Project path must be relative and cannot contain ".."'
-    };
+export function validateProjectPath(projectPath: string): Result<string> {
+  // Check for safe path structure
+  if (!isSafePath(projectPath)) {
+    return createError(ERROR_MESSAGES.PATH_VALIDATION);
   }
 
   // Check for invalid characters
-  const invalidChars = /[<>:"|?*]/;
-  if (invalidChars.test(projectPath)) {
-    return {
-      isValid: false,
-      error: 'Project path contains invalid characters'
-    };
+  if (VALIDATION_PATTERNS.INVALID_PATH_CHARS.test(projectPath)) {
+    return createError(ERROR_MESSAGES.INVALID_PATH_CHARS);
   }
 
-  return { isValid: true };
+  return createSuccess(projectPath);
+}
+
+/**
+ * Comprehensive project validation that combines name and path validation
+ */
+export function validateProject(input: string): Result<{
+  projectName: string;
+  projectPath: string;
+}> {
+  // Validate the project name
+  const projectName = validateProjectName(input);
+  if (!projectName) {
+    return createError(ERROR_MESSAGES.INVALID_PROJECT_NAME);
+  }
+
+  // Validate the project path
+  const pathResult = validateProjectPath(input);
+  if (isErrorResult(pathResult)) {
+    return createError(pathResult.error);
+  }
+
+  return createSuccess({
+    projectName,
+    projectPath: pathResult.data,
+  });
 }

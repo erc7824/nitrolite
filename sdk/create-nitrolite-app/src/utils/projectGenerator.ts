@@ -2,13 +2,29 @@ import fs from 'fs-extra';
 import path from 'path';
 import { execSync } from 'child_process';
 import mustache from 'mustache';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import { SDK_VERSION } from '../constants/version.js';
 import { ProjectConfig, GenerationStep } from '../types/index.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { 
+  DEFAULTS, 
+  SKIP_FILES, 
+  TEMPLATE_EXTENSIONS,
+  ERROR_MESSAGES 
+} from '../constants/defaults.js';
+import { 
+  resolveProjectPath, 
+  resolveTemplatePath, 
+  getRelativePath,
+  resolveProjectFile 
+} from './pathResolver.js';
+import { createProgressUpdater } from './progressCalculator.js';
+import { 
+  wrapAsync, 
+  createTemplateError, 
+  createGitError, 
+  createInstallError,
+  getErrorMessage,
+  isErrorResult 
+} from './errorHandler.js';
 
 interface GenerationCallbacks {
   onStep: (step: GenerationStep) => void;
@@ -16,16 +32,39 @@ interface GenerationCallbacks {
   onError: (error: string) => void;
 }
 
-const SKIP_FILES = [
-  'node_modules',
-  '.git',
-  '.next',
-  'dist',
-  'build',
-  '.template.json',
-  '.DS_Store',
-  'Thumbs.db'
-];
+// Git ignore template content
+const DEFAULT_GITIGNORE = `
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Production builds
+/dist
+/build
+/.next
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+`.trim();
 
 /**
  * Main project generation function
@@ -60,7 +99,7 @@ export async function generateProject(
     callbacks.onStep('complete');
     
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorMessage = getErrorMessage(error);
     callbacks.onError(errorMessage);
     throw error;
   }
@@ -74,12 +113,12 @@ async function copyTemplateFiles(
   template: string,
   onProgress: (percent: number) => void
 ): Promise<void> {
-  const templatePath = path.join(__dirname, '../../templates', template);
-  const targetPath = path.resolve(process.cwd(), projectPath);
+  const templatePath = resolveTemplatePath(template);
+  const targetPath = resolveProjectPath(projectPath);
   
   // Check if template exists
   if (!fs.existsSync(templatePath)) {
-    throw new Error(`Template "${template}" not found`);
+    throw createTemplateError(template);
   }
   
   // Create target directory
@@ -87,16 +126,16 @@ async function copyTemplateFiles(
   
   // Get all files recursively
   const files = await getAllFiles(templatePath);
-  const totalFiles = files.length;
+  const updateProgress = createProgressUpdater(files.length, onProgress);
   
   // Copy files with progress updates
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    const relativePath = path.relative(templatePath, file);
+    const relativePath = getRelativePath(templatePath, file);
     const targetFilePath = path.join(targetPath, relativePath);
     
     // Skip certain files
-    if (SKIP_FILES.some(skip => relativePath.includes(skip))) {
+    if (shouldSkipFile(relativePath)) {
       continue;
     }
     
@@ -107,8 +146,7 @@ async function copyTemplateFiles(
     await fs.copy(file, targetFilePath);
     
     // Update progress
-    const progress = Math.round(((i + 1) / totalFiles) * 100);
-    onProgress(progress);
+    updateProgress(i);
   }
 }
 
@@ -120,7 +158,7 @@ async function processTemplateVariables(
   projectName: string,
   onProgress: (percent: number) => void
 ): Promise<void> {
-  const targetPath = path.resolve(process.cwd(), projectPath);
+  const targetPath = resolveProjectPath(projectPath);
   
   const templateVariables = {
     projectName,
@@ -132,33 +170,24 @@ async function processTemplateVariables(
   
   // Get all files that might contain template variables
   const templateFiles = await getAllFiles(targetPath);
-  const filesToProcess = templateFiles.filter(file => {
-    const ext = path.extname(file);
-    return ['.json', '.md', '.ts', '.tsx', '.js', '.jsx', '.vue', '.html'].includes(ext);
-  });
-  
-  const totalFiles = filesToProcess.length;
+  const filesToProcess = templateFiles.filter(shouldProcessFile);
+  const updateProgress = createProgressUpdater(filesToProcess.length, onProgress);
   
   for (let i = 0; i < filesToProcess.length; i++) {
     const file = filesToProcess[i];
     
-    try {
-      // Read file content
+    const result = await wrapAsync(async () => {
       const content = await fs.readFile(file, 'utf-8');
-      
-      // Process mustache templates
       const processedContent = mustache.render(content, templateVariables);
-      
-      // Write back to file
       await fs.writeFile(file, processedContent, 'utf-8');
-      
-      // Update progress
-      const progress = Math.round(((i + 1) / totalFiles) * 100);
-      onProgress(progress);
-    } catch (error) {
-      // Skip files that can't be processed
-      console.warn(`Could not process template variables in ${file}:`, error);
+    });
+    
+    if (isErrorResult(result)) {
+      // Skip files that can't be processed but log the warning
+      console.warn(`Could not process template variables in ${file}:`, result.error);
     }
+    
+    updateProgress(i);
   }
 }
 
@@ -169,66 +198,30 @@ async function initializeGitRepository(
   projectPath: string,
   onProgress: (percent: number) => void
 ): Promise<void> {
-  const targetPath = path.resolve(process.cwd(), projectPath);
+  const targetPath = resolveProjectPath(projectPath);
   
   try {
     // Initialize git repository
-    onProgress(25);
+    onProgress(DEFAULTS.PROGRESS.QUARTER);
     execSync('git init', { cwd: targetPath, stdio: 'ignore' });
     
     // Create .gitignore if it doesn't exist
-    onProgress(50);
-    const gitignorePath = path.join(targetPath, '.gitignore');
-    if (!fs.existsSync(gitignorePath)) {
-      const gitignoreContent = `
-# Dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Production builds
-/dist
-/build
-/.next
-
-# Environment variables
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-`.trim();
-      
-      await fs.writeFile(gitignorePath, gitignoreContent, 'utf-8');
-    }
+    onProgress(DEFAULTS.PROGRESS.HALF);
+    await ensureGitignoreExists(targetPath);
     
     // Add all files
-    onProgress(75);
+    onProgress(DEFAULTS.PROGRESS.THREE_QUARTERS);
     execSync('git add -A', { cwd: targetPath, stdio: 'ignore' });
     
     // Create initial commit
-    onProgress(100);
+    onProgress(DEFAULTS.PROGRESS.COMPLETE);
     execSync('git commit -m "Initial commit from create-nitrolite-app"', { 
       cwd: targetPath, 
       stdio: 'ignore' 
     });
     
   } catch (error) {
-    throw new Error(`Failed to initialize git repository: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw createGitError(getErrorMessage(error));
   }
 }
 
@@ -239,18 +232,18 @@ async function installDependencies(
   projectPath: string,
   onProgress: (percent: number) => void
 ): Promise<void> {
-  const targetPath = path.resolve(process.cwd(), projectPath);
+  const targetPath = resolveProjectPath(projectPath);
   
   try {
-    onProgress(25);
+    onProgress(DEFAULTS.PROGRESS.QUARTER);
     
     // Check if package.json exists
-    const packageJsonPath = path.join(targetPath, 'package.json');
+    const packageJsonPath = resolveProjectFile(projectPath, 'package.json');
     if (!fs.existsSync(packageJsonPath)) {
-      throw new Error('No package.json found in project');
+      throw new Error(ERROR_MESSAGES.NO_PACKAGE_JSON);
     }
     
-    onProgress(50);
+    onProgress(DEFAULTS.PROGRESS.HALF);
     
     // Install dependencies
     execSync('npm install', { 
@@ -258,10 +251,10 @@ async function installDependencies(
       stdio: 'ignore'
     });
     
-    onProgress(100);
+    onProgress(DEFAULTS.PROGRESS.COMPLETE);
     
   } catch (error) {
-    throw new Error(`Failed to install dependencies: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw createInstallError(getErrorMessage(error));
   }
 }
 
@@ -287,4 +280,29 @@ async function getAllFiles(dir: string): Promise<string[]> {
   }
   
   return files;
+}
+
+/**
+ * Checks if a file should be skipped during copying
+ */
+function shouldSkipFile(relativePath: string): boolean {
+  return SKIP_FILES.some(skip => relativePath.includes(skip));
+}
+
+/**
+ * Checks if a file should be processed for template variables
+ */
+function shouldProcessFile(file: string): boolean {
+  const ext = path.extname(file);
+  return TEMPLATE_EXTENSIONS.includes(ext);
+}
+
+/**
+ * Ensures .gitignore file exists with default content
+ */
+async function ensureGitignoreExists(targetPath: string): Promise<void> {
+  const gitignorePath = path.join(targetPath, '.gitignore');
+  if (!fs.existsSync(gitignorePath)) {
+    await fs.writeFile(gitignorePath, DEFAULT_GITIGNORE, 'utf-8');
+  }
 }

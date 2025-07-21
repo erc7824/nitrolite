@@ -1,4 +1,4 @@
-import { config } from '../config/index.js';
+import { config, isDevelopment } from '../config/index.js';
 
 /**
  * Simple logger utility
@@ -10,10 +10,12 @@ class Logger {
 
   private formatMessage(level: string, message: string, ...args: any[]): string {
     const timestamp = this.getTimestamp();
-    const formattedArgs = args.length > 0 ? ' ' + args.map(arg => 
-      typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-    ).join(' ') : '';
-    
+    const formattedArgs =
+      args.length > 0
+        ? ' ' +
+        args.map((arg) => (typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg))).join(' ')
+        : '';
+
     return `[${timestamp}] [${level}] ${message}${formattedArgs}`;
   }
 
@@ -30,13 +32,13 @@ class Logger {
   }
 
   debug(message: string, ...args: any[]): void {
-    if (config.isDev) {
+    if (isDevelopment) {
       console.log(this.formatMessage('DEBUG', message, ...args));
     }
   }
 
   trace(message: string, ...args: any[]): void {
-    if (config.isDev) {
+    if (isDevelopment) {
       console.trace(this.formatMessage('TRACE', message, ...args));
     }
   }

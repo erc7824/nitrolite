@@ -1,287 +1,309 @@
-import { WebSocketServer, WebSocket } from 'ws';
-import { randomBytes } from 'crypto';
+import type { WebSocketServer, WebSocket } from 'ws';
+import { getNitroliteClient } from './nitrolite/client.js';
 import { logger } from '../utils/logger.js';
-import { authenticateWallet, generateAuthChallenge, validateAuthChallenge } from './nitrolite/auth.js';
-import type { 
-  WebSocketConnection, 
-  WebSocketMessage, 
-  AuthMessage, 
-  ErrorMessage, 
-  SuccessMessage,
-  ConnectionInfo 
-} from '../types/index.js';
 
-// Store active connections
-const connections = new Map<string, ConnectionInfo>();
+interface ClientConnection {
+  ws: WebSocket;
+  id: string;
+  isAlive: boolean;
+}
 
-/**
- * Setup WebSocket server handlers
- */
-export function setupWebSocketHandlers(wss: WebSocketServer): void {
-  logger.info('Setting up WebSocket handlers');
+class WebSocketService {
+  private clients = new Map<string, ClientConnection>();
+  private messageHandlers = new Map<string, (client: ClientConnection, data: any) => void>();
 
-  wss.on('connection', (ws: WebSocket) => {
-    const connection = ws as WebSocketConnection;
-    connection.id = randomBytes(8).toString('hex');
-    connection.isAuthenticated = false;
-    connection.connectedAt = new Date();
-    connection.lastActivity = new Date();
+  constructor() {
+    this.setupMessageHandlers();
+  }
 
-    // Store connection info
-    connections.set(connection.id, {
-      id: connection.id,
-      isAuthenticated: false,
-      connectedAt: connection.connectedAt,
-      lastActivity: connection.lastActivity
+  private setupMessageHandlers(): void {
+    // Handler for ping messages
+    this.messageHandlers.set('ping', (client: ClientConnection, data: any) => {
+      this.sendToClient(client.id, { type: 'pong', timestamp: Date.now() });
     });
 
-    logger.info(`Client connected: ${connection.id}`);
-
-    // Send welcome message
-    sendMessage(connection, {
-      type: 'welcome',
-      payload: {
-        connectionId: connection.id,
-        message: 'Welcome to {{projectName}}'
+    // Handler for Nitrolite message forwarding
+    this.messageHandlers.set('nitrolite_message', (client: ClientConnection, data: any) => {
+      const nitroliteClient = getNitroliteClient();
+      
+      if (!nitroliteClient || !nitroliteClient.isConnected) {
+        this.sendToClient(client.id, {
+          type: 'error',
+          message: 'Not connected to Nitrolite network',
+          code: 'NOT_CONNECTED'
+        });
+        return;
       }
-    });
 
-    // Handle incoming messages
-    connection.on('message', async (data: Buffer) => {
       try {
-        connection.lastActivity = new Date();
-        const message: WebSocketMessage = JSON.parse(data.toString());
-        await handleMessage(connection, message);
+        nitroliteClient.send(data.payload);
+        logger.debug(`Forwarded message to Nitrolite from client ${client.id}`);
       } catch (error) {
-        logger.error('Error parsing WebSocket message:', error);
-        sendError(connection, 'INVALID_MESSAGE', 'Invalid message format');
+        logger.error('Failed to forward message to Nitrolite:', error);
+        this.sendToClient(client.id, {
+          type: 'error',
+          message: 'Failed to forward message to Nitrolite',
+          code: 'FORWARD_FAILED',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
       }
     });
 
-    // Handle connection close
-    connection.on('close', () => {
-      logger.info(`Client disconnected: ${connection.id}`);
-      connections.delete(connection.id!);
+    // Handler for status requests
+    this.messageHandlers.set('status', (client: ClientConnection, data: any) => {
+      const nitroliteClient = getNitroliteClient();
+      
+      this.sendToClient(client.id, {
+        type: 'status',
+        nitrolite: {
+          connected: nitroliteClient?.isConnected || false,
+          status: nitroliteClient?.currentStatus || 'disconnected',
+          sessionAddress: nitroliteClient?.currentSessionAddress || null,
+        },
+        server: {
+          uptime: process.uptime(),
+          connectedClients: this.clients.size,
+        }
+      });
+    });
+  }
+
+  setupWebSocketServer(wss: WebSocketServer): void {
+    logger.info('Setting up WebSocket server...');
+
+    // Setup Nitrolite message forwarding
+    this.setupNitroliteForwarding();
+
+    wss.on('connection', (ws: WebSocket) => {
+      const clientId = this.generateClientId();
+      
+      const client: ClientConnection = {
+        ws,
+        id: clientId,
+        isAlive: true,
+      };
+
+      this.clients.set(clientId, client);
+      logger.info(`Client ${clientId} connected. Total clients: ${this.clients.size}`);
+
+      // Send welcome message
+      this.sendToClient(clientId, {
+        type: 'welcome',
+        clientId,
+        timestamp: Date.now(),
+        nitroliteStatus: {
+          connected: getNitroliteClient()?.isConnected || false,
+          status: getNitroliteClient()?.currentStatus || 'disconnected',
+        }
+      });
+
+      // Handle incoming messages
+      ws.on('message', (message: Buffer) => {
+        try {
+          const data = JSON.parse(message.toString());
+          this.handleClientMessage(client, data);
+        } catch (error) {
+          logger.error(`Invalid message from client ${clientId}:`, error);
+          this.sendToClient(clientId, {
+            type: 'error',
+            message: 'Invalid JSON message',
+            code: 'INVALID_JSON'
+          });
+        }
+      });
+
+      // Handle pong responses for heartbeat
+      ws.on('pong', () => {
+        client.isAlive = true;
+      });
+
+      // Handle client disconnection
+      ws.on('close', () => {
+        this.clients.delete(clientId);
+        logger.info(`Client ${clientId} disconnected. Total clients: ${this.clients.size}`);
+      });
+
+      // Handle WebSocket errors
+      ws.on('error', (error) => {
+        logger.error(`WebSocket error for client ${clientId}:`, error);
+        this.clients.delete(clientId);
+      });
     });
 
-    // Handle connection error
-    connection.on('error', (error) => {
-      logger.error(`WebSocket error for ${connection.id}:`, error);
-    });
-  });
+    // Setup heartbeat mechanism
+    this.setupHeartbeat();
 
-  // Periodic cleanup of stale connections
-  setInterval(() => {
-    const staleThreshold = 5 * 60 * 1000; // 5 minutes
-    const now = new Date().getTime();
+    logger.info('WebSocket server setup complete');
+  }
 
-    for (const [id, info] of connections.entries()) {
-      if (now - info.lastActivity.getTime() > staleThreshold) {
-        logger.info(`Removing stale connection: ${id}`);
-        connections.delete(id);
-      }
+  private setupNitroliteForwarding(): void {
+    const nitroliteClient = getNitroliteClient();
+    
+    if (!nitroliteClient) {
+      logger.warn('Nitrolite client not available for message forwarding');
+      return;
     }
-  }, 60000); // Check every minute
-}
 
-/**
- * Handle incoming WebSocket messages
- */
-async function handleMessage(connection: WebSocketConnection, message: WebSocketMessage): Promise<void> {
-  logger.debug(`Handling message type: ${message.type} from ${connection.id}`);
+    // Forward Nitrolite messages to all connected clients
+    nitroliteClient.onMessage((message: any) => {
+      this.broadcastToClients({
+        type: 'nitrolite_message',
+        data: message,
+        timestamp: Date.now(),
+      });
+    });
 
-  switch (message.type) {
-    case 'ping':
-      handlePing(connection);
-      break;
+    // Forward Nitrolite status changes to all connected clients
+    nitroliteClient.onStatusChange((status) => {
+      this.broadcastToClients({
+        type: 'nitrolite_status',
+        status,
+        timestamp: Date.now(),
+      });
+    });
 
-    case 'auth':
-      await handleAuth(connection, message as AuthMessage);
-      break;
+    // Forward Nitrolite errors to all connected clients
+    nitroliteClient.onError((error) => {
+      this.broadcastToClients({
+        type: 'nitrolite_error',
+        error: error.message,
+        timestamp: Date.now(),
+      });
+    });
 
-    case 'get_challenge':
-      handleGetChallenge(connection, message);
-      break;
-
-    case 'app_message':
-      if (connection.isAuthenticated) {
-        await handleAppMessage(connection, message);
-      } else {
-        sendError(connection, 'NOT_AUTHENTICATED', 'Authentication required');
-      }
-      break;
-
-    default:
-      logger.warn(`Unknown message type: ${message.type} from ${connection.id}`);
-      sendError(connection, 'UNKNOWN_MESSAGE_TYPE', `Unknown message type: ${message.type}`);
-  }
-}
-
-/**
- * Handle ping messages
- */
-function handlePing(connection: WebSocketConnection): void {
-  sendMessage(connection, {
-    type: 'pong',
-    timestamp: Date.now()
-  });
-}
-
-/**
- * Handle authentication requests
- */
-async function handleAuth(connection: WebSocketConnection, message: AuthMessage): Promise<void> {
-  const { walletAddress, signature, message: authMessage } = message.payload;
-
-  if (!walletAddress || !signature || !authMessage) {
-    sendError(connection, 'INVALID_AUTH', 'Missing required authentication fields');
-    return;
+    logger.info('Nitrolite message forwarding setup complete');
   }
 
-  // Validate auth challenge
-  if (!validateAuthChallenge(authMessage)) {
-    sendError(connection, 'EXPIRED_CHALLENGE', 'Authentication challenge expired');
-    return;
-  }
+  private handleClientMessage(client: ClientConnection, data: any): void {
+    const { type } = data;
 
-  // Verify signature
-  if (!authenticateWallet(walletAddress, signature, authMessage)) {
-    sendError(connection, 'INVALID_SIGNATURE', 'Invalid signature');
-    return;
-  }
-
-  // Mark as authenticated
-  connection.isAuthenticated = true;
-  connection.walletAddress = walletAddress;
-
-  // Update connection info
-  const connInfo = connections.get(connection.id!);
-  if (connInfo) {
-    connInfo.isAuthenticated = true;
-    connInfo.walletAddress = walletAddress;
-  }
-
-  logger.info(`Client authenticated: ${connection.id} (${walletAddress})`);
-
-  sendSuccess(connection, 'Authentication successful', {
-    walletAddress,
-    isAuthenticated: true
-  });
-}
-
-/**
- * Handle get challenge requests
- */
-function handleGetChallenge(connection: WebSocketConnection, message: WebSocketMessage): void {
-  const walletAddress = message.payload?.walletAddress;
-
-  if (!walletAddress) {
-    sendError(connection, 'MISSING_WALLET_ADDRESS', 'Wallet address required');
-    return;
-  }
-
-  const challenge = generateAuthChallenge(walletAddress);
-
-  sendMessage(connection, {
-    type: 'auth_challenge',
-    payload: {
-      challenge,
-      walletAddress
+    if (!type) {
+      this.sendToClient(client.id, {
+        type: 'error',
+        message: 'Message type is required',
+        code: 'MISSING_TYPE'
+      });
+      return;
     }
-  });
-}
 
-/**
- * Handle application-specific messages
- */
-async function handleAppMessage(connection: WebSocketConnection, message: WebSocketMessage): Promise<void> {
-  const { action, data } = message.payload;
+    const handler = this.messageHandlers.get(type);
+    if (handler) {
+      try {
+        handler(client, data);
+      } catch (error) {
+        logger.error(`Error handling message type ${type} from client ${client.id}:`, error);
+        this.sendToClient(client.id, {
+          type: 'error',
+          message: 'Internal server error',
+          code: 'HANDLER_ERROR'
+        });
+      }
+    } else {
+      logger.warn(`Unknown message type '${type}' from client ${client.id}`);
+      this.sendToClient(client.id, {
+        type: 'error',
+        message: `Unknown message type: ${type}`,
+        code: 'UNKNOWN_TYPE'
+      });
+    }
+  }
 
-  logger.info(`Handling app message: ${action} from ${connection.walletAddress}`);
+  private sendToClient(clientId: string, data: any): void {
+    const client = this.clients.get(clientId);
+    if (!client || client.ws.readyState !== client.ws.OPEN) {
+      return;
+    }
 
-  // Add your application-specific message handling here
-  switch (action) {
-    case 'get_status':
-      sendMessage(connection, {
-        type: 'app_response',
-        payload: {
-          action: 'status',
-          data: {
-            server: '{{projectName}}',
-            version: '0.1.0',
-            timestamp: Date.now(),
-            connections: connections.size
+    try {
+      client.ws.send(JSON.stringify(data));
+    } catch (error) {
+      logger.error(`Failed to send message to client ${clientId}:`, error);
+      this.clients.delete(clientId);
+    }
+  }
+
+  private broadcastToClients(data: any): void {
+    const message = JSON.stringify(data);
+    
+    this.clients.forEach((client, clientId) => {
+      if (client.ws.readyState === client.ws.OPEN) {
+        try {
+          client.ws.send(message);
+        } catch (error) {
+          logger.error(`Failed to broadcast to client ${clientId}:`, error);
+          this.clients.delete(clientId);
+        }
+      }
+    });
+  }
+
+  private setupHeartbeat(): void {
+    const interval = setInterval(() => {
+      this.clients.forEach((client, clientId) => {
+        if (!client.isAlive) {
+          logger.info(`Terminating unresponsive client ${clientId}`);
+          client.ws.terminate();
+          this.clients.delete(clientId);
+          return;
+        }
+
+        client.isAlive = false;
+        if (client.ws.readyState === client.ws.OPEN) {
+          try {
+            client.ws.ping();
+          } catch (error) {
+            logger.error(`Failed to ping client ${clientId}:`, error);
+            this.clients.delete(clientId);
           }
         }
       });
-      break;
+    }, 30000); // 30 seconds
 
-    default:
-      logger.warn(`Unknown app action: ${action}`);
-      sendError(connection, 'UNKNOWN_ACTION', `Unknown action: ${action}`);
+    // Cleanup interval on process exit
+    process.on('SIGINT', () => {
+      clearInterval(interval);
+    });
+
+    process.on('SIGTERM', () => {
+      clearInterval(interval);
+    });
+  }
+
+  private generateClientId(): string {
+    return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // Public methods for external use
+  getConnectedClientsCount(): number {
+    return this.clients.size;
+  }
+
+  getConnectedClientIds(): string[] {
+    return Array.from(this.clients.keys());
+  }
+
+  sendToAllClients(data: any): void {
+    this.broadcastToClients(data);
+  }
+
+  disconnectClient(clientId: string): boolean {
+    const client = this.clients.get(clientId);
+    if (client) {
+      client.ws.close();
+      this.clients.delete(clientId);
+      return true;
+    }
+    return false;
   }
 }
 
-/**
- * Send a message to a WebSocket connection
- */
-function sendMessage(connection: WebSocketConnection, message: WebSocketMessage): void {
-  if (connection.readyState === WebSocket.OPEN) {
-    connection.send(JSON.stringify({
-      ...message,
-      timestamp: message.timestamp || Date.now()
-    }));
-  }
+// Global WebSocket service instance
+const webSocketService = new WebSocketService();
+
+export function setupWebSocketHandlers(wss: WebSocketServer): void {
+  webSocketService.setupWebSocketServer(wss);
 }
 
-/**
- * Send an error message
- */
-function sendError(connection: WebSocketConnection, code: string, message: string, details?: any): void {
-  const errorMessage: ErrorMessage = {
-    type: 'error',
-    payload: {
-      code,
-      message,
-      details
-    }
-  };
-  sendMessage(connection, errorMessage);
-}
-
-/**
- * Send a success message
- */
-function sendSuccess(connection: WebSocketConnection, message: string, data?: any): void {
-  const successMessage: SuccessMessage = {
-    type: 'success',
-    payload: {
-      message,
-      data
-    }
-  };
-  sendMessage(connection, successMessage);
-}
-
-/**
- * Broadcast message to all authenticated connections
- */
-export function broadcastToAuthenticated(message: WebSocketMessage): void {
-  for (const [id, info] of connections.entries()) {
-    if (info.isAuthenticated) {
-      // Find the actual WebSocket connection
-      // In a real implementation, you'd store WebSocket references
-      logger.debug(`Broadcasting to ${id}`);
-    }
-  }
-}
-
-/**
- * Get connection statistics
- */
-export function getConnectionStats(): { total: number; authenticated: number } {
-  const total = connections.size;
-  const authenticated = Array.from(connections.values()).filter(c => c.isAuthenticated).length;
-  
-  return { total, authenticated };
+export function getWebSocketService(): WebSocketService {
+  return webSocketService;
 }

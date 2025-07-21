@@ -31,7 +31,7 @@ export function setupGracefulShutdown(server: Server, wss: WebSocketServer): voi
 
     // Graceful exit
     setTimeout(() => {
-      logger.info('{{projectName}} server shut down complete');
+      logger.info('Server shut down complete');
       process.exit(0);
     }, 1000);
   };

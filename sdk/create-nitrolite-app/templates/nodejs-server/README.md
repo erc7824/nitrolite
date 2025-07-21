@@ -80,17 +80,22 @@ npm start
 │   │   └── index.ts          # Environment configuration
 │   ├── services/
 │   │   ├── nitrolite/
-│   │   │   ├── client.ts     # Nitrolite RPC client
+│   │   │   ├── client.ts     # Nitrolite WebSocket client
 │   │   │   ├── auth.ts       # Authentication utilities
 │   │   │   └── types.ts      # Nitrolite type definitions
 │   │   └── websocket.ts      # WebSocket message handling
 │   ├── middleware/
 │   │   └── auth.ts           # Authentication middleware
 │   ├── routes/
-│   │   └── health.ts         # Health check endpoints
+│   │   ├── health.ts         # Health check endpoints
+│   │   └── nitrolite.ts      # Nitrolite API endpoints
+│   ├── stores/
+│   │   ├── RequestStore.ts   # Request/response tracking
+│   │   └── MessageStore.ts   # Message history storage
 │   ├── types/
 │   │   └── index.ts          # Shared type definitions
 │   ├── utils/
+│   │   ├── crypto.ts         # Cryptographic utilities
 │   │   ├── logger.ts         # Logging utility
 │   │   └── shutdown.ts       # Graceful shutdown handling
 │   └── server.ts             # Main server entry point
@@ -110,6 +115,16 @@ npm start
 - `GET /health/ready` - Readiness probe for deployments
 - `GET /health/live` - Liveness probe for deployments
 
+### Nitrolite API
+
+- `GET /api/nitrolite/status` - Get Nitrolite connection status
+- `POST /api/nitrolite/ping` - Send ping to Nitrolite network (requires auth)
+- `POST /api/nitrolite/send` - Send message to Nitrolite network (requires auth)
+- `GET /api/nitrolite/session` - Get session information (requires auth)
+- `GET /api/nitrolite/ws/clients` - Get WebSocket client information
+- `POST /api/nitrolite/ws/broadcast` - Broadcast message to all WebSocket clients
+- `POST /api/nitrolite/ws/disconnect/:clientId` - Disconnect a specific WebSocket client
+
 ## WebSocket API
 
 The server provides a WebSocket API for real-time communication. Connect to `ws://localhost:3001`.
@@ -128,43 +143,65 @@ interface WebSocketMessage {
 
 ### Supported Message Types
 
-#### Authentication
+#### Client Messages
 
-1. **Get Challenge**
+1. **Ping**
    ```json
    {
-     "type": "get_challenge",
+     "type": "ping"
+   }
+   ```
+
+2. **Forward to Nitrolite**
+   ```json
+   {
+     "type": "nitrolite_message",
      "payload": {
-       "walletAddress": "0x..."
+       "method": "assets",
+       "params": {...}
      }
    }
    ```
 
-2. **Authenticate**
+3. **Get Status**
    ```json
    {
-     "type": "auth",
-     "payload": {
-       "walletAddress": "0x...",
-       "signature": "0x...",
-       "message": "Please sign this message..."
+     "type": "status"
+   }
+   ```
+
+#### Server Messages
+
+1. **Welcome**
+   ```json
+   {
+     "type": "welcome",
+     "clientId": "client_123...",
+     "timestamp": 1234567890,
+     "nitroliteStatus": {
+       "connected": true,
+       "status": "connected"
      }
    }
    ```
 
-#### Application Messages
+2. **Nitrolite Messages**
+   ```json
+   {
+     "type": "nitrolite_message",
+     "data": {...},
+     "timestamp": 1234567890
+   }
+   ```
 
-After authentication, you can send application-specific messages:
-
-```json
-{
-  "type": "app_message",
-  "payload": {
-    "action": "get_status",
-    "data": {}
-  }
-}
-```
+3. **Status Updates**
+   ```json
+   {
+     "type": "nitrolite_status",
+     "status": "connected",
+     "timestamp": 1234567890
+   }
+   ```
 
 ## Environment Variables
 

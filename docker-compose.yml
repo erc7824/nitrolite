@@ -21,7 +21,7 @@ services:
     container_name: anvil
     ports:
       - "8545:8545"
-    entrypoint: ["anvil"] 
+    entrypoint: ["anvil"]
     command: ["--host","0.0.0.0","--chain-id","31337","--accounts","15","--balance","30000"]
     healthcheck:
       test: ["CMD", "cast", "block-number", "--rpc-url", "http://localhost:8545"]
@@ -88,16 +88,16 @@ services:
             tstamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
           );
         \" &&
-        
+
         echo 'Running pending migrations...' &&
         for migration in /migrations/*.sql; do
           filename=\$$(basename \$$migration) &&
           version=\$$(echo \$$filename | grep -o '^[0-9]\\+') &&
-          
+
           if ! psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -tAc \"SELECT 1 FROM goose_db_version WHERE version_id = \$$version\" | grep -q 1; then
             echo \"Applying migration: \$$filename\" &&
             # Extract and execute only the Up migration
-            sed -n '/^-- +goose Up/,/^-- +goose Down/p' \$$migration | 
+            sed -n '/^-- +goose Up/,/^-- +goose Down/p' \$$migration |
             grep -v '^-- +goose' |
             psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} &&
             psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c \"INSERT INTO goose_db_version (version_id) VALUES (\$$version);\" &&
@@ -110,11 +110,11 @@ services:
         echo 'Checking database...' &&
         # Check if token already exists
         TOKEN_EXISTS=$$(psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -t -c \"SELECT COUNT(*) FROM assets WHERE token = '$$TOKEN_ADDRESS' AND chain_id = 31337;\" | xargs) &&
-        
+
         if [ \"$$TOKEN_EXISTS\" -eq \"0\" ]; then
           echo 'Seeding database with tokens...' &&
           psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c \"
-            INSERT INTO assets (token, chain_id, symbol, decimals) 
+            INSERT INTO assets (token, chain_id, symbol, decimals)
             VALUES ('$$TOKEN_ADDRESS', 31337, 'USDC', 6);
           \" &&
           echo 'Database seeded with tokens successfully'
@@ -150,9 +150,9 @@ services:
       ANVIL_BALANCE_CHECKER_ADDRESS: ${ANVIL_BALANCE_CHECKER_ADDRESS:-0x730dB3A1D3Ca47e7BaEb260c24C74ED4378726Bc}
       ANVIL_INFURA_URL: ws://anvil:8545
       CLEARNODE_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-postgres}?sslmode=disable
+      CLEARNODE_LOG_LEVEL: ${CLEARNODE_LOG_LEVEL:-info}
     restart: unless-stopped
 
 volumes:
   postgres_data:
     driver: local
-

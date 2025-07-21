@@ -54,7 +54,6 @@ export async function createAuthRequestMessage(
         params.application ?? '',
     ];
     const request = NitroliteRPC.createRequest(requestId, RPCMethod.AuthRequest, paramsArray, timestamp);
-    request.sig = [''];
     return JSON.stringify(request);
 }
 

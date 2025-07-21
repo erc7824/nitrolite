@@ -28,7 +28,7 @@ func createRPCContext(id int, method string, params any) *RPCContext {
 				Params:    rpcParams,
 				Timestamp: uint64(time.Now().Unix()),
 			},
-			Sig: []string{"dummy-signature"},
+			Sig: []Signature{Signature([]byte("dummy-signature"))},
 		},
 	}
 }

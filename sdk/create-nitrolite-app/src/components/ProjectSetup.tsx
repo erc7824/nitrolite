@@ -4,7 +4,8 @@ import { useInput } from 'ink';
 import path from 'path';
 import fs from 'fs-extra';
 import { validateProjectName } from '../utils/validation.js';
-import { TEMPLATES, Template } from '../constants/templates.js';
+import { TemplateSelector } from './TemplateSelector.js';
+import { ProjectConfig, SetupStep } from '../types/index.js';
 
 interface ProjectSetupProps {
   initialPath: string;
@@ -13,15 +14,12 @@ interface ProjectSetupProps {
   onError: (error: string) => void;
 }
 
-type SetupStep = 'path' | 'git' | 'template';
-
 export function ProjectSetup({ initialPath, gitAvailable, onComplete, onError }: ProjectSetupProps) {
   const [step, setStep] = useState<SetupStep>('path');
   const [projectPath, setProjectPath] = useState(initialPath || '');
   const [projectName, setProjectName] = useState('');
   const [initGit, setInitGit] = useState(gitAvailable);
   const [template, setTemplate] = useState('nextjs-app');
-  const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
   const [inputBuffer, setInputBuffer] = useState('');
   const [error, setError] = useState('');
 
@@ -49,15 +47,6 @@ export function ProjectSetup({ initialPath, gitAvailable, onComplete, onError }:
     } else if (step === 'git' && (input === 'y' || input === 'n')) {
       setInitGit(input === 'y');
       setStep('template');
-    } else if (step === 'template') {
-      if (key.upArrow) {
-        setSelectedTemplateIndex((prev) => (prev > 0 ? prev - 1 : TEMPLATES.length - 1));
-      } else if (key.downArrow) {
-        setSelectedTemplateIndex((prev) => (prev < TEMPLATES.length - 1 ? prev + 1 : 0));
-      } else if (key.return) {
-        setTemplate(TEMPLATES[selectedTemplateIndex].id);
-        handleComplete();
-      }
     }
   });
 
@@ -83,6 +72,16 @@ export function ProjectSetup({ initialPath, gitAvailable, onComplete, onError }:
       setError('');
       setStep(gitAvailable ? 'git' : 'template');
     }
+  };
+
+  const handleTemplateSelect = (selectedTemplate: string) => {
+    setTemplate(selectedTemplate);
+    onComplete({
+      projectPath,
+      projectName,
+      initGit,
+      template: selectedTemplate,
+    });
   };
 
   const handleComplete = () => {
@@ -138,52 +137,13 @@ export function ProjectSetup({ initialPath, gitAvailable, onComplete, onError }:
     </Box>
   );
 
-  const renderTemplateSelection = () => (
-    <Box flexDirection="column">
-      <Text color="cyan">🎨 Select Template</Text>
-      <Newline />
-      <Text>Choose a template for your Nitrolite application:</Text>
-      <Newline />
-
-      {TEMPLATES.map((template, index) => (
-        <Box key={template.id} flexDirection="column" marginBottom={1}>
-          <Box>
-            <Text color={index === selectedTemplateIndex ? 'green' : 'gray'}>
-              {index === selectedTemplateIndex ? '❯ ' : '  '}
-            </Text>
-            <Text color={index === selectedTemplateIndex ? 'green' : 'white'} bold={index === selectedTemplateIndex}>
-              {template.name}
-            </Text>
-          </Box>
-          {index === selectedTemplateIndex && (
-            <Box flexDirection="column" paddingLeft={2}>
-              <Text color="gray">{template.description}</Text>
-              <Box flexDirection="row" flexWrap="wrap" gap={1}>
-                {template.features.map((feature, featureIndex) => (
-                  <Text key={featureIndex} color="blue">
-                    • {feature}
-                  </Text>
-                ))}
-              </Box>
-            </Box>
-          )}
-        </Box>
-      ))}
-
-      <Newline />
-      <Text color="gray">
-        Use <Text color="white">↑↓</Text> arrows to navigate, <Text color="white">Enter</Text> to select
-      </Text>
-    </Box>
-  );
-
   switch (step) {
     case 'path':
       return renderPathInput();
     case 'git':
       return renderGitInput();
     case 'template':
-      return renderTemplateSelection();
+      return <TemplateSelector currentTemplate={template} onSelect={handleTemplateSelect} />;
     default:
       return <Text>Unknown step</Text>;
   }

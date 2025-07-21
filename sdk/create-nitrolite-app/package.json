@@ -14,7 +14,14 @@
     "start": "node dist/index.js",
     "test": "jest"
   },
-  "keywords": ["nitrolite", "cli", "scaffold", "websocket", "blockchain"],
+  "keywords": [
+    "nitrolite",
+    "sdk",
+    "cli",
+    "scaffold",
+    "websocket",
+    "blockchain"
+  ],
   "author": "Nitrolite Team",
   "license": "ISC",
   "dependencies": {

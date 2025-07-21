@@ -1,13 +1,6 @@
 import { useEffect } from 'react';
 import { Text, Box, Newline } from 'ink';
-
-interface ProjectConfig {
-  projectPath: string;
-  projectName: string;
-  template: string;
-  initGit: boolean;
-  installDeps: boolean;
-}
+import { ProjectConfig } from '../types/index.js';
 
 interface CompletionScreenProps {
   config: ProjectConfig;

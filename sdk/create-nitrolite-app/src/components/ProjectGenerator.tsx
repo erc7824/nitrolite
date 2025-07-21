@@ -1,23 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Text, Box, Newline } from 'ink';
 import { generateProject } from '../utils/projectGenerator.js';
-
-interface ProjectConfig {
-  projectPath: string;
-  projectName: string;
-  template: string;
-  initGit: boolean;
-  installDeps: boolean;
-  gitAvailable: boolean;
-}
+import { ProjectConfig, GenerationStep } from '../types/index.js';
 
 interface ProjectGeneratorProps {
   config: ProjectConfig;
   onComplete: () => void;
   onError: (error: string) => void;
 }
-
-type GenerationStep = 'copying' | 'templating' | 'git' | 'installing' | 'complete';
 
 export function ProjectGenerator({ config, onComplete, onError }: ProjectGeneratorProps) {
   const [currentStep, setCurrentStep] = useState<GenerationStep>('copying');

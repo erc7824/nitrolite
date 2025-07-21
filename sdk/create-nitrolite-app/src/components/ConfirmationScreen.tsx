@@ -1,19 +1,17 @@
 import { Text, Box, Newline } from 'ink';
 import { useInput } from 'ink';
-
-interface ProjectConfig {
-  projectPath: string;
-  projectName: string;
-  template: string;
-  initGit: boolean;
-  installDeps: boolean;
-  gitAvailable: boolean;
-}
+import { ProjectConfig } from '../types/index.js';
+import { TEMPLATES } from '../constants/templates.js';
 
 interface ConfirmationScreenProps {
   config: ProjectConfig;
   onConfirm: () => void;
   onCancel: () => void;
+}
+
+function getTemplateName(templateId: string): string {
+  const template = TEMPLATES.find(t => t.id === templateId);
+  return template?.name || templateId;
 }
 
 export function ConfirmationScreen({ config, onConfirm, onCancel }: ConfirmationScreenProps) {
@@ -38,7 +36,7 @@ export function ConfirmationScreen({ config, onConfirm, onCancel }: Confirmation
         Package name: <Text color="green">{config.projectName}</Text>
       </Text>
       <Text>
-        Template: <Text color="green">{config.template}</Text>
+        Template: <Text color="green">{getTemplateName(config.template)}</Text>
       </Text>
       <Text>
         Initialize git: <Text color={config.initGit ? 'green' : 'red'}>{config.initGit ? 'Yes' : 'No'}</Text>

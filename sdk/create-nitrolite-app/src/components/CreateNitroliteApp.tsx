@@ -6,6 +6,7 @@ import { ConfirmationScreen } from './ConfirmationScreen.js';
 import { ProjectGenerator } from './ProjectGenerator.js';
 import { CompletionScreen } from './CompletionScreen.js';
 import { validateProjectName, checkGitAvailability } from '../utils/validation.js';
+import { ProjectConfig, AppStep } from '../types/index.js';
 
 interface CreateNitroliteAppProps {
   projectDirectory?: string;
@@ -15,17 +16,6 @@ interface CreateNitroliteAppProps {
   skipPrompts?: boolean;
 }
 
-type Step = 'welcome' | 'setup' | 'confirmation' | 'generate' | 'complete';
-
-interface ProjectConfig {
-  projectPath: string;
-  projectName: string;
-  template: string;
-  initGit: boolean;
-  installDeps: boolean;
-  gitAvailable: boolean;
-}
-
 export default function CreateNitroliteApp({
   projectDirectory,
   template = 'nextjs-app',
@@ -33,7 +23,7 @@ export default function CreateNitroliteApp({
   skipInstall = false,
   skipPrompts = false,
 }: CreateNitroliteAppProps) {
-  const [step, setStep] = useState<Step>('welcome');
+  const [step, setStep] = useState<AppStep>('welcome');
   const [config, setConfig] = useState<ProjectConfig>({
     projectPath: projectDirectory || '',
     projectName: '',

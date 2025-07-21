@@ -5,21 +5,13 @@ import mustache from 'mustache';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { SDK_VERSION } from '../constants/version.js';
+import { ProjectConfig, GenerationStep } from '../types/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-interface ProjectConfig {
-  projectPath: string;
-  projectName: string;
-  template: string;
-  initGit: boolean;
-  installDeps: boolean;
-  gitAvailable: boolean;
-}
-
 interface GenerationCallbacks {
-  onStep: (step: 'copying' | 'templating' | 'git' | 'installing' | 'complete') => void;
+  onStep: (step: GenerationStep) => void;
   onProgress: (percent: number) => void;
   onError: (error: string) => void;
 }

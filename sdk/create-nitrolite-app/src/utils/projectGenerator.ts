@@ -4,6 +4,7 @@ import { execSync } from 'child_process';
 import mustache from 'mustache';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { SDK_VERSION } from '../constants/version.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -128,11 +129,13 @@ async function processTemplateVariables(
   onProgress: (percent: number) => void
 ): Promise<void> {
   const targetPath = path.resolve(process.cwd(), projectPath);
+  
   const templateVariables = {
     projectName,
     packageName: projectName.toLowerCase(),
     year: new Date().getFullYear(),
-    date: new Date().toISOString().split('T')[0]
+    date: new Date().toISOString().split('T')[0],
+    sdkVersion: SDK_VERSION
   };
   
   // Get all files that might contain template variables

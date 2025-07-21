@@ -28,7 +28,7 @@ interface ProjectConfig {
 
 export default function CreateNitroliteApp({
   projectDirectory,
-  template = 'react-vite',
+  template = 'nextjs-app',
   skipGit = false,
   skipInstall = false,
   skipPrompts = false,

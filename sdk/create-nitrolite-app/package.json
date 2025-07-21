@@ -8,8 +8,9 @@
     "create-nitrolite-app": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsx src/index.tsx",
+    "inject-version": "tsx scripts/inject-version.ts",
+    "build": "npm run inject-version && tsc",
+    "dev": "npm run inject-version && tsx src/index.tsx",
     "start": "node dist/index.js",
     "test": "jest"
   },

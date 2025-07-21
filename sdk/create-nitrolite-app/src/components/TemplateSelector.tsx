@@ -1,28 +1,7 @@
 import { useState } from 'react';
 import { Text, Box, Newline } from 'ink';
 import { useInput } from 'ink';
-
-interface Template {
-  id: string;
-  name: string;
-  description: string;
-  features: string[];
-}
-
-const TEMPLATES: Template[] = [
-  {
-    id: 'nextjs-app',
-    name: 'Next.js App Router',
-    description: 'Next.js with App Router, TypeScript, and TailwindCSS',
-    features: ['Next.js 15', 'App Router', 'TypeScript', 'TailwindCSS', 'SSR support'],
-  },
-  {
-    id: 'minimal-sdk',
-    name: 'Minimal SDK Integration',
-    description: 'Minimal setup with just the Nitrolite SDK',
-    features: ['TypeScript', 'Minimal setup', 'WebSocket client', 'SDK only'],
-  },
-];
+import { TEMPLATES, Template } from '../constants/templates.js';
 
 interface TemplateSelectorProps {
   currentTemplate: string;
@@ -30,7 +9,10 @@ interface TemplateSelectorProps {
 }
 
 export function TemplateSelector({ currentTemplate, onSelect }: TemplateSelectorProps) {
-  const [selectedIndex, setSelectedIndex] = useState(TEMPLATES.findIndex((t) => t.id === currentTemplate) || 0);
+  const [selectedIndex, setSelectedIndex] = useState(() => {
+    const index = TEMPLATES.findIndex((t) => t.id === currentTemplate);
+    return index >= 0 ? index : 0;
+  });
 
   useInput((input, key) => {
     if (key.upArrow) {

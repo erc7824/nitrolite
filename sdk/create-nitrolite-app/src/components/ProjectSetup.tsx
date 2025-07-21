@@ -4,28 +4,7 @@ import { useInput } from 'ink';
 import path from 'path';
 import fs from 'fs-extra';
 import { validateProjectName } from '../utils/validation.js';
-
-interface Template {
-  id: string;
-  name: string;
-  description: string;
-  features: string[];
-}
-
-const TEMPLATES: Template[] = [
-  {
-    id: 'nextjs-app',
-    name: 'Next.js App Router',
-    description: 'Next.js with App Router, TypeScript, and TailwindCSS',
-    features: ['Next.js 15', 'App Router', 'TypeScript', 'TailwindCSS', 'SSR support'],
-  },
-  {
-    id: 'minimal-sdk',
-    name: 'Minimal SDK Integration',
-    description: 'Minimal setup with just the Nitrolite SDK',
-    features: ['TypeScript', 'Minimal setup', 'WebSocket client', 'SDK only'],
-  },
-];
+import { TEMPLATES, Template } from '../constants/templates.js';
 
 interface ProjectSetupProps {
   initialPath: string;

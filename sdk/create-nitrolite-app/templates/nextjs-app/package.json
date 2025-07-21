@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@erc7824/nitrolite": "^0.2.30",
+    "@erc7824/nitrolite": "^{{sdkVersion}}",
     "@privy-io/react-auth": "2.17.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",

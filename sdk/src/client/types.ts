@@ -12,13 +12,10 @@ export type ChannelId = Hex;
 export type StateHash = Hex;
 
 /**
- * Signature structure used for state channel operations
+ * Signature type used when signing states
+ * @dev Hex is used to support EIP-1271 and EIP-6492 signatures.
  */
-export interface Signature {
-    v: number;
-    r: Hex;
-    s: Hex;
-}
+export type Signature = Hex;
 
 /**
  * Allocation structure representing fund distribution

@@ -10,7 +10,7 @@ import {
     Transaction,
     TransferNotificationResponseParams,
     TransferResponseParams,
-    BalanceResponse,
+    Balance,
     LedgerEntry,
 } from '../types';
 import { addressSchema, dateSchema, decimalSchema, ParamsParser } from './common';
@@ -20,7 +20,7 @@ const BalanceObjectSchema = z
         asset: z.string(),
         amount: decimalSchema,
     })
-    .transform((b): BalanceResponse => b);
+    .transform((b): Balance => b);
 
 const GetLedgerBalancesParamsSchema = z
     .object({

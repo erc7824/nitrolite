@@ -7,7 +7,7 @@ import {
     CloseAppSessionResponseParams,
     GetAppDefinitionResponseParams,
     GetAppSessionsResponseParams,
-    AppSessionResponse,
+    AppSession,
 } from '../types';
 import { hexSchema, addressSchema, statusEnum, ParamsParser, dateSchema } from './common';
 
@@ -27,7 +27,7 @@ const AppSessionObjectSchema = z
         session_data: z.string().optional(),
     })
     .transform(
-        (raw): AppSessionResponse => ({
+        (raw): AppSession => ({
             appSessionId: raw.app_session_id,
             status: raw.status,
             participants: raw.participants,

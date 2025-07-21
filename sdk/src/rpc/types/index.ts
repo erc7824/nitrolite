@@ -26,6 +26,17 @@ export enum RPCChannelStatus {
 }
 
 /**
+ * Represents the request parameters for the 'get_transactions' RPC method.
+ */
+export enum TxType {
+    Transfer = 'transfer',
+    Deposit = 'deposit',
+    Withdrawal = 'withdrawal',
+    AppDeposit = 'app_deposit',
+    AppWithdrawal = 'app_withdrawal',
+}
+
+/**
  * Represents a generic RPC message structure that includes common fields.
  * This interface is extended by specific RPC request and response types.
  */
@@ -34,6 +45,8 @@ export interface GenericRPCMessage {
     timestamp?: Timestamp;
     signatures?: Hex[];
 }
+
+// TODO: create single domain allocation type
 
 /** Base type for asset allocations with common asset and amount fields. */
 export type AssetAllocation = {
@@ -61,6 +74,18 @@ export type Allowance = {
 export type AppSessionAllocation = AssetAllocation & {
     /** The Ethereum address of the participant receiving the allocation. */
     participant: Address;
+};
+
+/** Represents the allocation of assets for an RPC transfer.
+ * This structure is used to define the asset and amount being transferred to a specific destination address.
+ */
+export type RPCAllocation = {
+    /** The destination address for the allocation. */
+    destination: Address;
+    /** The token contract address for the asset being allocated. */
+    token: Address;
+    /** The amount of the asset being allocated. */
+    amount: bigint;
 };
 
 /** Represents the allocation of assets for a transfer.
@@ -179,6 +204,151 @@ export interface ChannelUpdate {
     createdAt: Date;
     /** The timestamp when the channel was last updated. */
     updatedAt: Date;
+}
+
+/**
+ * Represents the network information for the 'get_config' RPC method.
+ */
+export interface NetworkInfo {
+    /** The name of the network (e.g., "Ethereum", "Polygon"). */
+    name: string;
+    /** The chain ID of the network. */
+    chainId: number;
+    /** The custody contract address for the network. */
+    custodyAddress: Address;
+    /** The adjudicator contract address for the network. */
+    adjudicatorAddress: Address;
+}
+
+/**
+ * Represents the balance information from clearnode.
+ */
+export interface Balance {
+    /** The asset symbol (e.g., "ETH", "USDC"). */
+    asset: string;
+    /** The balance amount. */
+    amount: string;
+}
+
+/**
+ * Represents a single entry in the ledger.
+ */
+export interface LedgerEntry {
+    /** Unique identifier for the ledger entry. */
+    id: number;
+    /** The account identifier associated with the entry. */
+    accountId: string;
+    /** The type of account (e.g., "wallet", "channel"). */
+    accountType: number;
+    /** The asset symbol for the entry. */
+    asset: string;
+    /** The Ethereum address of the participant. */
+    participant: Address;
+    /** The credit amount. */
+    credit: string;
+    /** The debit amount. */
+    debit: string;
+    /** The timestamp when the entry was created. */
+    createdAt: Date;
+}
+
+/**
+ * Represents the app session information.
+ */
+export interface AppSession {
+    /** The unique identifier for the application session. */
+    appSessionId: Hex;
+    /** The current status of the channel (e.g., "open", "closed"). */
+    status: RPCChannelStatus;
+    /** List of participant Ethereum addresses. */
+    participants: Address[];
+    /** The protocol identifier for the application. */
+    protocol: string;
+    /** The challenge period in seconds. */
+    challenge: number;
+    /** The signature weights for each participant. */
+    weights: number[];
+    /** The minimum number of signatures required for state updates. */
+    quorum: number;
+    /** The version number of the session. */
+    version: number;
+    /** The nonce value for the session. */
+    nonce: number;
+    /** The timestamp when the session was created. */
+    createdAt: Date;
+    /** The timestamp when the session was last updated. */
+    updatedAt: Date;
+    /** Optional session data as a JSON string that stores application-specific state or metadata. */
+    sessionData?: string;
+}
+
+export interface ServerSignature {
+    /** The recovery value of the signature. */
+    v: number;
+    r: Hex;
+    s: Hex;
+}
+
+/**
+ * Represents RPC entry in the history.
+ */
+export interface RPCEntry {
+    /** Unique identifier for the RPC entry. */
+    id: number;
+    /** The Ethereum address of the sender. */
+    sender: Address;
+    /** The request ID for the RPC call. */
+    reqId: number;
+    /** The RPC method name. */
+    method: string;
+    /** The JSON string of the request parameters. */
+    params: string;
+    /** The timestamp of the RPC call. */
+    timestamp: number;
+    /** Array of request signatures. */
+    reqSig: Hex[];
+    /** Array of response signatures. */
+    resSig: Hex[];
+    /** The JSON string of the response. */
+    response: string;
+}
+
+/**
+ * Represents Asset information received from the clearnode.
+ */
+export interface Asset {
+    /** The token contract address. */
+    token: Address;
+    /** The chain ID where the asset exists. */
+    chainId: number;
+    /** The asset symbol (e.g., "ETH", "USDC"). */
+    symbol: string;
+    /** The number of decimal places for the asset. */
+    decimals: number;
+}
+
+/**
+ * Represents the parameters for the transfer transaction.
+ */
+export interface Transaction {
+    /** Unique identifier for the transfer. */
+    id: number;
+    /** The type of transaction. */
+    txType: TxType;
+    /** The source address from which assets were transferred. */
+    fromAccount: Address;
+    /** The user tag for the source account (optional). */
+    fromAccountTag?: string;
+    /** The destination address to which assets were transferred. */
+    toAccount: Address;
+    /** The user tag for the destination account (optional). */
+    toAccountTag?: string;
+    /** The asset symbol that was transferred. */
+    asset: string;
+    /** The amount that was transferred. */
+    amount: string;
+    /** The timestamp when the transfer was created. */
+    createdAt: Date;
 }
 
 /**
@@ -306,6 +476,15 @@ export const EIP712AuthTypes = {
         { name: 'amount', type: 'uint256' },
     ],
 };
+
+export interface PaginationFilters {
+    /** Pagination offset. */
+    offset?: number;
+    /** Number of transactions to return. */
+    limit?: number;
+    /** Sort order by created_at. */
+    sort?: 'asc' | 'desc';
+}
 
 /**
  * Represents the RPC methods used in the Nitrolite protocol.

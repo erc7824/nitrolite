@@ -1,15 +1,14 @@
 import { z } from 'zod';
-import { Address } from 'viem';
 import {
     RPCMethod,
     GetConfigResponseParams,
     ErrorResponseParams,
     GetRPCHistoryResponseParams,
     NetworkInfo,
-    RPCEntryResponse,
-    GetUserTagParams,
+    RPCEntry,
+    GetUserTagResponseParams,
 } from '../types';
-import { hexSchema, addressSchema, ParamsParser, ParserParamsMissingError } from './common';
+import { hexSchema, addressSchema, ParamsParser } from './common';
 
 const NetworkInfoObjectSchema = z
     .object({
@@ -55,7 +54,7 @@ const RPCEntryObjectSchema = z
         response: z.string(),
     })
     .transform(
-        (raw): RPCEntryResponse => ({
+        (raw): RPCEntry => ({
             id: raw.id,
             sender: raw.sender,
             reqId: raw.req_id,
@@ -84,7 +83,7 @@ const GetUserTagParamsSchema = z
     })
     .strict()
     // Validate received type with linter
-    .transform((raw): GetUserTagParams => raw);
+    .transform((raw): GetUserTagResponseParams => raw);
 
 const parseMessageParams: ParamsParser<unknown> = (params) => {
     return params;

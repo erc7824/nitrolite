@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { Address } from 'viem';
 import { RPCMethod, AuthChallengeResponseParams, AuthVerifyResponseParams, AuthRequestResponseParams } from '../types';
 import { addressSchema, ParamsParser } from './common';
 

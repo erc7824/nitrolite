@@ -208,12 +208,7 @@ export interface GetAppSessionsResponseParams {
 }
 export type GetAppSessionsRPCResponseParams = GetAppSessionsResponseParams; // for backward compatibility
 
-export interface ServerSignature {
-    /** The recovery value of the signature. */
-    v: number;
-    r: Hex;
-    s: Hex;
-}
+export type ServerSignature = Hex;
 
 export interface RPCAllocation {
     /** The destination address for the allocation. */

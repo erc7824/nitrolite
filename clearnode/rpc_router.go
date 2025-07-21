@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/gorm"
 )
@@ -197,15 +198,15 @@ func (r *RPCRouter) MetricsMiddleware(c *RPCContext) {
 }
 
 type RPCEntry struct {
-	ID        uint     `json:"id"`
-	Sender    string   `json:"sender"`
-	ReqID     uint64   `json:"req_id"`
-	Method    string   `json:"method"`
-	Params    string   `json:"params"`
-	Timestamp uint64   `json:"timestamp"`
-	ReqSig    []string `json:"req_sig"`
-	Result    string   `json:"response"`
-	ResSig    []string `json:"res_sig"`
+	ID        uint        `json:"id"`
+	Sender    string      `json:"sender"`
+	ReqID     uint64      `json:"req_id"`
+	Method    string      `json:"method"`
+	Params    string      `json:"params"`
+	Timestamp uint64      `json:"timestamp"`
+	ReqSig    []Signature `json:"req_sig"`
+	Result    string      `json:"response"`
+	ResSig    []Signature `json:"res_sig"`
 }
 
 func (r *RPCRouter) HistoryMiddleware(c *RPCContext) {
@@ -242,6 +243,18 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 
 	response := make([]RPCEntry, 0, len(rpcHistory))
 	for _, record := range rpcHistory {
+		reqSigs, err := nitrolite.SignaturesFromStrings(record.ReqSig)
+		if err != nil {
+			logger.Error("failed to decode request signatures", "error", err, "signatures", record.ReqSig)
+			continue
+		}
+
+		resSigs, err := nitrolite.SignaturesFromStrings(record.ResSig)
+		if err != nil {
+			logger.Error("failed to decode response signatures", "error", err, "signatures", record.ResSig)
+			continue
+		}
+
 		response = append(response, RPCEntry{
 			ID:        record.ID,
 			Sender:    record.Sender,
@@ -249,8 +262,8 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 			Method:    record.Method,
 			Params:    string(record.Params),
 			Timestamp: record.Timestamp,
-			ReqSig:    record.ReqSig,
-			ResSig:    record.ResSig,
+			ReqSig:    reqSigs,
+			ResSig:    resSigs,
 			Result:    string(record.Response),
 		})
 	}

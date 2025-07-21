@@ -69,12 +69,22 @@ func Sign(data []byte, privateKey *ecdsa.PrivateKey) (Signature, error) {
 		return nil, fmt.Errorf("invalid signature length: got %d, want 65", len(signature))
 	}
 
+	// This step is necessary to remain compatible with the ecrecover precompile
+	if signature[64] < 27 {
+		signature[64] += 27
+	}
+
 	return signature, nil
 }
 
 // Verify checks if the signature on the provided data was created by the given address.
 func Verify(data []byte, sig Signature, address common.Address) (bool, error) {
 	dataHash := crypto.Keccak256Hash(data)
+
+	// Ensure the signature is in the correct format
+	if sig[64] >= 27 {
+		sig[64] -= 27
+	}
 
 	pubKeyRaw, err := crypto.Ecrecover(dataHash.Bytes(), sig)
 	if err != nil {

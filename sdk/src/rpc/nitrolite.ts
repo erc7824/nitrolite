@@ -230,7 +230,7 @@ export class NitroliteRPC {
 
         try {
             const payload = this.getMessagePayload(message);
-            if (typeof signature !== 'string' || signature === '') {
+            if (typeof signature !== 'string') {
                 return false;
             }
             return await verifier(payload, signature as Hex, expectedSigner);

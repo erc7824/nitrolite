@@ -64,7 +64,7 @@ describe('API message creators', () => {
                 [clientAddress, clientAddress, 'test-app', [], '', '', clientAddress],
                 timestamp,
             ],
-            sig: [''],
+            sig: [],
         });
     });
 
@@ -231,7 +231,7 @@ describe('API message creators', () => {
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.AuthVerify, [{ jwt: jwtToken }], timestamp],
-            sig: undefined,
+            sig: [],
         });
     });
 

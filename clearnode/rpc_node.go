@@ -173,7 +173,11 @@ func (n *RPCNode) HandleConnection(w http.ResponseWriter, r *http.Request) {
 			var msg RPCMessage
 			if err := json.Unmarshal(messageBytes, &msg); err != nil {
 				n.logger.Debug("invalid message format", "error", err, "message", string(messageBytes))
-				n.sendErrorResponse(rpcConn, 0, "invalid message format")
+				reqId := uint64(0)
+				if msg.Req != nil {
+					reqId = msg.Req.RequestID
+				}
+				n.sendErrorResponse(rpcConn, reqId, "invalid message format")
 				continue
 			}
 

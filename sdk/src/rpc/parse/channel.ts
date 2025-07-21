@@ -1,20 +1,19 @@
 import { z } from 'zod';
-import { Address, Hex } from 'viem';
 import {
     RPCMethod,
     ResizeChannelResponseParams,
     CloseChannelResponseParams,
     GetChannelsResponseParams,
     ChannelUpdateResponseParams,
-    RPCChannelStatus,
     ChannelUpdate,
+    ChannelsUpdateResponseParams,
 } from '../types';
-import { hexSchema, addressSchema, statusEnum, ParamsParser } from './common';
+import { hexSchema, addressSchema, statusEnum, ParamsParser, bigIntSchema, dateSchema } from './common';
 
 const RPCAllocationSchema = z.object({
     destination: addressSchema,
     token: addressSchema,
-    amount: z.string().transform((a) => BigInt(a)),
+    amount: bigIntSchema,
 });
 
 const ServerSignatureSchema = z.object({
@@ -24,76 +23,48 @@ const ServerSignatureSchema = z.object({
 });
 
 const ResizeChannelParamsSchema = z
-    .array(
-        z
-            .object({
-                channel_id: hexSchema,
-                state_data: hexSchema,
-                intent: z.number(),
-                version: z.number(),
-                allocations: z.array(RPCAllocationSchema),
-                state_hash: hexSchema,
-                server_signature: ServerSignatureSchema,
-            })
-            .transform(
-                (raw) =>
-                    ({
-                        channelId: raw.channel_id as Hex,
-                        stateData: raw.state_data as Hex,
-                        intent: raw.intent,
-                        version: raw.version,
-                        allocations: raw.allocations.map((a) => ({
-                            destination: a.destination as Address,
-                            token: a.token as Address,
-                            amount: a.amount,
-                        })),
-                        stateHash: raw.state_hash as Hex,
-                        serverSignature: {
-                            v: +raw.server_signature.v,
-                            r: raw.server_signature.r as Hex,
-                            s: raw.server_signature.s as Hex,
-                        },
-                    }) as ResizeChannelResponseParams,
-            ),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
+    .object({
+        channel_id: hexSchema,
+        state_data: hexSchema,
+        intent: z.number(),
+        version: z.number(),
+        allocations: z.array(RPCAllocationSchema),
+        state_hash: hexSchema,
+        server_signature: ServerSignatureSchema,
+    })
+    .transform(
+        (raw): ResizeChannelResponseParams => ({
+            channelId: raw.channel_id,
+            stateData: raw.state_data,
+            intent: raw.intent,
+            version: raw.version,
+            allocations: raw.allocations,
+            stateHash: raw.state_hash,
+            serverSignature: raw.server_signature,
+        }),
+    );
 
 const CloseChannelParamsSchema = z
-    .array(
-        z
-            .object({
-                channel_id: hexSchema,
-                state_data: hexSchema,
-                intent: z.number(),
-                version: z.number(),
-                allocations: z.array(RPCAllocationSchema),
-                state_hash: hexSchema,
-                server_signature: ServerSignatureSchema,
-            })
-            .transform(
-                (raw) =>
-                    ({
-                        channelId: raw.channel_id as Hex,
-                        stateData: raw.state_data as Hex,
-                        intent: raw.intent,
-                        version: raw.version,
-                        allocations: raw.allocations.map((a) => ({
-                            destination: a.destination as Address,
-                            token: a.token as Address,
-                            amount: a.amount,
-                        })),
-                        stateHash: raw.state_hash as Hex,
-                        serverSignature: {
-                            v: +raw.server_signature.v,
-                            r: raw.server_signature.r as Hex,
-                            s: raw.server_signature.s as Hex,
-                        },
-                    }) as CloseChannelResponseParams,
-            ),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
+    .object({
+        channel_id: hexSchema,
+        state_data: hexSchema,
+        intent: z.number(),
+        version: z.number(),
+        allocations: z.array(RPCAllocationSchema),
+        state_hash: hexSchema,
+        server_signature: ServerSignatureSchema,
+    })
+    .transform(
+        (raw): CloseChannelResponseParams => ({
+            channelId: raw.channel_id,
+            stateData: raw.state_data,
+            intent: raw.intent,
+            version: raw.version,
+            allocations: raw.allocations,
+            stateHash: raw.state_hash,
+            serverSignature: raw.server_signature,
+        }),
+    );
 
 const ChannelUpdateObjectSchema = z
     .object({
@@ -101,50 +72,51 @@ const ChannelUpdateObjectSchema = z
         participant: addressSchema,
         status: statusEnum,
         token: addressSchema,
-        wallet: z.union([addressSchema, z.literal('')]),
-        amount: z.string().transform((a) => BigInt(a)),
+        wallet: addressSchema,
+        amount: bigIntSchema,
         chain_id: z.number(),
         adjudicator: addressSchema,
         challenge: z.number(),
         nonce: z.number(),
         version: z.number(),
-        created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-        updated_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
+        created_at: dateSchema,
+        updated_at: dateSchema,
     })
     .transform(
-        (c) =>
-            ({
-                channelId: c.channel_id as Hex,
-                participant: c.participant as Address,
-                status: c.status as RPCChannelStatus,
-                token: c.token as Address,
-                wallet: c.wallet as Address,
-                amount: c.amount,
-                chainId: c.chain_id,
-                adjudicator: c.adjudicator as Address,
-                challenge: c.challenge,
-                nonce: c.nonce,
-                version: c.version,
-                createdAt: c.created_at,
-                updatedAt: c.updated_at,
-            }) as ChannelUpdateResponseParams,
+        (raw): ChannelUpdate => ({
+            channelId: raw.channel_id,
+            participant: raw.participant,
+            status: raw.status,
+            token: raw.token,
+            wallet: raw.wallet,
+            amount: raw.amount,
+            chainId: raw.chain_id,
+            adjudicator: raw.adjudicator,
+            challenge: raw.challenge,
+            nonce: raw.nonce,
+            version: raw.version,
+            createdAt: raw.created_at,
+            updatedAt: raw.updated_at,
+        }),
     );
 
 const GetChannelsParamsSchema = z
-    .array(z.array(ChannelUpdateObjectSchema))
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0])
-    .transform((arr) => arr as GetChannelsResponseParams);
+    .object({
+        channels: z.array(ChannelUpdateObjectSchema),
+    })
+    // Validate received type with linter
+    .transform((raw): GetChannelsResponseParams => raw);
 
-const ChannelUpdateParamsSchema = z
-    .array(ChannelUpdateObjectSchema)
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
+const ChannelUpdateParamsSchema = ChannelUpdateObjectSchema
+    // Validate received type with linter
+    .transform((raw): ChannelUpdateResponseParams => raw);
 
 const ChannelsUpdateParamsSchema = z
-    .array(z.array(ChannelUpdateObjectSchema))
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
+    .object({
+        channels: z.array(ChannelUpdateObjectSchema),
+    })
+    // Validate received type with linter
+    .transform((raw): ChannelsUpdateResponseParams => raw);
 
 export const channelParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.ResizeChannel]: (params) => ResizeChannelParamsSchema.parse(params),

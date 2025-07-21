@@ -11,6 +11,7 @@ import {
     ApplicationRPCMessage,
     RPCResponse,
     RPCMethod,
+    RPCRequest,
 } from './types';
 import { getCurrentTimestamp, generateRequestId } from './utils';
 
@@ -28,14 +29,15 @@ export class NitroliteRPC {
      * @param timestamp - Timestamp for the request. Defaults to the current time.
      * @returns A formatted NitroliteRPCMessage object for the request.
      */
-    static createRequest(
-        requestId: number = generateRequestId(),
-        method: RPCMethod,
-        params: any[] = [],
-        timestamp: number = getCurrentTimestamp(),
-    ): NitroliteRPCMessage {
+    static createRequest({
+        method,
+        params = {},
+        requestId = generateRequestId(),
+        timestamp = getCurrentTimestamp(),
+        signatures = [],
+    }: RPCRequest): NitroliteRPCMessage {
         const requestData: RequestData = [requestId, method, params, timestamp];
-        const message: NitroliteRPCMessage = { req: requestData };
+        const message: NitroliteRPCMessage = { req: requestData, sig: signatures };
         return message;
     }
 
@@ -50,10 +52,7 @@ export class NitroliteRPC {
      * @returns A formatted NitroliteRPCMessage object for the request.
      */
     static createAppRequest(
-        requestId: number = generateRequestId(),
-        method: RPCMethod,
-        params: any[] = [],
-        timestamp: number = getCurrentTimestamp(),
+        { requestId = generateRequestId(), method, params = {}, timestamp = getCurrentTimestamp() }: RPCRequest,
         sid: Hex,
     ): ApplicationRPCMessage {
         const requestData: RequestData = [requestId, method, params, timestamp];

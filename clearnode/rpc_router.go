@@ -204,15 +204,15 @@ func (r *RPCRouter) MetricsMiddleware(c *RPCContext) {
 }
 
 type RPCEntry struct {
-	ID        uint     `json:"id"`
-	Sender    string   `json:"sender"`
-	ReqID     uint64   `json:"req_id"`
-	Method    string   `json:"method"`
-	Params    string   `json:"params"`
-	Timestamp uint64   `json:"timestamp"`
-	ReqSig    []string `json:"req_sig"`
-	Result    string   `json:"response"`
-	ResSig    []string `json:"res_sig"`
+	ID        uint        `json:"id"`
+	Sender    string      `json:"sender"`
+	ReqID     uint64      `json:"req_id"`
+	Method    string      `json:"method"`
+	Params    string      `json:"params"`
+	Timestamp uint64      `json:"timestamp"`
+	ReqSig    []Signature `json:"req_sig"`
+	Result    string      `json:"response"`
+	ResSig    []Signature `json:"res_sig"`
 }
 
 func (r *RPCRouter) HistoryMiddleware(c *RPCContext) {

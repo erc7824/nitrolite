@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -85,7 +86,7 @@ type ResizeChannelResponse struct {
 	Version     uint64       `json:"version"`
 	Allocations []Allocation `json:"allocations"`
 	StateHash   string       `json:"state_hash"`
-	Signature   []byte       `json:"server_signature"`
+	Signature   Signature    `json:"server_signature"`
 }
 
 type Allocation struct {
@@ -106,7 +107,7 @@ type CloseChannelResponse struct {
 	StateData        string       `json:"state_data"`
 	FinalAllocations []Allocation `json:"allocations"`
 	StateHash        string       `json:"state_hash"`
-	Signature        []byte       `json:"server_signature"`
+	Signature        Signature    `json:"server_signature"`
 }
 
 type ChannelResponse struct {
@@ -573,6 +574,20 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 
 	response := make([]RPCEntry, 0, len(rpcHistory))
 	for _, record := range rpcHistory {
+		reqSigs, err := nitrolite.SignaturesFromStrings(record.ReqSig)
+		if err != nil {
+			logger.Error("failed to decode request signature", "error", err, "recordID", record.ID)
+			c.Fail(err, "failed to decode request signature")
+			return
+		}
+
+		resSigs, err := nitrolite.SignaturesFromStrings(record.ResSig)
+		if err != nil {
+			logger.Error("failed to decode response signature", "error", err, "recordID", record.ID)
+			c.Fail(err, "failed to decode response signature")
+			return
+		}
+
 		response = append(response, RPCEntry{
 			ID:        record.ID,
 			Sender:    record.Sender,
@@ -580,8 +595,8 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 			Method:    record.Method,
 			Params:    string(record.Params),
 			Timestamp: record.Timestamp,
-			ReqSig:    record.ReqSig,
-			ResSig:    record.ResSig,
+			ReqSig:    reqSigs,
+			ResSig:    resSigs,
 			Result:    string(record.Response),
 		})
 	}

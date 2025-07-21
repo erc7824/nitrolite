@@ -1,4 +1,4 @@
-import { describe, test, expect, jest } from '@jest/globals';
+import { describe, test, expect, jest, beforeAll, afterAll } from '@jest/globals';
 import { Address, Hex } from 'viem';
 import { NitroliteRPC } from '../../../src/rpc/nitrolite';
 import {
@@ -22,24 +22,36 @@ describe('NitroliteRPC', () => {
         test('should create a valid request message', () => {
             const requestId = 12345;
             const method = RPCMethod.Ping;
-            const params = ['param1', 'param2'];
+            const params = {
+                param1: 'value1',
+                param2: 'value2',
+            };
             const timestamp = 1619876543210;
 
-            const result = NitroliteRPC.createRequest(requestId, method, params, timestamp);
+            const result = NitroliteRPC.createRequest({
+                requestId,
+                method,
+                params,
+                timestamp,
+            });
 
             expect(result).toEqual({
                 req: [requestId, method, params, timestamp],
+                sig: [],
             });
         });
 
         test('should use default values when not provided', () => {
             jest.spyOn(global.Date, 'now').mockReturnValue(1619876543210);
-            const result = NitroliteRPC.createRequest(undefined, RPCMethod.Ping);
+            const result = NitroliteRPC.createRequest({
+                method: RPCMethod.Ping,
+                params: {},
+            });
 
             expect(result.req).toBeDefined();
             expect(result.req![0]).toBeGreaterThan(0);
             expect(result.req![1]).toBe(RPCMethod.Ping);
-            expect(result.req![2]).toEqual([]);
+            expect(result.req![2]).toEqual({});
             expect(result.req![3]).toBe(1619876543210);
         });
     });
@@ -48,11 +60,22 @@ describe('NitroliteRPC', () => {
         test('should create a valid application request message', () => {
             const requestId = 12345;
             const method = RPCMethod.Ping;
-            const params = ['param1', 'param2'];
+            const params = {
+                param1: 'value1',
+                param2: 'value2',
+            };
             const timestamp = 1619876543210;
             const accountId = '0xaccountId' as Hex;
 
-            const result = NitroliteRPC.createAppRequest(requestId, method, params, timestamp, accountId);
+            const result = NitroliteRPC.createAppRequest(
+                {
+                    requestId,
+                    method,
+                    params,
+                    timestamp,
+                },
+                accountId,
+            );
 
             expect(result).toEqual({
                 req: [requestId, method, params, timestamp],

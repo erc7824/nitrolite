@@ -16,6 +16,7 @@ import {
     RPCMethod,
     RPCChannelStatus,
     ResponsePayload,
+    PaginationFilters,
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
@@ -24,7 +25,6 @@ import {
     CreateAppSessionRequestParams,
     SubmitAppStateRequestParams,
     ResizeChannelRequestParams,
-    GetLedgerTransactionsFilters,
     GetLedgerTransactionsRequestParams,
     TransferRequestParams,
     AuthRequest,
@@ -279,12 +279,12 @@ export async function createGetLedgerEntriesMessage(
 export async function createGetLedgerTransactionsMessage(
     signer: MessageSigner,
     accountId: string,
-    filters?: GetLedgerTransactionsFilters,
+    filters?: PaginationFilters,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
     // Build filtered parameters object
-    const filteredParams: Partial<GetLedgerTransactionsFilters> = {};
+    const filteredParams: Partial<PaginationFilters> = {};
     if (filters) {
         Object.entries(filters).forEach(([key, value]) => {
             if (value !== undefined && value !== null && value !== '') {

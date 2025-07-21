@@ -13,10 +13,10 @@ export type Timestamp = number;
 export type AccountID = Hex;
 
 /** Represents the data payload within a request message: [requestId, method, params, timestamp?]. */
-export type RequestData = [RequestID, RPCMethod, object[], Timestamp?];
+export type RequestData = [RequestID, RPCMethod, object, Timestamp?];
 
 /** Represents the data payload within a successful response message: [requestId, method, result, timestamp?]. */
-export type ResponseData = [RequestID, RPCMethod, object[], Timestamp?];
+export type ResponseData = [RequestID, RPCMethod, object, Timestamp?];
 
 /** Represents the status of a channel. */
 export enum RPCChannelStatus {
@@ -41,7 +41,7 @@ export enum TxType {
  * This interface is extended by specific RPC request and response types.
  */
 export interface GenericRPCMessage {
-    requestId: RequestID;
+    requestId?: RequestID;
     timestamp?: Timestamp;
     signatures?: Hex[];
 }

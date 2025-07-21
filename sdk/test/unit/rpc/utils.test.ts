@@ -204,7 +204,7 @@ describe('RPC Utils', () => {
 describe('rpcResponseParser', () => {
     test('should parse auth_challenge response correctly', () => {
         const rawResponse = JSON.stringify({
-            res: [123, RPCMethod.AuthChallenge, [{ challenge_message: 'test-challenge' }], 456],
+            res: [123, RPCMethod.AuthChallenge, { challenge_message: 'test-challenge' }, 456],
             sig: ['0x123'],
         });
 
@@ -217,12 +217,12 @@ describe('rpcResponseParser', () => {
     });
 
     test('should parse get_ledger_balances response correctly', () => {
-        const balances = [
-            [
+        const balances = {
+            ledger_balances: [
                 { asset: 'eth', amount: 1.5 },
                 { asset: 'usdc', amount: 1000 },
             ],
-        ];
+        };
 
         const rawResponse = JSON.stringify({
             res: [123, RPCMethod.GetLedgerBalances, balances, 456],
@@ -231,10 +231,12 @@ describe('rpcResponseParser', () => {
 
         const result = rpcResponseParser.getLedgerBalances(rawResponse);
         expect(result.method).toBe(RPCMethod.GetLedgerBalances);
-        expect(result.params).toEqual([
-            { asset: 'eth', amount: '1.5' },
-            { asset: 'usdc', amount: '1000' },
-        ]);
+        expect(result.params).toEqual({
+            ledgerBalances: [
+                { asset: 'eth', amount: '1.5' },
+                { asset: 'usdc', amount: '1000' },
+            ],
+        });
     });
 
     test('should parse get_config response correctly', () => {
@@ -251,7 +253,7 @@ describe('rpcResponseParser', () => {
         };
 
         const rawResponse = JSON.stringify({
-            res: [123, RPCMethod.GetConfig, [config], 456],
+            res: [123, RPCMethod.GetConfig, config, 456],
             sig: ['0x123'],
         });
 
@@ -272,7 +274,7 @@ describe('rpcResponseParser', () => {
 
     test('should parse ping response correctly', () => {
         const rawResponse = JSON.stringify({
-            res: [123, RPCMethod.Ping, [], 456],
+            res: [123, RPCMethod.Ping, {}, 456],
             sig: ['0x123'],
         });
 
@@ -290,7 +292,7 @@ describe('rpcResponseParser', () => {
         };
 
         const rawResponse = JSON.stringify({
-            res: [123, RPCMethod.CreateAppSession, [params], 456],
+            res: [123, RPCMethod.CreateAppSession, params, 456],
             sig: ['0x123'],
         });
 
@@ -319,7 +321,7 @@ describe('rpcResponseParser', () => {
 
     test('should throw error when parsing with the wrong method', () => {
         const rawResponse = JSON.stringify({
-            res: [123, RPCMethod.AuthChallenge, [{ challenge_message: 'test-challenge' }], 456],
+            res: [123, RPCMethod.AuthChallenge, { challenge_message: 'test-challenge' }, 456],
             sig: ['0x123'],
         });
 

@@ -79,6 +79,7 @@ func NewRPCRouter(
 
 	historyGroup := privGroup.NewGroup("")
 	historyGroup.Use(r.HistoryMiddleware)
+	historyGroup.Handle("create_channel", r.HandleCreateChannel)
 	historyGroup.Handle("resize_channel", r.HandleResizeChannel)
 	historyGroup.Handle("close_channel", r.HandleCloseChannel)
 

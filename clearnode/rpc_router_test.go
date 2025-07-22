@@ -108,7 +108,7 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, *gorm.DB, func()) {
 
 	logger := NewLoggerIPFS("root.test")
 
-	channelService := NewChannelService(db, signer)
+	channelService := NewChannelService(db, map[string]*NetworkConfig{}, signer)
 
 	// Create an instance of RPCRouter
 	router := &RPCRouter{

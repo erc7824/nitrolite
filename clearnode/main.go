@@ -57,7 +57,7 @@ func main() {
 	}
 
 	appSessionService := NewAppSessionService(db)
-	channelService := NewChannelService(db, signer)
+	channelService := NewChannelService(db, config.networks, signer)
 
 	rpcNode := NewRPCNode(signer, logger)
 	rpcRouter := NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, logger)

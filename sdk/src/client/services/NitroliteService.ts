@@ -1,4 +1,4 @@
-import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress } from 'viem';
+import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress, Hex } from 'viem';
 import { custodyAbi } from '../../abis/generated';
 import { ContractAddresses } from '../../abis';
 import { Errors } from '../../errors';
@@ -127,27 +127,7 @@ export class NitroliteService {
                 token: Address;
                 amount: bigint;
             }[],
-            sigs: (state.sigs || []).map((sig) => ({
-                v: sig.v,
-                r: sig.r,
-                s: sig.s,
-            })) as readonly {
-                v: number;
-                r: `0x${string}`;
-                s: `0x${string}`;
-            }[],
-        } as const;
-    }
-
-    /**
-     * Converts Signature type to format expected by generated ABI
-     * REQUIRED: Ensures proper readonly typing for viem compatibility
-     */
-    private convertSignatureForABI(signature: Signature) {
-        return {
-            v: signature.v,
-            r: signature.r,
-            s: signature.s,
+            sigs: state.sigs || [] as readonly Hex[],
         } as const;
     }
 
@@ -176,11 +156,7 @@ export class NitroliteService {
                 token: alloc.token,
                 amount: alloc.amount,
             })),
-            sigs: contractState.sigs.map((sig: any) => ({
-                v: sig.v,
-                r: sig.r,
-                s: sig.s,
-            })),
+            sigs: contractState.sigs,
         };
     }
 
@@ -371,13 +347,11 @@ export class NitroliteService {
         const operationName = 'prepareJoinChannel';
 
         try {
-            const abiSignature = this.convertSignatureForABI(sig);
-
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: 'join',
-                args: [channelId, index, abiSignature],
+                args: [channelId, index, sig],
                 account: account,
             });
 
@@ -492,13 +466,12 @@ export class NitroliteService {
         try {
             const abiCandidate = this.convertStateForABI(candidate);
             const abiProofs = proofs.map((proof) => this.convertStateForABI(proof));
-            const challengerSigABI = this.convertSignatureForABI(challengerSig);
 
             const { request } = await this.publicClient.simulateContract({
                 address: this.custodyAddress,
                 abi: custodyAbi,
                 functionName: 'challenge',
-                args: [channelId, abiCandidate, abiProofs, challengerSigABI],
+                args: [channelId, abiCandidate, abiProofs, challengerSig],
                 account: account,
             });
 

@@ -244,7 +244,7 @@ func (r *RPCRouter) handleAuthJWTVerify(ctx context.Context, authParams AuthVeri
 }
 
 // handleAuthJWTVerify verifies the challenge signature and returns the policy, response data and error.
-func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig string, authParams AuthVerifyParams) (*Policy, any, error) {
+func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, authParams AuthVerifyParams) (*Policy, any, error) {
 	logger := LoggerFromContext(ctx)
 
 	challenge, err := r.AuthManager.GetChallenge(authParams.Challenge)

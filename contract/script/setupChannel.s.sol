@@ -6,7 +6,8 @@ import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 import {Custody} from "../src/Custody.sol";
 import {Utils} from "../src/Utils.sol";
-import {Channel, State, Allocation, Signature, ChannelStatus, StateIntent, Amount} from "../src/interfaces/Types.sol";
+import {Channel, State, Allocation, ChannelStatus, StateIntent, Amount} from "../src/interfaces/Types.sol";
+import {TestUtils} from "../test/TestUtils.sol";
 
 contract SetupChannelScript is Script {
     uint64 constant CHALLENGE_DURATION = 1 days;
@@ -40,8 +41,8 @@ contract SetupChannelScript is Script {
 
         Channel memory channel = createChannel(USER_SESSION_KEY_ADDRESS, addresses[0], adjudicator);
         State memory initialState = createInitialState(token, USER_SESSION_KEY_ADDRESS, addresses[0]);
-        Signature memory userSig = signState(channel, initialState, USER_SESSION_KEY);
-        initialState.sigs = new Signature[](1);
+        bytes memory userSig = signState(channel, initialState, USER_SESSION_KEY);
+        initialState.sigs = new bytes[](1);
         initialState.sigs[0] = userSig;
 
         vm.broadcast(addresses[1]);
@@ -78,17 +79,16 @@ contract SetupChannelScript is Script {
             version: 0,
             data: bytes(""),
             allocations: allocations,
-            sigs: new Signature[](0)
+            sigs: new bytes[](0)
         });
     }
 
     function signState(Channel memory chan, State memory state, uint256 privateKey)
         internal
         view
-        returns (Signature memory)
+        returns (bytes memory)
     {
         bytes32 stateHash = Utils.getStateHash(chan, state);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, stateHash);
-        return Signature({v: v, r: r, s: s});
+        return TestUtils.sign(vm, privateKey, stateHash);
     }
 }

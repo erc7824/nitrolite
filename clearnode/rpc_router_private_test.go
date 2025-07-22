@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -25,10 +24,10 @@ func createSignedRPCContext(id int, method string, params any, signers ...Signer
 	rawReq, _ := json.Marshal(ctx.Message.Req)
 	ctx.Message.Req.rawBytes = rawReq
 
-	ctx.Message.Sig = make([]string, 0, len(signers))
+	ctx.Message.Sig = make([]Signature, 0, len(signers))
 	for _, signer := range signers {
 		sigBytes, _ := signer.Sign(rawReq)
-		ctx.Message.Sig = append(ctx.Message.Sig, hexutil.Encode(sigBytes))
+		ctx.Message.Sig = append(ctx.Message.Sig, sigBytes)
 	}
 
 	return ctx
@@ -65,18 +64,27 @@ func TestRPCRouterHandleGetRPCHistory(t *testing.T) {
 		baseTime := uint64(time.Now().Unix())
 		// Create 11 test records for pagination testing
 		records := []RPCRecord{
-			{Sender: userAddress, ReqID: 1, Method: "ping", Params: []byte(`[null]`), Timestamp: baseTime - 10, ReqSig: []string{"sig1"}, Response: []byte(`{"res":[1,"pong",[],1621234567890]}`), ResSig: []string{}},
-			{Sender: userAddress, ReqID: 2, Method: "get_config", Params: []byte(`[]`), Timestamp: baseTime - 9, ReqSig: []string{"sig2"}, Response: []byte(`{"res":[2,"get_config",[{"broker_address":"0xBroker"}],1621234597890]}`), ResSig: []string{}},
-			{Sender: userAddress, ReqID: 3, Method: "get_channels", Params: []byte(fmt.Sprintf(`[{"participant":"%s"}]`, userAddress)), Timestamp: baseTime - 8, ReqSig: []string{"sig3"}, Response: []byte(`{"res":[3,"get_channels",[[]],1621234627890]}`), ResSig: []string{}},
-			{Sender: userAddress, ReqID: 4, Method: "transfer", Params: []byte(`[{"destination":"0xDest","allocations":[{"asset":"USDC","amount":"100"}]}]`), Timestamp: baseTime - 7, ReqSig: []string{"sig4"}, Response: []byte(`{"res":[4,"transfer",[],1621234657890]}`), ResSig: []string{}},
-			{Sender: userAddress, ReqID: 5, Method: "get_ledger_balances", Params: []byte(`[]`), Timestamp: baseTime - 6, ReqSig: []string{"sig5"}, Response: []byte(`{"res":[5,"get_ledger_balances",[],1621234687890]}`), ResSig: []string{}},
-			{Sender: userAddress, ReqID: 6, Method: "create_application", Params: []byte(`[{"definition":{"protocol":"test"}}]`), Timestamp: baseTime - 5, ReqSig: []string{"sig6"}, Response: []byte(`{"res":[6,"create_application",[],1621234717890]}`), ResSig: []string{}},
-			{Sender: userAddress, ReqID: 7, Method: "submit_app_state", Params: []byte(`[{"app_session_id":"123"}]`), Timestamp: baseTime - 4, ReqSig: []string{"sig7"}, Response: []byte(`{"res":[7,"submit_app_state",[],1621234747890]}`), ResSig: []string{}},
-			{Sender: userAddress, ReqID: 8, Method: "close_application", Params: []byte(`[{"app_session_id":"123"}]`), Timestamp: baseTime - 3, ReqSig: []string{"sig8"}, Response: []byte(`{"res":[8,"close_application",[],1621234777890]}`), ResSig: []string{}},
-			{Sender: userAddress, ReqID: 9, Method: "resize_channel", Params: []byte(`[{"channel_id":"ch123"}]`), Timestamp: baseTime - 2, ReqSig: []string{"sig9"}, Response: []byte(`{"res":[9,"resize_channel",[],1621234807890]}`), ResSig: []string{}},
-			{Sender: userAddress, ReqID: 10, Method: "close_channel", Params: []byte(`[{"channel_id":"ch123"}]`), Timestamp: baseTime - 1, ReqSig: []string{"sig10"}, Response: []byte(`{"res":[10,"close_channel",[],1621234837890]}`), ResSig: []string{}},
-			{Sender: userAddress, ReqID: 11, Method: "get_user_tag", Params: []byte(`[]`), Timestamp: baseTime, ReqSig: []string{"sig11"}, Response: []byte(`{"res":[11,"get_user_tag",[],1621234867890]}`), ResSig: []string{}},
-			{Sender: "0xOtherParticipant", ReqID: 12, Method: "ping", Params: []byte(`[null]`), Timestamp: baseTime + 1, ReqSig: []string{"sig12"}, Response: []byte(`{"res":[12,"pong",[],1621234897890]}`)},
+			{Sender: userAddress, Method: "ping", Params: []byte(`[null]`), Response: []byte(`{"res":[1,"pong",[],1621234567890]}`)},
+			{Sender: userAddress, Method: "get_config", Params: []byte(`[]`), Response: []byte(`{"res":[2,"get_config",[{"broker_address":"0xBroker"}],1621234597890]}`)},
+			{Sender: userAddress, Method: "get_channels", Params: []byte(fmt.Sprintf(`[{"participant":"%s"}]`, userAddress)), Response: []byte(`{"res":[3,"get_channels",[[]],1621234627890]}`)},
+			{Sender: userAddress, Method: "transfer", Params: []byte(`[{"destination":"0xDest","allocations":[{"asset":"USDC","amount":"100"}]}]`), Response: []byte(`{"res":[4,"transfer",[],1621234657890]}`)},
+			{Sender: userAddress, Method: "get_ledger_balances", Params: []byte(`[]`), Response: []byte(`{"res":[5,"get_ledger_balances",[],1621234687890]}`)},
+			{Sender: userAddress, Method: "create_application", Params: []byte(`[{"definition":{"protocol":"test"}}]`), ReqSig: []string{"0x0006"}, Response: []byte(`{"res":[6,"create_application",[],1621234717890]}`)},
+			{Sender: userAddress, Method: "submit_app_state", Params: []byte(`[{"app_session_id":"123"}]`), Response: []byte(`{"res":[7,"submit_app_state",[],1621234747890]}`)},
+			{Sender: userAddress, Method: "close_application", Params: []byte(`[{"app_session_id":"123"}]`), Response: []byte(`{"res":[8,"close_application",[],1621234777890]}`)},
+			{Sender: userAddress, Method: "resize_channel", Params: []byte(`[{"channel_id":"ch123"}]`), Response: []byte(`{"res":[9,"resize_channel",[],1621234807890]}`)},
+			{Sender: userAddress, Method: "close_channel", Params: []byte(`[{"channel_id":"ch123"}]`), Response: []byte(`{"res":[10,"close_channel",[],1621234837890]}`)},
+			{Sender: userAddress, Method: "get_user_tag", Params: []byte(`[]`), Response: []byte(`{"res":[11,"get_user_tag",[],1621234867890]}`)},
+			{Sender: "0xOtherParticipant", Method: "ping", Params: []byte(`[null]`), Response: []byte(`{"res":[12,"pong",[],1621234897890]}`)},
+		}
+
+		numOfTestRecords := len(records)
+
+		for i := range records {
+			records[i].ReqID = uint64(i + 1)
+			records[i].Timestamp = baseTime - uint64(numOfTestRecords-i)
+			records[i].ReqSig = []string{fmt.Sprintf("0x%04X", i+1)}
+			records[i].ResSig = []string{}
 		}
 
 		require.NoError(t, router.DB.Create(records).Error)
@@ -350,7 +358,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000)))
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "eth", decimal.NewFromInt(5)))
 
-		// Setup user tag for receipient
+		// Setup user tag for recipient
 		recipientTag, err := GenerateOrRetrieveUserTag(db, recipientAddr.Hex())
 		require.NoError(t, err)
 

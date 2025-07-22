@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -123,12 +124,6 @@ type ChannelResponse struct {
 	Version     uint64          `json:"version"`
 	CreatedAt   string          `json:"created_at"`
 	UpdatedAt   string          `json:"updated_at"`
-}
-
-type Signature struct {
-	V uint8  `json:"v,string"`
-	R string `json:"r"`
-	S string `json:"s"`
 }
 
 type Balance struct {
@@ -579,6 +574,20 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 
 	response := make([]RPCEntry, 0, len(rpcHistory))
 	for _, record := range rpcHistory {
+		reqSigs, err := nitrolite.SignaturesFromStrings(record.ReqSig)
+		if err != nil {
+			logger.Error("failed to decode request signature", "error", err, "recordID", record.ID)
+			c.Fail(err, "failed to decode request signature")
+			return
+		}
+
+		resSigs, err := nitrolite.SignaturesFromStrings(record.ResSig)
+		if err != nil {
+			logger.Error("failed to decode response signature", "error", err, "recordID", record.ID)
+			c.Fail(err, "failed to decode response signature")
+			return
+		}
+
 		response = append(response, RPCEntry{
 			ID:        record.ID,
 			Sender:    record.Sender,
@@ -586,8 +595,8 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 			Method:    record.Method,
 			Params:    string(record.Params),
 			Timestamp: record.Timestamp,
-			ReqSig:    record.ReqSig,
-			ResSig:    record.ResSig,
+			ReqSig:    reqSigs,
+			ResSig:    resSigs,
 			Result:    string(record.Response),
 		})
 	}

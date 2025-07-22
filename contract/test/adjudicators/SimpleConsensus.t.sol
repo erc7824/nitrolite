@@ -8,9 +8,10 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 
 import {TestUtils} from "../TestUtils.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
+import {MockEIP712} from "../mocks/MockEIP712.sol";
 
 import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature, StateIntent} from "../../src/interfaces/Types.sol";
+import {Channel, State, Allocation, StateIntent, STATE_TYPEHASH} from "../../src/interfaces/Types.sol";
 import {SimpleConsensus} from "../../src/adjudicators/SimpleConsensus.sol";
 import {Utils} from "../../src/Utils.sol";
 
@@ -18,6 +19,10 @@ contract SimpleConsensusTest is Test {
     using ECDSA for bytes32;
 
     SimpleConsensus public adjudicator;
+    MockEIP712 public mockedChannelImpl;
+
+    // Mockup constructor parameters
+    address mockedOwner = address(0x456);
 
     address public host;
     address public guest;
@@ -31,7 +36,8 @@ contract SimpleConsensusTest is Test {
     uint256 private constant GUEST = 1;
 
     function setUp() public {
-        adjudicator = new SimpleConsensus();
+        mockedChannelImpl = new MockEIP712("TestChannelImpl", "1.0");
+        adjudicator = new SimpleConsensus(mockedOwner, address(mockedChannelImpl));
 
         hostPrivateKey = 0x1;
         guestPrivateKey = 0x2;
@@ -82,7 +88,7 @@ contract SimpleConsensusTest is Test {
         state.allocations = new Allocation[](2);
         state.allocations[HOST] = allocations[HOST];
         state.allocations[GUEST] = allocations[GUEST];
-        state.sigs = new Signature[](0);
+        state.sigs = new bytes[](0);
 
         return state;
     }
@@ -98,15 +104,35 @@ contract SimpleConsensusTest is Test {
         return state;
     }
 
-    function _signState(State memory state, uint256 privateKey) internal view returns (Signature memory) {
+    function _signState(State memory state, uint256 privateKey) internal view returns (bytes memory) {
         bytes32 stateHash = Utils.getStateHash(channel, state);
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, stateHash);
-        return Signature({v: v, r: r, s: s});
+        return TestUtils.sign(vm, privateKey, stateHash);
     }
 
-    function test_adjudicate_firstState_valid() public view {
+    function _signStateEIP191(State memory state, uint256 privateKey) internal view returns (bytes memory) {
+        bytes32 stateHash = Utils.getStateHash(channel, state);
+        return TestUtils.signEIP191(vm, privateKey, stateHash);
+    }
+
+    function _signStateEIP712(State memory state, uint256 privateKey) internal view returns (bytes memory) {
+        bytes32 channelId = Utils.getChannelId(channel);
+        bytes32 domainSeparator = mockedChannelImpl.domainSeparator();
+        bytes32 structHash = keccak256(
+            abi.encode(
+                STATE_TYPEHASH,
+                channelId,
+                state.intent,
+                state.version,
+                keccak256(state.data),
+                keccak256(abi.encode(state.allocations))
+            )
+        );
+        return TestUtils.signEIP712(vm, privateKey, domainSeparator, structHash);
+    }
+
+    function test_adjudicate_firstState_valid_withRawECDSASignatures() public view {
         State memory initialState = _createInitialState("initial state");
-        initialState.sigs = new Signature[](2);
+        initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 
@@ -114,9 +140,29 @@ contract SimpleConsensusTest is Test {
         assertTrue(valid, "Valid first state transition should be accepted");
     }
 
+    function test_adjudicate_firstState_valid_withEIP191Signatures() public view {
+        State memory initialState = _createInitialState("initial state");
+        initialState.sigs = new bytes[](2);
+        initialState.sigs[HOST] = _signStateEIP191(initialState, hostPrivateKey);
+        initialState.sigs[GUEST] = _signStateEIP191(initialState, guestPrivateKey);
+
+        bool valid = adjudicator.adjudicate(channel, initialState, new State[](0));
+        assertTrue(valid, "Valid first state transition with EIP191 signatures should be accepted");
+    }
+
+    function test_adjudicate_firstState_valid_withEIP712Signatures() public view {
+        State memory initialState = _createInitialState("initial state");
+        initialState.sigs = new bytes[](2);
+        initialState.sigs[HOST] = _signStateEIP712(initialState, hostPrivateKey);
+        initialState.sigs[GUEST] = _signStateEIP712(initialState, guestPrivateKey);
+
+        bool valid = adjudicator.adjudicate(channel, initialState, new State[](0));
+        assertTrue(valid, "Valid first state transition with EIP712 signatures should be accepted");
+    }
+
     function test_adjudicate_firstState_revert_whenMissingParticipantSignature() public view {
         State memory initialState = _createInitialState("initial state");
-        initialState.sigs = new Signature[](1);
+        initialState.sigs = new bytes[](1);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
 
         bool valid = adjudicator.adjudicate(channel, initialState, new State[](0));
@@ -126,7 +172,7 @@ contract SimpleConsensusTest is Test {
     function test_adjudicate_firstState_revert_whenIncorrectIntent() public view {
         State memory initialState = _createInitialState("initial state");
         initialState.intent = StateIntent.OPERATE; // Incorrect intent, should be INITIALIZE
-        initialState.sigs = new Signature[](2);
+        initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 
@@ -137,7 +183,7 @@ contract SimpleConsensusTest is Test {
     function test_adjudicate_firstState_revert_whenIncorrectVersion() public view {
         State memory initialState = _createInitialState("initial state");
         initialState.version = 1; // Incorrect version, should be 0
-        initialState.sigs = new Signature[](2);
+        initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 
@@ -147,7 +193,7 @@ contract SimpleConsensusTest is Test {
 
     function test_adjudicate_laterState_valid() public view {
         State memory state1 = _createOperateState("state 42", 42);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
@@ -157,12 +203,12 @@ contract SimpleConsensusTest is Test {
 
     function test_adjudicate_revert_whenTooManyProofs() public view {
         State memory state1 = _createOperateState("state 1", 1);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
         State memory state2 = _createOperateState("state 2", 2);
-        state2.sigs = new Signature[](2);
+        state2.sigs = new bytes[](2);
         state2.sigs[HOST] = _signState(state2, hostPrivateKey);
         state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
 
@@ -177,7 +223,7 @@ contract SimpleConsensusTest is Test {
     function test_adjudicate_revert_wrongSigner() public view {
         // Create state with signatures from wrong participants
         State memory state = _createOperateState("state 13", 13);
-        state.sigs = new Signature[](2);
+        state.sigs = new bytes[](2);
 
         state.sigs[HOST] = _signState(state, guestPrivateKey); // Should be host, but using guest
         state.sigs[GUEST] = _signState(state, guestPrivateKey);

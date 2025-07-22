@@ -71,8 +71,8 @@ func TestVerifyInvalidSignature(t *testing.T) {
 		t.Fatalf("failed to sign data: %v", err)
 	}
 
-	// Tamper with the signature (flip a bit in R).
-	sig.R[0] ^= 0xff
+	// Tamper with the signature (flip some bit).
+	sig[0] ^= 0xff
 
 	// Use the original public address.
 	publicAddress := crypto.PubkeyToAddress(privateKey.PublicKey)

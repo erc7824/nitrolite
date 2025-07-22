@@ -1,5 +1,5 @@
 import { describe, test, expect, jest } from '@jest/globals';
-import { getStateHash, signState, removeQuotesFromRS, verifySignature } from '../../../src/utils/state';
+import { getStateHash, signState, verifySignature } from '../../../src/utils/state';
 import { type State, type Signature, type Allocation, StateIntent } from '../../../src/client/types';
 import { Hex, Address, recoverMessageAddress, parseSignature, encodeAbiParameters, keccak256 } from 'viem';
 
@@ -55,9 +55,10 @@ describe('getStateHash', () => {
 });
 
 describe('signState', () => {
+    const expectedSignature = '0xrs1b' as Hex;
     const fakeHash = '0xstatehash' as Hex;
     const signer = jest.fn(async ({ message }) => {
-        if (message.raw === fakeHash) return '0xr0xs1b';
+        if (message.raw === fakeHash) return expectedSignature;
         throw new Error('sign fail');
     });
 
@@ -65,18 +66,7 @@ describe('signState', () => {
         // @ts-ignore
         const sig = await signState(fakeHash, signer);
         expect(signer).toHaveBeenCalledWith({ message: { raw: fakeHash } });
-        expect(parseSignature).toHaveBeenCalledWith('0xr0xs1b');
-        expect(sig).toEqual({ r: '0xr', s: '0xs', v: 27 });
-    });
-
-    test('throws if parseSignature yields no v', async () => {
-        const viemMock = jest.requireMock('viem');
-        // @ts-ignore
-        viemMock.parseSignature.mockReturnValueOnce({ r: '0xr', s: '0xs' });
-        // @ts-ignore
-        await expect(signState(fakeHash, signer)).rejects.toThrow(
-            /Invalid signature format: missing v or yParity value/,
-        );
+        expect(sig).toEqual(expectedSignature);
     });
 
     test('throws on signer error', async () => {
@@ -87,41 +77,16 @@ describe('signState', () => {
     });
 });
 
-describe('removeQuotesFromRS', () => {
-    test('removes surrounding quotes from r and s', () => {
-        const input: any = { r: '"0xr"', s: '"0xs"', v: 27 };
-        const out = removeQuotesFromRS(input);
-        expect(out).toEqual({ r: '0xr', s: '0xs', v: 27 });
-    });
-    test('leaves values without quotes untouched', () => {
-        const input: Signature = { r: '0xr', s: '0xs', v: 28 };
-        expect(removeQuotesFromRS(input)).toEqual(input);
-    });
-});
-
 describe('verifySignature', () => {
     const stateHash = '0xstate' as Hex;
-    const signature: Signature = { r: '0xr', s: '0xs', v: 0 }; // v < 27
+    const signature: Signature = "0xr0xs1b" as Signature;
     const expectedSigner = '0xSignerAddress' as Address;
 
-    test('normalizes v and recovers address', async () => {
+    test('recovers address', async () => {
         const result = await verifySignature(stateHash, signature, expectedSigner);
-        // vNormalized = 0 + 27 = 27 -> hex "1b"
-        const sigHex = `${signature.r}${signature.s.slice(2)}1b`;
         expect(recoverMessageAddress).toHaveBeenCalledWith({
             message: { raw: stateHash },
-            signature: sigHex as Hex,
-        });
-        expect(result).toBe(true);
-    });
-
-    test('handles v already >=27', async () => {
-        const sig2: Signature = { r: '0xr2', s: '0xs2', v: 28 };
-        const result = await verifySignature(stateHash, sig2, expectedSigner);
-        const sigHex2 = `${sig2.r}${sig2.s.slice(2)}1c`; // 28 hex
-        expect(recoverMessageAddress).toHaveBeenCalledWith({
-            message: { raw: stateHash },
-            signature: sigHex2 as Hex,
+            signature: signature as Hex,
         });
         expect(result).toBe(true);
     });

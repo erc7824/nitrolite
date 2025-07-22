@@ -11,6 +11,7 @@ import {
 } from '@erc7824/nitrolite';
 import { Wallet } from 'ethers';
 import { WebSocket } from 'ws';
+import type { MessageEvent as WSMessageEvent } from 'ws';
 import { UserRejectedError, NitroliteAuthContext } from '../../types/index.js';
 import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
@@ -177,9 +178,17 @@ export const handleAuthChallenge = async (
         );
 
         // Use raw message if provided, otherwise fall back to challengeResponse
-        const messageForVerify = rawMessage
-            ? (parseAnyRPCResponse(rawMessage) as AuthChallengeResponse)
-            : challengeResponse;
+        let messageForVerify: AuthChallengeResponse;
+        if (rawMessage) {
+            try {
+                messageForVerify = parseAnyRPCResponse(rawMessage) as AuthChallengeResponse;
+            } catch (error) {
+                logger.warn('Failed to parse raw message, using challengeResponse:', error);
+                messageForVerify = challengeResponse;
+            }
+        } else {
+            messageForVerify = challengeResponse;
+        }
 
         const authVerifyMessage = await createAuthVerifyMessage(eip712SigningFunction, messageForVerify);
         logger.info('📤 Sending auth_verify message to Yellow network (using EIP-712 signature)');
@@ -294,7 +303,7 @@ export const authenticateWithNitrolite = async (
     timeout: number = AUTH_TIMEOUT,
     pendingChallenge?: any,
     rawMessage?: string,
-): Promise<void> => {
+): Promise<{ jwtToken?: string }> => {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
         throw new Error('WebSocket not connected');
     }
@@ -311,11 +320,11 @@ export const authenticateWithNitrolite = async (
             ws.removeEventListener('message', handleAuthMessage);
         };
 
-        const resolveAuth = (result?: any) => {
+        const resolveAuth = (result?: { jwtToken?: string }) => {
             if (isResolved) return;
             isResolved = true;
             cleanup();
-            resolve(result);
+            resolve(result || {});
         };
 
         const rejectAuth = (error: Error) => {
@@ -334,12 +343,12 @@ export const authenticateWithNitrolite = async (
             }, timeout);
         };
 
-        const handleAuthMessage = async (event: MessageEvent) => {
+        const handleAuthMessage = async (event: WSMessageEvent) => {
             try {
                 // Parse and filter auth-related messages
                 let rawMessage;
                 try {
-                    rawMessage = parseAnyRPCResponse(event.data);
+                    rawMessage = parseAnyRPCResponse(event.data.toString());
                 } catch {
                     logger.error('failed to parse incoming event', event.data);
                     return;
@@ -351,7 +360,7 @@ export const authenticateWithNitrolite = async (
                 }
 
                 // Only parse with nitrolite SDK if it's an auth-related message
-                const response = parseAnyRPCResponse(event.data);
+                const response = parseAnyRPCResponse(event.data.toString());
 
                 if (response.method === RPCMethod.AuthChallenge) {
                     resetTimeout();
@@ -367,7 +376,7 @@ export const authenticateWithNitrolite = async (
                 } else if (response.method === RPCMethod.AuthVerify || response.method === RPCMethod.Error) {
                     const result = processAuthResponse(response);
                     if (result.success) {
-                        resolveAuth();
+                        resolveAuth({ jwtToken: result.jwtToken });
                     } else {
                         rejectAuth(new Error(result.error || 'Authentication failed'));
                     }

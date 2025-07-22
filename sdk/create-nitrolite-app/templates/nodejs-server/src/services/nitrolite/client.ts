@@ -1,6 +1,7 @@
 import { createPingMessage, createECDSAMessageSigner, parseAnyRPCResponse, RPCMethod } from '@erc7824/nitrolite';
 import { Wallet } from 'ethers';
 import { WebSocket } from 'ws';
+import type { MessageEvent as WSMessageEvent } from 'ws';
 import {
     authenticateWithNitrolite,
     sendAuthRequest,
@@ -15,10 +16,17 @@ import type {
     SessionKey,
     NitroliteConfig,
     NitroliteConnectionCallbacks,
-} from './types.js';
+} from '../../types/index.js';
 import { UserRejectedError } from '../../types/index.js';
 import { config, isDevelopment } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
+import { StatusManager } from './status-manager.js';
+import { WebSocketManager } from './websocket-manager.js';
+import { AuthenticationManager } from './auth-manager.js';
+import { ChallengeManager } from './challenge-manager.js';
+import { MessageRouter } from './message-router.js';
+import { ConnectionManager } from './connection-manager.js';
+import { NitroliteEventEmitter } from './event-emitter.js';
 
 export const DEFAULT_CONFIG: NitroliteConfig = {
     wsUrl: process.env.YELLOW_WS_URL || 'wss://clearnet.yellow.com/ws',
@@ -32,27 +40,13 @@ export const DEFAULT_CONFIG: NitroliteConfig = {
 let sessionKeyStore: SessionKey | null = null;
 
 export class NitroliteWebSocketClient {
-    private ws: WebSocket | null = null;
-    private status: WSStatus = 'disconnected';
-    private sessionKey: SessionKey | null = null;
-    private walletAddress: string | null = null;
-    private privateKey: string | null = null;
-    private isAuthenticated = false;
-    private pingInterval: NodeJS.Timeout | null = null;
-    private reconnectTimeout: NodeJS.Timeout | null = null;
-    private retryCount = 0;
-    private isDestroyed = false;
-    private userRejectedAuth = false;
-    private pendingChallenge: any = null;
-    private rawChallengeMessage: string | null = null;
-    private challengeTimeout: NodeJS.Timeout | null = null;
-    private challengeKeepAliveInterval: NodeJS.Timeout | null = null;
-    private authMessageHandler: ((event: MessageEvent) => void) | null = null;
-    private authInProgress = false;
-
-    private statusListeners = new Set<(status: WSStatus) => void>();
-    private messageListeners = new Set<(message: any) => void>();
-    private errorListeners = new Set<(error: Error) => void>();
+    private readonly statusManager: StatusManager;
+    private readonly wsManager: WebSocketManager;
+    private readonly authManager: AuthenticationManager;
+    private readonly challengeManager: ChallengeManager;
+    private readonly messageRouter: MessageRouter;
+    private readonly connectionManager: ConnectionManager;
+    private readonly eventEmitter: NitroliteEventEmitter;
 
     private config: NitroliteConfig;
     private callbacks: NitroliteConnectionCallbacks;
@@ -60,57 +54,98 @@ export class NitroliteWebSocketClient {
     constructor(config: Partial<NitroliteConfig> = {}, callbacks: NitroliteConnectionCallbacks = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
         this.callbacks = callbacks;
+        
+        this.statusManager = new StatusManager();
+        this.wsManager = new WebSocketManager(this.config);
+        this.authManager = new AuthenticationManager();
+        this.challengeManager = new ChallengeManager();
+        this.messageRouter = new MessageRouter();
+        this.connectionManager = new ConnectionManager(this.config);
+        this.eventEmitter = new NitroliteEventEmitter();
+        
+        this.setupEventHandlers();
+    }
+    
+    private setupEventHandlers(): void {
+        // WebSocket events
+        this.wsManager.onMessage((event) => this.handleMessage(event));
+        this.wsManager.onClose(() => this.handleDisconnection());
+        this.wsManager.onError((error) => this.handleWSError(error));
+        
+        // Status change events
+        this.statusManager.onStatusChange((status) => {
+            this.eventEmitter.status.emit(status);
+        });
+        
+        // Authentication events
+        this.authManager.onTokenExpired(() => this.handleTokenExpiration());
+        
+        // Challenge events
+        this.challengeManager.onChallengeReceived((challenge) => {
+            this.statusManager.setStatus('pending_auth');
+            this.callbacks.onChallengeReceived?.(challenge);
+        });
+        
+        // Connection events
+        this.connectionManager.onMaxRetriesReached(() => {
+            this.statusManager.setStatus('failed');
+        });
+        
+        // Message routing
+        this.messageRouter.onAuthChallenge((data) => this.handleAuthChallenge(data));
+        this.messageRouter.onAuthVerify((data) => this.handleAuthVerify(data));
+        this.messageRouter.onError((data) => this.handleRPCError(data));
+        this.messageRouter.onGeneralMessage((data) => this.emitMessage(data));
+        this.messageRouter.onAssets((data) => this.emitMessage(data));
     }
 
     get isConnected(): boolean {
-        return this.status === 'connected' && this.isAuthenticated;
+        return this.statusManager.isConnected && this.authManager.authenticated;
     }
 
     get currentStatus(): WSStatus {
-        return this.status;
+        return this.statusManager.currentStatus;
     }
 
     get currentSessionAddress(): string | null {
-        return this.sessionKey?.address || null;
+        return this.authManager.currentSessionAddress;
     }
 
     get hasPendingChallenge(): boolean {
-        return this.pendingChallenge !== null;
+        return this.challengeManager.hasPendingChallenge;
     }
 
     get sessionSigner() {
-        if (!this.sessionKey) {
+        const context = this.authManager.authContext;
+        if (!context?.sessionKey) {
             return null;
         }
-        return createECDSAMessageSigner(this.sessionKey.privateKey as `0x${string}`);
+        return createECDSAMessageSigner(context.sessionKey.privateKey as `0x${string}`);
     }
 
     onStatusChange(listener: (status: WSStatus) => void): () => void {
-        this.statusListeners.add(listener);
-        return () => this.statusListeners.delete(listener);
+        return this.eventEmitter.status.add(listener);
     }
 
     onMessage(listener: (message: any) => void): () => void {
-        this.messageListeners.add(listener);
-        return () => this.messageListeners.delete(listener);
+        return this.eventEmitter.message.add(listener);
     }
 
     onError(listener: (error: Error) => void): () => void {
-        this.errorListeners.add(listener);
-        return () => this.errorListeners.delete(listener);
+        return this.eventEmitter.error.add(listener);
     }
 
     async connect(walletAddress: string, privateKey: string): Promise<void> {
-        if (this.isDestroyed) {
+        if (this.connectionManager.destroyed) {
             throw new Error('Client has been destroyed');
         }
 
-        if (this.status === 'connecting' || this.isConnected) {
+        if (this.statusManager.isConnecting || this.isConnected) {
             logger.debug('connecting or connected');
             return;
         }
 
-        if (this.userRejectedAuth) {
+        if (this.connectionManager.hasUserRejectedAuth) {
             throw new UserRejectedError('User previously rejected authentication');
         }
 
@@ -118,23 +153,22 @@ export class NitroliteWebSocketClient {
             throw new Error('Private key is required for server-side authentication');
         }
 
-        this.walletAddress = walletAddress;
-        this.privateKey = privateKey;
-        this.setStatus('connecting');
+        this.statusManager.setStatus('connecting');
 
         try {
-            await this.initializeSessionKey();
-            await this.createWebSocketConnection();
+            await this.authManager.initializeContext(walletAddress, privateKey);
+            await this.wsManager.connect();
             await this.authenticate();
 
-            if (this.status !== 'pending_auth') {
+            if (!this.statusManager.isPendingAuth) {
                 this.startPingInterval();
-                this.setStatus('connected');
-                this.retryCount = 0;
+                this.statusManager.setStatus('connected');
+                this.connectionManager.resetRetryCount();
                 this.callbacks.onConnect?.();
                 this.callbacks.onAuthSuccess?.();
             }
         } catch (error) {
+            this.connectionManager.handleConnectionError(error as Error);
             this.handleConnectionError(error as Error);
             throw error;
         }
@@ -142,31 +176,36 @@ export class NitroliteWebSocketClient {
 
     disconnect(): void {
         this.cleanup();
-        if (this.ws) {
-            this.ws.close();
-            this.ws = null;
-        }
-        this.setStatus('disconnected');
-        this.isAuthenticated = false;
+        this.wsManager.close();
+        this.statusManager.setStatus('disconnected');
+        this.authManager.reset();
         this.callbacks.onDisconnect?.();
     }
 
     destroy(): void {
-        this.isDestroyed = true;
         this.disconnect();
-        this.statusListeners.clear();
-        this.messageListeners.clear();
-        this.errorListeners.clear();
+        this.statusManager.destroy();
+        this.wsManager.destroy();
+        this.authManager.destroy();
+        this.challengeManager.destroy();
+        this.messageRouter.destroy();
+        this.connectionManager.destroy();
+        this.eventEmitter.clear();
     }
 
     async ping(): Promise<void> {
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.sessionKey) {
-            throw new Error('Not connected or session key not available');
+        if (!this.wsManager.isOpen) {
+            throw new Error('WebSocket not connected');
+        }
+        
+        const context = this.authManager.authContext;
+        if (!context?.sessionKey) {
+            throw new Error('Session key not available');
         }
 
-        const sessionSigner = createECDSAMessageSigner(this.sessionKey.privateKey as `0x${string}`);
+        const sessionSigner = createECDSAMessageSigner(context.sessionKey.privateKey as `0x${string}`);
         const pingMessage = await createPingMessage(sessionSigner);
-        this.ws!.send(pingMessage);
+        this.wsManager.send(pingMessage);
     }
 
     send(data: any): void {
@@ -175,409 +214,174 @@ export class NitroliteWebSocketClient {
         }
 
         const message = typeof data === 'string' ? data : JSON.stringify(data);
-        this.ws!.send(message);
+        this.wsManager.send(message);
     }
 
     async approveChallenge(): Promise<void> {
-        if (!this.pendingChallenge) {
+        logger.info('🚀🚀 APPROVE CHALLENGE CALLED');
+        
+        if (!this.challengeManager.hasPendingChallenge) {
+            logger.error('❌ No pending challenge to approve');
             throw new Error('No pending challenge to approve');
         }
 
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        if (!this.wsManager.isOpen) {
+            logger.error('❌ WebSocket not connected');
             throw new Error('WebSocket not connected');
         }
 
-        if (this.authInProgress) {
-            logger.debug('Challenge approval already in progress, skipping duplicate');
-            return;
-        }
+        // Remove the inProgress check here since challenge handling is expected during auth flow
+        logger.info(`🔍 Auth status - authenticated: ${this.authManager.authenticated}, inProgress: ${this.authManager.inProgress}`);
+
+        logger.info('✅ Starting challenge approval process...');
+        logger.info(`Challenge: ${JSON.stringify(this.challengeManager.challenge, null, 2)}`);
 
         try {
-            this.authInProgress = true; // Prevent duplicate approvals
-
-            const authContext: NitroliteAuthContext = {
-                walletAddress: this.walletAddress!,
-                sessionKey: this.sessionKey!,
-                privateKey: this.privateKey!,
-            };
-
-            await authenticateWithNitrolite(
-                this.ws,
-                authContext,
+            logger.info('🔐 Calling authManager.authenticate...');
+            await this.authManager.authenticate(
+                this.wsManager,
                 this.config.requestTimeout,
-                this.pendingChallenge,
-                this.rawChallengeMessage,
+                this.challengeManager.challenge,
+                this.challengeManager.rawMessage || undefined,
             );
 
-            this.clearChallenge();
-            this.isAuthenticated = true;
+            logger.info('✅ Challenge approved successfully!');
+            this.challengeManager.clearChallenge();
             this.startPingInterval();
-            this.setStatus('connected');
-            this.retryCount = 0;
+            this.statusManager.setStatus('connected');
+            this.connectionManager.resetRetryCount();
             this.callbacks.onConnect?.();
             this.callbacks.onAuthSuccess?.();
         } catch (error) {
+            logger.error('❌ Challenge approval failed:', error);
             this.callbacks.onVerifyFailed?.(error instanceof Error ? error.message : 'Challenge approval failed');
-        } finally {
-            this.authInProgress = false; // Always reset the flag
         }
     }
 
     rejectChallenge(): void {
-        this.clearChallenge();
-        this.userRejectedAuth = true;
-        this.setStatus('disconnected');
+        this.challengeManager.clearChallenge();
+        this.connectionManager.resetUserRejection(); 
+        this.statusManager.setStatus('disconnected');
         this.callbacks.onAuthFailed?.('Authentication rejected');
     }
 
-    private clearChallenge(): void {
-        this.pendingChallenge = null;
-        this.rawChallengeMessage = null;
-        if (this.challengeTimeout) {
-            clearTimeout(this.challengeTimeout);
-            this.challengeTimeout = null;
-        }
-        this.clearChallengeKeepAlive();
-    }
-
-    private async initializeSessionKey(): Promise<void> {
-        // For server-side implementation, use the wallet private key as session key
-        if (!this.privateKey) {
-            throw new Error('Private key required for server session');
-        }
-
-        // Create wallet from private key to get the address
-        const { Wallet } = await import('ethers');
-        const wallet = new Wallet(this.privateKey);
-
-        this.sessionKey = {
-            privateKey: this.privateKey,
-            address: wallet.address,
-        };
-        sessionKeyStore = this.sessionKey;
-    }
-
-    private async createWebSocketConnection(): Promise<void> {
-        return new Promise((resolve, reject) => {
-            try {
-                logger.debug('wsurl', this.config.wsUrl);
-                this.ws = new WebSocket(this.config.wsUrl);
-
-                this.ws.onopen = () => {
-                    logger.info('WebSocket connection opened');
-                    resolve();
-                };
-                this.ws.onmessage = (event) => {
-                    this.handleMessage(event);
-                    if (this.authMessageHandler) {
-                        this.authMessageHandler(event);
-                    }
-                };
-                this.ws.onclose = () => {
-                    logger.info('WebSocket connection closed');
-                    this.handleDisconnection();
-                };
-                this.ws.onerror = (error) => {
-                    logger.error('WebSocket error:', error);
-                    reject(new Error('WebSocket connection failed'));
-                };
-            } catch (error) {
-                reject(error);
-            }
-        });
-    }
-
     private async authenticate(): Promise<void> {
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        if (!this.wsManager.isOpen) {
             throw new Error('WebSocket connection is not established');
         }
-        if (!this.sessionKey || !this.walletAddress || !this.privateKey) {
-            throw new Error('Authentication context not available - missing private key');
-        }
-
-        const authContext: NitroliteAuthContext = {
-            walletAddress: this.walletAddress,
-            sessionKey: this.sessionKey,
-            privateKey: this.privateKey,
-        };
-
-        await this.initializeManualAuth(authContext);
+        
+        await this.authManager.sendAuthRequest(this.wsManager);
     }
 
-    private async initializeManualAuth(authContext: NitroliteAuthContext): Promise<void> {
-        if (this.authInProgress) {
-            logger.debug('Authentication already in progress, skipping duplicate request');
+    private handleMessage(event: WSMessageEvent): void {
+        const dataStr = event.data.toString();
+        
+        // Log all messages received from clearnode WebSocket connection
+        logger.info('📨 Received message from clearnode WebSocket:');
+        logger.info(`Raw message: ${dataStr}`);
+        
+        // Check for token expiration first
+        try {
+            const rawJsonMessage = JSON.parse(dataStr);
+            if (this.authManager.checkForTokenExpiration(rawJsonMessage)) {
+                return;
+            }
+        } catch {
+            // Continue to message routing
+        }
+
+        // Route the message to appropriate handlers
+        this.messageRouter.routeMessage(event);
+    }
+
+    private handleAuthChallenge(data: any): void {
+        logger.info('🤝🤝 HANDLING AUTH_CHALLENGE MESSAGE');
+        logger.info(`Challenge data: ${JSON.stringify(data, null, 2)}`);
+        
+        if (!this.authManager.authenticated) {
+            logger.info('🤝 Setting challenge and will auto-approve...');
+            this.challengeManager.setChallenge(data, JSON.stringify(data));
+            
+            // Auto-approve challenge for server - use setTimeout to ensure async
+            setTimeout(() => {
+                if (this.hasPendingChallenge) {
+                    logger.info('🚀 AUTO-APPROVING CHALLENGE NOW');
+                    this.approveChallenge().catch((error) => {
+                        logger.error('❌ Failed to auto-approve challenge:', error);
+                    });
+                } else {
+                    logger.error('❌ No pending challenge to approve!');
+                }
+            }, 100);
+        } else {
+            logger.warn(`Ignoring auth_challenge - already authenticated: ${this.authManager.authenticated}`);
+        }
+    }
+
+    private handleAuthVerify(data: any): void {
+        logger.info('📥📥 HANDLING AUTH_VERIFY MESSAGE');
+        logger.info(`Auth verify data: ${JSON.stringify(data, null, 2)}`);
+        
+        if (!this.authManager.authenticated) {
+            logger.info('✅ Processing auth_verify response...');
+            const result = this.authManager.handleAuthResponse(data);
+            
+            if (result.success) {
+                logger.info('🎉 Authentication verification successful!');
+                this.startPingInterval();
+                this.statusManager.setStatus('connected');
+                this.connectionManager.resetRetryCount();
+                this.callbacks.onConnect?.();
+                this.callbacks.onAuthSuccess?.();
+            } else {
+                logger.error(`❌ Authentication verification failed: ${result.error}`);
+                this.callbacks.onVerifyFailed?.(result.error || 'Authentication failed');
+            }
+        } else {
+            logger.warn('⚠️  Ignoring auth_verify - already authenticated');
+        }
+    }
+
+    private handleRPCError(data: any): void {
+        if (this.authManager.checkForTokenExpiration(data.params?.error)) {
             return;
         }
-
-        this.authInProgress = true;
-        logger.info('Starting authentication flow...');
-
-        return new Promise((resolve, reject) => {
-            const cleanup = () => {
-                this.ws?.removeEventListener('message', handleMessage);
-                this.authMessageHandler = null;
-                this.authInProgress = false;
-            };
-
-            const handleMessage = async (event: MessageEvent) => {
-                try {
-                    let rawJsonMessage;
-                    try {
-                        rawJsonMessage = JSON.parse(event.data);
-                    } catch {
-                        return;
-                    }
-
-                    const nitroliteError = parseNitroliteError(rawJsonMessage);
-                    if (nitroliteError.isTokenExpired) {
-                        logger.info('Token error detected, clearing and restarting authentication...');
-
-                        clearJWTToken();
-                        this.isAuthenticated = false;
-                        this.pendingChallenge = null;
-                        this.clearChallengeKeepAlive();
-
-                        cleanup();
-
-                        if (!this.authInProgress) {
-                            this.initializeManualAuth(authContext)
-                                .then(() => {
-                                    logger.info('Fresh authentication flow completed after token error');
-                                })
-                                .catch((error) => {
-                                    logger.error('Fresh auth flow failed:', error);
-                                    this.callbacks.onVerifyFailed?.(error.message || 'Re-authentication failed');
-                                });
-                        }
-
-                        return;
-                    }
-
-                    let rawMessage;
-                    try {
-                        rawMessage = parseAnyRPCResponse(event.data);
-                    } catch {
-                        return;
-                    }
-
-                    if (rawMessage.method === RPCMethod.AuthChallenge) {
-                        this.pendingChallenge = rawMessage;
-                        this.setStatus('pending_auth');
-                        this.callbacks.onChallengeReceived?.(rawMessage);
-
-                        this.startChallengeKeepAlive();
-                        resolve();
-                    } else if (rawMessage.method === RPCMethod.AuthVerify) {
-                        if (rawMessage.params?.success) {
-                            cleanup();
-                            this.isAuthenticated = true;
-                            resolve();
-                        } else {
-                            this.callbacks.onVerifyFailed?.('Authentication verification failed');
-                        }
-                    } else if (rawMessage.method === RPCMethod.Error) {
-                        const authResult = processAuthResponse(rawMessage);
-
-                        if (authResult.tokenExpired) {
-                            logger.info(
-                                'Token error detected via processAuthResponse, clearing and restarting authentication...',
-                            );
-
-                            clearJWTToken();
-                            this.isAuthenticated = false;
-                            this.pendingChallenge = null;
-                            this.clearChallengeKeepAlive();
-
-                            cleanup();
-
-                            if (!this.authInProgress) {
-                                this.initializeManualAuth(authContext)
-                                    .then(() => {
-                                        logger.info('Fresh authentication flow completed after token error');
-                                    })
-                                    .catch((error) => {
-                                        logger.error('Fresh auth flow failed:', error);
-                                        this.callbacks.onVerifyFailed?.(error.message || 'Re-authentication failed');
-                                    });
-                            }
-
-                            return;
-                        } else {
-                            this.callbacks.onVerifyFailed?.(rawMessage.params?.error || 'Authentication error');
-                        }
-                    }
-                } catch (error) {
-                    // Skip parsing errors
-                }
-            };
-
-            this.ws!.addEventListener('message', handleMessage);
-            this.authMessageHandler = handleMessage;
-
-            sendAuthRequest(this.ws!, authContext).catch((error) => {
-                cleanup();
-                reject(error);
-            });
-        });
-    }
-
-    private startChallengeKeepAlive(): void {
-        if (this.challengeKeepAliveInterval) {
-            clearInterval(this.challengeKeepAliveInterval);
-        }
-
-        this.challengeKeepAliveInterval = setInterval(() => {
-            if (this.sessionKey) {
-                this.ping().catch(() => {
-                    this.clearChallengeKeepAlive();
-                });
-            } else {
-                this.clearChallengeKeepAlive();
-            }
-        }, 30000);
-    }
-
-    private clearChallengeKeepAlive(): void {
-        if (this.challengeKeepAliveInterval) {
-            clearInterval(this.challengeKeepAliveInterval);
-            this.challengeKeepAliveInterval = null;
-        }
+        this.emitError(new Error('Nitrolite service error'));
     }
 
     private handleTokenExpiration(): void {
-        logger.info('Handling token expiration - clearing auth state and triggering re-auth...');
-
-        this.isAuthenticated = false;
-        this.pendingChallenge = null;
-        this.clearChallengeKeepAlive();
-        this.setStatus('connecting');
-
-        if (this.authInProgress) {
-            logger.debug('Auth already in progress, skipping token expiration handling');
-            return;
-        }
-
-        if (
-            this.ws &&
-            this.ws.readyState === WebSocket.OPEN &&
-            this.sessionKey &&
-            this.walletAddress &&
-            this.privateKey
-        ) {
-            const authContext: NitroliteAuthContext = {
-                walletAddress: this.walletAddress,
-                sessionKey: this.sessionKey,
-                privateKey: this.privateKey,
-            };
-
-            this.initializeManualAuth(authContext)
+        logger.info('🔄 Handling token expiration - triggering re-authentication with fresh auth request');
+        this.statusManager.setStatus('connecting');
+        
+        const context = this.authManager.authContext;
+        if (this.wsManager.isOpen && context) {
+            this.authManager.sendAuthRequest(this.wsManager)
                 .then(() => {
-                    logger.info('Fresh authentication flow completed after token expiration');
+                    logger.info('🆕 Fresh authentication request sent after token expiration');
                 })
                 .catch((error) => {
-                    logger.error('Token expiration re-auth failed:', error);
+                    logger.error('❌ Token expiration re-auth failed:', error);
                     this.emitError(new Error(`Re-authentication failed: ${error.message}`));
                 });
         } else {
-            logger.error('Cannot re-authenticate: missing context or connection');
+            logger.error('❌ Cannot re-authenticate: missing connection or context');
             this.emitError(new Error('Cannot re-authenticate: connection or context unavailable'));
         }
     }
 
-    private handleMessage(event: MessageEvent): void {
-        try {
-            // First check for raw JSON error format (for parseNitroliteError)
-            let rawJsonMessage;
-            try {
-                rawJsonMessage = JSON.parse(event.data);
-            } catch {
-                return;
-            }
-
-            const nitroliteError = parseNitroliteError(rawJsonMessage);
-            if (nitroliteError.isTokenExpired) {
-                logger.info('Token error detected, clearing and triggering re-authentication...');
-                clearJWTToken();
-                this.handleTokenExpiration();
-                return;
-            }
-
-            try {
-                const response = parseAnyRPCResponse(event.data);
-
-                if (response.method === RPCMethod.AuthChallenge) {
-                    if (!this.isAuthenticated && !this.authInProgress) {
-                        this.pendingChallenge = response;
-                        this.rawChallengeMessage = event.data;
-                        this.setStatus('pending_auth');
-                        this.callbacks.onChallengeReceived?.(response);
-                        this.startChallengeKeepAlive();
-                    } else {
-                        logger.debug('Ignoring auth_challenge - already authenticated or auth in progress');
-                    }
-                    return;
-                }
-
-                if (response.method === RPCMethod.AuthVerify) {
-                    // Only process auth_verify if we're not already authenticated (prevent duplicates)
-                    if (!this.isAuthenticated) {
-                        logger.info('📥 Received auth_verify response:', JSON.stringify(response, null, 2));
-                        const authResult = processAuthResponse(response);
-                        if (authResult.success) {
-                            logger.info('🎉 Authentication verification successful!');
-                            this.isAuthenticated = true;
-                            this.startPingInterval();
-                            this.setStatus('connected');
-                            this.retryCount = 0;
-                            this.callbacks.onConnect?.();
-                            this.callbacks.onAuthSuccess?.();
-                        } else {
-                            logger.warn('❌ Authentication verification failed:', authResult.error);
-                            this.callbacks.onVerifyFailed?.(authResult.error || 'Authentication failed');
-                        }
-                    } else {
-                        logger.debug('Ignoring auth_verify - already authenticated');
-                    }
-                } else if (response.method === RPCMethod.Pong) {
-                    // Pong received - connection healthy
-                } else if (response.method === RPCMethod.Error) {
-                    if (isTokenExpiredError(response.params?.error)) {
-                        logger.info('Token error in RPC response, clearing and triggering re-authentication...');
-                        clearJWTToken();
-                        this.handleTokenExpiration();
-                    } else {
-                        this.emitError(new Error('Nitrolite service error'));
-                    }
-                } else {
-                    this.emitMessage(response);
-                }
-                return;
-            } catch (rpcError) {
-                if (isDevelopment) {
-                    logger.debug('Failed to parse as RPC, handling as raw message:', rpcError);
-                }
-            }
-
-            if (rawJsonMessage.method === RPCMethod.Assets) {
-                this.emitMessage(rawJsonMessage);
-                return;
-            }
-
-            this.emitMessage(rawJsonMessage);
-        } catch {
-            // Message parsing failed - skip
-        }
+    private handleWSError(error: any): void {
+        logger.error('WebSocket error:', error);
+        this.emitError(new Error('WebSocket connection error'));
     }
 
     private handleDisconnection(): void {
         this.cleanup();
-        this.isAuthenticated = false;
+        this.authManager.reset();
 
-        if (!this.isDestroyed && this.shouldReconnect()) {
+        if (!this.connectionManager.destroyed && this.connectionManager.shouldReconnect()) {
             this.scheduleReconnect();
         } else {
-            this.setStatus('disconnected');
+            this.statusManager.setStatus('disconnected');
             this.callbacks.onDisconnect?.();
         }
     }
@@ -586,87 +390,53 @@ export class NitroliteWebSocketClient {
         this.emitError(error);
         this.callbacks.onError?.(error);
 
-        if (error instanceof UserRejectedError || UserRejectedError.isUserRejection(error)) {
-            this.userRejectedAuth = true;
-            this.setStatus('disconnected');
-            this.callbacks.onAuthFailed?.(error.message);
-        } else if (this.shouldReconnect()) {
+        if (this.connectionManager.shouldReconnect()) {
             this.scheduleReconnect();
         } else {
-            this.setStatus('failed');
+            this.statusManager.setStatus('failed');
         }
-    }
-
-    private shouldReconnect(): boolean {
-        return !this.userRejectedAuth && this.retryCount < this.config.maxRetries;
     }
 
     private scheduleReconnect(): void {
-        if (this.isDestroyed) return;
-
-        this.retryCount++;
-        this.setStatus('reconnecting');
-
-        const delay = this.config.reconnectDelay * Math.pow(2, this.retryCount - 1);
-        this.reconnectTimeout = setTimeout(() => {
-            if (this.walletAddress && this.privateKey) {
-                this.connect(this.walletAddress, this.privateKey).catch(() => {
-                    // Reconnection failed - handled by handleConnectionError
-                });
+        this.statusManager.setStatus('reconnecting');
+        
+        this.connectionManager.scheduleReconnect(async () => {
+            const context = this.authManager.authContext;
+            if (context) {
+                await this.connect(context.walletAddress, context.privateKey);
             }
-        }, delay);
+        });
     }
 
     private startPingInterval(): void {
-        this.pingInterval = setInterval(() => {
-            if (this.isConnected) {
-                this.ping().catch(() => {
-                    // Ping failed - connection may be broken
-                });
-            }
-        }, this.config.pingInterval);
+        const context = this.authManager.authContext;
+        this.connectionManager.startPingInterval(
+            context?.sessionKey || null, 
+            (data: string) => this.wsManager.send(data)
+        );
     }
 
     private cleanup(): void {
-        if (this.pingInterval) {
-            clearInterval(this.pingInterval);
-            this.pingInterval = null;
-        }
-
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout);
-            this.reconnectTimeout = null;
-        }
-
-        this.clearChallenge();
-    }
-
-    private setStatus(status: WSStatus): void {
-        if (this.status !== status) {
-            this.status = status;
-            this.statusListeners.forEach((listener) => listener(status));
-        }
+        this.connectionManager.cleanup();
+        this.challengeManager.clearChallenge();
     }
 
     private emitMessage(message: any): void {
-        this.messageListeners.forEach((listener) => listener(message));
+        this.eventEmitter.message.emit(message);
         this.callbacks.onMessage?.(message);
     }
 
     private emitError(error: Error): void {
-        this.errorListeners.forEach((listener) => listener(error));
+        this.eventEmitter.error.emit(error);
     }
 
     resetRejectionState(): void {
-        this.userRejectedAuth = false;
+        this.connectionManager.resetUserRejection();
     }
 
     handleChallengeMessage(challengeData: any): void {
-        if (!this.isAuthenticated && challengeData.method === RPCMethod.AuthChallenge) {
-            this.pendingChallenge = challengeData;
-            this.setStatus('pending_auth');
-            this.callbacks.onChallengeReceived?.(challengeData);
-            this.startChallengeKeepAlive();
+        if (!this.authManager.authenticated && challengeData.method === RPCMethod.AuthChallenge) {
+            this.challengeManager.setChallenge(challengeData);
         }
     }
 }

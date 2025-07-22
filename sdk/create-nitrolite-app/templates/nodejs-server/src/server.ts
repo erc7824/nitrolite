@@ -3,7 +3,6 @@ import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { config, isDevelopment } from './config/index.js';
 import { initializeNitroliteClient } from './services/nitrolite/client.js';
-import { setupWebSocketHandlers } from './services/websocket.js';
 import { logger } from './utils/logger.js';
 import { setupGracefulShutdown } from './utils/shutdown.js';
 
@@ -23,9 +22,6 @@ async function startServer() {
     logger.info('Initializing Nitrolite client...');
     await initializeNitroliteClient();
     logger.info('Nitrolite client initialized successfully');
-
-    // Setup WebSocket handlers
-    setupWebSocketHandlers(wss);
 
     // Setup graceful shutdown
     setupGracefulShutdown(server, wss);

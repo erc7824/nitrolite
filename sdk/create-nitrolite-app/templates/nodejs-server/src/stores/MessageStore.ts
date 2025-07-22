@@ -67,7 +67,7 @@ class MessageStoreClass {
 
     // Filter by timestamp
     if (options.since) {
-      filtered = filtered.filter(msg => msg.timestamp >= options.since);
+      filtered = filtered.filter(msg => msg.timestamp >= options.since!);
     }
 
     // Apply offset

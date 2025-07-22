@@ -109,19 +109,20 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, *gorm.DB, func()) {
 	logger := NewLoggerIPFS("root.test")
 
 	channelService := NewChannelService(db, signer)
+	node := NewRPCNode(signer, logger)
+	wsNotifier := NewWSNotifier(node.Notify, logger)
 
 	// Create an instance of RPCRouter
 	router := &RPCRouter{
-		Node:              NewRPCNode(signer, logger),
+		Node:              node,
 		Signer:            signer,
-		AppSessionService: NewAppSessionService(db),
+		AppSessionService: NewAppSessionService(db, wsNotifier),
 		ChannelService:    channelService,
 		DB:                db,
+		wsNotifier:        wsNotifier,
 		lg:                logger.NewSystem("rpc-router"),
 		Metrics:           NewMetricsWithRegistry(prometheus.NewRegistry()),
 	}
-
-	router.AppSessionService.SetPublishBalanceUpdateCallback(router.SendBalanceUpdate)
 
 	return router, router.DB, func() {
 		dbCleanup()

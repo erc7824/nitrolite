@@ -57,8 +57,7 @@ func runReconcileCli(logger Logger) {
 	custody, err := NewCustody(
 		signer,
 		db,
-		func(_ string) {},
-		func(Channel) {},
+		NewWSNotifier(func(userID, method string, params ...any) {}, logger),
 		network.InfuraURL,
 		network.CustodyAddress,
 		network.AdjudicatorAddress,

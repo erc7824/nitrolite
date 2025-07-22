@@ -601,6 +601,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         Metadata storage meta = _channels[channelId];
 
         // effects
+        // NOTE: FINAL state is ephemeral because `meta` is deleted at the end of this function
         meta.stage = ChannelStatus.FINAL;
 
         // interactions

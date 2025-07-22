@@ -162,14 +162,6 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 				CreatedAt:   baseTime.Add(1 * time.Hour),
 			},
 			{
-				ChannelID:   "0xChannel3",
-				Wallet:      participantWallet,
-				Participant: participantSigner,
-				Status:      ChannelStatusJoining,
-				Nonce:       3,
-				CreatedAt:   baseTime.Add(2 * time.Hour),
-			},
-			{
 				ChannelID:   "0xOtherChannel",
 				Wallet:      "other_wallet",
 				Participant: "0xOtherParticipant",
@@ -225,11 +217,6 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 				expectedChannelIDs: []string{"0xChannel2"},
 			},
 			{
-				name:               "Filter by participant and status joining",
-				params:             map[string]interface{}{"participant": participantWallet, "status": string(ChannelStatusJoining)},
-				expectedChannelIDs: []string{"0xChannel3"},
-			},
-			{
 				name:               "Filter by status closed only",
 				params:             map[string]interface{}{"status": string(ChannelStatusClosed)},
 				expectedChannelIDs: []string{"0xChannel2"},
@@ -268,14 +255,12 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			{Wallet: "0xWallet1", Participant: "0xParticipant1", Status: ChannelStatusOpen, Nonce: 1},
 			{Wallet: "0xWallet2", Participant: "0xParticipant2", Status: ChannelStatusClosed, Nonce: 2},
 			{Wallet: "0xWallet3", Participant: "0xParticipant3", Status: ChannelStatusOpen, Nonce: 3},
-			{Wallet: "0xWallet4", Participant: "0xParticipant4", Status: ChannelStatusJoining, Nonce: 4},
-			{Wallet: "0xWallet5", Participant: "0xParticipant5", Status: ChannelStatusOpen, Nonce: 5},
-			{Wallet: "0xWallet6", Participant: "0xParticipant6", Status: ChannelStatusChallenged, Nonce: 6},
-			{Wallet: "0xWallet7", Participant: "0xParticipant7", Status: ChannelStatusOpen, Nonce: 7},
-			{Wallet: "0xWallet8", Participant: "0xParticipant8", Status: ChannelStatusClosed, Nonce: 8},
-			{Wallet: "0xWallet9", Participant: "0xParticipant9", Status: ChannelStatusOpen, Nonce: 9},
-			{Wallet: "0xWallet10", Participant: "0xParticipant10", Status: ChannelStatusJoining, Nonce: 10},
-			{Wallet: "0xWallet11", Participant: "0xParticipant11", Status: ChannelStatusOpen, Nonce: 11},
+			{Wallet: "0xWallet5", Participant: "0xParticipant5", Status: ChannelStatusOpen, Nonce: 4},
+			{Wallet: "0xWallet6", Participant: "0xParticipant6", Status: ChannelStatusChallenged, Nonce: 5},
+			{Wallet: "0xWallet7", Participant: "0xParticipant7", Status: ChannelStatusOpen, Nonce: 6},
+			{Wallet: "0xWallet8", Participant: "0xParticipant8", Status: ChannelStatusClosed, Nonce: 7},
+			{Wallet: "0xWallet9", Participant: "0xParticipant9", Status: ChannelStatusOpen, Nonce: 8},
+			{Wallet: "0xWallet11", Participant: "0xParticipant11", Status: ChannelStatusOpen, Nonce: 9},
 		}
 
 		for i := range testChannels {

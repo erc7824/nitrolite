@@ -92,11 +92,7 @@ export class TestNitroliteClient extends NitroliteClient {
                     },
                 ] as [Allocation, Allocation],
                 version: BigInt(closeParsedResponse.params.version),
-                serverSignature: {
-                    v: +closeParsedResponse.params.serverSignature.v,
-                    r: closeParsedResponse.params.serverSignature.r as Hex,
-                    s: closeParsedResponse.params.serverSignature.s as Hex,
-                },
+                serverSignature: closeParsedResponse.params.serverSignature,
             },
             stateData: closeParsedResponse.params.stateData as Hex,
         });

@@ -82,9 +82,6 @@ describe('Resize channel', () => {
         expect(resizeResponseParams.stateHash).toBeDefined();
 
         expect(resizeResponseParams.serverSignature).toBeDefined();
-        expect(resizeResponseParams.serverSignature.v).toBeDefined();
-        expect(resizeResponseParams.serverSignature.r).toBeDefined();
-        expect(resizeResponseParams.serverSignature.s).toBeDefined();
 
         expect(resizeResponseParams.allocations).toBeDefined();
         expect(resizeResponseParams.allocations).toHaveLength(2);

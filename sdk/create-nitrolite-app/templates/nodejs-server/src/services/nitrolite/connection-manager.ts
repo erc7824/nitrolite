@@ -42,7 +42,6 @@ export class ConnectionManager {
     handleConnectionError(error: Error): void {
         if (error instanceof UserRejectedError || UserRejectedError.isUserRejection(error)) {
             this.userRejectedAuth = true;
-            logger.info('User rejected authentication - disabling reconnection');
         }
     }
 
@@ -81,7 +80,6 @@ export class ConnectionManager {
         
         this.pingInterval = setInterval(async () => {
             if (!sessionKey) {
-                logger.warn('Cannot ping - no session key available');
                 this.pingFailedEmitter.emit();
                 return;
             }

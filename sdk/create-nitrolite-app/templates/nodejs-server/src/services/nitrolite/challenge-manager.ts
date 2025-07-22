@@ -79,10 +79,6 @@ export class ChallengeManager {
                     this.clearKeepAlive();
                 }
             }, 30000);
-        } else {
-            this.challengeKeepAliveInterval = setInterval(() => {
-                logger.debug('Challenge keep-alive tick (no ping - missing sessionKey or wsSend)');
-            }, 30000);
         }
     }
 

@@ -31,19 +31,15 @@ export class MessageRouter {
     routeMessage(event: WSMessageEvent): void {
         const parsed = this.parseMessage(event);
         
-        logger.debug(`🎯 Routing message type: ${parsed.type}, method: ${parsed.method || 'none'}`);
         
         switch (parsed.type) {
             case 'rpc':
-                logger.debug(`🔀 Routing RPC message: ${parsed.method}`);
                 this.routeRPCMessage(parsed.data, parsed.method!);
                 break;
             case 'raw':
-                logger.debug(`📤 Routing raw message`);
                 this.routeRawMessage(parsed.data);
                 break;
             case 'invalid':
-                logger.warn(`❌ Invalid message skipped`);
                 if (isDevelopment) {
                     logger.debug('Skipped invalid message:', parsed.data);
                 }
@@ -102,27 +98,21 @@ export class MessageRouter {
     }
 
     private routeRPCMessage(data: any, method: string): void {
-        logger.debug(`🚀 Routing RPC method: ${method}`);
         
         switch (method) {
             case RPCMethod.AuthChallenge:
-                logger.debug('🤝 Emitting auth_challenge to handlers');
                 this.authChallengeEmitter.emit(data);
                 break;
             case RPCMethod.AuthVerify:
-                logger.debug('✅ Emitting auth_verify to handlers');
                 this.authVerifyEmitter.emit(data);
                 break;
             case RPCMethod.Pong:
-                logger.debug('🏓 Emitting pong to handlers');
                 this.pongEmitter.emit(data);
                 break;
             case RPCMethod.Error:
-                logger.debug('❌ Emitting error to handlers');
                 this.errorEmitter.emit(data);
                 break;
             default:
-                logger.debug(`📨 Emitting ${method} to general handlers`);
                 this.generalEmitter.emit(data);
                 break;
         }

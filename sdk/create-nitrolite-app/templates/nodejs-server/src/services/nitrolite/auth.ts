@@ -70,17 +70,16 @@ export const getStoredJWTToken = (): string | null => {
 
 export const storeJWTToken = (token: string): void => {
     jwtTokenStore = token;
-    logger.info('✅ JWT token stored in memory');
-    logger.info(`🔑 JWT Token: ***REDACTED*** (length: ${token.length})`);
+    logger.debug(`Stored JWT Token (length: ${token.length})`);
 };
 
 export const removeJWTToken = (): void => {
-    logger.info('Removing JWT token due to expiration/error');
+    logger.debug('Removing JWT token due to expiration/error');
     jwtTokenStore = null;
 };
 
 export const clearJWTToken = (): void => {
-    logger.info('Force clearing JWT token');
+    logger.debug('Force clearing JWT token');
     jwtTokenStore = null;
 };
 
@@ -112,11 +111,9 @@ export const sendAuthRequest = async (ws: WebSocket, authContext: NitroliteAuthC
 
     try {
         if (jwtToken && isJWTTokenValid(jwtToken)) {
-            logger.info('🔐 Sending auth_verify with existing JWT token');
             logger.debug(`JWT Token: ***REDACTED*** (length: ${jwtToken.length})`);
             authRequest = await createAuthVerifyMessageWithJWT(jwtToken);
         } else {
-            logger.info('🆕 No valid JWT token found, sending fresh auth_request');
             const authMessage = createAuthMessage(authContext.walletAddress, authContext.sessionKey.address);
             authRequest = await createAuthRequestMessage(authMessage as any);
         }
@@ -135,16 +132,13 @@ export const handleAuthChallenge = async (
     ws: WebSocket,
     challengeResponse: AuthChallengeResponse,
     authContext: NitroliteAuthContext,
-    rawMessage?: string,
 ): Promise<void> => {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
         throw new Error('WebSocket not connected for auth verify');
     }
 
     const challenge = challengeResponse.params?.challengeMessage;
-    logger.info('🤝 Handling auth challenge with challenge message:', challenge);
     const authMessage = createAuthMessage(authContext.walletAddress, authContext.sessionKey.address, '0', challenge);
-    logger.debug('📝 Created auth message for challenge verification');
 
     try {
         // Create wallet from private key for signing
@@ -177,21 +171,7 @@ export const handleAuthChallenge = async (
             getAuthDomain(),
         );
 
-        // Use raw message if provided, otherwise fall back to challengeResponse
-        let messageForVerify: AuthChallengeResponse;
-        if (rawMessage) {
-            try {
-                messageForVerify = parseAnyRPCResponse(rawMessage) as AuthChallengeResponse;
-            } catch (error) {
-                logger.warn('Failed to parse raw message, using challengeResponse:', error);
-                messageForVerify = challengeResponse;
-            }
-        } else {
-            messageForVerify = challengeResponse;
-        }
-
-        const authVerifyMessage = await createAuthVerifyMessage(eip712SigningFunction, messageForVerify);
-        logger.info('📤 Sending auth_verify message to Yellow network (using EIP-712 signature)');
+        const authVerifyMessage = await createAuthVerifyMessage(eip712SigningFunction, challengeResponse);
 
         ws.send(authVerifyMessage);
     } catch (error) {
@@ -261,7 +241,6 @@ export const processAuthResponse = (
     error?: string;
     tokenExpired?: boolean;
 } => {
-    logger.info('🔍 Processing auth response');
     logger.debug('Auth response details:', JSON.stringify(response, null, 2));
 
     if (response.method === RPCMethod.AuthVerify && response.params?.success) {

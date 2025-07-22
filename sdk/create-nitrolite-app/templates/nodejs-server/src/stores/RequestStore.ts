@@ -30,7 +30,6 @@ class RequestStoreClass {
         timeout: timeoutId,
       });
 
-      logger.debug(`Request registered: ${requestInfo.method} [ID: ${requestInfo.requestId}]`);
     });
   }
 
@@ -48,7 +47,6 @@ class RequestStoreClass {
       clearTimeout(pendingRequest.timeout);
     }
 
-    logger.debug(`Request response received [ID: ${requestId}]`);
     pendingRequest.resolve(response);
     return true;
   }
@@ -67,7 +65,6 @@ class RequestStoreClass {
       clearTimeout(pendingRequest.timeout);
     }
 
-    logger.debug(`Request error handled [ID: ${requestId}]: ${error.message}`);
     pendingRequest.reject(error);
     return true;
   }

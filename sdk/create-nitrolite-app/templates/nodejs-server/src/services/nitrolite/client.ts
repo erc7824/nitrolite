@@ -141,7 +141,6 @@ export class NitroliteWebSocketClient {
         }
 
         if (this.statusManager.isConnecting || this.isConnected) {
-            logger.debug('connecting or connected');
             return;
         }
 
@@ -218,7 +217,6 @@ export class NitroliteWebSocketClient {
     }
 
     async approveChallenge(): Promise<void> {
-        logger.info('🚀 APPROVE CHALLENGE CALLED');
         
         if (!this.challengeManager.hasPendingChallenge) {
             logger.error('❌ No pending challenge to approve');
@@ -231,13 +229,10 @@ export class NitroliteWebSocketClient {
         }
 
         // Remove the inProgress check here since challenge handling is expected during auth flow
-        logger.info(`🔍 Auth status - authenticated: ${this.authManager.authenticated}, inProgress: ${this.authManager.inProgress}`);
 
-        logger.info('✅ Starting challenge approval process...');
         logger.debug(`Challenge: ${JSON.stringify(this.challengeManager.challenge, null, 2)}`);
 
         try {
-            logger.info('🔐 Calling authManager.authenticate...');
             await this.authManager.authenticate(
                 this.wsManager,
                 this.config.requestTimeout,
@@ -245,7 +240,6 @@ export class NitroliteWebSocketClient {
                 this.challengeManager.rawMessage || undefined,
             );
 
-            logger.info('✅ Challenge approved successfully!');
             this.challengeManager.clearChallenge();
             this.startPingInterval();
             this.statusManager.setStatus('connected');
@@ -295,17 +289,14 @@ export class NitroliteWebSocketClient {
     }
 
     private handleAuthChallenge(data: any): void {
-        logger.info('🤝 HANDLING AUTH_CHALLENGE MESSAGE');
         logger.debug(`Challenge data: ${JSON.stringify(data, null, 2)}`);
         
         if (!this.authManager.authenticated) {
-            logger.info('🤝 Setting challenge and will auto-approve...');
             this.challengeManager.setChallenge(data, JSON.stringify(data));
             
             // Auto-approve challenge for server - use setTimeout to ensure async
             setTimeout(() => {
                 if (this.hasPendingChallenge) {
-                    logger.debug('🚀 AUTO-APPROVING CHALLENGE NOW');
                     this.approveChallenge().catch((error) => {
                         logger.error('❌ Failed to auto-approve challenge:', error);
                     });
@@ -319,15 +310,12 @@ export class NitroliteWebSocketClient {
     }
 
     private handleAuthVerify(data: any): void {
-        logger.info('📥 HANDLING AUTH_VERIFY MESSAGE');
         logger.debug(`Auth verify data: ${JSON.stringify(data, null, 2)}`);
         
         if (!this.authManager.authenticated) {
-            logger.info('✅ Processing auth_verify response...');
             const result = this.authManager.handleAuthResponse(data);
             
             if (result.success) {
-                logger.info('🎉 Authentication verification successful!');
                 this.startPingInterval();
                 this.statusManager.setStatus('connected');
                 this.connectionManager.resetRetryCount();
@@ -350,15 +338,11 @@ export class NitroliteWebSocketClient {
     }
 
     private handleTokenExpiration(): void {
-        logger.info('🔄 Handling token expiration - triggering re-authentication with fresh auth request');
         this.statusManager.setStatus('connecting');
         
         const context = this.authManager.authContext;
         if (this.wsManager.isOpen && context) {
             this.authManager.sendAuthRequest(this.wsManager)
-                .then(() => {
-                    logger.info('🆕 Fresh authentication request sent after token expiration');
-                })
                 .catch((error) => {
                     logger.error('❌ Token expiration re-auth failed:', error);
                     this.emitError(new Error(`Re-authentication failed: ${error.message}`));
@@ -452,10 +436,8 @@ export function createNitroliteWebSocketClient(
 let globalClient: NitroliteWebSocketClient | null = null;
 
 export async function initializeNitroliteClient(): Promise<NitroliteWebSocketClient> {
-    logger.info('🚀 Initializing Nitrolite WebSocket client...');
 
     if (globalClient) {
-        logger.info('📋 Using existing global client');
         return globalClient;
     }
 
@@ -477,7 +459,6 @@ export async function initializeNitroliteClient(): Promise<NitroliteWebSocketCli
         },
         {
             onConnect: () => {
-                logger.info('✅ Nitrolite WebSocket connected successfully');
             },
             onDisconnect: () => {
                 logger.warn('❌ Nitrolite WebSocket disconnected');
@@ -486,13 +467,11 @@ export async function initializeNitroliteClient(): Promise<NitroliteWebSocketCli
                 logger.error('💥 Nitrolite WebSocket error:', error.message);
             },
             onAuthSuccess: () => {
-                logger.info('🔐 Nitrolite authentication successful');
             },
             onAuthFailed: (error) => {
                 logger.error('🔒 Nitrolite authentication failed:', error);
             },
             onChallengeReceived: (challenge) => {
-                logger.info('🤝 Nitrolite auth challenge received, will auto-approve...');
                 logger.debug('Auth challenge received for processing');
                 // Auto-approve challenge for server (like frontend manual approval)
                 if (globalClient && globalClient.hasPendingChallenge) {
@@ -508,10 +487,8 @@ export async function initializeNitroliteClient(): Promise<NitroliteWebSocketCli
     );
 
     // Connect the client
-    logger.info('🔗 Connecting to Nitrolite WebSocket...');
     await globalClient.connect(walletAddress, config.walletPrivateKey);
 
-    logger.info('✅ Nitrolite client initialization completed');
     return globalClient;
 }
 

@@ -90,12 +90,8 @@ export class AuthenticationManager {
         if (storedJWT && isJWTTokenValid(storedJWT)) {
             logger.info('🔑 Using stored JWT token for authentication');
             logger.debug(`JWT Token length: ${storedJWT.length} characters`);
-        } else {
-            logger.info('🆕 No valid JWT token found, proceeding with standard auth request');
-            if (storedJWT) {
-                logger.info('🗑️  Clearing expired JWT token');
-                clearJWTToken();
-            }
+        } else if (storedJWT) {
+            clearJWTToken();
         }
 
         this.authInProgress = true;
@@ -108,7 +104,6 @@ export class AuthenticationManager {
     }
 
     async authenticate(wsManager: any, timeout: number, pendingChallenge?: any, rawMessage?: string): Promise<void> {
-        logger.info('🔐 AUTH MANAGER AUTHENTICATE CALLED');
         logger.debug(`Pending challenge: ${JSON.stringify(pendingChallenge, null, 2)}`);
         logger.debug(`Raw message: ${rawMessage}`);
         
@@ -128,19 +123,12 @@ export class AuthenticationManager {
             throw new Error('WebSocket not available');
         }
 
-        logger.info('🚀 Starting authenticateWithNitrolite...');
         this.authInProgress = true;
         try {
             const authResult = await authenticateWithNitrolite(ws, context, timeout, pendingChallenge, rawMessage);
-            logger.info('✅ authenticateWithNitrolite completed successfully');
             
-            // Print JWT token if received
             if (authResult.jwtToken) {
-                logger.info('🎉 SUCCESS! JWT Token received and stored');
                 logger.info(`🔑 JWT Token: ***REDACTED*** (length: ${authResult.jwtToken.length})`);
-                logger.info('✅ JWT Token will be reused for future authentication requests');
-            } else {
-                logger.info('✅ Authentication successful but no JWT token received');
             }
             
             this.isAuthenticated = true;
@@ -151,12 +139,10 @@ export class AuthenticationManager {
             throw error;
         } finally {
             this.authInProgress = false;
-            logger.info('🔄 Auth progress reset to false');
         }
     }
 
     handleAuthResponse(response: any): { success: boolean; error?: string; tokenExpired?: boolean } {
-        logger.info('🔍 Processing authentication response');
         logger.debug(`Auth response: ${JSON.stringify(response, null, 2)}`);
         
         const result = processAuthResponse(response);
@@ -166,7 +152,6 @@ export class AuthenticationManager {
             
             // Log JWT token reception securely
             if (result.jwtToken) {
-                logger.info('🎉 SUCCESS! JWT Token received and stored');
                 logger.info(`🔑 JWT Token: ***REDACTED*** (length: ${result.jwtToken.length})`);
             } else {
                 logger.warn('⚠️  Authentication successful but no JWT token received');
@@ -194,7 +179,6 @@ export class AuthenticationManager {
     }
 
     private handleTokenExpiration(): void {
-        logger.info('Token expired - clearing auth state');
         clearJWTToken();
         this.isAuthenticated = false;
         this.authInProgress = false;

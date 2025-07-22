@@ -35,12 +35,7 @@ contract UtilsTest_Signatures is Test {
         participants[0] = signer;
         participants[1] = wrongSigner;
 
-        channel = Channel({
-            participants: participants,
-            adjudicator: address(0x123),
-            challenge: 3600,
-            nonce: 1
-        });
+        channel = Channel({participants: participants, adjudicator: address(0x123), challenge: 3600, nonce: 1});
 
         // Create test state
         Allocation[] memory allocations = new Allocation[](2);
@@ -136,23 +131,20 @@ contract UtilsTest_Signatures is Test {
     function test_recoverStateEIP712Signer_returnsCorrectSigner() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
-        bytes32 structHash = keccak256(abi.encode(
-            STATE_TYPEHASH,
-            channelId,
-            testState.intent,
-            testState.version,
-            keccak256(testState.data),
-            keccak256(abi.encode(testState.allocations))
-        ));
+        bytes32 structHash = keccak256(
+            abi.encode(
+                STATE_TYPEHASH,
+                channelId,
+                testState.intent,
+                testState.version,
+                keccak256(testState.data),
+                keccak256(abi.encode(testState.allocations))
+            )
+        );
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
-        address recoveredSigner = Utils.recoverStateEIP712Signer(
-            STATE_TYPEHASH,
-            channelId,
-            domainSeparator,
-            testState,
-            sig
-        );
+        address recoveredSigner =
+            Utils.recoverStateEIP712Signer(STATE_TYPEHASH, channelId, domainSeparator, testState, sig);
 
         assertEq(recoveredSigner, signer, "Should recover correct signer for state EIP712");
     }
@@ -162,27 +154,24 @@ contract UtilsTest_Signatures is Test {
         bytes32 domainSeparator = mockEIP712.domainSeparator();
 
         // Sign original state
-        bytes32 structHash = keccak256(abi.encode(
-            STATE_TYPEHASH,
-            channelId,
-            testState.intent,
-            testState.version,
-            keccak256(testState.data),
-            keccak256(abi.encode(testState.allocations))
-        ));
+        bytes32 structHash = keccak256(
+            abi.encode(
+                STATE_TYPEHASH,
+                channelId,
+                testState.intent,
+                testState.version,
+                keccak256(testState.data),
+                keccak256(abi.encode(testState.allocations))
+            )
+        );
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         // Create different state
         State memory differentState = testState;
         differentState.data = bytes("different data");
 
-        address recoveredSigner = Utils.recoverStateEIP712Signer(
-            STATE_TYPEHASH,
-            channelId,
-            domainSeparator,
-            differentState,
-            sig
-        );
+        address recoveredSigner =
+            Utils.recoverStateEIP712Signer(STATE_TYPEHASH, channelId, domainSeparator, differentState, sig);
 
         assertNotEq(recoveredSigner, signer, "Should not recover correct signer for different state");
     }
@@ -214,14 +203,16 @@ contract UtilsTest_Signatures is Test {
     function test_verifyStateSignature_returnsTrue_forEIP712Signature() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
-        bytes32 structHash = keccak256(abi.encode(
-            STATE_TYPEHASH,
-            channelId,
-            testState.intent,
-            testState.version,
-            keccak256(testState.data),
-            keccak256(abi.encode(testState.allocations))
-        ));
+        bytes32 structHash = keccak256(
+            abi.encode(
+                STATE_TYPEHASH,
+                channelId,
+                testState.intent,
+                testState.version,
+                keccak256(testState.data),
+                keccak256(abi.encode(testState.allocations))
+            )
+        );
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
@@ -254,14 +245,16 @@ contract UtilsTest_Signatures is Test {
     function test_verifyStateSignature_returnsFalse_forWrongSigner_EIP712() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
-        bytes32 structHash = keccak256(abi.encode(
-            STATE_TYPEHASH,
-            channelId,
-            testState.intent,
-            testState.version,
-            keccak256(testState.data),
-            keccak256(abi.encode(testState.allocations))
-        ));
+        bytes32 structHash = keccak256(
+            abi.encode(
+                STATE_TYPEHASH,
+                channelId,
+                testState.intent,
+                testState.version,
+                keccak256(testState.data),
+                keccak256(abi.encode(testState.allocations))
+            )
+        );
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, wrongSigner);
@@ -272,14 +265,16 @@ contract UtilsTest_Signatures is Test {
     function test_verifyStateSignature_returnsFalse_whenNoEIP712Support() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = Utils.NO_EIP712_SUPPORT;
-        bytes32 structHash = keccak256(abi.encode(
-            STATE_TYPEHASH,
-            channelId,
-            testState.intent,
-            testState.version,
-            keccak256(testState.data),
-            keccak256(abi.encode(testState.allocations))
-        ));
+        bytes32 structHash = keccak256(
+            abi.encode(
+                STATE_TYPEHASH,
+                channelId,
+                testState.intent,
+                testState.version,
+                keccak256(testState.data),
+                keccak256(abi.encode(testState.allocations))
+            )
+        );
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, mockEIP712.domainSeparator(), structHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
@@ -301,14 +296,16 @@ contract UtilsTest_Signatures is Test {
     function test_verifyStateSignature_returnsFalse_forEIP712WhenNoEIP712Support() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
-        bytes32 structHash = keccak256(abi.encode(
-            STATE_TYPEHASH,
-            channelId,
-            testState.intent,
-            testState.version,
-            keccak256(testState.data),
-            keccak256(abi.encode(testState.allocations))
-        ));
+        bytes32 structHash = keccak256(
+            abi.encode(
+                STATE_TYPEHASH,
+                channelId,
+                testState.intent,
+                testState.version,
+                keccak256(testState.data),
+                keccak256(abi.encode(testState.allocations))
+            )
+        );
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         bool isValid = Utils.verifyStateSignature(testState, channelId, Utils.NO_EIP712_SUPPORT, sig, signer);

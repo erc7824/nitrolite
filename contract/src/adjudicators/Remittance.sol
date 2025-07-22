@@ -86,7 +86,14 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable, EIP712AdjudicatorBa
             uint8 otherParty = candidateRemittance.sender == CREATOR ? BROKER : CREATOR;
 
             // Verify the other party signed the last proof
-            if (!earliestProof.verifyStateSignature(Utils.getChannelId(chan), channelImplDomainSeparator, earliestProof.sigs[0], chan.participants[otherParty])) {
+            if (
+                !earliestProof.verifyStateSignature(
+                    Utils.getChannelId(chan),
+                    channelImplDomainSeparator,
+                    earliestProof.sigs[0],
+                    chan.participants[otherParty]
+                )
+            ) {
                 return false;
             }
         } else {
@@ -123,7 +130,11 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable, EIP712AdjudicatorBa
         return true;
     }
 
-    function _validateRemittanceState(bytes32 domainSeparator, Channel calldata chan, State memory state) internal view returns (bool) {
+    function _validateRemittanceState(bytes32 domainSeparator, Channel calldata chan, State memory state)
+        internal
+        view
+        returns (bool)
+    {
         if (state.intent != StateIntent.OPERATE) {
             return false;
         }
@@ -143,7 +154,9 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable, EIP712AdjudicatorBa
         }
 
         // Verify signature is from the sender
-        return state.verifyStateSignature(Utils.getChannelId(chan), domainSeparator, state.sigs[0], chan.participants[currentRemittance.sender]);
+        return state.verifyStateSignature(
+            Utils.getChannelId(chan), domainSeparator, state.sigs[0], chan.participants[currentRemittance.sender]
+        );
     }
 
     function _validateRemittanceTransition(State memory previousState, State memory currentState)

@@ -7,7 +7,9 @@ pragma solidity ^0.8.13;
  */
 
 /// @dev EIP-712 domain separator type hash for state channel protocol
-bytes32 constant STATE_TYPEHASH = keccak256("AllowStateHash(bytes32 channelId,uint8 intent,uint256 version,bytes data,Allocation[] allocations)Allocation(address destination,address token,uint256 amount)");
+bytes32 constant STATE_TYPEHASH = keccak256(
+    "AllowStateHash(bytes32 channelId,uint8 intent,uint256 version,bytes data,Allocation[] allocations)Allocation(address destination,address token,uint256 amount)"
+);
 
 /**
  * @notice Amount structure for token value storage

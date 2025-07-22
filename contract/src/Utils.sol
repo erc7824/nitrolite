@@ -102,15 +102,30 @@ library Utils {
      * @param sig The signature to verify
      * @return The address of the signer
      */
-    function recoverStateEIP712Signer(bytes32 typeHash, bytes32 channelId, bytes32 domainSeparator, State memory state, bytes memory sig)
-        internal
-        pure
-        returns (address)
-    {
-        return Utils.recoverEIP712Signer(domainSeparator, keccak256(abi.encode(typeHash, channelId, state.intent, state.version, keccak256(state.data), keccak256(abi.encode(state.allocations)))), sig);
+    function recoverStateEIP712Signer(
+        bytes32 typeHash,
+        bytes32 channelId,
+        bytes32 domainSeparator,
+        State memory state,
+        bytes memory sig
+    ) internal pure returns (address) {
+        return Utils.recoverEIP712Signer(
+            domainSeparator,
+            keccak256(
+                abi.encode(
+                    typeHash,
+                    channelId,
+                    state.intent,
+                    state.version,
+                    keccak256(state.data),
+                    keccak256(abi.encode(state.allocations))
+                )
+            ),
+            sig
+        );
     }
 
-        /**
+    /**
      * @notice Verifies that a message hash is signed by the specified participant
      * @param state The state to verify
      * @param channelId The ID of the channel
@@ -119,7 +134,13 @@ library Utils {
      * @param signer The address of the expected signer
      * @return True if the signature is valid, false otherwise
      */
-    function verifyStateSignature(State memory state, bytes32 channelId, bytes32 domainSeparator, bytes memory sig, address signer) internal pure returns (bool) {
+    function verifyStateSignature(
+        State memory state,
+        bytes32 channelId,
+        bytes32 domainSeparator,
+        bytes memory sig,
+        address signer
+    ) internal pure returns (bool) {
         bytes32 stateHash = Utils.getStateHashShort(channelId, state);
 
         address rawECDSASigner = Utils.recoverRawECDSASigner(stateHash, sig);
@@ -152,7 +173,11 @@ library Utils {
      * @param domainSeparator The EIP-712 domain separator for the channel
      * @return True if the state is a valid initial state, false otherwise
      */
-    function validateInitialState(State memory state, Channel memory chan, bytes32 domainSeparator) internal view returns (bool) {
+    function validateInitialState(State memory state, Channel memory chan, bytes32 domainSeparator)
+        internal
+        view
+        returns (bool)
+    {
         if (state.version != 0) {
             return false;
         }
@@ -172,7 +197,11 @@ library Utils {
      * @param domainSeparator The EIP-712 domain separator for the channel
      * @return True if the state has valid signatures from both participants, false otherwise
      */
-    function validateUnanimousStateSignatures(State memory state, Channel memory chan, bytes32 domainSeparator) internal view returns (bool) {
+    function validateUnanimousStateSignatures(State memory state, Channel memory chan, bytes32 domainSeparator)
+        internal
+        view
+        returns (bool)
+    {
         if (state.sigs.length != 2) {
             return false;
         }

@@ -35,8 +35,8 @@ func (o *Operator) handleTransfer(args []string) {
 
 	fmt.Println("What destination format do you want to use?")
 	destinationFormatSuggestions := []prompt.Suggest{
-		{Text: "tag", Description: "Transfer to a user by his/her tag"},
-		{Text: "address", Description: "Transfer to a user by his/her address"},
+		{Text: "tag", Description: "Transfer by user tag"},
+		{Text: "address", Description: "Transfer by user address"},
 	}
 	destinationFormat := o.readSelectionArg("destination", destinationFormatSuggestions)
 

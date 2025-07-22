@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/big"
 	"os"
 	"time"
 
@@ -61,17 +60,13 @@ func (o *Operator) handleListChannels() {
 	for _, network := range o.config.Networks {
 		for _, asset := range network.Assets {
 			channelID := "N/A"
-			decChannelBalance := decimal.NewFromInt(0)
+			channelBalance := decimal.NewFromInt(0)
 			if asset.ChannelID != "" {
 				channelID = asset.ChannelID
-
-				channelBalance, ok := new(big.Int).SetString(asset.ChannelBalance, 10)
-				if ok {
-					decChannelBalance = decimal.NewFromBigInt(channelBalance, -int32(asset.Decimals))
-				}
+				channelBalance = decimal.NewFromBigInt(asset.RawChannelBalance, -int32(asset.Decimals))
 			}
 
-			t.AppendRow(table.Row{network.ChainName, asset.Symbol, channelID, decChannelBalance})
+			t.AppendRow(table.Row{network.ChainName, asset.Symbol, channelID, channelBalance.StringFixed(2)})
 		}
 	}
 	t.SetColumnConfigs(

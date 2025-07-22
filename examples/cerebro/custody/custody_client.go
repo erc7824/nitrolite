@@ -32,21 +32,21 @@ func (c *CustodyClient) OpenChannel(
 	chainID uint32, chainRPC string,
 	custodyAddress, adjudicatorAddress, brokerAddress, tokenAddress common.Address,
 	challenge uint64,
-) error {
+) (string, error) {
 	client, err := ethclient.Dial(chainRPC)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	custody, err := NewCustody(custodyAddress, client)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if challenge == 0 {
 		challenge = minCustodyChallengePeriod
 	} else if challenge < minCustodyChallengePeriod {
-		return fmt.Errorf("challenge period must be at least %d seconds", minCustodyChallengePeriod)
+		return "", fmt.Errorf("challenge period must be at least %d seconds", minCustodyChallengePeriod)
 	}
 
 	channel := Channel{
@@ -75,38 +75,38 @@ func (c *CustodyClient) OpenChannel(
 
 	channelID, err := GetChannelID(channel, chainID)
 	if err != nil {
-		return fmt.Errorf("failed to compute channel ID: %w", err)
+		return "", fmt.Errorf("failed to compute channel ID: %w", err)
 	}
 
 	initialStateData, err := EncodeState(channelID, initial)
 	if err != nil {
-		return fmt.Errorf("failed to encode initial state: %w", err)
+		return "", fmt.Errorf("failed to encode initial state: %w", err)
 	}
 
 	sig, err := signNitroData(signer, initialStateData)
 	if err != nil {
-		return fmt.Errorf("failed to sign initial state: %w", err)
+		return "", fmt.Errorf("failed to sign initial state: %w", err)
 	}
 	initial.Sigs = []Signature{sig}
 
 	txOpts := signerTxOpts(wallet, chainID)
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed to suggest gas price: %w", err)
+		return "", fmt.Errorf("failed to suggest gas price: %w", err)
 	}
 	txOpts.GasPrice = gasPrice.Add(gasPrice, gasPrice)
 
 	tx, err := custody.Create(txOpts, channel, initial)
 	if err != nil {
-		return fmt.Errorf("failed to create custody channel: %w", err)
+		return "", fmt.Errorf("failed to create custody channel: %w", err)
 	}
 
 	if _, err := bind.WaitMined(context.Background(), client, tx.Hash()); err != nil {
-		return err
+		return "", err
 	}
 
 	fmt.Printf("Channel created successfully: %s\n", tx.Hash().Hex())
-	return nil
+	return channelID.Hex(), nil
 }
 
 func (c *CustodyClient) CloseChannel(

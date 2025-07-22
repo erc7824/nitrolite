@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+
+	"github.com/shopspring/decimal"
 )
 
 func (c *ClearnodeClient) handleEvent(event RPCData) {
@@ -24,15 +26,15 @@ func (c *ClearnodeClient) handleEvent(event RPCData) {
 }
 
 type ChannelRes struct {
-	ChannelID   string `json:"channel_id"`
-	Participant string `json:"participant"`
-	Status      string `json:"status"`
-	Token       string `json:"token"`
-	RawAmount   string `json:"amount"` // Total amount in the channel (user + broker)
-	ChainID     uint32 `json:"chain_id"`
-	Adjudicator string `json:"adjudicator"`
-	Challenge   uint64 `json:"challenge"`
-	UpdatedAt   string `json:"updated_at"`
+	ChannelID   string          `json:"channel_id"`
+	Participant string          `json:"participant"`
+	Status      string          `json:"status"`
+	Token       string          `json:"token"`
+	RawAmount   decimal.Decimal `json:"amount"` // Total amount in the channel (user + broker)
+	ChainID     uint32          `json:"chain_id"`
+	Adjudicator string          `json:"adjudicator"`
+	Challenge   uint64          `json:"challenge"`
+	UpdatedAt   string          `json:"updated_at"`
 }
 
 func (c *ClearnodeClient) handleChannelsEvent(event RPCData) {

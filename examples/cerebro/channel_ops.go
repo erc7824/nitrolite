@@ -42,7 +42,7 @@ func (o *Operator) handleOpenChannel(args []string) {
 		return
 	}
 	if asset.IsEnabled() {
-		fmt.Printf("Channel is already opened for asset %s on %s.\n", assetSymbol, chainName)
+		fmt.Printf("Channel is already opened for asset %s on %s: %s.\n", assetSymbol, chainName, asset.ChannelID)
 		return
 	}
 
@@ -82,7 +82,7 @@ func (o *Operator) handleOpenChannel(args []string) {
 
 	fmt.Printf("Opening custody channel on %s...\n", chainName)
 
-	if err := o.custody.OpenChannel(
+	channelID, err := o.custody.OpenChannel(
 		o.config.Wallet, o.config.Signer,
 		network.ChainID, chainRPCDTOs[chainRPCIndex].URL,
 		network.CustodyAddress,
@@ -90,7 +90,8 @@ func (o *Operator) handleOpenChannel(args []string) {
 		o.config.BrokerAddress,
 		asset.Token,
 		0,
-	); err != nil {
+	)
+	if err != nil {
 		fmt.Printf("Failed to open custody channel on %s: %s\n", chainName, err.Error())
 		return
 	}
@@ -100,7 +101,7 @@ func (o *Operator) handleOpenChannel(args []string) {
 		return
 	}
 
-	fmt.Printf("Successfully opened custody channel on %s!\n", chainName)
+	fmt.Printf("Successfully opened custody channel(%s) on %s!\n", channelID, chainName)
 }
 
 func (o *Operator) handleCloseChannel(args []string) {
@@ -144,7 +145,7 @@ func (o *Operator) handleCloseChannel(args []string) {
 		return
 	}
 
-	fmt.Printf("Closing custody channel on %s...\n", chainName)
+	fmt.Printf("Closing custody channel(%s) on %s...\n", asset.ChannelID, chainName)
 
 	allocations := make([]custody.Allocation, len(closureRes.FinalAllocations))
 	for i, alloc := range closureRes.FinalAllocations {
@@ -176,7 +177,7 @@ func (o *Operator) handleCloseChannel(args []string) {
 	}
 
 	unlockedAmount := decimal.NewFromBigInt(allocations[0].Amount, -int32(asset.Decimals))
-	fmt.Printf("Successfully closed custody channel on %s with unlocked %s %s!\n", chainName, unlockedAmount, strings.ToUpper(asset.Symbol))
+	fmt.Printf("Successfully closed custody channel(%s) on %s with unlocked %s %s!\n", asset.ChannelID, chainName, unlockedAmount.StringFixed(2), strings.ToUpper(asset.Symbol))
 }
 
 func (o *Operator) handleResizeChannel(args []string) {
@@ -214,21 +215,16 @@ func (o *Operator) handleResizeChannel(args []string) {
 		return
 	}
 
-	custodyBalance, err := o.custody.GetLedgerBalance(
+	rawCustodyBalance, err := o.custody.GetLedgerBalance(
 		network.ChainID, chainRPC,
 		network.CustodyAddress, o.config.Wallet.Address(), asset.Token)
 	if err != nil {
 		fmt.Printf("Failed to get balance for asset %s on %s: %s\n", assetSymbol, chainName, err.Error())
 		return
 	}
-	decCustodyBalance := decimal.NewFromBigInt(custodyBalance, -int32(asset.Decimals))
+	custodyBalance := decimal.NewFromBigInt(rawCustodyBalance, -int32(asset.Decimals))
 
-	channelBalance, ok := new(big.Int).SetString(asset.ChannelBalance, 10)
-	if !ok {
-		fmt.Printf("Failed to parse channel balance for asset %s on %s.\n", assetSymbol, chainName)
-		return
-	}
-	decChannelBalance := decimal.NewFromBigInt(channelBalance, -int32(asset.Decimals))
+	channelBalance := decimal.NewFromBigInt(asset.RawChannelBalance, -int32(asset.Decimals))
 
 	unifiedBalances, err := o.clearnode.GetLedgerBalances()
 	if err != nil {
@@ -236,10 +232,10 @@ func (o *Operator) handleResizeChannel(args []string) {
 		return
 	}
 
-	decUnifiedBalance := decimal.New(0, 0)
+	unifiedBalance := decimal.New(0, 0)
 	for _, balance := range unifiedBalances {
 		if balance.Asset == asset.Symbol {
-			decUnifiedBalance = balance.Amount
+			unifiedBalance = balance.Amount
 			break
 		}
 	}
@@ -249,57 +245,57 @@ func (o *Operator) handleResizeChannel(args []string) {
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"Type", "Value"})
 	t.AppendSeparator()
-	t.AppendRow(table.Row{"On Custody Ledger", decCustodyBalance.String()})
-	t.AppendRow(table.Row{"On Channel", decChannelBalance.String()})
-	t.AppendRow(table.Row{"Unified On Clearnode", decUnifiedBalance.String()})
+	t.AppendRow(table.Row{"On Custody Ledger", custodyBalance.StringFixed(2)})
+	t.AppendRow(table.Row{"On Channel", channelBalance.StringFixed(2)})
+	t.AppendRow(table.Row{"Unified On Clearnode", unifiedBalance.StringFixed(2)})
 	t.Render()
 
 	fmt.Printf("How much %s do you want to resize (+)into/(-)out channel?\n", assetSymbol)
 	fmt.Println("That's the amount moved between custody ledger and channel.")
 	resizeAmountStr := o.readExtraArg("resize_amount")
 
-	decResizeAmount, err := decimal.NewFromString(resizeAmountStr)
+	resizeAmount, err := decimal.NewFromString(resizeAmountStr)
 	if err != nil {
 		fmt.Printf("Invalid amount format: %s\n", err.Error())
 		return
 	}
 
-	if decResizeAmount.GreaterThan(decCustodyBalance) {
+	if resizeAmount.GreaterThan(custodyBalance) {
 		fmt.Printf("You cannot resize more than your current balance of %s %s.\n",
-			decCustodyBalance.String(), assetSymbol)
+			custodyBalance.StringFixed(2), assetSymbol)
 		return
 	}
-	resizeAmount := decResizeAmount.Shift(int32(asset.Decimals))
+	rawResizeAmount := resizeAmount.Shift(int32(asset.Decimals))
 
 	fmt.Printf("How much %s do you want to allocate (+)into/(-)out channel?\n", assetSymbol)
 	fmt.Println("That's the amount moved between unified balance and channel.")
 	allocateAmountStr := o.readExtraArg("allocate_amount")
 
-	decAllocateAmount, err := decimal.NewFromString(allocateAmountStr)
+	allocateAmount, err := decimal.NewFromString(allocateAmountStr)
 	if err != nil {
 		fmt.Printf("Invalid amount format: %s\n", err.Error())
 		return
 	}
 
-	if decAllocateAmount.GreaterThan(decUnifiedBalance) {
+	if allocateAmount.GreaterThan(unifiedBalance) {
 		fmt.Printf("You cannot allocate more than your current unified balance of %s %s.\n",
-			decUnifiedBalance.String(), assetSymbol)
+			unifiedBalance.StringFixed(2), assetSymbol)
 		return
 	}
-	allocateAmount := decAllocateAmount.Shift(int32(asset.Decimals))
+	rawAllocateAmount := allocateAmount.Shift(int32(asset.Decimals))
 
-	if newChannelAmount := new(big.Int).Add(new(big.Int).Add(channelBalance, allocateAmount.BigInt()), resizeAmount.BigInt()); newChannelAmount.Cmp(big.NewInt(0)) < 0 {
-		fmt.Printf("New channel amount must not be negative after resize: %s\n", newChannelAmount)
+	if newChannelBalance := channelBalance.Add(allocateAmount).Add(resizeAmount); newChannelBalance.LessThan(decimal.Zero) {
+		fmt.Printf("New channel amount must not be negative after resize: %s\n", newChannelBalance)
 		return
 	}
 
-	resizeRes, err := o.clearnode.RequestChannelResize(o.config.Wallet.Address(), asset.ChannelID, allocateAmount, resizeAmount)
+	resizeRes, err := o.clearnode.RequestChannelResize(o.config.Wallet.Address(), asset.ChannelID, rawAllocateAmount, rawResizeAmount)
 	if err != nil {
 		fmt.Printf("Failed to request channel resize on %s: %s\n", chainName, err.Error())
 		return
 	}
 
-	fmt.Printf("Resizing custody channel on %s...\n", chainName)
+	fmt.Printf("Resizing custody channel(%s) on %s...\n", asset.ChannelID, chainName)
 
 	stateData, err := hexutil.Decode(resizeRes.StateData)
 	if err != nil {
@@ -337,7 +333,7 @@ func (o *Operator) handleResizeChannel(args []string) {
 		return
 	}
 
-	fmt.Printf("Successfully resized custody channel on %s!\n", chainName)
+	fmt.Printf("Successfully resized custody channel(%s) on %s!\n", asset.ChannelID, chainName)
 }
 
 func convertAllocationRes(a clearnet.AllocationRes) custody.Allocation {

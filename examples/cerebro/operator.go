@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/c-bata/go-prompt"
@@ -252,21 +253,21 @@ func (o *Operator) reloadConfig() {
 		for _, asset := range assets {
 			if asset.ChainID == network.ChainID {
 				channelID := ""
-				channelBalance := ""
+				rawChannelBalance := new(big.Int)
 				for _, channel := range channels {
 					if channel.ChainID == network.ChainID && channel.Token == asset.Token {
 						channelID = channel.ChannelID
-						channelBalance = channel.RawAmount
+						rawChannelBalance = channel.RawAmount.BigInt()
 						break
 					}
 				}
 
 				chainAssets = append(chainAssets, ChainAssetConfig{
-					Token:          common.HexToAddress(asset.Token),
-					Symbol:         asset.Symbol,
-					Decimals:       asset.Decimals,
-					ChannelID:      channelID,
-					ChannelBalance: channelBalance,
+					Token:             common.HexToAddress(asset.Token),
+					Symbol:            asset.Symbol,
+					Decimals:          asset.Decimals,
+					ChannelID:         channelID,
+					RawChannelBalance: rawChannelBalance,
 				})
 			}
 		}

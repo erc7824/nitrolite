@@ -1,6 +1,8 @@
 package main
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
@@ -76,8 +78,8 @@ type ChainAssetConfig struct {
 	Symbol   string
 	Decimals uint8
 
-	ChannelID      string
-	ChannelBalance string
+	ChannelID         string
+	RawChannelBalance *big.Int
 }
 
 func (c ChainAssetConfig) IsEnabled() bool {

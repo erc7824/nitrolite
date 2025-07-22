@@ -49,13 +49,13 @@ cerebro <clearnode_ws_url>
 
 ## Channel Operations Workflow
 
-1. **Opening a Channel**
+1. **Open a Channel**
    ```bash
    open channel <chain_name> <token_symbol>
    ```
    Creates a new payment channel for the specified asset on the given chain.
 
-2. **Resizing a Channel**
+2. **Resize a Channel**
    ```bash
    resize channel <chain_name> <token_symbol>
    ```
@@ -64,16 +64,16 @@ cerebro <clearnode_ws_url>
    - Moving funds from unified balance to channel (allocate amount)
    - Displays current balances before operation for clarity
 
-3. **Closing a Channel**
+3. **Close a Channel**
    ```bash
    close channel <chain_name> <token_symbol>
    ```
-   Requests channel closure and withdraws unlocked funds back to custody.
+   Requests channel closure and withdraws unlocked funds back to custody ledgers.
 
 ## Dependencies
 
 - Go 1.24.3+
-- Ethereum client libraries
+- go-ethereum for Ethereum chain interactions
 - SQLite for local storage
 - WebSocket support for real-time events
 

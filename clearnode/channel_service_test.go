@@ -48,7 +48,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(1500), initialBalance)
 
-		service := NewChannelService(db, &signer)
+		service := NewChannelService(db, nil, &signer)
 		allocateAmount := decimal.NewFromInt(200)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
@@ -59,7 +59,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 			userAddress.Hex(): {},
 		}
 
-		response, err := service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
+		response, err := service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
 		require.NoError(t, err)
 
 		// Validate response
@@ -113,7 +113,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		ledger := GetWalletLedger(db, userAddress)
 		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(500)))
 
-		service := NewChannelService(db, &signer)
+		service := NewChannelService(db, nil, &signer)
 		allocateAmount := decimal.NewFromInt(-300)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
@@ -124,7 +124,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 			userAddress.Hex(): {},
 		}
 
-		response, err := service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
+		response, err := service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
 		require.NoError(t, err)
 
 		// Channel amount should decrease
@@ -146,7 +146,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		signer := Signer{privateKey: rawKey}
 		userAddress := signer.GetAddress()
 
-		service := NewChannelService(db, &signer)
+		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
 		allocateAmount := decimal.NewFromInt(100)
 		params := &ResizeChannelParams{
 			ChannelID:        "0xNonExistentChannel",
@@ -155,7 +155,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
 
-		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "channel 0xNonExistentChannel not found")
 	})
@@ -184,7 +184,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
-		service := NewChannelService(db, &signer)
+		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
 		allocateAmount := decimal.NewFromInt(100)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
@@ -193,7 +193,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
 
-		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "channel 0xChanClosed is not open: closed")
 	})
@@ -233,7 +233,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
-		service := NewChannelService(db, &signer)
+		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
 		allocateAmount := decimal.NewFromInt(100)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
@@ -242,7 +242,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
 
-		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has challenged channels")
 	})
@@ -277,7 +277,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		ledger := GetWalletLedger(db, userAddress)
 		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromFloat(0.000001)))
 
-		service := NewChannelService(db, &signer)
+		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
 		allocateAmount := decimal.NewFromInt(200)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
@@ -286,7 +286,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
 
-		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "insufficient unified balance")
 	})
@@ -315,7 +315,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
-		service := NewChannelService(db, &signer)
+		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
 		allocateAmount := decimal.NewFromInt(100)
 		params := &ResizeChannelParams{
 			ChannelID:        ch.ChannelID,
@@ -324,7 +324,7 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		}
 		rpcSigners := map[string]struct{}{} // Empty signers
 
-		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid signature")
 	})
@@ -366,7 +366,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 			rawToDecimal(initialRawAmount.BigInt(), asset.Decimals),
 		))
 
-		service := NewChannelService(db, &signer)
+		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
 		params := &CloseChannelParams{
 			ChannelID:        ch.ChannelID,
 			FundsDestination: userAddress.Hex(),
@@ -375,7 +375,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 			userAddress.Hex(): {},
 		}
 
-		response, err := service.RequestClose(LoggerFromContext(context.Background()), params, rpcSigners)
+		response, err := service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
 		require.NoError(t, err)
 
 		// Validate response
@@ -435,7 +435,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 			rawToDecimal(initialRawAmount.BigInt(), asset.Decimals),
 		))
 
-		service := NewChannelService(db, &signer)
+		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
 		params := &CloseChannelParams{
 			ChannelID:        ch.ChannelID,
 			FundsDestination: userAddress.Hex(),
@@ -444,7 +444,7 @@ func TestChannelService_CloseChannel(t *testing.T) {
 			userAddress.Hex(): {},
 		}
 
-		_, err = service.RequestClose(LoggerFromContext(context.Background()), params, rpcSigners)
+		_, err = service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has challenged channels")
 	})

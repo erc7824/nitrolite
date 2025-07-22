@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -14,16 +16,98 @@ import (
 
 // ChannelService handles the business logic for funding channels.
 type ChannelService struct {
-	db     *gorm.DB
-	signer *Signer
+	db       *gorm.DB
+	networks map[string]*NetworkConfig
+	signer   *Signer
 }
 
 // NewAppSessionService creates a new AppSessionService.
-func NewChannelService(db *gorm.DB, signer *Signer) *ChannelService {
-	return &ChannelService{db: db, signer: signer}
+func NewChannelService(db *gorm.DB, networks map[string]*NetworkConfig, signer *Signer) *ChannelService {
+	return &ChannelService{db: db, networks: networks, signer: signer}
 }
 
-func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParams, rpcSigners map[string]struct{}) (ResizeChannelResponse, error) {
+func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChannelParams, rpcSigners map[string]struct{}, logger Logger) (CreateChannelResponse, error) {
+	_, ok := rpcSigners[wallet.Hex()]
+	if !ok {
+		return CreateChannelResponse{}, RPCErrorf("invalid signature")
+	}
+
+	_, err := GetAssetByToken(s.db, params.Token, params.ChainID)
+	if err != nil {
+		return CreateChannelResponse{}, RPCErrorf("token not supported: %s", params.Token)
+	}
+
+	allocations := []nitrolite.Allocation{
+		{
+			Destination: wallet,
+			Token:       common.HexToAddress(params.Token),
+			Amount:      params.Amount.BigInt(),
+		},
+		{
+			Destination: s.signer.GetAddress(),
+			Token:       common.HexToAddress(params.Token),
+			Amount:      big.NewInt(0),
+		},
+	}
+
+	networkConfig, ok := s.networks[fmt.Sprintf("%d", params.ChainID)]
+	if !ok {
+		return CreateChannelResponse{}, RPCErrorf("unsupported chain ID: %d", params.ChainID)
+	}
+
+	channel := nitrolite.Channel{
+		Participants: []common.Address{wallet, s.signer.GetAddress()},
+		Adjudicator:  common.HexToAddress(networkConfig.AdjudicatorAddress),
+		Challenge:    3600,
+		Nonce:        uint64(time.Now().UnixMilli()),
+	}
+
+	channelID, err := nitrolite.GetChannelID(channel, params.ChainID)
+	if err != nil {
+		logger.Error("failed to get channel ID", "error", err)
+		return CreateChannelResponse{}, RPCErrorf("failed to get channel ID")
+	}
+
+	stateDataHex := "0x"
+	stateDataBytes, err := hexutil.Decode(stateDataHex)
+	if err != nil {
+		logger.Error("failed to decode state data hex", "error", err)
+		return CreateChannelResponse{}, RPCErrorf("failed to decode state data hex")
+	}
+	encodedState, err := nitrolite.EncodeState(channelID, nitrolite.IntentINITIALIZE, big.NewInt(0), stateDataBytes, allocations)
+	if err != nil {
+		logger.Error("error encoding state hash", "error", err)
+		return CreateChannelResponse{}, RPCErrorf("error encoding state hash")
+	}
+
+	existingOpenChannel, err := CheckExistingChannels(s.db, wallet.Hex(), params.Token, params.ChainID)
+	if err != nil {
+		return CreateChannelResponse{}, RPCErrorf("failed to check existing channels")
+	}
+	if existingOpenChannel != nil {
+		return CreateChannelResponse{}, RPCErrorf("an open channel with broker already exists: %s", existingOpenChannel.ChannelID)
+	}
+
+	stateHash := crypto.Keccak256Hash(encodedState).Hex()
+	sig, err := s.signer.Sign(encodedState)
+	if err != nil {
+		logger.Error("failed to sign state", "error", err)
+		return CreateChannelResponse{}, RPCErrorf("failed to sign state")
+	}
+
+	resp := CreateChannelResponse{
+		ChannelID: channelID.Hex(),
+		Intent:    uint8(nitrolite.IntentFINALIZE),
+		Version:   1,
+		StateData: stateDataHex,
+		StateHash: stateHash,
+		Signature: sig,
+	}
+
+	return resp, nil
+}
+
+func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners map[string]struct{}, logger Logger) (ResizeChannelResponse, error) {
 	channel, err := GetChannelByID(s.db, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)
@@ -145,7 +229,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 	return resp, nil
 }
 
-func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams, rpcSigners map[string]struct{}) (CloseChannelResponse, error) {
+func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map[string]struct{}, logger Logger) (CloseChannelResponse, error) {
 	channel, err := GetChannelByID(s.db, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)

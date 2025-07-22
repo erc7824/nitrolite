@@ -177,7 +177,6 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		return
 	}
 
-	// TODO: move validations in a separate function
 	if challenge < 3600 {
 		logger.Warn("invalid challenge period", "challenge", challenge)
 		return
@@ -236,12 +235,11 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		if err != nil {
 			return fmt.Errorf("DB error fetching asset: %w", err)
 		}
+		amount := rawToDecimal(rawAmount, asset.Decimals)
 
 		walletAddress := ev.Wallet
 		channelAccountID := NewAccountID(channelID)
 		walletAccountID := NewAccountID(walletAddress.Hex())
-
-		amount := rawToDecimal(rawAmount, asset.Decimals)
 
 		ledger := GetWalletLedger(tx, walletAddress)
 		if err := ledger.Record(channelAccountID, asset.Symbol, amount); err != nil {
@@ -270,13 +268,6 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		logger.Error("error creating channel in database", "error", err)
 		return
 	}
-
-	// TODO: move to a separate endpoint
-	// encodedState, err := nitrolite.EncodeState(ev.ChannelId, nitrolite.IntentINITIALIZE, big.NewInt(0), ev.Initial.Data, ev.Initial.Allocations)
-	// if err != nil {
-	// 	logger.Error("error encoding state hash", "error", err)
-	// 	return
-	// }
 
 	c.wsNotifier.Notify(NewChannelNotification(ch))
 	c.wsNotifier.Notify(NewBalanceNotification(ch.Wallet, c.db))

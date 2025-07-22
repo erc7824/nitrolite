@@ -97,6 +97,8 @@ contract Counter is IAdjudicator {
             signerIdx = 1; // guest signer
         }
 
-        return state.verifyStateSignature(Utils.getChannelId(chan), Utils.NO_EIP712_SUPPORT, state.sigs[0], chan.participants[signerIdx]);
+        return state.verifyStateSignature(
+            Utils.getChannelId(chan), Utils.NO_EIP712_SUPPORT, state.sigs[0], chan.participants[signerIdx]
+        );
     }
 }

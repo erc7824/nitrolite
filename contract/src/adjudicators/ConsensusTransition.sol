@@ -47,12 +47,14 @@ contract ConsensusTransition is IAdjudicator, EIP712AdjudicatorBase {
 
         // proof is Initialize State
         if (candidate.version == 1) {
-            return proofs[0].validateTransitionTo(candidate) && proofs[0].validateInitialState(chan, channelImplDomainSeparator)
+            return proofs[0].validateTransitionTo(candidate)
+                && proofs[0].validateInitialState(chan, channelImplDomainSeparator)
                 && candidate.validateUnanimousStateSignatures(chan, channelImplDomainSeparator);
         }
 
         // proof is Operate or Resize State (both have same validation)
-        return proofs[0].validateTransitionTo(candidate) && proofs[0].validateUnanimousStateSignatures(chan, channelImplDomainSeparator)
+        return proofs[0].validateTransitionTo(candidate)
+            && proofs[0].validateUnanimousStateSignatures(chan, channelImplDomainSeparator)
             && candidate.validateUnanimousStateSignatures(chan, channelImplDomainSeparator);
     }
 }

@@ -52,7 +52,9 @@ abstract contract EIP712AdjudicatorBase is Ownable2Step {
         ) {
             /// Taken from EIP-712 specification
             /// https://eips.ethereum.org/EIPS/eip-712#definition-of-domainseparator
-            return keccak256(abi.encode(TYPE_HASH, keccak256(bytes(name)), keccak256(bytes(version)), chainId, verifyingContract));
+            return keccak256(
+                abi.encode(TYPE_HASH, keccak256(bytes(name)), keccak256(bytes(version)), chainId, verifyingContract)
+            );
         } catch {
             // NOTE: soft failure, if channel implementation contract does not support EIP-712
             return Utils.NO_EIP712_SUPPORT;

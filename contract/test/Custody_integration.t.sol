@@ -88,22 +88,27 @@ contract CustodyIntegrationTest is Test {
     }
 
     function _signStateEIP712(State memory state, uint256 privateKey) internal view returns (bytes memory) {
-        (,string memory name, string memory version, uint256 chainId, address verifyingContract,,) = custody.eip712Domain();
-        bytes32 domainSeparator = keccak256(abi.encode(
-            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-            keccak256(bytes(name)),
-            keccak256(bytes(version)),
-            chainId,
-            verifyingContract
-        ));
-        bytes32 structHash = keccak256(abi.encode(
-            STATE_TYPEHASH,
-            channelId,
-            state.intent,
-            state.version,
-            keccak256(state.data),
-            keccak256(abi.encode(state.allocations))
-        ));
+        (, string memory name, string memory version, uint256 chainId, address verifyingContract,,) =
+            custody.eip712Domain();
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes(name)),
+                keccak256(bytes(version)),
+                chainId,
+                verifyingContract
+            )
+        );
+        bytes32 structHash = keccak256(
+            abi.encode(
+                STATE_TYPEHASH,
+                channelId,
+                state.intent,
+                state.version,
+                keccak256(state.data),
+                keccak256(abi.encode(state.allocations))
+            )
+        );
         return TestUtils.signEIP712(vm, privateKey, domainSeparator, structHash);
     }
 
@@ -115,62 +120,28 @@ contract CustodyIntegrationTest is Test {
 
     // ==================== STATE CREATION HELPERS ====================
 
-    function _createState(
-        StateIntent intent,
-        uint256 version,
-        bytes memory data,
-        uint256 amount1,
-        uint256 amount2
-    ) internal view returns (State memory) {
+    function _createState(StateIntent intent, uint256 version, bytes memory data, uint256 amount1, uint256 amount2)
+        internal
+        view
+        returns (State memory)
+    {
         Allocation[] memory allocations = new Allocation[](2);
-        allocations[PARTICIPANT_1] = Allocation({
-            destination: participant1,
-            token: address(token),
-            amount: amount1
-        });
-        allocations[PARTICIPANT_2] = Allocation({
-            destination: participant2,
-            token: address(token),
-            amount: amount2
-        });
+        allocations[PARTICIPANT_1] = Allocation({destination: participant1, token: address(token), amount: amount1});
+        allocations[PARTICIPANT_2] = Allocation({destination: participant2, token: address(token), amount: amount2});
 
-        return State({
-            intent: intent,
-            version: version,
-            data: data,
-            allocations: allocations,
-            sigs: new bytes[](0)
-        });
+        return State({intent: intent, version: version, data: data, allocations: allocations, sigs: new bytes[](0)});
     }
 
     function _createInitialState() internal view returns (State memory) {
-        return _createState(
-            StateIntent.INITIALIZE,
-            0,
-            bytes(""),
-            DEPOSIT_AMOUNT,
-            DEPOSIT_AMOUNT
-        );
+        return _createState(StateIntent.INITIALIZE, 0, bytes(""), DEPOSIT_AMOUNT, DEPOSIT_AMOUNT);
     }
 
     function _createOperateState(uint256 version, bytes memory data) internal view returns (State memory) {
-        return _createState(
-            StateIntent.OPERATE,
-            version,
-            data,
-            DEPOSIT_AMOUNT,
-            DEPOSIT_AMOUNT
-        );
+        return _createState(StateIntent.OPERATE, version, data, DEPOSIT_AMOUNT, DEPOSIT_AMOUNT);
     }
 
     function _createFinalState(uint256 version) internal view returns (State memory) {
-        return _createState(
-            StateIntent.FINALIZE,
-            version,
-            bytes(""),
-            DEPOSIT_AMOUNT,
-            DEPOSIT_AMOUNT
-        );
+        return _createState(StateIntent.FINALIZE, version, bytes(""), DEPOSIT_AMOUNT, DEPOSIT_AMOUNT);
     }
 
     // ==================== MAIN INTEGRATION TEST ====================
@@ -187,7 +158,7 @@ contract CustodyIntegrationTest is Test {
         vm.prank(participant1);
         custody.depositAndCreate(address(token), DEPOSIT_AMOUNT, channel, initialState);
 
-        (,ChannelStatus status,,,) = custody.getChannelData(channelId);
+        (, ChannelStatus status,,,) = custody.getChannelData(channelId);
 
         // Verify channel is created
         assertTrue(status == ChannelStatus.INITIAL, "Channel should be in INITIAL status");
@@ -204,7 +175,7 @@ contract CustodyIntegrationTest is Test {
         vm.prank(participant2);
         custody.join(channelId, 1, participant2JoinSig);
 
-        (,status,,,) = custody.getChannelData(channelId);
+        (, status,,,) = custody.getChannelData(channelId);
 
         // Verify channel is now active
         assertTrue(status == ChannelStatus.ACTIVE, "Channel should be in ACTIVE status");
@@ -224,7 +195,7 @@ contract CustodyIntegrationTest is Test {
         custody.challenge(channelId, challengeState, new State[](0), challengerSig);
 
         uint256 challengeExpiry;
-        (,status,,challengeExpiry,) = custody.getChannelData(channelId);
+        (, status,, challengeExpiry,) = custody.getChannelData(channelId);
 
         // Verify channel is in challenge state
         assertTrue(status == ChannelStatus.DISPUTE, "Channel should be in DISPUTE status");
@@ -242,7 +213,7 @@ contract CustodyIntegrationTest is Test {
         vm.prank(participant2);
         custody.checkpoint(channelId, checkpointState, new State[](0));
 
-        (,status,,challengeExpiry,) = custody.getChannelData(channelId);
+        (, status,, challengeExpiry,) = custody.getChannelData(channelId);
 
         // Verify channel is back to active
         assertTrue(status == ChannelStatus.ACTIVE, "Channel should be back to ACTIVE status after checkpoint");
@@ -261,7 +232,7 @@ contract CustodyIntegrationTest is Test {
         custody.close(channelId, finalState, new State[](0));
 
         // Verify channel is closed
-        (,status,,,) = custody.getChannelData(channelId);
+        (, status,,,) = custody.getChannelData(channelId);
 
         // Verify channel is closed
         assertTrue(status == ChannelStatus.VOID, "Channel should have VOID status after close (channel data deleted)");

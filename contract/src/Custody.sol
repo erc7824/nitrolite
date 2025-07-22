@@ -51,7 +51,9 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
 
     uint256 constant MIN_CHALLENGE_PERIOD = 1 hours;
 
-    bytes32 constant CHALLENGE_STATE_TYPEHASH = keccak256("AllowChallengeStateHash(bytes32 channelId,uint8 intent,uint256 version,bytes data,Allocation[] allocations)Allocation(address destination,address token,uint256 amount)");
+    bytes32 constant CHALLENGE_STATE_TYPEHASH = keccak256(
+        "AllowChallengeStateHash(bytes32 channelId,uint8 intent,uint256 version,bytes data,Allocation[] allocations)Allocation(address destination,address token,uint256 amount)"
+    );
 
     // Recommended structure to keep track of states
     struct Metadata {
@@ -238,7 +240,11 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
 
         if (initial.sigs.length != 1) revert InvalidStateSignatures();
         // TODO: later we can lift the restriction that first sig must be from CLIENT
-        if (!initial.verifyStateSignature(channelId, _domainSeparatorV4(), initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX])) {
+        if (
+            !initial.verifyStateSignature(
+                channelId, _domainSeparatorV4(), initial.sigs[CLIENT_IDX], ch.participants[CLIENT_IDX]
+            )
+        ) {
             revert InvalidStateSignatures();
         }
 
@@ -313,7 +319,11 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         if (index != SERVER_IDX) revert InvalidParticipant();
         if (meta.actualDeposits[SERVER_IDX].amount != 0) revert DepositAlreadyFulfilled();
 
-        if (!meta.lastValidState.verifyStateSignature(channelId, _domainSeparatorV4(), sig, meta.chan.participants[SERVER_IDX])) revert InvalidStateSignatures();
+        if (
+            !meta.lastValidState.verifyStateSignature(
+                channelId, _domainSeparatorV4(), sig, meta.chan.participants[SERVER_IDX]
+            )
+        ) revert InvalidStateSignatures();
 
         State memory lastValidState = meta.lastValidState;
         bytes[] memory sigs = new bytes[](PART_NUM);
@@ -407,12 +417,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         if (meta.stage == ChannelStatus.DISPUTE || meta.stage == ChannelStatus.FINAL) revert InvalidStatus();
         if (candidate.intent == StateIntent.FINALIZE) revert InvalidState();
 
-        _requireChallengerIsParticipant(
-            channelId,
-            candidate,
-            meta.chan.participants,
-            challengerSig
-        );
+        _requireChallengerIsParticipant(channelId, candidate, meta.chan.participants, challengerSig);
 
         StateIntent lastValidStateIntent = meta.lastValidState.intent;
 
@@ -656,7 +661,9 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         bytes32 channelId = Utils.getChannelId(chan);
 
         for (uint256 i = 0; i < PART_NUM; i++) {
-            if (!state.verifyStateSignature(channelId, _domainSeparatorV4(), state.sigs[i], chan.participants[i])) return false;
+            if (!state.verifyStateSignature(channelId, _domainSeparatorV4(), state.sigs[i], chan.participants[i])) {
+                return false;
+            }
         }
 
         return true;
@@ -681,7 +688,14 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         }
 
         // NOTE: the `CHALLENGE_STATE_TYPEHASH` is used to recover the EIP-712 signer
-        if (Utils.addressArrayIncludes(participants, Utils.recoverStateEIP712Signer(_domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig))) {
+        if (
+            Utils.addressArrayIncludes(
+                participants,
+                Utils.recoverStateEIP712Signer(
+                    _domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig
+                )
+            )
+        ) {
             return;
         }
 

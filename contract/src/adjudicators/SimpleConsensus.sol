@@ -45,6 +45,7 @@ contract SimpleConsensus is IAdjudicator, EIP712AdjudicatorBase {
         }
 
         // proof is Operate or Resize State (both have same validation)
-        return candidate.intent != StateIntent.INITIALIZE && candidate.validateUnanimousStateSignatures(chan, channelImplDomainSeparator);
+        return candidate.intent != StateIntent.INITIALIZE
+            && candidate.validateUnanimousStateSignatures(chan, channelImplDomainSeparator);
     }
 }

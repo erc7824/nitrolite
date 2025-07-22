@@ -9,7 +9,7 @@ import {
     RPCMethod,
     type AuthRequestParams,
 } from '@erc7824/nitrolite';
-import { Wallet } from 'ethers';
+import { privateKeyToAccount } from 'viem/accounts';
 import { WebSocket } from 'ws';
 import type { MessageEvent as WSMessageEvent } from 'ws';
 import { UserRejectedError, NitroliteAuthContext } from '../../types/index.js';
@@ -141,17 +141,22 @@ export const handleAuthChallenge = async (
     const authMessage = createAuthMessage(authContext.walletAddress, authContext.sessionKey.address, '0', challenge);
 
     try {
-        // Create wallet from private key for signing
-        const wallet = new Wallet(authContext.privateKey);
+        // Create account from private key for signing
+        const account = privateKeyToAccount(authContext.privateKey as `0x${string}`);
 
         // Create a server-side wallet client adapter for EIP-712 signing
         const serverWalletClient = {
             account: {
-                address: wallet.address as `0x${string}`,
+                address: account.address,
             },
-            signTypedData: async ({ domain, types, message }: any) => {
-                // Use ethers wallet to sign EIP-712 message
-                return (await wallet.signTypedData(domain, types, message)) as `0x${string}`;
+            signTypedData: async ({ domain, types, primaryType, message }: any) => {
+                // Use viem account to sign EIP-712 message
+                return await account.signTypedData({ 
+                    domain, 
+                    types, 
+                    primaryType, 
+                    message 
+                });
             },
         };
 

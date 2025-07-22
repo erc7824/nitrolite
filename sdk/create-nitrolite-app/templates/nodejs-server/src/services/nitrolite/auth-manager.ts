@@ -1,4 +1,4 @@
-import { Wallet } from 'ethers';
+import { privateKeyToAccount } from 'viem/accounts';
 import type { NitroliteAuthContext, SessionKey } from '../../types/index.js';
 import { 
     sendAuthRequest,
@@ -62,10 +62,10 @@ export class AuthenticationManager {
         this.walletAddress = walletAddress;
         this.privateKey = privateKey;
         
-        const wallet = new Wallet(privateKey);
+        const account = privateKeyToAccount(privateKey as `0x${string}`);
         this.sessionKey = {
             privateKey: privateKey,
-            address: wallet.address,
+            address: account.address,
         };
     }
 

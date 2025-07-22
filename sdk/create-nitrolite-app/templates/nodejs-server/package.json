@@ -13,8 +13,7 @@
     "@erc7824/nitrolite": "^{{sdkVersion}}",
     "ws": "^8.16.0",
     "viem": "2.31.3",
-    "dotenv": "^16.4.5",
-    "ethers": "^6.11.1"
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "typescript": "^5",

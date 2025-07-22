@@ -1,5 +1,5 @@
 import { createPingMessage, createECDSAMessageSigner, RPCMethod } from '@erc7824/nitrolite';
-import { Wallet } from 'ethers';
+import { privateKeyToAccount } from 'viem/accounts';
 import type { MessageEvent as WSMessageEvent } from 'ws';
 import type { WSStatus, NitroliteConfig, NitroliteConnectionCallbacks } from '../../types/index.js';
 import { UserRejectedError } from '../../types/index.js';
@@ -415,8 +415,8 @@ export async function initializeNitroliteClient(): Promise<NitroliteWebSocketCli
         throw new Error('WALLET_PRIVATE_KEY is required for Nitrolite client initialization');
     }
 
-    const wallet = new Wallet(config.walletPrivateKey);
-    const walletAddress = wallet.address;
+    const account = privateKeyToAccount(config.walletPrivateKey as `0x${string}`);
+    const walletAddress = account.address;
 
     logger.info(`💼 Wallet address: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`);
     logger.info('🌐 Yellow WebSocket URL:', config.yellowWsUrl);

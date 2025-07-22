@@ -198,44 +198,6 @@ func TestChannelService_ResizeChannel(t *testing.T) {
 		assert.Contains(t, err.Error(), "channel 0xChanClosed is not open: closed")
 	})
 
-	t.Run("ErrorChannelJoining", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
-		t.Cleanup(cleanup)
-
-		rawKey, err := crypto.GenerateKey()
-		require.NoError(t, err)
-		signer := Signer{privateKey: rawKey}
-		userAddress := signer.GetAddress()
-
-		asset := Asset{Token: "0xTokenJoining", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
-
-		ch := Channel{
-			ChannelID:   "0xChanJoining",
-			Participant: userAddress.Hex(),
-			Wallet:      userAddress.Hex(),
-			Status:      ChannelStatusJoining,
-			Token:       asset.Token,
-			ChainID:     137,
-			RawAmount:   decimal.NewFromInt(1000),
-			Version:     1,
-		}
-		require.NoError(t, db.Create(&ch).Error)
-
-		service := NewChannelService(db, &signer)
-		allocateAmount := decimal.NewFromInt(100)
-		params := &ResizeChannelParams{
-			ChannelID:        ch.ChannelID,
-			AllocateAmount:   &allocateAmount,
-			FundsDestination: userAddress.Hex(),
-		}
-		rpcSigners := map[string]struct{}{userAddress.Hex(): {}}
-
-		_, err = service.RequestResize(LoggerFromContext(context.Background()), params, rpcSigners)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "channel 0xChanJoining is not open: joining")
-	})
-
 	t.Run("ErrorOtherChallengedChannel", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		t.Cleanup(cleanup)

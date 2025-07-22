@@ -1081,45 +1081,6 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		assertErrorResponse(t, ctx, "channel 0xChanClosed is not open: closed")
 	})
 
-	t.Run("ErrorChannelJoining", func(t *testing.T) {
-		t.Parallel()
-
-		router, db, cleanup := setupTestRPCRouter(t)
-		t.Cleanup(cleanup)
-
-		rawKey, err := crypto.GenerateKey()
-		require.NoError(t, err)
-		signer := Signer{privateKey: rawKey}
-		userAddress := signer.GetAddress()
-
-		asset := Asset{Token: "0xTokenJoining", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
-
-		ch := Channel{
-			ChannelID:   "0xChanJoining",
-			Participant: userAddress.Hex(),
-			Wallet:      userAddress.Hex(),
-			Status:      ChannelStatusJoining,
-			Token:       asset.Token,
-			ChainID:     137,
-			RawAmount:   decimal.NewFromInt(1000),
-			Version:     1,
-		}
-		require.NoError(t, db.Create(&ch).Error)
-
-		allocateAmount := decimal.NewFromInt(100)
-		resizeParams := ResizeChannelParams{
-			ChannelID:        ch.ChannelID,
-			AllocateAmount:   &allocateAmount,
-			FundsDestination: userAddress.Hex(),
-		}
-
-		ctx := createSignedRPCContext(1, "resize_channel", resizeParams, userSigner)
-		router.HandleResizeChannel(ctx)
-
-		assertErrorResponse(t, ctx, "channel 0xChanJoining is not open: joining")
-	})
-
 	t.Run("ErrorOtherChallengedChannel", func(t *testing.T) {
 		t.Parallel()
 

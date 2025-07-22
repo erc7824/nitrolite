@@ -352,7 +352,7 @@ func TestHandleCreatedEvent(t *testing.T) {
 			assert.Equal(t, dbChannel.Adjudicator, mockEvent.Channel.Adjudicator.Hex())
 			assert.Equal(t, dbChannel.RawAmount, decimal.NewFromBigInt(tc.amount, 0))
 			assert.Equal(t, dbChannel.Token, tokenAddress)
-			assert.Equal(t, dbChannel.Status, ChannelStatusJoining)
+			assert.Equal(t, dbChannel.Status, ChannelStatusOpen)
 
 			var entries []Entry
 			entriesErr := db.Where("wallet = ?", mockEvent.Wallet.Hex()).Find(&entries).Error
@@ -374,153 +374,6 @@ func TestHandleCreatedEvent(t *testing.T) {
 			assert.Equal(t, tc.amount.String(), balance.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).String()) // 6 decimals for USDC default test token
 		})
 	}
-}
-
-func TestHandleJoinedEvent(t *testing.T) {
-	t.Run("Success", func(t *testing.T) {
-		custody, db, cleanup := setupMockCustody(t)
-		defer cleanup()
-
-		amount := decimal.NewFromInt(1000000)
-
-		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
-		channelAccountID := NewAccountID(channelID)
-		walletAddr := newTestCommonAddress("0xWallet123")
-		walletAccountID := NewAccountID(walletAddr.Hex())
-		participantAddr := newTestCommonAddress("0xParticipant1")
-
-		initialChannel := Channel{
-			ChannelID:   channelID,
-			Wallet:      walletAddr.Hex(),
-			Participant: participantAddr.Hex(),
-			Status:      ChannelStatusJoining,
-			Token:       tokenAddress,
-			ChainID:     custody.chainID,
-			RawAmount:   amount,
-			Nonce:       12345,
-			Version:     1,
-			Challenge:   3600,
-			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		}
-		err := db.Create(&initialChannel).Error
-		require.NoError(t, err)
-
-		asset, err := GetAssetByToken(db, tokenAddress, custody.chainID)
-		require.NoError(t, err)
-
-		ledger := GetWalletLedger(db, walletAddr)
-		tokenAmountDecimal := decimal.NewFromBigInt(amount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
-		err = ledger.Record(channelAccountID, asset.Symbol, tokenAmountDecimal)
-		require.NoError(t, err)
-
-		_, mockEvent := createMockJoinedEvent(t)
-
-		capturedNotifications := make(map[string][]Notification)
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
-
-			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
-				userID:    userID,
-				eventType: EventType(method),
-				data:      params,
-			})
-		}
-
-		beforeUpdate := time.Now()
-		logger := custody.logger.With("event", "Joined")
-		custody.handleJoined(logger, mockEvent)
-		afterUpdate := time.Now()
-
-		var updatedChannel Channel
-		err = db.Where("channel_id = ?", channelID).First(&updatedChannel).Error
-		require.NoError(t, err)
-
-		assert.Equal(t, ChannelStatusOpen, updatedChannel.Status)
-		assert.Equal(t, initialChannel.RawAmount, updatedChannel.RawAmount, "Amount should not change")
-		assert.Equal(t, initialChannel.Nonce, updatedChannel.Nonce, "Nonce should not change")
-		assert.Equal(t, initialChannel.Challenge, updatedChannel.Challenge, "Challenge should not change")
-		assert.Equal(t, initialChannel.ChainID, updatedChannel.ChainID, "ChainID should not change")
-		assert.Equal(t, initialChannel.Token, updatedChannel.Token, "Token should not change")
-
-		var entries []Entry
-		err = db.Where("wallet = ?", walletAddr.Hex()).Find(&entries).Error
-		require.NoError(t, err)
-		assert.NotEmpty(t, entries)
-
-		assertNotifications(t, capturedNotifications, walletAddr.Hex(), 2)
-		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr.Hex()][1].eventType)
-
-		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix())
-		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt))
-		assert.True(t, updatedChannel.UpdatedAt.After(beforeUpdate) && updatedChannel.UpdatedAt.Before(afterUpdate))
-
-		channelBalance, err := ledger.Balance(channelAccountID, asset.Symbol)
-		require.NoError(t, err)
-		assert.True(t, channelBalance.IsZero(), "Channel balance should be zero after joined event")
-
-		walletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)
-		require.NoError(t, err)
-		assert.True(t, tokenAmountDecimal.Equal(walletBalance),
-			"Wallet balance should be %s, got %s", tokenAmountDecimal, walletBalance)
-
-		// Verify transaction was recorded to the database
-		var transactions []LedgerTransaction
-		err = db.Where("from_account = ? AND to_account = ?", channelID, walletAddr.Hex()).Find(&transactions).Error
-		require.NoError(t, err)
-		assert.Len(t, transactions, 1, "Should have 1 deposit transaction recorded")
-
-		tx := transactions[0]
-		assert.Equal(t, TransactionTypeDeposit, tx.Type, "Transaction type should be deposit")
-		assert.Equal(t, channelID, tx.FromAccount, "From account should be channel ID")
-		assert.Equal(t, walletAddr.Hex(), tx.ToAccount, "To account should be wallet address")
-		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
-		assert.True(t, tokenAmountDecimal.Equal(tx.Amount), "Transaction amount should match deposited amount")
-		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
-	})
-
-	t.Run("Channel Not Found", func(t *testing.T) {
-		custody, db, cleanup := setupMockCustody(t)
-		defer cleanup()
-
-		// Create a different channel ID than the one in the event
-		initialChannel := Channel{
-			ChannelID: "0xDifferentChannelId",
-			Wallet:    "0xWallet123",
-			Status:    ChannelStatusJoining,
-			Token:     tokenAddress,
-			ChainID:   custody.chainID,
-			RawAmount: decimal.NewFromInt(1000000),
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		}
-		err := db.Create(&initialChannel).Error
-		require.NoError(t, err)
-
-		_, mockEvent := createMockJoinedEvent(t)
-
-		capturedNotifications := make(map[string][]Notification)
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
-
-			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
-				userID:    userID,
-				eventType: EventType(method),
-				data:      params,
-			})
-		}
-
-		logger := custody.logger.With("event", "Joined")
-		custody.handleJoined(logger, mockEvent)
-
-		// Event should be ignored, and no callbacks should be called
-		assert.Equal(t, 0, len(capturedNotifications), "No notifications should be sent")
-
-		// Initial channel should remain unmodified
-		var checkChannel Channel
-		err = db.Where("channel_id = ?", initialChannel.ChannelID).First(&checkChannel).Error
-		require.NoError(t, err)
-		assert.Equal(t, ChannelStatusJoining, checkChannel.Status, "Status of other channel should not change")
-	})
 }
 
 func TestHandleClosedEvent(t *testing.T) {
@@ -727,7 +580,7 @@ func TestHandleClosedEvent(t *testing.T) {
 			ChannelID:   channelID,
 			Wallet:      walletAddr.Hex(),
 			Participant: participantAddr.Hex(),
-			Status:      ChannelStatusJoining,
+			Status:      ChannelStatusOpen,
 			Token:       tokenAddress,
 			ChainID:     custody.chainID,
 			RawAmount:   channelAmount,
@@ -1086,17 +939,6 @@ func TestHandleResizedEvent(t *testing.T) {
 }
 
 func TestHandleEventWithInvalidChannel(t *testing.T) {
-	t.Run("Invalid Channel For Joined", func(t *testing.T) {
-		custody, _, cleanup := setupMockCustody(t)
-		defer cleanup()
-
-		_, mockEvent := createMockJoinedEvent(t)
-
-		logger := custody.logger.With("event", "Joined")
-		// Should not panic when channel doesn't exist
-		custody.handleJoined(logger, mockEvent)
-	})
-
 	t.Run("Invalid Channel For Closed", func(t *testing.T) {
 		custody, _, cleanup := setupMockCustody(t)
 		defer cleanup()

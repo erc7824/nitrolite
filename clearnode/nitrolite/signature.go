@@ -81,12 +81,16 @@ func Sign(data []byte, privateKey *ecdsa.PrivateKey) (Signature, error) {
 func Verify(data []byte, sig Signature, address common.Address) (bool, error) {
 	dataHash := crypto.Keccak256Hash(data)
 
+	// Create a copy of the signature to avoid modifying the original
+	sigToVerify := make(Signature, len(sig))
+	copy(sigToVerify, sig)
+
 	// Ensure the signature is in the correct format
-	if sig[64] >= 27 {
-		sig[64] -= 27
+	if sigToVerify[64] >= 27 {
+		sigToVerify[64] -= 27
 	}
 
-	pubKeyRaw, err := crypto.Ecrecover(dataHash.Bytes(), sig)
+	pubKeyRaw, err := crypto.Ecrecover(dataHash.Bytes(), sigToVerify)
 	if err != nil {
 		return false, fmt.Errorf("failed to recover public key: %w", err)
 	}

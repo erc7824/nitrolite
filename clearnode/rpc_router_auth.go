@@ -45,9 +45,6 @@ func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 		return
 	}
 
-	fmt.Printf("Incoming auth request: %+v\n", authParams)
-	fmt.Printf("unparsed params: %+v\n", req.Params)
-
 	logger.Debug("incoming auth request",
 		"addr", authParams.Address,
 		"sessionKey", authParams.SessionKey,

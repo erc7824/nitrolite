@@ -3,7 +3,7 @@ import { localhost } from 'viem/chains';
 
 export const CONFIG = {
     CLEARNODE_URL: 'ws://localhost:8000/ws',
-    DEBUG_MODE: true,
+    DEBUG_MODE: false,
 
     IDENTITIES: [
         {

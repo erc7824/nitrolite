@@ -119,8 +119,6 @@ func RecoverAddressFromEip712Signature(
 	expire string,
 	signatureHex string) (string, error) {
 	convertedAllowances := convertAllowances(allowances)
-	fmt.Printf("address: %s, challenge: %s, sessionKey: %s, appName: %s, allowances: %+v, scope: %s, application: %s, expire: %s\n",
-		addrHex, challengeToken, sessionKey, appName, convertedAllowances, scope, application, expire)
 
 	typedData := apitypes.TypedData{
 		Types: apitypes.Types{
@@ -158,14 +156,12 @@ func RecoverAddressFromEip712Signature(
 	// 1. Hash the typed data (domain separator + message struct hash)
 	typedDataHash, _, err := apitypes.TypedDataAndHash(typedData)
 	if err != nil {
-		fmt.Printf("Failed to hash typed data: %v\n", err)
 		return "", err
 	}
 
 	// 2. Example signature
 	sig, err := hexutil.Decode(signatureHex)
 	if err != nil {
-		fmt.Printf("Failed to decode signature hex: %v\n", err)
 		return "", err
 	}
 
@@ -177,7 +173,6 @@ func RecoverAddressFromEip712Signature(
 	// 4. Recover public key
 	pubKey, err := crypto.SigToPub(typedDataHash, sig)
 	if err != nil {
-		fmt.Printf("Failed to recover public key: %v\n", err)
 		return "", err
 	}
 

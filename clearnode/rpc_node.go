@@ -167,10 +167,10 @@ read_loop:
 			}
 		}
 
-		var msg RPCMessage
+		msg := RPCMessage{Req: &RPCData{}}
 		if err := json.Unmarshal(messageBytes, &msg); err != nil {
 			n.logger.Debug("invalid message format", "error", err, "message", string(messageBytes))
-			n.sendErrorResponse(rpcConn, 0, "invalid message format")
+			n.sendErrorResponse(rpcConn, msg.Req.RequestID, "invalid message format")
 			continue
 		}
 

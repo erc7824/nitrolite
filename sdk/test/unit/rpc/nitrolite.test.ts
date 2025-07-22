@@ -29,6 +29,7 @@ describe('NitroliteRPC', () => {
 
             expect(result).toEqual({
                 req: [requestId, method, params, timestamp],
+                sig: [],
             });
         });
 

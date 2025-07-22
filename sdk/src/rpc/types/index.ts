@@ -93,7 +93,7 @@ export interface NitroliteRPCMessage {
     /** Contains the response or error payload if this is a response message. */
     res?: ResponsePayload;
     /** Optional cryptographic signature(s) for message authentication. */
-    sig?: Hex[] | [''];
+    sig?: Hex[];
 }
 
 /**

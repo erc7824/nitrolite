@@ -1,4 +1,3 @@
-import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { config, isDevelopment } from './config/index.js';
@@ -8,12 +7,8 @@ import { setupGracefulShutdown } from './utils/shutdown.js';
 
 async function startServer() {
   try {
-    // Create Express app
-    const app = express();
-    app.use(express.json());
-
     // Create HTTP server
-    const server = createServer(app);
+    const server = createServer();
 
     // Create WebSocket server
     const wss = new WebSocketServer({ server });

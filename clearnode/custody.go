@@ -109,34 +109,6 @@ func (c *Custody) ListenEvents(ctx context.Context) {
 	listenEvents(ctx, c.client, c.custodyAddr, c.chainID, c.blockStep, lastBlock, lastIndex, c.handleBlockChainEvent, c.logger)
 }
 
-// Join calls the join method on the custody contract
-func (c *Custody) Join(channelID string, lastStateData []byte) (common.Hash, error) {
-	// Convert string channelID to bytes32
-	channelIDBytes := common.HexToHash(channelID)
-
-	// The broker will always join as participant with index 1 (second participant)
-	index := big.NewInt(1)
-
-	sig, err := c.signer.Sign(lastStateData)
-	if err != nil {
-		return common.Hash{}, fmt.Errorf("failed to sign data: %w", err)
-	}
-
-	gasPrice, err := c.client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return common.Hash{}, fmt.Errorf("failed to suggest gas price: %w", err)
-	}
-
-	c.transactOpts.GasPrice = gasPrice.Add(gasPrice, gasPrice)
-	// Call the join method on the custody contract
-	tx, err := c.custody.Join(c.transactOpts, channelIDBytes, index, sig)
-	if err != nil {
-		return common.Hash{}, fmt.Errorf("failed to join channel: %w", err)
-	}
-
-	return tx.Hash(), nil
-}
-
 // handleBlockChainEvent processes different event types received from the blockchain
 func (c *Custody) handleBlockChainEvent(ctx context.Context, l types.Log) {
 	ctx = SetContextLogger(ctx, c.logger)
@@ -205,7 +177,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		return
 	}
 
-	// TODO: record all channels in db, but if channel parameters are unsupported, return user only closing state.
+	// TODO: move validations in a separate function
 	if challenge < 3600 {
 		logger.Warn("invalid challenge period", "challenge", challenge)
 		return
@@ -299,21 +271,15 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		return
 	}
 
-	encodedState, err := nitrolite.EncodeState(ev.ChannelId, nitrolite.IntentINITIALIZE, big.NewInt(0), ev.Initial.Data, ev.Initial.Allocations)
-	if err != nil {
-		logger.Error("error encoding state hash", "error", err)
-		return
-	}
-
-	txHash, err := c.Join(channelID, encodedState)
-	if err != nil {
-		logger.Error("error joining channel", "error", err)
-		return
-	}
+	// TODO: move to a separate endpoint
+	// encodedState, err := nitrolite.EncodeState(ev.ChannelId, nitrolite.IntentINITIALIZE, big.NewInt(0), ev.Initial.Data, ev.Initial.Allocations)
+	// if err != nil {
+	// 	logger.Error("error encoding state hash", "error", err)
+	// 	return
+	// }
 
 	c.wsNotifier.Notify(NewChannelNotification(ch))
-
-	logger.Info("successfully initiated join for channel", "channelId", channelID, "txHash", txHash.Hex())
+	c.wsNotifier.Notify(NewBalanceNotification(ch.Wallet, c.db))
 }
 
 func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenged) {

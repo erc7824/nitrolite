@@ -16,7 +16,7 @@ import {
     RPCMethod,
     RPCChannelStatus,
     ResponsePayload,
-    PaginationFilters,
+    GetLedgerTransactionsFilters,
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
@@ -27,7 +27,6 @@ import {
     ResizeChannelRequestParams,
     GetLedgerTransactionsRequestParams,
     TransferRequestParams,
-    AuthRequest,
 } from './types/request';
 
 /**
@@ -279,12 +278,12 @@ export async function createGetLedgerEntriesMessage(
 export async function createGetLedgerTransactionsMessage(
     signer: MessageSigner,
     accountId: string,
-    filters?: PaginationFilters,
+    filters?: GetLedgerTransactionsFilters,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
     // Build filtered parameters object
-    const filteredParams: Partial<PaginationFilters> = {};
+    const filteredParams: Partial<GetLedgerTransactionsFilters> = {};
     if (filters) {
         Object.entries(filters).forEach(([key, value]) => {
             if (value !== undefined && value !== null && value !== '') {
@@ -684,19 +683,15 @@ export function createEIP712AuthMessageSigner(
         // Safely extract the challenge from the payload for an AuthVerify request.
         // The expected structure is `[id, 'auth_verify', [{ challenge: '...' }], ts]`
         const params = payload[2];
-        const firstParam = Array.isArray(params) ? params[0] : undefined;
-
         if (
-            typeof firstParam !== 'object' ||
-            firstParam === null ||
-            !('challenge' in firstParam) ||
-            typeof firstParam.challenge !== 'string'
+            !('challenge' in params) ||
+            typeof params.challenge !== 'string'
         ) {
             throw new Error('Invalid payload for AuthVerify: The challenge string is missing or malformed.');
         }
 
-        // After the check, TypeScript knows `firstParam` is an object with a `challenge` property of type string.
-        const challengeUUID: string = firstParam.challenge;
+        // After the check, TypeScript knows `params` is an object with a `challenge` property of type string.
+        const challengeUUID: string = params.challenge;
 
         const message: EIP712AuthMessage = {
             ...partialMessage,

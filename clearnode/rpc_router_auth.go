@@ -10,13 +10,13 @@ import (
 )
 
 type AuthRequestParams struct {
-	Address            string      `json:"address"`             // The wallet address requesting authentication
-	SessionKey         string      `json:"session_key"`         // The session key for the authentication
-	AppName            string      `json:"app_name"`            // The name of the application requesting authentication
-	Allowances         []Allowance `json:"allowances"`          // Allowances for the application
-	Expire             string      `json:"expire"`              // Expiration time for the authentication
-	Scope              string      `json:"scope"`               // Scope of the authentication
-	ApplicationAddress string      `json:"application_address"` // The address of the application requesting authentication
+	Address            string      `json:"address"`     // The wallet address requesting authentication
+	SessionKey         string      `json:"session_key"` // The session key for the authentication
+	AppName            string      `json:"app_name"`    // The name of the application requesting authentication
+	Allowances         []Allowance `json:"allowances"`  // Allowances for the application
+	Expire             string      `json:"expire"`      // Expiration time for the authentication
+	Scope              string      `json:"scope"`       // Scope of the authentication
+	ApplicationAddress string      `json:"application"` // The address of the application requesting authentication
 }
 
 // AuthResponse represents the server's challenge response
@@ -44,6 +44,9 @@ func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 		c.Fail(err, "failed to parse auth parameters")
 		return
 	}
+
+	fmt.Printf("Incoming auth request: %+v\n", authParams)
+	fmt.Printf("unparsed params: %+v\n", req.Params)
 
 	logger.Debug("incoming auth request",
 		"addr", authParams.Address,

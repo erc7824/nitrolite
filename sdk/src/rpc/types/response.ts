@@ -16,6 +16,7 @@ import {
     RPCEntry,
     Asset,
     Transaction,
+    ChannelUpdateWithWallet,
 } from '.';
 
 /**
@@ -216,7 +217,7 @@ export interface GetChannelsResponse extends GenericRPCMessage {
     method: RPCMethod.GetChannels;
     params: {
         /** List of channel updates containing information about each channel. */
-        channels: ChannelUpdate[];
+        channels: ChannelUpdateWithWallet[];
     };
 }
 

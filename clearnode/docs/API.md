@@ -40,10 +40,10 @@ Initiates authentication with the server.
     "session_key": "0x9876543210fedcba...", // If specified, enables delegation to this key
     "app_name": "Example App", // Application name for analytics
     "allowances": [ // Asset allowances for the session
-      [
-        "usdc", 
-        "100.0"
-      ]
+      {
+        "asset": "usdc", 
+        "amount": "100.0"
+      }
     ],
     "scope": "app.create", // Permission scope (e.g., "app.create", "ledger.readonly")
     "expire": "3600", //  Session expiration

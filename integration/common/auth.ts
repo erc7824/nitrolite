@@ -14,8 +14,8 @@ export const createAuthSessionWithClearnode = async (
     authRequestParams?: AuthRequestParams
 ) => {
     authRequestParams = authRequestParams || {
-        wallet: identity.walletAddress,
-        participant: identity.sessionAddress,
+        address: identity.walletAddress,
+        session_key: identity.sessionAddress,
         app_name: 'Test Domain',
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
@@ -28,7 +28,7 @@ export const createAuthSessionWithClearnode = async (
         {
             scope: authRequestParams.scope,
             application: authRequestParams.application,
-            participant: authRequestParams.participant,
+            participant: authRequestParams.session_key,
             expire: authRequestParams.expire,
             allowances: authRequestParams.allowances,
         },

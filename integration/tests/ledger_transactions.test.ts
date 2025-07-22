@@ -47,7 +47,6 @@ describe('Ledger Transactions Integration', () => {
             const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
-            expect(Array.isArray(parsedResponse.params)).toBe(true);
         });
 
         it('should successfully request ledger transactions with asset filter', async () => {
@@ -65,11 +64,13 @@ describe('Ledger Transactions Integration', () => {
             const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
-            expect(Array.isArray(parsedResponse.params)).toBe(true);
+
+            const ledgerTransactions = parsedResponse.params.ledgerTransactions;
+            expect(Array.isArray(ledgerTransactions)).toBe(true);
 
             // If there are transactions, they should all be for usdc
-            if (parsedResponse.params.length > 0) {
-                parsedResponse.params.forEach((transaction) => {
+            if (ledgerTransactions.length > 0) {
+                ledgerTransactions.forEach((transaction) => {
                     expect(transaction.asset).toBe('usdc');
                 });
             }
@@ -90,11 +91,13 @@ describe('Ledger Transactions Integration', () => {
             const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
-            expect(Array.isArray(parsedResponse.params)).toBe(true);
+
+            const ledgerTransactions = parsedResponse.params.ledgerTransactions;
+            expect(Array.isArray(ledgerTransactions)).toBe(true);
 
             // If there are transactions, they should all be of type 'deposit'
-            if (parsedResponse.params.length > 0) {
-                parsedResponse.params.forEach((transaction) => {
+            if (ledgerTransactions.length > 0) {
+                ledgerTransactions.forEach((transaction) => {
                     expect(transaction.txType).toBe(TxType.Deposit);
                 });
             }
@@ -116,10 +119,12 @@ describe('Ledger Transactions Integration', () => {
             const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
-            expect(Array.isArray(parsedResponse.params)).toBe(true);
+
+            const ledgerTransactions = parsedResponse.params.ledgerTransactions;
+            expect(Array.isArray(ledgerTransactions)).toBe(true);
 
             // Should not return more than the limit
-            expect(parsedResponse.params.length).toBeLessThanOrEqual(5);
+            expect(ledgerTransactions.length).toBeLessThanOrEqual(5);
         });
 
         it('should successfully request ledger transactions with sort order', async () => {
@@ -138,13 +143,15 @@ describe('Ledger Transactions Integration', () => {
             const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
-            expect(Array.isArray(parsedResponse.params)).toBe(true);
+
+            const ledgerTransactions = parsedResponse.params.ledgerTransactions;
+            expect(Array.isArray(ledgerTransactions)).toBe(true);
 
             // If there are multiple transactions, they should be sorted by createdAt in descending order
-            if (parsedResponse.params.length > 1) {
-                for (let i = 0; i < parsedResponse.params.length - 1; i++) {
-                    const currentDate = parsedResponse.params[i].createdAt;
-                    const nextDate = parsedResponse.params[i + 1].createdAt;
+            if (ledgerTransactions.length > 1) {
+                for (let i = 0; i < ledgerTransactions.length - 1; i++) {
+                    const currentDate = ledgerTransactions[i].createdAt;
+                    const nextDate = ledgerTransactions[i + 1].createdAt;
                     expect(currentDate.getTime()).toBeGreaterThanOrEqual(nextDate.getTime());
                 }
             }
@@ -169,13 +176,15 @@ describe('Ledger Transactions Integration', () => {
             const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
-            expect(Array.isArray(parsedResponse.params)).toBe(true);
+
+            const ledgerTransactions = parsedResponse.params.ledgerTransactions;
+            expect(Array.isArray(ledgerTransactions)).toBe(true);
 
             // Should not return more than the limit
-            expect(parsedResponse.params.length).toBeLessThanOrEqual(3);
+            expect(ledgerTransactions.length).toBeLessThanOrEqual(3);
 
             // All transactions should match the filters
-            parsedResponse.params.forEach((transaction) => {
+            ledgerTransactions.forEach((transaction) => {
                 expect(transaction.asset).toBe('usdc');
                 expect(transaction.txType).toBe(TxType.Deposit);
             });
@@ -196,8 +205,10 @@ describe('Ledger Transactions Integration', () => {
             const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
-            expect(Array.isArray(parsedResponse.params)).toBe(true);
-            expect(parsedResponse.params.length).toBe(0);
+
+            const ledgerTransactions = parsedResponse.params.ledgerTransactions;
+            expect(Array.isArray(ledgerTransactions)).toBe(true);
+            expect(ledgerTransactions.length).toBe(0);
         });
 
         it('should handle invalid account ID gracefully', async () => {
@@ -212,9 +223,11 @@ describe('Ledger Transactions Integration', () => {
             const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
-            expect(Array.isArray(parsedResponse.params)).toBe(true);
+
+            const ledgerTransactions = parsedResponse.params.ledgerTransactions;
+            expect(Array.isArray(ledgerTransactions)).toBe(true);
             // Should return empty array for invalid/non-existent account
-            expect(parsedResponse.params.length).toBe(0);
+            expect(ledgerTransactions.length).toBe(0);
         });
     });
 });

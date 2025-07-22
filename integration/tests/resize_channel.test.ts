@@ -64,14 +64,12 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, [
-            {
-                channel_id: createResponseParams.channelId,
-                resize_amount: depositAmount,
-                allocate_amount: parseUnits('0', 6),
-                funds_destination: identity.walletAddress,
-            },
-        ]);
+        const msg = await createResizeChannelMessage(identity.messageSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: depositAmount,
+            allocate_amount: parseUnits('0', 6),
+            funds_destination: identity.walletAddress,
+        });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
         const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
@@ -159,14 +157,12 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, [
-            {
-                channel_id: createResponseParams.channelId,
-                resize_amount: -depositAmount,
-                allocate_amount: parseUnits('0', 6),
-                funds_destination: identity.walletAddress,
-            },
-        ]);
+        const msg = await createResizeChannelMessage(identity.messageSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: -depositAmount,
+            allocate_amount: parseUnits('0', 6),
+            funds_destination: identity.walletAddress,
+        });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
         const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
@@ -241,14 +237,12 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, [
-            {
-                channel_id: createResponseParams.channelId,
-                resize_amount: parseUnits('0', 6),
-                allocate_amount: -depositAmount,
-                funds_destination: identity.walletAddress,
-            },
-        ]);
+        const msg = await createResizeChannelMessage(identity.messageSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: parseUnits('0', 6),
+            allocate_amount: -depositAmount,
+            funds_destination: identity.walletAddress,
+        });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
         const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);

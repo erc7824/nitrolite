@@ -65,9 +65,9 @@ describe('Close channel', () => {
 
         const getAppSessionsParsedResponse = rpcResponseParser.getAppSessions(getAppSessionsResponse);
         expect(getAppSessionsParsedResponse).toBeDefined();
-        expect(getAppSessionsParsedResponse.params).toHaveLength(1);
+        expect(getAppSessionsParsedResponse.params.appSessions).toHaveLength(1);
 
-        const appSession = getAppSessionsParsedResponse.params[0];
+        const appSession = getAppSessionsParsedResponse.params.appSessions[0];
         expect(appSession.appSessionId).toBe(appSessionId);
         expect(appSession.sessionData).toBeDefined();
 
@@ -107,13 +107,11 @@ describe('Close channel', () => {
         sessionData: object,
         expectedVersion: number
     ) => {
-        const submitAppStateMsg = await createSubmitAppStateMessage(appIdentity.messageSigner, [
-            {
-                app_session_id: appSessionId as Hex,
-                allocations,
-                session_data: JSON.stringify(sessionData),
-            },
-        ]);
+        const submitAppStateMsg = await createSubmitAppStateMessage(appIdentity.messageSigner, {
+            app_session_id: appSessionId as Hex,
+            allocations,
+            session_data: JSON.stringify(sessionData),
+        });
 
         const submitAppStateResponse = await appWS.sendAndWaitForResponse(
             submitAppStateMsg,
@@ -135,13 +133,11 @@ describe('Close channel', () => {
         sessionData: object,
         expectedVersion: number
     ) => {
-        const closeAppSessionMsg = await createCloseAppSessionMessage(appIdentity.messageSigner, [
-            {
-                app_session_id: appSessionId as Hex,
-                allocations,
-                session_data: JSON.stringify(sessionData),
-            },
-        ]);
+        const closeAppSessionMsg = await createCloseAppSessionMessage(appIdentity.messageSigner, {
+            app_session_id: appSessionId as Hex,
+            allocations,
+            session_data: JSON.stringify(sessionData),
+        });
 
         const closeAppSessionResponse = await appWS.sendAndWaitForResponse(
             closeAppSessionMsg,
@@ -215,8 +211,8 @@ describe('Close channel', () => {
 
     it('should create app session with allowance for participant to deposit', async () => {
         await createAuthSessionWithClearnode(appWS, appIdentity, {
-            wallet: appIdentity.walletAddress,
-            participant: appIdentity.sessionAddress,
+            address: appIdentity.walletAddress,
+            session_key: appIdentity.sessionAddress,
             app_name: 'App Domain',
             expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
             scope: 'console',
@@ -243,10 +239,11 @@ describe('Close channel', () => {
 
         const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
         expect(getLedgerBalancesParsedResponse).toBeDefined();
-        expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
-        expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
-        expect(getLedgerBalancesParsedResponse.params[0].amount).toBe((decimalDepositAmount * BigInt(10)).toString());
-        expect(getLedgerBalancesParsedResponse.params[0].asset).toBe('USDC');
+
+        const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
+        expect(ledgerBalances).toHaveLength(1);
+        expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(10)).toString());
+        expect(ledgerBalances[0].asset).toBe('USDC');
     });
 
     it('should create app session', async () => {
@@ -272,13 +269,11 @@ describe('Close channel', () => {
             },
         ];
 
-        const createAppSessionMsg = await createAppSessionMessage(appIdentity.messageSigner, [
-            {
-                definition,
-                allocations,
-                session_data: JSON.stringify(SESSION_DATA_WAITING),
-            },
-        ]);
+        const createAppSessionMsg = await createAppSessionMessage(appIdentity.messageSigner, {
+            definition,
+            allocations,
+            session_data: JSON.stringify(SESSION_DATA_WAITING),
+        });
         const createAppSessionResponse = await appWS.sendAndWaitForResponse(
             createAppSessionMsg,
             getCreateAppSessionPredicate(),
@@ -355,9 +350,11 @@ describe('Close channel', () => {
 
         const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
         expect(getLedgerBalancesParsedResponse).toBeDefined();
-        expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
-        expect(getLedgerBalancesParsedResponse.params[0].amount).toBe((decimalDepositAmount * BigInt(9)).toString()); // 1000 - 100
-        expect(getLedgerBalancesParsedResponse.params[0].asset).toBe('USDC');
+
+        const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
+        expect(ledgerBalances).toHaveLength(1);
+        expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(9)).toString()); // 1000 - 100
+        expect(ledgerBalances[0].asset).toBe('USDC');
     });
 
     it('should update ledger balances for receiving side', async () => {
@@ -373,9 +370,11 @@ describe('Close channel', () => {
 
         const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
         expect(getLedgerBalancesParsedResponse).toBeDefined();
-        expect(getLedgerBalancesParsedResponse.params).toHaveLength(1);
-        expect(getLedgerBalancesParsedResponse.params[0].amount).toBe((decimalDepositAmount * BigInt(11)).toString()); // 1000 + 100
-        expect(getLedgerBalancesParsedResponse.params[0].asset).toBe('USDC');
+
+        const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
+        expect(ledgerBalances).toHaveLength(1);
+        expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(11)).toString()); // 1000 + 100
+        expect(ledgerBalances[0].asset).toBe('USDC');
     });
 
     it('should close channel and withdraw without app funds', async () => {
@@ -406,13 +405,11 @@ describe('Close channel', () => {
     });
 
     it('should resize channel by withdrawing received funds from app to channel', async () => {
-        const msg = await createResizeChannelMessage(cpIdentity.messageSigner, [
-            {
-                channel_id: cpChannelId,
-                allocate_amount: depositAmount,
-                funds_destination: cpIdentity.walletAddress,
-            },
-        ]);
+        const msg = await createResizeChannelMessage(cpIdentity.messageSigner, {
+            channel_id: cpChannelId,
+            allocate_amount: depositAmount,
+            funds_destination: cpIdentity.walletAddress,
+        });
 
         const resizeResponse = await cpWS.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
         const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);

@@ -162,7 +162,7 @@ func (r *RPCRouter) BalanceUpdateMiddleware(c *RPCContext) {
 		logger.Error("error getting balances", "sender", userAddress.Hex(), "error", err)
 		return
 	}
-	r.Node.Notify(c.UserID, "bu", balances)
+	r.Node.Notify(c.UserID, "bu", BalanceUpdatesResponse{BalanceUpdates: balances})
 
 	// TODO: notify other participants
 }

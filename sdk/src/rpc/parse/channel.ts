@@ -7,6 +7,7 @@ import {
     ChannelUpdateResponseParams,
     ChannelUpdate,
     ChannelsUpdateResponseParams,
+    ChannelUpdateWithWallet,
 } from '../types';
 import { hexSchema, addressSchema, statusEnum, ParamsParser, bigIntSchema, dateSchema } from './common';
 
@@ -66,43 +67,49 @@ const CloseChannelParamsSchema = z
         }),
     );
 
-const ChannelUpdateObjectSchema = z
-    .object({
-        channel_id: hexSchema,
-        participant: addressSchema,
-        status: statusEnum,
-        token: addressSchema,
-        wallet: addressSchema,
-        amount: bigIntSchema,
-        chain_id: z.number(),
-        adjudicator: addressSchema,
-        challenge: z.number(),
-        nonce: z.number(),
-        version: z.number(),
-        created_at: dateSchema,
-        updated_at: dateSchema,
-    })
-    .transform(
-        (raw): ChannelUpdate => ({
-            channelId: raw.channel_id,
-            participant: raw.participant,
-            status: raw.status,
-            token: raw.token,
-            wallet: raw.wallet,
-            amount: raw.amount,
-            chainId: raw.chain_id,
-            adjudicator: raw.adjudicator,
-            challenge: raw.challenge,
-            nonce: raw.nonce,
-            version: raw.version,
-            createdAt: raw.created_at,
-            updatedAt: raw.updated_at,
-        }),
-    );
+const ChannelUpdateObject = z.object({
+    channel_id: hexSchema,
+    participant: addressSchema,
+    status: statusEnum,
+    token: addressSchema,
+    amount: bigIntSchema,
+    chain_id: z.number(),
+    adjudicator: addressSchema,
+    challenge: z.number(),
+    nonce: z.number(),
+    version: z.number(),
+    created_at: dateSchema,
+    updated_at: dateSchema,
+});
+
+const ChannelUpdateObjectSchema = ChannelUpdateObject.transform(
+    (raw): ChannelUpdate => ({
+        channelId: raw.channel_id,
+        participant: raw.participant,
+        status: raw.status,
+        token: raw.token,
+        amount: raw.amount,
+        chainId: raw.chain_id,
+        adjudicator: raw.adjudicator,
+        challenge: raw.challenge,
+        nonce: raw.nonce,
+        version: raw.version,
+        createdAt: raw.created_at,
+        updatedAt: raw.updated_at,
+    }),
+);
+
+const ChannelUpdateWithWalletObjectSchema = z.object({
+    ...ChannelUpdateObject.shape,
+    wallet: addressSchema,
+}).transform((raw): ChannelUpdateWithWallet => ({
+    ...ChannelUpdateObjectSchema.parse(raw),
+    wallet: raw.wallet,
+}));
 
 const GetChannelsParamsSchema = z
     .object({
-        channels: z.array(ChannelUpdateObjectSchema),
+        channels: z.array(ChannelUpdateWithWalletObjectSchema),
     })
     // Validate received type with linter
     .transform((raw): GetChannelsResponseParams => raw);

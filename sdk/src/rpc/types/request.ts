@@ -7,8 +7,7 @@ import {
     TransferAllocation,
     AppSessionAllocation,
     Allowance,
-    PaginationFilters,
-    TxType
+    GetLedgerTransactionsFilters
 } from '.';
 
 /**
@@ -79,10 +78,8 @@ export interface GetLedgerEntriesRequest extends GenericRPCMessage {
  */
 export interface GetLedgerTransactionsRequest extends GenericRPCMessage {
     method: RPCMethod.GetLedgerTransactions;
-    params: PaginationFilters & {
+    params: GetLedgerTransactionsFilters & {
         account_id: string;
-        asset?: string;
-        tx_type?: TxType;
     };
 }
 
@@ -232,9 +229,9 @@ export interface AuthRequest extends GenericRPCMessage {
     method: RPCMethod.AuthRequest;
     params: {
         /** The Ethereum address of the wallet being authorized. */
-        wallet: Address;
+        address: Address;
         /** The session key address associated with the authentication attempt. */
-        participant: Address;
+        session_key: Address;
         /** The name of the application being authorized. */
         app_name: string;
         /** The allowances for the connection. */

@@ -186,8 +186,6 @@ export interface ChannelUpdate {
     status: RPCChannelStatus;
     /** The token contract address. */
     token: Address;
-    /** The wallet address associated with the channel. */
-    wallet: Address;
     /** The total amount in the channel. */
     amount: BigInt;
     /** The chain ID where the channel exists. */
@@ -204,6 +202,11 @@ export interface ChannelUpdate {
     createdAt: Date;
     /** The timestamp when the channel was last updated. */
     updatedAt: Date;
+}
+
+export interface ChannelUpdateWithWallet extends ChannelUpdate {
+    /** The Ethereum address of the wallet associated with the channel. */
+    wallet: Address;
 }
 
 /**
@@ -484,6 +487,13 @@ export interface PaginationFilters {
     limit?: number;
     /** Sort order by created_at. */
     sort?: 'asc' | 'desc';
+}
+
+export interface GetLedgerTransactionsFilters extends PaginationFilters {
+    /** Filter by transaction type. */
+    tx_type?: TxType;
+    /** Filter by asset symbol. */
+    asset?: string;
 }
 
 /**

@@ -8,7 +8,8 @@ import { getChannelUpdatePredicateWithStatus, TestWebSocket, getGetLedgerEntries
 import { createGetLedgerEntriesMessage, RPCChannelStatus, rpcResponseParser } from '@erc7824/nitrolite';
 import { parseUnits, GetTxpoolContentReturnType, Hash } from 'viem';
 
-describe('Close channel', () => {
+// TODO: this test could stuck anvil if is not gracefully closed
+describe.skip('Close channel', () => {
     const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
     const decimalDepositAmount = 100;
 

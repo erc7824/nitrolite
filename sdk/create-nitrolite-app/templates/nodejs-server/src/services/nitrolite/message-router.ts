@@ -31,15 +31,15 @@ export class MessageRouter {
     routeMessage(event: WSMessageEvent): void {
         const parsed = this.parseMessage(event);
         
-        logger.info(`🎯 Routing message type: ${parsed.type}, method: ${parsed.method || 'none'}`);
+        logger.debug(`🎯 Routing message type: ${parsed.type}, method: ${parsed.method || 'none'}`);
         
         switch (parsed.type) {
             case 'rpc':
-                logger.info(`🔀 Routing RPC message: ${parsed.method}`);
+                logger.debug(`🔀 Routing RPC message: ${parsed.method}`);
                 this.routeRPCMessage(parsed.data, parsed.method!);
                 break;
             case 'raw':
-                logger.info(`📤 Routing raw message`);
+                logger.debug(`📤 Routing raw message`);
                 this.routeRawMessage(parsed.data);
                 break;
             case 'invalid':
@@ -102,27 +102,27 @@ export class MessageRouter {
     }
 
     private routeRPCMessage(data: any, method: string): void {
-        logger.info(`🚀 Routing RPC method: ${method}`);
+        logger.debug(`🚀 Routing RPC method: ${method}`);
         
         switch (method) {
             case RPCMethod.AuthChallenge:
-                logger.info('🤝 Emitting auth_challenge to handlers');
+                logger.debug('🤝 Emitting auth_challenge to handlers');
                 this.authChallengeEmitter.emit(data);
                 break;
             case RPCMethod.AuthVerify:
-                logger.info('✅ Emitting auth_verify to handlers');
+                logger.debug('✅ Emitting auth_verify to handlers');
                 this.authVerifyEmitter.emit(data);
                 break;
             case RPCMethod.Pong:
-                logger.info('🏓 Emitting pong to handlers');
+                logger.debug('🏓 Emitting pong to handlers');
                 this.pongEmitter.emit(data);
                 break;
             case RPCMethod.Error:
-                logger.info('❌ Emitting error to handlers');
+                logger.debug('❌ Emitting error to handlers');
                 this.errorEmitter.emit(data);
                 break;
             default:
-                logger.info(`📨 Emitting ${method} to general handlers`);
+                logger.debug(`📨 Emitting ${method} to general handlers`);
                 this.generalEmitter.emit(data);
                 break;
         }

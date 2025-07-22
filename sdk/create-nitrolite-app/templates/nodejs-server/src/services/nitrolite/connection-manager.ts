@@ -55,7 +55,7 @@ export class ConnectionManager {
         this.retryCount++;
         const delay = this.config.reconnectDelay * Math.pow(2, this.retryCount - 1);
         
-        logger.info(`Scheduling reconnect attempt ${this.retryCount}/${this.config.maxRetries} in ${delay}ms`);
+        logger.warn(`Scheduling reconnect attempt ${this.retryCount}/${this.config.maxRetries} in ${delay}ms`);
         this.reconnectScheduledEmitter.emit(delay);
         
         this.clearReconnectTimeout();
@@ -63,7 +63,7 @@ export class ConnectionManager {
             try {
                 await reconnectCallback();
             } catch (error) {
-                logger.error('Reconnection attempt failed:', error);
+                logger.warn('Reconnection attempt failed:', error instanceof Error ? error.message : error);
             }
         }, delay);
     }

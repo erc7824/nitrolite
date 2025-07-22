@@ -44,7 +44,7 @@ export class WebSocketManager {
 
         return new Promise((resolve, reject) => {
             try {
-                logger.debug('WebSocket connecting to:', this.config.wsUrl);
+                logger.debug(`WebSocket connecting to: ${this.config.wsUrl.substring(0, 30)}...`);
                 this.ws = new WebSocket(this.config.wsUrl);
 
                 this.ws.onopen = () => {

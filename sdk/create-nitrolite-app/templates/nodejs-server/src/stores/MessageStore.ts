@@ -38,7 +38,7 @@ class MessageStoreClass {
       }
     });
 
-    logger.debug(`Added message ${message.id} (${type}) from ${source}`);
+    logger.debug(`Message stored: ${type} from ${source} [ID: ${message.id}]`);
     return message.id;
   }
 
@@ -119,7 +119,7 @@ class MessageStoreClass {
   clearMessages(): void {
     const count = this.messages.length;
     this.messages = [];
-    logger.info(`Cleared ${count} stored messages`);
+    logger.info(`Message store cleared: ${count} messages removed`);
   }
 
   onMessage(listener: (message: StoredMessage) => void): () => void {

@@ -71,7 +71,7 @@ export const getStoredJWTToken = (): string | null => {
 export const storeJWTToken = (token: string): void => {
     jwtTokenStore = token;
     logger.info('✅ JWT token stored in memory');
-    logger.info('🔑 JWT Token:', token.substring(0, 50) + '...' + token.substring(token.length - 10));
+    logger.info(`🔑 JWT Token: ***REDACTED*** (length: ${token.length})`);
 };
 
 export const removeJWTToken = (): void => {
@@ -113,7 +113,7 @@ export const sendAuthRequest = async (ws: WebSocket, authContext: NitroliteAuthC
     try {
         if (jwtToken && isJWTTokenValid(jwtToken)) {
             logger.info('🔐 Sending auth_verify with existing JWT token');
-            logger.debug('JWT Token preview:', jwtToken.substring(0, 30) + '...');
+            logger.debug(`JWT Token: ***REDACTED*** (length: ${jwtToken.length})`);
             authRequest = await createAuthVerifyMessageWithJWT(jwtToken);
         } else {
             logger.info('🆕 No valid JWT token found, sending fresh auth_request');
@@ -121,7 +121,7 @@ export const sendAuthRequest = async (ws: WebSocket, authContext: NitroliteAuthC
             authRequest = await createAuthRequestMessage(authMessage as any);
         }
 
-        logger.debug('Sending auth message via WebSocket:', authRequest.substring(0, 100) + '...');
+        logger.debug(`Sending auth message via WebSocket (length: ${authRequest.length})`);
         ws.send(authRequest);
     } catch (error) {
         throw new Error(`Auth request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -144,7 +144,7 @@ export const handleAuthChallenge = async (
     const challenge = challengeResponse.params?.challengeMessage;
     logger.info('🤝 Handling auth challenge with challenge message:', challenge);
     const authMessage = createAuthMessage(authContext.walletAddress, authContext.sessionKey.address, '0', challenge);
-    logger.debug('📝 Created auth message:', JSON.stringify(authMessage));
+    logger.debug('📝 Created auth message for challenge verification');
 
     try {
         // Create wallet from private key for signing
@@ -261,7 +261,8 @@ export const processAuthResponse = (
     error?: string;
     tokenExpired?: boolean;
 } => {
-    logger.info('🔍 Processing auth response:', JSON.stringify(response, null, 2));
+    logger.info('🔍 Processing auth response');
+    logger.debug('Auth response details:', JSON.stringify(response, null, 2));
 
     if (response.method === RPCMethod.AuthVerify && response.params?.success) {
         const result: { success: boolean; jwtToken?: string } = { success: true };
@@ -350,7 +351,7 @@ export const authenticateWithNitrolite = async (
                 try {
                     rawMessage = parseAnyRPCResponse(event.data.toString());
                 } catch {
-                    logger.error('failed to parse incoming event', event.data);
+                    logger.error('Failed to parse incoming WebSocket message');
                     return;
                 }
 

@@ -30,7 +30,7 @@ class RequestStoreClass {
         timeout: timeoutId,
       });
 
-      logger.debug(`Registered request ${requestInfo.requestId} (${requestInfo.method})`);
+      logger.debug(`Request registered: ${requestInfo.method} [ID: ${requestInfo.requestId}]`);
     });
   }
 
@@ -38,7 +38,7 @@ class RequestStoreClass {
     const pendingRequest = this.pendingRequests.get(requestId);
     
     if (!pendingRequest) {
-      logger.warn(`No pending request found for ID: ${requestId}`);
+      logger.warn(`Request not found [ID: ${requestId}]`);
       return false;
     }
 
@@ -48,7 +48,7 @@ class RequestStoreClass {
       clearTimeout(pendingRequest.timeout);
     }
 
-    logger.debug(`Handling response for request ${requestId}`);
+    logger.debug(`Request response received [ID: ${requestId}]`);
     pendingRequest.resolve(response);
     return true;
   }
@@ -57,7 +57,7 @@ class RequestStoreClass {
     const pendingRequest = this.pendingRequests.get(requestId);
     
     if (!pendingRequest) {
-      logger.warn(`No pending request found for error handling: ${requestId}`);
+      logger.warn(`Request not found for error handling [ID: ${requestId}]`);
       return false;
     }
 
@@ -67,7 +67,7 @@ class RequestStoreClass {
       clearTimeout(pendingRequest.timeout);
     }
 
-    logger.debug(`Handling error for request ${requestId}: ${error.message}`);
+    logger.debug(`Request error handled [ID: ${requestId}]: ${error.message}`);
     pendingRequest.reject(error);
     return true;
   }
@@ -106,7 +106,7 @@ class RequestStoreClass {
     }
     
     this.pendingRequests.clear();
-    logger.info('Cleared all pending requests');
+    logger.info(`Cleared ${this.pendingRequests.size} pending requests`);
   }
 }
 

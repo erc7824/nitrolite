@@ -89,7 +89,7 @@ export class AuthenticationManager {
         const storedJWT = getStoredJWTToken();
         if (storedJWT && isJWTTokenValid(storedJWT)) {
             logger.info('🔑 Using stored JWT token for authentication');
-            logger.info(`JWT Token: ${storedJWT}`);
+            logger.debug(`JWT Token length: ${storedJWT.length} characters`);
         } else {
             logger.info('🆕 No valid JWT token found, proceeding with standard auth request');
             if (storedJWT) {
@@ -108,9 +108,9 @@ export class AuthenticationManager {
     }
 
     async authenticate(wsManager: any, timeout: number, pendingChallenge?: any, rawMessage?: string): Promise<void> {
-        logger.info('🔐🔐 AUTH MANAGER AUTHENTICATE CALLED');
-        logger.info(`Pending challenge: ${JSON.stringify(pendingChallenge, null, 2)}`);
-        logger.info(`Raw message: ${rawMessage}`);
+        logger.info('🔐 AUTH MANAGER AUTHENTICATE CALLED');
+        logger.debug(`Pending challenge: ${JSON.stringify(pendingChallenge, null, 2)}`);
+        logger.debug(`Raw message: ${rawMessage}`);
         
         const context = this.authContext;
         if (!context) {
@@ -136,10 +136,8 @@ export class AuthenticationManager {
             
             // Print JWT token if received
             if (authResult.jwtToken) {
-                logger.info('🎉 SUCCESS! JWT Token received and stored:');
-                logger.info('🔑 ═══════════════════════════════════════════════════════════');
-                logger.info(`🔑 JWT TOKEN: ${authResult.jwtToken}`);
-                logger.info('🔑 ═══════════════════════════════════════════════════════════');
+                logger.info('🎉 SUCCESS! JWT Token received and stored');
+                logger.info(`🔑 JWT Token: ***REDACTED*** (length: ${authResult.jwtToken.length})`);
                 logger.info('✅ JWT Token will be reused for future authentication requests');
             } else {
                 logger.info('✅ Authentication successful but no JWT token received');
@@ -158,23 +156,20 @@ export class AuthenticationManager {
     }
 
     handleAuthResponse(response: any): { success: boolean; error?: string; tokenExpired?: boolean } {
-        logger.info('🔍 Processing authentication response:');
-        logger.info(`Auth response: ${JSON.stringify(response, null, 2)}`);
+        logger.info('🔍 Processing authentication response');
+        logger.debug(`Auth response: ${JSON.stringify(response, null, 2)}`);
         
         const result = processAuthResponse(response);
         
         if (result.success) {
             this.isAuthenticated = true;
             
-            // Always print JWT token when received - this is critical for verification
+            // Log JWT token reception securely
             if (result.jwtToken) {
-                logger.info('🎉 SUCCESS! JWT Token received and stored:');
-                logger.info('🔑 ═══════════════════════════════════════════════════════════');
-                logger.info(`🔑 JWT TOKEN: ${result.jwtToken}`);
-                logger.info('🔑 ═══════════════════════════════════════════════════════════');
-                logger.info('✅ JWT Token will be reused for future authentication requests');
+                logger.info('🎉 SUCCESS! JWT Token received and stored');
+                logger.info(`🔑 JWT Token: ***REDACTED*** (length: ${result.jwtToken.length})`);
             } else {
-                logger.info('✅ Authentication successful but no JWT token received');
+                logger.warn('⚠️  Authentication successful but no JWT token received');
             }
             
             this.successEmitter.emit();

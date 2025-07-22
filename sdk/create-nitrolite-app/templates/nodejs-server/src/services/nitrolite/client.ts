@@ -1,24 +1,9 @@
-import { createPingMessage, createECDSAMessageSigner, parseAnyRPCResponse, RPCMethod } from '@erc7824/nitrolite';
+import { createPingMessage, createECDSAMessageSigner, RPCMethod } from '@erc7824/nitrolite';
 import { Wallet } from 'ethers';
-import { WebSocket } from 'ws';
 import type { MessageEvent as WSMessageEvent } from 'ws';
-import {
-    authenticateWithNitrolite,
-    sendAuthRequest,
-    isTokenExpiredError,
-    processAuthResponse,
-    clearJWTToken,
-    parseNitroliteError,
-} from './auth.js';
-import type {
-    NitroliteAuthContext,
-    WSStatus,
-    SessionKey,
-    NitroliteConfig,
-    NitroliteConnectionCallbacks,
-} from '../../types/index.js';
+import type { WSStatus, NitroliteConfig, NitroliteConnectionCallbacks } from '../../types/index.js';
 import { UserRejectedError } from '../../types/index.js';
-import { config, isDevelopment } from '../../config/index.js';
+import { config } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 import { StatusManager } from './status-manager.js';
 import { WebSocketManager } from './websocket-manager.js';
@@ -36,9 +21,6 @@ export const DEFAULT_CONFIG: NitroliteConfig = {
     requestTimeout: 30000,
 };
 
-// In-memory session storage for server
-let sessionKeyStore: SessionKey | null = null;
-
 export class NitroliteWebSocketClient {
     private readonly statusManager: StatusManager;
     private readonly wsManager: WebSocketManager;
@@ -54,7 +36,7 @@ export class NitroliteWebSocketClient {
     constructor(config: Partial<NitroliteConfig> = {}, callbacks: NitroliteConnectionCallbacks = {}) {
         this.config = { ...DEFAULT_CONFIG, ...config };
         this.callbacks = callbacks;
-        
+
         this.statusManager = new StatusManager();
         this.wsManager = new WebSocketManager(this.config);
         this.authManager = new AuthenticationManager();
@@ -62,35 +44,35 @@ export class NitroliteWebSocketClient {
         this.messageRouter = new MessageRouter();
         this.connectionManager = new ConnectionManager(this.config);
         this.eventEmitter = new NitroliteEventEmitter();
-        
+
         this.setupEventHandlers();
     }
-    
+
     private setupEventHandlers(): void {
         // WebSocket events
         this.wsManager.onMessage((event) => this.handleMessage(event));
         this.wsManager.onClose(() => this.handleDisconnection());
         this.wsManager.onError((error) => this.handleWSError(error));
-        
+
         // Status change events
         this.statusManager.onStatusChange((status) => {
             this.eventEmitter.status.emit(status);
         });
-        
+
         // Authentication events
         this.authManager.onTokenExpired(() => this.handleTokenExpiration());
-        
+
         // Challenge events
         this.challengeManager.onChallengeReceived((challenge) => {
             this.statusManager.setStatus('pending_auth');
             this.callbacks.onChallengeReceived?.(challenge);
         });
-        
+
         // Connection events
         this.connectionManager.onMaxRetriesReached(() => {
             this.statusManager.setStatus('failed');
         });
-        
+
         // Message routing
         this.messageRouter.onAuthChallenge((data) => this.handleAuthChallenge(data));
         this.messageRouter.onAuthVerify((data) => this.handleAuthVerify(data));
@@ -196,7 +178,7 @@ export class NitroliteWebSocketClient {
         if (!this.wsManager.isOpen) {
             throw new Error('WebSocket not connected');
         }
-        
+
         const context = this.authManager.authContext;
         if (!context?.sessionKey) {
             throw new Error('Session key not available');
@@ -217,14 +199,11 @@ export class NitroliteWebSocketClient {
     }
 
     async approveChallenge(): Promise<void> {
-        
         if (!this.challengeManager.hasPendingChallenge) {
-            logger.error('❌ No pending challenge to approve');
             throw new Error('No pending challenge to approve');
         }
 
         if (!this.wsManager.isOpen) {
-            logger.error('❌ WebSocket not connected');
             throw new Error('WebSocket not connected');
         }
 
@@ -254,7 +233,7 @@ export class NitroliteWebSocketClient {
 
     rejectChallenge(): void {
         this.challengeManager.clearChallenge();
-        this.connectionManager.resetUserRejection(); 
+        this.connectionManager.resetUserRejection();
         this.statusManager.setStatus('disconnected');
         this.callbacks.onAuthFailed?.('Authentication rejected');
     }
@@ -263,17 +242,17 @@ export class NitroliteWebSocketClient {
         if (!this.wsManager.isOpen) {
             throw new Error('WebSocket connection is not established');
         }
-        
+
         await this.authManager.sendAuthRequest(this.wsManager);
     }
 
     private handleMessage(event: WSMessageEvent): void {
         const dataStr = event.data.toString();
-        
+
         // Log all messages received from clearnode WebSocket connection
         logger.debug('📨 Received message from clearnode WebSocket');
         logger.debug(`Raw message: ${dataStr}`);
-        
+
         // Check for token expiration first
         try {
             const rawJsonMessage = JSON.parse(dataStr);
@@ -290,20 +269,10 @@ export class NitroliteWebSocketClient {
 
     private handleAuthChallenge(data: any): void {
         logger.debug(`Challenge data: ${JSON.stringify(data, null, 2)}`);
-        
+
         if (!this.authManager.authenticated) {
             this.challengeManager.setChallenge(data, JSON.stringify(data));
-            
-            // Auto-approve challenge for server - use setTimeout to ensure async
-            setTimeout(() => {
-                if (this.hasPendingChallenge) {
-                    this.approveChallenge().catch((error) => {
-                        logger.error('❌ Failed to auto-approve challenge:', error);
-                    });
-                } else {
-                    logger.error('❌ No pending challenge to approve!');
-                }
-            }, 100);
+            // Note: challenge is handled by global client callback, not here
         } else {
             logger.warn(`Ignoring auth_challenge - already authenticated: ${this.authManager.authenticated}`);
         }
@@ -311,10 +280,10 @@ export class NitroliteWebSocketClient {
 
     private handleAuthVerify(data: any): void {
         logger.debug(`Auth verify data: ${JSON.stringify(data, null, 2)}`);
-        
-        if (!this.authManager.authenticated) {
+
+        if (!this.authManager.authenticated && !this.authManager.inProgress) {
             const result = this.authManager.handleAuthResponse(data);
-            
+
             if (result.success) {
                 this.startPingInterval();
                 this.statusManager.setStatus('connected');
@@ -326,7 +295,11 @@ export class NitroliteWebSocketClient {
                 this.callbacks.onVerifyFailed?.(result.error || 'Authentication failed');
             }
         } else {
-            logger.warn('⚠️  Ignoring auth_verify - already authenticated');
+            if (this.authManager.authenticated) {
+                logger.warn('⚠️  Ignoring auth_verify - already authenticated');
+            } else if (this.authManager.inProgress) {
+                logger.debug('Skipping message router processing - auth in progress');
+            }
         }
     }
 
@@ -339,14 +312,13 @@ export class NitroliteWebSocketClient {
 
     private handleTokenExpiration(): void {
         this.statusManager.setStatus('connecting');
-        
+
         const context = this.authManager.authContext;
         if (this.wsManager.isOpen && context) {
-            this.authManager.sendAuthRequest(this.wsManager)
-                .catch((error) => {
-                    logger.error('❌ Token expiration re-auth failed:', error);
-                    this.emitError(new Error(`Re-authentication failed: ${error.message}`));
-                });
+            this.authManager.sendAuthRequest(this.wsManager).catch((error) => {
+                logger.error('❌ Token expiration re-auth failed:', error);
+                this.emitError(new Error(`Re-authentication failed: ${error.message}`));
+            });
         } else {
             logger.error('❌ Cannot re-authenticate: missing connection or context');
             this.emitError(new Error('Cannot re-authenticate: connection or context unavailable'));
@@ -383,7 +355,7 @@ export class NitroliteWebSocketClient {
 
     private scheduleReconnect(): void {
         this.statusManager.setStatus('reconnecting');
-        
+
         this.connectionManager.scheduleReconnect(async () => {
             const context = this.authManager.authContext;
             if (context) {
@@ -394,9 +366,8 @@ export class NitroliteWebSocketClient {
 
     private startPingInterval(): void {
         const context = this.authManager.authContext;
-        this.connectionManager.startPingInterval(
-            context?.sessionKey || null, 
-            (data: string) => this.wsManager.send(data)
+        this.connectionManager.startPingInterval(context?.sessionKey || null, (data: string) =>
+            this.wsManager.send(data),
         );
     }
 
@@ -436,7 +407,6 @@ export function createNitroliteWebSocketClient(
 let globalClient: NitroliteWebSocketClient | null = null;
 
 export async function initializeNitroliteClient(): Promise<NitroliteWebSocketClient> {
-
     if (globalClient) {
         return globalClient;
     }
@@ -458,16 +428,14 @@ export async function initializeNitroliteClient(): Promise<NitroliteWebSocketCli
             wsUrl: config.yellowWsUrl,
         },
         {
-            onConnect: () => {
-            },
+            onConnect: () => {},
             onDisconnect: () => {
                 logger.warn('❌ Nitrolite WebSocket disconnected');
             },
             onError: (error) => {
                 logger.error('💥 Nitrolite WebSocket error:', error.message);
             },
-            onAuthSuccess: () => {
-            },
+            onAuthSuccess: () => {},
             onAuthFailed: (error) => {
                 logger.error('🔒 Nitrolite authentication failed:', error);
             },

@@ -79,20 +79,25 @@ type ResizeChannelParams struct {
 	FundsDestination string           `json:"funds_destination"                   validate:"required"`
 }
 
+type State struct {
+	Intent      uint8        `json:"intent"`
+	Version     uint64       `json:"version"`
+	Data        []byte       `json:"state_data"`
+	Allocations []Allocation `json:"allocations"`
+	Sigs        []Signature  `json:"sigs"`
+}
+
 type CreateChannelParams struct {
 	ChainID uint32           `json:"chain_id" validate:"required"`
 	Token   string           `json:"token" validate:"required"`
 	Amount  *decimal.Decimal `json:"amount" validate:"required, bigint"`
 }
 
-// TODO: return proper state struct in this, and later in resize and close endpoints too.
+// TODO: use proper state struct in resize and close too.
 type CreateChannelResponse struct {
-	ChannelID string    `json:"channel_id"`
-	Intent    uint8     `json:"intent"`
-	Version   uint64    `json:"version"`
-	StateData string    `json:"state_data"`
-	StateHash string    `json:"state_hash"`
-	Signature Signature `json:"server_signature"`
+	ChannelID string `json:"channel_id"`
+	StateHash string `json:"state_hash"`
+	State     State  `json:"state"`
 }
 
 type ResizeChannelResponse struct {

@@ -74,6 +74,7 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		logger.Error("failed to decode state data hex", "error", err)
 		return CreateChannelResponse{}, RPCErrorf("failed to decode state data hex")
 	}
+
 	encodedState, err := nitrolite.EncodeState(channelID, nitrolite.IntentINITIALIZE, big.NewInt(0), stateDataBytes, allocations)
 	if err != nil {
 		logger.Error("error encoding state hash", "error", err)
@@ -97,11 +98,21 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 
 	resp := CreateChannelResponse{
 		ChannelID: channelID.Hex(),
-		Intent:    uint8(nitrolite.IntentFINALIZE),
-		Version:   1,
-		StateData: stateDataHex,
 		StateHash: stateHash,
-		Signature: sig,
+		State: State{
+			Intent:  uint8(nitrolite.IntentINITIALIZE),
+			Version: 0,
+			Data:    stateDataBytes,
+			Sigs:    []Signature{sig},
+		},
+	}
+
+	for _, alloc := range allocations {
+		resp.State.Allocations = append(resp.State.Allocations, Allocation{
+			Participant:  alloc.Destination.Hex(),
+			TokenAddress: alloc.Token.Hex(),
+			RawAmount:    decimal.NewFromBigInt(alloc.Amount, 0),
+		})
 	}
 
 	return resp, nil

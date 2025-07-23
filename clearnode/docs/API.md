@@ -22,6 +22,7 @@
 | `create_app_session` | Creates a new virtual application on a ledger | Private |
 | `submit_app_state` | Submits an intermediate state into a virtual application | Private |
 | `close_app_session` | Closes a virtual application | Private |
+| `create_channel` | Creates a payment channel with broker | Private |
 | `close_channel` | Closes a payment channel | Private |
 | `resize_channel` | Adjusts channel capacity | Private |
 
@@ -804,6 +805,65 @@ The optional `session_data` field can be used to provide final application-speci
   "sig": ["0xabcd1234..."]
 }
 ```
+
+### Create Channel
+
+Requests opening a channel with a Clearnode broker on a specific network.
+
+**Request:**
+
+```json
+{
+  "req": [1, "create_channel", [{
+    "chain_id": 137,
+    "token": "0xeeee567890abcdef...",
+    "amount": "100000000"
+  }], 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+The request parameters are:
+- `chain_id`: The blockchain network ID where the channel should be created
+- `token`: The token contract address for the channel
+- `amount`: The initial amount to deposit in the channel (in raw token units)
+
+**Response:**
+
+Returns signed initial state with the requested amounts ready to submit on Blockchain.
+
+```json
+{
+  "res": [1, "create_channel", [{
+    "channel_id": "0x4567890123abcdef...",
+    "state_hash": "0xLedgerStateHash",
+    "state": {
+      "intent": 1,
+      "version": 1,
+      "state_data": "0x0000000000000000000000000000000000000000000000000000000000001ec7",
+      "allocations": [
+        {
+          "destination": "0x1234567890abcdef...",
+          "token": "0xeeee567890abcdef...",
+          "amount": "100000000"
+        },
+        {
+          "destination": "0xbbbb567890abcdef...",
+          "token": "0xeeee567890abcdef...",
+          "amount": "0"
+        }
+      ],
+      "sig": ["0x9876fedcba..."]
+    }
+  }], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+The response includes:
+- `channel_id`: Unique identifier for the channel
+- `state_hash`: Hash of the initial channel state
+- `state`: Complete initial state structure containing intent, version, allocations, and Broker signature
 
 ### Close Channel
 

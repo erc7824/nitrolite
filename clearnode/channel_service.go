@@ -32,7 +32,15 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		return CreateChannelResponse{}, RPCErrorf("invalid signature")
 	}
 
-	_, err := GetAssetByToken(s.db, params.Token, params.ChainID)
+	existingOpenChannel, err := CheckExistingChannels(s.db, wallet.Hex(), params.Token, params.ChainID)
+	if err != nil {
+		return CreateChannelResponse{}, RPCErrorf("failed to check existing channels")
+	}
+	if existingOpenChannel != nil {
+		return CreateChannelResponse{}, RPCErrorf("an open channel with broker already exists: %s", existingOpenChannel.ChannelID)
+	}
+
+	_, err = GetAssetByToken(s.db, params.Token, params.ChainID)
 	if err != nil {
 		return CreateChannelResponse{}, RPCErrorf("token not supported: %s", params.Token)
 	}
@@ -86,14 +94,6 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 	if err != nil {
 		logger.Error("error encoding state hash", "error", err)
 		return CreateChannelResponse{}, RPCErrorf("error encoding state hash")
-	}
-
-	existingOpenChannel, err := CheckExistingChannels(s.db, wallet.Hex(), params.Token, params.ChainID)
-	if err != nil {
-		return CreateChannelResponse{}, RPCErrorf("failed to check existing channels")
-	}
-	if existingOpenChannel != nil {
-		return CreateChannelResponse{}, RPCErrorf("an open channel with broker already exists: %s", existingOpenChannel.ChannelID)
 	}
 
 	stateHash := crypto.Keccak256Hash(encodedState).Hex()

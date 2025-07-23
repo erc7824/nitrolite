@@ -1,4 +1,5 @@
 import { Address, Hex } from 'viem';
+import { RPCAllowance } from './common';
 
 export * from './request';
 export * from './response';
@@ -137,11 +138,7 @@ export interface PartialEIP712AuthMessage {
     application: Address;
     participant: Address;
     expire: string;
-    // TODO: use Allowance type after replacing symbol with asset
-    allowances: {
-        asset: string;
-        amount: string;
-    }[];
+    allowances: RPCAllowance[];
 }
 
 /**

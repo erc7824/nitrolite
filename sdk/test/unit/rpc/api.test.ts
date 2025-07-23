@@ -407,16 +407,15 @@ describe('API message creators', () => {
     test('createGetLedgerTransactionsMessage filters out null/undefined/empty values', async () => {
         const accountId = 'test-account';
         const filters = {
-            // TODO: add these fields to method itself
-            // asset: '',
-            // tx_type: TxType.Transfer,
+            asset: '',
+            tx_type: RPCTxType.Transfer,
             offset: 0,
             limit: undefined,
             sort: null as any,
         };
         const expectedParams = {
             account_id: accountId,
-            // tx_type: TxType.Transfer,
+            tx_type: RPCTxType.Transfer,
             offset: 0,
         };
         const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);

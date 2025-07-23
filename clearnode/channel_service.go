@@ -75,7 +75,14 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		return CreateChannelResponse{}, RPCErrorf("failed to decode state data hex")
 	}
 
-	encodedState, err := nitrolite.EncodeState(channelID, nitrolite.IntentINITIALIZE, big.NewInt(0), stateDataBytes, allocations)
+	state := nitrolite.State{
+		Intent:      uint8(nitrolite.IntentINITIALIZE),
+		Version:     big.NewInt(0),
+		Data:        stateDataBytes,
+		Allocations: allocations,
+	}
+
+	encodedState, err := nitrolite.EncodeState(channelID, state)
 	if err != nil {
 		logger.Error("error encoding state hash", "error", err)
 		return CreateChannelResponse{}, RPCErrorf("error encoding state hash")
@@ -208,8 +215,15 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 	}
 
 	// 6) Encode & sign the new state
+	state := nitrolite.State{
+		Intent:      uint8(nitrolite.IntentRESIZE),
+		Version:     big.NewInt(int64(channel.Version) + 1),
+		Data:        encodedIntentions,
+		Allocations: allocations,
+	}
+
 	channelIDHash := common.HexToHash(channel.ChannelID)
-	encodedState, err := nitrolite.EncodeState(channelIDHash, nitrolite.IntentRESIZE, big.NewInt(int64(channel.Version)+1), encodedIntentions, allocations)
+	encodedState, err := nitrolite.EncodeState(channelIDHash, state)
 	if err != nil {
 		logger.Error("failed to encode state hash", "error", err)
 		return ResizeChannelResponse{}, RPCErrorf("failed to encode state hash")
@@ -308,7 +322,15 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 		logger.Error("failed to decode state data hex", "error", err)
 		return CloseChannelResponse{}, RPCErrorf("failed to decode state data hex")
 	}
-	encodedState, err := nitrolite.EncodeState(common.HexToHash(channel.ChannelID), nitrolite.IntentFINALIZE, big.NewInt(int64(channel.Version)+1), stateDataBytes, allocations)
+
+	state := nitrolite.State{
+		Intent:      uint8(nitrolite.IntentFINALIZE),
+		Version:     big.NewInt(int64(channel.Version) + 1),
+		Data:        stateDataBytes,
+		Allocations: allocations,
+	}
+
+	encodedState, err := nitrolite.EncodeState(common.HexToHash(channel.ChannelID), state)
 	if err != nil {
 		logger.Error("failed to encode state hash", "error", err)
 		return CloseChannelResponse{}, RPCErrorf("failed to encode state hash")

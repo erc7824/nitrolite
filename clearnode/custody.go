@@ -60,8 +60,8 @@ func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, infuraURL, 
 		return nil, fmt.Errorf("failed to create transaction signer: %w", err)
 	}
 
-	// TODO: remove as it is unused
-	auth.GasPrice = big.NewInt(30000000000) // 20 gwei.
+	// Needed to call challenge in the future.
+	auth.GasPrice = big.NewInt(30000000000) // 30 gwei.
 	auth.GasLimit = uint64(3000000)
 
 	custodyAddress := common.HexToAddress(custodyAddressStr)

@@ -154,21 +154,6 @@ func createMockCreatedEvent(t *testing.T, signer *Signer, token string, amount *
 	return &log, event
 }
 
-func createMockJoinedEvent(t *testing.T) (*types.Log, *nitrolite.CustodyJoined) {
-	t.Helper()
-
-	channelID := [32]byte{1, 2, 3, 4}
-
-	event := &nitrolite.CustodyJoined{
-		ChannelId: channelID,
-		Index:     big.NewInt(1),
-	}
-
-	log := createMockLog(custodyAbi.Events["Joined"].ID)
-
-	return &log, event
-}
-
 func createMockClosedEvent(t *testing.T, signer *Signer, token string, amount *big.Int) (*types.Log, *nitrolite.CustodyClosed) {
 	t.Helper()
 
@@ -366,7 +351,7 @@ func TestHandleCreatedEvent(t *testing.T) {
 			assert.WithinDuration(t, time.Now(), dbChannel.UpdatedAt, 2*time.Second)
 
 			walletLedger := GetWalletLedger(db, mockEvent.Wallet)
-			balance, err := walletLedger.Balance(NewAccountID(channelIDStr), "usdc")
+			balance, err := walletLedger.Balance(NewAccountID(capturedChannel.Wallet), "usdc")
 			require.NoError(t, err)
 
 			assert.Equal(t, tc.amount.String(), balance.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).String()) // 6 decimals for USDC default test token

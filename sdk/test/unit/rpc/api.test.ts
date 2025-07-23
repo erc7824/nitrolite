@@ -21,17 +21,16 @@ import {
     createECDSAMessageSigner,
 } from '../../../src/rpc/api';
 import {
-    CreateAppSessionRequest,
     MessageSigner,
     AuthChallengeResponse,
     RPCMethod,
-    RPCChannelStatus,
-    RequestData,
-    TransferAllocation,
     ResizeChannelRequestParams,
     AuthRequestParams,
     CloseAppSessionRequestParams,
-    TxType,
+    RPCChannelStatus,
+    RPCTransferAllocation,
+    RPCTxType,
+    RPCData,
 } from '../../../src/rpc/types';
 
 describe('API message creators', () => {
@@ -49,8 +48,8 @@ describe('API message creators', () => {
 
     test('createAuthRequestMessage', async () => {
         const authRequest: AuthRequestParams = {
-            wallet: clientAddress,
-            participant: clientAddress,
+            address: clientAddress,
+            session_key: clientAddress,
             app_name: 'test-app',
             allowances: [],
             expire: '',
@@ -65,8 +64,8 @@ describe('API message creators', () => {
                 requestId,
                 RPCMethod.AuthRequest,
                 {
-                    wallet: clientAddress,
-                    participant: clientAddress,
+                    address: clientAddress,
+                    session_key: clientAddress,
                     app_name: 'test-app',
                     allowances: [],
                     expire: '',
@@ -293,7 +292,7 @@ describe('API message creators', () => {
 
     test('createTransferMessage with destination address', async () => {
         const destination = '0x1234567890123456789012345678901234567890' as Address;
-        const allocations: TransferAllocation[] = [
+        const allocations: RPCTransferAllocation[] = [
             {
                 asset: 'usdc',
                 amount: '100.5',
@@ -315,7 +314,7 @@ describe('API message creators', () => {
 
     test('createTransferMessage with destination_user_tag', async () => {
         const destination_user_tag = 'UX123D8C';
-        const allocations: TransferAllocation[] = [
+        const allocations: RPCTransferAllocation[] = [
             {
                 asset: 'usdc',
                 amount: '100.5',
@@ -332,7 +331,7 @@ describe('API message creators', () => {
     });
 
     test('createTransferMessage validates destination parameters', async () => {
-        const allocations: TransferAllocation[] = [{ asset: 'usdc', amount: '100.5' }];
+        const allocations: RPCTransferAllocation[] = [{ asset: 'usdc', amount: '100.5' }];
 
         // Test missing both parameters
         await expect(createTransferMessage(signer, { allocations }, requestId, timestamp)).rejects.toThrow(
@@ -363,7 +362,7 @@ describe('API message creators', () => {
         const accountId = 'test-account';
         const filters = {
             asset: 'usdc',
-            tx_type: TxType.Transfer,
+            tx_type: RPCTxType.Transfer,
             offset: 10,
             limit: 20,
             sort: 'desc' as const,
@@ -371,7 +370,7 @@ describe('API message creators', () => {
         const expectedParams = {
             account_id: accountId,
             asset: 'usdc',
-            tx_type: TxType.Transfer,
+            tx_type: RPCTxType.Transfer,
             offset: 10,
             limit: 20,
             sort: 'desc',
@@ -431,7 +430,7 @@ describe('API message creators', () => {
 
     test('createECDSAMessageSigner', async () => {
         const privateKey = '0xb482c8fa261c29eaaa646703948e2cc2a2ff54411cc42d8fce9a161035dfb3dc';
-        const payload = [42, RPCMethod.Ping, { p1: 4337, p2: 7702 }, 20] as RequestData;
+        const payload: RPCData = [42, RPCMethod.Ping, { p1: 4337, p2: 7702 }, 20];
         const signer = createECDSAMessageSigner(privateKey);
         const signature = await signer(payload);
         expect(signature).toBeDefined();

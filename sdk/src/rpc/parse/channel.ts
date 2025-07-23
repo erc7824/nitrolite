@@ -5,9 +5,9 @@ import {
     CloseChannelResponseParams,
     GetChannelsResponseParams,
     ChannelUpdateResponseParams,
-    ChannelUpdate,
+    RPCChannel,
     ChannelsUpdateResponseParams,
-    ChannelUpdateWithWallet,
+    RPCChannelWithWallet,
 } from '../types';
 import { hexSchema, addressSchema, statusEnum, ParamsParser, bigIntSchema, dateSchema } from './common';
 
@@ -83,7 +83,7 @@ const ChannelUpdateObject = z.object({
 });
 
 const ChannelUpdateObjectSchema = ChannelUpdateObject.transform(
-    (raw): ChannelUpdate => ({
+    (raw): RPCChannel => ({
         channelId: raw.channel_id,
         participant: raw.participant,
         status: raw.status,
@@ -102,7 +102,7 @@ const ChannelUpdateObjectSchema = ChannelUpdateObject.transform(
 const ChannelUpdateWithWalletObjectSchema = z.object({
     ...ChannelUpdateObject.shape,
     wallet: addressSchema,
-}).transform((raw): ChannelUpdateWithWallet => ({
+}).transform((raw): RPCChannelWithWallet => ({
     ...ChannelUpdateObjectSchema.parse(raw),
     wallet: raw.wallet,
 }));

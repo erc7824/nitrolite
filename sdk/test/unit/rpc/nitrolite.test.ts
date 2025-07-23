@@ -6,9 +6,8 @@ import {
     MessageSigner,
     SingleMessageVerifier,
     MultiMessageVerifier,
-    RequestData,
-    ResponsePayload,
     RPCMethod,
+    RPCData,
 } from '../../../src/rpc/types';
 
 describe('NitroliteRPC', () => {
@@ -84,121 +83,10 @@ describe('NitroliteRPC', () => {
         });
     });
 
-    describe('parseResponse', () => {
-        test('should parse a valid response message string', () => {
-            const responseStr = JSON.stringify({
-                res: [12345, RPCMethod.Ping, ['result1', 'result2'], 1619876543210],
-            });
-
-            const result = NitroliteRPC.parseResponse(responseStr);
-
-            expect(result).toEqual({
-                isValid: true,
-                isError: false,
-                requestId: 12345,
-                method: RPCMethod.Ping,
-                data: ['result1', 'result2'],
-                timestamp: 1619876543210,
-            });
-        });
-
-        test('should parse a valid response message object', () => {
-            const responseObj = {
-                res: [12345, RPCMethod.Ping, ['result1', 'result2'], 1619876543210],
-            };
-
-            const result = NitroliteRPC.parseResponse(responseObj);
-
-            expect(result).toEqual({
-                isValid: true,
-                isError: false,
-                requestId: 12345,
-                method: RPCMethod.Ping,
-                data: ['result1', 'result2'],
-                timestamp: 1619876543210,
-            });
-        });
-
-        test('should parse a valid response message with sid field', () => {
-            const responseObj = {
-                res: [12345, RPCMethod.Ping, ['result1', 'result2'], 1619876543210],
-                sid: '0xaccountId' as Hex,
-            };
-
-            const result = NitroliteRPC.parseResponse(responseObj);
-
-            expect(result).toEqual({
-                isValid: true,
-                isError: false,
-                requestId: 12345,
-                method: RPCMethod.Ping,
-                data: ['result1', 'result2'],
-                sid: '0xaccountId',
-                timestamp: 1619876543210,
-            });
-        });
-
-        test('should handle error responses correctly', () => {
-            const errorResponse = {
-                res: [12345, 'error', [{ error: 'Something went wrong' }], 1619876543210],
-            };
-
-            const result = NitroliteRPC.parseResponse(errorResponse);
-
-            expect(result).toEqual({
-                isValid: true,
-                isError: true,
-                requestId: 12345,
-                method: 'error',
-                data: { error: 'Something went wrong' },
-                timestamp: 1619876543210,
-            });
-        });
-
-        test('should return invalid for malformed JSON', () => {
-            const result = NitroliteRPC.parseResponse('invalid json');
-
-            expect(result.isValid).toBe(false);
-            expect(result.error).toBe('Message parsing failed');
-        });
-
-        test('should return invalid for missing res field', () => {
-            const result = NitroliteRPC.parseResponse({ something: 'else' });
-
-            expect(result.isValid).toBe(false);
-            expect(result.error).toBe("Invalid message structure: Missing or invalid 'res' array.");
-        });
-
-        test('should return invalid for incorrectly sized res array', () => {
-            const result = NitroliteRPC.parseResponse({ res: [1, 2, 3] });
-
-            expect(result.isValid).toBe(false);
-            expect(result.error).toBe("Invalid message structure: Missing or invalid 'res' array.");
-        });
-
-        test('should return invalid for incorrect types in res array', () => {
-            const result = NitroliteRPC.parseResponse({
-                res: ['not-a-number', 123, 'not-an-array', 'not-a-number'],
-            });
-
-            expect(result.isValid).toBe(false);
-            expect(result.error).toBe("Invalid 'res' payload structure or types.");
-        });
-
-        test('should return invalid for malformed error response', () => {
-            const result = NitroliteRPC.parseResponse({
-                res: [12345, 'error', ['not an error object'], 1619876543210],
-            });
-
-            expect(result.isValid).toBe(false);
-            expect(result.error).toBe('Malformed error response payload.');
-        });
-    });
-
     describe('signRequestMessage', () => {
         test('should sign a request message and add signature to the message', async () => {
             const mockSigner = jest
-                .fn<(data: RequestData | ResponsePayload) => Promise<Hex>>()
+                .fn<(data: RPCData) => Promise<Hex>>()
                 .mockResolvedValue('0xsignature' as Hex);
             const request: NitroliteRPCMessage = {
                 req: [12345, RPCMethod.Ping, ['param1', 'param2'], 1619876543210],

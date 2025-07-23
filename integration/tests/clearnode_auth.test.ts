@@ -9,7 +9,8 @@ import {
     createAuthVerifyMessage,
     createAuthVerifyMessageWithJWT,
     createEIP712AuthMessageSigner,
-    rpcResponseParser,
+    parseAuthChallengeResponse,
+    parseAuthVerifyResponse,
 } from '@erc7824/nitrolite';
 
 describe('Clearnode Authentication', () => {
@@ -59,7 +60,7 @@ describe('Clearnode Authentication', () => {
         const response = await ws.sendAndWaitForResponse(msg, getAuthChallengePredicate(), 1000);
         expect(response).toBeDefined();
 
-        parsedChallengeResponse = rpcResponseParser.authChallenge(response);
+        parsedChallengeResponse = parseAuthChallengeResponse(response);
         expect(parsedChallengeResponse.params.challengeMessage).toBeDefined();
     });
 
@@ -81,7 +82,7 @@ describe('Clearnode Authentication', () => {
         const response = await ws.sendAndWaitForResponse(msg, getAuthVerifyPredicate(), 1000);
         expect(response).toBeDefined();
 
-        const parsedAuthVerifyResponse = rpcResponseParser.authVerify(response);
+        const parsedAuthVerifyResponse = parseAuthVerifyResponse(response);
 
         expect(parsedAuthVerifyResponse.params.success).toBe(true);
         expect(parsedAuthVerifyResponse.params.sessionKey).toBe(authRequestParams.session_key);
@@ -101,7 +102,7 @@ describe('Clearnode Authentication', () => {
         const response = await ws.sendAndWaitForResponse(msg, getAuthVerifyPredicate(), 1000);
         expect(response).toBeDefined();
 
-        const parsedAuthVerifyResponse = rpcResponseParser.authVerify(response);
+        const parsedAuthVerifyResponse = parseAuthVerifyResponse(response);
 
         expect(parsedAuthVerifyResponse.params.success).toBe(true);
         expect(parsedAuthVerifyResponse.params.sessionKey).toBe(authRequestParams.session_key);

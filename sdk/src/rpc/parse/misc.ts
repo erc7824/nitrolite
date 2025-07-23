@@ -4,8 +4,8 @@ import {
     GetConfigResponseParams,
     ErrorResponseParams,
     GetRPCHistoryResponseParams,
-    NetworkInfo,
-    RPCEntry,
+    RPCNetworkInfo,
+    RPCHistoryEntry,
     GetUserTagResponseParams,
 } from '../types';
 import { hexSchema, addressSchema, ParamsParser } from './common';
@@ -18,7 +18,7 @@ const NetworkInfoObjectSchema = z
         adjudicator_address: addressSchema,
     })
     .transform(
-        (raw): NetworkInfo => ({
+        (raw): RPCNetworkInfo => ({
             name: raw.name,
             chainId: raw.chain_id,
             custodyAddress: raw.custody_address,
@@ -54,7 +54,7 @@ const RPCEntryObjectSchema = z
         response: z.string(),
     })
     .transform(
-        (raw): RPCEntry => ({
+        (raw): RPCHistoryEntry => ({
             id: raw.id,
             sender: raw.sender,
             reqId: raw.req_id,

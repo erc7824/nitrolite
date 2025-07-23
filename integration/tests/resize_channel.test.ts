@@ -5,7 +5,7 @@ import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import { getResizeChannelPredicate, TestWebSocket } from '@/ws';
-import { createResizeChannelMessage, rpcResponseParser } from '@erc7824/nitrolite';
+import { createResizeChannelMessage, parseResizeChannelResponse } from '@erc7824/nitrolite';
 import { Hex, parseUnits } from 'viem';
 
 describe('Resize channel', () => {
@@ -72,7 +72,7 @@ describe('Resize channel', () => {
         });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
-        const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
         expect(resizeResponseParams.channelId).toBe(createResponseParams.channelId);
         expect(resizeResponseParams.stateData).toBeDefined();
         expect(resizeResponseParams.intent).toBe(2); // StateIntent.RESIZE // TODO: add enum to sdk
@@ -165,7 +165,7 @@ describe('Resize channel', () => {
         });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
-        const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
         expect(resizeResponseParams.allocations).toBeDefined();
         expect(resizeResponseParams.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.allocations[0].destination)).toBe(identity.walletAddress);
@@ -245,7 +245,7 @@ describe('Resize channel', () => {
         });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
-        const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
         expect(resizeResponseParams.allocations).toBeDefined();
         expect(resizeResponseParams.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.allocations[0].destination)).toBe(identity.walletAddress);

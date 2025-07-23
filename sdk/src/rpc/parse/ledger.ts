@@ -6,12 +6,12 @@ import {
     GetLedgerEntriesResponseParams,
     BalanceUpdateResponseParams,
     GetLedgerTransactionsResponseParams,
-    TxType,
-    Transaction,
+    RPCTxType,
+    RPCTransaction,
     TransferNotificationResponseParams,
     TransferResponseParams,
-    Balance,
-    LedgerEntry,
+    RPCBalance,
+    RPCLedgerEntry,
 } from '../types';
 import { addressSchema, dateSchema, decimalSchema, ParamsParser } from './common';
 
@@ -20,7 +20,7 @@ const BalanceObjectSchema = z
         asset: z.string(),
         amount: decimalSchema,
     })
-    .transform((b): Balance => b);
+    .transform((b): RPCBalance => b);
 
 const GetLedgerBalancesParamsSchema = z
     .object({
@@ -44,7 +44,7 @@ const LedgerEntryObjectSchema = z
         created_at: dateSchema,
     })
     .transform(
-        (e): LedgerEntry => ({
+        (e): RPCLedgerEntry => ({
             id: e.id,
             accountId: e.account_id,
             accountType: e.account_type,
@@ -66,7 +66,7 @@ const GetLedgerEntriesParamsSchema = z
         }),
     );
 
-export const txTypeEnum = z.nativeEnum(TxType);
+export const txTypeEnum = z.nativeEnum(RPCTxType);
 
 export const TransactionSchema = z
     .object({
@@ -81,7 +81,7 @@ export const TransactionSchema = z
         created_at: dateSchema,
     })
     .transform(
-        (raw): Transaction => ({
+        (raw): RPCTransaction => ({
             id: raw.id,
             txType: raw.tx_type,
             fromAccount: raw.from_account,

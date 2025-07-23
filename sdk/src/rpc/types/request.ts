@@ -2,11 +2,11 @@ import { Address, Hex } from 'viem';
 import {
     RPCMethod,
     GenericRPCMessage,
-    AppDefinition,
+    RPCAppDefinition,
     RPCChannelStatus,
-    TransferAllocation,
-    AppSessionAllocation,
-    Allowance,
+    RPCTransferAllocation,
+    RPCAppSessionAllocation,
+    RPCAllowance,
     GetLedgerTransactionsFilters
 } from '.';
 
@@ -98,9 +98,9 @@ export interface CreateAppSessionRequest extends GenericRPCMessage {
     method: RPCMethod.CreateAppSession;
     params: {
         /** The detailed definition of the application being created, including protocol, participants, weights, and quorum. */
-        definition: AppDefinition;
+        definition: RPCAppDefinition;
         /** The initial allocation distribution among participants. Each participant must have sufficient balance for their allocation. */
-        allocations: AppSessionAllocation[];
+        allocations: RPCAppSessionAllocation[];
         /** Optional session data as a JSON string that can store application-specific state or metadata. */
         session_data?: string;
     };
@@ -115,7 +115,7 @@ export interface SubmitAppStateRequest extends GenericRPCMessage {
         /** The unique identifier of the application session to update. */
         app_session_id: Hex;
         /** The new allocation distribution among participants. Must include all participants and maintain total balance. */
-        allocations: AppSessionAllocation[];
+        allocations: RPCAppSessionAllocation[];
         /** Optional session data as a JSON string that can store application-specific state or metadata. */
         session_data?: string;
     };
@@ -130,7 +130,7 @@ export interface CloseAppSessionRequest extends GenericRPCMessage {
         /** The unique identifier of the application session to close. */
         app_session_id: Hex;
         /** The final allocation distribution among participants upon closing. Must include all participants and maintain total balance. */
-        allocations: AppSessionAllocation[];
+        allocations: RPCAppSessionAllocation[];
         /** Optional session data as a JSON string that can store application-specific state or metadata. */
         session_data?: string;
     };
@@ -235,7 +235,7 @@ export interface AuthRequest extends GenericRPCMessage {
         /** The name of the application being authorized. */
         app_name: string;
         /** The allowances for the connection. */
-        allowances: Allowance[];
+        allowances: RPCAllowance[];
         /** The expiration timestamp for the authorization. */
         expire: string;
         /** The scope of the authorization. */
@@ -281,7 +281,7 @@ export interface TransferRequest extends GenericRPCMessage {
         /** The destination user tag to transfer assets to. Required if destination is not provided. */
         destination_user_tag?: string;
         /** The assets and amounts to transfer. */
-        allocations: TransferAllocation[];
+        allocations: RPCTransferAllocation[];
     };
 }
 

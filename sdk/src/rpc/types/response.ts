@@ -2,21 +2,19 @@ import { Address, Hex } from 'viem';
 import {
     RPCMethod,
     GenericRPCMessage,
-    AppDefinition,
+    RPCAppDefinition,
     RPCChannelStatus,
-    AuthVerifyRequestParams,
-    ChannelUpdate,
-    TxType,
-    NetworkInfo,
-    Balance,
-    LedgerEntry,
-    AppSession,
-    RPCAllocation,
-    ServerSignature,
-    RPCEntry,
-    Asset,
-    Transaction,
-    ChannelUpdateWithWallet,
+    RPCChannel,
+    RPCNetworkInfo,
+    RPCBalance,
+    RPCLedgerEntry,
+    RPCAppSession,
+    RPCChannelAllocation,
+    RPCSignature,
+    RPCHistoryEntry,
+    RPCAsset,
+    RPCTransaction,
+    RPCChannelWithWallet,
 } from '.';
 
 /**
@@ -50,7 +48,7 @@ export interface GetConfigResponse extends GenericRPCMessage {
         /** The Ethereum address of the broker. */
         brokerAddress: Address;
         /** List of supported networks and their configurations. */
-        networks: NetworkInfo[];
+        networks: RPCNetworkInfo[];
     };
 }
 
@@ -61,7 +59,7 @@ export interface GetLedgerBalancesResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerBalances;
     params: {
         /** List of balances for each asset in the ledger. */
-        ledgerBalances: Balance[];
+        ledgerBalances: RPCBalance[];
     };
 }
 
@@ -72,7 +70,7 @@ export interface GetLedgerEntriesResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerEntries;
     params: {
         /** List of ledger entries containing transaction details. */
-        ledgerEntries: LedgerEntry[];
+        ledgerEntries: RPCLedgerEntry[];
     };
 }
 
@@ -83,7 +81,7 @@ export interface GetLedgerTransactionsResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerTransactions;
     params: {
         /** List of transactions in the ledger. */
-        ledgerTransactions: Transaction[];
+        ledgerTransactions: RPCTransaction[];
     };
 }
 
@@ -148,7 +146,7 @@ export interface CloseAppSessionResponse extends GenericRPCMessage {
  */
 export interface GetAppDefinitionResponse extends GenericRPCMessage {
     method: RPCMethod.GetAppDefinition;
-    params: AppDefinition & {
+    params: RPCAppDefinition & {
         /** A unique nonce value for the application session to prevent replay attacks. */
         nonce: number;
     };
@@ -160,7 +158,7 @@ export interface GetAppDefinitionResponse extends GenericRPCMessage {
 export interface GetAppSessionsResponse extends GenericRPCMessage {
     method: RPCMethod.GetAppSessions;
     params: {
-        appSessions: AppSession[];
+        appSessions: RPCAppSession[];
     };
 }
 
@@ -179,11 +177,11 @@ export interface ResizeChannelResponse extends GenericRPCMessage {
         /** The version number of the channel. */
         version: number;
         /** The list of allocations for the channel. */
-        allocations: RPCAllocation[];
+        allocations: RPCChannelAllocation[];
         /** The hash of the channel state. */
         stateHash: Hex;
         /** The server's signature for the state update. */
-        serverSignature: ServerSignature;
+        serverSignature: RPCSignature;
     };
 }
 
@@ -202,11 +200,11 @@ export interface CloseChannelResponse extends GenericRPCMessage {
         /** The encoded state data for the channel. */
         stateData: Hex;
         /** The list of final allocations for the channel. */
-        allocations: RPCAllocation[];
+        allocations: RPCChannelAllocation[];
         /** The hash of the channel state. */
         stateHash: Hex;
         /** The server's signature for the state update. */
-        serverSignature: ServerSignature;
+        serverSignature: RPCSignature;
     };
 }
 
@@ -217,7 +215,7 @@ export interface GetChannelsResponse extends GenericRPCMessage {
     method: RPCMethod.GetChannels;
     params: {
         /** List of channel updates containing information about each channel. */
-        channels: ChannelUpdateWithWallet[];
+        channels: RPCChannelWithWallet[];
     };
 }
 
@@ -228,7 +226,7 @@ export interface GetRPCHistoryResponse extends GenericRPCMessage {
     method: RPCMethod.GetRPCHistory;
     params: {
         /** List of RPC entries containing historical RPC calls and their responses. */
-        rpcEntries: RPCEntry[];
+        rpcEntries: RPCHistoryEntry[];
     };
 }
 
@@ -239,7 +237,7 @@ export interface GetAssetsResponse extends GenericRPCMessage {
     method: RPCMethod.GetAssets;
     params: {
         /** List of assets available in the clearnode. */
-        assets: Asset[];
+        assets: RPCAsset[];
     };
 }
 
@@ -250,7 +248,7 @@ export interface AssetsResponse extends GenericRPCMessage {
     method: RPCMethod.Assets;
     params: {
         /** List of assets available in the clearnode. */
-        assets: Asset[];
+        assets: RPCAsset[];
     };
 }
 
@@ -294,7 +292,7 @@ export interface BalanceUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.BalanceUpdate;
     params: {
         /** List of balance updates. */
-        balanceUpdates: Balance[];
+        balanceUpdates: RPCBalance[];
     };
 }
 
@@ -305,7 +303,7 @@ export interface ChannelsUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.ChannelsUpdate;
     params: {
         /** List of channel updates. */
-        channels: ChannelUpdate[];
+        channels: RPCChannel[];
     };
 }
 
@@ -314,7 +312,7 @@ export interface ChannelsUpdateResponse extends GenericRPCMessage {
  */
 export interface ChannelUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.ChannelUpdate;
-    params: ChannelUpdate;
+    params: RPCChannel;
 }
 
 /**
@@ -340,7 +338,7 @@ export interface TransferResponse extends GenericRPCMessage {
     method: RPCMethod.Transfer;
     params: {
         /** List of transactions representing transfers. */
-        transactions: Transaction[];
+        transactions: RPCTransaction[];
     };
 }
 
@@ -351,7 +349,7 @@ export interface TransferNotificationResponse extends GenericRPCMessage {
     method: RPCMethod.TransferNotification;
     params: {
         /** List of transactions representing transfers. */
-        transactions: Transaction[];
+        transactions: RPCTransaction[];
     };
 }
 

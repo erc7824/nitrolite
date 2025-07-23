@@ -3,7 +3,7 @@ import {
     createAuthRequestMessage,
     createAuthVerifyMessage,
     AuthRequestParams,
-    rpcResponseParser,
+    parseAuthChallengeResponse,
 } from '@erc7824/nitrolite';
 import { Identity } from './identity';
 import { getAuthChallengePredicate, getAuthVerifyPredicate, TestWebSocket } from './ws';
@@ -40,7 +40,7 @@ export const createAuthSessionWithClearnode = async (
     const authRequestMsg = await createAuthRequestMessage(authRequestParams);
     const authRequestResponse = await ws.sendAndWaitForResponse(authRequestMsg, getAuthChallengePredicate(), 1000);
 
-    const authRequestParsedResponse = rpcResponseParser.authChallenge(authRequestResponse);
+    const authRequestParsedResponse = parseAuthChallengeResponse(authRequestResponse);
 
     const authVerifyMsg = await createAuthVerifyMessage(eip712MessageSigner, authRequestParsedResponse);
     await ws.sendAndWaitForResponse(authVerifyMsg, getAuthVerifyPredicate(), 1000);

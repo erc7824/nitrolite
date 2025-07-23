@@ -15,8 +15,8 @@ import {
     getCloseChannelPredicate,
 } from '@/ws';
 import {
-    AppDefinition,
-    AppSessionAllocation,
+    RPCAppDefinition,
+    RPCAppSessionAllocation,
     createAppSessionMessage,
     createCloseAppSessionMessage,
     createCloseChannelMessage,
@@ -25,9 +25,15 @@ import {
     createResizeChannelMessage,
     createSubmitAppStateMessage,
     RPCChannelStatus,
-    rpcResponseParser,
+    parseCloseAppSessionResponse,
+    parseCloseChannelResponse,
+    parseCreateAppSessionResponse,
+    parseGetAppSessionsResponse,
+    parseGetLedgerBalancesResponse,
+    parseResizeChannelResponse,
+    parseSubmitAppStateResponse,
 } from '@erc7824/nitrolite';
-import { Hex, parseUnits, Address } from 'viem';
+import { Hex, parseUnits } from 'viem';
 
 describe('Close channel', () => {
     const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
@@ -63,7 +69,7 @@ describe('Close channel', () => {
             1000
         );
 
-        const getAppSessionsParsedResponse = rpcResponseParser.getAppSessions(getAppSessionsResponse);
+        const getAppSessionsParsedResponse = parseGetAppSessionsResponse(getAppSessionsResponse);
         expect(getAppSessionsParsedResponse).toBeDefined();
         expect(getAppSessionsParsedResponse.params.appSessions).toHaveLength(1);
 
@@ -103,7 +109,7 @@ describe('Close channel', () => {
     };
 
     const submitAppStateUpdate = async (
-        allocations: AppSessionAllocation[],
+        allocations: RPCAppSessionAllocation[],
         sessionData: object,
         expectedVersion: number
     ) => {
@@ -119,7 +125,7 @@ describe('Close channel', () => {
             1000
         );
 
-        const submitAppStateParsedResponse = rpcResponseParser.submitAppState(submitAppStateResponse);
+        const submitAppStateParsedResponse = parseSubmitAppStateResponse(submitAppStateResponse);
         expect(submitAppStateParsedResponse).toBeDefined();
         expect(submitAppStateParsedResponse.params.appSessionId).toBe(appSessionId);
         expect(submitAppStateParsedResponse.params.status).toBe(RPCChannelStatus.Open);
@@ -129,7 +135,7 @@ describe('Close channel', () => {
     };
 
     const closeAppSessionWithState = async (
-        allocations: AppSessionAllocation[],
+        allocations: RPCAppSessionAllocation[],
         sessionData: object,
         expectedVersion: number
     ) => {
@@ -147,7 +153,7 @@ describe('Close channel', () => {
 
         expect(closeAppSessionResponse).toBeDefined();
 
-        const closeAppSessionParsedResponse = rpcResponseParser.closeAppSession(closeAppSessionResponse);
+        const closeAppSessionParsedResponse = parseCloseAppSessionResponse(closeAppSessionResponse);
         expect(closeAppSessionParsedResponse).toBeDefined();
         expect(closeAppSessionParsedResponse.params.appSessionId).toBe(appSessionId);
         expect(closeAppSessionParsedResponse.params.status).toBe(RPCChannelStatus.Closed);
@@ -237,7 +243,7 @@ describe('Close channel', () => {
             1000
         );
 
-        const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
+        const getLedgerBalancesParsedResponse = parseGetLedgerBalancesResponse(getLedgerBalancesResponse);
         expect(getLedgerBalancesParsedResponse).toBeDefined();
 
         const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
@@ -247,7 +253,7 @@ describe('Close channel', () => {
     });
 
     it('should create app session', async () => {
-        const definition: AppDefinition = {
+        const definition: RPCAppDefinition = {
             protocol: 'nitroliterpc',
             participants: [appIdentity.walletAddress, appCPIdentity.walletAddress],
             weights: [100, 0],
@@ -280,7 +286,7 @@ describe('Close channel', () => {
             1000
         );
 
-        const createAppSessionParsedResponse = rpcResponseParser.createAppSession(createAppSessionResponse);
+        const createAppSessionParsedResponse = parseCreateAppSessionResponse(createAppSessionResponse);
 
         expect(createAppSessionParsedResponse).toBeDefined();
         expect(createAppSessionParsedResponse.params.appSessionId).toBeDefined();
@@ -348,7 +354,7 @@ describe('Close channel', () => {
             1000
         );
 
-        const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
+        const getLedgerBalancesParsedResponse = parseGetLedgerBalancesResponse(getLedgerBalancesResponse);
         expect(getLedgerBalancesParsedResponse).toBeDefined();
 
         const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
@@ -368,7 +374,7 @@ describe('Close channel', () => {
             1000
         );
 
-        const getLedgerBalancesParsedResponse = rpcResponseParser.getLedgerBalances(getLedgerBalancesResponse);
+        const getLedgerBalancesParsedResponse = parseGetLedgerBalancesResponse(getLedgerBalancesResponse);
         expect(getLedgerBalancesParsedResponse).toBeDefined();
 
         const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
@@ -383,7 +389,7 @@ describe('Close channel', () => {
         const closeResponse = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();
 
-        const { params: closeResponseParams } = rpcResponseParser.closeChannel(closeResponse);
+        const { params: closeResponseParams } = parseCloseChannelResponse(closeResponse);
         const closeChannelTxHash = await client.closeChannel({
             finalState: {
                 intent: closeResponseParams.intent,
@@ -412,7 +418,7 @@ describe('Close channel', () => {
         });
 
         const resizeResponse = await cpWS.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
-        const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
 
         expect(resizeResponseParams.allocations).toBeDefined();
         expect(resizeResponseParams.allocations).toHaveLength(2);
@@ -466,7 +472,7 @@ describe('Close channel', () => {
         const closeResponse = await cpWS.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();
 
-        const { params: closeResponseParams } = rpcResponseParser.closeChannel(closeResponse);
+        const { params: closeResponseParams } = parseCloseChannelResponse(closeResponse);
         const closeChannelTxHash = await cpClient.closeChannel({
             finalState: {
                 intent: closeResponseParams.intent,

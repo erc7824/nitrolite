@@ -12,11 +12,10 @@ import {
     EIP712AuthDomain,
     EIP712AuthMessage,
     AuthChallengeResponse,
-    RequestData,
     RPCMethod,
-    RPCChannelStatus,
-    ResponsePayload,
+    RPCData,
     GetLedgerTransactionsFilters,
+    RPCChannelStatus,
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
@@ -667,7 +666,7 @@ export function createEIP712AuthMessageSigner(
     partialMessage: PartialEIP712AuthMessage,
     domain: EIP712AuthDomain,
 ): MessageSigner {
-    return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
+    return async (payload: RPCData): Promise<Hex> => {
         const address = walletClient.account?.address;
         if (!address) {
             throw new Error('Wallet client is not connected or does not have an account.');
@@ -683,10 +682,7 @@ export function createEIP712AuthMessageSigner(
         // Safely extract the challenge from the payload for an AuthVerify request.
         // The expected structure is `[id, 'auth_verify', [{ challenge: '...' }], ts]`
         const params = payload[2];
-        if (
-            !('challenge' in params) ||
-            typeof params.challenge !== 'string'
-        ) {
+        if (!('challenge' in params) || typeof params.challenge !== 'string') {
             throw new Error('Invalid payload for AuthVerify: The challenge string is missing or malformed.');
         }
 
@@ -729,7 +725,7 @@ export function createEIP712AuthMessageSigner(
  * @returns A MessageSigner function that signs the payload using ECDSA.
  */
 export function createECDSAMessageSigner(privateKey: Hex): MessageSigner {
-    return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
+    return async (payload: RPCData): Promise<Hex> => {
         try {
             const messageBytes = keccak256(
                 stringToBytes(JSON.stringify(payload, (_, v) => (typeof v === 'bigint' ? v.toString() : v))),

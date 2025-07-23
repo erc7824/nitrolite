@@ -3,7 +3,12 @@ import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { CONFIG } from '@/setup';
 import { getGetLedgerTransactionsPredicate, TestWebSocket } from '@/ws';
-import { createGetLedgerTransactionsMessage, rpcResponseParser, GetLedgerTransactionsFilters, TxType } from '@erc7824/nitrolite';
+import {
+    createGetLedgerTransactionsMessage,
+    GetLedgerTransactionsFilters,
+    parseGetLedgerTransactionsResponse,
+    RPCTxType,
+} from '@erc7824/nitrolite';
 
 describe('Ledger Transactions Integration', () => {
     let ws: TestWebSocket;
@@ -44,7 +49,7 @@ describe('Ledger Transactions Integration', () => {
 
             expect(response).toBeDefined();
 
-            const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
+            const parsedResponse = parseGetLedgerTransactionsResponse(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
         });
@@ -61,7 +66,7 @@ describe('Ledger Transactions Integration', () => {
 
             expect(response).toBeDefined();
 
-            const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
+            const parsedResponse = parseGetLedgerTransactionsResponse(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
 
@@ -79,7 +84,7 @@ describe('Ledger Transactions Integration', () => {
         it('should successfully request ledger transactions with tx_type filter', async () => {
             const accountId = identity.walletAddress;
             const filters: GetLedgerTransactionsFilters = {
-                tx_type: TxType.Deposit,
+                tx_type: RPCTxType.Deposit,
             };
 
             const msg = await createGetLedgerTransactionsMessage(identity.messageSigner, accountId, filters);
@@ -88,7 +93,7 @@ describe('Ledger Transactions Integration', () => {
 
             expect(response).toBeDefined();
 
-            const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
+            const parsedResponse = parseGetLedgerTransactionsResponse(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
 
@@ -98,7 +103,7 @@ describe('Ledger Transactions Integration', () => {
             // If there are transactions, they should all be of type 'deposit'
             if (ledgerTransactions.length > 0) {
                 ledgerTransactions.forEach((transaction) => {
-                    expect(transaction.txType).toBe(TxType.Deposit);
+                    expect(transaction.txType).toBe(RPCTxType.Deposit);
                 });
             }
         });
@@ -116,7 +121,7 @@ describe('Ledger Transactions Integration', () => {
 
             expect(response).toBeDefined();
 
-            const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
+            const parsedResponse = parseGetLedgerTransactionsResponse(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
 
@@ -140,7 +145,7 @@ describe('Ledger Transactions Integration', () => {
 
             expect(response).toBeDefined();
 
-            const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
+            const parsedResponse = parseGetLedgerTransactionsResponse(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
 
@@ -161,7 +166,7 @@ describe('Ledger Transactions Integration', () => {
             const accountId = identity.walletAddress;
             const filters: GetLedgerTransactionsFilters = {
                 asset: 'usdc',
-                tx_type: TxType.Deposit,
+                tx_type: RPCTxType.Deposit,
                 offset: 0,
                 limit: 3,
                 sort: 'desc',
@@ -173,7 +178,7 @@ describe('Ledger Transactions Integration', () => {
 
             expect(response).toBeDefined();
 
-            const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
+            const parsedResponse = parseGetLedgerTransactionsResponse(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
 
@@ -186,7 +191,7 @@ describe('Ledger Transactions Integration', () => {
             // All transactions should match the filters
             ledgerTransactions.forEach((transaction) => {
                 expect(transaction.asset).toBe('usdc');
-                expect(transaction.txType).toBe(TxType.Deposit);
+                expect(transaction.txType).toBe(RPCTxType.Deposit);
             });
         });
 
@@ -202,7 +207,7 @@ describe('Ledger Transactions Integration', () => {
 
             expect(response).toBeDefined();
 
-            const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
+            const parsedResponse = parseGetLedgerTransactionsResponse(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
 
@@ -220,7 +225,7 @@ describe('Ledger Transactions Integration', () => {
 
             expect(response).toBeDefined();
 
-            const parsedResponse = rpcResponseParser.getLedgerTransactions(response);
+            const parsedResponse = parseGetLedgerTransactionsResponse(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
 

@@ -56,44 +56,92 @@ const _parseSpecificRPCResponse = <T extends RPCMethod>(
     return result as SpecificRPCResponse<T>;
 };
 
-/**
- * The main RPC response parsing utility.
- * This object provides a collection of type-safe parsers for each specific RPC method.
- * It offers the best developer experience, returning a fully typed object
- * without the need for manual type guards.
- *
- * @example
- * const result = rpcResponseParser.authChallenge(rawResponse);
- * // `result` is now fully typed as AuthChallengeResponse
- * console.log(result.params.challengeMessage);
- */
-export const rpcResponseParser = {
-    authChallenge: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.AuthChallenge),
-    authVerify: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.AuthVerify),
-    authRequest: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.AuthRequest),
-    error: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Error),
-    getConfig: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetConfig),
-    getLedgerBalances: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetLedgerBalances),
-    getLedgerEntries: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetLedgerEntries),
-    getLedgerTransactions: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetLedgerTransactions),
-    getUserTag: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetUserTag),
-    createAppSession: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.CreateAppSession),
-    submitAppState: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.SubmitAppState),
-    closeAppSession: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.CloseAppSession),
-    getAppDefinition: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetAppDefinition),
-    getAppSessions: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetAppSessions),
-    resizeChannel: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.ResizeChannel),
-    closeChannel: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.CloseChannel),
-    getChannels: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetChannels),
-    getRPCHistory: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetRPCHistory),
-    getAssets: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetAssets),
-    assets: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Assets),
-    message: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Message),
-    balanceUpdate: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.BalanceUpdate),
-    channelsUpdate: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.ChannelsUpdate),
-    channelUpdate: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.ChannelUpdate),
-    ping: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Ping),
-    pong: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Pong),
-    transfer: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Transfer),
-    transferNotification: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.TransferNotification),
-};
+/** Parses `auth_challenge` response */
+export const parseAuthChallengeResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.AuthChallenge);
+
+/** Parses `auth_verify` response */
+export const parseAuthVerifyResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.AuthVerify);
+
+/** Parses `auth_request` response */
+export const parseAuthRequestResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.AuthRequest);
+
+/** Parses `error` response */
+export const parseErrorResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Error);
+
+/** Parses `get_config` response */
+export const parseGetConfigResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetConfig);
+
+/** Parses `get_ledger_balances` response */
+export const parseGetLedgerBalancesResponse = (raw: string) =>
+    _parseSpecificRPCResponse(raw, RPCMethod.GetLedgerBalances);
+
+/** Parses `get_ledger_entries` response */
+export const parseGetLedgerEntriesResponse = (raw: string) =>
+    _parseSpecificRPCResponse(raw, RPCMethod.GetLedgerEntries);
+
+/** Parses `get_ledger_transactions` response */
+export const parseGetLedgerTransactionsResponse = (raw: string) =>
+    _parseSpecificRPCResponse(raw, RPCMethod.GetLedgerTransactions);
+
+/** Parses `get_user_tag` response */
+export const parseGetUserTagResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetUserTag);
+
+/** Parses `create_app_session` response */
+export const parseCreateAppSessionResponse = (raw: string) =>
+    _parseSpecificRPCResponse(raw, RPCMethod.CreateAppSession);
+
+/** Parses `submit_app_state` response */
+export const parseSubmitAppStateResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.SubmitAppState);
+
+/** Parses `close_app_session` response */
+export const parseCloseAppSessionResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.CloseAppSession);
+
+/** Parses `get_app_definition` response */
+export const parseGetAppDefinitionResponse = (raw: string) =>
+    _parseSpecificRPCResponse(raw, RPCMethod.GetAppDefinition);
+
+/** Parses `get_app_sessions` response */
+export const parseGetAppSessionsResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetAppSessions);
+
+/** Parses `resize_channel` response */
+export const parseResizeChannelResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.ResizeChannel);
+
+/** Parses `close_channel` response */
+export const parseCloseChannelResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.CloseChannel);
+
+/** Parses `get_channels` response */
+export const parseGetChannelsResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetChannels);
+
+/** Parses `get_rpc_history` response */
+export const parseGetRPCHistoryResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetRPCHistory);
+
+/** Parses `get_assets` response */
+export const parseGetAssetsResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetAssets);
+
+/** Parses `assets` response */
+export const parseAssetsResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Assets);
+
+/** Parses `message` response */
+export const parseMessageResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Message);
+
+/** Parses `bu` response */
+export const parseBalanceUpdateResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.BalanceUpdate);
+
+/** Parses `channels` response */
+export const parseChannelsUpdateResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.ChannelsUpdate);
+
+/** Parses `cu` response */
+export const parseChannelUpdateResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.ChannelUpdate);
+
+/** Parses `ping` response */
+export const parsePingResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Ping);
+
+/** Parses `pong` response */
+export const parsePongResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Pong);
+
+/** Parses `transfer` response */
+export const parseTransferResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Transfer);
+
+/** Parses `tr` response */
+export const parseTransferNotificationResponse = (raw: string) =>
+    _parseSpecificRPCResponse(raw, RPCMethod.TransferNotification);

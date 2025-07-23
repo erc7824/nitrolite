@@ -162,6 +162,14 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 				CreatedAt:   baseTime.Add(1 * time.Hour),
 			},
 			{
+				ChannelID:   "0xChannel3",
+				Wallet:      participantWallet,
+				Participant: participantSigner,
+				Status:      ChannelStatusOpen,
+				Nonce:       3,
+				CreatedAt:   baseTime.Add(2 * time.Hour),
+			},
+			{
 				ChannelID:   "0xOtherChannel",
 				Wallet:      "other_wallet",
 				Participant: "0xOtherParticipant",
@@ -204,12 +212,12 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			{
 				name:               "Filter by status open",
 				params:             map[string]interface{}{"status": string(ChannelStatusOpen)},
-				expectedChannelIDs: []string{"0xOtherChannel", "0xChannel1"},
+				expectedChannelIDs: []string{"0xOtherChannel", "0xChannel3", "0xChannel1"},
 			},
 			{
 				name:               "Filter by participant and status open",
 				params:             map[string]interface{}{"participant": participantWallet, "status": string(ChannelStatusOpen)},
-				expectedChannelIDs: []string{"0xChannel1"},
+				expectedChannelIDs: []string{"0xChannel3", "0xChannel1"},
 			},
 			{
 				name:               "Filter by participant and status closed",
@@ -260,7 +268,9 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			{Wallet: "0xWallet7", Participant: "0xParticipant7", Status: ChannelStatusOpen, Nonce: 6},
 			{Wallet: "0xWallet8", Participant: "0xParticipant8", Status: ChannelStatusClosed, Nonce: 7},
 			{Wallet: "0xWallet9", Participant: "0xParticipant9", Status: ChannelStatusOpen, Nonce: 8},
-			{Wallet: "0xWallet11", Participant: "0xParticipant11", Status: ChannelStatusOpen, Nonce: 9},
+			{Wallet: "0xWallet10", Participant: "0xParticipant10", Status: ChannelStatusOpen, Nonce: 9},
+			{Wallet: "0xWallet11", Participant: "0xParticipant11", Status: ChannelStatusOpen, Nonce: 10},
+			{Wallet: "0xWallet12", Participant: "0xParticipant12", Status: ChannelStatusOpen, Nonce: 11},
 		}
 
 		for i := range testChannels {
@@ -300,7 +310,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			},
 			{name: "Pagination with status filter",
 				params:             map[string]interface{}{"status": "open", "limit": float64(3)},
-				expectedChannelIDs: []string{"0xChannel01", "0xChannel03", "0xChannel05"}, // Only open channels, first 3
+				expectedChannelIDs: []string{"0xChannel01", "0xChannel03", "0xChannel04"}, // Only open channels, first 3
 			},
 		}
 

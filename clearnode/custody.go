@@ -157,7 +157,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 	channelID := common.Hash(ev.ChannelId).Hex()
 	logger.Debug("parsed event", "channelId", channelID, "wallet", ev.Wallet.Hex(), "channel", ev.Channel, "initial", ev.Initial)
 
-	if len(ev.Channel.Participants) == 2 {
+	if len(ev.Channel.Participants) != 2 {
 		logger.Warn("supported only 2 participants in the channel")
 		return
 	}

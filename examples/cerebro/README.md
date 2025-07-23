@@ -20,6 +20,13 @@ cerebro <clearnode_ws_url>
 
 - `CEREBRO_CONFIG_DIR` - Path to the configuration directory (optional, defaults to OS-specific config directory)
 
+### Important Notes
+
+- **Authentication Required**: All commands except `import` require authentication to Clearnode. Use the `authenticate` command after importing both a wallet and signer.
+- **Chain RPC URLs**: Blockchain interaction commands require chain-specific RPC URLs. Import them using `import chain-rpc`.
+- **Interactive Prompts**: Commands like `resize channel`, `withdraw custody`, and `deposit custody` will interactively prompt you for amounts.
+- **Command Suggestions**: The CLI provides intelligent suggestions for command arguments. If no suggestions appear, no additional arguments are needed.
+
 ## Features
 
 - **Wallet Management**: Import and manage wallets and signers across multiple chains
@@ -38,14 +45,18 @@ cerebro <clearnode_ws_url>
 
 - `import` - Import a wallet, signer or chain RPC URL
 - `list` - List available chains, wallets, signers, or channels
+  - `list channels` - Displays channel ID and balance for each chain and supported asset
+  - `list chains` - Shows all supported assets, chain ID, name, and number of imported RPCs for each chain
 - `authenticate` - Authenticate to the Clearnode using your wallet private key and signer
-- `deposit custody` - Deposit assets from your wallet to the custody ledger
-- `withdraw custody` - Withdraw assets from the custody ledger to your wallet
+- `deposit custody` - Deposit assets from your wallet to the custody ledger (interactive amount prompt)
+- `withdraw custody` - Withdraw assets from the custody ledger to your wallet (interactive amount prompt)
 - `open channel` - Open a payment channel for a specific asset on a chain
 - `close channel` - Close a payment channel and unlock funds
-- `resize channel` - Resize payment channels by adjusting allocations between custody ledger, channel, and unified balance
+- `resize channel` - Resize payment channels by adjusting allocations between custody ledger, channel, and unified balance (interactive amount prompt)
 - `transfer` - Transfer assets to another Clearnode user
 - `exit` - Exit the application
+
+**Note**: You can discover supported tokens for each chain using either `list chains` or `list channels` commands.
 
 ## Channel Operations Workflow
 
@@ -99,6 +110,10 @@ cerebro <clearnode_ws_url>
     2. Resize channel (+1)
     3. Resize channel (-1)
     4. Withdraw from custody
+
+- **Simplified Clearnode Operations**
+  - `deposit clearnode` command - Simplified deposit using resize functionality under the hood
+  - `withdraw clearnode` command - Simplified withdrawal using resize functionality under the hood
 
 - **Enhanced Security**
   - Encrypted local database storage

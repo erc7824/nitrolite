@@ -1,8 +1,6 @@
 package nitrolite
 
 import (
-	"math/big"
-
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -16,8 +14,8 @@ const (
 	IntentFINALIZE   Intent = 3
 )
 
-// EncodeState encodes channel state into a byte array using channelID, intent, version, state data, and allocations.
-func EncodeState(channelID common.Hash, intent Intent, version *big.Int, stateData []byte, allocations []Allocation) ([]byte, error) {
+// EncodeState encodes channel state into a byte array.
+func EncodeState(channelID common.Hash, state State) ([]byte, error) {
 	allocationType, err := abi.NewType("tuple[]", "", []abi.ArgumentMarshaling{
 		{Name: "destination", Type: "address"},
 		{Name: "token", Type: "address"},
@@ -44,7 +42,7 @@ func EncodeState(channelID common.Hash, intent Intent, version *big.Int, stateDa
 		{Type: allocationType},           // allocations (tuple[])
 	}
 
-	packed, err := args.Pack(channelID, uint8(intent), version, stateData, allocations)
+	packed, err := args.Pack(channelID, state.Intent, state.Version, state.Data, state.Allocations)
 	if err != nil {
 		return nil, err
 	}

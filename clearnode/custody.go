@@ -246,8 +246,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 		if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
-			log.Printf("Error recording balance update for wallet: %v", err)
-			return err
+			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 		ledger = GetWalletLedger(tx, walletAddress)
 		if err := ledger.Record(walletAccountID, asset.Symbol, amount); err != nil {

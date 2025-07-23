@@ -90,7 +90,7 @@ type State struct {
 type CreateChannelParams struct {
 	ChainID uint32           `json:"chain_id" validate:"required"`
 	Token   string           `json:"token" validate:"required"`
-	Amount  *decimal.Decimal `json:"amount" validate:"required, bigint"`
+	Amount  *decimal.Decimal `json:"amount" validate:"required,bigint"`
 }
 
 // TODO: use proper state struct in resize and close too.

@@ -1673,3 +1673,216 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		assertErrorResponse(t, ctx, "has challenged channels")
 	})
 }
+
+func TestRPCRouterHandleCreateChannel(t *testing.T) {
+	key, err := crypto.GenerateKey()
+	require.NoError(t, err)
+	userSigner := Signer{privateKey: key}
+	userAddress := userSigner.GetAddress()
+
+	t.Run("SuccessfulCreateChannel", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Seed asset with proper address format
+		asset := Asset{Token: "0x1234567890123456789012345678901234567890", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		// Create channel params
+		amount := decimal.NewFromInt(1000000) // 1 USDC in raw units (6 decimals)
+		createParams := CreateChannelParams{
+			ChainID: 137,
+			Token:   asset.Token,
+			Amount:  &amount,
+		}
+
+		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
+		router.HandleCreateChannel(ctx)
+
+		res := assertResponse(t, ctx, "create_channel")
+		resObj, ok := res.Params[0].(CreateChannelResponse)
+		require.True(t, ok, "Response should be CreateChannelResponse")
+
+		// Verify response structure
+		require.NotEmpty(t, resObj.ChannelID, "Channel ID should not be empty")
+		require.NotEmpty(t, resObj.StateHash, "State hash should not be empty")
+		require.NotNil(t, resObj.State, "State should not be nil")
+
+		// Verify state structure
+		require.Equal(t, uint8(1), resObj.State.Intent, "Intent should be INITIALIZE (1)")
+		require.Equal(t, uint64(0), resObj.State.Version, "Version should be 0")
+		require.Len(t, resObj.State.Allocations, 2, "Should have 2 allocations")
+		require.Len(t, resObj.State.Sigs, 1, "Should have 1 signature")
+
+		// Verify allocations
+		require.Equal(t, userAddress.Hex(), resObj.State.Allocations[0].Participant, "First allocation should be for user")
+		require.Equal(t, asset.Token, resObj.State.Allocations[0].TokenAddress, "Token address should match")
+		require.Equal(t, amount, resObj.State.Allocations[0].RawAmount, "Amount should match")
+
+		require.Equal(t, router.Signer.GetAddress().Hex(), resObj.State.Allocations[1].Participant, "Second allocation should be for broker")
+		require.Equal(t, asset.Token, resObj.State.Allocations[1].TokenAddress, "Token address should match")
+		require.True(t, resObj.State.Allocations[1].RawAmount.IsZero(), "Broker allocation should be zero")
+	})
+
+	t.Run("ErrorInvalidChainID", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Seed asset for unsupported chain ID to pass asset check first
+		asset := Asset{Token: "0xTokenCreate", ChainID: 999, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		amount := decimal.NewFromInt(1000000)
+		createParams := CreateChannelParams{
+			ChainID: 999, // Unsupported chain ID
+			Token:   "0xTokenCreate",
+			Amount:  &amount,
+		}
+
+		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
+		router.HandleCreateChannel(ctx)
+
+		assertErrorResponse(t, ctx, "unsupported chain ID")
+	})
+
+	t.Run("ErrorUnsupportedToken", func(t *testing.T) {
+		t.Parallel()
+
+		router, _, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Don't seed any assets
+		amount := decimal.NewFromInt(1000000)
+		createParams := CreateChannelParams{
+			ChainID: 137,
+			Token:   "0xUnsupportedToken",
+			Amount:  &amount,
+		}
+
+		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
+		router.HandleCreateChannel(ctx)
+
+		assertErrorResponse(t, ctx, "token not supported")
+	})
+
+	t.Run("ErrorExistingOpenChannel", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Seed asset
+		asset := Asset{Token: "0xTokenCreate", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		// Create existing open channel
+		existingChannel := Channel{
+			ChannelID:   "0xExistingChannel",
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
+			Status:      ChannelStatusOpen,
+			Token:       asset.Token,
+			ChainID:     137,
+			RawAmount:   decimal.NewFromInt(500),
+			Version:     1,
+		}
+		require.NoError(t, db.Create(&existingChannel).Error)
+
+		// Try to create another channel with same token/chain
+		amount := decimal.NewFromInt(1000000)
+		createParams := CreateChannelParams{
+			ChainID: 137,
+			Token:   asset.Token,
+			Amount:  &amount,
+		}
+
+		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
+		router.HandleCreateChannel(ctx)
+
+		assertErrorResponse(t, ctx, "an open channel with broker already exists")
+	})
+
+	t.Run("ErrorInvalidSignature", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Seed asset
+		asset := Asset{Token: "0xTokenCreate", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		// Create channel params
+		amount := decimal.NewFromInt(1000000)
+		createParams := CreateChannelParams{
+			ChainID: 137,
+			Token:   asset.Token,
+			Amount:  &amount,
+		}
+
+		// Create context without signature (empty signers)
+		ctx := createSignedRPCContext(1, "create_channel", createParams)
+		ctx.UserID = userAddress.Hex() // Set UserID but no signature
+
+		router.HandleCreateChannel(ctx)
+
+		assertErrorResponse(t, ctx, "invalid signature")
+	})
+
+	t.Run("SuccessfulZeroAmount", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Seed asset
+		asset := Asset{Token: "0xTokenCreate", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		// Try to create channel with zero amount
+		amount := decimal.Zero
+		createParams := CreateChannelParams{
+			ChainID: 137,
+			Token:   asset.Token,
+			Amount:  &amount,
+		}
+
+		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
+		router.HandleCreateChannel(ctx)
+
+		// This should work as zero amount channels are allowed
+		res := assertResponse(t, ctx, "create_channel")
+		resObj, ok := res.Params[0].(CreateChannelResponse)
+		require.True(t, ok, "Response should be CreateChannelResponse")
+		require.True(t, resObj.State.Allocations[0].RawAmount.IsZero(), "User allocation should be zero")
+	})
+
+	t.Run("ErrorNegativeAmount", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Seed asset
+		asset := Asset{Token: "0xTokenCreate", ChainID: 137, Symbol: "usdc", Decimals: 6}
+		require.NoError(t, db.Create(&asset).Error)
+
+		// Try to create channel with negative amount
+		amount := decimal.NewFromInt(-1000)
+		createParams := CreateChannelParams{
+			ChainID: 137,
+			Token:   asset.Token,
+			Amount:  &amount,
+		}
+
+		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
+		router.HandleCreateChannel(ctx)
+
+		// This should fail during validation or processing
+		assertErrorResponse(t, ctx, "")
+	})
+}

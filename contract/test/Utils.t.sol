@@ -176,31 +176,31 @@ contract UtilsTest_Signatures is Test {
         assertNotEq(recoveredSigner, signer, "Should not recover correct signer for different state");
     }
 
-    // ==================== verifyStateSignature TESTS ====================
+    // ==================== verifyStateEOASignature TESTS ====================
 
-    function test_verifyStateSignature_returnsTrue_forRawECDSASignature() public view {
+    function test_verifyStateEOASignature_returnsTrue_forRawECDSASignature() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 stateHash = Utils.getStateHashShort(channelId, testState);
         bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
-        bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
+        bool isValid = Utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, signer);
 
         assertTrue(isValid, "Should verify raw ECDSA signature");
     }
 
-    function test_verifyStateSignature_returnsTrue_forEIP191Signature() public view {
+    function test_verifyStateEOASignature_returnsTrue_forEIP191Signature() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 stateHash = Utils.getStateHashShort(channelId, testState);
         bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, stateHash);
 
-        bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
+        bool isValid = Utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, signer);
 
         assertTrue(isValid, "Should verify EIP191 signature");
     }
 
-    function test_verifyStateSignature_returnsTrue_forEIP712Signature() public view {
+    function test_verifyStateEOASignature_returnsTrue_forEIP712Signature() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 structHash = keccak256(
@@ -215,34 +215,34 @@ contract UtilsTest_Signatures is Test {
         );
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
-        bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
+        bool isValid = Utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, signer);
 
         assertTrue(isValid, "Should verify EIP712 signature");
     }
 
-    function test_verifyStateSignature_returnsFalse_forWrongSigner_rawECDSA() public view {
+    function test_verifyStateEOASignature_returnsFalse_forWrongSigner_rawECDSA() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 stateHash = Utils.getStateHashShort(channelId, testState);
         bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
-        bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, wrongSigner);
+        bool isValid = Utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, wrongSigner);
 
         assertFalse(isValid, "Should not verify signature for wrong signer");
     }
 
-    function test_verifyStateSignature_returnsFalse_forWrongSigner_EIP191() public view {
+    function test_verifyStateEOASignature_returnsFalse_forWrongSigner_EIP191() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 stateHash = Utils.getStateHashShort(channelId, testState);
         bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, stateHash);
 
-        bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, wrongSigner);
+        bool isValid = Utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, wrongSigner);
 
         assertFalse(isValid, "Should not verify EIP191 signature for wrong signer");
     }
 
-    function test_verifyStateSignature_returnsFalse_forWrongSigner_EIP712() public view {
+    function test_verifyStateEOASignature_returnsFalse_forWrongSigner_EIP712() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 structHash = keccak256(
@@ -257,12 +257,12 @@ contract UtilsTest_Signatures is Test {
         );
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
-        bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, wrongSigner);
+        bool isValid = Utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, wrongSigner);
 
         assertFalse(isValid, "Should not verify EIP712 signature for wrong signer");
     }
 
-    function test_verifyStateSignature_returnsFalse_whenNoEIP712Support() public view {
+    function test_verifyStateEOASignature_returnsFalse_whenNoEIP712Support() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = Utils.NO_EIP712_SUPPORT;
         bytes32 structHash = keccak256(
@@ -277,23 +277,23 @@ contract UtilsTest_Signatures is Test {
         );
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, mockEIP712.domainSeparator(), structHash);
 
-        bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
+        bool isValid = Utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, signer);
 
         assertFalse(isValid, "Should not verify EIP712 signature when NO_EIP712_SUPPORT is set");
     }
 
-    function test_verifyStateSignature_returnsTrue_forRawECDSAWhenNoEIP712Support() public view {
+    function test_verifyStateEOASignature_returnsTrue_forRawECDSAWhenNoEIP712Support() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = Utils.NO_EIP712_SUPPORT;
         bytes32 stateHash = Utils.getStateHashShort(channelId, testState);
         bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
-        bool isValid = Utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
+        bool isValid = Utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, signer);
 
         assertTrue(isValid, "Should verify raw ECDSA signature even when NO_EIP712_SUPPORT is set");
     }
 
-    function test_verifyStateSignature_returnsFalse_forEIP712WhenNoEIP712Support() public view {
+    function test_verifyStateEOASignature_returnsFalse_forEIP712WhenNoEIP712Support() public view {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockEIP712.domainSeparator();
         bytes32 structHash = keccak256(
@@ -308,7 +308,7 @@ contract UtilsTest_Signatures is Test {
         );
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
-        bool isValid = Utils.verifyStateSignature(testState, channelId, Utils.NO_EIP712_SUPPORT, sig, signer);
+        bool isValid = Utils.verifyStateEOASignature(testState, channelId, Utils.NO_EIP712_SUPPORT, sig, signer);
 
         assertFalse(isValid, "Should not verify EIP712 signature when NO_EIP712_SUPPORT is set");
     }

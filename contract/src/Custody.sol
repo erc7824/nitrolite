@@ -653,7 +653,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
      * @param state The state to verify signatures for
      * @return valid True if both signatures are valid
      */
-    function _verifyAllSignatures(Channel memory chan, State memory state) internal view returns (bool valid) {
+    function _verifyAllSignatures(Channel memory chan, State memory state) internal returns (bool valid) {
         if (state.sigs.length != PART_NUM) {
             return false;
         }
@@ -675,28 +675,35 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         address[] memory participants,
         bytes memory challengerSig
     ) internal view {
-        bytes32 stateHash = Utils.getStateHash(_channels[channelId].chan, state);
+        // NOTE: ERC-6492 signature is NOT checked as at this point participants should already be deployed
+
+        bytes32 stateHash = Utils.getStateHashShort(channelId, state);
         // NOTE: the "challenge" suffix substitution for raw ECDSA and EIP-191 signatures
         bytes32 challengeStateHash = keccak256(abi.encode(stateHash, "challenge"));
 
-        if (Utils.addressArrayIncludes(participants, Utils.recoverRawECDSASigner(challengeStateHash, challengerSig))) {
-            return;
-        }
+        for (uint256 i = 0; i < participants.length; i++) {
+            if (participants[i].code.length != 0) {
+                if (Utils.isValidERC1271Signature(challengeStateHash, challengerSig, participants[i])) {
+                    return;
+                }
+            } else {
+                if (Utils.recoverRawECDSASigner(challengeStateHash, challengerSig) == participants[i]) {
+                    return;
+                }
 
-        if (Utils.addressArrayIncludes(participants, Utils.recoverEIP191Signer(challengeStateHash, challengerSig))) {
-            return;
-        }
+                if (Utils.recoverEIP191Signer(challengeStateHash, challengerSig) == participants[i]) {
+                    return;
+                }
 
-        // NOTE: the `CHALLENGE_STATE_TYPEHASH` is used to recover the EIP-712 signer
-        if (
-            Utils.addressArrayIncludes(
-                participants,
-                Utils.recoverStateEIP712Signer(
-                    _domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig
-                )
-            )
-        ) {
-            return;
+                // NOTE: the `CHALLENGE_STATE_TYPEHASH` is used to recover the EIP-712 signer
+                if (
+                    Utils.recoverStateEIP712Signer(
+                        _domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig
+                    ) == participants[i]
+                ) {
+                    return;
+                }
+            }
         }
 
         revert InvalidChallengerSignature();

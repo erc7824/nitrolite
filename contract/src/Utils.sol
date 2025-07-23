@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {EIP712} from "lib/openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
+import {IERC1271} from "lib/openzeppelin-contracts/contracts/interfaces/IERC1271.sol";
 import {STATE_TYPEHASH, Channel, State, StateIntent} from "./interfaces/Types.sol";
 
 /**
@@ -14,10 +15,16 @@ library Utils {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
 
-    uint256 constant CLIENT = 0;
-    uint256 constant SERVER = 1;
+    error ERC6492DeploymentFailed(address factory, bytes calldata_);
 
-    bytes32 constant NO_EIP712_SUPPORT = keccak256("NoEIP712Support");
+    uint256 public constant CLIENT = 0;
+    uint256 public constant SERVER = 1;
+
+    bytes32 public constant NO_EIP712_SUPPORT = keccak256("NoEIP712Support");
+
+    bytes32 public constant ERC6492_DETECTION_SUFFIX =
+        0x6492649264926492649264926492649264926492649264926492649264926492;
+    bytes4 public constant ERC1271_SUCCESS = 0x1626ba7e;
 
     /**
      * @notice Compute the unique identifier for a channel
@@ -126,7 +133,7 @@ library Utils {
     }
 
     /**
-     * @notice Verifies that a message hash is signed by the specified participant
+     * @notice Verifies that a state is signed by the specified EOA participant in either raw ECDSA, EIP-191, or EIP-712 format
      * @param state The state to verify
      * @param channelId The ID of the channel
      * @param domainSeparator The EIP-712 domain separator for the channel
@@ -134,7 +141,7 @@ library Utils {
      * @param signer The address of the expected signer
      * @return True if the signature is valid, false otherwise
      */
-    function verifyStateSignature(
+    function verifyStateEOASignature(
         State memory state,
         bytes32 channelId,
         bytes32 domainSeparator,
@@ -163,6 +170,84 @@ library Utils {
         }
 
         return false;
+    }
+
+    /**
+     * @notice Checks if a signature is valid by calling the expected signer contract according to the ERC-1271 standard
+     * @param msgHash The hash of the message to verify the signature against
+     * @param sig The signature to verify
+     * @param expectedSigner The address of the expected signer
+     * @return True if the signature is valid, false otherwise or if signer is not a contract
+     */
+    function isValidERC1271Signature(bytes32 msgHash, bytes memory sig, address expectedSigner)
+        internal
+        view
+        returns (bool)
+    {
+        return IERC1271(expectedSigner).isValidSignature(msgHash, sig) == ERC1271_SUCCESS;
+    }
+
+    /**
+     * @notice Checks if a signature is valid by deploying the expected signer contract according to the ERC-6492 standard
+     * @param msgHash The hash of the message to verify the signature against
+     * @param sig The signature to verify
+     * @param expectedSigner The address of the expected signer
+     * @return True if the signature is valid, false otherwise or if signer is not a contract
+     */
+    function isValidERC6492Signature(bytes32 msgHash, bytes memory sig, address expectedSigner)
+        internal
+        returns (bool)
+    {
+        (address create2Factory, bytes memory factoryCalldata, bytes memory originalSig) =
+            abi.decode(sig, (address, bytes, bytes));
+
+        if (expectedSigner.code.length == 0) {
+            (bool success,) = create2Factory.call(factoryCalldata);
+            require(success, ERC6492DeploymentFailed(create2Factory, factoryCalldata));
+        }
+
+        return IERC1271(expectedSigner).isValidSignature(msgHash, originalSig) == ERC1271_SUCCESS;
+    }
+
+    /**
+     * @notice Returns the last 32 bytes of a byte array
+     * @param data The byte array to extract from
+     * @return result The last 32 bytes of the byte array
+     */
+    function trailingBytes32(bytes memory data) internal pure returns (bytes32 result) {
+        if (data.length < 32) {
+            return bytes32(0);
+        }
+        assembly {
+            result := mload(add(data, mload(data)))
+        }
+    }
+
+    /**
+     * @notice Verifies that a state is signed by the specified participant as an EOA or a Smart Contract
+     * @param state The state to verify
+     * @param channelId The ID of the channel
+     * @param domainSeparator The EIP-712 domain separator for the channel
+     * @param sig The signature to verify
+     * @param signer The address of the expected signer
+     * @return True if the signature is valid, false otherwise
+     */
+    function verifyStateSignature(
+        State memory state,
+        bytes32 channelId,
+        bytes32 domainSeparator,
+        bytes memory sig,
+        address signer
+    ) internal returns (bool) {
+        if (trailingBytes32(sig) == ERC6492_DETECTION_SUFFIX) {
+            return isValidERC6492Signature(Utils.getStateHashShort(channelId, state), sig, signer);
+        }
+
+        if (signer.code.length != 0) {
+            return isValidERC1271Signature(Utils.getStateHashShort(channelId, state), sig, signer);
+        }
+
+        return Utils.verifyStateEOASignature(state, channelId, domainSeparator, sig, signer);
     }
 
     /**
@@ -208,8 +293,9 @@ library Utils {
 
         bytes32 channelId = getChannelId(chan);
 
-        return Utils.verifyStateSignature(state, channelId, domainSeparator, state.sigs[0], chan.participants[CLIENT])
-            && Utils.verifyStateSignature(state, channelId, domainSeparator, state.sigs[1], chan.participants[SERVER]);
+        return Utils.verifyStateEOASignature(
+            state, channelId, domainSeparator, state.sigs[0], chan.participants[CLIENT]
+        ) && Utils.verifyStateEOASignature(state, channelId, domainSeparator, state.sigs[1], chan.participants[SERVER]);
     }
 
     /**
@@ -242,14 +328,5 @@ library Utils {
         }
 
         return true;
-    }
-
-    function addressArrayIncludes(address[] memory arr, address addr) internal pure returns (bool) {
-        for (uint256 i = 0; i < arr.length; i++) {
-            if (arr[i] == addr) {
-                return true;
-            }
-        }
-        return false;
     }
 }

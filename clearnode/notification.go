@@ -9,11 +9,11 @@ import (
 )
 
 type WSNotifier struct {
-	notify func(userID string, method string, params ...any)
+	notify func(userID string, method string, params RPCDataParams)
 	logger Logger
 }
 
-func NewWSNotifier(notifyFunc func(userID string, method string, params ...any), logger Logger) *WSNotifier {
+func NewWSNotifier(notifyFunc func(userID string, method string, params RPCDataParams), logger Logger) *WSNotifier {
 	return &WSNotifier{
 		notify: notifyFunc,
 		logger: logger,

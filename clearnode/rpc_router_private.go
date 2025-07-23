@@ -9,9 +9,7 @@ import (
 )
 
 type GetLedgerBalancesParams struct {
-	// TODO: add XOR validation
-	Participant string `json:"participant,omitempty"` // Optional participant address to filter balances
-	AccountID   string `json:"account_id,omitempty"`  // Optional account ID to filter balances
+	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter balances
 }
 
 type GetRPCHistoryParams struct {
@@ -183,8 +181,6 @@ func (r *RPCRouter) HandleGetLedgerBalances(c *RPCContext) {
 	userAccountID := NewAccountID(c.UserID)
 	if params.AccountID != "" {
 		userAccountID = NewAccountID(params.AccountID)
-	} else if params.Participant != "" {
-		userAccountID = NewAccountID(params.Participant)
 	}
 
 	ledger := GetWalletLedger(r.DB, userAddress)

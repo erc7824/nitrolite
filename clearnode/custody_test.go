@@ -85,7 +85,7 @@ func setupMockCustody(t *testing.T) (*Custody, *gorm.DB, func()) {
 		custody:            contract,
 		chainID:            uint32(chainID.Int64()),
 		adjudicatorAddress: newTestCommonAddress("0xAdjudicatorAddress"),
-		wsNotifier:         NewWSNotifier(func(userID string, method string, params ...any) {}, logger),
+		wsNotifier:         NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, logger),
 		logger:             logger,
 	}
 
@@ -325,7 +325,7 @@ func TestHandleCreatedEvent(t *testing.T) {
 			}
 
 			var capturedNotifications []Notification
-			custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+			custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 				capturedNotifications = append(capturedNotifications, Notification{
 					userID:    userID,
 					eventType: EventType(method),
@@ -415,7 +415,7 @@ func TestHandleJoinedEvent(t *testing.T) {
 		_, mockEvent := createMockJoinedEvent(t)
 
 		var capturedNotifications []Notification
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 			capturedNotifications = append(capturedNotifications, Notification{
 				userID:    userID,
 				eventType: EventType(method),
@@ -496,7 +496,7 @@ func TestHandleJoinedEvent(t *testing.T) {
 		_, mockEvent := createMockJoinedEvent(t)
 
 		var capturedNotifications []Notification
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 			capturedNotifications = append(capturedNotifications, Notification{
 				userID:    userID,
 				eventType: EventType(method),
@@ -562,7 +562,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, finalAmount)
 
 		var capturedNotifications []Notification
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 			capturedNotifications = append(capturedNotifications, Notification{
 				userID:    userID,
 				eventType: EventType(method),
@@ -749,7 +749,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, channelAmount.BigInt())
 
 		var capturedNotifications []Notification
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 			capturedNotifications = append(capturedNotifications, Notification{
 				userID:    userID,
 				eventType: EventType(method),
@@ -819,7 +819,7 @@ func TestHandleChallengedEvent(t *testing.T) {
 		_, mockEvent := createMockChallengedEvent(t, custody.signer, tokenAddress, amount.BigInt())
 
 		var capturedNotifications []Notification
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 			capturedNotifications = append(capturedNotifications, Notification{
 				userID:    userID,
 				eventType: EventType(method),
@@ -893,7 +893,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		_, mockEvent := createMockResizedEvent(t, deltaAmount.BigInt())
 
 		var capturedNotifications []Notification
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 			capturedNotifications = append(capturedNotifications, Notification{
 				userID:    userID,
 				eventType: EventType(method),
@@ -1052,7 +1052,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		_, mockEvent := createMockResizedEvent(t, big.NewInt(500000))
 
 		var capturedNotifications []Notification
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 			capturedNotifications = append(capturedNotifications, Notification{
 				userID:    userID,
 				eventType: EventType(method),

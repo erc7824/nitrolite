@@ -12,7 +12,7 @@ import {
     isValidResponseTimestamp,
     isValidResponseRequestId,
 } from '../../../src/rpc/utils';
-import { rpcResponseParser } from '../../../src/rpc/parse/parse';
+import { parseAuthChallengeResponse, parseCreateAppSessionResponse, parseGetConfigResponse, parseGetLedgerBalancesResponse, parsePingResponse } from '../../../src/rpc/parse/parse';
 import { NitroliteRPCMessage, RPCMethod, RPCChannelStatus } from '../../../src/rpc/types';
 
 describe('RPC Utils', () => {
@@ -201,14 +201,14 @@ describe('RPC Utils', () => {
     });
 });
 
-describe('rpcResponseParser', () => {
+describe('rpc response parsers', () => {
     test('should parse auth_challenge response correctly', () => {
         const rawResponse = JSON.stringify({
-            res: [123, RPCMethod.AuthChallenge, [{ challenge_message: 'test-challenge' }], 456],
+            res: [123, RPCMethod.AuthChallenge, { challenge_message: 'test-challenge' }, 456],
             sig: ['0x123'],
         });
 
-        const result = rpcResponseParser.authChallenge(rawResponse);
+        const result = parseAuthChallengeResponse(rawResponse);
         expect(result.method).toBe(RPCMethod.AuthChallenge);
         expect(result.requestId).toBe(123);
         expect(result.timestamp).toBe(456);
@@ -217,24 +217,26 @@ describe('rpcResponseParser', () => {
     });
 
     test('should parse get_ledger_balances response correctly', () => {
-        const balances = [
-            [
+        const balances = {
+            ledger_balances: [
                 { asset: 'eth', amount: 1.5 },
                 { asset: 'usdc', amount: 1000 },
             ],
-        ];
+        };
 
         const rawResponse = JSON.stringify({
             res: [123, RPCMethod.GetLedgerBalances, balances, 456],
             sig: ['0x123'],
         });
 
-        const result = rpcResponseParser.getLedgerBalances(rawResponse);
+        const result = parseGetLedgerBalancesResponse(rawResponse);
         expect(result.method).toBe(RPCMethod.GetLedgerBalances);
-        expect(result.params).toEqual([
-            { asset: 'eth', amount: '1.5' },
-            { asset: 'usdc', amount: '1000' },
-        ]);
+        expect(result.params).toEqual({
+            ledgerBalances: [
+                { asset: 'eth', amount: '1.5' },
+                { asset: 'usdc', amount: '1000' },
+            ],
+        });
     });
 
     test('should parse get_config response correctly', () => {
@@ -251,11 +253,11 @@ describe('rpcResponseParser', () => {
         };
 
         const rawResponse = JSON.stringify({
-            res: [123, RPCMethod.GetConfig, [config], 456],
+            res: [123, RPCMethod.GetConfig, config, 456],
             sig: ['0x123'],
         });
 
-        const result = rpcResponseParser.getConfig(rawResponse);
+        const result = parseGetConfigResponse(rawResponse);
         expect(result.method).toBe(RPCMethod.GetConfig);
         expect(result.params).toEqual({
             brokerAddress: '0x1234567890123456789012345678901234567890',
@@ -272,11 +274,11 @@ describe('rpcResponseParser', () => {
 
     test('should parse ping response correctly', () => {
         const rawResponse = JSON.stringify({
-            res: [123, RPCMethod.Ping, [], 456],
+            res: [123, RPCMethod.Ping, {}, 456],
             sig: ['0x123'],
         });
 
-        const result = rpcResponseParser.ping(rawResponse);
+        const result = parsePingResponse(rawResponse);
         expect(result.method).toBe(RPCMethod.Ping);
         expect(result.requestId).toBe(123);
         expect(result.params).toEqual({});
@@ -290,11 +292,11 @@ describe('rpcResponseParser', () => {
         };
 
         const rawResponse = JSON.stringify({
-            res: [123, RPCMethod.CreateAppSession, [params], 456],
+            res: [123, RPCMethod.CreateAppSession, params, 456],
             sig: ['0x123'],
         });
 
-        const result = rpcResponseParser.createAppSession(rawResponse);
+        const result = parseCreateAppSessionResponse(rawResponse);
 
         expect(result.method).toBe(RPCMethod.CreateAppSession);
         expect(result.params).toEqual({
@@ -309,22 +311,22 @@ describe('rpcResponseParser', () => {
             res: [123, RPCMethod.Ping, 456], // Missing one element
         });
 
-        expect(() => rpcResponseParser.ping(invalidResponse)).toThrow('Invalid RPC response format');
+        expect(() => parsePingResponse(invalidResponse)).toThrow('Invalid RPC response format');
     });
 
     test('should throw error for invalid JSON', () => {
         const invalidJSON = 'this is not json';
-        expect(() => rpcResponseParser.ping(invalidJSON)).toThrow(/Failed to parse RPC response/);
+        expect(() => parsePingResponse(invalidJSON)).toThrow(/Failed to parse RPC response/);
     });
 
     test('should throw error when parsing with the wrong method', () => {
         const rawResponse = JSON.stringify({
-            res: [123, RPCMethod.AuthChallenge, [{ challenge_message: 'test-challenge' }], 456],
+            res: [123, RPCMethod.AuthChallenge, { challenge_message: 'test-challenge' }, 456],
             sig: ['0x123'],
         });
 
         // Try to parse an auth_challenge response with the ping parser
-        expect(() => rpcResponseParser.ping(rawResponse)).toThrow(
+        expect(() => parsePingResponse(rawResponse)).toThrow(
             "Expected RPC method to be 'ping', but received 'auth_challenge'",
         );
     });

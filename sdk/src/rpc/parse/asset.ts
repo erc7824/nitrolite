@@ -1,29 +1,39 @@
 import { z } from 'zod';
-import { Address } from 'viem';
-import { RPCMethod, GetAssetsResponseParams } from '../types';
+import { RPCMethod, GetAssetsResponseParams, RPCAsset, AssetsResponseParams } from '../types';
 import { addressSchema, ParamsParser } from './common';
 
+const AssetObjectSchema = z
+    .object({ token: addressSchema, chain_id: z.number(), symbol: z.string(), decimals: z.number() })
+    .transform(
+        (raw): RPCAsset => ({
+            token: raw.token,
+            chainId: raw.chain_id,
+            symbol: raw.symbol,
+            decimals: raw.decimals,
+        }),
+    );
+
 const GetAssetsParamsSchema = z
-    .array(
-        z.array(
-            z
-                .object({ token: addressSchema, chain_id: z.number(), symbol: z.string(), decimals: z.number() })
-                .transform(
-                    (a) =>
-                        ({
-                            token: a.token as Address,
-                            chainId: a.chain_id,
-                            symbol: a.symbol,
-                            decimals: a.decimals,
-                        }) as GetAssetsResponseParams,
-                ),
-        ),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0])
-    .transform((arr) => arr as GetAssetsResponseParams[]);
+    .object({
+        assets: z.array(AssetObjectSchema),
+    })
+    .transform(
+        (raw): GetAssetsResponseParams => ({
+            assets: raw.assets,
+        }),
+    );
+
+const AssetsParamsSchema = z
+    .object({
+        assets: z.array(AssetObjectSchema),
+    })
+    .transform(
+        (raw): AssetsResponseParams => ({
+            assets: raw.assets,
+        }),
+    );
 
 export const assetParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.GetAssets]: (params) => GetAssetsParamsSchema.parse(params),
-    [RPCMethod.Assets]: (params) => GetAssetsParamsSchema.parse(params), // Alias
+    [RPCMethod.Assets]: (params) => AssetsParamsSchema.parse(params),
 };

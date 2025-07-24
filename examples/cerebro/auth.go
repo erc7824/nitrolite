@@ -38,7 +38,8 @@ func (o *Operator) handleAuthenticate(args []string) {
 		return
 	}
 
-	if err := o.clearnode.Authenticate(wallet, signer); err != nil {
+	userTag, err := o.clearnode.Authenticate(wallet, signer)
+	if err != nil {
 		fmt.Printf("\nAuthentication failed: %s\n", err.Error())
 		return
 	}
@@ -46,4 +47,5 @@ func (o *Operator) handleAuthenticate(args []string) {
 	o.config.Wallet = wallet
 	o.config.Signer = signer
 	fmt.Println("Authentication successful!")
+	fmt.Printf("Welcome, \"%s\"!\n", userTag)
 }

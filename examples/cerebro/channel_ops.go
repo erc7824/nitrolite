@@ -4,20 +4,22 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/shopspring/decimal"
 
 	"github.com/erc7824/nitrolite/examples/cerebro/clearnet"
 	"github.com/erc7824/nitrolite/examples/cerebro/custody"
 )
 
-func (o *Operator) handleEnableChain(args []string) {
-	if len(args) < 3 {
-		fmt.Println("Usage: enable <chain_name> <token_symbol>")
+func (o *Operator) handleOpenChannel(args []string) {
+	if len(args) < 4 {
+		fmt.Println("Usage: open channel <chain_name> <token_symbol>")
 		return
 	}
 
@@ -26,21 +28,21 @@ func (o *Operator) handleEnableChain(args []string) {
 		return
 	}
 
-	chainName := args[1]
+	chainName := args[2]
 	network := o.config.GetNetworkByName(chainName)
 	if network == nil {
 		fmt.Printf("Chain %s is not supported by the broker.\n", chainName)
 		return
 	}
 
-	assetSymbol := args[2]
+	assetSymbol := args[3]
 	asset := network.GetAssetBySymbol(assetSymbol)
 	if asset == nil {
-		fmt.Printf("Asset %s is not supported on chain %s.\n", assetSymbol, chainName)
+		fmt.Printf("Asset %s is not supported on %s.\n", assetSymbol, chainName)
 		return
 	}
 	if asset.IsEnabled() {
-		fmt.Printf("Asset %s on chain %s is already enabled.\n", assetSymbol, chainName)
+		fmt.Printf("Channel is already opened for asset %s on %s: %s.\n", assetSymbol, chainName, asset.ChannelID)
 		return
 	}
 
@@ -78,9 +80,9 @@ func (o *Operator) handleEnableChain(args []string) {
 		return
 	}
 
-	fmt.Printf("Opening custody channel for %s...\n", chainName)
+	fmt.Printf("Opening custody channel on %s...\n", chainName)
 
-	if err := o.custody.OpenChannel(
+	channelID, err := o.custody.OpenChannel(
 		o.config.Wallet, o.config.Signer,
 		network.ChainID, chainRPCDTOs[chainRPCIndex].URL,
 		network.CustodyAddress,
@@ -88,8 +90,9 @@ func (o *Operator) handleEnableChain(args []string) {
 		o.config.BrokerAddress,
 		asset.Token,
 		0,
-	); err != nil {
-		fmt.Printf("Failed to open custody channel for chain %s: %s\n", chainName, err.Error())
+	)
+	if err != nil {
+		fmt.Printf("Failed to open custody channel on %s: %s\n", chainName, err.Error())
 		return
 	}
 
@@ -98,12 +101,12 @@ func (o *Operator) handleEnableChain(args []string) {
 		return
 	}
 
-	fmt.Printf("Successfully opened custody channel for %s!\n", chainName)
+	fmt.Printf("Successfully opened custody channel (%s) on %s!\n", channelID, chainName)
 }
 
-func (o *Operator) handleDisableChain(args []string) {
-	if len(args) < 3 {
-		fmt.Println("Usage: disable <chain_name> <token_symbol>")
+func (o *Operator) handleCloseChannel(args []string) {
+	if len(args) < 4 {
+		fmt.Println("Usage: close channel <chain_name> <token_symbol>")
 		return
 	}
 
@@ -112,21 +115,21 @@ func (o *Operator) handleDisableChain(args []string) {
 		return
 	}
 
-	chainName := args[1]
+	chainName := args[2]
 	network := o.config.GetNetworkByName(chainName)
 	if network == nil {
 		fmt.Printf("Chain %s is not supported by the broker.\n", chainName)
 		return
 	}
 
-	assetSymbol := args[2]
+	assetSymbol := args[3]
 	asset := network.GetAssetBySymbol(assetSymbol)
 	if asset == nil {
-		fmt.Printf("Asset %s is not supported on chain %s.\n", assetSymbol, chainName)
+		fmt.Printf("Asset %s is not supported on %s.\n", assetSymbol, chainName)
 		return
 	}
 	if !asset.IsEnabled() {
-		fmt.Printf("Asset %s on chain %s is not enabled.\n", assetSymbol, chainName)
+		fmt.Printf("There are no opened channels for %s on %s.\n", assetSymbol, chainName)
 		return
 	}
 
@@ -142,7 +145,7 @@ func (o *Operator) handleDisableChain(args []string) {
 		return
 	}
 
-	fmt.Printf("Closing custody channel on %s...\n", chainName)
+	fmt.Printf("Closing custody channel (%s) on %s...\n", asset.ChannelID, chainName)
 
 	allocations := make([]custody.Allocation, len(closureRes.FinalAllocations))
 	for i, alloc := range closureRes.FinalAllocations {
@@ -164,7 +167,7 @@ func (o *Operator) handleDisableChain(args []string) {
 		allocations,
 		brokerSig,
 	); err != nil {
-		fmt.Printf("Failed to close custody channel for chain %s: %s\n", chainName, err.Error())
+		fmt.Printf("Failed to close custody channel on %s: %s\n", chainName, err.Error())
 		return
 	}
 
@@ -174,12 +177,12 @@ func (o *Operator) handleDisableChain(args []string) {
 	}
 
 	unlockedAmount := decimal.NewFromBigInt(allocations[0].Amount, -int32(asset.Decimals))
-	fmt.Printf("Successfully closed custody channel for %s with unlocked %s %s!\n", chainName, unlockedAmount, strings.ToUpper(asset.Symbol))
+	fmt.Printf("Successfully closed custody channel (%s) on %s with unlocked %s %s!\n", asset.ChannelID, chainName, fmtDec(unlockedAmount), strings.ToUpper(asset.Symbol))
 }
 
-func (o *Operator) handleResizeChain(args []string) {
-	if len(args) < 3 {
-		fmt.Println("Usage: resize <chain_name> <token_symbol>")
+func (o *Operator) handleResizeChannel(args []string) {
+	if len(args) < 4 {
+		fmt.Println("Usage: resize channel <chain_name> <token_symbol>")
 		return
 	}
 
@@ -188,21 +191,21 @@ func (o *Operator) handleResizeChain(args []string) {
 		return
 	}
 
-	chainName := args[1]
+	chainName := args[2]
 	network := o.config.GetNetworkByName(chainName)
 	if network == nil {
 		fmt.Printf("Chain %s is not supported by the broker.\n", chainName)
 		return
 	}
 
-	assetSymbol := args[2]
+	assetSymbol := args[3]
 	asset := network.GetAssetBySymbol(assetSymbol)
 	if asset == nil {
-		fmt.Printf("Asset %s is not supported on chain %s.\n", assetSymbol, chainName)
+		fmt.Printf("Asset %s is not supported on %s.\n", assetSymbol, chainName)
 		return
 	}
 	if !asset.IsEnabled() {
-		fmt.Printf("Asset %s on chain %s is not enabled.\n", assetSymbol, chainName)
+		fmt.Printf("There are no opened channels for %s on %s.\n", assetSymbol, chainName)
 		return
 	}
 
@@ -212,86 +215,87 @@ func (o *Operator) handleResizeChain(args []string) {
 		return
 	}
 
-	balance, err := o.custody.GetLedgerBalance(
+	rawCustodyBalance, err := o.custody.GetLedgerBalance(
 		network.ChainID, chainRPC,
 		network.CustodyAddress, o.config.Wallet.Address(), asset.Token)
 	if err != nil {
-		fmt.Printf("Failed to get balance for asset %s on chain %s: %s\n", assetSymbol, chainName, err.Error())
+		fmt.Printf("Failed to get balance for asset %s on %s: %s\n", assetSymbol, chainName, err.Error())
 		return
 	}
+	custodyBalance := decimal.NewFromBigInt(rawCustodyBalance, -int32(asset.Decimals))
 
-	decLedgerBalance := decimal.NewFromBigInt(balance, -int32(asset.Decimals))
-	fmt.Printf("Your current balance for asset %s on chain %s is: %s\n",
-		assetSymbol, chainName, decLedgerBalance.String())
+	channelBalance := decimal.NewFromBigInt(asset.RawChannelBalance, -int32(asset.Decimals))
 
-	fmt.Printf("How much %s do you want to resize into channel?\n", assetSymbol)
-	resizeAmountStr := o.readExtraArg("resize_amount")
-
-	decResizeAmount, err := decimal.NewFromString(resizeAmountStr)
-	if err != nil {
-		fmt.Printf("Invalid amount format: %s\n", err.Error())
-		return
-	}
-
-	if decResizeAmount.GreaterThan(decLedgerBalance) {
-		fmt.Printf("You cannot resize more than your current balance of %s %s.\n",
-			decLedgerBalance.String(), assetSymbol)
-		return
-	}
-	resizeAmount := decResizeAmount.Shift(int32(asset.Decimals)).BigInt()
-
-	balances, err := o.clearnode.GetLedgerBalances()
+	unifiedBalances, err := o.clearnode.GetLedgerBalances()
 	if err != nil {
 		fmt.Printf("Failed to get ledger balances: %s\n", err.Error())
 		return
 	}
 
-	decUnifiedBalance := decimal.New(0, 0)
-	for _, balance := range balances {
+	unifiedBalance := decimal.New(0, 0)
+	for _, balance := range unifiedBalances {
 		if balance.Asset == asset.Symbol {
-			decUnifiedBalance = balance.Amount
+			unifiedBalance = balance.Amount
 			break
 		}
 	}
-	fmt.Printf("Your current unified balance for asset %s is: %s\n",
-		assetSymbol, decUnifiedBalance.String())
 
-	fmt.Printf("How much %s do you want to allocate to channel?\n", assetSymbol)
-	allocateAmountStr := o.readExtraArg("allocate_amount")
+	fmt.Printf("Your current balances for asset %s:\n", assetSymbol)
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Type", "Value"})
+	t.AppendSeparator()
+	t.AppendRow(table.Row{"On Custody Ledger", fmtDec(custodyBalance)})
+	t.AppendRow(table.Row{"On Channel", fmtDec(channelBalance)})
+	t.AppendRow(table.Row{"Unified On Clearnode", fmtDec(unifiedBalance)})
+	t.Render()
 
-	decAllocateAmount, err := decimal.NewFromString(allocateAmountStr)
+	fmt.Printf("How much %s do you want to resize (+)into/(-)out channel?\n", assetSymbol)
+	fmt.Println("That's the amount moved between custody ledger and channel.")
+	resizeAmountStr := o.readExtraArg("resize_amount")
+
+	resizeAmount, err := decimal.NewFromString(resizeAmountStr)
 	if err != nil {
 		fmt.Printf("Invalid amount format: %s\n", err.Error())
 		return
 	}
 
-	if decAllocateAmount.GreaterThan(decUnifiedBalance) {
+	if resizeAmount.GreaterThan(custodyBalance) {
+		fmt.Printf("You cannot resize more than your current balance of %s %s.\n",
+			fmtDec(custodyBalance), assetSymbol)
+		return
+	}
+	rawResizeAmount := resizeAmount.Shift(int32(asset.Decimals))
+
+	fmt.Printf("How much %s do you want to allocate (+)into/(-)out channel?\n", assetSymbol)
+	fmt.Println("That's the amount moved between unified balance and channel.")
+	allocateAmountStr := o.readExtraArg("allocate_amount")
+
+	allocateAmount, err := decimal.NewFromString(allocateAmountStr)
+	if err != nil {
+		fmt.Printf("Invalid amount format: %s\n", err.Error())
+		return
+	}
+
+	if allocateAmount.GreaterThan(unifiedBalance) {
 		fmt.Printf("You cannot allocate more than your current unified balance of %s %s.\n",
-			decUnifiedBalance.String(), assetSymbol)
+			fmtDec(unifiedBalance), assetSymbol)
 		return
 	}
-	allocateAmount := decAllocateAmount.Shift(int32(asset.Decimals)).BigInt()
+	rawAllocateAmount := allocateAmount.Shift(int32(asset.Decimals))
 
-	channelBalance, err := o.custody.GetChannelBalance(
-		network.ChainID, chainRPC,
-		network.CustodyAddress, common.HexToHash(asset.ChannelID), asset.Token)
+	if newChannelBalance := channelBalance.Add(allocateAmount).Add(resizeAmount); newChannelBalance.LessThan(decimal.Zero) {
+		fmt.Printf("New channel amount must not be negative after resize: %s\n", fmtDec(newChannelBalance))
+		return
+	}
+
+	resizeRes, err := o.clearnode.RequestChannelResize(o.config.Wallet.Address(), asset.ChannelID, rawAllocateAmount, rawResizeAmount)
 	if err != nil {
-		fmt.Printf("Failed to get channel balance for asset %s on chain %s: %s\n", assetSymbol, chainName, err.Error())
+		fmt.Printf("Failed to request channel resize on %s: %s\n", chainName, err.Error())
 		return
 	}
 
-	if new(big.Int).Add(new(big.Int).Add(channelBalance, allocateAmount), resizeAmount).Cmp(big.NewInt(0)) < 0 {
-		fmt.Printf("New channel amount must not be negative after resize: %s\n", new(big.Int).Add(channelBalance, resizeAmount).String())
-		return
-	}
-
-	resizeRes, err := o.clearnode.RequestChannelResize(o.config.Wallet.Address(), asset.ChannelID, allocateAmount, resizeAmount)
-	if err != nil {
-		fmt.Printf("Failed to request channel closure for chain %s: %s\n", chainName, err.Error())
-		return
-	}
-
-	fmt.Printf("Resizing custody channel on %s...\n", chainName)
+	fmt.Printf("Resizing custody channel (%s) on %s...\n", asset.ChannelID, chainName)
 
 	stateData, err := hexutil.Decode(resizeRes.StateData)
 	if err != nil {
@@ -320,7 +324,7 @@ func (o *Operator) handleResizeChain(args []string) {
 		allocations,
 		brokerSig,
 	); err != nil {
-		fmt.Printf("Failed to close custody channel for chain %s: %s\n", chainName, err.Error())
+		fmt.Printf("Failed to resize custody channel on %s: %s\n", chainName, err.Error())
 		return
 	}
 
@@ -329,14 +333,14 @@ func (o *Operator) handleResizeChain(args []string) {
 		return
 	}
 
-	fmt.Printf("Successfully resized custody channel on %s!\n", chainName)
+	fmt.Printf("Successfully resized custody channel (%s) on %s!\n", asset.ChannelID, chainName)
 }
 
 func convertAllocationRes(a clearnet.AllocationRes) custody.Allocation {
 	return custody.Allocation{
 		Destination: common.HexToAddress(a.Destination),
 		Token:       common.HexToAddress(a.Token),
-		Amount:      a.Amount,
+		Amount:      a.Amount.BigInt(),
 	}
 }
 

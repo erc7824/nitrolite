@@ -11,23 +11,23 @@ import (
 	"github.com/erc7824/nitrolite/examples/cerebro/custody"
 )
 
-func (o *Operator) handleDepositChain(args []string) {
-	if len(args) < 3 {
-		fmt.Println("Usage: deposit <chain_name> <token_symbol>")
+func (o *Operator) handleDepositCustody(args []string) {
+	if len(args) < 4 {
+		fmt.Println("Usage: deposit custody <chain_name> <token_symbol>")
 		return
 	}
 
-	chainName := args[1]
+	chainName := args[2]
 	network := o.config.GetNetworkByName(chainName)
 	if network == nil {
 		fmt.Printf("Chain %s is not supported by the broker.\n", chainName)
 		return
 	}
 
-	assetSymbol := args[2]
+	assetSymbol := args[3]
 	asset := network.GetAssetBySymbol(assetSymbol)
 	if asset == nil {
-		fmt.Printf("Asset %s is not supported on chain %s.\n", assetSymbol, chainName)
+		fmt.Printf("Asset %s is not supported on %s.\n", assetSymbol, chainName)
 		return
 	}
 
@@ -37,47 +37,39 @@ func (o *Operator) handleDepositChain(args []string) {
 		return
 	}
 
-	balance, err := o.custody.GetLedgerBalance(
-		network.ChainID, chainRPC,
-		network.CustodyAddress, o.config.Wallet.Address(), asset.Token)
-	if err != nil {
-		fmt.Printf("Failed to get balance for asset %s on chain %s: %s\n", assetSymbol, chainName, err.Error())
-		return
-	}
-
-	decBalance := decimal.NewFromBigInt(balance, -int32(asset.Decimals))
-	fmt.Printf("Your current ledger balance for asset %s on chain %s is: %s\n",
-		assetSymbol, chainName, decBalance.String())
-
-	fmt.Printf("How much %s do you want to deposit?\n", assetSymbol)
-	amountStr := o.readExtraArg("deposit_amount")
-
-	decAmount, err := decimal.NewFromString(amountStr)
-	if err != nil {
-		fmt.Printf("Invalid amount format: %s\n", err.Error())
-		return
-	}
-
-	if decAmount.LessThanOrEqual(decimal.Zero) {
-		fmt.Println("Amount must be greater than zero.")
-		return
-	}
-	amount := decAmount.Shift(int32(asset.Decimals)).BigInt()
-
-	tokenBalance, err := custody.GetTokenBalance(network.ChainID, chainRPC, asset.Token, o.config.Wallet.Address())
+	rawTokenBalance, err := custody.GetTokenBalance(network.ChainID, chainRPC, asset.Token, o.config.Wallet.Address())
 	if err != nil {
 		fmt.Printf("Failed to get token balance for asset %s on chain %s: %s\n", assetSymbol, chainName, err.Error())
 		return
 	}
 
+	tokenBalance := decimal.NewFromBigInt(rawTokenBalance, -int32(asset.Decimals))
+	fmt.Printf("Your current balance for asset %s on chain %s is: %s\n",
+		assetSymbol, chainName, fmtDec(tokenBalance))
+
+	fmt.Printf("How much %s do you want to deposit?\n", assetSymbol)
+	amountStr := o.readExtraArg("deposit_amount")
+
+	amount, err := decimal.NewFromString(amountStr)
+	if err != nil {
+		fmt.Printf("Invalid amount format: %s\n", err.Error())
+		return
+	}
+
+	if amount.LessThanOrEqual(decimal.Zero) {
+		fmt.Printf("Amount must be greater than zero: %s\n", fmtDec(amount))
+		return
+	}
+	rawAmount := amount.Shift(int32(asset.Decimals)).BigInt()
+
 	if tokenBalance.Cmp(amount) < 0 {
-		fmt.Printf("Not have enough %s to deposit. Available: %s, Required: %s\n",
-			assetSymbol, decimal.NewFromBigInt(tokenBalance, -int32(asset.Decimals)), decAmount.String())
+		fmt.Printf("You do not have enough %s to deposit. Available: %s, Required: %s\n",
+			assetSymbol, fmtDec(tokenBalance), amount)
 		return
 	}
 
 	if err := custody.ApproveAllowance(o.config.Wallet, network.ChainID, chainRPC,
-		asset.Token, network.CustodyAddress, amount); err != nil {
+		asset.Token, network.CustodyAddress, rawAmount); err != nil {
 		fmt.Printf("Failed to approve allowance for %s on chain %s: %s\n", assetSymbol, chainName, err.Error())
 		return
 	}
@@ -86,33 +78,33 @@ func (o *Operator) handleDepositChain(args []string) {
 		o.config.Wallet,
 		network.ChainID, chainRPC,
 		network.CustodyAddress, asset.Token,
-		amount,
+		rawAmount,
 	); err != nil {
 		fmt.Printf("Failed to deposit %s on chain %s: %s\n", assetSymbol, chainName, err.Error())
 		return
 	}
 
-	fmt.Printf("Successfully deposited %s %s on chain %s.\n",
-		decAmount.String(), assetSymbol, chainName)
+	fmt.Printf("Successfully deposited %s %s to custody on chain %s.\n",
+		fmtDec(amount), assetSymbol, chainName)
 }
 
-func (o *Operator) handleWithdrawChain(args []string) {
-	if len(args) < 3 {
-		fmt.Println("Usage: withdraw <chain_name> <token_symbol>")
+func (o *Operator) handleWithdrawCustody(args []string) {
+	if len(args) < 4 {
+		fmt.Println("Usage: withdraw custody <chain_name> <token_symbol>")
 		return
 	}
 
-	chainName := args[1]
+	chainName := args[2]
 	network := o.config.GetNetworkByName(chainName)
 	if network == nil {
 		fmt.Printf("Chain %s is not supported by the broker.\n", chainName)
 		return
 	}
 
-	assetSymbol := args[2]
+	assetSymbol := args[3]
 	asset := network.GetAssetBySymbol(assetSymbol)
 	if asset == nil {
-		fmt.Printf("Asset %s is not supported on chain %s.\n", assetSymbol, chainName)
+		fmt.Printf("Asset %s is not supported on %s.\n", assetSymbol, chainName)
 		return
 	}
 
@@ -122,54 +114,54 @@ func (o *Operator) handleWithdrawChain(args []string) {
 		return
 	}
 
-	balance, err := o.custody.GetLedgerBalance(
+	rawCustodyBalance, err := o.custody.GetLedgerBalance(
 		network.ChainID, chainRPC,
 		network.CustodyAddress, o.config.Wallet.Address(), asset.Token)
 	if err != nil {
-		fmt.Printf("Failed to get balance for asset %s on chain %s: %s\n", assetSymbol, chainName, err.Error())
+		fmt.Printf("Failed to get custody balance for asset %s on %s: %s\n", assetSymbol, chainName, err.Error())
 		return
 	}
-	if balance == nil || balance.Cmp(new(big.Int)) <= 0 {
-		fmt.Printf("You have no balance for asset %s on chain %s.\n", assetSymbol, chainName)
+	if rawCustodyBalance == nil || rawCustodyBalance.Cmp(new(big.Int)) <= 0 {
+		fmt.Printf("Insufficient custody balance for asset %s on %s.\n", assetSymbol, chainName)
 		return
 	}
 
-	decBalance := decimal.NewFromBigInt(balance, -int32(asset.Decimals))
-	fmt.Printf("Your current ledger balance for asset %s on chain %s is: %s\n",
-		assetSymbol, chainName, decBalance.String())
+	custodyBalance := decimal.NewFromBigInt(rawCustodyBalance, -int32(asset.Decimals))
+	fmt.Printf("Your current custody balance for asset %s on %s is: %s\n",
+		assetSymbol, chainName, fmtDec(custodyBalance))
 
 	fmt.Printf("How much %s do you want to withdraw?\n", assetSymbol)
 	amountStr := o.readExtraArg("withdraw_amount")
 
-	decAmount, err := decimal.NewFromString(amountStr)
+	amount, err := decimal.NewFromString(amountStr)
 	if err != nil {
 		fmt.Printf("Invalid amount format: %s\n", err.Error())
 		return
 	}
 
-	if decAmount.LessThanOrEqual(decimal.Zero) {
-		fmt.Println("Amount must be greater than zero.")
+	if amount.LessThanOrEqual(decimal.Zero) {
+		fmt.Printf("Amount must be greater than zero: %s\n", fmtDec(amount))
 		return
 	}
-	if decAmount.GreaterThan(decBalance) {
-		fmt.Printf("You cannot withdraw more than your current balance of %s %s.\n",
-			decBalance.String(), assetSymbol)
+	if amount.GreaterThan(custodyBalance) {
+		fmt.Printf("You cannot withdraw more than your current custody balance of %s %s.\n",
+			fmtDec(custodyBalance), assetSymbol)
 		return
 	}
 
-	amount := decAmount.Shift(int32(asset.Decimals)).BigInt()
+	rawAmount := amount.Shift(int32(asset.Decimals)).BigInt()
 	if err := o.custody.Withdraw(
 		o.config.Wallet,
 		network.ChainID, chainRPC,
 		network.CustodyAddress, asset.Token,
-		amount,
+		rawAmount,
 	); err != nil {
-		fmt.Printf("Failed to withdraw %s on chain %s: %s\n", assetSymbol, chainName, err.Error())
+		fmt.Printf("Failed to withdraw %s on %s: %s\n", assetSymbol, chainName, err.Error())
 		return
 	}
 
-	fmt.Printf("Successfully withdrawn %s %s on chain %s.\n",
-		decAmount.String(), assetSymbol, chainName)
+	fmt.Printf("Successfully withdrawn %s %s on %s.\n",
+		fmtDec(amount), assetSymbol, chainName)
 }
 
 func (o *Operator) getChainRPC(chainID uint32) (string, error) {

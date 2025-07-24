@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/shopspring/decimal"
 )
 
 func (o *Operator) handleListChains() {
@@ -16,7 +17,7 @@ func (o *Operator) handleListChains() {
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Name", "ID", "Asset", "Enabled", "RPCs", "Last Used"})
+	t.AppendHeader(table.Row{"Name", "ID", "Asset", "RPCs", "Last Used"})
 	t.AppendSeparator()
 
 	for _, network := range o.config.Networks {
@@ -33,9 +34,47 @@ func (o *Operator) handleListChains() {
 		}
 
 		for _, asset := range network.Assets {
-			t.AppendRow(table.Row{network.ChainName, network.ChainID, asset.Symbol, asset.IsEnabled(), numRPCs, lastUsed.Format(time.RFC3339)})
+			t.AppendRow(table.Row{network.ChainName, network.ChainID, asset.Symbol, numRPCs, lastUsed.Format(time.RFC3339)})
 		}
 	}
+	t.SetColumnConfigs(
+		[]table.ColumnConfig{
+			{Number: 1, AutoMerge: true},
+			{Number: 2, AutoMerge: true},
+		},
+	)
+	t.Render()
+}
+
+func (o *Operator) handleListChannels() {
+	if !o.isUserAuthenticated() {
+		fmt.Println("Not authenticated. Please authenticate first.")
+		return
+	}
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Chain", "Asset", "ID", "Balance"})
+	t.AppendSeparator()
+
+	for _, network := range o.config.Networks {
+		for _, asset := range network.Assets {
+			channelID := "N/A"
+			channelBalance := decimal.NewFromInt(0)
+			if asset.ChannelID != "" {
+				channelID = asset.ChannelID
+				channelBalance = decimal.NewFromBigInt(asset.RawChannelBalance, -int32(asset.Decimals))
+			}
+
+			t.AppendRow(table.Row{network.ChainName, asset.Symbol, channelID, fmtDec(channelBalance)})
+		}
+	}
+	t.SetColumnConfigs(
+		[]table.ColumnConfig{
+			{Number: 1, AutoMerge: true},
+			{Number: 2, AutoMerge: true},
+		},
+	)
 	t.Render()
 }
 

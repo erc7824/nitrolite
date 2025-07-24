@@ -30,9 +30,10 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
 		require.NoError(t, GetWalletLedger(db, userAddressB).Record(userAccountIDB, "usdc", decimal.NewFromInt(200)))
 
-		var capturedNotifications []Notification
+		capturedNotifications := make(map[string][]Notification)
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
-			capturedNotifications = append(capturedNotifications, Notification{
+
+			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
 				data:      params,
@@ -68,8 +69,12 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		sessionAccountID := NewAccountID(appSession.SessionID)
 
 		assert.Len(t, capturedNotifications, 2)
-		assert.Equal(t, capturedNotifications[0].userID, userAddressA.Hex())
-		assert.Equal(t, capturedNotifications[1].userID, userAddressB.Hex())
+		assert.Contains(t, capturedNotifications, userAddressA.Hex())
+		assert.Contains(t, capturedNotifications, userAddressB.Hex())
+		assert.Len(t, capturedNotifications[userAddressA.Hex()], 1)
+		assert.Len(t, capturedNotifications[userAddressB.Hex()], 1)
+		assert.Equal(t, capturedNotifications[userAddressA.Hex()][0].userID, userAddressA.Hex())
+		assert.Equal(t, capturedNotifications[userAddressB.Hex()][0].userID, userAddressB.Hex())
 
 		// Verify balances
 		balA, err := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
@@ -300,9 +305,10 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		var capturedNotifications []Notification
+		capturedNotifications := make(map[string][]Notification)
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
-			capturedNotifications = append(capturedNotifications, Notification{
+
+			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
 				data:      params,
@@ -343,8 +349,12 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		assert.Equal(t, uint64(2), newVersion)
 
 		assert.Len(t, capturedNotifications, 2)
-		assert.Equal(t, capturedNotifications[0].userID, userAddressA.Hex())
-		assert.Equal(t, capturedNotifications[1].userID, userAddressB.Hex())
+		assert.Contains(t, capturedNotifications, userAddressA.Hex())
+		assert.Contains(t, capturedNotifications, userAddressB.Hex())
+		assert.Len(t, capturedNotifications[userAddressA.Hex()], 1)
+		assert.Len(t, capturedNotifications[userAddressB.Hex()], 1)
+		assert.Equal(t, capturedNotifications[userAddressA.Hex()][0].userID, userAddressA.Hex())
+		assert.Equal(t, capturedNotifications[userAddressB.Hex()][0].userID, userAddressB.Hex())
 
 		var closedSession AppSession
 		require.NoError(t, db.First(&closedSession, "session_id = ?", session.SessionID).Error)
@@ -387,9 +397,10 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		var capturedNotifications []Notification
+		capturedNotifications := make(map[string][]Notification)
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
-			capturedNotifications = append(capturedNotifications, Notification{
+
+			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
 				data:      params,

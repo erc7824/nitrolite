@@ -324,9 +324,12 @@ func TestHandleCreatedEvent(t *testing.T) {
 				Initial:   initialState,
 			}
 
-			var capturedNotifications []Notification
+			capturedNotifications := make(map[string][]Notification)
 			custody.wsNotifier.notify = func(userID string, method string, params ...any) {
-				capturedNotifications = append(capturedNotifications, Notification{
+				if capturedNotifications[userID] == nil {
+					capturedNotifications[userID] = make([]Notification, 0)
+				}
+				capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 					userID:    userID,
 					eventType: EventType(method),
 					data:      params,
@@ -356,7 +359,9 @@ func TestHandleCreatedEvent(t *testing.T) {
 			require.NoError(t, entriesErr)
 			assert.NotEmpty(t, entries)
 
-			assert.Equal(t, capturedNotifications[0].userID, mockEvent.Wallet.Hex())
+			assert.Contains(t, capturedNotifications, mockEvent.Wallet.Hex())
+			assert.Len(t, capturedNotifications[mockEvent.Wallet.Hex()], 1)
+			assert.Equal(t, capturedNotifications[mockEvent.Wallet.Hex()][0].userID, mockEvent.Wallet.Hex())
 			assert.Equal(t, dbChannel.ChainID, uint32(custody.chainID))
 			assert.False(t, dbChannel.CreatedAt.IsZero())
 			assert.False(t, dbChannel.UpdatedAt.IsZero())
@@ -414,9 +419,10 @@ func TestHandleJoinedEvent(t *testing.T) {
 
 		_, mockEvent := createMockJoinedEvent(t)
 
-		var capturedNotifications []Notification
+		capturedNotifications := make(map[string][]Notification)
 		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
-			capturedNotifications = append(capturedNotifications, Notification{
+
+			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
 				data:      params,
@@ -444,8 +450,10 @@ func TestHandleJoinedEvent(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, entries)
 
-		assert.Equal(t, walletAddr.Hex(), capturedNotifications[0].userID)
-		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[1].eventType)
+		assert.Contains(t, capturedNotifications, walletAddr.Hex())
+		assert.Len(t, capturedNotifications[walletAddr.Hex()], 2)
+		assert.Equal(t, walletAddr.Hex(), capturedNotifications[walletAddr.Hex()][0].userID)
+		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr.Hex()][1].eventType)
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix())
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt))
@@ -495,9 +503,10 @@ func TestHandleJoinedEvent(t *testing.T) {
 
 		_, mockEvent := createMockJoinedEvent(t)
 
-		var capturedNotifications []Notification
+		capturedNotifications := make(map[string][]Notification)
 		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
-			capturedNotifications = append(capturedNotifications, Notification{
+
+			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
 				data:      params,
@@ -561,9 +570,10 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, finalAmount)
 
-		var capturedNotifications []Notification
+		capturedNotifications := make(map[string][]Notification)
 		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
-			capturedNotifications = append(capturedNotifications, Notification{
+
+			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
 				data:      params,
@@ -588,8 +598,10 @@ func TestHandleClosedEvent(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, entries)
 
-		assert.Equal(t, walletAddr.Hex(), capturedNotifications[0].userID)
-		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[1].eventType)
+		assert.Contains(t, capturedNotifications, walletAddr.Hex())
+		assert.Len(t, capturedNotifications[walletAddr.Hex()], 2)
+		assert.Equal(t, walletAddr.Hex(), capturedNotifications[walletAddr.Hex()][0].userID)
+		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr.Hex()][1].eventType)
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
@@ -748,9 +760,10 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, channelAmount.BigInt())
 
-		var capturedNotifications []Notification
+		capturedNotifications := make(map[string][]Notification)
 		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
-			capturedNotifications = append(capturedNotifications, Notification{
+
+			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
 				data:      params,
@@ -770,8 +783,10 @@ func TestHandleClosedEvent(t *testing.T) {
 		assert.Equal(t, decimal.Zero.String(), updatedChannel.RawAmount.String(), "Amount should be zero after closing")
 		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
 
-		assert.Equal(t, walletAddr.Hex(), capturedNotifications[0].userID)
-		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[1].eventType)
+		assert.Contains(t, capturedNotifications, walletAddr.Hex())
+		assert.Len(t, capturedNotifications[walletAddr.Hex()], 2)
+		assert.Equal(t, walletAddr.Hex(), capturedNotifications[walletAddr.Hex()][0].userID)
+		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr.Hex()][1].eventType)
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
@@ -818,9 +833,10 @@ func TestHandleChallengedEvent(t *testing.T) {
 
 		_, mockEvent := createMockChallengedEvent(t, custody.signer, tokenAddress, amount.BigInt())
 
-		var capturedNotifications []Notification
+		capturedNotifications := make(map[string][]Notification)
 		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
-			capturedNotifications = append(capturedNotifications, Notification{
+
+			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
 				data:      params,
@@ -844,7 +860,9 @@ func TestHandleChallengedEvent(t *testing.T) {
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
 		assert.True(t, updatedChannel.UpdatedAt.After(beforeUpdate) && updatedChannel.UpdatedAt.Before(afterUpdate))
 
-		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[0].eventType)
+		assert.Contains(t, capturedNotifications, walletAddr)
+		assert.Len(t, capturedNotifications[walletAddr], 1)
+		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr][0].eventType)
 	})
 }
 
@@ -892,9 +910,10 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		_, mockEvent := createMockResizedEvent(t, deltaAmount.BigInt())
 
-		var capturedNotifications []Notification
+		capturedNotifications := make(map[string][]Notification)
 		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
-			capturedNotifications = append(capturedNotifications, Notification{
+
+			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
 				data:      params,
@@ -918,8 +937,10 @@ func TestHandleResizedEvent(t *testing.T) {
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
 		assert.True(t, updatedChannel.UpdatedAt.After(beforeUpdate) && updatedChannel.UpdatedAt.Before(afterUpdate))
 
-		assert.Equal(t, walletAddr.Hex(), capturedNotifications[0].userID)
-		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[1].eventType)
+		assert.Contains(t, capturedNotifications, walletAddr.Hex())
+		assert.Len(t, capturedNotifications[walletAddr.Hex()], 2)
+		assert.Equal(t, walletAddr.Hex(), capturedNotifications[walletAddr.Hex()][0].userID)
+		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr.Hex()][1].eventType)
 
 		walletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)
 		require.NoError(t, err)
@@ -1051,9 +1072,10 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		_, mockEvent := createMockResizedEvent(t, big.NewInt(500000))
 
-		var capturedNotifications []Notification
+		capturedNotifications := make(map[string][]Notification)
 		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
-			capturedNotifications = append(capturedNotifications, Notification{
+
+			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
 				data:      params,

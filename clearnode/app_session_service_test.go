@@ -10,6 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func assertNotifications(t *testing.T, capturedNotifications map[string][]Notification, userID string, expectedCount int) {
+	assert.Contains(t, capturedNotifications, userID)
+	assert.Len(t, capturedNotifications[userID], expectedCount)
+	if expectedCount > 0 {
+		assert.Equal(t, capturedNotifications[userID][0].userID, userID)
+	}
+}
+
 func TestAppSessionService_CreateApplication(t *testing.T) {
 	rawA, _ := crypto.GenerateKey()
 	rawB, _ := crypto.GenerateKey()
@@ -69,12 +77,8 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		sessionAccountID := NewAccountID(appSession.SessionID)
 
 		assert.Len(t, capturedNotifications, 2)
-		assert.Contains(t, capturedNotifications, userAddressA.Hex())
-		assert.Contains(t, capturedNotifications, userAddressB.Hex())
-		assert.Len(t, capturedNotifications[userAddressA.Hex()], 1)
-		assert.Len(t, capturedNotifications[userAddressB.Hex()], 1)
-		assert.Equal(t, capturedNotifications[userAddressA.Hex()][0].userID, userAddressA.Hex())
-		assert.Equal(t, capturedNotifications[userAddressB.Hex()][0].userID, userAddressB.Hex())
+		assertNotifications(t, capturedNotifications, userAddressA.Hex(), 1)
+		assertNotifications(t, capturedNotifications, userAddressB.Hex(), 1)
 
 		// Verify balances
 		balA, err := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
@@ -349,12 +353,8 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		assert.Equal(t, uint64(2), newVersion)
 
 		assert.Len(t, capturedNotifications, 2)
-		assert.Contains(t, capturedNotifications, userAddressA.Hex())
-		assert.Contains(t, capturedNotifications, userAddressB.Hex())
-		assert.Len(t, capturedNotifications[userAddressA.Hex()], 1)
-		assert.Len(t, capturedNotifications[userAddressB.Hex()], 1)
-		assert.Equal(t, capturedNotifications[userAddressA.Hex()][0].userID, userAddressA.Hex())
-		assert.Equal(t, capturedNotifications[userAddressB.Hex()][0].userID, userAddressB.Hex())
+		assertNotifications(t, capturedNotifications, userAddressA.Hex(), 1)
+		assertNotifications(t, capturedNotifications, userAddressB.Hex(), 1)
 
 		var closedSession AppSession
 		require.NoError(t, db.First(&closedSession, "session_id = ?", session.SessionID).Error)

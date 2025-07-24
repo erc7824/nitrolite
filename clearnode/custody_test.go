@@ -359,9 +359,7 @@ func TestHandleCreatedEvent(t *testing.T) {
 			require.NoError(t, entriesErr)
 			assert.NotEmpty(t, entries)
 
-			assert.Contains(t, capturedNotifications, mockEvent.Wallet.Hex())
-			assert.Len(t, capturedNotifications[mockEvent.Wallet.Hex()], 1)
-			assert.Equal(t, capturedNotifications[mockEvent.Wallet.Hex()][0].userID, mockEvent.Wallet.Hex())
+			assertNotifications(t, capturedNotifications, mockEvent.Wallet.Hex(), 1)
 			assert.Equal(t, dbChannel.ChainID, uint32(custody.chainID))
 			assert.False(t, dbChannel.CreatedAt.IsZero())
 			assert.False(t, dbChannel.UpdatedAt.IsZero())
@@ -450,9 +448,7 @@ func TestHandleJoinedEvent(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, entries)
 
-		assert.Contains(t, capturedNotifications, walletAddr.Hex())
-		assert.Len(t, capturedNotifications[walletAddr.Hex()], 2)
-		assert.Equal(t, walletAddr.Hex(), capturedNotifications[walletAddr.Hex()][0].userID)
+		assertNotifications(t, capturedNotifications, walletAddr.Hex(), 2)
 		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr.Hex()][1].eventType)
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix())
@@ -598,9 +594,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, entries)
 
-		assert.Contains(t, capturedNotifications, walletAddr.Hex())
-		assert.Len(t, capturedNotifications[walletAddr.Hex()], 2)
-		assert.Equal(t, walletAddr.Hex(), capturedNotifications[walletAddr.Hex()][0].userID)
+		assertNotifications(t, capturedNotifications, walletAddr.Hex(), 2)
 		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr.Hex()][1].eventType)
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
@@ -783,9 +777,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		assert.Equal(t, decimal.Zero.String(), updatedChannel.RawAmount.String(), "Amount should be zero after closing")
 		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
 
-		assert.Contains(t, capturedNotifications, walletAddr.Hex())
-		assert.Len(t, capturedNotifications[walletAddr.Hex()], 2)
-		assert.Equal(t, walletAddr.Hex(), capturedNotifications[walletAddr.Hex()][0].userID)
+		assertNotifications(t, capturedNotifications, walletAddr.Hex(), 2)
 		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr.Hex()][1].eventType)
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
@@ -860,8 +852,7 @@ func TestHandleChallengedEvent(t *testing.T) {
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
 		assert.True(t, updatedChannel.UpdatedAt.After(beforeUpdate) && updatedChannel.UpdatedAt.Before(afterUpdate))
 
-		assert.Contains(t, capturedNotifications, walletAddr)
-		assert.Len(t, capturedNotifications[walletAddr], 1)
+		assertNotifications(t, capturedNotifications, walletAddr, 1)
 		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr][0].eventType)
 	})
 }
@@ -937,9 +928,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
 		assert.True(t, updatedChannel.UpdatedAt.After(beforeUpdate) && updatedChannel.UpdatedAt.Before(afterUpdate))
 
-		assert.Contains(t, capturedNotifications, walletAddr.Hex())
-		assert.Len(t, capturedNotifications[walletAddr.Hex()], 2)
-		assert.Equal(t, walletAddr.Hex(), capturedNotifications[walletAddr.Hex()][0].userID)
+		assertNotifications(t, capturedNotifications, walletAddr.Hex(), 2)
 		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr.Hex()][1].eventType)
 
 		walletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)

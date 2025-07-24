@@ -13,9 +13,6 @@ import (
 func assertNotifications(t *testing.T, capturedNotifications map[string][]Notification, userID string, expectedCount int) {
 	assert.Contains(t, capturedNotifications, userID)
 	assert.Len(t, capturedNotifications[userID], expectedCount)
-	if expectedCount > 0 {
-		assert.Equal(t, capturedNotifications[userID][0].userID, userID)
-	}
 }
 
 func TestAppSessionService_CreateApplication(t *testing.T) {

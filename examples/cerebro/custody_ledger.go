@@ -45,7 +45,7 @@ func (o *Operator) handleDepositCustody(args []string) {
 
 	tokenBalance := decimal.NewFromBigInt(rawTokenBalance, -int32(asset.Decimals))
 	fmt.Printf("Your current balance for asset %s on chain %s is: %s\n",
-		assetSymbol, chainName, tokenBalance.StringFixed(2))
+		assetSymbol, chainName, fmtDec(tokenBalance))
 
 	fmt.Printf("How much %s do you want to deposit?\n", assetSymbol)
 	amountStr := o.readExtraArg("deposit_amount")
@@ -57,14 +57,14 @@ func (o *Operator) handleDepositCustody(args []string) {
 	}
 
 	if amount.LessThanOrEqual(decimal.Zero) {
-		fmt.Printf("Amount must be greater than zero: %s\n", amount.StringFixed(2))
+		fmt.Printf("Amount must be greater than zero: %s\n", fmtDec(amount))
 		return
 	}
 	rawAmount := amount.Shift(int32(asset.Decimals)).BigInt()
 
 	if tokenBalance.Cmp(amount) < 0 {
 		fmt.Printf("You do not have enough %s to deposit. Available: %s, Required: %s\n",
-			assetSymbol, tokenBalance.StringFixed(2), amount)
+			assetSymbol, fmtDec(tokenBalance), amount)
 		return
 	}
 
@@ -85,7 +85,7 @@ func (o *Operator) handleDepositCustody(args []string) {
 	}
 
 	fmt.Printf("Successfully deposited %s %s to custody on chain %s.\n",
-		amount.StringFixed(2), assetSymbol, chainName)
+		fmtDec(amount), assetSymbol, chainName)
 }
 
 func (o *Operator) handleWithdrawCustody(args []string) {
@@ -128,7 +128,7 @@ func (o *Operator) handleWithdrawCustody(args []string) {
 
 	custodyBalance := decimal.NewFromBigInt(rawCustodyBalance, -int32(asset.Decimals))
 	fmt.Printf("Your current custody balance for asset %s on %s is: %s\n",
-		assetSymbol, chainName, custodyBalance.StringFixed(2))
+		assetSymbol, chainName, fmtDec(custodyBalance))
 
 	fmt.Printf("How much %s do you want to withdraw?\n", assetSymbol)
 	amountStr := o.readExtraArg("withdraw_amount")
@@ -140,12 +140,12 @@ func (o *Operator) handleWithdrawCustody(args []string) {
 	}
 
 	if amount.LessThanOrEqual(decimal.Zero) {
-		fmt.Printf("Amount must be greater than zero: %s\n", amount.StringFixed(2))
+		fmt.Printf("Amount must be greater than zero: %s\n", fmtDec(amount))
 		return
 	}
 	if amount.GreaterThan(custodyBalance) {
 		fmt.Printf("You cannot withdraw more than your current custody balance of %s %s.\n",
-			custodyBalance.StringFixed(2), assetSymbol)
+			fmtDec(custodyBalance), assetSymbol)
 		return
 	}
 
@@ -161,7 +161,7 @@ func (o *Operator) handleWithdrawCustody(args []string) {
 	}
 
 	fmt.Printf("Successfully withdrawn %s %s on %s.\n",
-		amount.StringFixed(2), assetSymbol, chainName)
+		fmtDec(amount), assetSymbol, chainName)
 }
 
 func (o *Operator) getChainRPC(chainID uint32) (string, error) {

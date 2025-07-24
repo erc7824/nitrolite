@@ -66,7 +66,7 @@ func (o *Operator) handleListChannels() {
 				channelBalance = decimal.NewFromBigInt(asset.RawChannelBalance, -int32(asset.Decimals))
 			}
 
-			t.AppendRow(table.Row{network.ChainName, asset.Symbol, channelID, channelBalance.StringFixed(2)})
+			t.AppendRow(table.Row{network.ChainName, asset.Symbol, channelID, fmtDec(channelBalance)})
 		}
 	}
 	t.SetColumnConfigs(

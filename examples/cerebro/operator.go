@@ -7,6 +7,7 @@ import (
 
 	"github.com/c-bata/go-prompt"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/shopspring/decimal"
 
 	"github.com/erc7824/nitrolite/examples/cerebro/clearnet"
 	"github.com/erc7824/nitrolite/examples/cerebro/custody"
@@ -378,4 +379,12 @@ func (o *Operator) getSignerSuggestions() []prompt.Suggest {
 
 func (o *Operator) isUserAuthenticated() bool {
 	return o.config.Wallet != nil && o.config.Signer != nil
+}
+
+func fmtDec(value decimal.Decimal) string {
+	if value.Equal(value.Floor()) {
+		return value.StringFixed(1)
+	}
+
+	return value.String()
 }

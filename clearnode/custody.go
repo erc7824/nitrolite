@@ -60,7 +60,7 @@ func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, infuraURL, 
 		return nil, fmt.Errorf("failed to create transaction signer: %w", err)
 	}
 
-	// Needed to call challenge in the future.
+	// TODO: estimate on the go.
 	auth.GasPrice = big.NewInt(30000000000) // 30 gwei.
 	auth.GasLimit = uint64(3000000)
 

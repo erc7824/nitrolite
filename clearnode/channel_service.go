@@ -40,8 +40,7 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		return CreateChannelResponse{}, RPCErrorf("an open channel with broker already exists: %s", existingOpenChannel.ChannelID)
 	}
 
-	_, err = GetAssetByToken(s.db, params.Token, params.ChainID)
-	if err != nil {
+	if _, err := GetAssetByToken(s.db, params.Token, params.ChainID); err != nil {
 		return CreateChannelResponse{}, RPCErrorf("token not supported: %s", params.Token)
 	}
 

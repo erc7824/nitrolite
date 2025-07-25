@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -14,16 +16,114 @@ import (
 
 // ChannelService handles the business logic for funding channels.
 type ChannelService struct {
-	db     *gorm.DB
-	signer *Signer
+	db       *gorm.DB
+	networks map[string]*NetworkConfig
+	signer   *Signer
 }
 
 // NewAppSessionService creates a new AppSessionService.
-func NewChannelService(db *gorm.DB, signer *Signer) *ChannelService {
-	return &ChannelService{db: db, signer: signer}
+func NewChannelService(db *gorm.DB, networks map[string]*NetworkConfig, signer *Signer) *ChannelService {
+	return &ChannelService{db: db, networks: networks, signer: signer}
 }
 
-func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParams, rpcSigners map[string]struct{}) (ResizeChannelResponse, error) {
+func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChannelParams, rpcSigners map[string]struct{}, logger Logger) (CreateChannelResponse, error) {
+	_, ok := rpcSigners[wallet.Hex()]
+	if !ok {
+		return CreateChannelResponse{}, RPCErrorf("invalid signature")
+	}
+
+	existingOpenChannel, err := CheckExistingChannels(s.db, wallet.Hex(), params.Token, params.ChainID)
+	if err != nil {
+		return CreateChannelResponse{}, RPCErrorf("failed to check existing channels")
+	}
+	if existingOpenChannel != nil {
+		return CreateChannelResponse{}, RPCErrorf("an open channel with broker already exists: %s", existingOpenChannel.ChannelID)
+	}
+
+	if _, err := GetAssetByToken(s.db, params.Token, params.ChainID); err != nil {
+		return CreateChannelResponse{}, RPCErrorf("token not supported: %s", params.Token)
+	}
+
+	allocations := []nitrolite.Allocation{
+		{
+			Destination: wallet,
+			Token:       common.HexToAddress(params.Token),
+			Amount:      params.Amount.BigInt(),
+		},
+		{
+			Destination: s.signer.GetAddress(),
+			Token:       common.HexToAddress(params.Token),
+			Amount:      big.NewInt(0),
+		},
+	}
+
+	networkConfig, ok := s.networks[fmt.Sprintf("%d", params.ChainID)]
+	if !ok {
+		return CreateChannelResponse{}, RPCErrorf("unsupported chain ID: %d", params.ChainID)
+	}
+
+	channel := nitrolite.Channel{
+		Participants: []common.Address{wallet, s.signer.GetAddress()},
+		Adjudicator:  common.HexToAddress(networkConfig.AdjudicatorAddress),
+		Challenge:    3600,
+		Nonce:        uint64(time.Now().UnixMilli()),
+	}
+
+	channelID, err := nitrolite.GetChannelID(channel, params.ChainID)
+	if err != nil {
+		logger.Error("failed to get channel ID", "error", err)
+		return CreateChannelResponse{}, RPCErrorf("failed to get channel ID")
+	}
+
+	stateDataHex := "0x"
+	stateDataBytes, err := hexutil.Decode(stateDataHex)
+	if err != nil {
+		logger.Error("failed to decode state data hex", "error", err)
+		return CreateChannelResponse{}, RPCErrorf("failed to decode state data hex")
+	}
+
+	state := nitrolite.State{
+		Intent:      uint8(nitrolite.IntentINITIALIZE),
+		Version:     big.NewInt(0),
+		Data:        stateDataBytes,
+		Allocations: allocations,
+	}
+
+	stateData, err := nitrolite.EncodeStateData(channelID, state)
+	if err != nil {
+		logger.Error("error encoding state hash", "error", err)
+		return CreateChannelResponse{}, RPCErrorf("error encoding state hash")
+	}
+
+	sig, err := s.signer.Sign(stateData)
+	if err != nil {
+		logger.Error("failed to sign state", "error", err)
+		return CreateChannelResponse{}, RPCErrorf("failed to sign state")
+	}
+
+	resp := CreateChannelResponse{
+		ChannelID: channelID.Hex(),
+		StateHash: crypto.Keccak256Hash(stateData).Hex(),
+		State: State{
+			Intent:  uint8(nitrolite.IntentINITIALIZE),
+			Version: 0,
+			Data:    stateDataBytes,
+			Sigs:    []Signature{sig},
+		},
+	}
+
+	for _, alloc := range allocations {
+		resp.State.Allocations = append(resp.State.Allocations, Allocation{
+			Participant:  alloc.Destination.Hex(),
+			TokenAddress: alloc.Token.Hex(),
+			RawAmount:    decimal.NewFromBigInt(alloc.Amount, 0),
+		})
+	}
+
+	return resp, nil
+}
+
+func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners map[string]struct{}, logger Logger) (ResizeChannelResponse, error) {
 	channel, err := GetChannelByID(s.db, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)
@@ -113,14 +213,21 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 	}
 
 	// 6) Encode & sign the new state
+	state := nitrolite.State{
+		Intent:      uint8(nitrolite.IntentRESIZE),
+		Version:     big.NewInt(int64(channel.Version) + 1),
+		Data:        encodedIntentions,
+		Allocations: allocations,
+	}
+
 	channelIDHash := common.HexToHash(channel.ChannelID)
-	encodedState, err := nitrolite.EncodeState(channelIDHash, nitrolite.IntentRESIZE, big.NewInt(int64(channel.Version)+1), encodedIntentions, allocations)
+	stateData, err := nitrolite.EncodeStateData(channelIDHash, state)
 	if err != nil {
 		logger.Error("failed to encode state hash", "error", err)
 		return ResizeChannelResponse{}, RPCErrorf("failed to encode state hash")
 	}
-	stateHash := crypto.Keccak256Hash(encodedState).Hex()
-	sig, err := s.signer.Sign(encodedState)
+
+	sig, err := s.signer.Sign(stateData)
 	if err != nil {
 		logger.Error("failed to sign state", "error", err)
 		return ResizeChannelResponse{}, RPCErrorf("failed to sign state")
@@ -131,7 +238,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		Intent:    uint8(nitrolite.IntentRESIZE),
 		Version:   channel.Version + 1,
 		StateData: hexutil.Encode(encodedIntentions),
-		StateHash: stateHash,
+		StateHash: crypto.Keccak256Hash(stateData).Hex(),
 		Signature: sig,
 	}
 
@@ -145,7 +252,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 	return resp, nil
 }
 
-func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams, rpcSigners map[string]struct{}) (CloseChannelResponse, error) {
+func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map[string]struct{}, logger Logger) (CloseChannelResponse, error) {
 	channel, err := GetChannelByID(s.db, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)
@@ -213,13 +320,21 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 		logger.Error("failed to decode state data hex", "error", err)
 		return CloseChannelResponse{}, RPCErrorf("failed to decode state data hex")
 	}
-	encodedState, err := nitrolite.EncodeState(common.HexToHash(channel.ChannelID), nitrolite.IntentFINALIZE, big.NewInt(int64(channel.Version)+1), stateDataBytes, allocations)
+
+	state := nitrolite.State{
+		Intent:      uint8(nitrolite.IntentFINALIZE),
+		Version:     big.NewInt(int64(channel.Version) + 1),
+		Data:        stateDataBytes,
+		Allocations: allocations,
+	}
+
+	stateData, err := nitrolite.EncodeStateData(common.HexToHash(channel.ChannelID), state)
 	if err != nil {
 		logger.Error("failed to encode state hash", "error", err)
 		return CloseChannelResponse{}, RPCErrorf("failed to encode state hash")
 	}
-	stateHash := crypto.Keccak256Hash(encodedState).Hex()
-	sig, err := s.signer.Sign(encodedState)
+
+	sig, err := s.signer.Sign(stateData)
 	if err != nil {
 		logger.Error("failed to sign state", "error", err)
 		return CloseChannelResponse{}, RPCErrorf("failed to sign state")
@@ -230,7 +345,7 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 		Intent:    uint8(nitrolite.IntentFINALIZE),
 		Version:   channel.Version + 1,
 		StateData: stateDataHex,
-		StateHash: stateHash,
+		StateHash: crypto.Keccak256Hash(stateData).Hex(),
 		Signature: sig,
 	}
 

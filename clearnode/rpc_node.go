@@ -201,7 +201,7 @@ read_loop:
 		}
 		n.logger.Info("processing message",
 			"requestID", msg.Req.RequestID,
-			"userID", rpcConn.UserID,
+			"userID", rpcConn.UserID(),
 			"method", msg.Req.Method,
 			"route", methodRoute)
 

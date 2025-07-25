@@ -9,8 +9,6 @@ import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/crypt
 import {State, Channel} from "../src/interfaces/Types.sol";
 import {Utils} from "../src/Utils.sol";
 
-import {console} from "lib/forge-std/src/console.sol";
-
 library TestUtils {
     bytes32 public constant TYPE_HASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
@@ -70,11 +68,6 @@ library TestUtils {
                 keccak256(abi.encode(state.allocations))
             )
         );
-        console.log("Signing state with EIP-712:");
-        console.log("domainSeparator:");
-        console.logBytes32(domainSeparator);
-        console.log("typeHash:");
-        console.logBytes32(stateTypehash);
         return TestUtils.signEIP712(vm, privateKey, domainSeparator, structHash);
     }
 }

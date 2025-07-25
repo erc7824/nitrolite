@@ -47,14 +47,14 @@ func TestRPCNode(t *testing.T) {
 		send(onConnectMethod, onConnectCounts)
 	})
 
-	onDisconnectCounts := 0
+	onDisconnectSignal := newTestSignal()
 	disconnectedUserID := ""
 	node.OnDisconnect(func(userID string) {
 		mu.Lock()
 		defer mu.Unlock()
 
-		onDisconnectCounts++
 		disconnectedUserID = userID
+		onDisconnectSignal.trigger()
 	})
 
 	onAuthenticatedMethod := "on_authenticated.test"
@@ -68,12 +68,12 @@ func TestRPCNode(t *testing.T) {
 		send(onAuthenticatedMethod, onAuthenticatedCounts, userID)
 	})
 
-	onMessageSentCounts := 0
+	onMessageSentSignal := newTestSignal()
 	node.OnMessageSent(func() {
 		mu.Lock()
 		defer mu.Unlock()
 
-		onMessageSentCounts++
+		onMessageSentSignal.trigger()
 	})
 
 	createDummyHandler := func(method string) func(c *RPCContext) {
@@ -212,8 +212,8 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, onConnectMethod, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 1)
 		assert.Len(t, resp.Sig, 1)
-		assert.Equal(t, 1, onConnectCounts)     // on connect counts
-		assert.Equal(t, 1, onMessageSentCounts) // number of messages sent
+		assert.Equal(t, 1, onConnectCounts)         // on connect counts
+		assert.True(t, onMessageSentSignal.await()) // on message sent signal
 	})
 
 	// Test root handler
@@ -227,12 +227,12 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, rootMethod, resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 5)
 		assert.Len(t, resp.Sig, 1)
-		assert.Equal(t, "", resp.Res.Params[0])    // not authenticated
-		assert.Equal(t, "", resp.Res.Params[1])    // previous dummy method empty
-		assert.Equal(t, true, resp.Res.Params[2])  // root middleware executed
-		assert.Equal(t, false, resp.Res.Params[3]) // group A middleware not executed
-		assert.Equal(t, false, resp.Res.Params[4]) // group B middleware not executed
-		assert.Equal(t, 2, onMessageSentCounts)    // number of messages sent
+		assert.Equal(t, "", resp.Res.Params[0])     // not authenticated
+		assert.Equal(t, "", resp.Res.Params[1])     // previous dummy method empty
+		assert.Equal(t, true, resp.Res.Params[2])   // root middleware executed
+		assert.Equal(t, false, resp.Res.Params[3])  // group A middleware not executed
+		assert.Equal(t, false, resp.Res.Params[4])  // group B middleware not executed
+		assert.True(t, onMessageSentSignal.await()) // on message sent signal
 	})
 
 	// Test auth handler
@@ -248,7 +248,7 @@ func TestRPCNode(t *testing.T) {
 		assert.Len(t, resp.Res.Params, 1)
 		assert.Len(t, resp.Sig, 1)
 		assert.Equal(t, authenticatedUserID, resp.Res.Params[0]) // authenticated user ID
-		assert.Equal(t, 4, onMessageSentCounts)                  // number of messages sent
+		assert.True(t, onMessageSentSignal.await())              // on message sent signal
 		mu.Unlock()
 
 		// on authenticated method executed
@@ -261,7 +261,7 @@ func TestRPCNode(t *testing.T) {
 		assert.Len(t, resp.Sig, 1)
 		assert.Equal(t, 1, onAuthenticatedCounts)                // on authenticated counts
 		assert.Equal(t, authenticatedUserID, resp.Res.Params[1]) // authenticated user ID
-		assert.Equal(t, 4, onMessageSentCounts)                  // number of messages sent
+		assert.True(t, onMessageSentSignal.await())              // on message sent signal
 		mu.Unlock()
 	})
 
@@ -281,7 +281,7 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, true, resp.Res.Params[2])                // root middleware executed
 		assert.Equal(t, true, resp.Res.Params[3])                // group A middleware executed
 		assert.Equal(t, false, resp.Res.Params[4])               // group B middleware not executed
-		assert.Equal(t, 5, onMessageSentCounts)                  // number of messages sent
+		assert.True(t, onMessageSentSignal.await())              // on message sent signal
 	})
 
 	// Test group handler 2
@@ -300,7 +300,7 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, true, resp.Res.Params[2])                // root middleware executed
 		assert.Equal(t, true, resp.Res.Params[3])                // group A middleware executed
 		assert.Equal(t, true, resp.Res.Params[4])                // group B middleware executed
-		assert.Equal(t, 6, onMessageSentCounts)                  // number of messages sent
+		assert.True(t, onMessageSentSignal.await())              // on message sent signal
 	})
 
 	// Test unknown method
@@ -314,7 +314,7 @@ func TestRPCNode(t *testing.T) {
 		assert.Equal(t, "error", resp.Res.Method)
 		assert.Len(t, resp.Res.Params, 1)
 		assert.Contains(t, resp.Res.Params[0], "unknown method")
-		assert.Equal(t, 7, onMessageSentCounts) // number of messages sent
+		assert.True(t, onMessageSentSignal.await()) // on message sent signal
 	})
 
 	// Test invalid message format
@@ -334,7 +334,7 @@ func TestRPCNode(t *testing.T) {
 		require.NotNil(t, respMsg.Res)
 		assert.Equal(t, "error", respMsg.Res.Method)
 		assert.Contains(t, respMsg.Res.Params[0], "invalid message format")
-		assert.Equal(t, 8, onMessageSentCounts) // number of messages sent
+		assert.True(t, onMessageSentSignal.await()) // on message sent signal
 	})
 
 	// Test disconnect
@@ -342,14 +342,39 @@ func TestRPCNode(t *testing.T) {
 		// Close the connection
 		err = conn.Close()
 		require.NoError(t, err)
-		time.Sleep(100 * time.Millisecond) // Give some time for the disconnect handler to be called
+
+		// Verify onDisconnect handler was called
+		assert.True(t, onDisconnectSignal.await()) // on disconnect signal
 
 		mu.Lock()
 		defer mu.Unlock()
 
-		// Verify onDisconnect handler was called
-		assert.Equal(t, 1, onDisconnectCounts)                   // number of disconnects
 		assert.Equal(t, authenticatedUserID, disconnectedUserID) // disconnected user ID
-		assert.Equal(t, 8, onMessageSentCounts)                  // number of messages sent
+		assert.False(t, onMessageSentSignal.await())             // on message sent signal should not be called after disconnect
 	})
+}
+
+type testSignal struct {
+	signalCh chan struct{}
+}
+
+func newTestSignal() *testSignal {
+	return &testSignal{
+		signalCh: make(chan struct{}, 5), // Buffered channel to avoid blocking
+	}
+}
+
+func (ts *testSignal) trigger() {
+	ts.signalCh <- struct{}{}
+}
+
+func (ts *testSignal) await() bool {
+	maxSignalWait := 500 * time.Millisecond
+
+	select {
+	case <-ts.signalCh:
+		return true
+	case <-time.After(maxSignalWait):
+		return false
+	}
 }

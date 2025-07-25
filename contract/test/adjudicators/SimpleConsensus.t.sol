@@ -117,17 +117,7 @@ contract SimpleConsensusTest is Test {
     function _signStateEIP712(State memory state, uint256 privateKey) internal view returns (bytes memory) {
         bytes32 channelId = Utils.getChannelId(channel);
         bytes32 domainSeparator = mockedChannelImpl.domainSeparator();
-        bytes32 structHash = keccak256(
-            abi.encode(
-                STATE_TYPEHASH,
-                channelId,
-                state.intent,
-                state.version,
-                keccak256(state.data),
-                keccak256(abi.encode(state.allocations))
-            )
-        );
-        return TestUtils.signEIP712(vm, privateKey, domainSeparator, structHash);
+        return TestUtils.signStateEIP712(vm, channelId, state, STATE_TYPEHASH, domainSeparator, privateKey);
     }
 
     function test_adjudicate_firstState_valid_withRawECDSASignatures() public  {

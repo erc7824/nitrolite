@@ -28,7 +28,7 @@ abstract contract UtilsTest_SignaturesBase is Test {
         utils = new UtilsHarness();
         mockEIP712 = new MockEIP712("TestDomain", "1.0");
         erc4337Factory = new MockERC4337Factory();
-        domainSeparator = domainSeparator;
+        domainSeparator = mockEIP712.domainSeparator();
 
         signerPrivateKey = vm.createWallet("signer").privateKey;
         wrongSignerPrivateKey = vm.createWallet("wrongSigner").privateKey;

@@ -49,9 +49,9 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
     uint256 constant CLIENT_IDX = 0; // Participant index for the channel creator
     uint256 constant SERVER_IDX = 1; // Participant index for the server in clearnet context
 
-    uint256 constant MIN_CHALLENGE_PERIOD = 1 hours;
+    uint256 public constant MIN_CHALLENGE_PERIOD = 1 hours;
 
-    bytes32 constant CHALLENGE_STATE_TYPEHASH = keccak256(
+    bytes32 public constant CHALLENGE_STATE_TYPEHASH = keccak256(
         "AllowChallengeStateHash(bytes32 channelId,uint8 intent,uint256 version,bytes data,Allocation[] allocations)Allocation(address destination,address token,uint256 amount)"
     );
 
@@ -698,7 +698,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
                 // NOTE: the `CHALLENGE_STATE_TYPEHASH` is used to recover the EIP-712 signer
                 if (
                     Utils.recoverStateEIP712Signer(
-                        _domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig
+                        CHALLENGE_STATE_TYPEHASH, channelId, _domainSeparatorV4(), state, challengerSig
                     ) == participants[i]
                 ) {
                     return;

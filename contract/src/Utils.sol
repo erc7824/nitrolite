@@ -7,6 +7,8 @@ import {EIP712} from "lib/openzeppelin-contracts/contracts/utils/cryptography/EI
 import {IERC1271} from "lib/openzeppelin-contracts/contracts/interfaces/IERC1271.sol";
 import {STATE_TYPEHASH, Channel, State, StateIntent} from "./interfaces/Types.sol";
 
+import {console} from "lib/forge-std/src/console.sol";
+
 /**
  * @title Channel Utilities
  * @notice Library providing utility functions for state channel operations
@@ -117,15 +119,37 @@ library Utils {
         State memory state,
         bytes memory sig
     ) internal pure returns (address) {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                typeHash,
+                channelId,
+                state.intent,
+                state.version,
+                keccak256(state.data),
+                keccak256(abi.encode(state.allocations))
+            )
+        );
+
+        console.log("Recovering EIP-712 signer");
+        console.log("domainSeparator:");
+        console.logBytes32(domainSeparator);
+        console.log("typeHash:");
+        console.logBytes32(typeHash);
+        console.log("structHash:");
+        console.logBytes32(structHash);
+        console.log("sig:");
+        console.logBytes(sig);
+
         return Utils.recoverEIP712Signer(
             domainSeparator,
-            keccak256(
-                abi.encode(
-                    typeHash,
-                    channelId,
-                    state.intent,
-                    state.version,
-                    keccak256(state.data),
+            structHash,
+            sig
+        );
+    }
+
+    /**
+     * @notice Verifies that a state is signed by the specified EOA participant in either raw ECDSA, EIP-191, or EIP-712 format
+     * @param state The state to verify
                     keccak256(abi.encode(state.allocations))
                 )
             ),

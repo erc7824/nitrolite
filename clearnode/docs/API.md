@@ -22,9 +22,9 @@
 | `create_app_session` | Creates a new virtual application on a ledger | Private |
 | `submit_app_state` | Submits an intermediate state into a virtual application | Private |
 | `close_app_session` | Closes a virtual application | Private |
-| `create_channel` | Creates a payment channel with broker | Private |
-| `close_channel` | Closes a payment channel | Private |
-| `resize_channel` | Adjusts channel capacity | Private |
+| `create_channel` | Returns data and Broker signature to open a channel | Private |
+| `close_channel` | Returns data and Broker signature to close a channel | Private |
+| `resize_channel` | Returns data and Broker signature to adjust channel capacity | Private |
 
 ## Authentication
 
@@ -839,8 +839,8 @@ Returns signed initial state with the requested amounts ready to submit on Block
     "state_hash": "0xLedgerStateHash",
     "state": {
       "intent": 1,
-      "version": 1,
-      "state_data": "0x0000000000000000000000000000000000000000000000000000000000001ec7",
+      "version": 0,
+      "state_data": "0xc0ffee",
       "allocations": [
         {
           "destination": "0x1234567890abcdef...",

@@ -30,7 +30,6 @@ contract SimpleConsensus is IAdjudicator, EIP712AdjudicatorBase {
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
-        view
         override
         returns (bool valid)
     {

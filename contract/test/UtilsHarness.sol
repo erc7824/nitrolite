@@ -82,7 +82,6 @@ contract UtilsHarness {
 
     function validateInitialState(State memory state, Channel memory chan, bytes32 domainSeparator)
         external
-        view
         returns (bool)
     {
         return Utils.validateInitialState(state, chan, domainSeparator);
@@ -90,7 +89,6 @@ contract UtilsHarness {
 
     function validateUnanimousStateSignatures(State memory state, Channel memory chan, bytes32 domainSeparator)
         external
-        view
         returns (bool)
     {
         return Utils.validateUnanimousStateSignatures(state, chan, domainSeparator);

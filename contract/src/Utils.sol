@@ -262,7 +262,6 @@ library Utils {
      */
     function validateInitialState(State memory state, Channel memory chan, bytes32 domainSeparator)
         internal
-        view
         returns (bool)
     {
         if (state.version != 0) {
@@ -286,7 +285,6 @@ library Utils {
      */
     function validateUnanimousStateSignatures(State memory state, Channel memory chan, bytes32 domainSeparator)
         internal
-        view
         returns (bool)
     {
         if (state.sigs.length != 2) {
@@ -295,9 +293,9 @@ library Utils {
 
         bytes32 channelId = getChannelId(chan);
 
-        return Utils.verifyStateEOASignature(
+        return Utils.verifyStateSignature(
             state, channelId, domainSeparator, state.sigs[0], chan.participants[CLIENT]
-        ) && Utils.verifyStateEOASignature(state, channelId, domainSeparator, state.sigs[1], chan.participants[SERVER]);
+        ) && Utils.verifyStateSignature(state, channelId, domainSeparator, state.sigs[1], chan.participants[SERVER]);
     }
 
     /**

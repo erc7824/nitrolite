@@ -16,6 +16,7 @@ library Utils {
     using MessageHashUtils for bytes32;
 
     error ERC6492DeploymentFailed(address factory, bytes calldata_);
+    error ERC6492NoCode(address expectedSigner);
 
     uint256 public constant CLIENT = 0;
     uint256 public constant SERVER = 1;
@@ -204,6 +205,7 @@ library Utils {
         if (expectedSigner.code.length == 0) {
             (bool success,) = create2Factory.call(factoryCalldata);
             require(success, ERC6492DeploymentFailed(create2Factory, factoryCalldata));
+            require(expectedSigner.code.length != 0, ERC6492NoCode(expectedSigner));
         }
 
         return IERC1271(expectedSigner).isValidSignature(msgHash, originalSig) == ERC1271_SUCCESS;

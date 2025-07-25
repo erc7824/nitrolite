@@ -107,25 +107,4 @@ contract UtilsHarness {
     function trailingBytes32(bytes memory data) external pure returns (bytes32) {
         return Utils.trailingBytes32(data);
     }
-
-    // Constants
-    function CLIENT() external pure returns (uint256) {
-        return Utils.CLIENT;
-    }
-
-    function SERVER() external pure returns (uint256) {
-        return Utils.SERVER;
-    }
-
-    function NO_EIP712_SUPPORT() external pure returns (bytes32) {
-        return Utils.NO_EIP712_SUPPORT;
-    }
-
-    function ERC6492_DETECTION_SUFFIX() external pure returns (bytes32) {
-        return Utils.ERC6492_DETECTION_SUFFIX;
-    }
-
-    function ERC1271_SUCCESS() external pure returns (bytes4) {
-        return Utils.ERC1271_SUCCESS;
-    }
 }

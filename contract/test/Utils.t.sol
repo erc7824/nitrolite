@@ -49,7 +49,7 @@ abstract contract UtilsTest_SignaturesBase is Test {
         );
 
         bytes memory erc6492Sig = abi.encode(address(erc4337Factory), factoryCalldata, originalSig);
-        bytes memory sigWithSuffix = abi.encodePacked(erc6492Sig, utils.ERC6492_DETECTION_SUFFIX());
+        bytes memory sigWithSuffix = abi.encodePacked(erc6492Sig, Utils.ERC6492_DETECTION_SUFFIX);
 
         return (sigWithSuffix, expectedSigner);
     }
@@ -190,7 +190,7 @@ contract UtilsTest_Signatures is UtilsTest_SignaturesBase {
         );
 
         bytes memory erc6492Sig = abi.encode(address(erc4337Factory), factoryCalldata, originalSig);
-        bytes memory sigWithSuffix = abi.encodePacked(erc6492Sig, utils.ERC6492_DETECTION_SUFFIX());
+        bytes memory sigWithSuffix = abi.encodePacked(erc6492Sig, Utils.ERC6492_DETECTION_SUFFIX);
 
         vm.expectRevert(abi.encodeWithSelector(
             Utils.ERC6492DeploymentFailed.selector,
@@ -382,7 +382,7 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
     }
 
     function test_verifyStateEOASignature_returnsFalse_whenNoEIP712Support() public view {
-        bytes32 domainSeparator = utils.NO_EIP712_SUPPORT();
+        bytes32 domainSeparator = Utils.NO_EIP712_SUPPORT;
         bytes32 structHash = keccak256(
             abi.encode(
                 STATE_TYPEHASH,
@@ -401,7 +401,7 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
     }
 
     function test_verifyStateEOASignature_returnsTrue_forRawECDSAWhenNoEIP712Support() public view {
-        bytes32 domainSeparator = utils.NO_EIP712_SUPPORT();
+        bytes32 domainSeparator = Utils.NO_EIP712_SUPPORT;
         bytes32 stateHash = utils.getStateHashShort(channelId, testState);
         bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
@@ -423,7 +423,7 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
         );
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
-        bool isValid = utils.verifyStateEOASignature(testState, channelId, utils.NO_EIP712_SUPPORT(), sig, signer);
+        bool isValid = utils.verifyStateEOASignature(testState, channelId, Utils.NO_EIP712_SUPPORT, sig, signer);
 
         assertFalse(isValid, "Should not verify EIP712 signature when NO_EIP712_SUPPORT is set");
     }

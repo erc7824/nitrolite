@@ -698,7 +698,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
                 // NOTE: the `CHALLENGE_STATE_TYPEHASH` is used to recover the EIP-712 signer
                 if (
                     Utils.recoverStateEIP712Signer(
-                        CHALLENGE_STATE_TYPEHASH, channelId, _domainSeparatorV4(), state, challengerSig
+                        _domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig
                     ) == participants[i]
                 ) {
                     return;

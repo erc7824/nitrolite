@@ -105,17 +105,17 @@ library Utils {
 
     /**
      * @notice Recovers the signer of a state using EIP-712 format
+     * @param domainSeparator The EIP-712 domain separator
      * @param typeHash The type hash for the state structure
      * @param channelId The unique identifier for the channel
-     * @param domainSeparator The EIP-712 domain separator
      * @param state The state to verify
      * @param sig The signature to verify
      * @return The address of the signer
      */
     function recoverStateEIP712Signer(
+        bytes32 domainSeparator,
         bytes32 typeHash,
         bytes32 channelId,
-        bytes32 domainSeparator,
         State memory state,
         bytes memory sig
     ) internal pure returns (address) {
@@ -189,7 +189,7 @@ library Utils {
             return false;
         }
 
-        address eip712Signer = Utils.recoverStateEIP712Signer(STATE_TYPEHASH, channelId, domainSeparator, state, sig);
+        address eip712Signer = Utils.recoverStateEIP712Signer(domainSeparator, STATE_TYPEHASH, channelId, state, sig);
         if (eip712Signer == signer) {
             return true;
         }

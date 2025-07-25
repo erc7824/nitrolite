@@ -278,7 +278,7 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
         bytes memory sig = TestUtils.signEIP712(vm, signerPrivateKey, domainSeparator, structHash);
 
         address recoveredSigner =
-            utils.recoverStateEIP712Signer(STATE_TYPEHASH, channelId, domainSeparator, testState, sig);
+            utils.recoverStateEIP712Signer(domainSeparator, STATE_TYPEHASH, channelId, testState, sig);
 
         assertEq(recoveredSigner, signer, "Should recover correct signer for state EIP712");
     }
@@ -302,7 +302,7 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
         differentState.data = bytes("different data");
 
         address recoveredSigner =
-            utils.recoverStateEIP712Signer(STATE_TYPEHASH, channelId, domainSeparator, differentState, sig);
+            utils.recoverStateEIP712Signer(domainSeparator, STATE_TYPEHASH, channelId, differentState, sig);
 
         assertNotEq(recoveredSigner, signer, "Should not recover correct signer for different state");
     }

@@ -36,13 +36,13 @@ contract UtilsHarness {
     }
 
     function recoverStateEIP712Signer(
+        bytes32 domainSeparator,
         bytes32 typeHash,
         bytes32 channelId,
-        bytes32 domainSeparator,
         State memory state,
         bytes memory sig
     ) external pure returns (address) {
-        return Utils.recoverStateEIP712Signer(typeHash, channelId, domainSeparator, state, sig);
+        return Utils.recoverStateEIP712Signer(domainSeparator, typeHash, channelId, state, sig);
     }
 
     function verifyStateEOASignature(

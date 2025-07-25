@@ -47,7 +47,6 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable, EIP712AdjudicatorBa
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
-        view
         override
         returns (bool valid)
     {
@@ -132,7 +131,6 @@ contract RemittanceAdjudicator is IAdjudicator, IComparable, EIP712AdjudicatorBa
 
     function _validateRemittanceState(bytes32 domainSeparator, Channel calldata chan, State memory state)
         internal
-        view
         returns (bool)
     {
         if (state.intent != StateIntent.OPERATE) {

@@ -114,7 +114,7 @@ contract CounterTest is Test {
 
     // -------------------- FIRST STATE TRANSITION TESTS --------------------
 
-    function test_adjudicate_firstState_valid() public view {
+    function test_adjudicate_firstState_valid() public {
         // Create initial state with target 10
         State memory initialState = _createInitialState(10);
         initialState.sigs = new bytes[](2);
@@ -135,7 +135,7 @@ contract CounterTest is Test {
         assertTrue(valid, "Valid first state transition should be accepted");
     }
 
-    function test_adjudicate_firstState_revert_whenTargetExceeded() public view {
+    function test_adjudicate_firstState_revert_whenTargetExceeded() public {
         // Create initial state with target 10
         State memory initialState = _createInitialState(10);
         initialState.sigs = new bytes[](2);
@@ -156,7 +156,7 @@ contract CounterTest is Test {
         assertFalse(valid, "State with version exceeding target should be rejected");
     }
 
-    function test_adjudicate_firstState_revert_whenIncorrectSigner() public view {
+    function test_adjudicate_firstState_revert_whenIncorrectSigner() public {
         // Create initial state with target 10
         State memory initialState = _createInitialState(10);
         initialState.sigs = new bytes[](2);
@@ -177,7 +177,7 @@ contract CounterTest is Test {
         assertFalse(valid, "First state signed by incorrect participant should be rejected");
     }
 
-    function test_adjudicate_firstState_revert_whenWrongIntent() public view {
+    function test_adjudicate_firstState_revert_whenWrongIntent() public {
         // Create initial state with target 10
         State memory initialState = _createInitialState(10);
         initialState.sigs = new bytes[](2);
@@ -201,7 +201,7 @@ contract CounterTest is Test {
 
     // -------------------- LATER STATE TRANSITION TESTS --------------------
 
-    function test_adjudicate_laterState_valid() public view {
+    function test_adjudicate_laterState_valid() public {
         // Create state 1
         State memory state1 = _createCounterState(10, 1);
         state1.sigs = new bytes[](1);
@@ -221,7 +221,7 @@ contract CounterTest is Test {
         assertTrue(valid, "Valid state transition from 1 to 2 should be accepted");
     }
 
-    function test_adjudicate_laterState_revert_whenIncorrectVersionIncrement() public view {
+    function test_adjudicate_laterState_revert_whenIncorrectVersionIncrement() public {
         // Create state 1
         State memory state1 = _createCounterState(10, 1);
         state1.sigs = new bytes[](1);
@@ -241,7 +241,7 @@ contract CounterTest is Test {
         assertFalse(valid, "State with non-sequential version should be rejected");
     }
 
-    function test_adjudicate_laterState_revert_whenTargetChanged() public view {
+    function test_adjudicate_laterState_revert_whenTargetChanged() public {
         // Create state 1 with target 10
         State memory state1 = _createCounterState(10, 1);
         state1.sigs = new bytes[](1);
@@ -261,7 +261,7 @@ contract CounterTest is Test {
         assertFalse(valid, "State with changed target should be rejected");
     }
 
-    function test_adjudicate_laterState_revert_whenAllocationSumChanged() public view {
+    function test_adjudicate_laterState_revert_whenAllocationSumChanged() public {
         // Create state 1
         State memory state1 = _createCounterState(10, 1);
         state1.sigs = new bytes[](1);
@@ -283,7 +283,7 @@ contract CounterTest is Test {
         assertFalse(valid, "State with changed allocation sum should be rejected");
     }
 
-    function test_adjudicate_laterState_revert_whenWrongSigner() public view {
+    function test_adjudicate_laterState_revert_whenWrongSigner() public {
         // Create state 1
         State memory state1 = _createCounterState(10, 1);
         state1.sigs = new bytes[](1);
@@ -303,7 +303,7 @@ contract CounterTest is Test {
         assertFalse(valid, "State signed by incorrect participant should be rejected");
     }
 
-    function test_adjudicate_revert_whenNoStateProof() public view {
+    function test_adjudicate_revert_whenNoStateProof() public {
         // Create state 2 without providing a proof
         State memory state2 = _createCounterState(10, 2);
         state2.sigs = new bytes[](1);
@@ -317,7 +317,7 @@ contract CounterTest is Test {
         assertFalse(valid, "Non-initial state without proof should be rejected");
     }
 
-    function test_adjudicate_revert_whenTooManyProofs() public view {
+    function test_adjudicate_revert_whenTooManyProofs() public {
         // Create state 1
         State memory state1 = _createCounterState(10, 1);
         state1.sigs = new bytes[](1);
@@ -340,7 +340,7 @@ contract CounterTest is Test {
 
     // -------------------- RESIZE STATE TRANSITION TESTS --------------------
 
-    function test_adjudicate_afterResize_valid() public view {
+    function test_adjudicate_afterResize_valid() public {
         // Create state 1
         State memory state1 = _createCounterState(10, 1);
         state1.sigs = new bytes[](1);
@@ -368,7 +368,7 @@ contract CounterTest is Test {
         assertTrue(valid, "Valid state transition after resize should be accepted");
     }
 
-    function test_adjudicate_afterResize_revert_whenTargetChanged() public view {
+    function test_adjudicate_afterResize_revert_whenTargetChanged() public {
         // Create resize state 2
         int256[] memory resizeAmounts = new int256[](2);
         resizeAmounts[0] = 20;

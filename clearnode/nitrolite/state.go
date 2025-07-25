@@ -14,8 +14,8 @@ const (
 	IntentFINALIZE   Intent = 3
 )
 
-// EncodeState encodes channel state into a byte array.
-func EncodeState(channelID common.Hash, state State) ([]byte, error) {
+// EncodeStateData encodes channel state data into a byte array.
+func EncodeStateData(channelID common.Hash, state State) ([]byte, error) {
 	allocationType, err := abi.NewType("tuple[]", "", []abi.ArgumentMarshaling{
 		{Name: "destination", Type: "address"},
 		{Name: "token", Type: "address"},

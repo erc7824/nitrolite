@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import {Utils} from "../src/Utils.sol";
 import {Channel, State, StateIntent} from "../src/interfaces/Types.sol";
 
-contract TestUtilsContract {
+contract UtilsHarness {
     using Utils for *;
 
     function getChannelId(Channel memory ch) external view returns (bytes32) {

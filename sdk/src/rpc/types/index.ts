@@ -23,6 +23,7 @@ export enum RPCChannelStatus {
     Joining = 'joining',
     Open = 'open',
     Closed = 'closed',
+    Challenged = 'challenged',
 }
 
 /**
@@ -172,7 +173,7 @@ export interface ChannelUpdate {
     /** The challenge period in seconds. */
     challenge: number;
     /** The nonce value for the channel. */
-    nonce: number;
+    nonce: BigInt;
     /** The version number of the channel. */
     version: number;
     /** The timestamp when the channel was created. */

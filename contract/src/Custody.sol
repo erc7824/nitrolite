@@ -239,11 +239,6 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         if (_channels[channelId].stage != ChannelStatus.VOID) revert InvalidStatus();
 
         if (initial.sigs.length == 0 || initial.sigs.length > PART_NUM) revert InvalidStateSignatures();
-        if (initial.sigs.length == PART_NUM && initial.allocations[SERVER_IDX].amount != 0 ||
-            initial.sigs.length != PART_NUM && initial.allocations[SERVER_IDX].amount == 0
-        ) {
-            revert InvalidState();
-        }
 
         if (
             !initial.verifyStateSignature(
@@ -286,7 +281,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
 
         emit Created(channelId, wallet, ch, initial);
 
-        if (initial.sigs.length == PART_NUM && initial.allocations[SERVER_IDX].amount == 0) {
+        if (initial.sigs.length == PART_NUM) {
             if (
                 !initial.verifyStateSignature(
                     channelId, _domainSeparatorV4(), initial.sigs[SERVER_IDX], ch.participants[SERVER_IDX]
@@ -296,8 +291,11 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
             }
 
             meta.stage = ChannelStatus.ACTIVE;
-            meta.actualDeposits[SERVER_IDX] =  meta.expectedDeposits[SERVER_IDX];
+            Amount memory expectedDeposit = meta.expectedDeposits[SERVER_IDX];
+            meta.actualDeposits[SERVER_IDX] = expectedDeposit;
             _ledgers[ch.participants[SERVER_IDX]].channels.add(channelId);
+
+            _lockAccountFundsToChannel(ch.participants[SERVER_IDX], channelId, expectedDeposit.token, expectedDeposit.amount);
 
             emit Opened(channelId);
         }

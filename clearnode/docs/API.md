@@ -830,9 +830,9 @@ In the request, the user must specify funds destination. After the channel is cl
 {
   "res": [1, "close_channel", [{
     "channel_id": "0x4567890123abcdef...",
-    "intent": 3, // IntentFINALIZE - constant magic number for closing channel
+    "intent": 3, // IntentFINALIZE - constant specifying that this is a final state
     "version": 123,
-    "state_data": "0x0000000000000000000000000000000000000000000000000000000000001ec7",
+    "state_data": "0xdeadbeef",
     "allocations": [
       {
         "destination": "0x1234567890abcdef...", // Provided funds address
@@ -846,11 +846,7 @@ In the request, the user must specify funds destination. After the channel is cl
       }
     ],
     "state_hash": "0xLedgerStateHash",
-    "server_signature": {
-      "v": "27",
-      "r": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-      "s": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-    }
+    "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c",
   }], 1619123456789],
   "sig": ["0xabcd1234..."]
 }
@@ -890,7 +886,7 @@ Example:
 {
   "res": [1, "resize_channel", [{
     "channel_id": "0x4567890123abcdef...",
-    "state_data": "0x0000000000000000000000000000000000000000000000000000000000002ec7",
+    "state_data": "0xdeadbeef",
     "intent": 2, // IntentRESIZE
     "version": 5,
     "allocations": [
@@ -906,11 +902,7 @@ Example:
       }
     ],
     "state_hash": "0xLedgerStateHash",
-    "server_signature": {
-      "v": "28",
-      "r": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-      "s": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-    }
+    "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c",
   }], 1619123456789],
   "sig": ["0xabcd1234..."]
 }

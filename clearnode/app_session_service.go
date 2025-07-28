@@ -23,21 +23,21 @@ func NewAppSessionService(db *gorm.DB, wsNotifier *WSNotifier) *AppSessionServic
 	return &AppSessionService{db: db, wsNotifier: wsNotifier}
 }
 
-func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}) (*AppSession, error) {
+func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}) (AppSessionResponse, error) {
 	if len(params.Definition.ParticipantWallets) < 2 {
-		return nil, RPCErrorf("invalid number of participants")
+		return AppSessionResponse{}, RPCErrorf("invalid number of participants")
 	}
 	if len(params.Definition.Weights) != len(params.Definition.ParticipantWallets) {
-		return nil, RPCErrorf("number of weights must be equal to participants")
+		return AppSessionResponse{}, RPCErrorf("number of weights must be equal to participants")
 	}
 	if params.Definition.Nonce == 0 {
-		return nil, RPCErrorf("nonce is zero or not provided")
+		return AppSessionResponse{}, RPCErrorf("nonce is zero or not provided")
 	}
 
 	// Generate a unique ID for the virtual application
 	appBytes, err := json.Marshal(params.Definition)
 	if err != nil {
-		return nil, RPCErrorf("failed to generate app session ID")
+		return AppSessionResponse{}, RPCErrorf("failed to generate app session ID")
 	}
 	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
 	sessionAccountID := NewAccountID(appSessionID)
@@ -106,17 +106,21 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 	})
 
 	if err != nil {
-		return nil, err
+		return AppSessionResponse{}, err
 	}
 
 	for participant := range participants {
 		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
 	}
 
-	return &AppSession{SessionID: appSessionID, Version: 1, Status: ChannelStatusOpen}, nil
+	return AppSessionResponse{
+		AppSessionID: appSessionID,
+		Version:      1,
+		Status:       string(ChannelStatusOpen),
+	}, nil
 }
 
-func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSigners map[string]struct{}) (uint64, error) {
+func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSigners map[string]struct{}) (AppSessionResponse, error) {
 	var newVersion uint64
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
@@ -181,16 +185,20 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 	})
 
 	if err != nil {
-		return 0, err
+		return AppSessionResponse{}, err
 	}
 
-	return newVersion, nil
+	return AppSessionResponse{
+		AppSessionID: params.AppSessionID,
+		Version:      newVersion,
+		Status:       string(ChannelStatusOpen),
+	}, nil
 }
 
 // CloseApplication closes a virtual app session and redistributes funds to participants
-func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcSigners map[string]struct{}) (uint64, error) {
+func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcSigners map[string]struct{}) (AppSessionResponse, error) {
 	if params.AppSessionID == "" || len(params.Allocations) == 0 {
-		return 0, errors.New("missing required parameters: app_id or allocations")
+		return AppSessionResponse{}, errors.New("missing required parameters: app_id or allocations")
 	}
 
 	participants := make(map[string]bool)
@@ -265,14 +273,18 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 	})
 
 	if err != nil {
-		return 0, err
+		return AppSessionResponse{}, err
 	}
 
 	for participant := range participants {
 		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
 	}
 
-	return newVersion, nil
+	return AppSessionResponse{
+		AppSessionID: params.AppSessionID,
+		Version:      newVersion,
+		Status:       string(ChannelStatusClosed),
+	}, nil
 }
 
 // getAppSessions finds all app sessions

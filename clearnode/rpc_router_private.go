@@ -361,21 +361,17 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 		return
 	}
 
-	appSession, err := r.AppSessionService.CreateApplication(&params, rpcSigners)
+	resp, err := r.AppSessionService.CreateApplication(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to create application session", "error", err)
 		c.Fail(err, "failed to create application session")
 		return
 	}
 
-	c.Succeed(req.Method, AppSessionResponse{
-		AppSessionID: appSession.SessionID,
-		Version:      appSession.Version,
-		Status:       string(ChannelStatusOpen),
-	})
+	c.Succeed(req.Method, resp)
 	logger.Info("application session created",
 		"userID", c.UserID,
-		"sessionID", appSession.SessionID,
+		"sessionID", resp.AppSessionID,
 		"protocol", params.Definition.Protocol,
 		"participants", params.Definition.ParticipantWallets,
 		"challenge", params.Definition.Challenge,
@@ -403,22 +399,18 @@ func (r *RPCRouter) HandleSubmitAppState(c *RPCContext) {
 		return
 	}
 
-	newVersion, err := r.AppSessionService.SubmitAppState(&params, rpcSigners)
+	resp, err := r.AppSessionService.SubmitAppState(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to submit app state", "error", err)
 		c.Fail(err, "failed to submit app state")
 		return
 	}
 
-	c.Succeed(req.Method, AppSessionResponse{
-		AppSessionID: params.AppSessionID,
-		Version:      newVersion,
-		Status:       string(ChannelStatusOpen),
-	})
+	c.Succeed(req.Method, resp)
 	logger.Info("application session state submitted",
 		"userID", c.UserID,
 		"sessionID", params.AppSessionID,
-		"newVersion", newVersion,
+		"newVersion", resp.Version,
 		"allocations", params.Allocations,
 	)
 }
@@ -442,22 +434,18 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 		return
 	}
 
-	finalVersion, err := r.AppSessionService.CloseApplication(&params, rpcSigners)
+	resp, err := r.AppSessionService.CloseApplication(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to close application session", "error", err)
 		c.Fail(err, "failed to close application session")
 		return
 	}
 
-	c.Succeed(req.Method, AppSessionResponse{
-		AppSessionID: params.AppSessionID,
-		Version:      finalVersion,
-		Status:       string(ChannelStatusClosed),
-	})
+	c.Succeed(req.Method, resp)
 	logger.Info("application session closed",
 		"userID", c.UserID,
 		"sessionID", params.AppSessionID,
-		"finalVersion", finalVersion,
+		"finalVersion", resp.Version,
 		"allocations", params.Allocations,
 	)
 }

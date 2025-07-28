@@ -677,30 +677,22 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
     ) internal view {
         // NOTE: ERC-6492 signature is NOT checked as at this point participants should already be deployed
 
-        bytes32 stateHash = Utils.getStateHashShort(channelId, state);
         // NOTE: the "challenge" suffix substitution for raw ECDSA and EIP-191 signatures
-        bytes32 challengeStateHash = keccak256(abi.encode(stateHash, "challenge"));
+        bytes32 challengeStateHash = keccak256(abi.encode(Utils.getStateHashShort(channelId, state), "challenge"));
+        address rawSigner = Utils.recoverRawECDSASigner(challengeStateHash, challengerSig);
+        address eip191Signer = Utils.recoverEIP191Signer(challengeStateHash, challengerSig);
+        address eip712Signer = Utils.recoverStateEIP712Signer(
+            _domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig
+        );
 
         for (uint256 i = 0; i < participants.length; i++) {
-            if (participants[i].code.length != 0) {
-                if (Utils.isValidERC1271Signature(challengeStateHash, challengerSig, participants[i])) {
+            address participant = participants[i];
+            if (participant.code.length != 0) {
+                if (Utils.isValidERC1271Signature(challengeStateHash, challengerSig, participant)) {
                     return;
                 }
             } else {
-                if (Utils.recoverRawECDSASigner(challengeStateHash, challengerSig) == participants[i]) {
-                    return;
-                }
-
-                if (Utils.recoverEIP191Signer(challengeStateHash, challengerSig) == participants[i]) {
-                    return;
-                }
-
-                // NOTE: the `CHALLENGE_STATE_TYPEHASH` is used to recover the EIP-712 signer
-                if (
-                    Utils.recoverStateEIP712Signer(
-                        _domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig
-                    ) == participants[i]
-                ) {
+                if (rawSigner == participant || eip191Signer == participant || eip712Signer == participant) {
                     return;
                 }
             }

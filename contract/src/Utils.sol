@@ -242,12 +242,14 @@ library Utils {
         bytes memory sig,
         address signer
     ) internal returns (bool) {
+        bytes32 stateHash = Utils.getStateHashShort(channelId, state);
+
         if (trailingBytes32(sig) == ERC6492_DETECTION_SUFFIX) {
-            return isValidERC6492Signature(Utils.getStateHashShort(channelId, state), sig, signer);
+            return isValidERC6492Signature(stateHash, sig, signer);
         }
 
         if (signer.code.length != 0) {
-            return isValidERC1271Signature(Utils.getStateHashShort(channelId, state), sig, signer);
+            return isValidERC1271Signature(stateHash, sig, signer);
         }
 
         return Utils.verifyStateEOASignature(state, channelId, domainSeparator, sig, signer);

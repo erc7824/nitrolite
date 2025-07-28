@@ -136,16 +136,6 @@ library Utils {
     /**
      * @notice Verifies that a state is signed by the specified EOA participant in either raw ECDSA, EIP-191, or EIP-712 format
      * @param state The state to verify
-                    keccak256(abi.encode(state.allocations))
-                )
-            ),
-            sig
-        );
-    }
-
-    /**
-     * @notice Verifies that a state is signed by the specified EOA participant in either raw ECDSA, EIP-191, or EIP-712 format
-     * @param state The state to verify
      * @param channelId The ID of the channel
      * @param domainSeparator The EIP-712 domain separator for the channel
      * @param sig The signature to verify
@@ -199,7 +189,8 @@ library Utils {
     }
 
     /**
-     * @notice Checks if a signature is valid by deploying the expected signer contract according to the ERC-6492 standard
+     * @notice Checks the validity of a smart contract signature. If the expected signer has no code, it is deployed using the provided factory and calldata from the signature.
+     * Otherwise, it checks the signature using the ERC-1271 standard.
      * @param msgHash The hash of the message to verify the signature against
      * @param sig The signature to verify
      * @param expectedSigner The address of the expected signer

@@ -21,7 +21,9 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 import {MockFlagERC1271} from "./mocks/MockFlagERC1271.sol"; // import to allow easier artifact fetching for `getCode` cheat code
 import {TestUtils} from "./TestUtils.sol";
 import {Custody} from "../src/Custody.sol";
-import {Channel, State, Allocation, ChannelStatus, StateIntent, Amount, STATE_TYPEHASH} from "../src/interfaces/Types.sol";
+import {
+    Channel, State, Allocation, ChannelStatus, StateIntent, Amount, STATE_TYPEHASH
+} from "../src/interfaces/Types.sol";
 import {Utils} from "../src/Utils.sol";
 
 import {FlagAdjudicator} from "./mocks/FlagAdjudicator.sol";
@@ -315,7 +317,9 @@ contract CustodyTest_challenge is CustodyTest_Base {
         challengeState.version = 97; // Version 97 indicates a challenge state
 
         // Host signs the challenge state
-        bytes memory hostChallengeSig = TestUtils.signStateEIP712(vm, Utils.getChannelId(chan), challengeState, STATE_TYPEHASH, custodyDomainSeparator, hostSKPrivKey);
+        bytes memory hostChallengeSig = TestUtils.signStateEIP712(
+            vm, Utils.getChannelId(chan), challengeState, STATE_TYPEHASH, custodyDomainSeparator, hostSKPrivKey
+        );
         bytes[] memory challengeSigs = new bytes[](1);
         challengeSigs[0] = hostChallengeSig;
         challengeState.sigs = challengeSigs;
@@ -467,7 +471,8 @@ contract CustodyTest_challenge is CustodyTest_Base {
     }
 
     function test_immediateClose_whenChallengingInitial() public {
-        (uint256 hostAvailableBefore, uint256 hostChannelCountBefore) = getAvailableBalanceAndChannelCount(hostSK, address(token));
+        (uint256 hostAvailableBefore, uint256 hostChannelCountBefore) =
+            getAvailableBalanceAndChannelCount(hostSK, address(token));
         (, uint256 guestChannelCountBefore) = getAvailableBalanceAndChannelCount(guestSK, address(token));
 
         // Create a new channel for this test (guest doesn't join)
@@ -505,7 +510,6 @@ contract CustodyTest_challenge is CustodyTest_Base {
 }
 
 contract CustodyTest is CustodyTest_Base {
-
     // ==================== TEST CASES ====================
 
     // ==== 1. Channel Creation and Joining ====
@@ -753,7 +757,6 @@ contract CustodyTest is CustodyTest_Base {
         custody.close(nonExistentChannelId, closingState, new State[](0));
         vm.stopPrank();
     }
-
 
     // ==== 3. Checkpoint Mechanism ====
 

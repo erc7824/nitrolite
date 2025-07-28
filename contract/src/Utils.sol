@@ -296,9 +296,8 @@ library Utils {
 
         bytes32 channelId = getChannelId(chan);
 
-        return Utils.verifyStateSignature(
-            state, channelId, domainSeparator, state.sigs[0], chan.participants[CLIENT]
-        ) && Utils.verifyStateSignature(state, channelId, domainSeparator, state.sigs[1], chan.participants[SERVER]);
+        return Utils.verifyStateSignature(state, channelId, domainSeparator, state.sigs[0], chan.participants[CLIENT])
+            && Utils.verifyStateSignature(state, channelId, domainSeparator, state.sigs[1], chan.participants[SERVER]);
     }
 
     /**

@@ -126,11 +126,7 @@ contract CustodyIntegrationTest_Signatures is Test {
         bytes memory signature = "dummy signature";
         bool flag = true; // meaning each EIP-1271 signature is valid
 
-        bytes memory factoryCalldata = abi.encodeWithSelector(
-            CheatERC6492Factory.createAccount.selector,
-            signer,
-            flag
-        );
+        bytes memory factoryCalldata = abi.encodeWithSelector(CheatERC6492Factory.createAccount.selector, signer, flag);
 
         bytes memory erc6492Sig = abi.encode(address(factory), factoryCalldata, signature);
         return abi.encodePacked(erc6492Sig, Utils.ERC6492_DETECTION_SUFFIX);
@@ -234,7 +230,6 @@ contract CustodyIntegrationTest_Signatures is Test {
 
         assertTrue(status == ChannelStatus.ACTIVE, "Channel should be back to ACTIVE status after checkpoint");
         assertEq(challengeExpiry, 0, "Channel should have no challengeExpiry after checkpoint");
-
 
         // ==================== 5. CHECKPOINT AGAIN ====================
 

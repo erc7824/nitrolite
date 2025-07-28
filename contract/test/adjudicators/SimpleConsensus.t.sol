@@ -120,7 +120,7 @@ contract SimpleConsensusTest is Test {
         return TestUtils.signStateEIP712(vm, channelId, state, STATE_TYPEHASH, domainSeparator, privateKey);
     }
 
-    function test_adjudicate_firstState_valid_withRawECDSASignatures() public  {
+    function test_adjudicate_firstState_valid_withRawECDSASignatures() public {
         State memory initialState = _createInitialState("initial state");
         initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
@@ -130,7 +130,7 @@ contract SimpleConsensusTest is Test {
         assertTrue(valid, "Valid first state transition should be accepted");
     }
 
-    function test_adjudicate_firstState_valid_withEIP191Signatures() public  {
+    function test_adjudicate_firstState_valid_withEIP191Signatures() public {
         State memory initialState = _createInitialState("initial state");
         initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signStateEIP191(initialState, hostPrivateKey);
@@ -140,7 +140,7 @@ contract SimpleConsensusTest is Test {
         assertTrue(valid, "Valid first state transition with EIP191 signatures should be accepted");
     }
 
-    function test_adjudicate_firstState_valid_withEIP712Signatures() public  {
+    function test_adjudicate_firstState_valid_withEIP712Signatures() public {
         State memory initialState = _createInitialState("initial state");
         initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signStateEIP712(initialState, hostPrivateKey);
@@ -150,7 +150,7 @@ contract SimpleConsensusTest is Test {
         assertTrue(valid, "Valid first state transition with EIP712 signatures should be accepted");
     }
 
-    function test_adjudicate_firstState_revert_whenMissingParticipantSignature() public  {
+    function test_adjudicate_firstState_revert_whenMissingParticipantSignature() public {
         State memory initialState = _createInitialState("initial state");
         initialState.sigs = new bytes[](1);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
@@ -159,7 +159,7 @@ contract SimpleConsensusTest is Test {
         assertFalse(valid, "First state without both signatures should be rejected");
     }
 
-    function test_adjudicate_firstState_revert_whenIncorrectIntent() public  {
+    function test_adjudicate_firstState_revert_whenIncorrectIntent() public {
         State memory initialState = _createInitialState("initial state");
         initialState.intent = StateIntent.OPERATE; // Incorrect intent, should be INITIALIZE
         initialState.sigs = new bytes[](2);
@@ -170,7 +170,7 @@ contract SimpleConsensusTest is Test {
         assertFalse(valid, "First state with incorrect intent should be rejected");
     }
 
-    function test_adjudicate_firstState_revert_whenIncorrectVersion() public  {
+    function test_adjudicate_firstState_revert_whenIncorrectVersion() public {
         State memory initialState = _createInitialState("initial state");
         initialState.version = 1; // Incorrect version, should be 0
         initialState.sigs = new bytes[](2);
@@ -181,7 +181,7 @@ contract SimpleConsensusTest is Test {
         assertFalse(valid, "First state with incorrect version should be rejected");
     }
 
-    function test_adjudicate_laterState_valid() public  {
+    function test_adjudicate_laterState_valid() public {
         State memory state1 = _createOperateState("state 42", 42);
         state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
@@ -191,7 +191,7 @@ contract SimpleConsensusTest is Test {
         assertTrue(valid, "Valid state transition from 1 to 2 should be accepted");
     }
 
-    function test_adjudicate_revert_whenTooManyProofs() public  {
+    function test_adjudicate_revert_whenTooManyProofs() public {
         State memory state1 = _createOperateState("state 1", 1);
         state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
@@ -210,7 +210,7 @@ contract SimpleConsensusTest is Test {
     }
 
     // Test signature validation using a non-corrupt signature but wrong signer
-    function test_adjudicate_revert_wrongSigner() public  {
+    function test_adjudicate_revert_wrongSigner() public {
         // Create state with signatures from wrong participants
         State memory state = _createOperateState("state 13", 13);
         state.sigs = new bytes[](2);

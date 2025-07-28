@@ -36,17 +36,14 @@ abstract contract UtilsTest_SignaturesBase is Test {
         wrongSigner = vm.addr(wrongSignerPrivateKey);
     }
 
-    function getERC6492SignatureAndSigner(
-        bool flag,
-        bytes32 salt,
-        bytes memory originalSig
-    ) internal virtual view returns (bytes memory, address) {
+    function getERC6492SignatureAndSigner(bool flag, bytes32 salt, bytes memory originalSig)
+        internal
+        view
+        virtual
+        returns (bytes memory, address)
+    {
         address expectedSigner = erc4337Factory.getAddress(flag, salt);
-        bytes memory factoryCalldata = abi.encodeWithSelector(
-            MockERC4337Factory.createAccount.selector,
-            flag,
-            salt
-        );
+        bytes memory factoryCalldata = abi.encodeWithSelector(MockERC4337Factory.createAccount.selector, flag, salt);
 
         bytes memory erc6492Sig = abi.encode(address(erc4337Factory), factoryCalldata, originalSig);
         bytes memory sigWithSuffix = abi.encodePacked(erc6492Sig, Utils.ERC6492_DETECTION_SUFFIX);
@@ -162,8 +159,7 @@ contract UtilsTest_Signatures is UtilsTest_SignaturesBase {
         bool flag = true;
 
         address expectedSigner = erc4337Factory.createAccount(flag, salt);
-        (bytes memory signature, ) =
-            getERC6492SignatureAndSigner(flag, salt, "dummy signature");
+        (bytes memory signature,) = getERC6492SignatureAndSigner(flag, salt, "dummy signature");
 
         bool isValid = utils.isValidERC6492Signature(messageHash, signature, expectedSigner);
 
@@ -183,40 +179,29 @@ contract UtilsTest_Signatures is UtilsTest_SignaturesBase {
         address expectedSigner = address(0x12345678); // Simulate a contract that will not deploy correctly
         bytes memory originalSig = "dummy signature";
 
-        bytes memory factoryCalldata = abi.encodeWithSelector(
-            MockERC4337Factory.createAccount.selector,
-            "corrupted data",
-            keccak256("test salt")
-        );
+        bytes memory factoryCalldata =
+            abi.encodeWithSelector(MockERC4337Factory.createAccount.selector, "corrupted data", keccak256("test salt"));
 
         bytes memory erc6492Sig = abi.encode(address(erc4337Factory), factoryCalldata, originalSig);
         bytes memory sigWithSuffix = abi.encodePacked(erc6492Sig, Utils.ERC6492_DETECTION_SUFFIX);
 
-        vm.expectRevert(abi.encodeWithSelector(
-            Utils.ERC6492DeploymentFailed.selector,
-            erc4337Factory,
-            factoryCalldata
-        ));
+        vm.expectRevert(abi.encodeWithSelector(Utils.ERC6492DeploymentFailed.selector, erc4337Factory, factoryCalldata));
         utils.isValidERC6492Signature(messageHash, sigWithSuffix, expectedSigner);
     }
 
     function test_isValidERC6492Signature_reverts_forWrongExpectedSigner_thatIsNotContract() public {
         address wrongExpectedSigner = address(0x33231234); // Wrong address
 
-        (bytes memory signature, ) = getERC6492SignatureAndSigner(true, keccak256("test salt"), "dummy signature");
+        (bytes memory signature,) = getERC6492SignatureAndSigner(true, keccak256("test salt"), "dummy signature");
 
-        vm.expectRevert(abi.encodeWithSelector(
-            Utils.ERC6492NoCode.selector,
-            wrongExpectedSigner
-        ));
+        vm.expectRevert(abi.encodeWithSelector(Utils.ERC6492NoCode.selector, wrongExpectedSigner));
         utils.isValidERC6492Signature(messageHash, signature, wrongExpectedSigner);
     }
 
     function test_isValidERC6492Signature_returnsFalse_forWrongExpectedSigner_thatIsContract() public {
         address wrongExpectedSigner = address(new MockFlagERC1271(false)); // Different deployed contract
 
-        (bytes memory signature, ) =
-            getERC6492SignatureAndSigner(true, keccak256("test salt"), "dummy signature");
+        (bytes memory signature,) = getERC6492SignatureAndSigner(true, keccak256("test salt"), "dummy signature");
 
         bool isValid = utils.isValidERC6492Signature(messageHash, signature, wrongExpectedSigner);
 
@@ -510,8 +495,7 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
         bool flag = true;
 
         address expectedSigner = factory.createAccount(flag, salt);
-        (bytes memory signature, ) =
-            getERC6492SignatureAndSigner(flag, salt, "dummy signature");
+        (bytes memory signature,) = getERC6492SignatureAndSigner(flag, salt, "dummy signature");
 
         bool isValid = utils.verifyStateSignature(testState, channelId, domainSeparator, signature, expectedSigner);
 
@@ -532,8 +516,7 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
         bool flag = false;
 
         address expectedSigner = factory.createAccount(flag, salt);
-        (bytes memory signature, ) =
-            getERC6492SignatureAndSigner(flag, salt, "dummy signature");
+        (bytes memory signature,) = getERC6492SignatureAndSigner(flag, salt, "dummy signature");
 
         bool isValid = utils.verifyStateSignature(testState, channelId, domainSeparator, signature, expectedSigner);
 
@@ -543,8 +526,7 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
     function test_verifyStateSignature_returnsFalse_forERC6492_wrongExpectedSigner() public {
         address wrongExpectedSigner = address(new MockFlagERC1271(false));
 
-        (bytes memory signature, ) =
-            getERC6492SignatureAndSigner(true, keccak256("test salt"), "dummy signature");
+        (bytes memory signature,) = getERC6492SignatureAndSigner(true, keccak256("test salt"), "dummy signature");
 
         bool isValid = utils.verifyStateSignature(testState, channelId, domainSeparator, signature, wrongExpectedSigner);
 

@@ -161,7 +161,7 @@ contract ConsensusTransitionTest is Test {
         assertTrue(valid, "Valid first state transition should be accepted");
     }
 
-    function test_adjudicate_firstState_revert_whenMissingParticipantSignature() public  {
+    function test_adjudicate_firstState_revert_whenMissingParticipantSignature() public {
         // Create initial state with both signatures
         State memory initialState = _createInitialState("initial state");
         initialState.sigs = new bytes[](2);
@@ -182,7 +182,7 @@ contract ConsensusTransitionTest is Test {
         assertFalse(valid, "First state without both signatures should be rejected");
     }
 
-    function test_adjudicate_firstState_revert_whenIncorrectVersion() public  {
+    function test_adjudicate_firstState_revert_whenIncorrectVersion() public {
         // Create initial state with both signatures
         State memory initialState = _createInitialState("initial state");
         initialState.sigs = new bytes[](2);
@@ -206,7 +206,7 @@ contract ConsensusTransitionTest is Test {
 
     // -------------------- LATER STATE TRANSITION TESTS --------------------
 
-    function test_adjudicate_laterState_valid() public  {
+    function test_adjudicate_laterState_valid() public {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
         state1.sigs = new bytes[](2);
@@ -228,7 +228,7 @@ contract ConsensusTransitionTest is Test {
         assertTrue(valid, "Valid state transition from 1 to 2 should be accepted");
     }
 
-    function test_adjudicate_laterState_revert_whenIncorrectVersionIncrement() public  {
+    function test_adjudicate_laterState_revert_whenIncorrectVersionIncrement() public {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
         state1.sigs = new bytes[](2);
@@ -250,7 +250,7 @@ contract ConsensusTransitionTest is Test {
         assertFalse(valid, "State with non-sequential version should be rejected");
     }
 
-    function test_adjudicate_laterState_revert_whenAllocationSumChanged() public  {
+    function test_adjudicate_laterState_revert_whenAllocationSumChanged() public {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
         state1.sigs = new bytes[](2);
@@ -274,7 +274,7 @@ contract ConsensusTransitionTest is Test {
         assertFalse(valid, "State with changed allocation sum should be rejected");
     }
 
-    function test_adjudicate_revert_whenNoStateProof() public  {
+    function test_adjudicate_revert_whenNoStateProof() public {
         // Create state 2 without providing a proof
         State memory state2 = _createOperateState("state 2", 2);
         state2.sigs = new bytes[](2);
@@ -289,7 +289,7 @@ contract ConsensusTransitionTest is Test {
         assertFalse(valid, "State without proof should be rejected");
     }
 
-    function test_adjudicate_revert_whenTooManyProofs() public  {
+    function test_adjudicate_revert_whenTooManyProofs() public {
         // Create state 1
         State memory state1 = _createOperateState("state 1", 1);
         state1.sigs = new bytes[](2);
@@ -314,7 +314,7 @@ contract ConsensusTransitionTest is Test {
 
     // -------------------- RESIZE STATE TRANSITION TESTS --------------------
 
-    function test_adjudicate_afterResize_valid() public  {
+    function test_adjudicate_afterResize_valid() public {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
         state1.sigs = new bytes[](2);
@@ -346,7 +346,7 @@ contract ConsensusTransitionTest is Test {
     }
 
     // Test signature validation using a non-corrupt signature but wrong signer
-    function test_WrongSignerRejected() public  {
+    function test_WrongSignerRejected() public {
         // Create state with signatures from wrong participants
         State memory state = _createOperateState("state", 1);
         state.sigs = new bytes[](2);

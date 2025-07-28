@@ -10,21 +10,22 @@ import {State, Channel} from "../src/interfaces/Types.sol";
 import {Utils} from "../src/Utils.sol";
 
 library TestUtils {
-    bytes32 public constant TYPE_HASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 public constant TYPE_HASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
-    function buildDomainSeparator(
-        string memory name,
-        string memory version,
-        uint256 chainId,
-        address verifyingContract
-    ) internal pure returns (bytes32) {
-        return keccak256(abi.encode(TYPE_HASH, keccak256(bytes(name)), keccak256(bytes(version)), chainId, verifyingContract));
+    function buildDomainSeparator(string memory name, string memory version, uint256 chainId, address verifyingContract)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return keccak256(
+            abi.encode(TYPE_HASH, keccak256(bytes(name)), keccak256(bytes(version)), chainId, verifyingContract)
+        );
     }
 
-    function buildDomainSeparatorForContract(
-        EIP712 eip712Contract
-    ) internal view returns (bytes32) {
-        (, string memory name, string memory version, uint256 chainId, address verifyingContract,,) = eip712Contract.eip712Domain();
+    function buildDomainSeparatorForContract(EIP712 eip712Contract) internal view returns (bytes32) {
+        (, string memory name, string memory version, uint256 chainId, address verifyingContract,,) =
+            eip712Contract.eip712Domain();
         return buildDomainSeparator(name, version, chainId, verifyingContract);
     }
 
@@ -52,12 +53,23 @@ library TestUtils {
         return abi.encodePacked(r, s, v);
     }
 
-    function signStateEIP191(Vm vm, Channel memory channel, State memory state, uint256 privateKey) internal view returns (bytes memory) {
+    function signStateEIP191(Vm vm, Channel memory channel, State memory state, uint256 privateKey)
+        internal
+        view
+        returns (bytes memory)
+    {
         bytes32 stateHash = Utils.getStateHash(channel, state);
         return TestUtils.signEIP191(vm, privateKey, stateHash);
     }
 
-    function signStateEIP712(Vm vm, bytes32 channelId, State memory state, bytes32 stateTypehash, bytes32 domainSeparator, uint256 privateKey) internal pure returns (bytes memory) {
+    function signStateEIP712(
+        Vm vm,
+        bytes32 channelId,
+        State memory state,
+        bytes32 stateTypehash,
+        bytes32 domainSeparator,
+        uint256 privateKey
+    ) internal pure returns (bytes memory) {
         bytes32 structHash = keccak256(
             abi.encode(
                 stateTypehash,

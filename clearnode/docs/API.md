@@ -836,7 +836,7 @@ Returns signed initial state with the requested amounts ready to submit on Block
 {
   "res": [1, "create_channel", [{
     "channel_id": "0x4567890123abcdef...",
-    "state_hash": "0xLedgerStateHash",
+    "state_hash": "0xStateHash",
     "state": {
       "intent": 1,
       "version": 0,
@@ -852,9 +852,9 @@ Returns signed initial state with the requested amounts ready to submit on Block
           "token": "0xeeee567890abcdef...",
           "amount": "0"
         }
-      ],
-      "sig": ["0x9876fedcba..."]
-    }
+      ]
+    },
+    "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c"
   }], 1619123456789],
   "sig": ["0xabcd1234..."]
 }
@@ -863,7 +863,8 @@ Returns signed initial state with the requested amounts ready to submit on Block
 The response includes:
 - `channel_id`: Unique identifier for the channel
 - `state_hash`: Hash of the initial channel state
-- `state`: Complete initial state structure containing intent, version, allocations, and Broker signature
+- `state`: Complete initial state structure containing intent, version, state_data, and allocations
+- `server_signature`: Broker's signature of the state
 
 ### Close Channel
 
@@ -890,23 +891,25 @@ In the request, the user must specify funds destination. After the channel is cl
 {
   "res": [1, "close_channel", [{
     "channel_id": "0x4567890123abcdef...",
-    "intent": 3, // IntentFINALIZE - constant specifying that this is a final state
-    "version": 123,
-    "state_data": "0xdeadbeef",
-    "allocations": [
-      {
-        "destination": "0x1234567890abcdef...", // Provided funds address
-        "token": "0xeeee567890abcdef...",
-        "amount": "50000"
-      },
-      {
-        "destination": "0xbbbb567890abcdef...", // Broker address
-        "token": "0xeeee567890abcdef...",
-        "amount": "50000"
-      }
-    ],
-    "state_hash": "0xLedgerStateHash",
-    "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c",
+    "state_hash": "0xStateHash",
+    "state": {
+      "intent": 3, // IntentFINALIZE - constant specifying that this is a final state
+      "version": 123,
+      "state_data": "0xc0ffee", 
+      "allocations": [
+        {
+          "destination": "0x1234567890abcdef...", // Provided funds address
+          "token": "0xeeee567890abcdef...",
+          "amount": "50000"
+        },
+        {
+          "destination": "0xbbbb567890abcdef...", // Broker address
+          "token": "0xeeee567890abcdef...",
+          "amount": "50000"
+        }
+      ]
+    },
+    "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c"
   }], 1619123456789],
   "sig": ["0xabcd1234..."]
 }
@@ -946,23 +949,25 @@ Example:
 {
   "res": [1, "resize_channel", [{
     "channel_id": "0x4567890123abcdef...",
-    "state_data": "0xdeadbeef",
-    "intent": 2, // IntentRESIZE
-    "version": 5,
-    "allocations": [
-      {
-        "destination": "0x1234567890abcdef...",
-        "token": "0xeeee567890abcdef...",
-        "amount": "100000"
-      },
-      {
-        "destination": "0xbbbb567890abcdef...", // Broker address
-        "token": "0xeeee567890abcdef...",
-        "amount": "0"
-      }
-    ],
-    "state_hash": "0xLedgerStateHash",
-    "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c",
+    "state_hash": "0xStateHash",
+    "state": {
+      "intent": 2, // IntentRESIZE
+      "version": 5,
+      "state_data": "0xc0ffee",
+      "allocations": [
+        {
+          "destination": "0x1234567890abcdef...",
+          "token": "0xeeee567890abcdef...",
+          "amount": "100000"
+        },
+        {
+          "destination": "0xbbbb567890abcdef...", // Broker address
+          "token": "0xeeee567890abcdef...",
+          "amount": "0"
+        }
+      ]
+    },
+    "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c"
   }], 1619123456789],
   "sig": ["0xabcd1234..."]
 }

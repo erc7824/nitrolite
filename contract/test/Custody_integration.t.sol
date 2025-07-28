@@ -2,20 +2,29 @@
 pragma solidity ^0.8.26;
 
 import {Test} from "lib/forge-std/src/Test.sol";
-import {console} from "lib/forge-std/src/console.sol";
+import {Vm} from "lib/forge-std/src/Vm.sol";
 
 import {TestUtils} from "./TestUtils.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
+import {MockFlagERC1271} from "./mocks/MockFlagERC1271.sol";
 
 import {Custody} from "../src/Custody.sol";
 import {SimpleConsensus} from "../src/adjudicators/SimpleConsensus.sol";
 import {Utils} from "../src/Utils.sol";
 import {ChannelStatus, Channel, State, Allocation, StateIntent, STATE_TYPEHASH} from "../src/interfaces/Types.sol";
 
-contract CustodyIntegrationTest is Test {
+/// @dev used to mock the deployment of ERC-4337 accounts to specific addresses
+contract CheatERC6492Factory is Test {
+    function createAccount(address to, bool flag) external {
+        deployCodeTo("MockFlagERC1271", abi.encode(flag), to);
+    }
+}
+
+contract CustodyIntegrationTest_Signatures is Test {
     Custody public custody;
     SimpleConsensus public adjudicator;
     MockERC20 public token;
+    CheatERC6492Factory public factory;
 
     // Test participants
     address public participant1;
@@ -42,6 +51,7 @@ contract CustodyIntegrationTest is Test {
         custody = new Custody();
         adjudicator = new SimpleConsensus(address(this), address(custody));
         token = new MockERC20("Test Token", "TEST", 18);
+        factory = new CheatERC6492Factory();
 
         // Set up participants
         participant1PrivateKey = vm.createWallet("participant1").privateKey;
@@ -112,6 +122,16 @@ contract CustodyIntegrationTest is Test {
         return TestUtils.signEIP712(vm, privateKey, domainSeparator, structHash);
     }
 
+    function _signStateEIP6492(address signer, State memory) internal view returns (bytes memory) {
+        bytes memory signature = "dummy signature";
+        bool flag = true; // meaning each EIP-1271 signature is valid
+
+        bytes memory factoryCalldata = abi.encodeWithSelector(CheatERC6492Factory.createAccount.selector, signer, flag);
+
+        bytes memory erc6492Sig = abi.encode(address(factory), factoryCalldata, signature);
+        return abi.encodePacked(erc6492Sig, Utils.ERC6492_DETECTION_SUFFIX);
+    }
+
     function _signChallenge(State memory state, uint256 privateKey) internal view returns (bytes memory) {
         bytes32 stateHash = Utils.getStateHash(channel, state);
         bytes32 challengeHash = keccak256(abi.encode(stateHash, "challenge"));
@@ -154,22 +174,19 @@ contract CustodyIntegrationTest is Test {
         initialState.sigs = new bytes[](1);
         initialState.sigs[0] = _signStateEIP191(initialState, participant1PrivateKey);
 
-        // Participant1 deposits and creates channel
         vm.prank(participant1);
         custody.depositAndCreate(address(token), DEPOSIT_AMOUNT, channel, initialState);
 
         (, ChannelStatus status,,,) = custody.getChannelData(channelId);
 
-        // Verify channel is created
         assertTrue(status == ChannelStatus.INITIAL, "Channel should be in INITIAL status");
 
         // ==================== 2. JOIN CHANNEL ====================
 
-        // Participant2 deposits
         vm.prank(participant2);
         custody.deposit(participant2, address(token), DEPOSIT_AMOUNT);
 
-        // Participant2 joins with raw ECDSA signature
+        // Participant2 joins using raw ECDSA signature
         bytes memory participant2JoinSig = _signStateRaw(initialState, participant2PrivateKey);
 
         vm.prank(participant2);
@@ -177,7 +194,6 @@ contract CustodyIntegrationTest is Test {
 
         (, status,,,) = custody.getChannelData(channelId);
 
-        // Verify channel is now active
         assertTrue(status == ChannelStatus.ACTIVE, "Channel should be in ACTIVE status");
 
         // ==================== 3. CHALLENGE CHANNEL ====================
@@ -188,7 +204,6 @@ contract CustodyIntegrationTest is Test {
         challengeState.sigs[PARTICIPANT_1] = _signStateEIP712(challengeState, participant1PrivateKey);
         challengeState.sigs[PARTICIPANT_2] = _signStateRaw(challengeState, participant2PrivateKey);
 
-        // Participant1 challenges with EIP191 challenger signature
         bytes memory challengerSig = _signChallenge(challengeState, participant1PrivateKey);
 
         vm.prank(participant1);
@@ -197,7 +212,6 @@ contract CustodyIntegrationTest is Test {
         uint256 challengeExpiry;
         (, status,, challengeExpiry,) = custody.getChannelData(channelId);
 
-        // Verify channel is in challenge state
         assertTrue(status == ChannelStatus.DISPUTE, "Channel should be in DISPUTE status");
         assertTrue(challengeExpiry > block.timestamp, "Channel should have challengeExpiry set in future");
 
@@ -209,37 +223,47 @@ contract CustodyIntegrationTest is Test {
         checkpointState.sigs[PARTICIPANT_1] = _signStateRaw(checkpointState, participant1PrivateKey);
         checkpointState.sigs[PARTICIPANT_2] = _signStateRaw(checkpointState, participant2PrivateKey);
 
-        // Participant2 checkpoints to resolve challenge
         vm.prank(participant2);
         custody.checkpoint(channelId, checkpointState, new State[](0));
 
         (, status,, challengeExpiry,) = custody.getChannelData(channelId);
 
-        // Verify channel is back to active
         assertTrue(status == ChannelStatus.ACTIVE, "Channel should be back to ACTIVE status after checkpoint");
         assertEq(challengeExpiry, 0, "Channel should have no challengeExpiry after checkpoint");
 
-        // ==================== 5. CLOSE CHANNEL ====================
+        // ==================== 5. CHECKPOINT AGAIN ====================
 
-        // Create final state - participant1 uses EIP191, participant2 uses raw ECDSA
-        State memory finalState = _createFinalState(3);
+        // Create checkpoint state with higher version - participant1 uses EIP-6492, participant2 uses raw ECDSA
+        checkpointState = _createOperateState(3, bytes("checkpoint data"));
+        checkpointState.sigs = new bytes[](2);
+        checkpointState.sigs[PARTICIPANT_1] = _signStateEIP6492(participant1, checkpointState);
+        checkpointState.sigs[PARTICIPANT_2] = _signStateRaw(checkpointState, participant2PrivateKey);
+
+        vm.prank(participant2);
+        custody.checkpoint(channelId, checkpointState, new State[](0));
+
+        (, status,, challengeExpiry,) = custody.getChannelData(channelId);
+
+        assertTrue(status == ChannelStatus.ACTIVE, "Channel should still be in an ACTIVE status after checkpoint");
+
+        // ==================== 6. CLOSE CHANNEL ====================
+
+        // Create final state - participant1 uses EIP1271, participant2 uses raw ECDSA
+        State memory finalState = _createFinalState(4);
         finalState.sigs = new bytes[](2);
+        // as participant1 already has a contract at its address, we assume this contract expects EIP-191 signature
         finalState.sigs[PARTICIPANT_1] = _signStateEIP191(finalState, participant1PrivateKey);
         finalState.sigs[PARTICIPANT_2] = _signStateRaw(finalState, participant2PrivateKey);
 
-        // Close channel cooperatively
         vm.prank(participant1);
         custody.close(channelId, finalState, new State[](0));
 
-        // Verify channel is closed
         (, status,,,) = custody.getChannelData(channelId);
 
-        // Verify channel is closed
         assertTrue(status == ChannelStatus.VOID, "Channel should have VOID status after close (channel data deleted)");
 
-        // ==================== 6. VERIFY FINAL BALANCES ====================
+        // ==================== 7. VERIFY FINAL BALANCES ====================
 
-        // Check that participants got their tokens back
         address[] memory users = new address[](2);
         users[0] = participant1;
         users[1] = participant2;
@@ -252,7 +276,6 @@ contract CustodyIntegrationTest is Test {
         assertEq(balances[0][0], DEPOSIT_AMOUNT, "Participant1 should have deposit amount available");
         assertEq(balances[1][0], DEPOSIT_AMOUNT, "Participant2 should have deposit amount available");
 
-        // Verify no channels remain
         bytes32[][] memory channels = custody.getOpenChannels(users);
         assertEq(channels[0].length, 0, "Participant1 should have no open channels");
         assertEq(channels[1].length, 0, "Participant2 should have no open channels");

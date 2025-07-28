@@ -104,12 +104,12 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 	resp := CreateChannelResponse{
 		ChannelID: channelID.Hex(),
 		StateHash: crypto.Keccak256Hash(stateData).Hex(),
-		State: State{
+		State: UnsignedState{
 			Intent:  uint8(nitrolite.IntentINITIALIZE),
 			Version: 0,
 			Data:    stateDataBytes,
-			Sigs:    []Signature{sig},
 		},
+		Signature: sig,
 	}
 
 	for _, alloc := range allocations {

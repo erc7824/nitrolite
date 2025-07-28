@@ -79,12 +79,11 @@ type ResizeChannelParams struct {
 	FundsDestination string           `json:"funds_destination"                   validate:"required"`
 }
 
-type State struct {
+type UnsignedState struct {
 	Intent      uint8        `json:"intent"`
 	Version     uint64       `json:"version"`
 	Data        []byte       `json:"state_data"`
 	Allocations []Allocation `json:"allocations"`
-	Sigs        []Signature  `json:"sigs"`
 }
 
 type CreateChannelParams struct {
@@ -95,9 +94,10 @@ type CreateChannelParams struct {
 
 // TODO: use proper state struct in resize and close too.
 type CreateChannelResponse struct {
-	ChannelID string `json:"channel_id"`
-	StateHash string `json:"state_hash"`
-	State     State  `json:"state"`
+	ChannelID string        `json:"channel_id"`
+	StateHash string        `json:"state_hash"`
+	State     UnsignedState `json:"state"`
+	Signature Signature     `json:"server_signature"`
 }
 
 type ResizeChannelResponse struct {

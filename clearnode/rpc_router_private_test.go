@@ -1714,7 +1714,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		require.Equal(t, uint8(1), resObj.State.Intent, "Intent should be INITIALIZE (1)")
 		require.Equal(t, uint64(0), resObj.State.Version, "Version should be 0")
 		require.Len(t, resObj.State.Allocations, 2, "Should have 2 allocations")
-		require.Len(t, resObj.State.Sigs, 1, "Should have 1 signature")
+		require.NotEmpty(t, resObj.Signature, "Should have 1 signature")
 
 		// Verify allocations
 		require.Equal(t, userAddress.Hex(), resObj.State.Allocations[0].Participant, "First allocation should be for user")

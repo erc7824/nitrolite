@@ -307,7 +307,7 @@ func TestChannelService(t *testing.T) {
 		assert.Equal(t, uint8(1), response.State.Intent, "Intent should be INITIALIZE (1)")
 		assert.Equal(t, uint64(0), response.State.Version, "Version should be 0")
 		assert.Len(t, response.State.Allocations, 2, "Should have 2 allocations")
-		assert.Len(t, response.State.Sigs, 1, "Should have 1 signature")
+		assert.NotEmpty(t, response.Signature, "Should have 1 signature")
 
 		// Verify allocations
 		assert.Equal(t, userAddress.Hex(), response.State.Allocations[0].Participant, "First allocation should be for user")

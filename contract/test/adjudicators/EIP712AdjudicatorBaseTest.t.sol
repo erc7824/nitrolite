@@ -11,8 +11,6 @@ import {MockERC20} from "../mocks/MockERC20.sol";
 import {MockEIP712} from "../mocks/MockEIP712.sol";
 import {Utils} from "../../src/Utils.sol";
 
-import {console} from "lib/forge-std/src/console.sol";
-
 contract EIP712AdjudicatorBaseTest is Test {
     TestEIP712Adjudicator public adjudicator;
     MockERC20 public token;
@@ -40,8 +38,6 @@ contract EIP712AdjudicatorBaseTest is Test {
 
         bytes32 result = custodyAdjudicator.getChannelImplDomainSeparator();
         bytes32 expectedDomainSeparator = mockCustody.domainSeparator();
-
-        console.logBytes32(Utils.NO_EIP712_SUPPORT);
 
         assertEq(result, expectedDomainSeparator, "Domain separator should match expected value");
     }

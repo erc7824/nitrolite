@@ -49,9 +49,9 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
     uint256 constant CLIENT_IDX = 0; // Participant index for the channel creator
     uint256 constant SERVER_IDX = 1; // Participant index for the server in clearnet context
 
-    uint256 constant MIN_CHALLENGE_PERIOD = 1 hours;
+    uint256 public constant MIN_CHALLENGE_PERIOD = 1 hours;
 
-    bytes32 constant CHALLENGE_STATE_TYPEHASH = keccak256(
+    bytes32 public constant CHALLENGE_STATE_TYPEHASH = keccak256(
         "AllowChallengeStateHash(bytes32 channelId,uint8 intent,uint256 version,bytes data,Allocation[] allocations)Allocation(address destination,address token,uint256 amount)"
     );
 
@@ -653,7 +653,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
      * @param state The state to verify signatures for
      * @return valid True if both signatures are valid
      */
-    function _verifyAllSignatures(Channel memory chan, State memory state) internal view returns (bool valid) {
+    function _verifyAllSignatures(Channel memory chan, State memory state) internal returns (bool valid) {
         if (state.sigs.length != PART_NUM) {
             return false;
         }
@@ -675,28 +675,27 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         address[] memory participants,
         bytes memory challengerSig
     ) internal view {
-        bytes32 stateHash = Utils.getStateHash(_channels[channelId].chan, state);
+        // NOTE: ERC-6492 signature is NOT checked as at this point participants should already be deployed
+
         // NOTE: the "challenge" suffix substitution for raw ECDSA and EIP-191 signatures
-        bytes32 challengeStateHash = keccak256(abi.encode(stateHash, "challenge"));
+        bytes32 challengeStateHash = keccak256(abi.encode(Utils.getStateHashShort(channelId, state), "challenge"));
+        address rawSigner = Utils.recoverRawECDSASigner(challengeStateHash, challengerSig);
+        address eip191Signer = Utils.recoverEIP191Signer(challengeStateHash, challengerSig);
+        address eip712Signer = Utils.recoverStateEIP712Signer(
+            _domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig
+        );
 
-        if (Utils.addressArrayIncludes(participants, Utils.recoverRawECDSASigner(challengeStateHash, challengerSig))) {
-            return;
-        }
-
-        if (Utils.addressArrayIncludes(participants, Utils.recoverEIP191Signer(challengeStateHash, challengerSig))) {
-            return;
-        }
-
-        // NOTE: the `CHALLENGE_STATE_TYPEHASH` is used to recover the EIP-712 signer
-        if (
-            Utils.addressArrayIncludes(
-                participants,
-                Utils.recoverStateEIP712Signer(
-                    _domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig
-                )
-            )
-        ) {
-            return;
+        for (uint256 i = 0; i < participants.length; i++) {
+            address participant = participants[i];
+            if (participant.code.length != 0) {
+                if (Utils.isValidERC1271Signature(challengeStateHash, challengerSig, participant)) {
+                    return;
+                }
+            } else {
+                if (rawSigner == participant || eip191Signer == participant || eip712Signer == participant) {
+                    return;
+                }
+            }
         }
 
         revert InvalidChallengerSignature();

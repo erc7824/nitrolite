@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
 	"time"
 
@@ -20,8 +19,7 @@ import (
 )
 
 var (
-	custodyAbi        *abi.ABI
-	balanceCheckerAbi *abi.ABI
+	custodyAbi *abi.ABI
 )
 
 var ErrCustodyEventAlreadyProcessed = errors.New("custody event already processed")
@@ -72,7 +70,7 @@ func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, infuraURL, 
 
 	balanceChecker, err := nitrolite.NewBalanceChecker(common.HexToAddress(balanceCheckerAddr), client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to bind custody contract: %w", err)
+		return nil, fmt.Errorf("failed to bind balance checker contract: %w", err)
 	}
 
 	return &Custody{
@@ -189,7 +187,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 
 	// Check if channel was created with the broker.
 	if broker != c.signer.GetAddress() {
-		logger.Warn("participantB is not Broker", "actual", c.signer.GetAddress().Hex(), "expected", broker)
+		logger.Warn("channel participant is not the broker", "actual", c.signer.GetAddress().Hex(), "expected", broker.Hex())
 		return
 	}
 
@@ -233,7 +231,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 
 		asset, err := GetAssetByToken(tx, tokenAddress, c.chainID)
 		if err != nil {
-			return fmt.Errorf("DB error fetching asset: %w", err)
+			return fmt.Errorf("failed to get asset: %w", err)
 		}
 		amount := rawToDecimal(rawAmount, asset.Decimals)
 
@@ -355,7 +353,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 		if resizeAmount.Cmp(big.NewInt(0)) != 0 {
 			asset, err := GetAssetByToken(tx, channel.Token, c.chainID)
 			if err != nil {
-				return fmt.Errorf("DB error fetching asset: %w", err)
+				return fmt.Errorf("failed to get asset: %w", err)
 			}
 
 			amount := rawToDecimal(resizeAmount, asset.Decimals)
@@ -437,7 +435,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 
 		asset, err := GetAssetByToken(tx, channel.Token, c.chainID)
 		if err != nil {
-			return fmt.Errorf("DB error fetching asset: %w", err)
+			return fmt.Errorf("failed to get asset: %w", err)
 		}
 
 		rawAmount := ev.FinalState.Allocations[0].Amount
@@ -460,8 +458,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 				return fmt.Errorf("error recording balance update for participant: %w", err)
 			}
 			if err := ledger.Record(channelAccountID, asset.Symbol, amount); err != nil {
-				log.Printf("[Closed] Error recording balance update for wallet: %v", err)
-				return err
+				return fmt.Errorf("error recording balance update for wallet: %w", err)
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeWithdrawal, walletAccountID, channelAccountID, asset.Symbol, amount)
 			if err != nil {
@@ -471,8 +468,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 
 		// 2. Withdraw from the channel account.
 		if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
-			log.Printf("[Closed] Error recording balance update for wallet: %v", err)
-			return err
+			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 
 		channel.Status = ChannelStatusClosed
@@ -548,7 +544,7 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 	for i, asset := range assets {
 		var available decimal.Decimal
 		if len(availInfo) > 0 && i < len(availInfo[0]) {
-			available := rawToDecimal(availInfo[0][i], asset.Decimals)
+			available = rawToDecimal(availInfo[0][i], asset.Decimals)
 
 			metrics.BrokerBalanceAvailable.With(prometheus.Labels{
 				"network": fmt.Sprintf("%d", c.chainID),

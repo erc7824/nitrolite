@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -82,7 +81,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppDeposit, userAccountID, sessionAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
-				return fmt.Errorf("failed to record transaction: %w", err)
+				return RPCErrorf("failed to record transaction: %w", err)
 			}
 			participants[walletAddress] = true
 		}
@@ -137,7 +136,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 		allocationSum := map[string]decimal.Decimal{}
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsNegative() {
-				return fmt.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+				return RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 
 			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
@@ -153,7 +152,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 			ledger := GetWalletLedger(tx, userAddress)
 			balance, err := ledger.Balance(sessionAccountID, alloc.AssetSymbol)
 			if err != nil {
-				return RPCErrorf("failed to get session balance")
+				return RPCErrorf("failed to get session balance for asset %s", alloc.AssetSymbol)
 			}
 
 			// Reset participant allocation in app session to the new amount
@@ -198,7 +197,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 // CloseApplication closes a virtual app session and redistributes funds to participants
 func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcSigners map[string]struct{}) (AppSessionResponse, error) {
 	if params.AppSessionID == "" || len(params.Allocations) == 0 {
-		return AppSessionResponse{}, errors.New("missing required parameters: app_id or allocations")
+		return AppSessionResponse{}, RPCErrorf("missing required parameters: app_id or allocations")
 	}
 
 	participants := make(map[string]bool)
@@ -218,7 +217,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 		allocationSum := map[string]decimal.Decimal{}
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsNegative() {
-				return fmt.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+				return RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 
 			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
@@ -235,7 +234,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 			ledger := GetWalletLedger(tx, userAddress)
 			balance, err := ledger.Balance(sessionAccountID, alloc.AssetSymbol)
 			if err != nil {
-				return RPCErrorf("failed to get session balance")
+				return RPCErrorf("failed to get session balance for asset %s", alloc.AssetSymbol)
 			}
 
 			// Debit session, credit participant
@@ -247,7 +246,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppWithdrawal, sessionAccountID, userAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
-				return fmt.Errorf("failed to record transaction: %w", err)
+				return RPCErrorf("failed to record transaction: %w", err)
 			}
 
 			if !alloc.Amount.IsZero() {
@@ -287,7 +286,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 	}, nil
 }
 
-// getAppSessions finds all app sessions
+// GetAppSessions finds all app sessions
 // If participantWallet is specified, it returns only sessions for that participant
 // If participantWallet is empty, it returns all sessions
 func (s *AppSessionService) GetAppSessions(participantWallet string, status string, options *ListOptions) ([]AppSession, error) {

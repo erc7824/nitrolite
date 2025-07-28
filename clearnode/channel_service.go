@@ -14,14 +14,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// ChannelService handles the business logic for funding channels.
+// ChannelService handles the business logic for channel operations.
 type ChannelService struct {
 	db       *gorm.DB
 	networks map[string]*NetworkConfig
 	signer   *Signer
 }
 
-// NewAppSessionService creates a new AppSessionService.
+// NewChannelService creates a new ChannelService.
 func NewChannelService(db *gorm.DB, networks map[string]*NetworkConfig, signer *Signer) *ChannelService {
 	return &ChannelService{db: db, networks: networks, signer: signer}
 }
@@ -91,8 +91,8 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 
 	stateData, err := nitrolite.EncodeStateData(channelID, state)
 	if err != nil {
-		logger.Error("error encoding state hash", "error", err)
-		return ChannelOperationResponse{}, RPCErrorf("error encoding state hash")
+		logger.Error("failed to encode state hash", "error", err)
+		return ChannelOperationResponse{}, RPCErrorf("failed to encode state hash")
 	}
 
 	sig, err := s.signer.Sign(stateData)
@@ -146,10 +146,8 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 		return ChannelOperationResponse{}, RPCErrorf("resize operation requires non-zero ResizeAmount or AllocateAmount")
 	}
 
-	userAddress := common.HexToAddress(channel.Wallet)
-	userAccountID := NewAccountID(channel.Wallet)
-	ledger := GetWalletLedger(s.db, userAddress)
-	balance, err := ledger.Balance(userAccountID, asset.Symbol)
+	ledger := GetWalletLedger(s.db, common.HexToAddress(channel.Wallet))
+	balance, err := ledger.Balance(NewAccountID(channel.Wallet), asset.Symbol)
 	if err != nil {
 		logger.Error("failed to check participant balance", "error", err)
 		return ChannelOperationResponse{}, RPCErrorf("failed to check participant balance for asset %s", asset.Symbol)
@@ -183,7 +181,7 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 
 	intentionType, err := abi.NewType("int256[]", "", nil)
 	if err != nil {
-		logger.Fatal("failed to create intention type", "error", err)
+		logger.Error("failed to create intention type", "error", err)
 		return ChannelOperationResponse{}, RPCErrorf("failed to create intention type")
 	}
 	intentionArgs := abi.Arguments{{Type: intentionType}}
@@ -193,7 +191,6 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 		return ChannelOperationResponse{}, RPCErrorf("failed to pack resize amounts")
 	}
 
-	// Encode & sign the new state
 	state := nitrolite.State{
 		Intent:      uint8(nitrolite.IntentRESIZE),
 		Version:     big.NewInt(int64(channel.Version) + 1),
@@ -221,10 +218,10 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 	channel, err := GetChannelByID(s.db, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)
-		return ChannelOperationResponse{}, RPCErrorf("failed to find channel")
+		return ChannelOperationResponse{}, RPCErrorf("failed to find channel: %s", params.ChannelID)
 	}
 	if channel == nil {
-		return ChannelOperationResponse{}, RPCErrorf("channel not found")
+		return ChannelOperationResponse{}, RPCErrorf("channel %s not found", params.ChannelID)
 	}
 
 	if err = checkChallengedChannels(s.db, channel.Wallet); err != nil {
@@ -247,13 +244,11 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 		return ChannelOperationResponse{}, RPCErrorf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID)
 	}
 
-	userAddress := common.HexToAddress(channel.Wallet)
-	userAccountID := NewAccountID(channel.Wallet)
-	ledger := GetWalletLedger(s.db, userAddress)
-	balance, err := ledger.Balance(userAccountID, asset.Symbol)
+	ledger := GetWalletLedger(s.db, common.HexToAddress(channel.Wallet))
+	balance, err := ledger.Balance(NewAccountID(channel.Wallet), asset.Symbol)
 	if err != nil {
 		logger.Error("failed to check participant balance", "error", err)
-		return ChannelOperationResponse{}, RPCErrorf("failed to check participant balance")
+		return ChannelOperationResponse{}, RPCErrorf("failed to check participant balance for asset %s", asset.Symbol)
 	}
 	if balance.IsNegative() {
 		logger.Error("negative balance", "balance", balance.String())

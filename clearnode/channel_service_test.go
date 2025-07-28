@@ -109,12 +109,12 @@ func TestChannelService(t *testing.T) {
 
 		// Validate response
 		assert.Equal(t, ch.ChannelID, response.ChannelID)
-		assert.Equal(t, ch.Version+1, response.Version)
+		assert.Equal(t, ch.Version+1, response.State.Version)
 
 		// New channel amount should be initial + 200
 		expected := channelAmountRaw.Add(decimal.NewFromInt(200))
-		assert.Equal(t, 0, response.Allocations[0].RawAmount.Cmp(expected), "Allocated amount mismatch")
-		assert.Equal(t, 0, response.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
+		assert.Equal(t, 0, response.State.Allocations[0].RawAmount.Cmp(expected), "Allocated amount mismatch")
+		assert.Equal(t, 0, response.State.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		channel, err := GetChannelByID(db, ch.ChannelID)
@@ -149,7 +149,7 @@ func TestChannelService(t *testing.T) {
 
 		// Channel amount should decrease
 		expected := channelAmountRaw.Sub(decimal.NewFromInt(300))
-		assert.Equal(t, 0, response.Allocations[0].RawAmount.Cmp(expected), "Decreased amount mismatch")
+		assert.Equal(t, 0, response.State.Allocations[0].RawAmount.Cmp(expected), "Decreased amount mismatch")
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, tokenSymbol)
@@ -264,11 +264,11 @@ func TestChannelService(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ch.ChannelID, response.ChannelID)
-		assert.Equal(t, ch.Version+1, response.Version)
+		assert.Equal(t, ch.Version+1, response.State.Version)
 
 		// Final allocation should send full balance to destination
-		assert.Equal(t, 0, response.FinalAllocations[0].RawAmount.Cmp(channelAmountRaw), "Primary allocation mismatch")
-		assert.Equal(t, 0, response.FinalAllocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
+		assert.Equal(t, 0, response.State.Allocations[0].RawAmount.Cmp(channelAmountRaw), "Primary allocation mismatch")
+		assert.Equal(t, 0, response.State.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 	})
 
 	t.Run("RequestClose_ErrorOtherChallengedChannel", func(t *testing.T) {
@@ -307,7 +307,7 @@ func TestChannelService(t *testing.T) {
 		assert.Equal(t, uint8(1), response.State.Intent, "Intent should be INITIALIZE (1)")
 		assert.Equal(t, uint64(0), response.State.Version, "Version should be 0")
 		assert.Len(t, response.State.Allocations, 2, "Should have 2 allocations")
-		assert.NotEmpty(t, response.Signature, "Should have 1 signature")
+		assert.NotEmpty(t, response.StateSignature, "Should have 1 signature")
 
 		// Verify allocations
 		assert.Equal(t, userAddress.Hex(), response.State.Allocations[0].Participant, "First allocation should be for user")

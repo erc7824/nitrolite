@@ -72,11 +72,29 @@ type AppSessionResponse struct {
 	UpdatedAt          string   `json:"updated_at"`
 }
 
+type CreateChannelParams struct {
+	ChainID uint32           `json:"chain_id" validate:"required"`
+	Token   string           `json:"token" validate:"required"`
+	Amount  *decimal.Decimal `json:"amount" validate:"required,bigint"`
+}
+
 type ResizeChannelParams struct {
 	ChannelID        string           `json:"channel_id"                          validate:"required"`
 	AllocateAmount   *decimal.Decimal `json:"allocate_amount,omitempty"           validate:"omitempty,required_without=ResizeAmount,bigint"`
 	ResizeAmount     *decimal.Decimal `json:"resize_amount,omitempty"             validate:"omitempty,required_without=AllocateAmount,bigint"`
 	FundsDestination string           `json:"funds_destination"                   validate:"required"`
+}
+
+type CloseChannelParams struct {
+	ChannelID        string `json:"channel_id"`
+	FundsDestination string `json:"funds_destination"`
+}
+
+type ChannelOperationResponse struct {
+	ChannelID      string        `json:"channel_id"`
+	StateHash      string        `json:"state_hash"`
+	State          UnsignedState `json:"state"`
+	StateSignature Signature     `json:"server_signature"`
 }
 
 type UnsignedState struct {
@@ -86,49 +104,10 @@ type UnsignedState struct {
 	Allocations []Allocation `json:"allocations"`
 }
 
-type CreateChannelParams struct {
-	ChainID uint32           `json:"chain_id" validate:"required"`
-	Token   string           `json:"token" validate:"required"`
-	Amount  *decimal.Decimal `json:"amount" validate:"required,bigint"`
-}
-
-// TODO: use proper state struct in resize and close too.
-type CreateChannelResponse struct {
-	ChannelID string        `json:"channel_id"`
-	StateHash string        `json:"state_hash"`
-	State     UnsignedState `json:"state"`
-	Signature Signature     `json:"server_signature"`
-}
-
-type ResizeChannelResponse struct {
-	ChannelID   string       `json:"channel_id"`
-	StateData   string       `json:"state_data"`
-	Intent      uint8        `json:"intent"`
-	Version     uint64       `json:"version"`
-	Allocations []Allocation `json:"allocations"`
-	StateHash   string       `json:"state_hash"`
-	Signature   Signature    `json:"server_signature"`
-}
-
 type Allocation struct {
 	Participant  string          `json:"destination"`
 	TokenAddress string          `json:"token"`
 	RawAmount    decimal.Decimal `json:"amount"`
-}
-
-type CloseChannelParams struct {
-	ChannelID        string `json:"channel_id"`
-	FundsDestination string `json:"funds_destination"`
-}
-
-type CloseChannelResponse struct {
-	ChannelID        string       `json:"channel_id"`
-	Intent           uint8        `json:"intent"`
-	Version          uint64       `json:"version"`
-	StateData        string       `json:"state_data"`
-	FinalAllocations []Allocation `json:"allocations"`
-	StateHash        string       `json:"state_hash"`
-	Signature        Signature    `json:"server_signature"`
 }
 
 type ChannelResponse struct {
@@ -546,7 +525,6 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 	logger.Info("channel resize requested",
 		"userID", c.UserID,
 		"channelID", resp.ChannelID,
-		"newVersion", resp.Version,
 		"fundsDestination", params.FundsDestination,
 		"resizeAmount", params.ResizeAmount.String(),
 		"allocateAmount", params.AllocateAmount.String(),
@@ -602,7 +580,6 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 	logger.Info("channel close requested",
 		"userID", c.UserID,
 		"channelID", resp.ChannelID,
-		"newVersion", resp.Version,
 		"fundsDestination", params.FundsDestination,
 	)
 }

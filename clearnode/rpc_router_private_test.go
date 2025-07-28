@@ -950,15 +950,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params[0].(ChannelOperationResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
-		require.Equal(t, ch.Version+1, resObj.Version)
+		require.Equal(t, ch.Version+1, resObj.State.Version)
 
 		// New channel amount should be initial + 200
 		expected := initialRawAmount.Add(allocateAmount)
-		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Allocated amount mismatch")
-		require.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
+		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(expected), "Allocated amount mismatch")
+		require.Equal(t, 0, resObj.State.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
@@ -1010,12 +1010,12 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params[0].(ChannelOperationResponse)
 		require.True(t, ok)
 
 		// Channel amount should decrease
 		expected := initialRawAmount.Add(allocateAmount)
-		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Decreased amount mismatch")
+		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(expected), "Decreased amount mismatch")
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, "usdc")
@@ -1248,12 +1248,12 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params[0].(ChannelOperationResponse)
 		require.True(t, ok)
 
 		// Should be initial amount (1000) + allocate amount (0) + resize amount (100) = 1100
 		expected := initialRawAmount.Add(allocateAmount)
-		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected))
+		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(expected))
 	})
 
 	t.Run("SuccessfulResizeWithdrawal", func(t *testing.T) {
@@ -1295,12 +1295,12 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params[0].(ChannelOperationResponse)
 		require.True(t, ok)
 
 		// Should be initial amount (1000) + allocate amount (0) - resize amount (100) = 900
 		expected := initialRawAmount.Add(allocateAmount)
-		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected))
+		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(expected))
 	})
 
 	t.Run("ErrorExcessiveDeallocation", func(t *testing.T) {
@@ -1414,12 +1414,12 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params[0].(ChannelOperationResponse)
 		require.True(t, ok)
 
 		// Verify the large allocation was processed correctly
 		expectedAmount := decimal.NewFromInt(1000).Add(allocateAmount) // 1000 + 10^15
-		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expectedAmount))
+		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(expectedAmount))
 	})
 
 	t.Run("SuccessfulAllocationWithResizeDeposit", func(t *testing.T) {
@@ -1469,15 +1469,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params[0].(ChannelOperationResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
-		require.Equal(t, ch.Version+1, resObj.Version)
+		require.Equal(t, ch.Version+1, resObj.State.Version)
 
 		// New channel amount should be initial + AllocateAmount + ResizeAmount = 1000 + 150 + 100 = 1250
 		expected := initialRawAmount.Add(allocateAmount).Add(resizeAmount)
-		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(expected), "Combined allocation+resize amount mismatch")
-		require.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
+		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(expected), "Combined allocation+resize amount mismatch")
+		require.Equal(t, 0, resObj.State.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
@@ -1539,14 +1539,14 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params[0].(ResizeChannelResponse)
+		resObj, ok := res.Params[0].(ChannelOperationResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
-		require.Equal(t, ch.Version+1, resObj.Version)
+		require.Equal(t, ch.Version+1, resObj.State.Version)
 
 		// New channel amount should be initial + AllocateAmount + ResizeAmount = 0 + 100 - 100 = 0
-		require.Equal(t, 0, resObj.Allocations[0].RawAmount.Cmp(decimal.Zero), "Combined allocation+resize amount mismatch")
-		require.Equal(t, 0, resObj.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
+		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(decimal.Zero), "Combined allocation+resize amount mismatch")
+		require.Equal(t, 0, resObj.State.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
@@ -1609,14 +1609,14 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		router.HandleCloseChannel(ctx)
 
 		res := assertResponse(t, ctx, "close_channel")
-		resObj, ok := res.Params[0].(CloseChannelResponse)
+		resObj, ok := res.Params[0].(ChannelOperationResponse)
 		require.True(t, ok, "Response should be CloseChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
-		require.Equal(t, ch.Version+1, resObj.Version)
+		require.Equal(t, ch.Version+1, resObj.State.Version)
 
 		// Final allocation should send full balance to destination
-		require.Equal(t, 0, resObj.FinalAllocations[0].RawAmount.Cmp(initialRawAmount), "Primary allocation mismatch")
-		require.Equal(t, 0, resObj.FinalAllocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
+		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(initialRawAmount), "Primary allocation mismatch")
+		require.Equal(t, 0, resObj.State.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 	})
 	t.Run("ErrorOtherChannelInChallenge", func(t *testing.T) {
 		t.Parallel()
@@ -1702,7 +1702,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		router.HandleCreateChannel(ctx)
 
 		res := assertResponse(t, ctx, "create_channel")
-		resObj, ok := res.Params[0].(CreateChannelResponse)
+		resObj, ok := res.Params[0].(ChannelOperationResponse)
 		require.True(t, ok, "Response should be CreateChannelResponse")
 
 		// Verify response structure
@@ -1714,7 +1714,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		require.Equal(t, uint8(1), resObj.State.Intent, "Intent should be INITIALIZE (1)")
 		require.Equal(t, uint64(0), resObj.State.Version, "Version should be 0")
 		require.Len(t, resObj.State.Allocations, 2, "Should have 2 allocations")
-		require.NotEmpty(t, resObj.Signature, "Should have 1 signature")
+		require.NotEmpty(t, resObj.StateSignature, "Should have 1 signature")
 
 		// Verify allocations
 		require.Equal(t, userAddress.Hex(), resObj.State.Allocations[0].Participant, "First allocation should be for user")
@@ -1856,7 +1856,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 
 		// This should work as zero amount channels are allowed
 		res := assertResponse(t, ctx, "create_channel")
-		resObj, ok := res.Params[0].(CreateChannelResponse)
+		resObj, ok := res.Params[0].(ChannelOperationResponse)
 		require.True(t, ok, "Response should be CreateChannelResponse")
 		require.True(t, resObj.State.Allocations[0].RawAmount.IsZero(), "User allocation should be zero")
 	})

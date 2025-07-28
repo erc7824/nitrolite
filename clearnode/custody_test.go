@@ -344,7 +344,8 @@ func TestHandleCreatedEvent(t *testing.T) {
 			require.NoError(t, entriesErr)
 			assert.NotEmpty(t, entries)
 
-			assertNotifications(t, capturedNotifications, mockEvent.Wallet.Hex(), 1)
+			assertNotifications(t, capturedNotifications, mockEvent.Wallet.Hex(), 2)
+
 			assert.Equal(t, dbChannel.ChainID, uint32(custody.chainID))
 			assert.False(t, dbChannel.CreatedAt.IsZero())
 			assert.False(t, dbChannel.UpdatedAt.IsZero())
@@ -353,7 +354,7 @@ func TestHandleCreatedEvent(t *testing.T) {
 			assert.WithinDuration(t, time.Now(), dbChannel.UpdatedAt, 2*time.Second)
 
 			walletLedger := GetWalletLedger(db, mockEvent.Wallet)
-			balance, err := walletLedger.Balance(NewAccountID(capturedChannel.Wallet), "usdc")
+			balance, err := walletLedger.Balance(NewAccountID(mockEvent.Wallet.Hex()), "usdc")
 			require.NoError(t, err)
 
 			assert.Equal(t, tc.amount.String(), balance.Mul(decimal.NewFromInt(10).Pow(decimal.NewFromInt(6))).String()) // 6 decimals for USDC default test token

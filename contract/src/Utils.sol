@@ -42,29 +42,6 @@ library Utils {
     }
 
     /**
-     * @notice Compute the hash of a channel state in a canonical way (ignoring the signature)
-     * @param ch The channel struct
-     * @param state The state struct
-     * @return The state hash as bytes32
-     * @dev The state hash is computed according to the specification in the README, using channelId, data, version, and allocations
-     */
-    function getStateHash(Channel memory ch, State memory state) internal view returns (bytes32) {
-        bytes32 channelId = getChannelId(ch);
-        return keccak256(abi.encode(channelId, state.intent, state.version, state.data, state.allocations));
-    }
-
-    /**
-     * @notice Compute the hash of a channel state in a canonical way (ignoring the signature)
-     * @param channelId The unique identifier for the channel
-     * @param state The state struct
-     * @return The state hash as bytes32
-     * @dev The state hash is computed according to the specification in the README, using channelId, data, version, and allocations
-     */
-    function getStateHashShort(bytes32 channelId, State memory state) internal pure returns (bytes32) {
-        return keccak256(abi.encode(channelId, state.intent, state.version, state.data, state.allocations));
-    }
-
-    /**
      * @notice Packs the channelId and the state into a byte array for signing
      * @param channelId The unique identifier for the channel
      * @param state The state struct to pack
@@ -251,7 +228,8 @@ library Utils {
         bytes memory sig,
         address signer
     ) internal returns (bool) {
-        bytes32 stateHash = Utils.getStateHashShort(channelId, state);
+        // NOTE: both EIP-1271 and EIP-6492 signatures use message hash
+        bytes32 stateHash = keccak256(Utils.getPackedState(channelId, state));
 
         if (trailingBytes32(sig) == ERC6492_DETECTION_SUFFIX) {
             return isValidERC6492Signature(stateHash, sig, signer);

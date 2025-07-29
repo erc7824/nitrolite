@@ -11,14 +11,6 @@ contract UtilsHarness {
         return Utils.getChannelId(ch);
     }
 
-    function getStateHash(Channel memory ch, State memory state) external view returns (bytes32) {
-        return Utils.getStateHash(ch, state);
-    }
-
-    function getStateHashShort(bytes32 channelId, State memory state) external pure returns (bytes32) {
-        return Utils.getStateHashShort(channelId, state);
-    }
-
     function getPackedState(bytes32 channelId, State memory state) external pure returns (bytes memory) {
         return Utils.getPackedState(channelId, state);
     }

@@ -220,45 +220,49 @@ export interface RPCAllocation {
 }
 
 /**
- * Represents the parameters for the 'resize_channel' RPC method.
+ * Represents the state object within channel operation responses.
  */
-export interface ResizeChannelResponseParams {
-    /** The unique identifier for the channel. */
-    channelId: Hex;
-    /** The encoded state data for the channel. */
-    stateData: Hex;
+export interface ChannelOperationState {
     /** The intent type for the state update. */
     intent: number;
     /** The version number of the channel. */
     version: number;
+    /** The encoded state data for the channel. */
+    stateData: Hex;
     /** The list of allocations for the channel. */
     allocations: RPCAllocation[];
+}
+
+/**
+ * Represents the unified parameters for channel operations (create, resize, close).
+ */
+export interface ChannelOperationResponseParams {
+    /** The unique identifier for the channel. */
+    channelId: Hex;
     /** The hash of the channel state. */
     stateHash: Hex;
+    /** The channel state object. */
+    state: ChannelOperationState;
     /** The server's signature for the state update. */
     serverSignature: ServerSignature;
 }
+
+/**
+ * Represents the parameters for the 'create_channel' RPC method.
+ */
+export interface CreateChannelResponseParams extends ChannelOperationResponseParams {}
+export type CreateChannelRPCResponseParams = CreateChannelResponseParams; // for backward compatibility
+
+/**
+ * Represents the parameters for the 'resize_channel' RPC method.
+ */
+export interface ResizeChannelResponseParams extends ChannelOperationResponseParams {}
 export type ResizeChannelRPCResponseParams = ResizeChannelResponseParams; // for backward compatibility
 
 /**
  * Represents the parameters for the 'close_channel' RPC method.
  */
-export interface CloseChannelResponseParams {
-    /** The unique identifier for the channel. */
-    channelId: Hex;
-    /** The intent type for the state update. */
-    intent: number;
-    /** The version number of the channel. */
-    version: number;
-    /** The encoded state data for the channel. */
-    stateData: Hex;
-    /** The list of final allocations for the channel. */
-    allocations: RPCAllocation[];
-    /** The hash of the channel state. */
-    stateHash: Hex;
-    /** The server's signature for the state update. */
-    serverSignature: ServerSignature;
-}
+export interface CloseChannelResponseParams extends ChannelOperationResponseParams {}
 export type CloseChannelRPCResponseParams = CloseChannelResponseParams; // for backward compatibility
 
 /**
@@ -393,6 +397,14 @@ export interface GetAppDefinitionResponse extends GenericRPCMessage {
 export interface GetAppSessionsResponse extends GenericRPCMessage {
     method: RPCMethod.GetAppSessions;
     params: GetAppSessionsResponseParams[];
+}
+
+/**
+ * Represents the response structure for the 'create_channel' RPC method.
+ */
+export interface CreateChannelResponse extends GenericRPCMessage {
+    method: RPCMethod.CreateChannel;
+    params: CreateChannelResponseParams;
 }
 
 /**
@@ -628,6 +640,7 @@ export type RPCResponse =
     | CloseAppSessionResponse
     | GetAppDefinitionResponse
     | GetAppSessionsResponse
+    | CreateChannelResponse
     | ResizeChannelResponse
     | CloseChannelResponse
     | GetChannelsResponse

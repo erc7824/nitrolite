@@ -19,12 +19,16 @@ contract UtilsHarness {
         return Utils.getStateHashShort(channelId, state);
     }
 
-    function recoverRawECDSASigner(bytes32 msgHash, bytes memory sig) external pure returns (address) {
-        return Utils.recoverRawECDSASigner(msgHash, sig);
+    function getPackedState(bytes32 channelId, State memory state) external pure returns (bytes memory) {
+        return Utils.getPackedState(channelId, state);
     }
 
-    function recoverEIP191Signer(bytes32 msgHash, bytes memory sig) external pure returns (address) {
-        return Utils.recoverEIP191Signer(msgHash, sig);
+    function recoverRawECDSASigner(bytes memory message, bytes memory sig) external pure returns (address) {
+        return Utils.recoverRawECDSASigner(message, sig);
+    }
+
+    function recoverEIP191Signer(bytes memory message, bytes memory sig) external pure returns (address) {
+        return Utils.recoverEIP191Signer(message, sig);
     }
 
     function recoverEIP712Signer(bytes32 domainSeparator, bytes32 structHash, bytes memory sig)

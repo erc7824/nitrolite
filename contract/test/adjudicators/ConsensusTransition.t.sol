@@ -133,8 +133,8 @@ contract ConsensusTransitionTest is Test {
 
     // Helper to sign a state
     function _signState(State memory state, uint256 privateKey) internal view returns (bytes memory) {
-        bytes32 stateHash = Utils.getStateHash(channel, state);
-        return TestUtils.sign(vm, privateKey, stateHash);
+        bytes memory packedState = Utils.getPackedState(Utils.getChannelId(channel), state);
+        return TestUtils.sign(vm, privateKey, packedState);
     }
 
     // -------------------- FIRST STATE TRANSITION TESTS --------------------

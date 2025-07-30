@@ -107,6 +107,42 @@ func (c *Custody) ListenEvents(ctx context.Context) {
 	listenEvents(ctx, c.client, c.custodyAddr, c.chainID, c.blockStep, lastBlock, lastIndex, c.handleBlockChainEvent, c.logger)
 }
 
+// Checkpoint calls the checkpoint method on the custody contract
+func (c *Custody) Checkpoint(channelID string, newState UnsignedState, userSig, serverSig Signature, proofs []nitrolite.State) (common.Hash, error) {
+	// Convert string channelID to bytes32
+	channelIDBytes := common.HexToHash(channelID)
+
+	gasPrice, err := c.client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed to suggest gas price: %w", err)
+	}
+
+	nitroState := nitrolite.State{
+		Intent:  uint8(newState.Intent),
+		Version: big.NewInt(int64(newState.Version)),
+		Data:    newState.Data,
+		Sigs:    [][]byte{userSig, serverSig},
+	}
+
+	for _, alloc := range newState.Allocations {
+		nitroState.Allocations = append(nitroState.Allocations, nitrolite.Allocation{
+			Destination: common.HexToAddress(alloc.Participant),
+			Token:       common.HexToAddress(alloc.TokenAddress),
+			Amount:      alloc.RawAmount.BigInt(),
+		})
+	}
+
+	c.transactOpts.GasPrice = gasPrice.Add(gasPrice, gasPrice)
+
+	// Call the checkpoint method on the custody contract
+	tx, err := c.custody.Checkpoint(c.transactOpts, channelIDBytes, nitroState, proofs)
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed to join channel: %w", err)
+	}
+
+	return tx.Hash(), nil
+}
+
 // handleBlockChainEvent processes different event types received from the blockchain
 func (c *Custody) handleBlockChainEvent(ctx context.Context, l types.Log) {
 	ctx = SetContextLogger(ctx, c.logger)
@@ -306,10 +342,6 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 		channel.Status = ChannelStatusChallenged
 		channel.UpdatedAt = time.Now()
 
-		// TODO:
-		// 1. Check if the inconning state is older than the current state in db.
-		// 2. If it is, sumbit the newer state to the custody contract.
-
 		if err := tx.Save(&channel).Error; err != nil {
 			return fmt.Errorf("error saving channel in database: %w", err)
 		}
@@ -322,6 +354,16 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 	} else if err != nil {
 		logger.Error("failed to update channel", "channelId", channelID, "error", err)
 		return
+	}
+
+	if ev.State.Version.Uint64() < channel.State.Version {
+		txHash, err := c.Checkpoint(channelID, channel.State, *channel.UserStateSignature, *channel.ServerStateSignature, []nitrolite.State{ev.State})
+		if err != nil {
+			logger.Error("error joining channel", "error", err)
+			return
+		}
+
+		logger.Info("successfully checkpointed a newer state on challenge", "channelId", channelID, "txHash", txHash.Hex())
 	}
 
 	c.wsNotifier.Notify(NewChannelNotification(channel))

@@ -182,6 +182,35 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
+	// TODO:
+	// First call: request_transfer
+
+	// type RequestTransferParams struct {
+	// 	Allocations []TransferAllocation `json:"allocations"`
+	// }
+
+	// 1. Selects all user channels with the same asset
+	// 2. Sort user channel allocations by amounts
+	// 3. Select first n channels with allocations enough to cover the transfer amount
+	// 4. Returns a list of states for user to sign (with no broker signature)
+	// 5. ChannelStates []ChannelState `json:"channel_states"`
+
+	// Second call: submit_transfer
+
+	// 1. User must submit all signed ChannelStates []ChannelState `json:"channel_states"` and provide transfer destination
+
+	// type SubmitTransferParams struct {
+	// 	Destination        string         `json:"destination"`
+	// 	DestinationUserTag string         `json:"destination_user_tag"`
+	// 	Allocations        []TransferAllocation `json:"allocations"`
+	// 	ChannelStates      []ChannelState `json:"channel_states"`
+	// }
+
+	// 1. Verify that all states are signed by the user
+	// 2. Get current states for all channels
+	// 3. Verify that all states are valid (total amount in states before - transfer_amount = total amount of the new states after)
+	// 4. Return user a signed resize body as before
+
 	// Allow only ledger accounts as destination at the current stage. In the future we'll unlock application accounts.
 	switch {
 	case params.Destination == "" && params.DestinationUserTag == "":
@@ -474,6 +503,21 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 	ctx := c.Context
 	logger := LoggerFromContext(ctx)
 	req := c.Message.Req
+
+	// TODO: require state signatures for all user channels with this asset.
+	// First call: initialise resize
+	// Selects all user channels with the same asset
+	// Creates updated state for each channel
+	// Returns a list of states for user to sign (with no broker signature)
+	// ChannelStates []ChannelState `json:"channel_states"`
+
+	// Second call: request resize signature
+	// 1. User must submit all signed ChannelStates []ChannelState `json:"channel_states"`
+	// 2. Select all user channels with the same asset
+	// 3. Verify that all states are signed by the user
+	// 4. Verify that all states are valid (total amount before = total amount after)
+	// 5. Block user activity until resize confirmation is received
+	// 6. Return user a signed resize body as before
 
 	var params ResizeChannelParams
 	if err := parseParams(req.Params, &params); err != nil {

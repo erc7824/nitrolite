@@ -28,6 +28,7 @@ import {
     GetLedgerTransactionsRequestParams,
     TransferRequestParams,
 } from './types/request';
+import { signRawECDSAMessage } from '../utils/sign';
 
 /**
  * Creates the signed, stringified message body for an 'auth_request'.
@@ -642,12 +643,8 @@ export function createEIP712AuthMessageSigner(
 export function createECDSAMessageSigner(privateKey: Hex): MessageSigner {
     return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
         try {
-            const messageBytes = keccak256(
-                stringToBytes(JSON.stringify(payload, (_, v) => (typeof v === 'bigint' ? v.toString() : v))),
-            );
-            const flatSignature = await privateKeyToAccount(privateKey).sign({ hash: messageBytes });
-
-            return flatSignature as Hex;
+            const message = JSON.stringify(payload, (_, v) => (typeof v === 'bigint' ? v.toString() : v));
+            return signRawECDSAMessage(message, privateKey);
         } catch (error) {
             console.error('ECDSA signing failed:', error);
             throw new Error(`ECDSA signing failed: ${error}`);

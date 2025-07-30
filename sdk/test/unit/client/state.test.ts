@@ -6,7 +6,7 @@ import { Hex } from 'viem';
 import { _prepareAndSignInitialState, _prepareAndSignFinalState } from '../../../src/client/state';
 import * as utils from '../../../src/utils';
 import { Errors } from '../../../src/errors';
-import { StateIntent } from '../../../src/client/types';
+import { State, StateIntent } from '../../../src/client/types';
 
 // Mock utils
 jest.mock('../../../src/utils', () => ({
@@ -19,19 +19,21 @@ jest.mock('../../../src/utils', () => ({
 }));
 
 describe('_prepareAndSignInitialState', () => {
-    let deps: any;
+    let deps;
     const guestAddress = '0xGUEST' as Hex;
     const tokenAddress = '0xTOKEN' as Hex;
     const adjudicatorAddress = '0xADJ' as Hex;
-    const challengeDuration = 123;
+    const challengeDuration = BigInt(123);
+    const stateSigner = {
+        getAddress: jest.fn(async () => '0xOWNER' as Hex),
+        signState: jest.fn(async (_1: Hex, _2: State) => 'accSig'),
+        signRawMessage: jest.fn(async (_: Hex) => 'accSig'),
+    };
 
     beforeEach(() => {
         deps = {
             account: { address: '0xOWNER' as Hex },
-            stateWalletClient: {
-                account: { address: '0xOWNER' as Hex },
-                signMessage: async (_: string) => 'walletSig',
-            },
+            stateSigner,
             addresses: {
                 guestAddress,
                 adjudicator: adjudicatorAddress,
@@ -73,13 +75,16 @@ describe('_prepareAndSignInitialState', () => {
             sigs: ['accSig'],
         });
         // Signs the state
-        expect(utils.signState).toHaveBeenCalledWith('cid', {
-            data: 'customData',
-            intent: StateIntent.INITIALIZE,
-            allocations: expect.any(Array),
-            version: 0n,
-            sigs: [],
-        }, deps.stateWalletClient.signMessage);
+        expect(stateSigner.signState).toHaveBeenCalledWith(
+            'cid',
+            {
+                data: 'customData',
+                intent: StateIntent.INITIALIZE,
+                allocations: expect.any(Array),
+                version: 0n,
+                sigs: [],
+            }
+        );
     });
 
     test('throws if no adjudicator', async () => {
@@ -108,13 +113,15 @@ describe('_prepareAndSignFinalState', () => {
     const channelIdArg = 'cid' as Hex;
     const allocations = [{ destination: '0xA' as Hex, token: '0xT' as Hex, amount: 5n }];
     const version = 7n;
+    const stateSigner = {
+        getAddress: jest.fn(async () => '0xOWNER' as Hex),
+        signState: jest.fn(async (_1: Hex, _2: State) => 'accSig'),
+        signRawMessage: jest.fn(async (_: Hex) => 'accSig'),
+    };
 
     beforeEach(() => {
         deps = {
-            stateWalletClient: {
-                account: { address: '0xOWNER' as Hex },
-                signMessage: async (_: string) => 'walletSig2',
-            },
+            stateSigner,
             addresses: {
                 /* not used */
             },
@@ -147,13 +154,16 @@ describe('_prepareAndSignFinalState', () => {
             version,
             sigs: ['accSig', 'srvSig'],
         });
-        expect(utils.signState).toHaveBeenCalledWith('cid', {
-            data: 'finalData',
-            intent: StateIntent.FINALIZE,
-            allocations,
-            version,
-            sigs: [],
-        }, deps.stateWalletClient.signMessage);
+        expect(stateSigner.signState).toHaveBeenCalledWith(
+            'cid',
+            {
+                data: 'finalData',
+                intent: StateIntent.FINALIZE,
+                allocations,
+                version,
+                sigs: [],
+            }
+        );
     });
 
     test('throws if no stateData', async () => {

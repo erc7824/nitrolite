@@ -1,6 +1,6 @@
-import { Address, encodeAbiParameters, encodePacked, Hex, keccak256 } from 'viem';
+import { Address, Hex } from 'viem';
 import * as Errors from '../errors';
-import { generateChannelNonce, getChannelId, getPackedState, getStateHash, signChallengeState, signState } from '../utils';
+import { generateChannelNonce, getChallengeHash, getChannelId } from '../utils';
 import { PreparerDependencies } from './prepare';
 import {
     ChallengeChannelParams,
@@ -38,7 +38,7 @@ export async function _prepareAndSignInitialState(
     const channelNonce = generateChannelNonce(deps.account.address);
 
     const participants: [Hex, Hex] = [deps.account.address, deps.addresses.guestAddress];
-    const channelParticipants: [Hex, Hex] = [deps.stateWalletClient.account.address, deps.addresses.guestAddress];
+    const channelParticipants: [Hex, Hex] = [await deps.stateSigner.getAddress(), deps.addresses.guestAddress];
     const adjudicatorAddress = deps.addresses.adjudicator;
     if (!adjudicatorAddress) {
         throw new Errors.MissingParameterError(
@@ -77,8 +77,7 @@ export async function _prepareAndSignInitialState(
         sigs: [],
     };
 
-
-    const accountSignature = await signState(channelId, stateToSign, deps.stateWalletClient.signMessage);
+    const accountSignature = await deps.stateSigner.signState(channelId, stateToSign);
     const initialState: State = {
         ...stateToSign,
         sigs: [accountSignature],
@@ -104,7 +103,8 @@ export async function _prepareAndSignChallengeState(
     challengerSig: Signature;
 }> {
     const { channelId, candidateState, proofStates = [] } = params;
-    const challengerSig = await signChallengeState(channelId, candidateState, deps.stateWalletClient.signMessage);
+    const challengeHash = await getChallengeHash(channelId, candidateState);
+    const challengerSig = await deps.stateSigner.signRawMessage(challengeHash);
 
     return { channelId, candidateState, proofs: proofStates, challengerSig };
 }
@@ -136,7 +136,7 @@ export async function _prepareAndSignResizeState(
         sigs: [],
     };
 
-    const accountSignature = await signState(channelId, stateToSign, deps.stateWalletClient.signMessage);
+    const accountSignature = await deps.stateSigner.signState(channelId, stateToSign);
 
     // Create a new state with signatures in the requested style
     const resizeStateWithSigs: State = {
@@ -176,7 +176,7 @@ export async function _prepareAndSignFinalState(
         sigs: [],
     };
 
-    const accountSignature = await signState(channelId, stateToSign, deps.stateWalletClient.signMessage);
+    const accountSignature = await deps.stateSigner.signState(channelId, stateToSign);
 
     // Create a new state with signatures in the requested style
     const finalStateWithSigs: State = {

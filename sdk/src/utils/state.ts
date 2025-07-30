@@ -1,4 +1,4 @@
-import { keccak256, encodeAbiParameters, Address, Hex, recoverMessageAddress, numberToHex, parseSignature } from 'viem';
+import { keccak256, encodeAbiParameters, Address, Hex, recoverMessageAddress, numberToHex, parseSignature, encodePacked } from 'viem';
 import { State, StateHash, Signature, ChannelId } from '../client/types'; // Updated import path
 import { get } from 'http';
 
@@ -54,6 +54,7 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
  */
 type SignMessageFn = (args: { message: { raw: Hex } }) => Promise<Hex>;
 
+// TODO: extract into an interface and provide on NitroliteClient creation
 /**
  * Create a raw ECDSA signature for a hash over a packed state using a Viem WalletClient or Account compatible signer.
  * Uses the locally defined parseSignature function.
@@ -64,9 +65,11 @@ type SignMessageFn = (args: { message: { raw: Hex } }) => Promise<Hex>;
  * @throws If the signer cannot sign messages or signing/parsing fails.
  */
 export async function signState(
-    stateHash: StateHash,
+    channelId: ChannelId,
+    state: State,
     signMessage: SignMessageFn,
 ): Promise<Signature> {
+    const stateHash = getStateHash(channelId, state);
     try {
         return await signMessage({ message: { raw: stateHash } });
     } catch (error) {
@@ -76,6 +79,36 @@ export async function signState(
 }
 
 /**
+ * Signs a challenge state for a channel.
+ * This function encodes the packed state and the challenge string, hashes it, and signs it.
+ * @param channelId The ID of the channel.
+ * @param state The state to sign.
+ * @param signMessage The signing function compatible with Viem's WalletClient or Account.
+ * @returns The signature as a Hex string.
+ * @throws If signing fails.
+ */
+export async function signChallengeState(
+    channelId: ChannelId,
+    state: State,
+    signMessage: SignMessageFn,
+): Promise<Signature> {
+    const packedState = getPackedState(channelId, state);
+    const encoded = encodePacked(
+        [ 'bytes', 'string' ],
+        [packedState, 'challenge'],
+    );
+    const challengeHash = keccak256(encoded) as Hex;
+
+    try {
+        return await signMessage({ message: { raw: challengeHash } });
+    } catch (error) {
+        console.error('Error signing challenge state:', error);
+        throw new Error(`Failed to sign challenge state: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+// TODO: extract into an interface and provide on NitroliteClient creation
+/**
  * Verifies a raw ECDSA signature over a hash of a packed state.
  * @param stateHash The hash of the state.
  * @param signature The signature to verify.
@@ -83,11 +116,13 @@ export async function signState(
  * @returns True if the signature is valid and recovers to the expected signer, false otherwise.
  */
 export async function verifySignature(
-    stateHash: StateHash,
+    channelId: ChannelId,
+    state: State,
     signature: Signature,
     expectedSigner: Address,
 ): Promise<boolean> {
     try {
+        const stateHash = getStateHash(channelId, state);
         const recoveredAddress = await recoverMessageAddress({
             message: { raw: stateHash },
             signature: signature,

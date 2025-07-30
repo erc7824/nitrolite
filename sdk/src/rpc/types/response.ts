@@ -233,8 +233,6 @@ export interface ResizeChannelResponseParams {
     version: number;
     /** The list of allocations for the channel. */
     allocations: RPCAllocation[];
-    /** The hash of the channel state. */
-    stateHash: Hex;
     /** The server's signature for the state update. */
     serverSignature: ServerSignature;
 }
@@ -254,8 +252,6 @@ export interface CloseChannelResponseParams {
     stateData: Hex;
     /** The list of final allocations for the channel. */
     allocations: RPCAllocation[];
-    /** The hash of the channel state. */
-    stateHash: Hex;
     /** The server's signature for the state update. */
     serverSignature: ServerSignature;
 }

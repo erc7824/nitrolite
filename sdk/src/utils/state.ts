@@ -1,18 +1,17 @@
 import { keccak256, encodeAbiParameters, Address, Hex, recoverMessageAddress, numberToHex, parseSignature } from 'viem';
 import { State, StateHash, Signature, ChannelId } from '../client/types'; // Updated import path
+import { get } from 'http';
 
 /**
- * Compute the hash of a channel state in a canonical way (ignoring the signature)
- * @param channelId The channelId
- * @param state The state struct
- * @returns The state hash as Hex
+ * Packs a channel state into a canonical format for hashing and signing.
+ * @param channelId The ID of the channel.
+ * @param state The state to pack.
+ * @returns The packed state as Hex.
  */
-export function getStateHash(channelId: ChannelId, state: State): StateHash {
-    const encoded = encodeAbiParameters(
+export function getPackedState(channelId: ChannelId, state: State): Hex {
+    return encodeAbiParameters(
         [
             { name: 'channelId', type: 'bytes32' },
-            // For channel creation, state.version must be 0 (corresponds to INITIAL status)
-            // For active channels, state.version must be greater than 0
             {
                 name: 'intent',
                 type: 'uint8',
@@ -34,13 +33,21 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
         ],
         [channelId, state.intent, state.version, state.data, state.allocations],
     );
+}
 
-    return keccak256(encoded);
+/**
+ * Compute the hash of a channel state in a canonical way (ignoring the signature)
+ * @param channelId The channelId
+ * @param state The state struct
+ * @returns The state hash as Hex
+ */
+export function getStateHash(channelId: ChannelId, state: State): StateHash {
+    return keccak256(getPackedState(channelId, state)) as StateHash;
 }
 
 /**
  * Function type for signing messages, compatible with Viem's WalletClient or Account.
- * @dev Signing should not add an EIP-191 prefix to the message.
+ * @dev Signing should NOT add an EIP-191 prefix to the message.
  * @param args An object containing the message to sign in the `{ message: { raw: Hex } }` format.
  * @returns A promise that resolves to the signature as a Hex string.
  * @throws If the signing fails.
@@ -48,7 +55,7 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
 type SignMessageFn = (args: { message: { raw: Hex } }) => Promise<Hex>;
 
 /**
- * Create a signature for a state hash using a Viem WalletClient or Account compatible signer.
+ * Create a raw ECDSA signature for a hash over a packed state using a Viem WalletClient or Account compatible signer.
  * Uses the locally defined parseSignature function.
  * @dev `signMessage` function should NOT add an EIP-191 prefix to the stateHash. See {@link SignMessageFn}.
  * @param stateHash The hash of the state to sign.
@@ -69,7 +76,7 @@ export async function signState(
 }
 
 /**
- * Verifies that a state hash was signed by the expected signer.
+ * Verifies a raw ECDSA signature over a hash of a packed state.
  * @param stateHash The hash of the state.
  * @param signature The signature to verify.
  * @param expectedSigner The address of the participant expected to have signed.

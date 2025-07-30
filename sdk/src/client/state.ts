@@ -1,6 +1,6 @@
-import { Address, encodeAbiParameters, Hex, keccak256 } from 'viem';
+import { Address, encodeAbiParameters, encodePacked, Hex, keccak256 } from 'viem';
 import * as Errors from '../errors';
-import { generateChannelNonce, getChannelId, getStateHash, signState } from '../utils';
+import { generateChannelNonce, getChannelId, getPackedState, getStateHash, signState } from '../utils';
 import { PreparerDependencies } from './prepare';
 import {
     ChallengeChannelParams,
@@ -106,13 +106,10 @@ export async function _prepareAndSignChallengeState(
 }> {
     const { channelId, candidateState, proofStates = [] } = params;
 
-    const stateHash = getStateHash(channelId, candidateState);
-    const encoded = encodeAbiParameters(
-        [
-            { type: 'bytes32', name: 'stateHash' },
-            { type: 'string', name: 'challenge' },
-        ],
-        [stateHash, 'challenge'],
+    const packedState = getPackedState(channelId, candidateState);
+    const encoded = encodePacked(
+        [ 'bytes', 'string' ],
+        [packedState, 'challenge'],
     );
     const challengeHash = keccak256(encoded) as Hex;
     const challengerSig = await signState(challengeHash, deps.stateWalletClient.signMessage);

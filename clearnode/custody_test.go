@@ -385,11 +385,9 @@ func TestHandleClosedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   initialRawAmount,
 			Nonce:       12345,
-			Version:     1,
-			Challenge:   3600,
-			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		err := db.Create(&initialChannel).Error
 		require.NoError(t, err)
@@ -426,7 +424,7 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		assert.Equal(t, ChannelStatusClosed, updatedChannel.Status)
 		assert.Equal(t, decimal.NewFromInt(0), updatedChannel.RawAmount, "Amount should be zero after closing")
-		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
+		assert.Greater(t, updatedChannel.State.Version, initialChannel.State.Version, "Version should be incremented")
 
 		var entries []Entry
 		err = db.Where("wallet = ?", walletAddr.Hex()).Find(&entries).Error
@@ -488,7 +486,9 @@ func TestHandleClosedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   initialRawAmount,
 			Nonce:       12345,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 			Challenge:   3600,
 			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
 			CreatedAt:   time.Now(),
@@ -571,11 +571,9 @@ func TestHandleClosedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   channelAmount,
 			Nonce:       12345,
-			Version:     1,
-			Challenge:   3600,
-			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		err := db.Create(&initialChannel).Error
 		require.NoError(t, err)
@@ -614,7 +612,7 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		assert.Equal(t, ChannelStatusClosed, updatedChannel.Status)
 		assert.Equal(t, decimal.Zero.String(), updatedChannel.RawAmount.String(), "Amount should be zero after closing")
-		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
+		assert.Greater(t, updatedChannel.State.Version, initialChannel.State.Version, "Version should be incremented")
 
 		assertNotifications(t, capturedNotifications, walletAddr.Hex(), 2)
 		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr.Hex()][1].eventType)
@@ -653,7 +651,9 @@ func TestHandleChallengedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   amount,
 			Nonce:       12345,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 			Challenge:   3600,
 			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
 			CreatedAt:   time.Now(),
@@ -684,7 +684,6 @@ func TestHandleChallengedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ChannelStatusChallenged, updatedChannel.Status)
-		assert.Equal(t, uint64(2), updatedChannel.Version, "Version should be updated to match event")
 		assert.Equal(t, initialChannel.RawAmount, updatedChannel.RawAmount, "Amount should not change")
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
@@ -720,7 +719,22 @@ func TestHandleResizedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   initialRawAmount,
 			Nonce:       12345,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+				Intent:  StateIntentOperate,
+				Allocations: []Allocation{
+					{
+						Participant:  participantAddr.Hex(),
+						TokenAddress: tokenAddress,
+						RawAmount:    initialRawAmount,
+					},
+					{
+						Participant:  custody.signer.GetAddress().Hex(),
+						TokenAddress: tokenAddress,
+						RawAmount:    decimal.Zero,
+					},
+				},
+			},
 			Challenge:   3600,
 			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
 			CreatedAt:   time.Now(),
@@ -761,7 +775,7 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		assert.Equal(t, ChannelStatusOpen, updatedChannel.Status, "Status should remain open")
 		assert.Equal(t, expectedAmount, updatedChannel.RawAmount, "Amount should be increased by deltaAmount")
-		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
+		assert.Greater(t, updatedChannel.State.Version, initialChannel.State.Version, "Version should be incremented")
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
@@ -821,11 +835,22 @@ func TestHandleResizedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   initialRawAmount,
 			Nonce:       12345,
-			Version:     1,
-			Challenge:   3600,
-			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
+			State: UnsignedState{
+				Version: 1,
+				Intent:  StateIntentOperate,
+				Allocations: []Allocation{
+					{
+						Participant:  participantAddr.Hex(),
+						TokenAddress: tokenAddress,
+						RawAmount:    initialRawAmount,
+					},
+					{
+						Participant:  custody.signer.GetAddress().Hex(),
+						TokenAddress: tokenAddress,
+						RawAmount:    decimal.Zero,
+					},
+				},
+			},
 		}
 		err := db.Create(&initialChannel).Error
 		require.NoError(t, err)
@@ -850,7 +875,7 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		assert.Equal(t, ChannelStatusOpen, updatedChannel.Status)
 		assert.Equal(t, expectedAmount, updatedChannel.RawAmount)
-		assert.Greater(t, updatedChannel.Version, initialChannel.Version)
+		assert.Greater(t, updatedChannel.State.Version, initialChannel.State.Version)
 
 		walletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)
 		require.NoError(t, err)

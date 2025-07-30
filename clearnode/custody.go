@@ -213,6 +213,21 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 			return fmt.Errorf("an open channel with broker already exists: %s", existingOpenChannel.ChannelID)
 		}
 
+		// Record initial channel state
+		state := UnsignedState{
+			Intent:  StateIntent(ev.Initial.Intent),
+			Version: ev.Initial.Version.Uint64(),
+			Data:    ev.Initial.Data,
+		}
+		for _, alloc := range ev.Initial.Allocations {
+			state.Allocations = append(state.Allocations, Allocation{
+				Participant:  alloc.Destination.Hex(),
+				TokenAddress: alloc.Token.Hex(),
+				RawAmount:    decimal.NewFromBigInt(alloc.Amount, 0),
+			})
+		}
+		// NOTE: Signatures are not recorded with the initial state.
+
 		ch, err = CreateChannel(
 			tx,
 			channelID,
@@ -224,6 +239,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 			c.chainID,
 			tokenAddress,
 			decimal.NewFromBigInt(rawAmount, 0),
+			state,
 		)
 		if err != nil {
 			return err
@@ -289,7 +305,11 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 
 		channel.Status = ChannelStatusChallenged
 		channel.UpdatedAt = time.Now()
-		channel.Version = ev.State.Version.Uint64()
+
+		// TODO:
+		// 1. Check if the inconning state is older than the current state in db.
+		// 2. If it is, sumbit the newer state to the custody contract.
+
 		if err := tx.Save(&channel).Error; err != nil {
 			return fmt.Errorf("error saving channel in database: %w", err)
 		}
@@ -335,9 +355,18 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			return fmt.Errorf("invalid resize, channel balance cannot be negative: %s", newRawAmount.String())
 		}
 
+		// Update state allocations
+		if len(ev.DeltaAllocations) == 2 {
+			channel.State.Allocations[0].RawAmount = channel.State.Allocations[0].RawAmount.Add(decimal.NewFromBigInt(ev.DeltaAllocations[0], 0))
+			channel.State.Allocations[1].RawAmount = channel.State.Allocations[1].RawAmount.Sub(decimal.NewFromBigInt(ev.DeltaAllocations[1], 0))
+		}
+
 		channel.RawAmount = decimal.NewFromBigInt(newRawAmount, 0)
 		channel.UpdatedAt = time.Now()
-		channel.Version++
+		channel.State.Version++
+		channel.ServerStateSignature = nil // Reset server signature
+		channel.UserStateSignature = nil   // Reset user signature
+
 		if err := tx.Save(&channel).Error; err != nil {
 			return fmt.Errorf("error saving channel in database: %w", err)
 		}
@@ -474,7 +503,26 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		channel.Status = ChannelStatusClosed
 		channel.RawAmount = decimal.Zero
 		channel.UpdatedAt = time.Now()
-		channel.Version++
+
+		channel.State.Intent = StateIntent(ev.FinalState.Intent)
+		channel.State.Version++
+		if len(ev.FinalState.Allocations) == 2 {
+			channel.State.Allocations = []Allocation{
+				{
+					Participant:  ev.FinalState.Allocations[0].Destination.Hex(),
+					TokenAddress: ev.FinalState.Allocations[0].Token.Hex(),
+					RawAmount:    decimal.NewFromBigInt(rawAmount, 0),
+				},
+				{
+					Participant:  ev.FinalState.Allocations[1].Destination.Hex(),
+					TokenAddress: ev.FinalState.Allocations[1].Token.Hex(),
+					RawAmount:    decimal.NewFromBigInt(ev.FinalState.Allocations[1].Amount, 0),
+				},
+			}
+		}
+		channel.ServerStateSignature = nil // Reset server signature
+		channel.UserStateSignature = nil   // Reset user signature
+
 		if err := tx.Save(&channel).Error; err != nil {
 			return fmt.Errorf("failed to close channel: %w", err)
 		}

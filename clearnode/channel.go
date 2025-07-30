@@ -27,14 +27,16 @@ type Channel struct {
 	Participant string `gorm:"column:participant;not null"`
 	// RawAmount represents an Integer value of token amount (wei) as represented on the blockchain
 	// type:varchar(78) is set for sqlite to address the issue of not supporting big decimals
-	RawAmount   decimal.Decimal `gorm:"column:raw_amount;type:varchar(78);not null"`
-	Status      ChannelStatus   `gorm:"column:status;not null;"`
-	Challenge   uint64          `gorm:"column:challenge;default:0"`
-	Nonce       uint64          `gorm:"column:nonce;default:0"`
-	Version     uint64          `gorm:"column:version;default:0"`
-	Adjudicator string          `gorm:"column:adjudicator;not null"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	RawAmount            decimal.Decimal `gorm:"column:raw_amount;type:varchar(78);not null"`
+	Status               ChannelStatus   `gorm:"column:status;not null;"`
+	Challenge            uint64          `gorm:"column:challenge;default:0"`
+	Nonce                uint64          `gorm:"column:nonce;default:0"`
+	Adjudicator          string          `gorm:"column:adjudicator;not null"`
+	State                UnsignedState   `gorm:"column:state;type:text;not null"`
+	ServerStateSignature *Signature      `gorm:"column:server_state_signature;type:text" json:"server_state_sig,omitempty"`
+	UserStateSignature   *Signature      `gorm:"column:user_state_signature;type:text" json:"user_state_sig,omitempty"`
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 }
 
 // TableName specifies the table name for the Channel model
@@ -43,7 +45,7 @@ func (Channel) TableName() string {
 }
 
 // CreateChannel creates a new channel in the database
-func CreateChannel(tx *gorm.DB, channelID, wallet, participantSigner string, nonce uint64, challenge uint64, adjudicator string, chainID uint32, tokenAddress string, amount decimal.Decimal) (Channel, error) {
+func CreateChannel(tx *gorm.DB, channelID, wallet, participantSigner string, nonce uint64, challenge uint64, adjudicator string, chainID uint32, tokenAddress string, amount decimal.Decimal, state UnsignedState) (Channel, error) {
 	channel := Channel{
 		ChannelID:   channelID,
 		Wallet:      wallet,
@@ -55,6 +57,7 @@ func CreateChannel(tx *gorm.DB, channelID, wallet, participantSigner string, non
 		Challenge:   challenge,
 		Token:       tokenAddress,
 		RawAmount:   amount,
+		State:       state,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}

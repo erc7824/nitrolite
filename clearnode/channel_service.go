@@ -191,7 +191,7 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 
 	state := nitrolite.State{
 		Intent:      uint8(nitrolite.IntentRESIZE),
-		Version:     big.NewInt(int64(channel.Version) + 1),
+		Version:     big.NewInt(int64(channel.State.Version) + 1),
 		Data:        encodedIntentions,
 		Allocations: allocations,
 	}
@@ -280,7 +280,7 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 
 	state := nitrolite.State{
 		Intent:      uint8(nitrolite.IntentFINALIZE),
-		Version:     big.NewInt(int64(channel.Version) + 1),
+		Version:     big.NewInt(int64(channel.State.Version) + 1),
 		Data:        stateDataBytes,
 		Allocations: allocations,
 	}
@@ -317,7 +317,7 @@ func createChannelOperationResponse(channelID string, state nitrolite.State, sig
 	resp := ChannelOperationResponse{
 		ChannelID: channelID,
 		State: UnsignedState{
-			Intent:  uint8(state.Intent),
+			Intent:  StateIntent(state.Intent),
 			Version: state.Version.Uint64(),
 			Data:    state.Data,
 		},

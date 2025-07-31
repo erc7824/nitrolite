@@ -17,12 +17,6 @@ const RPCAllocationSchema = z.object({
     amount: z.string().transform((a) => BigInt(a)),
 });
 
-const ServerSignatureSchema = z.object({
-    v: z.union([z.string(), z.number()]).transform((a) => Number(a)),
-    r: hexSchema,
-    s: hexSchema,
-});
-
 const ResizeChannelParamsSchema = z
     .array(
         z
@@ -32,8 +26,7 @@ const ResizeChannelParamsSchema = z
                 intent: z.number(),
                 version: z.number(),
                 allocations: z.array(RPCAllocationSchema),
-                state_hash: hexSchema,
-                server_signature: ServerSignatureSchema,
+                server_signature: hexSchema,
             })
             .transform(
                 (raw) =>
@@ -47,12 +40,7 @@ const ResizeChannelParamsSchema = z
                             token: a.token as Address,
                             amount: a.amount,
                         })),
-                        stateHash: raw.state_hash as Hex,
-                        serverSignature: {
-                            v: +raw.server_signature.v,
-                            r: raw.server_signature.r as Hex,
-                            s: raw.server_signature.s as Hex,
-                        },
+                        serverSignature: raw.server_signature,
                     }) as ResizeChannelResponseParams,
             ),
     )
@@ -68,8 +56,7 @@ const CloseChannelParamsSchema = z
                 intent: z.number(),
                 version: z.number(),
                 allocations: z.array(RPCAllocationSchema),
-                state_hash: hexSchema,
-                server_signature: ServerSignatureSchema,
+                server_signature: hexSchema,
             })
             .transform(
                 (raw) =>
@@ -83,12 +70,7 @@ const CloseChannelParamsSchema = z
                             token: a.token as Address,
                             amount: a.amount,
                         })),
-                        stateHash: raw.state_hash as Hex,
-                        serverSignature: {
-                            v: +raw.server_signature.v,
-                            r: raw.server_signature.r as Hex,
-                            s: raw.server_signature.s as Hex,
-                        },
+                        serverSignature: raw.server_signature,
                     }) as CloseChannelResponseParams,
             ),
     )

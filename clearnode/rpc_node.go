@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -168,10 +167,10 @@ read_loop:
 			}
 		}
 
-		var msg RPCMessage
+		msg := RPCMessage{Req: &RPCData{}}
 		if err := json.Unmarshal(messageBytes, &msg); err != nil {
 			n.logger.Debug("invalid message format", "error", err, "message", string(messageBytes))
-			n.sendErrorResponse(rpcConn, 0, "invalid message format")
+			n.sendErrorResponse(rpcConn, msg.Req.RequestID, "invalid message format")
 			continue
 		}
 
@@ -360,7 +359,7 @@ func prepareRawRPCResponse(signer *Signer, data *RPCData) ([]byte, error) {
 
 	responseMessage := &RPCMessage{
 		Res: data,
-		Sig: []string{hexutil.Encode(signature)},
+		Sig: []Signature{signature},
 	}
 	resMessageBytes, err := json.Marshal(responseMessage)
 	if err != nil {

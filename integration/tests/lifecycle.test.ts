@@ -27,7 +27,7 @@ import {
     RPCChannelStatus,
     rpcResponseParser,
 } from '@erc7824/nitrolite';
-import { Hex, parseUnits, Address } from 'viem';
+import { Hex, parseUnits } from 'viem';
 
 describe('Close channel', () => {
     const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)

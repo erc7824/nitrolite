@@ -94,7 +94,7 @@ export interface NitroliteRPCMessage {
     /** Contains the response or error payload if this is a response message. */
     res?: ResponsePayload;
     /** Optional cryptographic signature(s) for message authentication. */
-    sig?: Hex[] | [''];
+    sig?: Hex[];
 }
 
 /**
@@ -222,7 +222,7 @@ export type MessageSigner = (payload: RequestData | ResponsePayload) => Promise<
 
 /**
  * Defines the function signature for signing challenge state data.
- * This signer is specifically used for signing state challenges in the form of keccak256(abi.encode(stateHash, 'challenge')).
+ * This signer is specifically used for signing state challenges in the form of keccak256(abi.encodePacked(packedState, 'challenge')).
  *
  * @param stateHash - The state hash as a Hex string
  * @returns A Promise that resolves to the cryptographic signature as a Hex string.

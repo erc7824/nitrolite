@@ -50,3 +50,51 @@ func EncodeState(channelID common.Hash, intent Intent, version *big.Int, stateDa
 	}
 	return packed, nil
 }
+
+// COMMON STATE DEFINITION
+
+// Assumption: let's abstract from state channel framework, and try do define a common state without being limited by state-channel limitations.
+
+type CommonState struct {
+	State         UnsignedCommonState `json:"state"`
+	OwnerSig      Signature           `json:"owner_sig"`
+	ValidatorSigs []Signature         `json:"validator_sigs"`
+}
+
+// Adjudicator manages a registry of approved validator nodes. Each node has a signature weight.
+// Adjudicator verifies that validatorSigs achieve a signature quorum threshold.
+// Number of validators and quorum threshold can be adjusted in realtime by adjudicator contract.
+
+type UnsignedCommonState struct {
+	Version     *big.Int     `json:"version"`      // Common state version
+	StateData   []byte       `json:"state_data"`   // Common state data
+	ChainStates []ChainState `json:"chain_states"` // User allocation on each chain
+}
+
+type ChainState struct {
+	ChainID     uint32            `json:"chain_id"`
+	Allocations []TokenAllocation `json:"allocations"`
+}
+
+type TokenAllocation struct {
+	TokenAddress common.Address `json:"token"`
+	RawAmount    *big.Int       `json:"amount"`
+}
+
+// User deposits money on smart contract. Smart contract account is a big state channel with Yellow Network.
+// Yellow network users are participants of this big state channel. State changes are validated by set of validators.
+// Funds are in the same pool, delivering high liquidity and funds efficiency.
+
+// User has 2 options to withdraw funds:
+// 1. Withdraw with a set of validator signatures (cooperative withdraw).
+// 	- Withdraw(CurrentCommonState, WithdrawReqValidatorSigs)
+// 2. Call Withdraw without providing signatures (if network is down), which will initialize a withdraw. (like challenge or unlock period in yellow vault). Validator can use this window to submit a newer state.
+// 	- Withdraw(CurrentCommonState)
+
+// CLEARNODE COMMON STATE INTEGRATION
+
+// To perform a transfer on Yellow Network, user must:
+
+// Call GetTransferState([]AssetAmount) on a Clearnode
+// Receive a new UnsignedCommonState,
+// sign it and submit it to a Clearnode by calling ExecuteTransfer(Destination, UnsignedCommonState, Signature)

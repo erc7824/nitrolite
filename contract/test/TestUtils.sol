@@ -29,15 +29,15 @@ library TestUtils {
         return buildDomainSeparator(name, version, chainId, verifyingContract);
     }
 
-    function sign(Vm vm, uint256 privateKey, bytes32 digest) internal pure returns (bytes memory) {
-        // Sign the digest directly without applying EIP-191 prefix
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+    function sign(Vm vm, uint256 privateKey, bytes memory message) internal pure returns (bytes memory) {
+        // Sign the message directly without applying EIP-191 prefix
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, keccak256(message));
         return abi.encodePacked(r, s, v);
     }
 
-    function signEIP191(Vm vm, uint256 privateKey, bytes32 messageHash) internal pure returns (bytes memory) {
+    function signEIP191(Vm vm, uint256 privateKey, bytes memory message) internal pure returns (bytes memory) {
         // Apply EIP-191 prefix and sign
-        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(messageHash);
+        bytes32 ethSignedMessageHash = MessageHashUtils.toEthSignedMessageHash(message);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, ethSignedMessageHash);
         return abi.encodePacked(r, s, v);
     }
@@ -58,8 +58,8 @@ library TestUtils {
         view
         returns (bytes memory)
     {
-        bytes32 stateHash = Utils.getStateHash(channel, state);
-        return TestUtils.signEIP191(vm, privateKey, stateHash);
+        bytes memory packedState = Utils.getPackedState(Utils.getChannelId(channel), state);
+        return TestUtils.signEIP191(vm, privateKey, packedState);
     }
 
     function signStateEIP712(

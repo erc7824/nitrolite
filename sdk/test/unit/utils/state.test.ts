@@ -1,12 +1,11 @@
 import { describe, test, expect, jest } from '@jest/globals';
 import { getStateHash, signState, verifySignature } from '../../../src/utils/state';
 import { type State, type Signature, type Allocation, StateIntent } from '../../../src/client/types';
-import { Hex, Address, recoverMessageAddress, parseSignature, encodeAbiParameters, keccak256 } from 'viem';
+import { Hex, Address, recoverMessageAddress, encodeAbiParameters, keccak256 } from 'viem';
 
 jest.mock('viem', () => ({
     encodeAbiParameters: jest.fn(() => '0xencoded'),
     keccak256: jest.fn(() => '0xhash'),
-    parseSignature: jest.fn(() => ({ r: '0xr', s: '0xs', v: 27 })),
     recoverMessageAddress: jest.fn(async () => '0xSignerAddress'),
 }));
 
@@ -55,17 +54,28 @@ describe('getStateHash', () => {
 });
 
 describe('signState', () => {
+    const channelId = '0xChannelId' as Hex;
+    const state: State = {
+        data: '0xdata' as Hex,
+        intent: StateIntent.INITIALIZE,
+        allocations: [
+            { destination: '0xA' as Address, token: '0xT' as Address, amount: 10n },
+            { destination: '0xB' as Address, token: '0xT' as Address, amount: 20n },
+        ] as [Allocation, Allocation],
+        version: 0n,
+        sigs: [],
+    };
+    const stateHash = getStateHash(channelId, state);
     const expectedSignature = '0xrs1b' as Hex;
-    const fakeHash = '0xstatehash' as Hex;
     const signer = jest.fn(async ({ message }) => {
-        if (message.raw === fakeHash) return expectedSignature;
+        if (message.raw === stateHash) return expectedSignature;
         throw new Error('sign fail');
     });
 
     test('successfully signs and parses signature', async () => {
         // @ts-ignore
-        const sig = await signState(fakeHash, signer);
-        expect(signer).toHaveBeenCalledWith({ message: { raw: fakeHash } });
+        const sig = await signState(channelId, state, signer);
+        expect(signer).toHaveBeenCalledWith({ message: { raw: stateHash } });
         expect(sig).toEqual(expectedSignature);
     });
 
@@ -73,17 +83,28 @@ describe('signState', () => {
         const badSigner = jest.fn(async () => {
             throw new Error('bad');
         });
-        await expect(signState(fakeHash, badSigner)).rejects.toThrow(/Failed to sign state hash: bad/);
+        await expect(signState(channelId, state, badSigner)).rejects.toThrow(/Failed to sign state hash: bad/);
     });
 });
 
 describe('verifySignature', () => {
-    const stateHash = '0xstate' as Hex;
+    const channelId = '0xChannelId' as Hex;
+    const state: State = {
+        data: '0xdata' as Hex,
+        intent: StateIntent.INITIALIZE,
+        allocations: [
+            { destination: '0xA' as Address, token: '0xT' as Address, amount: 10n },
+            { destination: '0xB' as Address, token: '0xT' as Address, amount: 20n },
+        ] as [Allocation, Allocation],
+        version: 0n,
+        sigs: [],
+    };
+    const stateHash = getStateHash(channelId, state);
     const signature: Signature = "0xr0xs1b" as Signature;
     const expectedSigner = '0xSignerAddress' as Address;
 
     test('recovers address', async () => {
-        const result = await verifySignature(stateHash, signature, expectedSigner);
+        const result = await verifySignature(channelId, state, signature, expectedSigner);
         expect(recoverMessageAddress).toHaveBeenCalledWith({
             message: { raw: stateHash },
             signature: signature as Hex,
@@ -95,12 +116,12 @@ describe('verifySignature', () => {
         const viemMock = jest.requireMock('viem');
         // @ts-ignore
         viemMock.recoverMessageAddress.mockRejectedValueOnce(new Error('fail'));
-        const res = await verifySignature(stateHash, signature, expectedSigner);
+        const res = await verifySignature(channelId, state, signature, expectedSigner);
         expect(res).toBe(false);
     });
 
     test('returns false on mismatched address', async () => {
-        const res = await verifySignature(stateHash, signature, '0xOther' as Address);
+        const res = await verifySignature(channelId, state, signature, '0xOther' as Address);
         expect(res).toBe(false);
     });
 });

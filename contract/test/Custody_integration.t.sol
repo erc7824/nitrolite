@@ -88,13 +88,13 @@ contract CustodyIntegrationTest_Signatures is Test {
     // ==================== SIGNATURE HELPERS ====================
 
     function _signStateRaw(State memory state, uint256 privateKey) internal view returns (bytes memory) {
-        bytes32 stateHash = Utils.getStateHash(channel, state);
-        return TestUtils.sign(vm, privateKey, stateHash);
+        bytes memory packedState = Utils.getPackedState(channelId, state);
+        return TestUtils.sign(vm, privateKey, packedState);
     }
 
     function _signStateEIP191(State memory state, uint256 privateKey) internal view returns (bytes memory) {
-        bytes32 stateHash = Utils.getStateHash(channel, state);
-        return TestUtils.signEIP191(vm, privateKey, stateHash);
+        bytes memory packedState = Utils.getPackedState(channelId, state);
+        return TestUtils.signEIP191(vm, privateKey, packedState);
     }
 
     function _signStateEIP712(State memory state, uint256 privateKey) internal view returns (bytes memory) {
@@ -133,9 +133,8 @@ contract CustodyIntegrationTest_Signatures is Test {
     }
 
     function _signChallenge(State memory state, uint256 privateKey) internal view returns (bytes memory) {
-        bytes32 stateHash = Utils.getStateHash(channel, state);
-        bytes32 challengeHash = keccak256(abi.encode(stateHash, "challenge"));
-        return TestUtils.sign(vm, privateKey, challengeHash);
+        bytes memory packedChallengeState = abi.encodePacked(Utils.getPackedState(channelId, state), "challenge");
+        return TestUtils.sign(vm, privateKey, packedChallengeState);
     }
 
     // ==================== STATE CREATION HELPERS ====================

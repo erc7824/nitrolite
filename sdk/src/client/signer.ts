@@ -17,7 +17,7 @@ export interface StateSigner {
      * Get the address of the signer.
      * @returns The address of the signer as a Promise.
      */
-    getAddress(): Promise<Address>;
+    getAddress(): Address;
     /**
      * Sign a state for a given channel ID.
      * @param channelId The ID of the channel.
@@ -47,7 +47,7 @@ export class WalletStateSigner implements StateSigner {
         this.walletClient = walletClient;
     }
 
-    async getAddress(): Promise<Address> {
+    getAddress(): Address {
         return this.walletClient.account.address;
     }
 
@@ -76,7 +76,7 @@ export class SessionKeyStateSigner implements StateSigner {
         this.account = privateKeyToAccount(sessionKey);
     }
 
-    async getAddress(): Promise<Address> {
+    getAddress(): Address {
         return this.account.address;
     }
 

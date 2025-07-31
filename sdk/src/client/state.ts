@@ -38,7 +38,7 @@ export async function _prepareAndSignInitialState(
     const channelNonce = generateChannelNonce(deps.account.address);
 
     const participants: [Hex, Hex] = [deps.account.address, deps.addresses.guestAddress];
-    const channelParticipants: [Hex, Hex] = [await deps.stateSigner.getAddress(), deps.addresses.guestAddress];
+    const channelParticipants: [Hex, Hex] = [deps.stateSigner.getAddress(), deps.addresses.guestAddress];
     const adjudicatorAddress = deps.addresses.adjudicator;
     if (!adjudicatorAddress) {
         throw new Errors.MissingParameterError(
@@ -103,7 +103,7 @@ export async function _prepareAndSignChallengeState(
     challengerSig: Signature;
 }> {
     const { channelId, candidateState, proofStates = [] } = params;
-    const challengeHash = await getChallengeHash(channelId, candidateState);
+    const challengeHash = getChallengeHash(channelId, candidateState);
     const challengerSig = await deps.stateSigner.signRawMessage(challengeHash);
 
     return { channelId, candidateState, proofs: proofStates, challengerSig };

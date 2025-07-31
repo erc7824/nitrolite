@@ -21,7 +21,7 @@ export class TestNitroliteClient extends NitroliteClient {
             // @ts-ignore
             publicClient,
             walletClient: identity.walletClient,
-            stateWalletClient: identity.stateWalletClient,
+            stateSigner: identity.stateSigner,
             account: identity.walletClient.account,
             chainId: chain.id,
             challengeDuration: BigInt(CONFIG.DEFAULT_CHALLENGE_TIMEOUT), // min

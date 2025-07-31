@@ -32,7 +32,7 @@ describe('NitroliteClient', () => {
     let mockErc20Service: any;
 
     const stateSigner = {
-        getAddress: jest.fn(async () => mockAccount.address),
+        getAddress: jest.fn(() => mockAccount.address),
         signState: jest.fn(async (_1: Hex, _2: any) => mockSignature as Hex),
         signRawMessage: jest.fn(async (_: Hex) => mockSignature as Hex),
     }

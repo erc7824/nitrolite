@@ -51,7 +51,7 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
  * @param state The state to calculate with.
  * @returns The challenge hash as a Hex string.
  */
-export async function getChallengeHash(channelId: ChannelId, state: State): Promise<Hex> {
+export function getChallengeHash(channelId: ChannelId, state: State): Hex {
     const packedState = getPackedState(channelId, state);
     const encoded = encodePacked(['bytes', 'string'], [packedState, 'challenge']);
     return keccak256(encoded);

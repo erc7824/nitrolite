@@ -1,132 +1,119 @@
 import { z } from 'zod';
-import { Address, Hex } from 'viem';
 import {
     RPCMethod,
     ResizeChannelResponseParams,
     CloseChannelResponseParams,
     GetChannelsResponseParams,
     ChannelUpdateResponseParams,
-    RPCChannelStatus,
-    ChannelUpdate,
+    RPCChannel,
+    ChannelsUpdateResponseParams,
+    RPCChannelWithWallet,
 } from '../types';
-import { hexSchema, addressSchema, statusEnum, ParamsParser } from './common';
+import { hexSchema, addressSchema, statusEnum, ParamsParser, bigIntSchema, dateSchema } from './common';
 
 const RPCAllocationSchema = z.object({
     destination: addressSchema,
     token: addressSchema,
-    amount: z.string().transform((a) => BigInt(a)),
+    amount: bigIntSchema,
 });
 
 const ResizeChannelParamsSchema = z
-    .array(
-        z
-            .object({
-                channel_id: hexSchema,
-                state_data: hexSchema,
-                intent: z.number(),
-                version: z.number(),
-                allocations: z.array(RPCAllocationSchema),
-                server_signature: hexSchema,
-            })
-            .transform(
-                (raw) =>
-                    ({
-                        channelId: raw.channel_id as Hex,
-                        stateData: raw.state_data as Hex,
-                        intent: raw.intent,
-                        version: raw.version,
-                        allocations: raw.allocations.map((a) => ({
-                            destination: a.destination as Address,
-                            token: a.token as Address,
-                            amount: a.amount,
-                        })),
-                        serverSignature: raw.server_signature,
-                    }) as ResizeChannelResponseParams,
-            ),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
-
-const CloseChannelParamsSchema = z
-    .array(
-        z
-            .object({
-                channel_id: hexSchema,
-                state_data: hexSchema,
-                intent: z.number(),
-                version: z.number(),
-                allocations: z.array(RPCAllocationSchema),
-                server_signature: hexSchema,
-            })
-            .transform(
-                (raw) =>
-                    ({
-                        channelId: raw.channel_id as Hex,
-                        stateData: raw.state_data as Hex,
-                        intent: raw.intent,
-                        version: raw.version,
-                        allocations: raw.allocations.map((a) => ({
-                            destination: a.destination as Address,
-                            token: a.token as Address,
-                            amount: a.amount,
-                        })),
-                        serverSignature: raw.server_signature,
-                    }) as CloseChannelResponseParams,
-            ),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
-
-const ChannelUpdateObjectSchema = z
     .object({
         channel_id: hexSchema,
-        participant: addressSchema,
-        status: statusEnum,
-        token: addressSchema,
-        wallet: z.union([addressSchema, z.literal('')]),
-        amount: z.union([z.string(), z.number()]).transform((a) => BigInt(a)),
-        chain_id: z.number(),
-        adjudicator: addressSchema,
-        challenge: z.number(),
-        nonce: z.union([z.string(), z.number()]).transform((n) => BigInt(n)),
+        state_data: hexSchema,
+        intent: z.number(),
         version: z.number(),
-        created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-        updated_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
+        allocations: z.array(RPCAllocationSchema),
+        server_signature: hexSchema,
     })
     .transform(
-        (c) =>
-            ({
-                channelId: c.channel_id as Hex,
-                participant: c.participant as Address,
-                status: c.status as RPCChannelStatus,
-                token: c.token as Address,
-                wallet: c.wallet as Address,
-                amount: c.amount,
-                chainId: c.chain_id,
-                adjudicator: c.adjudicator as Address,
-                challenge: c.challenge,
-                nonce: c.nonce,
-                version: c.version,
-                createdAt: c.created_at,
-                updatedAt: c.updated_at,
-            }) as ChannelUpdateResponseParams,
+        (raw): ResizeChannelResponseParams => ({
+            channelId: raw.channel_id,
+            stateData: raw.state_data,
+            intent: raw.intent,
+            version: raw.version,
+            allocations: raw.allocations,
+            serverSignature: raw.server_signature,
+        }),
     );
 
-const GetChannelsParamsSchema = z
-    .array(z.array(ChannelUpdateObjectSchema))
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0])
-    .transform((arr) => arr as GetChannelsResponseParams);
+const CloseChannelParamsSchema = z
+    .object({
+        channel_id: hexSchema,
+        state_data: hexSchema,
+        intent: z.number(),
+        version: z.number(),
+        allocations: z.array(RPCAllocationSchema),
+        server_signature: hexSchema,
+    })
+    .transform(
+        (raw): CloseChannelResponseParams => ({
+            channelId: raw.channel_id,
+            stateData: raw.state_data,
+            intent: raw.intent,
+            version: raw.version,
+            allocations: raw.allocations,
+            serverSignature: raw.server_signature,
+        }),
+    );
 
-const ChannelUpdateParamsSchema = z
-    .array(ChannelUpdateObjectSchema)
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
+const ChannelUpdateObject = z.object({
+    channel_id: hexSchema,
+    participant: addressSchema,
+    status: statusEnum,
+    token: addressSchema,
+    amount: bigIntSchema,
+    chain_id: z.number(),
+    adjudicator: addressSchema,
+    challenge: z.number(),
+    nonce: z.number(),
+    version: z.number(),
+    created_at: dateSchema,
+    updated_at: dateSchema,
+});
+
+const ChannelUpdateObjectSchema = ChannelUpdateObject.transform(
+    (raw): RPCChannel => ({
+        channelId: raw.channel_id,
+        participant: raw.participant,
+        status: raw.status,
+        token: raw.token,
+        amount: raw.amount,
+        chainId: raw.chain_id,
+        adjudicator: raw.adjudicator,
+        challenge: raw.challenge,
+        nonce: raw.nonce,
+        version: raw.version,
+        createdAt: raw.created_at,
+        updatedAt: raw.updated_at,
+    }),
+);
+
+const ChannelUpdateWithWalletObjectSchema = z.object({
+    ...ChannelUpdateObject.shape,
+    wallet: addressSchema,
+}).transform((raw): RPCChannelWithWallet => ({
+    ...ChannelUpdateObjectSchema.parse(raw),
+    wallet: raw.wallet,
+}));
+
+const GetChannelsParamsSchema = z
+    .object({
+        channels: z.array(ChannelUpdateWithWalletObjectSchema),
+    })
+    // Validate received type with linter
+    .transform((raw): GetChannelsResponseParams => raw);
+
+const ChannelUpdateParamsSchema = ChannelUpdateObjectSchema
+    // Validate received type with linter
+    .transform((raw): ChannelUpdateResponseParams => raw);
 
 const ChannelsUpdateParamsSchema = z
-    .array(z.array(ChannelUpdateObjectSchema))
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
+    .object({
+        channels: z.array(ChannelUpdateObjectSchema),
+    })
+    // Validate received type with linter
+    .transform((raw): ChannelsUpdateResponseParams => raw);
 
 export const channelParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.ResizeChannel]: (params) => ResizeChannelParamsSchema.parse(params),

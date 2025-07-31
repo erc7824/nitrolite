@@ -36,7 +36,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddressB).Record(userAccountIDB, "usdc", decimal.NewFromInt(200)))
 
 		capturedNotifications := make(map[string][]Notification)
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {
 
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
@@ -117,7 +117,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(50))) // Not enough
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -148,7 +148,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			Status: ChannelStatusChallenged,
 		}).Error)
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -175,7 +175,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -208,7 +208,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session",
 			Protocol:           "test-proto",
@@ -258,7 +258,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-negative",
 			Protocol:           "test-proto",
@@ -307,8 +307,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		defer cleanup()
 
 		capturedNotifications := make(map[string][]Notification)
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
-
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
@@ -395,7 +394,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		defer cleanup()
 
 		capturedNotifications := make(map[string][]Notification)
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {
 
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
@@ -457,7 +456,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-close-negative",
 			Protocol:           "test-proto",

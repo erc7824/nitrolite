@@ -2,313 +2,40 @@ import { Address, Hex } from 'viem';
 import {
     RPCMethod,
     GenericRPCMessage,
-    AppDefinition,
+    RPCAppDefinition,
     RPCChannelStatus,
-    AuthVerifyRequestParams,
-    TransferAllocation,
-    ChannelUpdate,
-    TxType,
+    RPCChannel,
+    RPCNetworkInfo,
+    RPCBalance,
+    RPCLedgerEntry,
+    RPCAppSession,
+    RPCChannelAllocation,
+    RPCHistoryEntry,
+    RPCAsset,
+    RPCTransaction,
+    RPCChannelWithWallet,
 } from '.';
-
-/**
- * Represents the parameters for the 'auth_challenge' RPC method.
- */
-export interface AuthChallengeResponseParams {
-    /** The challenge message to be signed by the client for authentication. */
-    challengeMessage: string;
-}
-export type AuthChallengeRPCResponseParams = AuthChallengeResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'auth_challenge' RPC method.
  */
 export interface AuthChallengeResponse extends GenericRPCMessage {
     method: RPCMethod.AuthChallenge;
-    params: AuthChallengeResponseParams;
+    params: {
+        /** The challenge message to be signed by the client for authentication. */
+        challengeMessage: string;
+    };
 }
-
-/**
- * Represents the parameters for the 'auth_verify' RPC method.
- */
-export type AuthVerifyResponseParams = {
-    address: Address;
-    sessionKey: Address;
-    success: boolean;
-} & {
-    /** Available only if challenge auth method was used in {@link AuthVerifyRequestParams} during the call to {@link RPCMethod.AuthRequest} */
-    jwtToken: string;
-};
-export type AuthVerifyRPCResponseParams = AuthVerifyResponseParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'error' RPC method.
- */
-export interface ErrorResponseParams {
-    /** The error message describing what went wrong. */
-    error: string;
-}
-export type ErrorRPCResponseParams = ErrorResponseParams; // for backward compatibility
-
-/**
- * Represents the network information for the 'get_config' RPC method.
- */
-export interface NetworkInfo {
-    /** The name of the network (e.g., "Ethereum", "Polygon"). */
-    name: string;
-    /** The chain ID of the network. */
-    chainId: number;
-    /** The custody contract address for the network. */
-    custodyAddress: Address;
-    /** The adjudicator contract address for the network. */
-    adjudicatorAddress: Address;
-}
-
-/**
- * Represents the parameters for the 'get_config' RPC method.
- */
-export interface GetConfigResponseParams {
-    /** The Ethereum address of the broker. */
-    brokerAddress: Address;
-    /** List of supported networks and their configurations. */
-    networks: NetworkInfo[];
-}
-export type GetConfigRPCResponseParams = GetConfigResponseParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'get_ledger_balances' RPC method.
- */
-export interface GetLedgerBalancesResponseParams {
-    /** The asset symbol (e.g., "ETH", "USDC"). */
-    asset: string;
-    /** The balance amount. */
-    amount: string;
-}
-export type GetLedgerBalancesRPCResponseParams = GetLedgerBalancesResponseParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'get_ledger_entries' RPC method.
- */
-export interface GetLedgerEntriesResponseParams {
-    /** Unique identifier for the ledger entry. */
-    id: number;
-    /** The account identifier associated with the entry. */
-    accountId: string;
-    /** The type of account (e.g., "wallet", "channel"). */
-    accountType: number;
-    /** The asset symbol for the entry. */
-    asset: string;
-    /** The Ethereum address of the participant. */
-    participant: Address;
-    /** The credit amount. */
-    credit: string;
-    /** The debit amount. */
-    debit: string;
-    /** The timestamp when the entry was created. */
-    createdAt: Date;
-}
-export type GetLedgerEntriesRPCResponseParams = GetLedgerEntriesResponseParams; // for backward compatibility
-
-export type GetLedgerTransactionsResponseParams = Transaction[];
-
-/**
- * Represents the parameters for the 'get_user_tag' RPC method.
- */
-export interface UserTagParams {
-    /** The user's unique tag identifier. */
-    tag: string;
-}
-export type GetUserTagRPCResponseParams = UserTagParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'create_app_session' RPC method.
- */
-export interface CreateAppSessionResponseParams {
-    /** The unique identifier for the application session. */
-    appSessionId: Hex;
-    /** The version number of the session. */
-    version: number;
-    /** The current status of the channel (e.g., "open", "closed"). */
-    status: RPCChannelStatus;
-}
-export type CreateAppSessionRPCResponseParams = CreateAppSessionResponseParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'submit_app_state' RPC method.
- */
-export interface SubmitAppStateResponseParams {
-    /** The unique identifier for the application session. */
-    appSessionId: Hex;
-    /** The version number of the session. */
-    version: number;
-    /** The current status of the channel (e.g., "open", "closed"). */
-    status: RPCChannelStatus;
-}
-export type SubmitAppStateRPCResponseParams = SubmitAppStateResponseParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'close_app_session' RPC method.
- */
-export interface CloseAppSessionResponseParams {
-    /** The unique identifier for the application session. */
-    appSessionId: Hex;
-    /** The version number of the session. */
-    version: number;
-    /** The current status of the channel (e.g., "open", "closed"). */
-    status: RPCChannelStatus;
-}
-export type CloseAppSessionRPCResponseParams = CloseAppSessionResponseParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'get_app_definition' RPC method.
- */
-export interface GetAppDefinitionResponseParams extends AppDefinition {
-    /** The protocol identifier for the application (e.g., "payment", "swap"). */
-    protocol: string;
-    /** List of Ethereum addresses of participants in the application session. */
-    participants: Address[];
-    /** Array of signature weights for each participant, used for quorum calculations. */
-    weights: number[];
-    /** The minimum number of signatures required for state updates. */
-    quorum: number;
-    /** The challenge period in seconds for state updates. */
-    challenge: number;
-    /** A unique nonce value for the application session to prevent replay attacks. */
-    nonce: number;
-}
-export type GetAppDefinitionRPCResponseParams = GetAppDefinitionResponseParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'get_app_sessions' RPC method.
- */
-export interface GetAppSessionsResponseParams {
-    /** The unique identifier for the application session. */
-    appSessionId: Hex;
-    /** The current status of the channel (e.g., "open", "closed"). */
-    status: RPCChannelStatus;
-    /** List of participant Ethereum addresses. */
-    participants: Address[];
-    /** The protocol identifier for the application. */
-    protocol: string;
-    /** The challenge period in seconds. */
-    challenge: number;
-    /** The signature weights for each participant. */
-    weights: number[];
-    /** The minimum number of signatures required for state updates. */
-    quorum: number;
-    /** The version number of the session. */
-    version: number;
-    /** The nonce value for the session. */
-    nonce: number;
-    /** The timestamp when the session was created. */
-    createdAt: Date;
-    /** The timestamp when the session was last updated. */
-    updatedAt: Date;
-    /** Optional session data as a JSON string that stores application-specific state or metadata. */
-    sessionData?: string;
-}
-export type GetAppSessionsRPCResponseParams = GetAppSessionsResponseParams; // for backward compatibility
-
-export type ServerSignature = Hex;
-
-export interface RPCAllocation {
-    /** The destination address for the allocation. */
-    destination: Address;
-    /** The token contract address. */
-    token: Address;
-    /** The amount to allocate. */
-    amount: bigint;
-}
-
-/**
- * Represents the parameters for the 'resize_channel' RPC method.
- */
-export interface ResizeChannelResponseParams {
-    /** The unique identifier for the channel. */
-    channelId: Hex;
-    /** The encoded state data for the channel. */
-    stateData: Hex;
-    /** The intent type for the state update. */
-    intent: number;
-    /** The version number of the channel. */
-    version: number;
-    /** The list of allocations for the channel. */
-    allocations: RPCAllocation[];
-    /** The server's signature for the state update. */
-    serverSignature: ServerSignature;
-}
-export type ResizeChannelRPCResponseParams = ResizeChannelResponseParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'close_channel' RPC method.
- */
-export interface CloseChannelResponseParams {
-    /** The unique identifier for the channel. */
-    channelId: Hex;
-    /** The intent type for the state update. */
-    intent: number;
-    /** The version number of the channel. */
-    version: number;
-    /** The encoded state data for the channel. */
-    stateData: Hex;
-    /** The list of final allocations for the channel. */
-    allocations: RPCAllocation[];
-    /** The server's signature for the state update. */
-    serverSignature: ServerSignature;
-}
-export type CloseChannelRPCResponseParams = CloseChannelResponseParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'get_channels' RPC method.
- */
-export type GetChannelsResponseParams = ChannelUpdate[];
-export type GetChannelsRPCResponseParams = GetChannelsResponseParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'get_rpc_history' RPC method.
- */
-export interface GetRPCHistoryResponseParams {
-    /** Unique identifier for the RPC entry. */
-    id: number;
-    /** The Ethereum address of the sender. */
-    sender: Address;
-    /** The request ID for the RPC call. */
-    reqId: number;
-    /** The RPC method name. */
-    method: string;
-    /** The JSON string of the request parameters. */
-    params: string;
-    /** The timestamp of the RPC call. */
-    timestamp: number;
-    /** Array of request signatures. */
-    reqSig: Hex[];
-    /** Array of response signatures. */
-    resSig: Hex[];
-    /** The JSON string of the response. */
-    response: string;
-}
-export type GetRPCHistoryRPCResponseParams = GetRPCHistoryResponseParams; // for backward compatibility
-
-/**
- * Represents the parameters for the 'get_assets' RPC method.
- */
-export interface GetAssetsResponseParams {
-    /** The token contract address. */
-    token: Address;
-    /** The chain ID where the asset exists. */
-    chainId: number;
-    /** The asset symbol (e.g., "ETH", "USDC"). */
-    symbol: string;
-    /** The number of decimal places for the asset. */
-    decimals: number;
-}
-export type GetAssetsRPCResponseParams = GetAssetsResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for an error response.
  */
 export interface ErrorResponse extends GenericRPCMessage {
     method: RPCMethod.Error;
-    params: ErrorResponseParams;
+    params: {
+        /** The error message describing what went wrong. */
+        error: string;
+    };
 }
 
 /**
@@ -316,7 +43,12 @@ export interface ErrorResponse extends GenericRPCMessage {
  */
 export interface GetConfigResponse extends GenericRPCMessage {
     method: RPCMethod.GetConfig;
-    params: GetConfigResponseParams;
+    params: {
+        /** The Ethereum address of the broker. */
+        brokerAddress: Address;
+        /** List of supported networks and their configurations. */
+        networks: RPCNetworkInfo[];
+    };
 }
 
 /**
@@ -324,7 +56,10 @@ export interface GetConfigResponse extends GenericRPCMessage {
  */
 export interface GetLedgerBalancesResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerBalances;
-    params: GetLedgerBalancesResponseParams[];
+    params: {
+        /** List of balances for each asset in the ledger. */
+        ledgerBalances: RPCBalance[];
+    };
 }
 
 /**
@@ -332,7 +67,10 @@ export interface GetLedgerBalancesResponse extends GenericRPCMessage {
  */
 export interface GetLedgerEntriesResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerEntries;
-    params: GetLedgerEntriesResponseParams[];
+    params: {
+        /** List of ledger entries containing transaction details. */
+        ledgerEntries: RPCLedgerEntry[];
+    };
 }
 
 /**
@@ -340,7 +78,10 @@ export interface GetLedgerEntriesResponse extends GenericRPCMessage {
  */
 export interface GetLedgerTransactionsResponse extends GenericRPCMessage {
     method: RPCMethod.GetLedgerTransactions;
-    params: GetLedgerTransactionsResponseParams;
+    params: {
+        /** List of transactions in the ledger. */
+        ledgerTransactions: RPCTransaction[];
+    };
 }
 
 /**
@@ -348,7 +89,10 @@ export interface GetLedgerTransactionsResponse extends GenericRPCMessage {
  */
 export interface GetUserTagResponse extends GenericRPCMessage {
     method: RPCMethod.GetUserTag;
-    params: UserTagParams;
+    params: {
+        /** The user's unique tag identifier. */
+        tag: string;
+    };
 }
 
 /**
@@ -356,7 +100,14 @@ export interface GetUserTagResponse extends GenericRPCMessage {
  */
 export interface CreateAppSessionResponse extends GenericRPCMessage {
     method: RPCMethod.CreateAppSession;
-    params: CreateAppSessionResponseParams;
+    params: {
+        /** The unique identifier for the application session. */
+        appSessionId: Hex;
+        /** The version number of the session. */
+        version: number;
+        /** The current status of the channel (e.g., "open", "closed"). */
+        status: RPCChannelStatus;
+    };
 }
 
 /**
@@ -364,7 +115,14 @@ export interface CreateAppSessionResponse extends GenericRPCMessage {
  */
 export interface SubmitAppStateResponse extends GenericRPCMessage {
     method: RPCMethod.SubmitAppState;
-    params: SubmitAppStateResponseParams;
+    params: {
+        /** The unique identifier for the application session. */
+        appSessionId: Hex;
+        /** The version number of the session. */
+        version: number;
+        /** The current status of the channel (e.g., "open", "closed"). */
+        status: RPCChannelStatus;
+    };
 }
 
 /**
@@ -372,7 +130,14 @@ export interface SubmitAppStateResponse extends GenericRPCMessage {
  */
 export interface CloseAppSessionResponse extends GenericRPCMessage {
     method: RPCMethod.CloseAppSession;
-    params: CloseAppSessionResponseParams;
+    params: {
+        /** The unique identifier for the application session. */
+        appSessionId: Hex;
+        /** The version number of the session. */
+        version: number;
+        /** The current status of the channel (e.g., "open", "closed"). */
+        status: RPCChannelStatus;
+    };
 }
 
 /**
@@ -380,7 +145,10 @@ export interface CloseAppSessionResponse extends GenericRPCMessage {
  */
 export interface GetAppDefinitionResponse extends GenericRPCMessage {
     method: RPCMethod.GetAppDefinition;
-    params: GetAppDefinitionResponseParams;
+    params: RPCAppDefinition & {
+        /** A unique nonce value for the application session to prevent replay attacks. */
+        nonce: number;
+    };
 }
 
 /**
@@ -388,7 +156,9 @@ export interface GetAppDefinitionResponse extends GenericRPCMessage {
  */
 export interface GetAppSessionsResponse extends GenericRPCMessage {
     method: RPCMethod.GetAppSessions;
-    params: GetAppSessionsResponseParams[];
+    params: {
+        appSessions: RPCAppSession[];
+    };
 }
 
 /**
@@ -396,7 +166,20 @@ export interface GetAppSessionsResponse extends GenericRPCMessage {
  */
 export interface ResizeChannelResponse extends GenericRPCMessage {
     method: RPCMethod.ResizeChannel;
-    params: ResizeChannelResponseParams;
+    params: {
+        /** The unique identifier for the channel. */
+        channelId: Hex;
+        /** The encoded state data for the channel. */
+        stateData: Hex;
+        /** The intent type for the state update. */
+        intent: number;
+        /** The version number of the channel. */
+        version: number;
+        /** The list of allocations for the channel. */
+        allocations: RPCChannelAllocation[];
+        /** The server's signature for the state update. */
+        serverSignature: Hex;
+    };
 }
 
 /**
@@ -404,7 +187,20 @@ export interface ResizeChannelResponse extends GenericRPCMessage {
  */
 export interface CloseChannelResponse extends GenericRPCMessage {
     method: RPCMethod.CloseChannel;
-    params: CloseChannelResponseParams;
+    params: {
+        /** The unique identifier for the channel. */
+        channelId: Hex;
+        /** The intent type for the state update. */
+        intent: number;
+        /** The version number of the channel. */
+        version: number;
+        /** The encoded state data for the channel. */
+        stateData: Hex;
+        /** The list of final allocations for the channel. */
+        allocations: RPCChannelAllocation[];
+        /** The server's signature for the state update. */
+        serverSignature: Hex;
+    };
 }
 
 /**
@@ -412,7 +208,10 @@ export interface CloseChannelResponse extends GenericRPCMessage {
  */
 export interface GetChannelsResponse extends GenericRPCMessage {
     method: RPCMethod.GetChannels;
-    params: GetChannelsResponseParams;
+    params: {
+        /** List of channel updates containing information about each channel. */
+        channels: RPCChannelWithWallet[];
+    };
 }
 
 /**
@@ -420,7 +219,10 @@ export interface GetChannelsResponse extends GenericRPCMessage {
  */
 export interface GetRPCHistoryResponse extends GenericRPCMessage {
     method: RPCMethod.GetRPCHistory;
-    params: GetRPCHistoryResponseParams[];
+    params: {
+        /** List of RPC entries containing historical RPC calls and their responses. */
+        rpcEntries: RPCHistoryEntry[];
+    };
 }
 
 /**
@@ -428,12 +230,21 @@ export interface GetRPCHistoryResponse extends GenericRPCMessage {
  */
 export interface GetAssetsResponse extends GenericRPCMessage {
     method: RPCMethod.GetAssets;
-    params: GetAssetsResponseParams[];
+    params: {
+        /** List of assets available in the clearnode. */
+        assets: RPCAsset[];
+    };
 }
 
+/**
+ * Represents the response structure for the 'assets' RPC method.
+ */
 export interface AssetsResponse extends GenericRPCMessage {
     method: RPCMethod.Assets;
-    params: GetAssetsResponseParams[];
+    params: {
+        /** List of assets available in the clearnode. */
+        assets: RPCAsset[];
+    };
 }
 
 /**
@@ -441,169 +252,241 @@ export interface AssetsResponse extends GenericRPCMessage {
  */
 export interface AuthVerifyResponse extends GenericRPCMessage {
     method: RPCMethod.AuthVerify;
-    params: AuthVerifyResponseParams;
+    params: {
+        address: Address;
+        sessionKey: Address;
+        success: boolean;
+        /** Available only if challenge auth method was used in {@link AuthVerifyRequest} during the call to {@link RPCMethod.AuthRequest} */
+        jwtToken?: string;
+    };
 }
-
-/**
- * Represents the parameters for the 'auth_request' RPC method.
- */
-export interface AuthRequestResponseParams {
-    /** The challenge message to be signed by the client for authentication. */
-    challengeMessage: string;
-}
-export type AuthRequestRPCResponseParams = AuthRequestResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'auth_request' RPC method.
  */
 export interface AuthRequestResponse extends GenericRPCMessage {
     method: RPCMethod.AuthRequest;
-    params: AuthRequestResponseParams;
+    params: {
+        /** The challenge message to be signed by the client for authentication. */
+        challengeMessage: string;
+    };
 }
-
-/**
- * Represents the response parameters for the 'message' RPC method.
- */
-export interface MessageResponseParams {
-    // Message response parameters are handled by the application
-}
-export type MessageRPCResponseParams = MessageResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'message' RPC method.
  */
 export interface MessageResponse extends GenericRPCMessage {
     method: RPCMethod.Message;
-    params: MessageResponseParams;
+    params: {};
 }
-
-/**
- * Represents the parameters for the 'bu' RPC method.
- */
-export interface BalanceUpdateResponseParams {
-    /** The asset symbol (e.g., "ETH", "USDC"). */
-    asset: string;
-    /** The balance amount. */
-    amount: string;
-}
-export type BalanceUpdateRPCResponseParams = BalanceUpdateResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'bu' RPC method.
  */
 export interface BalanceUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.BalanceUpdate;
-    params: BalanceUpdateResponseParams[];
+    params: {
+        /** List of balance updates. */
+        balanceUpdates: RPCBalance[];
+    };
 }
 
 /**
- * Represents the parameters for the 'channels' RPC method.
- */
-export type ChannelsUpdateResponseParams = ChannelUpdate;
-
-/**
- * Represents the response structure for the 'channels_update' RPC method.
+ * Represents the response structure for the 'channels' RPC method.
  */
 export interface ChannelsUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.ChannelsUpdate;
-    params: ChannelsUpdateResponseParams;
+    params: {
+        /** List of channel updates. */
+        channels: RPCChannel[];
+    };
 }
-
-/**
- * Represents the parameters for the 'cu' RPC method.
- */
-export type ChannelUpdateResponseParams = ChannelUpdate;
-export type ChannelUpdateRPCResponseParams = ChannelUpdateResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'cu' RPC method.
  */
 export interface ChannelUpdateResponse extends GenericRPCMessage {
     method: RPCMethod.ChannelUpdate;
-    params: ChannelUpdateResponseParams;
+    params: RPCChannel;
 }
-
-/**
- * Represents the parameters for the 'ping' RPC method.
- */
-export interface PingResponseParams {
-    // No parameters needed for ping
-}
-export type PingRPCResponseParams = PingResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'ping' RPC method.
  */
 export interface PingResponse extends GenericRPCMessage {
     method: RPCMethod.Ping;
-    params: PingResponseParams;
+    params: {};
 }
-
-/**
- * Represents the parameters for the 'pong' RPC method.
- */
-export interface PongResponseParams {
-    // No parameters needed for pong
-}
-export type PongRPCResponseParams = PongResponseParams; // for backward compatibility
 
 /**
  * Represents the response structure for the 'pong' RPC method.
  */
 export interface PongResponse extends GenericRPCMessage {
     method: RPCMethod.Pong;
-    params: PongResponseParams;
+    params: {};
 }
-
-/**
- * Represents the parameters for the transfer transaction.
- */
-export interface Transaction {
-    /** Unique identifier for the transfer. */
-    id: number;
-    /** The type of transaction. */
-    txType: TxType;
-    /** The source address from which assets were transferred. */
-    fromAccount: Address;
-    /** The user tag for the source account (optional). */
-    fromAccountTag?: string;
-    /** The destination address to which assets were transferred. */
-    toAccount: Address;
-    /** The user tag for the destination account (optional). */
-    toAccountTag?: string;
-    /** The asset symbol that was transferred. */
-    asset: string;
-    /** The amount that was transferred. */
-    amount: string;
-    /** The timestamp when the transfer was created. */
-    createdAt: Date;
-}
-
-/**
- * Represents the parameters for the 'transfer' RPC method.
- */
-export type TransferResponseParams = Transaction[];
 
 /**
  * Represents the response structure for the 'transfer' RPC method.
  */
 export interface TransferResponse extends GenericRPCMessage {
     method: RPCMethod.Transfer;
-    params: TransferResponseParams;
+    params: {
+        /** List of transactions representing transfers. */
+        transactions: RPCTransaction[];
+    };
 }
-
-/**
- * Represents the parameters for the 'transfer_notification' RPC method.
- */
-export type TransferNotificationResponseParams = Transaction[];
 
 /**
  * Represents the response structure for the 'transfer_notification' RPC method.
  */
 export interface TransferNotificationResponse extends GenericRPCMessage {
     method: RPCMethod.TransferNotification;
-    params: TransferNotificationResponseParams;
+    params: {
+        /** List of transactions representing transfers. */
+        transactions: RPCTransaction[];
+    };
 }
+
+/**
+ * Represents the parameters for the 'auth_challenge' RPC method.
+ */
+export type AuthChallengeResponseParams = AuthChallengeResponse['params'];
+
+/**
+ * Represents the parameters for the 'auth_verify' RPC method.
+ */
+export type AuthVerifyResponseParams = AuthVerifyResponse['params'];
+
+/**
+ * Represents the parameters for the 'error' RPC method.
+ */
+export type ErrorResponseParams = ErrorResponse['params'];
+
+/**
+ * Represents the parameters for the 'get_config' RPC method.
+ */
+export type GetConfigResponseParams = GetConfigResponse['params'];
+
+/**
+ * Represents the parameters for the 'get_ledger_balances' RPC method.
+ */
+export type GetLedgerBalancesResponseParams = GetLedgerBalancesResponse['params'];
+
+/**
+ * Represents the parameters for the 'get_ledger_entries' RPC method.
+ */
+export type GetLedgerEntriesResponseParams = GetLedgerEntriesResponse['params'];
+
+/**
+ * Represents the parameters for the 'get_ledger_transactions' RPC method.
+ */
+export type GetLedgerTransactionsResponseParams = GetLedgerTransactionsResponse['params'];
+
+/**
+ * Represents the parameters for the 'get_user_tag' RPC method.
+ */
+export type GetUserTagResponseParams = GetUserTagResponse['params'];
+
+/**
+ * Represents the parameters for the 'create_app_session' RPC method.
+ */
+export type CreateAppSessionResponseParams = CreateAppSessionResponse['params'];
+
+/**
+ * Represents the parameters for the 'submit_app_state' RPC method.
+ */
+export type SubmitAppStateResponseParams = SubmitAppStateResponse['params'];
+
+/**
+ * Represents the parameters for the 'close_app_session' RPC method.
+ */
+export type CloseAppSessionResponseParams = CloseAppSessionResponse['params'];
+
+/**
+ * Represents the parameters for the 'get_app_definition' RPC method.
+ */
+export type GetAppDefinitionResponseParams = GetAppDefinitionResponse['params'];
+
+/**
+ * Represents the parameters for the 'get_app_sessions' RPC method.
+ */
+export type GetAppSessionsResponseParams = GetAppSessionsResponse['params'];
+
+/**
+ * Represents the parameters for the 'resize_channel' RPC method.
+ */
+export type ResizeChannelResponseParams = ResizeChannelResponse['params'];
+
+/**
+ * Represents the parameters for the 'close_channel' RPC method.
+ */
+export type CloseChannelResponseParams = CloseChannelResponse['params'];
+
+/**
+ * Represents the parameters for the 'get_channels' RPC method.
+ */
+export type GetChannelsResponseParams = GetChannelsResponse['params'];
+
+/**
+ * Represents the parameters for the 'get_rpc_history' RPC method.
+ */
+export type GetRPCHistoryResponseParams = GetRPCHistoryResponse['params'];
+
+/**
+ * Represents the parameters for the 'get_assets' RPC method.
+ */
+export type GetAssetsResponseParams = GetAssetsResponse['params'];
+
+/**
+ * Represents the parameters for the 'assets' RPC method.
+ */
+export type AssetsResponseParams = AssetsResponse['params'];
+
+/**
+ * Represents the parameters for the 'auth_request' RPC method.
+ */
+export type AuthRequestResponseParams = AuthRequestResponse['params'];
+
+/**
+ * Represents the parameters for the 'message' RPC method.
+ */
+export type MessageResponseParams = MessageResponse['params'];
+
+/**
+ * Represents the parameters for the 'bu' RPC method.
+ */
+export type BalanceUpdateResponseParams = BalanceUpdateResponse['params'];
+
+/**
+ * Represents the parameters for the 'channels' RPC method.
+ */
+export type ChannelsUpdateResponseParams = ChannelsUpdateResponse['params'];
+
+/**
+ * Represents the parameters for the 'cu' RPC method.
+ */
+export type ChannelUpdateResponseParams = ChannelUpdateResponse['params'];
+
+/**
+ * Represents the parameters for the 'ping' RPC method.
+ */
+export type PingResponseParams = PingResponse['params'];
+
+/**
+ * Represents the parameters for the 'pong' RPC method.
+ */
+export type PongResponseParams = PongResponse['params'];
+
+/**
+ * Represents the parameters for the 'transfer' RPC method.
+ */
+export type TransferResponseParams = TransferResponse['params'];
+
+/**
+ * Represents the parameters for the 'tr' RPC method.
+ */
+export type TransferNotificationResponseParams = TransferNotificationResponse['params'];
 
 /**
  * Union type for all possible RPC response types.

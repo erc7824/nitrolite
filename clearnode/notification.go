@@ -9,11 +9,11 @@ import (
 )
 
 type WSNotifier struct {
-	notify func(userID string, method string, params ...any)
+	notify func(userID string, method string, params RPCDataParams)
 	logger Logger
 }
 
-func NewWSNotifier(notifyFunc func(userID string, method string, params ...any), logger Logger) *WSNotifier {
+func NewWSNotifier(notifyFunc func(userID string, method string, params RPCDataParams), logger Logger) *WSNotifier {
 	return &WSNotifier{
 		notify: notifyFunc,
 		logger: logger,
@@ -55,7 +55,7 @@ func NewBalanceNotification(wallet string, db *gorm.DB) *Notification {
 	return &Notification{
 		userID:    wallet,
 		eventType: BalanceUpdateEventType,
-		data:      balances,
+		data:      BalanceUpdatesResponse{BalanceUpdates: balances},
 	}
 }
 
@@ -82,7 +82,7 @@ func NewChannelNotification(channel Channel) *Notification {
 }
 
 // NewTransferNotification creates a notification for a transfer event
-func NewTransferNotification(wallet string, transferredAllocations []TransactionResponse) *Notification {
+func NewTransferNotification(wallet string, transferredAllocations TransferResponse) *Notification {
 	return &Notification{
 		userID:    wallet,
 		eventType: TransferEventType,

@@ -1,16 +1,12 @@
 import { Address, Hex } from 'viem';
 import {
     NitroliteRPCMessage,
-    RequestData,
-    NitroliteRPCErrorDetail,
     MessageSigner,
     SingleMessageVerifier,
     MultiMessageVerifier,
-    ParsedResponse,
-    ResponsePayload,
     ApplicationRPCMessage,
-    RPCResponse,
-    RPCMethod,
+    RPCRequest,
+    RPCData,
 } from './types';
 import { getCurrentTimestamp, generateRequestId } from './utils';
 
@@ -28,14 +24,15 @@ export class NitroliteRPC {
      * @param timestamp - Timestamp for the request. Defaults to the current time.
      * @returns A formatted NitroliteRPCMessage object for the request.
      */
-    static createRequest(
-        requestId: number = generateRequestId(),
-        method: RPCMethod,
-        params: any[] = [],
-        timestamp: number = getCurrentTimestamp(),
-    ): NitroliteRPCMessage {
-        const requestData: RequestData = [requestId, method, params, timestamp];
-        const message: NitroliteRPCMessage = { req: requestData, sig: [] };
+    static createRequest({
+        method,
+        params = {},
+        requestId = generateRequestId(),
+        timestamp = getCurrentTimestamp(),
+        signatures = [],
+    }: RPCRequest): NitroliteRPCMessage {
+        const requestData: RPCData = [requestId, method, params, timestamp];
+        const message: NitroliteRPCMessage = { req: requestData, sig: signatures };
         return message;
     }
 
@@ -50,121 +47,12 @@ export class NitroliteRPC {
      * @returns A formatted NitroliteRPCMessage object for the request.
      */
     static createAppRequest(
-        requestId: number = generateRequestId(),
-        method: RPCMethod,
-        params: any[] = [],
-        timestamp: number = getCurrentTimestamp(),
+        { requestId = generateRequestId(), method, params = {}, timestamp = getCurrentTimestamp() }: RPCRequest,
         sid: Hex,
     ): ApplicationRPCMessage {
-        const requestData: RequestData = [requestId, method, params, timestamp];
+        const requestData: RPCData = [requestId, method, params, timestamp];
         const message: ApplicationRPCMessage = { req: requestData, sid };
         return message;
-    }
-
-    /**
-     * Parses a raw message string or object received from the broker,
-     * validating its structure as a Nitrolite RPC response. Handles both
-     * messages with and without the top-level 'sid' field.
-     * Does NOT verify the signature.
-     *
-     * @param rawMessage - The raw JSON string or pre-parsed object received.
-     * @returns A ParsedResponse object containing the extracted data and validation status.
-     */
-    static parseResponse(rawMessage: string | object): ParsedResponse {
-        // TODO: either merge or replace it with parseRPCResponse from utils.ts
-        let message: any;
-
-        try {
-            message = typeof rawMessage === 'string' ? JSON.parse(rawMessage) : rawMessage;
-        } catch (e) {
-            console.error('Failed to parse incoming message:', e);
-            return {
-                isValid: false,
-                error: 'Message parsing failed',
-            };
-        }
-
-        if (
-            !message ||
-            typeof message !== 'object' ||
-            !message.res ||
-            !Array.isArray(message.res) ||
-            message.res.length !== 4
-        ) {
-            return {
-                isValid: false,
-                error: "Invalid message structure: Missing or invalid 'res' array.",
-            };
-        }
-
-        const [requestId, method, dataPayload, timestamp] = message.res;
-        const sid = typeof message.sid === 'string' ? message.sid : undefined;
-
-        if (
-            typeof requestId !== 'number' ||
-            typeof method !== 'string' ||
-            !Object.values(RPCMethod).includes(method as RPCMethod) ||
-            !Array.isArray(dataPayload) ||
-            typeof timestamp !== 'number'
-        ) {
-            return {
-                isValid: false,
-                requestId,
-                method,
-                sid,
-                timestamp,
-                error: "Invalid 'res' payload structure or types.",
-            };
-        }
-
-        let data: any[] | NitroliteRPCErrorDetail;
-        let isError = false;
-
-        if (method === RPCMethod.Error) {
-            isError = true;
-            if (
-                dataPayload.length === 1 &&
-                typeof dataPayload[0] === 'object' &&
-                dataPayload[0] !== null &&
-                'error' in dataPayload[0]
-            ) {
-                data = dataPayload[0] as NitroliteRPCErrorDetail;
-            } else {
-                return {
-                    isValid: false,
-                    requestId,
-                    method,
-                    sid,
-                    timestamp,
-                    error: 'Malformed error response payload.',
-                };
-            }
-        } else {
-            data = dataPayload;
-        }
-
-        return {
-            isValid: true,
-            isError,
-            requestId,
-            method: method as RPCMethod,
-            data,
-            sid,
-            timestamp,
-        };
-    }
-
-    /**
-     * Type guard to check if a response is a specific RPC response type.
-     * @param response - The response to check
-     * @param method - The method name to check against
-     * @returns True if the response is of the specified type
-     */
-    static isResponseType<T extends RPCResponse>(
-        response: ParsedResponse,
-        method: T['method'],
-    ): response is ParsedResponse & { data: T['params'] } {
-        return response.isValid && !response.isError && response.method === method;
     }
 
     /**
@@ -175,7 +63,7 @@ export class NitroliteRPC {
      * @throws Error if the message doesn't contain a 'req' or 'res' field.
      * @private
      */
-    private static getMessagePayload(message: NitroliteRPCMessage): RequestData | ResponsePayload {
+    private static getMessagePayload(message: NitroliteRPCMessage): RPCData {
         if (message.req) return message.req;
         if (message.res) return message.res;
         throw new Error("Message must contain either 'req' or 'res' field");

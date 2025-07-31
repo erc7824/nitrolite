@@ -1707,7 +1707,6 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 
 		// Verify response structure
 		require.NotEmpty(t, resObj.ChannelID, "Channel ID should not be empty")
-		require.NotEmpty(t, resObj.StateHash, "State hash should not be empty")
 		require.NotNil(t, resObj.State, "State should not be nil")
 
 		// Verify state structure

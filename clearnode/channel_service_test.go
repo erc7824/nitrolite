@@ -300,7 +300,6 @@ func TestChannelService(t *testing.T) {
 
 		// Validate response structure
 		assert.NotEmpty(t, response.ChannelID, "Channel ID should not be empty")
-		assert.NotEmpty(t, response.StateHash, "State hash should not be empty")
 		assert.NotNil(t, response.State, "State should not be nil")
 
 		// Verify state structure

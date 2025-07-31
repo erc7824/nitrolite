@@ -26,7 +26,6 @@ const ResizeChannelParamsSchema = z
                 intent: z.number(),
                 version: z.number(),
                 allocations: z.array(RPCAllocationSchema),
-                state_hash: hexSchema,
                 server_signature: hexSchema,
             })
             .transform(
@@ -41,7 +40,6 @@ const ResizeChannelParamsSchema = z
                             token: a.token as Address,
                             amount: a.amount,
                         })),
-                        stateHash: raw.state_hash as Hex,
                         serverSignature: raw.server_signature,
                     }) as ResizeChannelResponseParams,
             ),
@@ -58,7 +56,6 @@ const CloseChannelParamsSchema = z
                 intent: z.number(),
                 version: z.number(),
                 allocations: z.array(RPCAllocationSchema),
-                state_hash: hexSchema,
                 server_signature: hexSchema,
             })
             .transform(
@@ -73,7 +70,6 @@ const CloseChannelParamsSchema = z
                             token: a.token as Address,
                             amount: a.amount,
                         })),
-                        stateHash: raw.state_hash as Hex,
                         serverSignature: raw.server_signature,
                     }) as CloseChannelResponseParams,
             ),

@@ -11,20 +11,16 @@ contract UtilsHarness {
         return Utils.getChannelId(ch);
     }
 
-    function getStateHash(Channel memory ch, State memory state) external view returns (bytes32) {
-        return Utils.getStateHash(ch, state);
+    function getPackedState(bytes32 channelId, State memory state) external pure returns (bytes memory) {
+        return Utils.getPackedState(channelId, state);
     }
 
-    function getStateHashShort(bytes32 channelId, State memory state) external pure returns (bytes32) {
-        return Utils.getStateHashShort(channelId, state);
+    function recoverRawECDSASigner(bytes memory message, bytes memory sig) external pure returns (address) {
+        return Utils.recoverRawECDSASigner(message, sig);
     }
 
-    function recoverRawECDSASigner(bytes32 msgHash, bytes memory sig) external pure returns (address) {
-        return Utils.recoverRawECDSASigner(msgHash, sig);
-    }
-
-    function recoverEIP191Signer(bytes32 msgHash, bytes memory sig) external pure returns (address) {
-        return Utils.recoverEIP191Signer(msgHash, sig);
+    function recoverEIP191Signer(bytes memory message, bytes memory sig) external pure returns (address) {
+        return Utils.recoverEIP191Signer(message, sig);
     }
 
     function recoverEIP712Signer(bytes32 domainSeparator, bytes32 structHash, bytes memory sig)

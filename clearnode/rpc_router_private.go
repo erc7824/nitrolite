@@ -92,7 +92,6 @@ type CloseChannelParams struct {
 
 type ChannelOperationResponse struct {
 	ChannelID      string        `json:"channel_id"`
-	StateHash      string        `json:"state_hash"`
 	State          UnsignedState `json:"state"`
 	StateSignature Signature     `json:"server_signature"`
 }

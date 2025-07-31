@@ -53,24 +53,23 @@ abstract contract UtilsTest_SignaturesBase is Test {
 }
 
 contract UtilsTest_Signatures is UtilsTest_SignaturesBase {
-    bytes message = "test message";
-    bytes32 messageHash = keccak256(message);
+    bytes32 messageHash = keccak256("test message");
 
     // ==================== recoverRawECDSASigner TESTS ====================
 
     function test_recoverRawECDSASigner_returnsCorrectSigner() public view {
-        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, message);
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, messageHash);
 
-        address recoveredSigner = utils.recoverRawECDSASigner(message, sig);
+        address recoveredSigner = utils.recoverRawECDSASigner(messageHash, sig);
 
         assertEq(recoveredSigner, signer, "Should recover correct signer");
     }
 
     function test_recoverRawECDSASigner_returnsWrongSignerForDifferentMessage() public view {
-        bytes memory differentMessage = "different message";
-        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, message);
+        bytes32 differentMessageHash = keccak256("different message");
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, messageHash);
 
-        address recoveredSigner = utils.recoverRawECDSASigner(differentMessage, sig);
+        address recoveredSigner = utils.recoverRawECDSASigner(differentMessageHash, sig);
 
         assertNotEq(recoveredSigner, signer, "Should not recover correct signer for different message");
     }
@@ -78,27 +77,27 @@ contract UtilsTest_Signatures is UtilsTest_SignaturesBase {
     // ==================== recoverEIP191Signer TESTS ====================
 
     function test_recoverEIP191Signer_returnsCorrectSigner() public view {
-        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, message);
+        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, messageHash);
 
-        address recoveredSigner = utils.recoverEIP191Signer(message, sig);
+        address recoveredSigner = utils.recoverEIP191Signer(messageHash, sig);
 
         assertEq(recoveredSigner, signer, "Should recover correct signer with EIP191");
     }
 
     function test_recoverEIP191Signer_returnsWrongSigner_forDifferentMessage() public view {
-        bytes memory differentMessage = "different message";
-        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, message);
+        bytes32 differentMessageHash = keccak256("different message");
+        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, messageHash);
 
-        address recoveredSigner = utils.recoverEIP191Signer(differentMessage, sig);
+        address recoveredSigner = utils.recoverEIP191Signer(differentMessageHash, sig);
 
         assertNotEq(recoveredSigner, signer, "Should not recover correct signer for different message");
     }
 
     function test_recoverEIP191Signer_returnsWrongSigner_forRawSignature() public view {
         // Sign with raw ECDSA instead of EIP191
-        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, message);
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, messageHash);
 
-        address recoveredSigner = utils.recoverEIP191Signer(message, sig);
+        address recoveredSigner = utils.recoverEIP191Signer(messageHash, sig);
 
         assertNotEq(recoveredSigner, signer, "Should not recover correct signer when using raw signature for EIP191");
     }
@@ -296,8 +295,8 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
     // ==================== verifyStateEOASignature TESTS ====================
 
     function test_verifyStateEOASignature_returnsTrue_forRawECDSASignature() public view {
-        bytes memory packedState = utils.getPackedState(channelId, testState);
-        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, packedState);
+        bytes32 stateHash = utils.getStateHashShort(channelId, testState);
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
         bool isValid = utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, signer);
 
@@ -305,8 +304,8 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
     }
 
     function test_verifyStateEOASignature_returnsTrue_forEIP191Signature() public view {
-        bytes memory packedState = utils.getPackedState(channelId, testState);
-        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, packedState);
+        bytes32 stateHash = utils.getStateHashShort(channelId, testState);
+        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, stateHash);
 
         bool isValid = utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, signer);
 
@@ -332,8 +331,8 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
     }
 
     function test_verifyStateEOASignature_returnsFalse_forWrongSigner_rawECDSA() public view {
-        bytes memory packedState = utils.getPackedState(channelId, testState);
-        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, packedState);
+        bytes32 stateHash = utils.getStateHashShort(channelId, testState);
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
         bool isValid = utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, wrongSigner);
 
@@ -341,8 +340,8 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
     }
 
     function test_verifyStateEOASignature_returnsFalse_forWrongSigner_EIP191() public view {
-        bytes memory packedState = utils.getPackedState(channelId, testState);
-        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, packedState);
+        bytes32 stateHash = utils.getStateHashShort(channelId, testState);
+        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, stateHash);
 
         bool isValid = utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, wrongSigner);
 
@@ -388,8 +387,8 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
 
     function test_verifyStateEOASignature_returnsTrue_forRawECDSAWhenNoEIP712Support() public view {
         bytes32 domainSeparator = Utils.NO_EIP712_SUPPORT;
-        bytes memory packedState = utils.getPackedState(channelId, testState);
-        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, packedState);
+        bytes32 stateHash = utils.getStateHashShort(channelId, testState);
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
         bool isValid = utils.verifyStateEOASignature(testState, channelId, domainSeparator, sig, signer);
 
@@ -418,8 +417,8 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
 
     // EOA Signature Tests
     function test_verifyStateSignature_returnsTrue_forEOA_rawECDSASignature() public {
-        bytes memory packedState = utils.getPackedState(channelId, testState);
-        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, packedState);
+        bytes32 stateHash = utils.getStateHashShort(channelId, testState);
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
         bool isValid = utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
 
@@ -427,8 +426,8 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
     }
 
     function test_verifyStateSignature_returnsTrue_forEOA_EIP191Signature() public {
-        bytes memory packedState = utils.getPackedState(channelId, testState);
-        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, packedState);
+        bytes32 stateHash = utils.getStateHashShort(channelId, testState);
+        bytes memory sig = TestUtils.signEIP191(vm, signerPrivateKey, stateHash);
 
         bool isValid = utils.verifyStateSignature(testState, channelId, domainSeparator, sig, signer);
 
@@ -454,8 +453,8 @@ contract UtilsTest_StateSignatures is UtilsTest_SignaturesBase {
     }
 
     function test_verifyStateSignature_returnsFalse_forEOA_wrongSigner() public {
-        bytes memory packedState = utils.getPackedState(channelId, testState);
-        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, packedState);
+        bytes32 stateHash = utils.getStateHashShort(channelId, testState);
+        bytes memory sig = TestUtils.sign(vm, signerPrivateKey, stateHash);
 
         bool isValid = utils.verifyStateSignature(testState, channelId, domainSeparator, sig, wrongSigner);
 

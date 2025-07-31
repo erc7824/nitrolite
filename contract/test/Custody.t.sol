@@ -219,8 +219,8 @@ contract CustodyTest_Base is Test {
         view
         returns (bytes memory)
     {
-        bytes memory packedState = Utils.getPackedState(Utils.getChannelId(chan), state);
-        return TestUtils.sign(vm, privateKey, packedState);
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+        return TestUtils.sign(vm, privateKey, stateHash);
     }
 
     function signChallenge(Channel memory chan, State memory state, uint256 privateKey)
@@ -228,8 +228,9 @@ contract CustodyTest_Base is Test {
         view
         returns (bytes memory)
     {
-        bytes memory packedChallengeState = abi.encodePacked(Utils.getPackedState(Utils.getChannelId(chan), state), "challenge");
-        return TestUtils.sign(vm, privateKey, packedChallengeState);
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+        bytes32 challengeHash = keccak256(abi.encode(stateHash, "challenge"));
+        return TestUtils.sign(vm, privateKey, challengeHash);
     }
 
     function signChallengeEIP712(Channel memory chan, State memory state, uint256 privateKey)

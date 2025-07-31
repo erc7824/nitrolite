@@ -108,8 +108,8 @@ contract CounterTest is Test {
     }
 
     function _signState(State memory state, uint256 privateKey) internal view returns (bytes memory) {
-        bytes memory packedState = Utils.getPackedState(Utils.getChannelId(channel), state);
-        return TestUtils.sign(vm, privateKey, packedState);
+        bytes32 stateHash = Utils.getStateHash(channel, state);
+        return TestUtils.sign(vm, privateKey, stateHash);
     }
 
     // -------------------- FIRST STATE TRANSITION TESTS --------------------

@@ -678,9 +678,9 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         // NOTE: ERC-6492 signature is NOT checked as at this point participants should already be deployed
 
         // NOTE: the "challenge" suffix substitution for raw ECDSA and EIP-191 signatures
-        bytes memory packedChallengeState = abi.encodePacked(Utils.getPackedState(channelId, state), "challenge");
-        address rawSigner = Utils.recoverRawECDSASigner(packedChallengeState, challengerSig);
-        address eip191Signer = Utils.recoverEIP191Signer(packedChallengeState, challengerSig);
+        bytes32 challengeStateHash = keccak256(abi.encode(Utils.getStateHashShort(channelId, state), "challenge"));
+        address rawSigner = Utils.recoverRawECDSASigner(challengeStateHash, challengerSig);
+        address eip191Signer = Utils.recoverEIP191Signer(challengeStateHash, challengerSig);
         address eip712Signer = Utils.recoverStateEIP712Signer(
             _domainSeparatorV4(), CHALLENGE_STATE_TYPEHASH, channelId, state, challengerSig
         );
@@ -688,7 +688,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         for (uint256 i = 0; i < participants.length; i++) {
             address participant = participants[i];
             if (participant.code.length != 0) {
-                if (Utils.isValidERC1271Signature(keccak256(packedChallengeState), challengerSig, participant)) {
+                if (Utils.isValidERC1271Signature(challengeStateHash, challengerSig, participant)) {
                     return;
                 }
             } else {

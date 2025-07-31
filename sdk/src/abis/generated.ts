@@ -7,32 +7,6 @@ export const custodyAbi = [
   },
   {
     "type": "function",
-    "name": "CHALLENGE_STATE_TYPEHASH",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "MIN_CHALLENGE_PERIOD",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "challenge",
     "inputs": [
       {
@@ -1420,33 +1394,6 @@ export const custodyAbi = [
         "name": "s",
         "type": "bytes32",
         "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "ERC6492DeploymentFailed",
-    "inputs": [
-      {
-        "name": "factory",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "calldata_",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "ERC6492NoCode",
-    "inputs": [
-      {
-        "name": "expectedSigner",
-        "type": "address",
-        "internalType": "address"
       }
     ]
   },

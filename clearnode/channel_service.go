@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -113,12 +114,13 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 
 	// 6) Encode & sign the new state
 	channelIDHash := common.HexToHash(channel.ChannelID)
-	packedState, err := nitrolite.PackState(channelIDHash, nitrolite.IntentRESIZE, big.NewInt(int64(channel.Version)+1), encodedIntentions, allocations)
+	encodedState, err := nitrolite.EncodeState(channelIDHash, nitrolite.IntentRESIZE, big.NewInt(int64(channel.Version)+1), encodedIntentions, allocations)
 	if err != nil {
-		logger.Error("failed to pack state", "error", err)
-		return ResizeChannelResponse{}, RPCErrorf("failed to pack state")
+		logger.Error("failed to encode state hash", "error", err)
+		return ResizeChannelResponse{}, RPCErrorf("failed to encode state hash")
 	}
-	sig, err := s.signer.Sign(packedState)
+	stateHash := crypto.Keccak256Hash(encodedState).Hex()
+	sig, err := s.signer.Sign(encodedState)
 	if err != nil {
 		logger.Error("failed to sign state", "error", err)
 		return ResizeChannelResponse{}, RPCErrorf("failed to sign state")
@@ -129,6 +131,7 @@ func (s *ChannelService) RequestResize(logger Logger, params *ResizeChannelParam
 		Intent:    uint8(nitrolite.IntentRESIZE),
 		Version:   channel.Version + 1,
 		StateData: hexutil.Encode(encodedIntentions),
+		StateHash: stateHash,
 		Signature: sig,
 	}
 
@@ -210,12 +213,13 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 		logger.Error("failed to decode state data hex", "error", err)
 		return CloseChannelResponse{}, RPCErrorf("failed to decode state data hex")
 	}
-	packedState, err := nitrolite.PackState(common.HexToHash(channel.ChannelID), nitrolite.IntentFINALIZE, big.NewInt(int64(channel.Version)+1), stateDataBytes, allocations)
+	encodedState, err := nitrolite.EncodeState(common.HexToHash(channel.ChannelID), nitrolite.IntentFINALIZE, big.NewInt(int64(channel.Version)+1), stateDataBytes, allocations)
 	if err != nil {
-		logger.Error("failed to pack state", "error", err)
-		return CloseChannelResponse{}, RPCErrorf("failed to pack state")
+		logger.Error("failed to encode state hash", "error", err)
+		return CloseChannelResponse{}, RPCErrorf("failed to encode state hash")
 	}
-	sig, err := s.signer.Sign(packedState)
+	stateHash := crypto.Keccak256Hash(encodedState).Hex()
+	sig, err := s.signer.Sign(encodedState)
 	if err != nil {
 		logger.Error("failed to sign state", "error", err)
 		return CloseChannelResponse{}, RPCErrorf("failed to sign state")
@@ -226,6 +230,7 @@ func (s *ChannelService) RequestClose(logger Logger, params *CloseChannelParams,
 		Intent:    uint8(nitrolite.IntentFINALIZE),
 		Version:   channel.Version + 1,
 		StateData: stateDataHex,
+		StateHash: stateHash,
 		Signature: sig,
 	}
 

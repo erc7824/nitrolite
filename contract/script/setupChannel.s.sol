@@ -88,7 +88,7 @@ contract SetupChannelScript is Script {
         view
         returns (bytes memory)
     {
-        bytes memory packedState = Utils.getPackedState(Utils.getChannelId(chan), state);
-        return TestUtils.sign(vm, privateKey, packedState);
+        bytes32 stateHash = Utils.getStateHash(chan, state);
+        return TestUtils.sign(vm, privateKey, stateHash);
     }
 }

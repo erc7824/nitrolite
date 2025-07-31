@@ -168,6 +168,7 @@ type ChannelClosureRes struct {
 	Version          uint64          `json:"version"`
 	StateData        string          `json:"state_data"`
 	FinalAllocations []AllocationRes `json:"allocations"`
+	StateHash        string          `json:"state_hash"`
 	Signature        SignatureRes    `json:"server_signature"`
 }
 
@@ -220,6 +221,7 @@ type ChannelResizeRes struct {
 	Version     uint64          `json:"version"`
 	StateData   string          `json:"state_data"`
 	Allocations []AllocationRes `json:"allocations"`
+	StateHash   string          `json:"state_hash"`
 	Signature   SignatureRes    `json:"server_signature"`
 }
 

@@ -72,14 +72,15 @@ describe('_prepareAndSignInitialState', () => {
             version: 0n,
             sigs: ['accSig'],
         });
-        // Signs the state
-        expect(utils.signState).toHaveBeenCalledWith('cid', {
+        // Hash and sign calls
+        expect(utils.getStateHash).toHaveBeenCalledWith('cid', {
             data: 'customData',
             intent: StateIntent.INITIALIZE,
             allocations: expect.any(Array),
             version: 0n,
             sigs: [],
-        }, deps.stateWalletClient.signMessage);
+        });
+        expect(utils.signState).toHaveBeenCalledWith('hsh', deps.stateWalletClient.signMessage);
     });
 
     test('throws if no adjudicator', async () => {
@@ -147,13 +148,14 @@ describe('_prepareAndSignFinalState', () => {
             version,
             sigs: ['accSig', 'srvSig'],
         });
-        expect(utils.signState).toHaveBeenCalledWith('cid', {
+        expect(utils.getStateHash).toHaveBeenCalledWith(channelIdArg, {
             data: 'finalData',
             intent: StateIntent.FINALIZE,
             allocations,
             version,
             sigs: [],
-        }, deps.stateWalletClient.signMessage);
+        });
+        expect(utils.signState).toHaveBeenCalledWith('hsh', deps.stateWalletClient.signMessage);
     });
 
     test('throws if no stateData', async () => {

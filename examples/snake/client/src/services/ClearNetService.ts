@@ -286,7 +286,6 @@ class ClearNetService {
             if (!signingClient) {
                 throw new Error("No signing client available");
             }
-            // raw ECDSA signature, where packed state is the `message`, that is hashed and signed
             const signature = await signingClient.signMessage({
                 message: { raw: stateHash },
             });

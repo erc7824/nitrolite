@@ -845,6 +845,7 @@ In the request, the user must specify funds destination. After the channel is cl
         "amount": "50000"
       }
     ],
+    "state_hash": "0xLedgerStateHash",
     "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c",
   }], 1619123456789],
   "sig": ["0xabcd1234..."]
@@ -900,6 +901,7 @@ Example:
         "amount": "0"
       }
     ],
+    "state_hash": "0xLedgerStateHash",
     "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c",
   }], 1619123456789],
   "sig": ["0xabcd1234..."]

@@ -13,8 +13,7 @@ import {STATE_TYPEHASH, Channel, State, StateIntent} from "./interfaces/Types.so
  */
 library Utils {
     using ECDSA for bytes32;
-    using MessageHashUtils for bytes;
-    using { MessageHashUtils.toTypedDataHash } for bytes32;
+    using MessageHashUtils for bytes32;
 
     error ERC6492DeploymentFailed(address factory, bytes calldata_);
     error ERC6492NoCode(address expectedSigner);
@@ -42,34 +41,49 @@ library Utils {
     }
 
     /**
-     * @notice Packs the channelId and the state into a byte array for signing
-     * @param channelId The unique identifier for the channel
-     * @param state The state struct to pack
-     * @return The packed channelId and state as bytes
+     * @notice Compute the hash of a channel state in a canonical way (ignoring the signature)
+     * @param ch The channel struct
+     * @param state The state struct
+     * @return The state hash as bytes32
+     * @dev The state hash is computed according to the specification in the README, using channelId, data, version, and allocations
      */
-    function getPackedState(bytes32 channelId, State memory state) internal pure returns (bytes memory) {
-        return abi.encode(channelId, state.intent, state.version, state.data, state.allocations);
+    function getStateHash(Channel memory ch, State memory state) internal view returns (bytes32) {
+        bytes32 channelId = getChannelId(ch);
+        return keccak256(abi.encode(channelId, state.intent, state.version, state.data, state.allocations));
+    }
+
+    /**
+     * @notice Compute the hash of a channel state in a canonical way (ignoring the signature)
+     * @param channelId The unique identifier for the channel
+     * @param state The state struct
+     * @return The state hash as bytes32
+     * @dev The state hash is computed according to the specification in the README, using channelId, data, version, and allocations
+     */
+    function getStateHashShort(bytes32 channelId, State memory state) internal pure returns (bytes32) {
+        return keccak256(abi.encode(channelId, state.intent, state.version, state.data, state.allocations));
     }
 
     /**
      * @notice Recovers the signer of a state hash from a signature
-     * @param message The message to verify the signature against
+     * @param msgHash The hash of the message to verify the signature against
      * @param sig The signature to verify
      * @return The address of the signer
      */
-    function recoverRawECDSASigner(bytes memory message, bytes memory sig) internal pure returns (address) {
-        // Verify the signature directly on the message hash without using EIP-191
-        return keccak256(message).recover(sig);
+    function recoverRawECDSASigner(bytes32 msgHash, bytes memory sig) internal pure returns (address) {
+        // Verify the signature directly on the stateHash without using EIP-191
+        return msgHash.recover(sig);
     }
 
     /**
      * @notice Recovers the signer of a state hash using EIP-191 format
-     * @param message The message to verify the signature against
+     * @dev NOTE: FIXME: inconsistent with EIP-712 state recovery, which receives channelId and state as "message", whereas EIP-191 receives
+     * stateHash directly. This breaks the principle of least astonishment, as in EIP-191 and EIP-712 contexts the message is different.
+     * @param msgHash The hash of the message to verify the signature against
      * @param sig The signature to verify
      * @return The address of the signer
      */
-    function recoverEIP191Signer(bytes memory message, bytes memory sig) internal pure returns (address) {
-        return message.toEthSignedMessageHash().recover(sig);
+    function recoverEIP191Signer(bytes32 msgHash, bytes memory sig) internal pure returns (address) {
+        return msgHash.toEthSignedMessageHash().recover(sig);
     }
 
     /**
@@ -135,14 +149,14 @@ library Utils {
         bytes memory sig,
         address signer
     ) internal pure returns (bool) {
-        bytes memory packedState = Utils.getPackedState(channelId, state);
+        bytes32 stateHash = Utils.getStateHashShort(channelId, state);
 
-        address rawECDSASigner = Utils.recoverRawECDSASigner(packedState, sig);
+        address rawECDSASigner = Utils.recoverRawECDSASigner(stateHash, sig);
         if (rawECDSASigner == signer) {
             return true;
         }
 
-        address eip191Signer = Utils.recoverEIP191Signer(packedState, sig);
+        address eip191Signer = Utils.recoverEIP191Signer(stateHash, sig);
         if (eip191Signer == signer) {
             return true;
         }
@@ -228,8 +242,7 @@ library Utils {
         bytes memory sig,
         address signer
     ) internal returns (bool) {
-        // NOTE: both EIP-1271 and EIP-6492 signatures use message hash
-        bytes32 stateHash = keccak256(Utils.getPackedState(channelId, state));
+        bytes32 stateHash = Utils.getStateHashShort(channelId, state);
 
         if (trailingBytes32(sig) == ERC6492_DETECTION_SUFFIX) {
             return isValidERC6492Signature(stateHash, sig, signer);

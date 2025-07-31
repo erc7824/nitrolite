@@ -1,4 +1,4 @@
-import { AbiParameter } from 'abitype';
+import { type AbiParameter } from 'abitype';
 
 /**
  * Common ABI fragments that can be reused across different ABIs

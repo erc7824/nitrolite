@@ -1,4 +1,4 @@
-import { Abi } from 'abitype';
+import { type Abi } from 'abitype';
 
 /**
  * Minimal ERC20 ABI with only functions used by the SDK

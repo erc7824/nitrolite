@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import {
-    RPCMethod,
+import type {
     GetConfigResponseParams,
     ErrorResponseParams,
     GetRPCHistoryResponseParams,
@@ -8,7 +7,8 @@ import {
     RPCHistoryEntry,
     GetUserTagResponseParams,
 } from '../types';
-import { hexSchema, addressSchema, ParamsParser } from './common';
+import { RPCMethod } from '../types';
+import { hexSchema, addressSchema, type ParamsParser } from './common';
 
 const NetworkInfoObjectSchema = z
     .object({

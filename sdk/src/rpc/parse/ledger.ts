@@ -1,19 +1,17 @@
 import { z } from 'zod';
-import { Address } from 'viem';
-import {
-    RPCMethod,
+import type {
     GetLedgerBalancesResponseParams,
     GetLedgerEntriesResponseParams,
     BalanceUpdateResponseParams,
     GetLedgerTransactionsResponseParams,
-    RPCTxType,
     RPCTransaction,
     TransferNotificationResponseParams,
     TransferResponseParams,
     RPCBalance,
     RPCLedgerEntry,
 } from '../types';
-import { addressSchema, dateSchema, decimalSchema, ParamsParser } from './common';
+import { RPCMethod, RPCTxType } from '../types';
+import { addressSchema, dateSchema, decimalSchema, type ParamsParser } from './common';
 
 const BalanceObjectSchema = z
     .object({

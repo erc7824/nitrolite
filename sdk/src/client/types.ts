@@ -1,5 +1,5 @@
-import { Account, Hex, PublicClient, WalletClient, Chain, Transport, ParseAccount, Address } from 'viem';
-import { ContractAddresses } from '../abis';
+import type { Account, Hex, PublicClient, WalletClient, Chain, Transport, ParseAccount, Address } from 'viem';
+import type { ContractAddresses } from '../abis';
 
 /**
  * Channel identifier

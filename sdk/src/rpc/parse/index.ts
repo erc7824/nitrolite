@@ -1,5 +1,5 @@
 import { RPCMethod } from '../types';
-import { ParamsParser, noop } from './common';
+import { type ParamsParser, noop } from './common';
 import { authParamsParsers } from './auth';
 import { ledgerParamsParsers } from './ledger';
 import { appParamsParsers } from './app';

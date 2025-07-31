@@ -1,4 +1,4 @@
-import { Account, Address, PublicClient, WalletClient, Hash } from 'viem';
+import type { Account, Address, PublicClient, WalletClient, Hash } from 'viem';
 import { Erc20Abi } from '../../abis/token';
 import { Errors } from '../../errors';
 

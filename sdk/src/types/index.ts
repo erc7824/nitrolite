@@ -1,5 +1,5 @@
-import { Address, Hex } from 'viem';
-import { Channel, State } from '../client/types';
+import type { Address, Hex } from 'viem';
+import type { Channel, State } from '../client/types';
 
 /**
  * Participant roles in a channel

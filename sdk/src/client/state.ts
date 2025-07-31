@@ -1,8 +1,8 @@
-import { Address, encodeAbiParameters, encodePacked, Hex, keccak256 } from 'viem';
+import { type Address, encodeAbiParameters, encodePacked, type Hex, keccak256 } from 'viem';
 import * as Errors from '../errors';
 import { generateChannelNonce, getChannelId, getPackedState, getStateHash, signChallengeState, signState } from '../utils';
-import { PreparerDependencies } from './prepare';
-import {
+import { type PreparerDependencies } from './prepare';
+import type {
     ChallengeChannelParams,
     Channel,
     ChannelId,
@@ -10,9 +10,9 @@ import {
     CreateChannelParams,
     ResizeChannelParams,
     State,
-    StateIntent,
     Signature,
 } from './types';
+import { StateIntent } from './types';
 
 /**
  * Shared logic for preparing the channel object, initial state, and signing it.

@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { RPCMethod, AuthChallengeResponseParams, AuthVerifyResponseParams, AuthRequestResponseParams } from '../types';
-import { addressSchema, ParamsParser } from './common';
+import type { AuthChallengeResponseParams, AuthVerifyResponseParams, AuthRequestResponseParams } from '../types';
+import { RPCMethod } from '../types';
+import { addressSchema, type ParamsParser } from './common';
 
 const AuthChallengeParamsSchema = z
     .object({ challenge_message: z.string() })

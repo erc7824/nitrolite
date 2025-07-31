@@ -1,5 +1,5 @@
-import { Address, Hex } from 'viem';
-import {
+import type { Address, Hex } from 'viem';
+import type {
     NitroliteRPCMessage,
     MessageSigner,
     SingleMessageVerifier,

@@ -1,5 +1,5 @@
-import { Hex, stringToHex } from 'viem';
-import { NitroliteRPCMessage } from './types';
+import { type Hex, stringToHex } from 'viem';
+import { type NitroliteRPCMessage } from './types';
 
 /**
  * Get the current time in milliseconds

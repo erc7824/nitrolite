@@ -1,4 +1,4 @@
-import { Abi } from 'abitype';
+import { type Abi } from 'abitype';
 
 /**
  * ABI for the Adjudicator interface

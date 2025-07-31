@@ -1,4 +1,4 @@
-import { Address } from 'viem';
+import { type Address } from 'viem';
 
 /**
  * Base class for all Nitrolite SDK errors

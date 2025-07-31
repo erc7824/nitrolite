@@ -1,8 +1,9 @@
-import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress, Hex } from 'viem';
+import type { Hex, Account, Address, PublicClient, WalletClient, Hash } from 'viem';
+import { zeroAddress } from 'viem';
 import { custodyAbi } from '../../abis/generated';
-import { ContractAddresses } from '../../abis';
+import { type ContractAddresses } from '../../abis';
 import { Errors } from '../../errors';
-import { Channel, ChannelData, ChannelId, Signature, State } from '../types';
+import type { Channel, ChannelData, ChannelId, Signature, State } from '../types';
 
 /**
  * Type utility to properly type the request object from simulateContract
@@ -282,7 +283,6 @@ export class NitroliteService {
     ): Promise<PreparedContractRequest> {
         const account = this.ensureAccount();
         const operationName = 'prepareDepositAndCreateChannel';
-        const accountAddress = typeof account === 'string' ? account : account.address;
 
         try {
             const abiChannel = this.convertChannelForABI(channel);

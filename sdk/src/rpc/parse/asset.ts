@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { RPCMethod, GetAssetsResponseParams, RPCAsset, AssetsResponseParams } from '../types';
-import { addressSchema, ParamsParser } from './common';
+import type { GetAssetsResponseParams, RPCAsset, AssetsResponseParams } from '../types';
+import { RPCMethod } from '../types';
+import { addressSchema, type ParamsParser } from './common';
 
 const AssetObjectSchema = z
     .object({ token: addressSchema, chain_id: z.number(), symbol: z.string(), decimals: z.number() })

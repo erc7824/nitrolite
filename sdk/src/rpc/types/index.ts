@@ -1,5 +1,5 @@
-import { Address, Hex } from 'viem';
-import { RPCAllowance } from './common';
+import type { Address, Hex } from 'viem';
+import { type RPCAllowance } from './common';
 
 export * from './request';
 export * from './response';

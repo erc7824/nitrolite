@@ -1,4 +1,4 @@
-import {
+import type {
     Account,
     Address,
     Chain,
@@ -6,9 +6,9 @@ import {
     SimulateContractReturnType,
     Transport,
     WalletClient,
-    zeroAddress,
 } from 'viem';
-import { ContractAddresses } from '../abis';
+import { zeroAddress } from 'viem';
+import { type ContractAddresses } from '../abis';
 import * as Errors from '../errors';
 import { Erc20Service, NitroliteService } from './services';
 import {
@@ -17,7 +17,7 @@ import {
     _prepareAndSignInitialState,
     _prepareAndSignResizeState,
 } from './state';
-import {
+import type {
     ChallengeChannelParams,
     CheckpointChannelParams,
     CloseChannelParams,

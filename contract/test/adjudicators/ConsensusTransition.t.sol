@@ -10,7 +10,7 @@ import {TestUtils} from "../TestUtils.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 
 import {IAdjudicator} from "../../src/interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature, StateIntent} from "../../src/interfaces/Types.sol";
+import {Channel, State, Allocation, StateIntent} from "../../src/interfaces/Types.sol";
 import {ConsensusTransition} from "../../src/adjudicators/ConsensusTransition.sol";
 import {Utils} from "../../src/Utils.sol";
 
@@ -18,6 +18,10 @@ contract ConsensusTransitionTest is Test {
     using ECDSA for bytes32;
 
     ConsensusTransition public adjudicator;
+
+    // Mockup constructor parameters
+    address mockedOwner = address(0x456);
+    address mockedChannelImpl = address(0x123);
 
     // Test accounts
     address public host;
@@ -35,7 +39,7 @@ contract ConsensusTransitionTest is Test {
 
     function setUp() public {
         // Deploy the adjudicator contract
-        adjudicator = new ConsensusTransition();
+        adjudicator = new ConsensusTransition(mockedOwner, mockedChannelImpl);
 
         // Generate private keys and addresses for the participants
         hostPrivateKey = 0x1;
@@ -56,29 +60,6 @@ contract ConsensusTransitionTest is Test {
             challenge: 3600, // 1 hour challenge period
             nonce: 1
         });
-    }
-
-    // Test case: Basic signing test to verify our signature approach
-    // using foundry's vm.sign and correctly formatted message for ecrecover
-    function test_BasicSignatureVerification() public view {
-        // Simple message to sign
-        bytes32 message = keccak256("test message");
-
-        // Sign the message directly without EIP-191 prefix
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, hostPrivateKey, message);
-
-        // Recover the signer using direct recovery (no prefix)
-        address recovered = ECDSA.recover(message, v, r, s);
-
-        // This should pass - verifying our signing approach
-        assertEq(recovered, host);
-
-        // Now test with Utils.verifySignature
-        Signature memory signature = Signature({v: v, r: r, s: s});
-        bool isValid = Utils.verifySignature(message, signature, host);
-
-        // This should also pass with our updated Utils.verifySignature
-        assertTrue(isValid);
     }
 
     // Helper function to create test allocations
@@ -105,7 +86,7 @@ contract ConsensusTransitionTest is Test {
         state.allocations = new Allocation[](2);
         state.allocations[HOST] = allocations[HOST];
         state.allocations[GUEST] = allocations[GUEST];
-        state.sigs = new Signature[](0);
+        state.sigs = new bytes[](0);
 
         return state;
     }
@@ -123,7 +104,7 @@ contract ConsensusTransitionTest is Test {
         state.allocations = new Allocation[](2);
         state.allocations[HOST] = allocations[HOST];
         state.allocations[GUEST] = allocations[GUEST];
-        state.sigs = new Signature[](0);
+        state.sigs = new bytes[](0);
 
         return state;
     }
@@ -145,30 +126,29 @@ contract ConsensusTransitionTest is Test {
         state.allocations = new Allocation[](2);
         state.allocations[HOST] = allocations[HOST];
         state.allocations[GUEST] = allocations[GUEST];
-        state.sigs = new Signature[](0);
+        state.sigs = new bytes[](0);
 
         return state;
     }
 
     // Helper to sign a state
-    function _signState(State memory state, uint256 privateKey) internal view returns (Signature memory) {
-        bytes32 stateHash = Utils.getStateHash(channel, state);
-        (uint8 v, bytes32 r, bytes32 s) = TestUtils.sign(vm, privateKey, stateHash);
-        return Signature({v: v, r: r, s: s});
+    function _signState(State memory state, uint256 privateKey) internal view returns (bytes memory) {
+        bytes memory packedState = Utils.getPackedState(Utils.getChannelId(channel), state);
+        return TestUtils.sign(vm, privateKey, packedState);
     }
 
     // -------------------- FIRST STATE TRANSITION TESTS --------------------
 
-    function test_adjudicate_firstState_valid() public view {
+    function test_adjudicate_firstState_valid() public {
         // Create initial state with both signatures
         State memory initialState = _createInitialState("initial state");
-        initialState.sigs = new Signature[](2);
+        initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 
         // Create first operate state with both signatures
         State memory firstState = _createOperateState("first state", 1);
-        firstState.sigs = new Signature[](2);
+        firstState.sigs = new bytes[](2);
         firstState.sigs[HOST] = _signState(firstState, hostPrivateKey);
         firstState.sigs[GUEST] = _signState(firstState, guestPrivateKey);
 
@@ -181,16 +161,16 @@ contract ConsensusTransitionTest is Test {
         assertTrue(valid, "Valid first state transition should be accepted");
     }
 
-    function test_adjudicate_firstState_revert_whenMissingParticipantSignature() public view {
+    function test_adjudicate_firstState_revert_whenMissingParticipantSignature() public {
         // Create initial state with both signatures
         State memory initialState = _createInitialState("initial state");
-        initialState.sigs = new Signature[](2);
+        initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 
         // Create first operate state with only one signature
         State memory firstState = _createOperateState("first state", 1);
-        firstState.sigs = new Signature[](1);
+        firstState.sigs = new bytes[](1);
         firstState.sigs[0] = _signState(firstState, hostPrivateKey);
 
         // Provide the initial state as proof
@@ -202,16 +182,16 @@ contract ConsensusTransitionTest is Test {
         assertFalse(valid, "First state without both signatures should be rejected");
     }
 
-    function test_adjudicate_firstState_revert_whenIncorrectVersion() public view {
+    function test_adjudicate_firstState_revert_whenIncorrectVersion() public {
         // Create initial state with both signatures
         State memory initialState = _createInitialState("initial state");
-        initialState.sigs = new Signature[](2);
+        initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 
         // Create first operate state with incorrect version (2 instead of 1)
         State memory firstState = _createOperateState("first state", 2);
-        firstState.sigs = new Signature[](2);
+        firstState.sigs = new bytes[](2);
         firstState.sigs[HOST] = _signState(firstState, hostPrivateKey);
         firstState.sigs[GUEST] = _signState(firstState, guestPrivateKey);
 
@@ -226,16 +206,16 @@ contract ConsensusTransitionTest is Test {
 
     // -------------------- LATER STATE TRANSITION TESTS --------------------
 
-    function test_adjudicate_laterState_valid() public view {
+    function test_adjudicate_laterState_valid() public {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
         // Create state 2 with both signatures
         State memory state2 = _createOperateState("state 2", 2);
-        state2.sigs = new Signature[](2);
+        state2.sigs = new bytes[](2);
         state2.sigs[HOST] = _signState(state2, hostPrivateKey);
         state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
 
@@ -248,16 +228,16 @@ contract ConsensusTransitionTest is Test {
         assertTrue(valid, "Valid state transition from 1 to 2 should be accepted");
     }
 
-    function test_adjudicate_laterState_revert_whenIncorrectVersionIncrement() public view {
+    function test_adjudicate_laterState_revert_whenIncorrectVersionIncrement() public {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
         // Create state 3 with both signatures (skipping version 2)
         State memory state3 = _createOperateState("state 3", 3);
-        state3.sigs = new Signature[](2);
+        state3.sigs = new bytes[](2);
         state3.sigs[HOST] = _signState(state3, hostPrivateKey);
         state3.sigs[GUEST] = _signState(state3, guestPrivateKey);
 
@@ -270,10 +250,10 @@ contract ConsensusTransitionTest is Test {
         assertFalse(valid, "State with non-sequential version should be rejected");
     }
 
-    function test_adjudicate_laterState_revert_whenAllocationSumChanged() public view {
+    function test_adjudicate_laterState_revert_whenAllocationSumChanged() public {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
@@ -281,7 +261,7 @@ contract ConsensusTransitionTest is Test {
         State memory state2 = _createOperateState("state 2", 2);
         state2.allocations[HOST].amount = 60; // Changed from 50
         state2.allocations[GUEST].amount = 50; // Kept at 50, total sum is now 110 instead of 100
-        state2.sigs = new Signature[](2);
+        state2.sigs = new bytes[](2);
         state2.sigs[HOST] = _signState(state2, hostPrivateKey);
         state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
 
@@ -294,10 +274,10 @@ contract ConsensusTransitionTest is Test {
         assertFalse(valid, "State with changed allocation sum should be rejected");
     }
 
-    function test_adjudicate_revert_whenNoStateProof() public view {
+    function test_adjudicate_revert_whenNoStateProof() public {
         // Create state 2 without providing a proof
         State memory state2 = _createOperateState("state 2", 2);
-        state2.sigs = new Signature[](2);
+        state2.sigs = new bytes[](2);
         state2.sigs[HOST] = _signState(state2, hostPrivateKey);
         state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
 
@@ -309,16 +289,16 @@ contract ConsensusTransitionTest is Test {
         assertFalse(valid, "State without proof should be rejected");
     }
 
-    function test_adjudicate_revert_whenTooManyProofs() public view {
+    function test_adjudicate_revert_whenTooManyProofs() public {
         // Create state 1
         State memory state1 = _createOperateState("state 1", 1);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
         // Create state 2
         State memory state2 = _createOperateState("state 2", 2);
-        state2.sigs = new Signature[](2);
+        state2.sigs = new bytes[](2);
         state2.sigs[HOST] = _signState(state2, hostPrivateKey);
         state2.sigs[GUEST] = _signState(state2, guestPrivateKey);
 
@@ -334,10 +314,10 @@ contract ConsensusTransitionTest is Test {
 
     // -------------------- RESIZE STATE TRANSITION TESTS --------------------
 
-    function test_adjudicate_afterResize_valid() public view {
+    function test_adjudicate_afterResize_valid() public {
         // Create state 1 with both signatures
         State memory state1 = _createOperateState("state 1", 1);
-        state1.sigs = new Signature[](2);
+        state1.sigs = new bytes[](2);
         state1.sigs[HOST] = _signState(state1, hostPrivateKey);
         state1.sigs[GUEST] = _signState(state1, guestPrivateKey);
 
@@ -346,13 +326,13 @@ contract ConsensusTransitionTest is Test {
         resizeAmounts[HOST] = 10;
         resizeAmounts[GUEST] = -10;
         State memory resizeState = _createResizeState("resize state", 2, resizeAmounts);
-        resizeState.sigs = new Signature[](2);
+        resizeState.sigs = new bytes[](2);
         resizeState.sigs[HOST] = _signState(resizeState, hostPrivateKey);
         resizeState.sigs[GUEST] = _signState(resizeState, guestPrivateKey);
 
         // Create state 3 after resize
         State memory state3 = _createOperateState("state 3", 3);
-        state3.sigs = new Signature[](2);
+        state3.sigs = new bytes[](2);
         state3.sigs[HOST] = _signState(state3, hostPrivateKey);
         state3.sigs[GUEST] = _signState(state3, guestPrivateKey);
 
@@ -366,10 +346,10 @@ contract ConsensusTransitionTest is Test {
     }
 
     // Test signature validation using a non-corrupt signature but wrong signer
-    function test_WrongSignerRejected() public view {
+    function test_WrongSignerRejected() public {
         // Create state with signatures from wrong participants
         State memory state = _createOperateState("state", 1);
-        state.sigs = new Signature[](2);
+        state.sigs = new bytes[](2);
 
         // Use guest's signature for both slots
         state.sigs[HOST] = _signState(state, guestPrivateKey); // Should be host, but using guest
@@ -377,7 +357,7 @@ contract ConsensusTransitionTest is Test {
 
         // Create a valid initial state as proof
         State memory initialState = _createInitialState("initial state");
-        initialState.sigs = new Signature[](2);
+        initialState.sigs = new bytes[](2);
         initialState.sigs[HOST] = _signState(initialState, hostPrivateKey);
         initialState.sigs[GUEST] = _signState(initialState, guestPrivateKey);
 

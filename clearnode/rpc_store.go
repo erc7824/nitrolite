@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 
+	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
@@ -36,7 +37,7 @@ func NewRPCStore(db *gorm.DB) *RPCStore {
 }
 
 // StoreMessage stores an RPC message in the database
-func (s *RPCStore) StoreMessage(sender string, req *RPCData, reqSig []string, resBytes []byte, resSig []string) error {
+func (s *RPCStore) StoreMessage(sender string, req *RPCData, reqSigs []Signature, resBytes []byte, resSigs []Signature) error {
 	paramsBytes, err := json.Marshal(req.Params)
 	if err != nil {
 		return err
@@ -48,8 +49,8 @@ func (s *RPCStore) StoreMessage(sender string, req *RPCData, reqSig []string, re
 		Method:    req.Method,
 		Params:    paramsBytes,
 		Response:  resBytes,
-		ReqSig:    reqSig,
-		ResSig:    resSig,
+		ReqSig:    nitrolite.SignaturesToStrings(reqSigs),
+		ResSig:    nitrolite.SignaturesToStrings(resSigs),
 		Timestamp: req.Timestamp,
 	}
 

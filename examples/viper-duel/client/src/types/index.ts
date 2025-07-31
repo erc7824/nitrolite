@@ -74,7 +74,7 @@ export interface DirectionPayload {
 }
 
 // WebSocket message types
-export type WebSocketMessageType = 
+export type WebSocketMessageType =
   | 'joinRoom'
   | 'startGame'
   | 'changeDirection'

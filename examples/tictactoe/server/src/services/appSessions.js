@@ -65,7 +65,7 @@ export async function generateAppSessionMessage(roomId, participantA, participan
       nonce: nonce,
     };
 
-    const appSessionData = [{
+    const appSessionData = {
       definition: appDefinition,
       allocations: [
         {
@@ -84,7 +84,7 @@ export async function generateAppSessionMessage(roomId, participantA, participan
           amount: '0',
         },
       ]
-    }];
+    };
 
     // Generate the complete request structure that everyone will sign
     const sign = rpcClient.signMessage.bind(rpcClient);
@@ -362,28 +362,26 @@ export async function createAppSession(roomId, participantA, participantB) {
     // Create the signed message
     const signedMessage = await createAppSessionMessage(
       sign,
-      [
-        {
-          definition: appDefinition,
-          allocations: [
-            {
-              participant: participantA,
-              asset: 'usdc',
-              amount: '0.01',
-            },
-            {
-              participant: participantB,
-              asset: 'usdc',
-              amount: '0.01',
-            },
-            {
-              participant: serverAddress,
-              asset: 'usdc',
-              amount: '0',
-            },
-          ]
-        },
-      ]
+      {
+        definition: appDefinition,
+        allocations: [
+          {
+            participant: participantA,
+            asset: 'usdc',
+            amount: '0.01',
+          },
+          {
+            participant: participantB,
+            asset: 'usdc',
+            amount: '0.01',
+          },
+          {
+            participant: serverAddress,
+            asset: 'usdc',
+            amount: '0',
+          },
+        ]
+      }
     );
     logger.data(`Signed app session message for room ${roomId}:`, signedMessage);
     // Send the message directly using ws.send, similar to authentication
@@ -575,7 +573,7 @@ export async function closeAppSession(roomId, allocations) {
     // Create the signed message
     const signedMessage = await createCloseAppSessionMessage(
       sign,
-      [closeRequest],
+      closeRequest,
     );
 
     logger.data(`Signed app session close message for room ${roomId}:`, signedMessage);

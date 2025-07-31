@@ -19,12 +19,12 @@ function App() {
     const [gameView, setGameView] = useState<"lobby" | "game">("lobby");
 
     // WebSocket connection
-    const { 
-        error: wsError, 
-        lastMessage, 
-        joinRoom, 
-        changeDirection, 
-        startGame, 
+    const {
+        error: wsError,
+        lastMessage,
+        joinRoom,
+        changeDirection,
+        startGame,
         getAvailableRooms,
         sendAppSessionSignature,
         sendAppSessionStartGame
@@ -79,7 +79,7 @@ function App() {
 
         if (combinedError) {
             console.log("Error detected:", combinedError);
-            
+
             // Don't show error modal for MetaMask connection message
             if (combinedError === "MetaMask not connected. Please connect your wallet.") {
                 setShowError(false);
@@ -212,9 +212,9 @@ function App() {
             {/* Main Content */}
             <div className="max-w-xl w-full relative z-10">
                 {gameView === "lobby" ? (
-                    <GameLobbyIntegrated 
-                        onJoinRoom={handleJoinRoom} 
-                        availableRooms={availableRooms} 
+                    <GameLobbyIntegrated
+                        onJoinRoom={handleJoinRoom}
+                        availableRooms={availableRooms}
                         onGetAvailableRooms={handleGetAvailableRooms}
                         onlineUsers={onlineUsers}
                     />

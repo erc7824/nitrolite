@@ -53,8 +53,8 @@ export async function authenticate(
     console.log('- EIP-712 signature for auth_verify challenge (UUID only)');
 
     const authMessage: AuthRequestParams = {
-        wallet: walletAddress as Hex,
-        participant: signer.address as Hex,
+        address: walletAddress as Hex,
+        session_key: signer.address as Hex,
         app_name: 'Snake Game',
         expire: expire, // 24 hours in seconds
         scope: 'snake-game',
@@ -148,7 +148,7 @@ export async function authenticate(
                         const eip712SigningFunction = createEIP712AuthMessageSigner(walletClient, {
                             scope: authMessage.scope,
                             application: authMessage.application,
-                            participant: authMessage.participant,
+                            participant: authMessage.session_key,
                             expire: authMessage.expire,
                             allowances: authMessage.allowances.map(({ asset, amount }: { asset: string, amount: any }) => ({
                                 asset,

@@ -161,8 +161,8 @@ export class NitroliteRPCClient {
         logger.auth("- EIP-712 signature for auth_verify challenge");
 
         const authMessage = {
-            wallet: this.address,
-            participant: this.address,
+            address: this.address,
+            session_key: this.address,
             app_name: "Viper Duel",
             expire: expire, // 24 hours in seconds
             scope: "console",
@@ -216,7 +216,7 @@ export class NitroliteRPCClient {
                                 {
                                     scope: authMessage.scope,
                                     application: authMessage.application,
-                                    participant: authMessage.participant,
+                                    participant: authMessage.address,
                                     expire: authMessage.expire,
                                     allowances: authMessage.allowances.map((allowance) => ({
                                         asset: allowance.symbol || allowance.asset,
@@ -380,7 +380,12 @@ export class NitroliteRPCClient {
 
         return new Promise(async (resolve, reject) => {
             try {
-                const request = NitroliteRPC.createRequest(requestId, method, params);
+                const request = NitroliteRPC.createRequest({
+                    requestId,
+                    method,
+                    params,
+                    timestamp: Date.now()
+                });
                 const signedRequest = await NitroliteRPC.signRequestMessage(request, sign);
 
                 logger.ws(`Sending request: ${JSON.stringify(signedRequest).slice(0, 100)}...`);
@@ -457,7 +462,7 @@ export class NitroliteRPCClient {
     async getChannelInfo() {
         try {
             logger.nitro("Requesting channel information...");
-            const response = await this.sendRequest("get_channels", [{ participant: this.address }]);
+            const response = await this.sendRequest("get_channels", { participant: this.address });
             logger.data("Channel info received", response);
 
             logger.system("Debug - Raw channel response:");

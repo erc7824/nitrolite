@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { 
-  GameState, 
-  GameOver, 
+import type {
+  GameState,
+  GameOver,
   WebSocketMessages,
   AppSessionSignatureRequestMessage,
   AppSessionStartGameRequestMessage
@@ -20,7 +20,7 @@ const INITIAL_GAME_STATE: GameState = {
     },
     player2: {
       body: [],
-      direction: 'LEFT', 
+      direction: 'LEFT',
       alive: false,
       score: 0
     }
@@ -50,15 +50,15 @@ export function useGameState(
   const [awaitingHostStart, setAwaitingHostStart] = useState(false);
 
   // App session signature handling
-  const { 
-    isSigningInProgress, 
-    signatureError, 
-    handleParticipantBSignature, 
-    handleParticipantASignature 
+  const {
+    isSigningInProgress,
+    signatureError,
+    handleParticipantBSignature,
+    handleParticipantASignature
   } = useAppSessionSignature(sendAppSessionSignature, sendAppSessionStartGame);
 
   // Determine player's role (player1 or player2)
-  const playerId = gameState.players.player1 === eoaAddress ? 'player1' : 
+  const playerId = gameState.players.player1 === eoaAddress ? 'player1' :
                    gameState.players.player2 === eoaAddress ? 'player2' : null;
 
   // We don't need to generate room IDs client-side anymore
@@ -74,7 +74,7 @@ export function useGameState(
       case 'room:created':
         console.log("Room created:", lastMessage.roomId, "role:", lastMessage.role);
         setRoomId(lastMessage.roomId);
-        
+
         // Set host status based on role
         if (lastMessage.role === 'host') {
           console.log("Player is host");
@@ -83,13 +83,13 @@ export function useGameState(
           console.log("Player is guest");
           setIsHost(false);
         }
-        
+
         setErrorMessage(null);
         break;
-        
+
       case 'room:state':
         console.log("Received room:state", lastMessage, "eoaAddress:", eoaAddress);
-        
+
         setGameState({
           roomId: lastMessage.roomId,
           snakes: lastMessage.snakes,
@@ -98,7 +98,7 @@ export function useGameState(
           gameTime: lastMessage.gameTime,
           betAmount: lastMessage.betAmount || 0
         });
-        
+
         // Set host status based on player role (player1 is always host)
         if (lastMessage.players.player1 === eoaAddress) {
           console.log("Player is host (player1)");
@@ -107,12 +107,12 @@ export function useGameState(
           console.log("Player is guest (player2)");
           setIsHost(false);
         }
-        
+
         // Always update room ID when we get a room:state message
         if (lastMessage.roomId) {
           setRoomId(lastMessage.roomId);
         }
-        
+
         setErrorMessage(null);
         break;
 
@@ -121,7 +121,7 @@ export function useGameState(
         setIsRoomReady(true);
         setErrorMessage(null);
         break;
-        
+
       case 'game:started':
         setIsGameStarted(true);
         setErrorMessage(null);
@@ -158,7 +158,7 @@ export function useGameState(
       case 'appSession:signatureRequest':
         console.log("Received signature request for participant B:", lastMessage);
         setPendingSignatureRequest(lastMessage as AppSessionSignatureRequestMessage);
-        
+
         // Automatically sign for participant B (guest)
         if (!isHost) {
           try {
@@ -235,7 +235,7 @@ export function useGameState(
   }, []);
 
   // TODO: Add integration with @erc7824/nitrolite for persisting game state
-  
+
   return {
     gameState,
     gameOver,

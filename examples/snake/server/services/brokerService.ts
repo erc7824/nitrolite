@@ -1,9 +1,8 @@
 import WebSocket from "ws";
 import {ethers} from "ethers";
 import {
-    AppDefinition,
+    RPCAppDefinition,
     AuthRequestParams,
-    ChannelUpdate,
     CloseAppSessionRequestParams,
     createAppSessionMessage,
     CreateAppSessionRequestParams,
@@ -14,12 +13,13 @@ import {
     createEIP712AuthMessageSigner,
     createGetLedgerBalancesMessage,
     MessageSigner,
-    NitroliteRPC,
     parseAnyRPCResponse,
-    RequestData,
-    ResponsePayload,
+    RPCData,
     RPCMethod,
     RPCResponse,
+    createGetChannelsMessage,
+    createGetAppDefinitionMessage,
+    RPCChannel,
 } from "@erc7824/nitrolite";
 import {BROKER_WS_URL, WALLET_PRIVATE_KEY} from "../config/index.ts";
 import {
@@ -54,10 +54,8 @@ async function getChannels(): Promise<void> {
     }
 
     const signer = createEthersSigner(WALLET_PRIVATE_KEY);
-    const params = [{participant: signer.address}];
-    const request = NitroliteRPC.createRequest(10, RPCMethod.GetChannels, params);
-    const getChannelMessage = await NitroliteRPC.signRequestMessage(request, signer.sign);
-    brokerWs.send(JSON.stringify(getChannelMessage));
+    const request = await createGetChannelsMessage(signer.sign, signer.address);
+    brokerWs.send(request);
 }
 
 // Connects to the Nitrolite broker
@@ -136,8 +134,8 @@ async function authenticateWithBroker(): Promise<void> {
     const expire = String(Math.floor(Date.now() / 1000) + 24 * 60 * 60);
 
     const authMessage: AuthRequestParams = {
-        wallet: serverAddress,
-        participant: serverAddress,
+        address: serverAddress,
+        session_key: serverAddress,
         app_name: 'Snake Game',
         expire: expire,
         scope: 'snake-game',
@@ -187,16 +185,7 @@ async function authenticateWithBroker(): Promise<void> {
 
                         console.log('Creating EIP-712 signing function...');
                         // @ts-ignore
-                        const eip712SigningFunction = createEIP712AuthMessageSigner(walletClient, {
-                            scope: authMessage.scope,
-                            application: walletClient.account.address,
-                            participant: authMessage.wallet,
-                            expire: authMessage.expire,
-                            allowances: authMessage.allowances.map((allowance) => ({
-                                asset: allowance.asset,
-                                amount: allowance.amount.toString(),
-                            })),
-                        }, getAuthDomain());
+                        const eip712SigningFunction = createEIP712AuthMessageSigner(walletClient, message, getAuthDomain());
 
                         // Create and send verification message with EIP-712 signature
                         console.log('Calling createAuthVerifyMessage...');
@@ -360,14 +349,8 @@ export function handleBrokerMessage(raw: string): void {
             }
             return;
         } else if (message.method === RPCMethod.GetChannels || message.method === RPCMethod.ChannelsUpdate) {
-            let channels: ChannelUpdate[];
-            if (message.method === RPCMethod.GetChannels) {
-                channels = message.params;
-            } else {
-                channels = [message.params];
-            }
-
             console.log("Received get_channels from broker:", message.params);
+            let channels: RPCChannel[] = message.params.channels || [];
             if (channels.length === 0) {
                 throw new Error("No channels found. Please open a channel at apps.yellow.com");
             }
@@ -533,7 +516,7 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
         signerAddress: signer.address
     });
 
-    const appDefinition: AppDefinition = {
+    const appDefinition: RPCAppDefinition = {
         protocol: DEFAULT_PROTOCOL,
         participants,
         weights: DEFAULT_WEIGHTS,
@@ -541,14 +524,14 @@ export async function createAppSession(participantA: Hex, participantB: Hex): Pr
         challenge: 0,
         nonce: Date.now(),
     };
-    const params: CreateAppSessionRequestParams[] = [{
+    const params: CreateAppSessionRequestParams = {
         definition: appDefinition,
         allocations: participants.map((participant, index) => ({
             participant,
             asset: "usdc",
             amount: index < 2 ? "0.00001" : "0", // Players get 0.00001, server gets 0
         }))
-    }]
+    };
 
     // Create the request with properly formatted parameters
     const request = await createAppSessionMessage(signer.sign, params);
@@ -583,11 +566,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
 
     // Verify the app session exists before trying to close it
     try {
-        const requestId = Date.now();
-        const timestamp = Date.now();
-        const request: { req: [number, string, { app_session_id: string }[], number] } = {
-            req: [requestId, "get_app_definition", [{app_session_id: appId}], timestamp]
-        };
+        const request = createGetAppDefinitionMessage(signer.sign, appId);
         console.log("[closeAppSession] Verifying app session exists:", appId);
         await sendToBroker(request);
         console.log("[closeAppSession] App session exists, proceeding with close");
@@ -601,14 +580,14 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
     }
 
     // Create close message and sign with server
-    const params: CloseAppSessionRequestParams[] = [{
+    const params: CloseAppSessionRequestParams = {
         app_session_id: appId,
         allocations: [participantA, participantB, signer.address].map((participant, index) => ({
             participant,
             asset: "usdc",
             amount: index < 2 ? "0.00001" : "0", // Players get 0.00001, server gets 0
         }))
-    }]
+    };
     const closeRequestData = await createCloseAppSessionMessage(signer.sign, params);
     const req = JSON.parse(closeRequestData);
     const serverSignature = await signer.sign(req);
@@ -628,7 +607,7 @@ export async function closeAppSession(appId: Hex, participantA: Hex, participant
 export async function signStateData(stateData: string): Promise<{ signature: string; address: Hex }> {
     const signer = createEthersSigner(WALLET_PRIVATE_KEY);
     return {
-        signature: await signer.sign(stateData as unknown as RequestData),
+        signature: await signer.sign(stateData as unknown as RPCData),
         address: signer.address as Hex,
     };
 }
@@ -660,7 +639,7 @@ export function createEthersSigner(privateKey: string): WalletSigner {
         return {
             publicKey: wallet.address,
             address: wallet.address as Hex,
-            sign: async (data: RequestData | ResponsePayload): Promise<Hex> => {
+            sign: async (data: RPCData): Promise<Hex> => {
                 try {
                     const messageStr = JSON.stringify(data);
 
@@ -684,7 +663,7 @@ export function createEthersSigner(privateKey: string): WalletSigner {
 // Helper function to sign RPC request data for the broker
 export async function signRpcRequest(requestData: any[]): Promise<string> {
     const signer = createEthersSigner(WALLET_PRIVATE_KEY);
-    return signer.sign(requestData as RequestData);
+    return signer.sign(requestData as RPCData);
 }
 
 // Verify a signature against a message and expected signer

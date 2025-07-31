@@ -1,13 +1,13 @@
 import {
-    ChannelUpdate,
     createGetLedgerBalancesMessage,
     createPingMessage,
     parseAnyRPCResponse,
+    RPCChannel,
     RPCMethod,
 } from "@erc7824/nitrolite";
 import { BROKER_WS_URL, CHAIN_ID } from "../config";
 import { createEthersSigner, generateKeyPair } from "../crypto";
-import type { Account, Transport, Chain, Hex, ParseAccount, WalletClient } from "viem";
+import type { Account, Transport, Chain, Hex, ParseAccount, WalletClient, Address } from "viem";
 import { authenticate } from "./authentication";
 
 class ClearNetService {
@@ -214,7 +214,7 @@ class ClearNetService {
                 if (nitroChannelId && this.wsConnection) {
                     const getBalancesMsg = await createGetLedgerBalancesMessage(
                         signer.sign,
-                        nitroChannelId as Hex
+                        nitroChannelId as Address
                     );
                     this.wsConnection.send(getBalancesMsg);
                 }
@@ -233,14 +233,8 @@ class ClearNetService {
         console.log("Parsed message:", message);
 
         if (message.method === RPCMethod.GetChannels || message.method === RPCMethod.ChannelsUpdate) {
-            let channels: ChannelUpdate[];
-            if (message.method === RPCMethod.GetChannels) {
-                channels = message.params;
-            } else {
-                channels = [message.params];
-            }
-
             console.log('[ClearNetService] Received channels update:', message);
+            let channels: RPCChannel[] = message.params.channels || [];
             const channel = channels.find((ch: any) => {
                 return ch.chain_id === CHAIN_ID && ch.status === "open";
             });

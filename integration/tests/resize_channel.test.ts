@@ -79,12 +79,8 @@ describe('Resize channel', () => {
         expect(resizeResponseParams.stateData).toBeDefined();
         expect(resizeResponseParams.intent).toBe(2); // StateIntent.RESIZE // TODO: add enum to sdk
         expect(resizeResponseParams.version).toBe(createResponseParams.version + 1);
-        expect(resizeResponseParams.stateHash).toBeDefined();
 
         expect(resizeResponseParams.serverSignature).toBeDefined();
-        expect(resizeResponseParams.serverSignature.v).toBeDefined();
-        expect(resizeResponseParams.serverSignature.r).toBeDefined();
-        expect(resizeResponseParams.serverSignature.s).toBeDefined();
 
         expect(resizeResponseParams.allocations).toBeDefined();
         expect(resizeResponseParams.allocations).toHaveLength(2);

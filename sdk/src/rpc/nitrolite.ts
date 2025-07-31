@@ -35,7 +35,7 @@ export class NitroliteRPC {
         timestamp: number = getCurrentTimestamp(),
     ): NitroliteRPCMessage {
         const requestData: RequestData = [requestId, method, params, timestamp];
-        const message: NitroliteRPCMessage = { req: requestData };
+        const message: NitroliteRPCMessage = { req: requestData, sig: [] };
         return message;
     }
 
@@ -230,7 +230,7 @@ export class NitroliteRPC {
 
         try {
             const payload = this.getMessagePayload(message);
-            if (typeof signature !== 'string' || signature === '') {
+            if (typeof signature !== 'string') {
                 return false;
             }
             return await verifier(payload, signature as Hex, expectedSigner);

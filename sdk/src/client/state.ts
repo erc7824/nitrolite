@@ -1,6 +1,6 @@
-import { Address, encodeAbiParameters, Hex, keccak256 } from 'viem';
+import { Address, encodeAbiParameters, encodePacked, Hex, keccak256 } from 'viem';
 import * as Errors from '../errors';
-import { generateChannelNonce, getChannelId, getStateHash, removeQuotesFromRS, signState } from '../utils';
+import { generateChannelNonce, getChannelId, getPackedState, getStateHash, signChallengeState, signState } from '../utils';
 import { PreparerDependencies } from './prepare';
 import {
     ChallengeChannelParams,
@@ -77,9 +77,8 @@ export async function _prepareAndSignInitialState(
         sigs: [],
     };
 
-    const stateHash = getStateHash(channelId, stateToSign);
 
-    const accountSignature = await signState(stateHash, deps.stateWalletClient.signMessage);
+    const accountSignature = await signState(channelId, stateToSign, deps.stateWalletClient.signMessage);
     const initialState: State = {
         ...stateToSign,
         sigs: [accountSignature],
@@ -105,17 +104,7 @@ export async function _prepareAndSignChallengeState(
     challengerSig: Signature;
 }> {
     const { channelId, candidateState, proofStates = [] } = params;
-
-    const stateHash = getStateHash(channelId, candidateState);
-    const encoded = encodeAbiParameters(
-        [
-            { type: 'bytes32', name: 'stateHash' },
-            { type: 'string', name: 'challenge' },
-        ],
-        [stateHash, 'challenge'],
-    );
-    const challengeHash = keccak256(encoded) as Hex;
-    const challengerSig = await signState(challengeHash, deps.stateWalletClient.signMessage);
+    const challengerSig = await signChallengeState(channelId, candidateState, deps.stateWalletClient.signMessage);
 
     return { channelId, candidateState, proofs: proofStates, challengerSig };
 }
@@ -138,7 +127,6 @@ export async function _prepareAndSignResizeState(
     }
 
     const channelId = resizeState.channelId;
-    const serverSignature = removeQuotesFromRS(resizeState.serverSignature);
 
     const stateToSign: State = {
         data: resizeState.data,
@@ -148,14 +136,12 @@ export async function _prepareAndSignResizeState(
         sigs: [],
     };
 
-    const stateHash = getStateHash(channelId, stateToSign);
-
-    const accountSignature = await signState(stateHash, deps.stateWalletClient.signMessage);
+    const accountSignature = await signState(channelId, stateToSign, deps.stateWalletClient.signMessage);
 
     // Create a new state with signatures in the requested style
     const resizeStateWithSigs: State = {
         ...stateToSign,
-        sigs: [accountSignature, serverSignature],
+        sigs: [accountSignature, resizeState.serverSignature],
     };
 
     let proofs: State[] = [...proofStates];
@@ -181,7 +167,6 @@ export async function _prepareAndSignFinalState(
     }
 
     const channelId = finalState.channelId;
-    const serverSignature = removeQuotesFromRS(finalState.serverSignature);
 
     const stateToSign: State = {
         data: stateData,
@@ -191,14 +176,12 @@ export async function _prepareAndSignFinalState(
         sigs: [],
     };
 
-    const stateHash = getStateHash(channelId, stateToSign);
-
-    const accountSignature = await signState(stateHash, deps.stateWalletClient.signMessage);
+    const accountSignature = await signState(channelId, stateToSign, deps.stateWalletClient.signMessage);
 
     // Create a new state with signatures in the requested style
     const finalStateWithSigs: State = {
         ...stateToSign,
-        sigs: [accountSignature, serverSignature],
+        sigs: [accountSignature, finalState.serverSignature],
     };
 
     return { finalStateWithSigs, channelId };

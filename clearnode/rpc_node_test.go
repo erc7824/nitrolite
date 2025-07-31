@@ -191,7 +191,7 @@ func TestRPCNode(t *testing.T) {
 
 		reqMsg := &RPCMessage{
 			Req: reqData,
-			Sig: []string{},
+			Sig: []Signature{},
 		}
 
 		// Send request

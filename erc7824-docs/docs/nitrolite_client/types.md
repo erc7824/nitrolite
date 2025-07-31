@@ -30,14 +30,10 @@ A hash of a channel state, represented as a hexadecimal string.
 ### Signature
 
 ```typescript
-interface Signature {
-  v: number;  // Recovery value
-  r: Hex;     // First 32 bytes of the signature
-  s: Hex;     // Second 32 bytes of the signature
-}
+type Signature = Hex;
 ```
 
-Represents a cryptographic signature used for signing state channel states.
+Represents a cryptographic signature used for signing state channel states as a hexadecimal string.
 
 ### Allocation
 
@@ -81,11 +77,11 @@ Indicates the intent of a state update. The intent determines how the state is p
 
 ```typescript
 interface State {
-  intent: StateIntent;                 // Intent of the state
-  version: bigint;                     // Version number, incremented for each update
-  data: Hex;                           // Application data encoded as hex
-  allocations: [Allocation, Allocation]; // Asset allocation for each participant
-  sigs: Signature[];                   // State hash signatures
+  intent: StateIntent;                    // Intent of the state
+  version: bigint;                        // Version number, incremented for each update
+  data: Hex;                              // Application data encoded as hex
+  allocations: [Allocation, Allocation];  // Asset allocation for each participant
+  sigs: Signature[];                      // State hash signatures
 }
 ```
 

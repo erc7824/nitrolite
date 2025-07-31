@@ -1,5 +1,5 @@
-import { keccak256, encodeAbiParameters, Address, Hex, recoverMessageAddress, encodePacked } from 'viem';
-import { State, StateHash, Signature, ChannelId } from '../client/types'; // Updated import path
+import { keccak256, encodeAbiParameters, type Address, type Hex, recoverMessageAddress, encodePacked } from 'viem';
+import type { State, StateHash, Signature, ChannelId } from '../client/types';
 
 /**
  * Packs a channel state into a canonical format for hashing and signing.
@@ -56,7 +56,6 @@ type SignMessageFn = (args: { message: { raw: Hex } }) => Promise<Hex>;
 // TODO: extract into an interface and provide on NitroliteClient creation
 /**
  * Create a raw ECDSA signature for a hash over a packed state using a Viem WalletClient or Account compatible signer.
- * Uses the locally defined parseSignature function.
  * @dev `signMessage` function should NOT add an EIP-191 prefix to the stateHash. See {@link SignMessageFn}.
  * @param stateHash The hash of the state to sign.
  * @param signer An object with a `signMessage` method compatible with Viem's interface (e.g., WalletClient, Account).

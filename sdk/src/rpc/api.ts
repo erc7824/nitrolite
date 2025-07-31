@@ -1,6 +1,7 @@
-import { Address, Hex, keccak256, stringToBytes, WalletClient } from 'viem';
+import type { Address, Hex, WalletClient } from 'viem';
+import { keccak256, stringToBytes } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import {
+import type {
     MessageSigner,
     AccountID,
     RequestID,
@@ -8,18 +9,16 @@ import {
     CreateAppSessionRequest,
     AuthRequestParams,
     PartialEIP712AuthMessage,
-    EIP712AuthTypes,
     EIP712AuthDomain,
     EIP712AuthMessage,
     AuthChallengeResponse,
-    RPCMethod,
     RPCData,
     GetLedgerTransactionsFilters,
-    RPCChannelStatus,
 } from './types';
+import { RPCMethod, EIP712AuthTypes, RPCChannelStatus } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
-import {
+import type {
     CloseAppSessionRequestParams,
     CreateAppSessionRequestParams,
     SubmitAppStateRequestParams,

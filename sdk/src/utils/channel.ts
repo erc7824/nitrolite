@@ -1,5 +1,5 @@
-import { keccak256, encodeAbiParameters, Address } from 'viem';
-import { Channel, ChannelId } from '../client/types'; // Updated import path
+import { keccak256, encodeAbiParameters, type Address } from 'viem';
+import type { Channel, ChannelId } from '../client/types'; // Updated import path
 
 /**
  * Compute the unique identifier for a channel based on its configuration.

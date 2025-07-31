@@ -71,7 +71,7 @@ export async function generateAppSessionMessage(roomId, participantA, participan
       nonce: nonce,
     };
 
-    const appSessionData = [{
+    const appSessionData = {
       definition: appDefinition,
       allocations: [
         {
@@ -90,7 +90,7 @@ export async function generateAppSessionMessage(roomId, participantA, participan
           amount: '0',
         },
       ]
-    }];
+    };
 
     // Generate the complete request structure that everyone will sign
     const sign = rpcClient.signMessage.bind(rpcClient);
@@ -608,7 +608,7 @@ export async function closeAppSession(roomId, allocations) {
     // Create the signed message
     const signedMessage = await createCloseAppSessionMessage(
       sign,
-      [closeRequest],
+      closeRequest,
     );
 
     logger.data(`Signed app session close message for room ${roomId}:`, signedMessage);

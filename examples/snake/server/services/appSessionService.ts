@@ -1,7 +1,7 @@
 import { Hex } from 'viem';
 import { ethers } from 'ethers';
 import dotenv from 'dotenv';
-import { createAppSessionMessage, AppDefinition, MessageSigner, CreateAppSessionRequestParams } from '@erc7824/nitrolite';
+import { createAppSessionMessage, RPCAppDefinition, MessageSigner, CreateAppSessionRequestParams } from '@erc7824/nitrolite';
 import { SERVER_PRIVATE_KEY } from '../config/index.ts';
 import { DEFAULT_PROTOCOL, sendToBroker } from './brokerService.ts';
 
@@ -19,8 +19,8 @@ interface AppSession {
 }
 
 interface PendingAppSession {
-  appSessionData: CreateAppSessionRequestParams[];
-  appDefinition: AppDefinition;
+  appSessionData: CreateAppSessionRequestParams;
+  appDefinition: RPCAppDefinition;
   participantA: Hex;
   participantB: Hex;
   serverAddress: Hex;
@@ -47,12 +47,7 @@ export const serverSigner: MessageSigner = async (payload: any): Promise<Hex> =>
 /**
  * Generate app session message for multi-signature collection
  */
-export async function generateAppSessionMessage(roomId: string, participantA: Hex, participantB: Hex): Promise<{
-  appSessionData: CreateAppSessionRequestParams[];
-  appDefinition: AppDefinition;
-  participants: Hex[];
-  requestToSign: any;
-}> {
+export async function generateAppSessionMessage(roomId: string, participantA: Hex, participantB: Hex): Promise<{requestToSign: any;}> {
   try {
     // Format addresses to proper checksum format
     const formattedParticipantA = ethers.getAddress(participantA) as Hex;
@@ -66,9 +61,6 @@ export async function generateAppSessionMessage(roomId: string, participantA: He
     if (pendingSession) {
       console.log(`Using existing app session message for room ${roomId} - nonce: ${pendingSession.nonce}, requestToSign: ${JSON.stringify(pendingSession.requestToSign)}`);
       return {
-        appSessionData: pendingSession.appSessionData,
-        appDefinition: pendingSession.appDefinition,
-        participants: [pendingSession.participantA, pendingSession.participantB, pendingSession.serverAddress],
         requestToSign: pendingSession.requestToSign
       };
     }
@@ -78,7 +70,7 @@ export async function generateAppSessionMessage(roomId: string, participantA: He
 
     // Create app definition with fixed nonce
     const nonce = Date.now();
-    const appDefinition: AppDefinition = {
+    const appDefinition: RPCAppDefinition = {
       protocol: DEFAULT_PROTOCOL,
       participants: [formattedParticipantA, formattedParticipantB, serverAddress],
       weights: [0, 0, 100],
@@ -87,7 +79,7 @@ export async function generateAppSessionMessage(roomId: string, participantA: He
       nonce: nonce,
     };
 
-    const appSessionData: CreateAppSessionRequestParams[] = [{
+    const appSessionData: CreateAppSessionRequestParams = {
       definition: appDefinition,
       allocations: [
         {
@@ -106,7 +98,7 @@ export async function generateAppSessionMessage(roomId: string, participantA: He
           amount: '0',
         },
       ]
-    }];
+    };
 
     // Generate the complete request structure
     const signedMessage = await createAppSessionMessage(serverSigner, appSessionData);
@@ -133,9 +125,6 @@ export async function generateAppSessionMessage(roomId: string, participantA: He
 
     console.log(`App session message generated for room ${roomId} with nonce ${nonce}`);
     return {
-      appSessionData,
-      appDefinition,
-      participants: [formattedParticipantA, formattedParticipantB, serverAddress],
       requestToSign: requestToSign
     };
 
@@ -247,7 +236,7 @@ export async function createAppSessionWithSignatures(roomId: string): Promise<st
     console.debug(`Final message structure:`, {
       req: finalMessage.req,
       signatures: finalMessage.sig,
-      participantsOrder: pendingSession.appSessionData[0].definition.participants,
+      participantsOrder: pendingSession.appSessionData.definition.participants,
       messageToSend: JSON.stringify(finalMessage)
     });
 
@@ -289,8 +278,8 @@ export function getAppSession(roomId: string): AppSession | null {
  * Get existing pending app session message for a room
  */
 export function getPendingAppSessionMessage(roomId: string): {
-  appSessionData: CreateAppSessionRequestParams[];
-  appDefinition: AppDefinition;
+  appSessionData: CreateAppSessionRequestParams;
+  appDefinition: RPCAppDefinition;
   participants: Hex[];
   requestToSign: any;
 } | null {

@@ -1,4 +1,4 @@
-import { PublicClient, Hash, TransactionReceipt } from 'viem';
+import type { PublicClient, Hash, TransactionReceipt } from 'viem';
 import { Errors } from '../../errors';
 
 /**

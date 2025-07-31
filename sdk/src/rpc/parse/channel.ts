@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import {
-    RPCMethod,
+import type {
     ResizeChannelResponseParams,
     CloseChannelResponseParams,
     GetChannelsResponseParams,
@@ -9,7 +8,8 @@ import {
     ChannelsUpdateResponseParams,
     RPCChannelWithWallet,
 } from '../types';
-import { hexSchema, addressSchema, statusEnum, ParamsParser, bigIntSchema, dateSchema } from './common';
+import { RPCMethod } from '../types';
+import { hexSchema, addressSchema, statusEnum, type ParamsParser, bigIntSchema, dateSchema } from './common';
 
 const RPCAllocationSchema = z.object({
     destination: addressSchema,

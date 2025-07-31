@@ -477,7 +477,7 @@ async function handleFinalizeGame(data: any): Promise<void> {
 
   try {
     // Create close message and sign with server
-    const params: CloseAppSessionRequestParams[] = [{
+    const params: CloseAppSessionRequestParams = {
       app_session_id: room.appId,
       allocations: [
         {
@@ -496,7 +496,7 @@ async function handleFinalizeGame(data: any): Promise<void> {
           amount: "0"
         }
       ]
-    }];
+    };
 
     // Create the message to be signed by all participants
     const closeRequestData = await createCloseAppSessionMessage(serverSigner, params);

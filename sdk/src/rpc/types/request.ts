@@ -1,14 +1,16 @@
-import { Address, Hex } from 'viem';
-import {
-    RPCMethod,
+import type { Address, Hex } from 'viem';
+import type {
     GenericRPCMessage,
     RPCAppDefinition,
-    RPCChannelStatus,
     RPCTransferAllocation,
     RPCAppSessionAllocation,
     RPCAllowance,
     GetLedgerTransactionsFilters
 } from '.';
+import {
+    RPCMethod,
+    RPCChannelStatus,
+ } from '.';
 
 /**
  * Represents the request structure for the 'auth_challenge' RPC method.

@@ -1,16 +1,16 @@
-import { type Hex } from "viem";
+import { Address, type Hex } from "viem";
 import { ethers } from "ethers";
 import {
     createAuthRequestMessage,
-    NitroliteRPC,
     createAuthVerifyMessage,
     createPingMessage,
     createAuthVerifyMessageWithJWT,
     createEIP712AuthMessageSigner,
     parseAnyRPCResponse,
     RPCMethod,
+    createGetChannelsMessage,
+    type Channel,
 } from "@erc7824/nitrolite";
-import type { Channel } from "@erc7824/nitrolite";
 import { WalletStore } from "../store";
 
 // ===== Types =====
@@ -272,8 +272,8 @@ export class WebSocketClient {
         } else {
             console.log("No JWT token found, proceeding with challenge-response authentication");
             authRequest = await createAuthRequestMessage({
-                wallet: ethers.getAddress(privyWalletAddress) as `0x${string}`, // wallet
-                participant: this.signer.address, //session key
+                address: ethers.getAddress(privyWalletAddress) as `0x${string}`,
+                session_key: this.signer.address,
                 app_name: "Nitro Aura",
                 expire: expire,
                 scope: "app.nitro.aura",
@@ -348,11 +348,9 @@ export class WebSocketClient {
                         }
 
                         // Authentication successful
-                        const paramsForChannels = [{ participant: ethers.getAddress(privyWalletAddress) as `0x${string}` }];
-                        const getChannelsMessage = NitroliteRPC.createRequest(10, RPCMethod.GetChannels, paramsForChannels);
-                        const getChannelMessage = await NitroliteRPC.signRequestMessage(getChannelsMessage, this.signer.sign);
-                        console.log("getChannelMessage", getChannelMessage);
-                        this.ws?.send(JSON.stringify(getChannelMessage));
+                        const getChannelsMessage = await createGetChannelsMessage(this.signer.sign, ethers.getAddress(privyWalletAddress) as Address);
+                        console.log("getChannelMessage", getChannelsMessage);
+                        this.ws?.send(JSON.stringify(getChannelsMessage));
                         clearTimeout(authTimeout);
                         this.ws?.removeEventListener("message", handleAuthResponse);
                         resolve();
@@ -498,7 +496,7 @@ export class WebSocketClient {
         try {
             message = JSON.parse(event.data);
         } catch (error) {
-            this.emitError(new Error(`Failed to parse message: ${event.data}`));
+            this.emitError(new Error(`Failed to parse message: ${error}: ${event.data}`));
             return;
         }
 

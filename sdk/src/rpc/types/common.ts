@@ -1,4 +1,4 @@
-import { Hex, Address } from 'viem';
+import type { Hex, Address } from 'viem';
 
 /** Represents the status of a channel. */
 export enum RPCChannelStatus {

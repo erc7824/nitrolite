@@ -1,6 +1,6 @@
 import { type Hex } from "viem";
 import { ethers } from "ethers";
-import { type MessageSigner, type RequestData, type ResponsePayload } from "@erc7824/nitrolite";
+import { type MessageSigner, type RPCData } from "@erc7824/nitrolite";
 
 /**
  * Interface for a cryptographic keypair
@@ -36,7 +36,7 @@ export const createEthersSigner = (privateKey: string): WalletSigner => {
 
         return {
             address: ethers.getAddress(wallet.address) as Hex,
-            sign: async (payload: RequestData | ResponsePayload): Promise<Hex> => {
+            sign: async (payload: RPCData): Promise<Hex> => {
                 try {
                     const message = JSON.stringify(payload);
                     console.log("Signing message in Sign function:", message);

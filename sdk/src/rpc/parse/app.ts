@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { Address } from 'viem';
-import {
-    RPCMethod,
+import { type Address } from 'viem';
+import type {
     CreateAppSessionResponseParams,
     SubmitAppStateResponseParams,
     CloseAppSessionResponseParams,
@@ -9,7 +8,8 @@ import {
     GetAppSessionsResponseParams,
     RPCAppSession,
 } from '../types';
-import { hexSchema, addressSchema, statusEnum, ParamsParser, dateSchema } from './common';
+import { RPCMethod } from '../types';
+import { hexSchema, addressSchema, statusEnum, type ParamsParser, dateSchema } from './common';
 
 const AppSessionObjectSchema = z
     .object({

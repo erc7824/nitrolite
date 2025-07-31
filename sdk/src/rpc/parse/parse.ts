@@ -1,6 +1,6 @@
-import { RPCResponse, RPCMethod } from '../types';
+import { type RPCResponse, RPCMethod } from '../types';
 import { paramsParsers } from './index';
-import { ParamsParser } from './common';
+import { type ParamsParser } from './common';
 
 // Helper type to extract a specific response type from the main RPCResponse union.
 type SpecificRPCResponse<T extends RPCMethod> = Extract<RPCResponse, { method: T }>;

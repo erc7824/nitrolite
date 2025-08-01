@@ -53,7 +53,7 @@ func EncodeState(channelID common.Hash, intent Intent, version *big.Int, stateDa
 
 // COMMON STATE DEFINITION
 
-// Assumption: let's abstract from state channel framework, and try do define a common state without being limited by state-channel limitations.
+// Assumption: let's abstract from state channel framework, and try do define a common state without being limited by state-channels.
 
 type CommonState struct {
 	State         UnsignedCommonState `json:"state"`
@@ -69,6 +69,7 @@ type UnsignedCommonState struct {
 	Nonce       uint64       `json:"nonce"`        // Common state nonce
 	StateData   []byte       `json:"state_data"`   // Common state data
 	ChainStates []ChainState `json:"chain_states"` // User allocation on each chain
+	SessionKeys []SessionKey `json:"session_keys"` // List of active session keys.
 }
 
 type ChainState struct {
@@ -79,6 +80,19 @@ type ChainState struct {
 type TokenAllocation struct {
 	TokenAddress common.Address `json:"token"`
 	RawAmount    *big.Int       `json:"amount"`
+}
+
+// SessionKey holds the public key and permissions for a delegated key.
+type SessionKey struct {
+	KeyAddress  common.Address        `json:"key_address"` // The public address of the session key.
+	Permissions SessionKeyPermissions `json:"permissions"`
+}
+
+// SessionKeyPermissions defines what a session key is allowed to do.
+type SessionKeyPermissions struct {
+	SpendingLimits []TokenAllocation `json:"spending_limits,omitempty"`
+	Expiry         uint64            `json:"expiry,omitempty"` // The timestamp when this key expires (seconds)
+	Nonce          uint64            `json:"nonce,omitempty"`  // A nonce to prevent replay of the session key authorization.
 }
 
 // User deposits money on smart contract. Smart contract account is a big state channel with Yellow Network.

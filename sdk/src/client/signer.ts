@@ -1,6 +1,6 @@
 import { Account, Address, Chain, Hex, ParseAccount, toHex, Transport, WalletClient } from 'viem';
 import { State } from './types';
-import { getStateHash } from '../utils';
+import { getPackedState, getStateHash } from '../utils';
 import { signRawECDSAMessage } from '../utils/sign';
 import { privateKeyToAccount } from 'viem/accounts';
 
@@ -15,7 +15,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 export interface StateSigner {
     /**
      * Get the address of the signer.
-     * @returns The address of the signer as a Promise.
+     * @returns The address of the signer.
      */
     getAddress(): Address;
     /**
@@ -52,9 +52,9 @@ export class WalletStateSigner implements StateSigner {
     }
 
     async signState(channelId: Hex, state: State): Promise<Hex> {
-        const stateHash = getStateHash(channelId, state);
+        const packedState = getPackedState(channelId, state)
 
-        return this.walletClient.signMessage({ message: { raw: stateHash } });
+        return this.walletClient.signMessage({ message: { raw: packedState } });
     }
 
     async signRawMessage(message: Hex): Promise<Hex> {

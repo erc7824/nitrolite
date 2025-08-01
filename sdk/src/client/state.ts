@@ -1,6 +1,6 @@
 import { Address, Hex } from 'viem';
 import * as Errors from '../errors';
-import { generateChannelNonce, getChallengeHash, getChannelId } from '../utils';
+import { generateChannelNonce, getChannelId, getPackedChallengeState } from '../utils';
 import { PreparerDependencies } from './prepare';
 import {
     ChallengeChannelParams,
@@ -103,8 +103,8 @@ export async function _prepareAndSignChallengeState(
     challengerSig: Signature;
 }> {
     const { channelId, candidateState, proofStates = [] } = params;
-    const challengeHash = getChallengeHash(channelId, candidateState);
-    const challengerSig = await deps.stateSigner.signRawMessage(challengeHash);
+    const challengeMsg = getPackedChallengeState(channelId, candidateState);
+    const challengerSig = await deps.stateSigner.signRawMessage(challengeMsg);
 
     return { channelId, candidateState, proofs: proofStates, challengerSig };
 }

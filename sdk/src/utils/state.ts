@@ -45,6 +45,20 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
 }
 
 /**
+ * Get a packed challenge state for a channel.
+ * This function encodes the packed state and the challenge string.ß
+ * @param channelId The ID of the channel.
+ * @param state The state to calculate with.
+ * @returns The encoded and packed challenge state as a Hex string.
+ */
+export function getPackedChallengeState(channelId: ChannelId, state: State): Hex {
+    const packedState = getPackedState(channelId, state);
+    const encoded = encodePacked(['bytes', 'string'], [packedState, 'challenge']);
+
+    return encoded;
+}
+
+/**
  * Calculate a challenge state for a channel.
  * This function encodes the packed state and the challenge string and hashes it
  * @param channelId The ID of the channel.
@@ -52,9 +66,7 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
  * @returns The challenge hash as a Hex string.
  */
 export function getChallengeHash(channelId: ChannelId, state: State): Hex {
-    const packedState = getPackedState(channelId, state);
-    const encoded = encodePacked(['bytes', 'string'], [packedState, 'challenge']);
-    return keccak256(encoded);
+    return keccak256(getPackedChallengeState(channelId, state));
 }
 
 // TODO: extract into an interface and provide on NitroliteClient creation

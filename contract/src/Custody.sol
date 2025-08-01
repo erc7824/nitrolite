@@ -281,6 +281,25 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
 
         emit Created(channelId, wallet, ch, initial);
 
+        if (initial.sigs.length == PART_NUM) {
+            if (
+                !initial.verifyStateSignature(
+                    channelId, _domainSeparatorV4(), initial.sigs[SERVER_IDX], ch.participants[SERVER_IDX]
+                )
+            ) {
+                revert InvalidStateSignatures();
+            }
+
+            meta.stage = ChannelStatus.ACTIVE;
+            Amount memory expectedDeposit = meta.expectedDeposits[SERVER_IDX];
+            meta.actualDeposits[SERVER_IDX] = expectedDeposit;
+            _ledgers[ch.participants[SERVER_IDX]].channels.add(channelId);
+
+            _lockAccountFundsToChannel(ch.participants[SERVER_IDX], channelId, expectedDeposit.token, expectedDeposit.amount);
+
+            emit Opened(channelId);
+        }
+
         return channelId;
     }
 

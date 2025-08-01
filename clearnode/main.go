@@ -58,9 +58,8 @@ func main() {
 
 	rpcNode := NewRPCNode(signer, logger)
 	wsNotifier := NewWSNotifier(rpcNode.Notify, logger)
-
 	appSessionService := NewAppSessionService(db, wsNotifier)
-	channelService := NewChannelService(db, signer)
+	channelService := NewChannelService(db, config.networks, signer)
 
 	NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, wsNotifier, logger)
 

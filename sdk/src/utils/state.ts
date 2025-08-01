@@ -45,65 +45,28 @@ export function getStateHash(channelId: ChannelId, state: State): StateHash {
 }
 
 /**
- * Function type for signing messages, compatible with Viem's WalletClient or Account.
- * @dev Signing should NOT add an EIP-191 prefix to the message.
- * @param args An object containing the message to sign in the `{ message: { raw: Hex } }` format.
- * @returns A promise that resolves to the signature as a Hex string.
- * @throws If the signing fails.
+ * Get a packed challenge state for a channel.
+ * This function encodes the packed state and the challenge string.ß
+ * @param channelId The ID of the channel.
+ * @param state The state to calculate with.
+ * @returns The encoded and packed challenge state as a Hex string.
  */
-type SignMessageFn = (args: { message: { raw: Hex } }) => Promise<Hex>;
+export function getPackedChallengeState(channelId: ChannelId, state: State): Hex {
+    const packedState = getPackedState(channelId, state);
+    const encoded = encodePacked(['bytes', 'string'], [packedState, 'challenge']);
 
-// TODO: extract into an interface and provide on NitroliteClient creation
-/**
- * Create a raw ECDSA signature for a hash over a packed state using a Viem WalletClient or Account compatible signer.
- * Uses the locally defined parseSignature function.
- * @dev `signMessage` function should NOT add an EIP-191 prefix to the stateHash. See {@link SignMessageFn}.
- * @param stateHash The hash of the state to sign.
- * @param signer An object with a `signMessage` method compatible with Viem's interface (e.g., WalletClient, Account).
- * @returns The signature over the state hash.
- * @throws If the signer cannot sign messages or signing/parsing fails.
- */
-export async function signState(
-    channelId: ChannelId,
-    state: State,
-    signMessage: SignMessageFn,
-): Promise<Signature> {
-    const stateHash = getStateHash(channelId, state);
-    try {
-        return await signMessage({ message: { raw: stateHash } });
-    } catch (error) {
-        console.error('Error signing state hash:', error);
-        throw new Error(`Failed to sign state hash: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    return encoded;
 }
 
 /**
- * Signs a challenge state for a channel.
- * This function encodes the packed state and the challenge string, hashes it, and signs it.
+ * Calculate a challenge state for a channel.
+ * This function encodes the packed state and the challenge string and hashes it
  * @param channelId The ID of the channel.
- * @param state The state to sign.
- * @param signMessage The signing function compatible with Viem's WalletClient or Account.
- * @returns The signature as a Hex string.
- * @throws If signing fails.
+ * @param state The state to calculate with.
+ * @returns The challenge hash as a Hex string.
  */
-export async function signChallengeState(
-    channelId: ChannelId,
-    state: State,
-    signMessage: SignMessageFn,
-): Promise<Signature> {
-    const packedState = getPackedState(channelId, state);
-    const encoded = encodePacked(
-        [ 'bytes', 'string' ],
-        [packedState, 'challenge'],
-    );
-    const challengeHash = keccak256(encoded) as Hex;
-
-    try {
-        return await signMessage({ message: { raw: challengeHash } });
-    } catch (error) {
-        console.error('Error signing challenge state:', error);
-        throw new Error(`Failed to sign challenge state: ${error instanceof Error ? error.message : String(error)}`);
-    }
+export function getChallengeHash(channelId: ChannelId, state: State): Hex {
+    return keccak256(getPackedChallengeState(channelId, state));
 }
 
 // TODO: extract into an interface and provide on NitroliteClient creation

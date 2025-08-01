@@ -1,5 +1,6 @@
 import { Account, Hex, PublicClient, WalletClient, Chain, Transport, ParseAccount, Address } from 'viem';
 import { ContractAddresses } from '../abis';
+import { StateSigner } from './signer';
 
 /**
  * Channel identifier
@@ -125,14 +126,9 @@ export interface NitroliteClientConfig {
     walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
 
     /**
-     * Optional: A separate viem WalletClient used *only* for signing off-chain state updates (`signMessage`).
-     * Provide this if you want to use a different key (e.g., a "hot" key from localStorage)
-     * for state signing than the one used for on-chain transactions.
-     * If omitted, `walletClient` will be used for state signing.
-     * @dev Note that the client's `signMessage` function should NOT add an EIP-191 prefix to the message signed. See {@link SignMessageFn} for details.
-     * viem's `signMessage` can operate in `raw` mode, which suffice.
+     * Implementation of the StateSigner interface used for signing protocol states.
      */
-    stateWalletClient?: WalletClient<Transport, Chain, ParseAccount<Account>>;
+    stateSigner: StateSigner;
 
     /** Contract addresses required by the SDK. */
     addresses: ContractAddresses;

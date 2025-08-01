@@ -24,6 +24,7 @@ import {
     CreateChannelParams,
     ResizeChannelParams,
 } from './types';
+import { StateSigner } from './signer';
 
 /**
  * Represents the data needed to construct a transaction or UserOperation call.
@@ -41,7 +42,7 @@ export interface PreparerDependencies {
     addresses: ContractAddresses;
     account: ParseAccount<Account>;
     walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
-    stateWalletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
+    stateSigner: StateSigner;
     challengeDuration: bigint;
     chainId: number;
 }

@@ -66,7 +66,7 @@ type CommonState struct {
 // Number of validators and quorum threshold can be adjusted in realtime by adjudicator contract.
 
 type UnsignedCommonState struct {
-	Version     *big.Int     `json:"version"`      // Common state version
+	Nonce       uint64       `json:"nonce"`        // Common state nonce
 	StateData   []byte       `json:"state_data"`   // Common state data
 	ChainStates []ChainState `json:"chain_states"` // User allocation on each chain
 }
@@ -85,16 +85,55 @@ type TokenAllocation struct {
 // Yellow network users are participants of this big state channel. State changes are validated by set of validators.
 // Funds are in the same pool, delivering high liquidity and funds efficiency.
 
-// User has 2 options to withdraw funds:
-// 1. Withdraw with a set of validator signatures (cooperative withdraw).
-// 	- Withdraw(CurrentCommonState, WithdrawReqValidatorSigs)
-// 2. Call Withdraw without providing signatures (if network is down), which will initialize a withdraw. (like challenge or unlock period in yellow vault). Validator can use this window to submit a newer state.
-// 	- Withdraw(CurrentCommonState)
-
 // CLEARNODE COMMON STATE INTEGRATION
 
-// To perform a transfer on Yellow Network, user must:
+// To perform a transfer on Yellow Network, User Creates and signs an Intent:
 
-// Call GetTransferState([]AssetAmount) on a Clearnode
-// Receive a new UnsignedCommonState,
-// sign it and submit it to a Clearnode by calling ExecuteTransfer(Destination, UnsignedCommonState, Signature)
+type TransferIntent struct {
+	TransferIntent UnsignedTransferIntent `json:"transfer_intent"`
+	Signature      Signature              `json:"signature"`
+}
+
+type UnsignedTransferIntent struct {
+	StateNonce  uint64         `json:"state_nonce"` // Must match the sender's current CommonState nonce.
+	Destination common.Address `json:"destination"`
+	Allocations []Allocation   `json:"allocations"` // The assets and amounts to be transferred.
+}
+
+// Validators sign the new CommonState both for sender and receiver, store them and return them to the users.
+// Users can then anytime submit the signed CommonState to the Custody contract to settle. User also needs to provide his signature for the CommonState.
+
+// As when Network create new CommonStates, they have only signatures of validators, they can not submit the CommonState to the Custody contract straight away.
+// However, if network needs to source money the money user owes, it calls the Adjudicator contract.
+// Adjudicator contract accepts:
+// - last CommonState A signed by user and validators.
+// - array of transfer intents signed by user. (Proofs)
+// - final CommonState C signed by validators.
+
+// Adjudicator contract verifies that provided signed transfer intents lead from state A to state C, so it can accept state C.
+
+// WithdrawIntent is a user's declaration of their intent to withdraw funds.
+type WithdrawIntent struct {
+	StateNonce  uint64            `json:"state_nonce"` // Must match the sender's current CommonState nonce.
+	Destination common.Address    `json:"destination"` // Destination for the withdrawn funds, typically the owner's address.
+	Withdrawals []TokenAllocation `json:"withdrawals"` // A list of assets and amounts to withdraw. Could be all or a partial amount.
+	ChainID     uint32            `json:"chain_id"`    // Chain to withdraw.
+}
+
+// SignedWithdrawIntent is the complete object submitted to the Adjudicator.
+// It contains the intent and all required signatures.
+type SignedWithdrawIntent struct {
+	Intent        WithdrawIntent `json:"intent"`
+	Signature     Signature      `json:"signature"`      // User's signature on the Intent.
+	ValidatorSigs []Signature    `json:"validator_sigs"` // Quorum of validator signatures on the Intent.
+}
+
+// User has 2 options to withdraw funds:
+
+// 1. Immediate cooperative withdraw with validators signatures.
+// - Submit a Withdraw Intent to the Yellow Network, get validators signatures, and then submit the signed withdraw state to the Custody contract.
+
+// 2. Withdraw with cooldown period with no validators signatures of Withdraw Intent.
+// - Submit a Withdraw Intent to the Yellow Network without validators signatures (in case network is down),
+// which will initialize a delayed withdraw. (like challenge or unlock period in yellow vault).
+// Validator can use this time window to submit a newer valid state.

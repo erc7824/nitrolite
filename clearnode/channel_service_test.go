@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -79,8 +80,8 @@ func TestChannelService(t *testing.T) {
 			Name:               "polygon",
 			ChainID:            chainID,
 			InfuraURL:          "https://polygon-mainnet.infura.io/v3/test",
-			CustodyAddress:     "0xCustodyAddress",
-			AdjudicatorAddress: "0xAdjudicatorAddress",
+			CustodyAddress:     "0x2e189bd6f6FD3EB59fd97FcA03251d93Af4E522a",
+			AdjudicatorAddress: "0xdadB0d80178819F2319190D340ce9A924f783711",
 		},
 	}
 
@@ -316,6 +317,10 @@ func TestChannelService(t *testing.T) {
 		assert.Equal(t, signer.GetAddress().Hex(), response.State.Allocations[1].Participant, "Second allocation should be for broker")
 		assert.Equal(t, asset.Token, response.State.Allocations[1].TokenAddress, "Token address should match")
 		assert.True(t, response.State.Allocations[1].RawAmount.IsZero(), "Broker allocation should be zero")
+		assert.Equal(t, 2, len(response.Channel.Participants), "Expected 2 participants")
+		assert.Equal(t, networks[fmt.Sprintf("%d", chainID)].AdjudicatorAddress, response.Channel.Adjudicator, "Adjudicator address should match")
+		assert.Equal(t, uint64(3600), response.Channel.Challenge, "Challenge should match")
+		assert.NotEqual(t, uint64(0), response.Channel.Nonce, "Nonce should not be 0")
 	})
 
 	t.Run("RequestCreate_ZeroAmount", func(t *testing.T) {

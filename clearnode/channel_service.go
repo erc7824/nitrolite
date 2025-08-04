@@ -99,7 +99,7 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		return ChannelOperationResponse{}, RPCErrorf("failed to sign state")
 	}
 
-	return createChannelOperationResponse(channelIDHash.Hex(), state, sig), nil
+	return createChannelOperationResponse(channelIDHash.Hex(), state, &channel, sig), nil
 }
 
 func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners map[string]struct{}, logger Logger) (ChannelOperationResponse, error) {
@@ -208,7 +208,7 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 		return ChannelOperationResponse{}, RPCErrorf("failed to sign state")
 	}
 
-	return createChannelOperationResponse(channel.ChannelID, state, sig), nil
+	return createChannelOperationResponse(channel.ChannelID, state, nil, sig), nil
 }
 
 func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map[string]struct{}, logger Logger) (ChannelOperationResponse, error) {
@@ -297,7 +297,7 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 		return ChannelOperationResponse{}, RPCErrorf("failed to sign state")
 	}
 
-	return createChannelOperationResponse(channel.ChannelID, state, sig), nil
+	return createChannelOperationResponse(channel.ChannelID, state, nil, sig), nil
 }
 
 // checkChallengedChannels checks if the participant has any channels in the challenged state.
@@ -313,7 +313,7 @@ func checkChallengedChannels(tx *gorm.DB, wallet string) error {
 	return nil
 }
 
-func createChannelOperationResponse(channelID string, state nitrolite.State, signature Signature) ChannelOperationResponse {
+func createChannelOperationResponse(channelID string, state nitrolite.State, channel *nitrolite.Channel, signature Signature) ChannelOperationResponse {
 	resp := ChannelOperationResponse{
 		ChannelID: channelID,
 		State: UnsignedState{
@@ -329,6 +329,19 @@ func createChannelOperationResponse(channelID string, state nitrolite.State, sig
 			TokenAddress: alloc.Token.Hex(),
 			RawAmount:    decimal.NewFromBigInt(alloc.Amount, 0),
 		})
+	}
+	if channel != nil {
+		resp.Channel = &struct {
+			Participants [2]string `json:"participants"`
+			Adjudicator  string    `json:"adjudicator"`
+			Challenge    uint64    `json:"challenge"`
+			Nonce        uint64    `json:"nonce"`
+		}{
+			Participants: [2]string{channel.Participants[0].Hex(), channel.Participants[1].Hex()},
+			Adjudicator:  channel.Adjudicator.Hex(),
+			Challenge:    channel.Challenge,
+			Nonce:        channel.Nonce,
+		}
 	}
 	return resp
 }

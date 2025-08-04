@@ -836,7 +836,12 @@ Returns signed initial state with the requested amounts ready to submit on Block
 {
   "res": [1, "create_channel", [{
     "channel_id": "0x4567890123abcdef...",
-    "state_hash": "0xStateHash",
+    "channel": {
+      "participants": ["0x1234567890abcdef...", "0xbbbb567890abcdef..."],
+      "adjudicator": "0xAdjudicatorContractAddress...",
+      "challenge": 3600,
+      "nonce": 1619123456789
+    },
     "state": {
       "intent": 1,
       "version": 0,
@@ -862,7 +867,7 @@ Returns signed initial state with the requested amounts ready to submit on Block
 
 The response includes:
 - `channel_id`: Unique identifier for the channel
-- `state_hash`: Hash of the initial channel state
+- `channel`: Channel definition with participants, adjudicator, challenge period, and nonce
 - `state`: Complete initial state structure containing intent, version, state_data, and allocations
 - `server_signature`: Broker's signature of the state
 

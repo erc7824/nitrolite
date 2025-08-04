@@ -151,3 +151,13 @@ type SignedWithdrawIntent struct {
 // - Submit a Withdraw Intent to the Yellow Network without validators signatures (in case network is down),
 // which will initialize a delayed withdraw. (like challenge or unlock period in yellow vault).
 // Validator can use this time window to submit a newer valid state.
+
+// Deposits
+
+// The Network validators monitor Deposit events.
+
+// Upon seeing a new Deposit event, the validators create a new UnsignedCommonState for the user.
+// This new state will have an incremented nonce and an updated ChainStates with the deposited funds.
+
+// The validators sign this new CommonState and credit the user's account within the network.
+// The user doesn't need to sign a separate intent for deposits. // The Deposit event emitted by the contract is the authorization for the validators to update the user's state.

@@ -52,10 +52,10 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 	defer cleanup()
 
 	router.Config = &Config{
-		networks: map[string]*NetworkConfig{
-			"polygon": {Name: "polygon", ChainID: 137, InfuraURL: "https://polygon-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress1"},
-			"celo":    {Name: "celo", ChainID: 42220, InfuraURL: "https://celo-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress2"},
-			"base":    {Name: "base", ChainID: 8453, InfuraURL: "https://base-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress3"},
+		networks: map[uint32]*NetworkConfig{
+			137:   {ChainID: 137, InfuraURL: "https://polygon-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress1"},
+			42220: {ChainID: 42220, InfuraURL: "https://celo-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress2"},
+			8453:  {ChainID: 8453, InfuraURL: "https://base-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress3"},
 		},
 	}
 
@@ -68,17 +68,16 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 	assert.Equal(t, router.Signer.GetAddress().Hex(), configMap.BrokerAddress)
 	require.Len(t, configMap.Networks, 3, "Should have 3 supported networks")
 
-	expectedNetworks := map[string]uint32{
-		"polygon": 137,
-		"celo":    42220,
-		"base":    8453,
+	expectedNetworks := map[uint32]struct{}{
+		137:   {},
+		42220: {},
+		8453:  {},
 	}
 	for _, network := range configMap.Networks {
-		expectedChainID, exists := expectedNetworks[network.Name]
-		assert.True(t, exists, "Network %s should be in expected networks", network.Name)
-		assert.Equal(t, expectedChainID, network.ChainID, "Chain ID should match for %s", network.Name)
+		_, exists := expectedNetworks[network.ChainID]
+		assert.True(t, exists, "Network %d should be in expected networks", network.ChainID)
 		assert.Contains(t, network.CustodyAddress, "0xCustodyAddress", "Custody address should be present")
-		delete(expectedNetworks, network.Name)
+		delete(expectedNetworks, network.ChainID)
 	}
 	assert.Empty(t, expectedNetworks, "All expected networks should be found")
 }

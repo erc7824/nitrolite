@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -75,8 +74,8 @@ func TestChannelService(t *testing.T) {
 	channelAmountRaw := decimal.NewFromInt(1000)
 	chainID := uint32(137)
 
-	networks := map[string]*NetworkConfig{
-		"137": {
+	networks := map[uint32]*NetworkConfig{
+		137: {
 			Name:               "polygon",
 			ChainID:            chainID,
 			InfuraURL:          "https://polygon-mainnet.infura.io/v3/test",
@@ -162,7 +161,7 @@ func TestChannelService(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		t.Cleanup(cleanup)
 
-		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
+		service := NewChannelService(db, map[uint32]*NetworkConfig{}, &signer)
 
 		allocateAmount := decimal.NewFromInt(100)
 		params := getResizeChannelParams("0xNonExistentChannel", &allocateAmount, nil, userAddress.Hex())
@@ -178,7 +177,7 @@ func TestChannelService(t *testing.T) {
 
 		asset := seedAsset(t, db, tokenAddress, chainID, tokenSymbol, 6)
 		ch := seedChannel(t, db, channelID, userAddress.Hex(), userAddress.Hex(), asset.Token, chainID, channelAmountRaw, 1, ChannelStatusClosed)
-		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
+		service := NewChannelService(db, map[uint32]*NetworkConfig{}, &signer)
 
 		allocateAmount := decimal.NewFromInt(100)
 		params := getResizeChannelParams(ch.ChannelID, &allocateAmount, nil, userAddress.Hex())
@@ -194,7 +193,7 @@ func TestChannelService(t *testing.T) {
 
 		asset := seedAsset(t, db, tokenAddress, chainID, tokenSymbol, 6)
 		ch := seedChannel(t, db, channelID, userAddress.Hex(), userAddress.Hex(), asset.Token, chainID, channelAmountRaw, 1, ChannelStatusChallenged)
-		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
+		service := NewChannelService(db, map[uint32]*NetworkConfig{}, &signer)
 
 		allocateAmount := decimal.NewFromInt(100)
 		params := getResizeChannelParams(ch.ChannelID, &allocateAmount, nil, userAddress.Hex())
@@ -216,7 +215,7 @@ func TestChannelService(t *testing.T) {
 		ledger := GetWalletLedger(db, userAddress)
 		require.NoError(t, ledger.Record(userAccountID, tokenSymbol, decimal.NewFromFloat(0.000001)))
 
-		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
+		service := NewChannelService(db, map[uint32]*NetworkConfig{}, &signer)
 
 		allocateAmount := decimal.NewFromInt(200)
 		params := getResizeChannelParams(ch.ChannelID, &allocateAmount, nil, userAddress.Hex())
@@ -232,7 +231,7 @@ func TestChannelService(t *testing.T) {
 
 		asset := seedAsset(t, db, tokenAddress, chainID, tokenSymbol, 6)
 		ch := seedChannel(t, db, channelID, userAddress.Hex(), userAddress.Hex(), asset.Token, chainID, channelAmountRaw, 1, ChannelStatusOpen)
-		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
+		service := NewChannelService(db, map[uint32]*NetworkConfig{}, &signer)
 
 		allocateAmount := decimal.NewFromInt(100)
 		params := getResizeChannelParams(ch.ChannelID, &allocateAmount, nil, userAddress.Hex())
@@ -258,7 +257,7 @@ func TestChannelService(t *testing.T) {
 			rawToDecimal(channelAmountRaw.BigInt(), asset.Decimals),
 		))
 
-		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
+		service := NewChannelService(db, map[uint32]*NetworkConfig{}, &signer)
 
 		params := getCloseChannelParams(ch.ChannelID, userAddress.Hex())
 		response, err := service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
@@ -278,7 +277,7 @@ func TestChannelService(t *testing.T) {
 
 		asset := seedAsset(t, db, tokenAddress, chainID, tokenSymbol, 6)
 		ch := seedChannel(t, db, channelID, userAddress.Hex(), userAddress.Hex(), asset.Token, chainID, channelAmountRaw, 2, ChannelStatusChallenged)
-		service := NewChannelService(db, map[string]*NetworkConfig{}, &signer)
+		service := NewChannelService(db, map[uint32]*NetworkConfig{}, &signer)
 
 		params := getCloseChannelParams(ch.ChannelID, userAddress.Hex())
 		_, err = service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
@@ -318,7 +317,7 @@ func TestChannelService(t *testing.T) {
 		assert.Equal(t, asset.Token, response.State.Allocations[1].TokenAddress, "Token address should match")
 		assert.True(t, response.State.Allocations[1].RawAmount.IsZero(), "Broker allocation should be zero")
 		assert.Equal(t, 2, len(response.Channel.Participants), "Expected 2 participants")
-		assert.Equal(t, networks[fmt.Sprintf("%d", chainID)].AdjudicatorAddress, response.Channel.Adjudicator, "Adjudicator address should match")
+		assert.Equal(t, networks[chainID].AdjudicatorAddress, response.Channel.Adjudicator, "Adjudicator address should match")
 		assert.Equal(t, uint64(3600), response.Channel.Challenge, "Challenge should match")
 		assert.NotEqual(t, uint64(0), response.Channel.Nonce, "Nonce should not be 0")
 	})

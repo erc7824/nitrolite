@@ -49,7 +49,7 @@ func main() {
 	// Initialize Prometheus metrics
 	metrics := NewMetrics()
 	// Map to store custody clients for later reference
-	custodyClients := make(map[string]*Custody)
+	custodyClients := make(map[uint32]*Custody)
 
 	authManager, err := NewAuthManager(signer.GetPrivateKey())
 	if err != nil {
@@ -73,13 +73,13 @@ func main() {
 		Handler: rpcMux,
 	}
 
-	for name, network := range config.networks {
+	for chainID, network := range config.networks {
 		client, err := NewCustody(signer, db, wsNotifier, network.InfuraURL, network.CustodyAddress, network.AdjudicatorAddress, network.BalanceCHeckerAddress, network.ChainID, network.BlockStep, logger)
 		if err != nil {
-			logger.Warn("failed to initialize blockchain client", "network", name, "error", err)
+			logger.Warn("failed to initialize blockchain client", "chainID", chainID, "error", err)
 			continue
 		}
-		custodyClients[name] = client
+		custodyClients[chainID] = client
 		go client.ListenEvents(context.Background())
 	}
 

@@ -1,4 +1,4 @@
-import { Address, Hex, keccak256, stringToBytes, WalletClient } from 'viem';
+import { Address, Hex, keccak256, stringToBytes, toHex, WalletClient } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import {
     MessageSigner,
@@ -643,11 +643,9 @@ export function createEIP712AuthMessageSigner(
 export function createECDSAMessageSigner(privateKey: Hex): MessageSigner {
     return async (payload: RequestData | ResponsePayload): Promise<Hex> => {
         try {
-            const messageBytes = keccak256(
-                stringToBytes(JSON.stringify(payload, (_, v) => (typeof v === 'bigint' ? v.toString() : v))),
-            );
+            const message = toHex(JSON.stringify(payload, (_, v) => (typeof v === 'bigint' ? v.toString() : v)));
 
-            return signRawECDSAMessage(messageBytes, privateKey);
+            return signRawECDSAMessage(message, privateKey);
         } catch (error) {
             console.error('ECDSA signing failed:', error);
             throw new Error(`ECDSA signing failed: ${error}`);

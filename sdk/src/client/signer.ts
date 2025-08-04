@@ -81,9 +81,9 @@ export class SessionKeyStateSigner implements StateSigner {
     }
 
     async signState(channelId: Hex, state: State): Promise<Hex> {
-        const stateHash = getStateHash(channelId, state);
+        const packedState = getPackedState(channelId, state);
 
-        return signRawECDSAMessage(stateHash, this.sessionKey);
+        return signRawECDSAMessage(packedState, this.sessionKey);
     }
 
     async signRawMessage(message: Hex): Promise<Hex> {

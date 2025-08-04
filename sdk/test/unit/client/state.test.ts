@@ -25,7 +25,7 @@ describe('_prepareAndSignInitialState', () => {
     const adjudicatorAddress = '0xADJ' as Hex;
     const challengeDuration = BigInt(123);
     const stateSigner = {
-        getAddress: jest.fn(async () => '0xOWNER' as Hex),
+        getAddress: jest.fn(() => '0xOWNER' as Hex),
         signState: jest.fn(async (_1: Hex, _2: State) => 'accSig'),
         signRawMessage: jest.fn(async (_: Hex) => 'accSig'),
     };

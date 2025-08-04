@@ -91,7 +91,13 @@ type CloseChannelParams struct {
 }
 
 type ChannelOperationResponse struct {
-	ChannelID      string        `json:"channel_id"`
+	ChannelID string `json:"channel_id"`
+	Channel   *struct {
+		Participants [2]string `json:"participants"`
+		Adjudicator  string    `json:"adjudicator"`
+		Challenge    uint64    `json:"challenge"`
+		Nonce        uint64    `json:"nonce"`
+	} `json:"channel,omitempty"`
 	State          UnsignedState `json:"state"`
 	StateSignature Signature     `json:"server_signature"`
 }

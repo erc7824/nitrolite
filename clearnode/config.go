@@ -39,7 +39,7 @@ type NetworkConfig struct {
 
 // Config represents the overall application configuration
 type Config struct {
-	networks      map[string]*NetworkConfig
+	networks      map[uint32]*NetworkConfig
 	privateKeyHex string
 	dbConf        DatabaseConfig
 	msgExpiryTime int // Time in seconds for message timestamp validation
@@ -92,7 +92,7 @@ func LoadConfig(logger Logger) (*Config, error) {
 	logger.Info("set message expiry time", "value", messageTimestampExpiry)
 
 	config := Config{
-		networks:      make(map[string]*NetworkConfig),
+		networks:      make(map[uint32]*NetworkConfig),
 		privateKeyHex: privateKeyHex,
 		dbConf:        dbConf,
 		msgExpiryTime: messageTimestampExpiry,
@@ -137,7 +137,7 @@ func LoadConfig(logger Logger) (*Config, error) {
 		// Only add network if both required variables are present
 		if infuraURL != "" && custodyAddress != "" && adjudicatorAddress != "" && balanceCheckerAddress != "" {
 			networkLower := strings.ToLower(network)
-			config.networks[networkLower] = &NetworkConfig{
+			config.networks[chainID] = &NetworkConfig{
 				Name:                  networkLower,
 				ChainID:               chainID,
 				InfuraURL:             infuraURL,

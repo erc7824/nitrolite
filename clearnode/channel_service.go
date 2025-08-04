@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/big"
 	"time"
 
@@ -16,12 +15,12 @@ import (
 // ChannelService handles the business logic for channel operations.
 type ChannelService struct {
 	db       *gorm.DB
-	networks map[string]*NetworkConfig
+	networks map[uint32]*NetworkConfig
 	signer   *Signer
 }
 
 // NewChannelService creates a new ChannelService.
-func NewChannelService(db *gorm.DB, networks map[string]*NetworkConfig, signer *Signer) *ChannelService {
+func NewChannelService(db *gorm.DB, networks map[uint32]*NetworkConfig, signer *Signer) *ChannelService {
 	return &ChannelService{db: db, networks: networks, signer: signer}
 }
 
@@ -56,7 +55,7 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		},
 	}
 
-	networkConfig, ok := s.networks[fmt.Sprintf("%d", params.ChainID)]
+	networkConfig, ok := s.networks[params.ChainID]
 	if !ok {
 		return ChannelOperationResponse{}, RPCErrorf("unsupported chain ID: %d", params.ChainID)
 	}

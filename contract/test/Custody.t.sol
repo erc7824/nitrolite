@@ -662,7 +662,8 @@ contract CustodyTest_create is CustodyTest_Base {
         initialState.allocations[1].amount = 0;
 
         bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
-        bytes memory guestSig = TestUtils.signStateEIP191(vm, chan, initialState, guestSKPrivKey);
+        bytes32 channelId = Utils.getChannelId(chan);
+        bytes memory guestSig = TestUtils.signStateEIP191(vm, channelId, initialState, guestSKPrivKey);
         bytes[] memory sigs = new bytes[](2);
         sigs[0] = hostSig;
         sigs[1] = guestSig;
@@ -671,7 +672,7 @@ contract CustodyTest_create is CustodyTest_Base {
         depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
 
         vm.prank(hostSK);
-        bytes32 channelId = custody.create(chan, initialState);
+        custody.create(chan, initialState);
 
         verifyChannelActive([hostSK, guestSK], channelId, chan);
         verifyDeposited(hostSK, address(token), DEPOSIT_AMOUNT);
@@ -684,7 +685,8 @@ contract CustodyTest_create is CustodyTest_Base {
         initialState.allocations[1].amount = 0;
 
         bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
-        bytes memory guestSig = TestUtils.signStateEIP712(vm, Utils.getChannelId(chan), initialState, STATE_TYPEHASH, custodyDomainSeparator, guestSKPrivKey);
+        bytes32 channelId = Utils.getChannelId(chan);
+        bytes memory guestSig = TestUtils.signStateEIP712(vm, channelId, initialState, STATE_TYPEHASH, custodyDomainSeparator, guestSKPrivKey);
         bytes[] memory sigs = new bytes[](2);
         sigs[0] = hostSig;
         sigs[1] = guestSig;
@@ -693,7 +695,7 @@ contract CustodyTest_create is CustodyTest_Base {
         depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
 
         vm.prank(hostSK);
-        bytes32 channelId = custody.create(chan, initialState);
+        custody.create(chan, initialState);
 
         verifyChannelActive([hostSK, guestSK], channelId, chan);
         verifyDeposited(hostSK, address(token), DEPOSIT_AMOUNT);

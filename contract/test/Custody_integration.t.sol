@@ -26,6 +26,8 @@ contract CustodyIntegrationTest_Signatures is Test {
     MockERC20 public token;
     CheatERC6492Factory public factory;
 
+    bytes32 custodyDomainSeparator;
+
     // Test participants
     address public participant1;
     address public participant2;
@@ -52,6 +54,8 @@ contract CustodyIntegrationTest_Signatures is Test {
         adjudicator = new SimpleConsensus(address(this), address(custody));
         token = new MockERC20("Test Token", "TEST", 18);
         factory = new CheatERC6492Factory();
+
+        custodyDomainSeparator = TestUtils.buildDomainSeparatorForContract(custody);
 
         // Set up participants
         participant1PrivateKey = vm.createWallet("participant1").privateKey;
@@ -86,41 +90,6 @@ contract CustodyIntegrationTest_Signatures is Test {
     }
 
     // ==================== SIGNATURE HELPERS ====================
-
-    function _signStateRaw(State memory state, uint256 privateKey) internal view returns (bytes memory) {
-        bytes memory packedState = Utils.getPackedState(channelId, state);
-        return TestUtils.sign(vm, privateKey, packedState);
-    }
-
-    function _signStateEIP191(State memory state, uint256 privateKey) internal view returns (bytes memory) {
-        bytes memory packedState = Utils.getPackedState(channelId, state);
-        return TestUtils.signEIP191(vm, privateKey, packedState);
-    }
-
-    function _signStateEIP712(State memory state, uint256 privateKey) internal view returns (bytes memory) {
-        (, string memory name, string memory version, uint256 chainId, address verifyingContract,,) =
-            custody.eip712Domain();
-        bytes32 domainSeparator = keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes(name)),
-                keccak256(bytes(version)),
-                chainId,
-                verifyingContract
-            )
-        );
-        bytes32 structHash = keccak256(
-            abi.encode(
-                STATE_TYPEHASH,
-                channelId,
-                state.intent,
-                state.version,
-                keccak256(state.data),
-                keccak256(abi.encode(state.allocations))
-            )
-        );
-        return TestUtils.signEIP712(vm, privateKey, domainSeparator, structHash);
-    }
 
     function _signStateEIP6492(address signer, State memory) internal view returns (bytes memory) {
         bytes memory signature = "dummy signature";
@@ -171,7 +140,7 @@ contract CustodyIntegrationTest_Signatures is Test {
         // Create initial state - participant1 uses EIP191
         State memory initialState = _createInitialState();
         initialState.sigs = new bytes[](1);
-        initialState.sigs[0] = _signStateEIP191(initialState, participant1PrivateKey);
+        initialState.sigs[0] = TestUtils.signStateEIP191(vm, channelId, initialState, participant1PrivateKey);
 
         vm.prank(participant1);
         custody.depositAndCreate(address(token), DEPOSIT_AMOUNT, channel, initialState);
@@ -186,7 +155,7 @@ contract CustodyIntegrationTest_Signatures is Test {
         custody.deposit(participant2, address(token), DEPOSIT_AMOUNT);
 
         // Participant2 joins using raw ECDSA signature
-        bytes memory participant2JoinSig = _signStateRaw(initialState, participant2PrivateKey);
+        bytes memory participant2JoinSig = TestUtils.signStateRaw(vm, channelId, initialState, participant2PrivateKey);
 
         vm.prank(participant2);
         custody.join(channelId, 1, participant2JoinSig);
@@ -200,8 +169,8 @@ contract CustodyIntegrationTest_Signatures is Test {
         // Create challenge state - participant1 uses EIP712, participant2 uses raw ECDSA
         State memory challengeState = _createOperateState(1, bytes("challenge data"));
         challengeState.sigs = new bytes[](2);
-        challengeState.sigs[PARTICIPANT_1] = _signStateEIP712(challengeState, participant1PrivateKey);
-        challengeState.sigs[PARTICIPANT_2] = _signStateRaw(challengeState, participant2PrivateKey);
+        challengeState.sigs[PARTICIPANT_1] = TestUtils.signStateEIP712(vm, channelId, challengeState, STATE_TYPEHASH, custodyDomainSeparator, participant1PrivateKey);
+        challengeState.sigs[PARTICIPANT_2] = TestUtils.signStateRaw(vm, channelId, challengeState, participant2PrivateKey);
 
         bytes memory challengerSig = _signChallenge(challengeState, participant1PrivateKey);
 
@@ -219,8 +188,8 @@ contract CustodyIntegrationTest_Signatures is Test {
         // Create checkpoint state with higher version - participant1 uses raw ECDSA, participant2 uses raw ECDSA
         State memory checkpointState = _createOperateState(2, bytes("checkpoint data"));
         checkpointState.sigs = new bytes[](2);
-        checkpointState.sigs[PARTICIPANT_1] = _signStateRaw(checkpointState, participant1PrivateKey);
-        checkpointState.sigs[PARTICIPANT_2] = _signStateRaw(checkpointState, participant2PrivateKey);
+        checkpointState.sigs[PARTICIPANT_1] = TestUtils.signStateRaw(vm, channelId, checkpointState, participant1PrivateKey);
+        checkpointState.sigs[PARTICIPANT_2] = TestUtils.signStateRaw(vm, channelId, checkpointState, participant2PrivateKey);
 
         vm.prank(participant2);
         custody.checkpoint(channelId, checkpointState, new State[](0));
@@ -236,7 +205,7 @@ contract CustodyIntegrationTest_Signatures is Test {
         checkpointState = _createOperateState(3, bytes("checkpoint data"));
         checkpointState.sigs = new bytes[](2);
         checkpointState.sigs[PARTICIPANT_1] = _signStateEIP6492(participant1, checkpointState);
-        checkpointState.sigs[PARTICIPANT_2] = _signStateRaw(checkpointState, participant2PrivateKey);
+        checkpointState.sigs[PARTICIPANT_2] = TestUtils.signStateRaw(vm, channelId, checkpointState, participant2PrivateKey);
 
         vm.prank(participant2);
         custody.checkpoint(channelId, checkpointState, new State[](0));
@@ -251,8 +220,8 @@ contract CustodyIntegrationTest_Signatures is Test {
         State memory finalState = _createFinalState(4);
         finalState.sigs = new bytes[](2);
         // as participant1 already has a contract at its address, we assume this contract expects EIP-191 signature
-        finalState.sigs[PARTICIPANT_1] = _signStateEIP191(finalState, participant1PrivateKey);
-        finalState.sigs[PARTICIPANT_2] = _signStateRaw(finalState, participant2PrivateKey);
+        finalState.sigs[PARTICIPANT_1] = TestUtils.signStateEIP191(vm, channelId, finalState, participant1PrivateKey);
+        finalState.sigs[PARTICIPANT_2] = TestUtils.signStateRaw(vm, channelId, finalState, participant2PrivateKey);
 
         vm.prank(participant1);
         custody.close(channelId, finalState, new State[](0));

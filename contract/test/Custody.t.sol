@@ -628,7 +628,7 @@ contract CustodyTest_create is CustodyTest_Base {
         custody.create(chan, initialState);
     }
 
-    function test_create_brokerAutoJoin_zeroAllocation_rawECDSA() public {
+    function test_create_brokerAutoJoinWithTheirSig_zeroAllocation_rawECDSA() public {
         Channel memory chan = createTestChannelWithSK();
         State memory initialState = createInitialStateWithSK();
         initialState.allocations[1].amount = 0;
@@ -656,7 +656,7 @@ contract CustodyTest_create is CustodyTest_Base {
         verifyDeposited(guestSK, address(token), 0); // No funds have been allocated to guest, so they keep their full deposit
     }
 
-    function test_create_brokerAutoJoin_zeroAllocation_EIP191() public {
+    function test_create_brokerAutoJoinWithTheirSig_zeroAllocation_EIP191() public {
         Channel memory chan = createTestChannelWithSK();
         State memory initialState = createInitialStateWithSK();
         initialState.allocations[1].amount = 0;
@@ -679,7 +679,7 @@ contract CustodyTest_create is CustodyTest_Base {
         verifyDeposited(guestSK, address(token), 0); // No funds have been allocated to guest, so they keep their full deposit
     }
 
-    function test_create_brokerAutoJoin_zeroAllocation_EIP712() public {
+    function test_create_brokerAutoJoinWithTheirSig_zeroAllocation_EIP712() public {
         Channel memory chan = createTestChannelWithSK();
         State memory initialState = createInitialStateWithSK();
         initialState.allocations[1].amount = 0;
@@ -702,7 +702,7 @@ contract CustodyTest_create is CustodyTest_Base {
         verifyDeposited(guestSK, address(token), 0); // No funds have been allocated to guest, so they keep their full deposit
     }
 
-    function test_create_brokerAutoJoin_nonZeroAllocation() public {
+    function test_create_brokerAutoJoinWithTheirSig_nonZeroAllocation() public {
         Channel memory chan = createTestChannelWithSK();
         State memory initialState = createInitialStateWithSK();
 
@@ -724,7 +724,7 @@ contract CustodyTest_create is CustodyTest_Base {
         verifyDeposited(guestSK, address(token), DEPOSIT_AMOUNT);
     }
 
-    function test_create_revert_brokerAutoJoin_insufficientFunds() public {
+    function test_create_revert_whenBrokerAutoJoinWithTheirSig_insufficientFunds() public {
         Channel memory chan = createTestChannelWithSK();
         State memory initialState = createInitialStateWithSK();
 

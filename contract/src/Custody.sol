@@ -238,7 +238,8 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         channelId = Utils.getChannelId(ch);
         if (_channels[channelId].stage != ChannelStatus.VOID) revert InvalidStatus();
 
-        if (initial.sigs.length != 1) revert InvalidStateSignatures();
+        if (initial.sigs.length == 0 || initial.sigs.length > PART_NUM) revert InvalidStateSignatures();
+
         // TODO: later we can lift the restriction that first sig must be from CLIENT
         if (
             !initial.verifyStateSignature(
@@ -297,6 +298,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
 
             _lockAccountFundsToChannel(ch.participants[SERVER_IDX], channelId, expectedDeposit.token, expectedDeposit.amount);
 
+            emit Joined(channelId, SERVER_IDX);
             emit Opened(channelId);
         }
 

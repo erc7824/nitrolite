@@ -106,7 +106,7 @@ type ChannelOperationResponse struct {
 type UnsignedState struct {
 	Intent      uint8        `json:"intent"`
 	Version     uint64       `json:"version"`
-	Data        []byte       `json:"state_data"`
+	Data        string       `json:"state_data"`
 	Allocations []Allocation `json:"allocations"`
 }
 

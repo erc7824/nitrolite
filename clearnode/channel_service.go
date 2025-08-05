@@ -327,7 +327,7 @@ func createChannelOperationResponse(channelID string, state nitrolite.State, cha
 		State: UnsignedState{
 			Intent:  uint8(state.Intent),
 			Version: state.Version.Uint64(),
-			Data:    state.Data,
+			Data:    hexutil.Encode(state.Data),
 		},
 		StateSignature: signature,
 	}

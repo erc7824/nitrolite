@@ -55,29 +55,43 @@ func EncodeState(channelID common.Hash, intent Intent, version *big.Int, stateDa
 
 // Assumption: let's abstract from state channel framework, and try do define a common state without being limited by state-channels.
 
+// As we plan to support non-EVM chains, we will issue users with a unique Yellow Network account identifier (UserID).
+
+/*
+SQL Schema reference:
+CREATE TABLE user_keys (
+	user_id text PRIMARY KEY,
+	key_type text NOT NULL,
+	address text NOT NULL UNIQUE,
+	permissions text NOT NULL // Includes target chains and apps and actions that can be performed with this key.
+)
+*/
+
 type CommonState struct {
-	State         UnsignedCommonState `json:"state"`
-	OwnerSig      Signature           `json:"owner_sig"`
-	ValidatorSigs []Signature         `json:"validator_sigs"`
+	State       UnsignedCommonState `json:"state"`
+	OwnerSig    Signature           `json:"owner_sig"`
+	NetworkSigs []Signature         `json:"network_sigs"`
 }
 
-// Adjudicator manages a registry of approved validator nodes. Each node has a signature weight.
-// Adjudicator verifies that validatorSigs achieve a signature quorum threshold.
-// Number of validators and quorum threshold can be adjusted in realtime by adjudicator contract.
+// Adjudicator manages a registry of approved ledger nodes. Each node has a signature weight.
+// Adjudicator verifies that networkSigs achieve a signature quorum threshold.
+// Number of approved ledger nodes and quorum threshold can be adjusted in realtime by adjudicator contract.
 
 type UnsignedCommonState struct {
-	Nonce       uint64       `json:"nonce"`        // Common state nonce
-	StateData   []byte       `json:"state_data"`   // Common state data
-	ChainStates []ChainState `json:"chain_states"` // User allocation on each chain
-	SessionKeys []SessionKey `json:"session_keys"` // List of active session keys.
+	Nonce             uint64       `json:"nonce"`               // Common state nonce
+	StateData         []byte       `json:"state_data"`          // Common state data
+	ChainStates       []ChainState `json:"chain_states"`        // User allocation on each chain
+	ActiveSessionKeys []SessionKey `json:"active_session_keys"` // List of active session keys.
 }
+
+// ActiveSessionKeys defines which keys can be used to sign new states or intents.
 
 type ChainState struct {
-	ChainID     uint32            `json:"chain_id"`
-	Allocations []TokenAllocation `json:"allocations"`
+	ChainID     uint32        `json:"chain_id"`
+	Allocations []TokenAmount `json:"allocations"`
 }
 
-type TokenAllocation struct {
+type TokenAmount struct {
 	TokenAddress common.Address `json:"token"`
 	RawAmount    *big.Int       `json:"amount"`
 }
@@ -90,9 +104,9 @@ type SessionKey struct {
 
 // SessionKeyPermissions defines what a session key is allowed to do.
 type SessionKeyPermissions struct {
-	SpendingLimits []TokenAllocation `json:"spending_limits,omitempty"`
-	Expiry         uint64            `json:"expiry,omitempty"` // The timestamp when this key expires (seconds)
-	Nonce          uint64            `json:"nonce,omitempty"`  // A nonce to prevent replay of the session key authorization.
+	SpendingLimits []TokenAmount `json:"spending_limits,omitempty"`
+	Expiry         uint64        `json:"expiry,omitempty"` // The timestamp when this key expires (seconds)
+	Nonce          uint64        `json:"nonce,omitempty"`  // A nonce to prevent replay of the session key authorization.
 }
 
 // User deposits money on smart contract. Smart contract account is a big state channel with Yellow Network.
@@ -126,29 +140,28 @@ type UnsignedTransferIntent struct {
 
 // Adjudicator contract verifies that provided signed transfer intents lead from state A to state C, so it can accept state C.
 
-// WithdrawIntent is a user's declaration of their intent to withdraw funds.
-type WithdrawIntent struct {
-	StateNonce  uint64            `json:"state_nonce"` // Must match the sender's current CommonState nonce.
-	Destination common.Address    `json:"destination"` // Destination for the withdrawn funds, typically the owner's address.
-	Withdrawals []TokenAllocation `json:"withdrawals"` // A list of assets and amounts to withdraw. Could be all or a partial amount.
-	ChainID     uint32            `json:"chain_id"`    // Chain to withdraw.
+// SignedBatchWithdrawalIntent is the complete object submitted to the Custody contract and verified by Adjudicator.
+type SignedBatchWithdrawalIntent struct {
+	Intent      BatchWithdrawalIntent `json:"intent"`
+	Signature   Signature             `json:"signature"`    // User's signature on the Intent.
+	NetworkSigs []Signature           `json:"network_sigs"` // Quorum of valid network signatures on the Intent.
 }
 
-// SignedWithdrawIntent is the complete object submitted to the Adjudicator.
-// It contains the intent and all required signatures.
-type SignedWithdrawIntent struct {
-	Intent        WithdrawIntent `json:"intent"`
-	Signature     Signature      `json:"signature"`      // User's signature on the Intent.
-	ValidatorSigs []Signature    `json:"validator_sigs"` // Quorum of validator signatures on the Intent.
+// BatchWithdrawalIntent is a user's declaration of their intent to withdraw funds.
+type BatchWithdrawalIntent struct {
+	StateNonce  uint64         `json:"state_nonce"` // Must match the sender's current CommonState nonce.
+	ChainID     uint32         `json:"chain_id"`    // Chain to withdraw.
+	Destination common.Address `json:"destination"` // Destination for the withdrawn funds, typically the owner's address.
+	Withdrawals []TokenAmount  `json:"withdrawals"` // A list of tokens and amounts to withdraw. Can be full or a partial amount.
 }
 
 // User has 2 options to withdraw funds:
 
-// 1. Immediate cooperative withdraw with validators signatures.
-// - Submit a Withdraw Intent to the Yellow Network, get validators signatures, and then submit the signed withdraw state to the Custody contract.
+// 1. Immediate cooperative withdraw with ledger node signatures.
+// - Submit a Withdraw Intent to the Yellow Network, get ledger node signatures, and then submit the signed withdraw state to the Custody contract.
 
-// 2. Withdraw with cooldown period with no validators signatures of Withdraw Intent.
-// - Submit a Withdraw Intent to the Yellow Network without validators signatures (in case network is down),
+// 2. Withdraw with cooldown period with no ledger node signatures of Withdraw Intent.
+// - Submit a Withdraw Intent to the Yellow Network without ledger node signatures (in case network is down),
 // which will initialize a delayed withdraw. (like challenge or unlock period in yellow vault).
 // Validator can use this time window to submit a newer valid state.
 

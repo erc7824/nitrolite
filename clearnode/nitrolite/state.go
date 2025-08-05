@@ -60,9 +60,14 @@ func EncodeState(channelID common.Hash, intent Intent, version *big.Int, stateDa
 
 // - A master smart contract, deployed on Ethereum, acts as a registry for main network configuration.
 // This config defines registry of supported blockchains, networks on each blockchain, and smart contracts for each network.
+// The smart contract also manages registry of approved ledger nodes, each with a signature weight.
 
+// Per-Chain Configuration
 // - Adjudicator on each chain will need to know mapping of YN asset id to token on it's network.
 // So it keeps a registry of tokens it supports and maps them to YN tokens.
+// Adjudicator should also mirror the registry of approved ledger nodes with their signature weights.
+
+// YN ACCOUNT DEFINITION
 
 // As we plan to support non-EVM chains, we will issue users with a unique Yellow Network account identifier (UserID).
 
@@ -81,10 +86,6 @@ type CommonState struct {
 	OwnerSig    Signature           `json:"owner_sig"`
 	NetworkSigs []Signature         `json:"network_sigs"`
 }
-
-// Adjudicator manages a registry of approved ledger nodes. Each node has a signature weight.
-// Adjudicator verifies that networkSigs achieve a signature quorum threshold.
-// Number of approved ledger nodes and quorum threshold can be adjusted in realtime by adjudicator contract.
 
 type UnsignedCommonState struct {
 	Nonce             uint64       `json:"nonce"`               // Common state nonce
@@ -124,7 +125,7 @@ type SessionKeyPermissions struct {
 
 // CLEARNODE COMMON STATE INTEGRATION
 
-// To perform a transfer on Yellow Network, User Creates and signs an Intent:
+// To perform a transfer on Yellow Network, a user Creates and signs an Intent:
 
 type BatchTransferIntent struct {
 	TransferIntent UnsignedBatchTransferIntent `json:"transfer_intent"`
@@ -147,6 +148,7 @@ type UnsignedBatchTransferIntent struct {
 // - array of transfer intents signed by user. (Proofs)
 // - final CommonState C signed by validators.
 
+// Adjudicator verifies that networkSigs achieve a signature quorum threshold.
 // Adjudicator contract verifies that provided signed transfer intents lead from state A to state C, so it can accept state C.
 
 // SignedBatchWithdrawalIntent is the complete object submitted to the Custody contract and verified by Adjudicator.
@@ -163,6 +165,9 @@ type BatchWithdrawalIntent struct {
 	Destination common.Address `json:"destination"` // Destination for the withdrawn funds on the target chain, typically the owner's address.
 	Withdrawals []TokenAmount  `json:"withdrawals"` // A list of tokens and amounts to withdraw. Can be full or a partial amount.
 }
+
+// User requests a withdrawal from our node by providing it with BatchWithdrawalIntent;
+// Node keeps this Intent inside "mempool", where other nodes or "validators" can add their proofs;
 
 // User has 2 options to withdraw funds:
 
@@ -183,5 +188,3 @@ type BatchWithdrawalIntent struct {
 
 // The validators sign this new CommonState and credit the user's account within the network.
 // The user doesn't need to sign a separate intent for deposits. // The Deposit event emitted by the contract is the authorization for the validators to update the user's state.
-
-// TODO: have a single document in markdown. Move from this file into markdown.

@@ -409,6 +409,28 @@ export async function createApplicationMessage(
     return JSON.stringify(signedRequest);
 }
 
+export async function createCreateChannelMessage(
+    signer: MessageSigner,
+    chainId: number,
+    token: Address,
+    amount: bigint,
+    sessionKeyAddress?: Hex,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const params = [
+        {
+            chain_id: chainId,
+            token,
+            amount,
+            session_key: sessionKeyAddress,
+        },
+    ];
+    const request = NitroliteRPC.createRequest(requestId, RPCMethod.CreateChannel, params, timestamp);
+    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+    return JSON.stringify(signedRequest, (_, value) => (typeof value === 'bigint' ? value.toString() : value));
+}
+
 /**
  * Creates the signed, stringified message body for a 'close_channel' request.
  *

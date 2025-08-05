@@ -268,6 +268,8 @@ export interface CreateChannelRequestParams {
     token: Address;
     /** The initial amount to deposit in the channel (in raw token units). */
     amount: bigint;
+    /** Optional session key address for the channel. */
+    session_key?: Hex;
 }
 export type CreateChannelRPCRequestParams = CreateChannelRequestParams; // for backward compatibility
 

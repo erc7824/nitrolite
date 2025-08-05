@@ -190,6 +190,12 @@ export const getChannelUpdatePredicateWithStatus = (status: RPCChannelStatus) =>
     };
 };
 
+export const getCreateChannelPredicate = () => {
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.CreateChannel, reqId);
+    }  
+};
+
 export const getCloseChannelPredicate = () => {
     return (data: string, reqId?: number): boolean => {
         return genericPredicate(data, (r) => r.method === RPCMethod.CloseChannel, reqId);

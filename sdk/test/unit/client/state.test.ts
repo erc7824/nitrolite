@@ -6,7 +6,8 @@ import { Hex } from 'viem';
 import { _prepareAndSignInitialState, _prepareAndSignFinalState } from '../../../src/client/state';
 import * as utils from '../../../src/utils';
 import { Errors } from '../../../src/errors';
-import { StateIntent } from '../../../src/client/types';
+import { Channel, CreateChannelParams, State, StateIntent } from '../../../src/client/types';
+import { channel } from 'diagnostics_channel';
 
 // Mock utils
 jest.mock('../../../src/utils', () => ({
@@ -20,10 +21,12 @@ jest.mock('../../../src/utils', () => ({
 
 describe('_prepareAndSignInitialState', () => {
     let deps: any;
+    let defaultChannel: Channel;
+    let defaultState: State;
     const guestAddress = '0xGUEST' as Hex;
     const tokenAddress = '0xTOKEN' as Hex;
     const adjudicatorAddress = '0xADJ' as Hex;
-    const challengeDuration = 123;
+    const challengeDuration = 123n;
 
     beforeEach(() => {
         deps = {
@@ -38,32 +41,38 @@ describe('_prepareAndSignInitialState', () => {
             },
             challengeDuration,
         };
-    });
 
-    test('success with explicit stateData', async () => {
-        const params = {
-            initialAllocationAmounts: [10n, 20n],
-            stateData: 'customData',
-        };
-        const { channel, initialState, channelId } = await _prepareAndSignInitialState(
-            tokenAddress,
-            deps,
-            params as any,
-        );
-
-        // Channel fields
-        expect(utils.generateChannelNonce).toHaveBeenCalledWith(deps.account.address);
-        expect(channel).toEqual({
+        defaultChannel = {
             participants: [deps.account.address, guestAddress],
             adjudicator: adjudicatorAddress,
             challenge: challengeDuration,
             nonce: 999n,
-        });
+        };
+
+        defaultState = {
+            data: '0xcustomData',
+            intent: StateIntent.INITIALIZE,
+            allocations: [
+                { destination: deps.account.address, token: tokenAddress, amount: 10n },
+                { destination: guestAddress, token: tokenAddress, amount: 20n },
+            ],
+            version: 0n,
+            sigs: [],
+        };
+    });
+
+    test('success with explicit stateData', async () => {
+        const params: CreateChannelParams = {
+            channel: defaultChannel,
+            initialState: defaultState,
+        };
+        const { initialState, channelId } = await _prepareAndSignInitialState(deps, params);
+
         // channelId is stubbed
         expect(channelId).toBe('cid');
         // State fields
         expect(initialState).toEqual({
-            data: 'customData',
+            data: '0xcustomData',
             intent: StateIntent.INITIALIZE,
             allocations: [
                 { destination: deps.account.address, token: tokenAddress, amount: 10n },
@@ -73,31 +82,38 @@ describe('_prepareAndSignInitialState', () => {
             sigs: ['accSig'],
         });
         // Signs the state
-        expect(utils.signState).toHaveBeenCalledWith('cid', {
-            data: 'customData',
-            intent: StateIntent.INITIALIZE,
-            allocations: expect.any(Array),
-            version: 0n,
-            sigs: [],
-        }, deps.stateWalletClient.signMessage);
+        expect(utils.signState).toHaveBeenCalledWith(
+            'cid',
+            {
+                data: '0xcustomData',
+                intent: StateIntent.INITIALIZE,
+                allocations: expect.any(Array),
+                version: 0n,
+                sigs: [],
+            },
+            deps.stateWalletClient.signMessage,
+        );
     });
 
     test('throws if no adjudicator', async () => {
-        deps.addresses.adjudicator = undefined;
+        const localChannel = { ...defaultChannel, adjudicator: undefined } as any;
+
         await expect(
-            _prepareAndSignInitialState(tokenAddress, deps, {
-                initialAllocationAmounts: [1n, 2n],
-                stateData: '0xdata',
+            _prepareAndSignInitialState(deps, {
+                channel: localChannel,
+                initialState: defaultState,
             }),
         ).rejects.toThrow(Errors.MissingParameterError);
     });
 
     test('throws if bad allocations length', async () => {
+        const localState = { ...defaultState, allocations: [] } as any;
+
         await expect(
-            _prepareAndSignInitialState(tokenAddress, deps, {
-                initialAllocationAmounts: [1n],
-                stateData: 'd',
-            } as any),
+            _prepareAndSignInitialState(deps, {
+                channel: defaultChannel,
+                initialState: localState,
+            }),
         ).rejects.toThrow(Errors.InvalidParameterError);
     });
 });
@@ -147,13 +163,17 @@ describe('_prepareAndSignFinalState', () => {
             version,
             sigs: ['accSig', 'srvSig'],
         });
-        expect(utils.signState).toHaveBeenCalledWith('cid', {
-            data: 'finalData',
-            intent: StateIntent.FINALIZE,
-            allocations,
-            version,
-            sigs: [],
-        }, deps.stateWalletClient.signMessage);
+        expect(utils.signState).toHaveBeenCalledWith(
+            'cid',
+            {
+                data: 'finalData',
+                intent: StateIntent.FINALIZE,
+                allocations,
+                version,
+                sigs: [],
+            },
+            deps.stateWalletClient.signMessage,
+        );
     });
 
     test('throws if no stateData', async () => {

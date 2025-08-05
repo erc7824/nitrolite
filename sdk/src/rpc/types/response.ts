@@ -234,6 +234,16 @@ export interface ChannelOperationState {
 }
 
 /**
+ * Represents the fixed part of a channel, containing essential metadata.
+ */
+export interface RPCChannel {
+    participants: Address[];
+    adjudicator: Address;
+    challenge: number;
+    nonce: number;
+}
+
+/**
  * Represents the unified parameters for channel operations (create, resize, close).
  */
 export interface ChannelOperationResponseParams {
@@ -248,7 +258,9 @@ export interface ChannelOperationResponseParams {
 /**
  * Represents the parameters for the 'create_channel' RPC method.
  */
-export interface CreateChannelResponseParams extends ChannelOperationResponseParams {}
+export interface CreateChannelResponseParams extends ChannelOperationResponseParams {
+    channel: RPCChannel;
+}
 export type CreateChannelRPCResponseParams = CreateChannelResponseParams; // for backward compatibility
 
 /**

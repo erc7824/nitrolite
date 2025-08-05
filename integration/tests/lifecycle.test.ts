@@ -387,14 +387,14 @@ describe('Close channel', () => {
         const { params: closeResponseParams } = rpcResponseParser.closeChannel(closeResponse);
         const closeChannelTxHash = await client.closeChannel({
             finalState: {
-                intent: closeResponseParams.intent,
+                intent: closeResponseParams.state.intent,
                 channelId: closeResponseParams.channelId,
-                data: closeResponseParams.stateData as Hex,
-                allocations: closeResponseParams.allocations,
-                version: BigInt(closeResponseParams.version),
+                data: closeResponseParams.state.stateData as Hex,
+                allocations: closeResponseParams.state.allocations,
+                version: BigInt(closeResponseParams.state.version),
                 serverSignature: closeResponseParams.serverSignature,
             },
-            stateData: closeResponseParams.stateData as Hex,
+            stateData: closeResponseParams.state.stateData as Hex,
         });
         expect(closeChannelTxHash).toBeDefined();
 
@@ -417,22 +417,22 @@ describe('Close channel', () => {
         const resizeResponse = await cpWS.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
         const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
 
-        expect(resizeResponseParams.allocations).toBeDefined();
-        expect(resizeResponseParams.allocations).toHaveLength(2);
-        expect(String(resizeResponseParams.allocations[0].destination)).toBe(cpIdentity.walletAddress);
-        expect(String(resizeResponseParams.allocations[0].amount)).toBe(
+        expect(resizeResponseParams.state.allocations).toBeDefined();
+        expect(resizeResponseParams.state.allocations).toHaveLength(2);
+        expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(cpIdentity.walletAddress);
+        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
             (depositAmount * BigInt(11)).toString() // 1000 + 100
         );
-        expect(String(resizeResponseParams.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
-        expect(String(resizeResponseParams.allocations[1].amount)).toBe('0');
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
         const resizeChannelTxHash = await cpClient.resizeChannel({
             resizeState: {
                 channelId: resizeResponseParams.channelId as Hex,
-                intent: resizeResponseParams.intent,
-                version: BigInt(resizeResponseParams.version),
-                data: resizeResponseParams.stateData as Hex,
-                allocations: resizeResponseParams.allocations,
+                intent: resizeResponseParams.state.intent,
+                version: BigInt(resizeResponseParams.state.version),
+                data: resizeResponseParams.state.stateData as Hex,
+                allocations: resizeResponseParams.state.allocations,
                 serverSignature: resizeResponseParams.serverSignature,
             },
             proofStates: [
@@ -472,14 +472,14 @@ describe('Close channel', () => {
         const { params: closeResponseParams } = rpcResponseParser.closeChannel(closeResponse);
         const closeChannelTxHash = await cpClient.closeChannel({
             finalState: {
-                intent: closeResponseParams.intent,
+                intent: closeResponseParams.state.intent,
                 channelId: closeResponseParams.channelId,
-                data: closeResponseParams.stateData as Hex,
-                allocations: closeResponseParams.allocations,
-                version: BigInt(closeResponseParams.version),
+                data: closeResponseParams.state.stateData as Hex,
+                allocations: closeResponseParams.state.allocations,
+                version: BigInt(closeResponseParams.state.version),
                 serverSignature: closeResponseParams.serverSignature,
             },
-            stateData: closeResponseParams.stateData as Hex,
+            stateData: closeResponseParams.state.stateData as Hex,
         });
         expect(closeChannelTxHash).toBeDefined();
 

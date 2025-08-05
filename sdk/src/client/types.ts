@@ -148,8 +148,8 @@ export interface NitroliteClientConfig {
  * Parameters required for creating a new state channel.
  */
 export interface CreateChannelParams {
-    initialAllocationAmounts: [bigint, bigint];
-    stateData?: Hex;
+    channel: Channel;
+    initialState: State;
 }
 
 /**

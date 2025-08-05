@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/shopspring/decimal"
 )
 
 type Intent uint8
@@ -55,6 +56,14 @@ func EncodeState(channelID common.Hash, intent Intent, version *big.Int, stateDa
 
 // Assumption: let's abstract from state channel framework, and try do define a common state without being limited by state-channels.
 
+// NETWORK CONFIGURATION
+
+// - A master smart contract, deployed on Ethereum, acts as a registry for main network configuration.
+// This config defines registry of supported blockchains, networks on each blockchain, and smart contracts for each network.
+
+// - Adjudicator on each chain will need to know mapping of YN asset id to token on it's network.
+// So it keeps a registry of tokens it supports and maps them to YN tokens.
+
 // As we plan to support non-EVM chains, we will issue users with a unique Yellow Network account identifier (UserID).
 
 /*
@@ -92,8 +101,8 @@ type ChainState struct {
 }
 
 type TokenAmount struct {
-	TokenAddress common.Address `json:"token"`
-	RawAmount    *big.Int       `json:"amount"`
+	Asset  string          `json:"asset"` // Asset identifier on YN (todo: define strict formatting rules)
+	Amount decimal.Decimal `json:"amount"`
 }
 
 // SessionKey holds the public key and permissions for a delegated key.
@@ -117,15 +126,15 @@ type SessionKeyPermissions struct {
 
 // To perform a transfer on Yellow Network, User Creates and signs an Intent:
 
-type TransferIntent struct {
-	TransferIntent UnsignedTransferIntent `json:"transfer_intent"`
-	Signature      Signature              `json:"signature"`
+type BatchTransferIntent struct {
+	TransferIntent UnsignedBatchTransferIntent `json:"transfer_intent"`
+	Signature      Signature                   `json:"signature"` // Recovered address from signature must match the recovered address from the referenced StateNonce.
 }
 
-type UnsignedTransferIntent struct {
+type UnsignedBatchTransferIntent struct {
 	StateNonce  uint64         `json:"state_nonce"` // Must match the sender's current CommonState nonce.
-	Destination common.Address `json:"destination"`
-	Allocations []Allocation   `json:"allocations"` // The assets and amounts to be transferred.
+	Destination common.Address `json:"destination"` // YN account identifier.
+	Allocations []TokenAmount  `json:"allocations"` // The assets and amounts to be transferred.
 }
 
 // Validators sign the new CommonState both for sender and receiver, store them and return them to the users.
@@ -143,7 +152,7 @@ type UnsignedTransferIntent struct {
 // SignedBatchWithdrawalIntent is the complete object submitted to the Custody contract and verified by Adjudicator.
 type SignedBatchWithdrawalIntent struct {
 	Intent      BatchWithdrawalIntent `json:"intent"`
-	Signature   Signature             `json:"signature"`    // User's signature on the Intent.
+	Signature   Signature             `json:"signature"`    // Recovered address from signature must match the recovered address from the referenced StateNonce.
 	NetworkSigs []Signature           `json:"network_sigs"` // Quorum of valid network signatures on the Intent.
 }
 
@@ -151,7 +160,7 @@ type SignedBatchWithdrawalIntent struct {
 type BatchWithdrawalIntent struct {
 	StateNonce  uint64         `json:"state_nonce"` // Must match the sender's current CommonState nonce.
 	ChainID     uint32         `json:"chain_id"`    // Chain to withdraw.
-	Destination common.Address `json:"destination"` // Destination for the withdrawn funds, typically the owner's address.
+	Destination common.Address `json:"destination"` // Destination for the withdrawn funds on the target chain, typically the owner's address.
 	Withdrawals []TokenAmount  `json:"withdrawals"` // A list of tokens and amounts to withdraw. Can be full or a partial amount.
 }
 
@@ -174,3 +183,5 @@ type BatchWithdrawalIntent struct {
 
 // The validators sign this new CommonState and credit the user's account within the network.
 // The user doesn't need to sign a separate intent for deposits. // The Deposit event emitted by the contract is the authorization for the validators to update the user's state.
+
+// TODO: have a single document in markdown. Move from this file into markdown.

@@ -19,15 +19,16 @@ import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/crypt
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 import {MockFlagERC1271} from "./mocks/MockFlagERC1271.sol"; // import to allow easier artifact fetching for `getCode` cheat code
+import {FlagAdjudicator} from "./mocks/FlagAdjudicator.sol";
+import {MockERC20} from "./mocks/MockERC20.sol";
 import {TestUtils} from "./TestUtils.sol";
+
 import {Custody} from "../src/Custody.sol";
 import {
     Channel, State, Allocation, ChannelStatus, StateIntent, Amount, STATE_TYPEHASH
 } from "../src/interfaces/Types.sol";
+import {IChannel} from "../src/interfaces/IChannel.sol";
 import {Utils} from "../src/Utils.sol";
-
-import {FlagAdjudicator} from "./mocks/FlagAdjudicator.sol";
-import {MockERC20} from "./mocks/MockERC20.sol";
 
 contract CustodyTest_Base is Test {
     Custody public custody;
@@ -509,67 +510,244 @@ contract CustodyTest_challenge is CustodyTest_Base {
     }
 }
 
+contract CustodyTest_create is CustodyTest_Base {
+    function setupChannelAndState() internal view returns (Channel memory chan, State memory initialState) {
+        chan = createTestChannelWithSK();
+        initialState = createInitialStateWithSK();
+
+        bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
+        bytes[] memory sigs = new bytes[](1);
+        sigs[0] = hostSig;
+        initialState.sigs = sigs;
+    }
+
+    function verifyChannelCreated(address creator, bytes32 channelId, Channel memory chan) internal view {
+        (uint256 available, uint256 channelCount) = getAvailableBalanceAndChannelCount(creator, address(token));
+        assertEq(available, DEPOSIT_AMOUNT, "Host should have correct available balance");
+        assertEq(channelCount, 1, "Host should have 1 channel");
+
+        bytes32 expectedChannelId = Utils.getChannelId(chan);
+        assertEq(channelId, expectedChannelId, "Channel ID is incorrect");
+
+        (, ChannelStatus status,,,) = custody.getChannelData(channelId);
+        assertTrue(status == ChannelStatus.INITIAL, "Channel should be INITIAL");
+    }
+
+    function verifyChannelActive(address[2] memory participants, bytes32 channelId, Channel memory chan) internal view {
+        address[] memory participantsDyn = new address[](2);
+        participantsDyn[0] = participants[0];
+        participantsDyn[1] = participants[1];
+        bytes32[][] memory channels = custody.getOpenChannels(participantsDyn);
+
+        assertEq(channels[0].length, 1, "Should have 1 channel for host");
+        assertEq(channels[0][0], channelId, "Host's channel ID is incorrect");
+
+        assertEq(channels[1].length, 1, "Should have 1 channel for guest");
+        assertEq(channels[1][0], channelId, "Guest's channel ID is incorrect");
+
+        bytes32 expectedChannelId = Utils.getChannelId(chan);
+        assertEq(channelId, expectedChannelId, "Channel ID is incorrect");
+
+        (, ChannelStatus status,,,) = custody.getChannelData(channelId);
+        assertTrue(status == ChannelStatus.ACTIVE, "Channel should be ACTIVE");
+    }
+
+    function verifyDeposited(address user, address tokenAddress, uint256 amount) internal view {
+        address[] memory users = new address[](1);
+        users[0] = user;
+        address[] memory tokens = new address[](1);
+        tokens[0] = tokenAddress;
+        uint256 available = custody.getAccountsBalances(users, tokens)[0][0];
+        assertEq(available, amount, "User should have correct available balance");
+    }
+
+    function test_create() public {
+        (Channel memory chan, State memory initialState) = setupChannelAndState();
+
+        vm.deal(hostSK, 1 ether); // Ensure host has ETH for gas
+
+        vm.prank(hostSK);
+        custody.deposit(hostSK, address(token), DEPOSIT_AMOUNT * 2);
+
+        vm.prank(hostSK);
+        bytes32 channelId = custody.create(chan, initialState);
+
+        verifyChannelCreated(hostSK, channelId, chan);
+    }
+
+    function test_depositAndCreate() public {
+        (Channel memory chan, State memory initialState) = setupChannelAndState();
+
+        vm.prank(hostSK);
+        bytes32 channelId = custody.depositAndCreate(address(token), DEPOSIT_AMOUNT * 2, chan, initialState);
+
+        verifyChannelCreated(hostSK, channelId, chan);
+    }
+
+    function test_create_revert_ifEmptyParticipants() public {
+        (Channel memory chan, State memory initialState) = setupChannelAndState();
+        chan.participants = new address[](0);
+
+        bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
+        bytes[] memory sigs = new bytes[](1);
+        sigs[0] = hostSig;
+        initialState.sigs = sigs;
+
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+
+        vm.prank(hostSK);
+        vm.expectRevert(Custody.InvalidParticipant.selector);
+        custody.create(chan, initialState);
+    }
+
+    function test_create_revert_ifZeroAdjudicator() public {
+        (Channel memory chan, State memory initialState) = setupChannelAndState();
+        chan.adjudicator = address(0);
+
+        bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
+        bytes[] memory sigs = new bytes[](1);
+        sigs[0] = hostSig;
+        initialState.sigs = sigs;
+
+        vm.prank(hostSK);
+        vm.expectRevert(Custody.InvalidAdjudicator.selector);
+        custody.create(chan, initialState);
+}
+
+    function test_create_revert_ifZeroChallenge() public {
+        (Channel memory chan, State memory initialState) = setupChannelAndState();
+        chan.challenge = 0;
+
+        bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
+        bytes[] memory sigs = new bytes[](1);
+        sigs[0] = hostSig;
+        initialState.sigs = sigs;
+
+        vm.prank(hostSK);
+        vm.expectRevert(Custody.InvalidChallengePeriod.selector);
+        custody.create(chan, initialState);
+    }
+
+    function test_create_brokerAutoJoin_zeroAllocation_rawECDSA() public {
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
+        initialState.allocations[1].amount = 0;
+
+        bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
+        bytes memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        bytes[] memory sigs = new bytes[](2);
+        sigs[0] = hostSig;
+        sigs[1] = guestSig;
+        initialState.sigs = sigs;
+
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+
+        bytes32 channelId = Utils.getChannelId(chan);
+
+        vm.expectEmit(true, true, true, true);
+        emit IChannel.Joined(channelId, 1);
+        vm.expectEmit(true, true, true, true);
+        emit IChannel.Opened(channelId);
+        vm.prank(hostSK);
+        custody.create(chan, initialState);
+
+        verifyChannelActive([hostSK, guestSK], channelId, chan);
+        verifyDeposited(hostSK, address(token), DEPOSIT_AMOUNT);
+        verifyDeposited(guestSK, address(token), 0); // No funds have been allocated to guest, so they keep their full deposit
+    }
+
+    function test_create_brokerAutoJoin_zeroAllocation_EIP191() public {
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
+        initialState.allocations[1].amount = 0;
+
+        bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
+        bytes memory guestSig = TestUtils.signStateEIP191(vm, chan, initialState, guestSKPrivKey);
+        bytes[] memory sigs = new bytes[](2);
+        sigs[0] = hostSig;
+        sigs[1] = guestSig;
+        initialState.sigs = sigs;
+
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+
+        vm.prank(hostSK);
+        bytes32 channelId = custody.create(chan, initialState);
+
+        verifyChannelActive([hostSK, guestSK], channelId, chan);
+        verifyDeposited(hostSK, address(token), DEPOSIT_AMOUNT);
+        verifyDeposited(guestSK, address(token), 0); // No funds have been allocated to guest, so they keep their full deposit
+    }
+
+    function test_create_brokerAutoJoin_zeroAllocation_EIP712() public {
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
+        initialState.allocations[1].amount = 0;
+
+        bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
+        bytes memory guestSig = TestUtils.signStateEIP712(vm, Utils.getChannelId(chan), initialState, STATE_TYPEHASH, custodyDomainSeparator, guestSKPrivKey);
+        bytes[] memory sigs = new bytes[](2);
+        sigs[0] = hostSig;
+        sigs[1] = guestSig;
+        initialState.sigs = sigs;
+
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+
+        vm.prank(hostSK);
+        bytes32 channelId = custody.create(chan, initialState);
+
+        verifyChannelActive([hostSK, guestSK], channelId, chan);
+        verifyDeposited(hostSK, address(token), DEPOSIT_AMOUNT);
+        verifyDeposited(guestSK, address(token), 0); // No funds have been allocated to guest, so they keep their full deposit
+    }
+
+    function test_create_brokerAutoJoin_nonZeroAllocation() public {
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
+
+        bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
+        bytes memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        bytes[] memory sigs = new bytes[](2);
+        sigs[0] = hostSig;
+        sigs[1] = guestSig;
+        initialState.sigs = sigs;
+
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+        depositTokens(guestSK, DEPOSIT_AMOUNT * 2);
+
+        vm.prank(hostSK);
+        bytes32 channelId = custody.create(chan, initialState);
+
+        verifyChannelActive([hostSK, guestSK], channelId, chan);
+        verifyDeposited(hostSK, address(token), DEPOSIT_AMOUNT);
+        verifyDeposited(guestSK, address(token), DEPOSIT_AMOUNT);
+    }
+
+    function test_create_revert_brokerAutoJoin_insufficientFunds() public {
+        Channel memory chan = createTestChannelWithSK();
+        State memory initialState = createInitialStateWithSK();
+
+        // Both CLIENT and SERVER sign the initial state
+        bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
+        bytes memory guestSig = signState(chan, initialState, guestSKPrivKey);
+        bytes[] memory sigs = new bytes[](2);
+        sigs[0] = hostSig;
+        sigs[1] = guestSig;
+        initialState.sigs = sigs;
+
+        // CLIENT deposits enough, but SERVER doesn't have sufficient funds
+        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
+        depositTokens(guestSK, DEPOSIT_AMOUNT / 2); // Not enough for their DEPOSIT_AMOUNT allocation
+
+        vm.prank(hostSK);
+        vm.expectRevert(abi.encodeWithSelector(Custody.InsufficientBalance.selector, DEPOSIT_AMOUNT / 2, DEPOSIT_AMOUNT));
+        custody.create(chan, initialState);
+    }
+}
+
 contract CustodyTest is CustodyTest_Base {
     // ==================== TEST CASES ====================
 
     // ==== 1. Channel Creation and Joining ====
-
-    function test_Create() public {
-        // 1. Prepare channel and initial state
-        Channel memory chan = createTestChannelWithSK();
-        State memory initialState = createInitialStateWithSK();
-
-        // 2. Sign the state by the host
-        vm.deal(hostSK, 1 ether); // Ensure host has ETH for gas
-
-        // Sign the state
-        bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
-        bytes[] memory sigs = new bytes[](1);
-        sigs[0] = hostSig;
-        initialState.sigs = sigs;
-
-        // 3. Deposit tokens for the host
-        vm.prank(hostSK);
-        custody.deposit(hostSK, address(token), DEPOSIT_AMOUNT * 2);
-
-        // 4. Create the channel as host
-        vm.prank(hostSK);
-        bytes32 channelId = custody.create(chan, initialState);
-
-        // Verify the channel is created and in INITIAL state
-        (uint256 available, uint256 channelCount) = getAvailableBalanceAndChannelCount(hostSK, address(token));
-        assertEq(available, DEPOSIT_AMOUNT, "Host should have correct available balance");
-        assertEq(channelCount, 1, "Host should have 1 channel");
-
-        // Also check that the channelId is consistent
-        bytes32 expectedChannelId = Utils.getChannelId(chan);
-        assertEq(channelId, expectedChannelId, "Channel ID is incorrect");
-    }
-
-    function test_depositAndCreate() public {
-        // 1. Prepare channel and initial state
-        Channel memory chan = createTestChannelWithSK();
-        State memory initialState = createInitialStateWithSK();
-
-        // 2. Sign the state by the host
-        bytes memory hostSig = signState(chan, initialState, hostSKPrivKey);
-        bytes[] memory sigs = new bytes[](1);
-        sigs[0] = hostSig;
-        initialState.sigs = sigs;
-
-        // 3. Create the channel as host
-        vm.prank(hostSK);
-        bytes32 channelId = custody.depositAndCreate(address(token), DEPOSIT_AMOUNT * 2, chan, initialState);
-
-        // Verify the channel is created and in INITIAL state
-        (uint256 available, uint256 channelCount) = getAvailableBalanceAndChannelCount(hostSK, address(token));
-        assertEq(available, DEPOSIT_AMOUNT, "Host should have correct available balance");
-        assertEq(channelCount, 1, "Host should have 1 channel");
-
-        // Also check that the channelId is consistent
-        bytes32 expectedChannelId = Utils.getChannelId(chan);
-        assertEq(channelId, expectedChannelId, "Channel ID is incorrect");
-    }
 
     function test_CompleteChannelFunding() public {
         // 1. Create channel with host
@@ -607,57 +785,6 @@ contract CustodyTest is CustodyTest_Base {
 
         assertEq(hostAvailable, DEPOSIT_AMOUNT, "Host should have correct available balance");
         assertEq(guestAvailable, DEPOSIT_AMOUNT, "Guest should have correct available balance");
-    }
-
-    function test_InvalidChannelCreation() public {
-        // Create channel with invalid participant (empty array)
-        address[] memory invalidParticipants = new address[](1);
-        invalidParticipants[0] = hostSK;
-        Channel memory chanWithInvalidParticipants = Channel({
-            participants: invalidParticipants,
-            adjudicator: address(adjudicator),
-            challenge: CHALLENGE_DURATION,
-            nonce: NONCE
-        });
-
-        State memory initialState = createInitialStateWithSK();
-        bytes memory hostSig = signState(chanWithInvalidParticipants, initialState, hostSKPrivKey);
-        bytes[] memory sigs = new bytes[](1);
-        sigs[0] = hostSig;
-        initialState.sigs = sigs;
-
-        depositTokens(hostSK, DEPOSIT_AMOUNT * 2);
-
-        vm.startPrank(hostSK);
-        vm.expectRevert(Custody.InvalidParticipant.selector);
-        custody.create(chanWithInvalidParticipants, initialState);
-        vm.stopPrank();
-
-        // Test with zero address as adjudicator
-        address[] memory validParticipants = new address[](2);
-        validParticipants[0] = hostSK;
-        validParticipants[1] = guestSK;
-
-        Channel memory chanWithZeroAdjudicator = Channel({
-            participants: validParticipants,
-            adjudicator: address(0),
-            challenge: CHALLENGE_DURATION,
-            nonce: NONCE
-        });
-
-        vm.startPrank(hostSK);
-        vm.expectRevert(Custody.InvalidAdjudicator.selector);
-        custody.create(chanWithZeroAdjudicator, initialState);
-        vm.stopPrank();
-
-        // Test with zero challenge period
-        Channel memory chanWithZeroChallenge =
-            Channel({participants: validParticipants, adjudicator: address(adjudicator), challenge: 0, nonce: NONCE});
-
-        vm.startPrank(hostSK);
-        vm.expectRevert(Custody.InvalidChallengePeriod.selector);
-        custody.create(chanWithZeroChallenge, initialState);
-        vm.stopPrank();
     }
 
     // ==== 2. Channel Closing ====

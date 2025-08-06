@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package nitrolite;
+
+option go_package = "github.com/nitrolite/clearnode/proto;proto";
+
+// UserAccount represents a user's account in the Yellow Network
+// Each user has a unique ID and can have multiple keys for different purposes
+message UserAccount {
+  bytes user_id = 1;                    // Unique Yellow Network user identifier
+  repeated UserKey user_keys = 2;       // Associated keys
+}
+
+// User's cryptographic key with permissions
+message UserKey {
+  bytes user_id = 1;              // User this key belongs to
+  string key_type = 2;            // Key type
+  bytes address = 3;              // Key address
+  KeyPermissions permissions = 4; // Key permissions
+}
+
+// Access control for keys
+message KeyPermissions {
+  repeated string target_chains = 1;   // Allowed chain IDs
+  repeated string allowed_apps = 2;    // Allowed applications
+  repeated string allowed_actions = 3; // Allowed actions
+}

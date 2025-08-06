@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package nitrolite;
+
+option go_package = "github.com/nitrolite/clearnode/proto;proto";
+
+enum SignatureAlgorithm {
+  SIG_ALG_UNSPECIFIED = 0;
+  SIG_ALG_SECP256K1 = 1;   // ECDSA (Bitcoin/Ethereum)
+  SIG_ALG_ED25519 = 2;     // EdDSA (modern chains)
+}
+
+// Cryptographic signature with algorithm identifier
+message Signature {
+  SignatureAlgorithm alg = 1; // Signature algorithm
+  bytes data = 2;             // Signature bytes
+}

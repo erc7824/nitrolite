@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package nitrolite;
+
+option go_package = "github.com/nitrolite/clearnode/proto;proto";
+
+import "state.proto";
+
+// Yellow Network configuration
+message NetworkConfig {
+  repeated Blockchain blockchains = 1;   // Supported blockchains
+  repeated LedgerNode ledger_nodes = 2;  // Approved validator nodes
+}
+
+// Supported blockchain platform
+message Blockchain {
+  string name = 1;               
+  repeated Network networks = 2;
+}
+
+// Specific network on a blockchain
+message Network {
+  string chain_id = 1;         
+  string name = 2;            
+  bytes contract_address = 3;  // Custody contract address
+}
+
+// Approved ledger node
+message LedgerNode {
+  string node_id = 1;           // Node identifier
+  SessionKey session_key = 2;   // Node's signing key
+  uint32 signature_weight = 3;  // Voting weight
+}
+
+// Per-chain asset mapping configuration
+message ChainConfig {
+  string chain_id = 1;                  // Chain ID
+  repeated AssetToken asset_tokens = 2; // YN asset to token mapping
+  repeated LedgerNode ledger_nodes = 3; // Validator registry mirror (for funds recovery)
+}
+
+// AssetToken maps YN assets to chain tokens
+message AssetToken {
+  string asset_id = 1;   // YN asset ID
+  bytes address = 2;     // Token contract address
+  uint32 decimals = 3;   // Token decimals
+}

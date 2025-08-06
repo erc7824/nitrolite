@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package nitrolite;
+
+option go_package = "github.com/nitrolite/clearnode/proto;proto";
+
+import "signature.proto";
+
+// User's complete account state with signatures
+message State {
+  UnsignedState state = 1;
+  Signature owner_sig = 2;              // User's signature
+  repeated Signature network_sigs = 3;  // Ledger node signatures attesting state validity
+}
+
+// Core state data that gets signed
+message UnsignedState {
+  uint64 nonce = 1;                            // Strictly increasing nonce
+  bytes data = 2;                              // Optional state data
+  repeated AssetAmount balances = 4;           // User's unified asset balances across all chains
+  repeated SessionKey active_session_keys = 5; // Delegated keys with permissions
+}
+
+// AssetAmount represents a quantity of a specific asset in the Yellow Network
+message AssetAmount {
+  string asset = 1;  // Yellow Network asset ID
+  bytes amount = 2;  // Amount in YN decimals
+}
+
+// Delegated key with limited permissions
+message SessionKey {
+  bytes address = 1;                     // Session key address
+  uint64 nonce = 2;                      // Session key nonce
+  SessionKeyPermissions permissions = 3; // Key permissions
+}
+
+// Session key limits and expiry
+message SessionKeyPermissions {
+  repeated AssetAmount spending_limits = 1; // Maximum spend per asset
+  uint64 expiry = 2;                       // Expiry timestamp
+}
+
+// Transfer request for off-chain transfers
+message BatchTransferIntent {
+  UnsignedBatchTransferIntent batch_transfer_intent = 1;
+  Signature signature = 2; // User or session key signature
+}
+
+// Transfer details
+message UnsignedBatchTransferIntent {
+  uint64 state_nonce = 1;                // Sender's current nonce
+  bytes destination = 2;                 // Destination user ID or app address
+  repeated AssetAmount allocations = 3;  // Assets to transfer
+}
+
+// Withdrawal request with validator signatures
+message SignedBatchWithdrawalIntent {
+  BatchWithdrawalIntent batch_withdrawal_intent = 1;
+  Signature signature = 2;         // User's signature
+  repeated Signature network_sigs = 3; // Ledger node signatures
+}
+
+// Withdrawal request to blockchain
+message BatchWithdrawalIntent {
+  uint64 state_nonce = 1;                // User's current nonce
+  string chain_id = 2;                   // Target chain ID
+  bytes destination = 3;                 // Target address
+  repeated AssetAmount withdrawals = 4;  // Assets to withdraw
+}

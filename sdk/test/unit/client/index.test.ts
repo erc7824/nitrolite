@@ -31,6 +31,12 @@ describe('NitroliteClient', () => {
     let mockNitroService: any;
     let mockErc20Service: any;
 
+    const stateSigner = {
+        getAddress: jest.fn(() => mockAccount.address),
+        signState: jest.fn(async (_1: Hex, _2: any) => mockSignature as Hex),
+        signRawMessage: jest.fn(async (_: Hex) => mockSignature as Hex),
+    }
+
     beforeEach(() => {
         jest.restoreAllMocks();
         client = new NitroliteClient({
@@ -39,7 +45,7 @@ describe('NitroliteClient', () => {
             addresses: mockAddresses,
             challengeDuration,
             chainId: chainId,
-            stateWalletClient: { ...mockWalletClient, signMessage: mockSignMessage },
+            stateSigner,
         });
         mockNitroService = {
             deposit: jest.fn(),

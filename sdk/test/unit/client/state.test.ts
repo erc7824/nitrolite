@@ -7,7 +7,6 @@ import { _prepareAndSignInitialState, _prepareAndSignFinalState } from '../../..
 import * as utils from '../../../src/utils';
 import { Errors } from '../../../src/errors';
 import { Channel, CreateChannelParams, State, StateIntent } from '../../../src/client/types';
-import { channel } from 'diagnostics_channel';
 
 // Mock utils
 jest.mock('../../../src/utils', () => ({
@@ -64,7 +63,8 @@ describe('_prepareAndSignInitialState', () => {
     test('success with explicit stateData', async () => {
         const params: CreateChannelParams = {
             channel: defaultChannel,
-            initialState: defaultState,
+            unsignedInitialState: defaultState,
+            serverSignature: '0xSRVSIG',
         };
         const { initialState, channelId } = await _prepareAndSignInitialState(deps, params);
 
@@ -79,7 +79,7 @@ describe('_prepareAndSignInitialState', () => {
                 { destination: guestAddress, token: tokenAddress, amount: 20n },
             ],
             version: 0n,
-            sigs: ['accSig'],
+            sigs: ['accSig', '0xSRVSIG'],
         });
         // Signs the state
         expect(utils.signState).toHaveBeenCalledWith(
@@ -101,7 +101,8 @@ describe('_prepareAndSignInitialState', () => {
         await expect(
             _prepareAndSignInitialState(deps, {
                 channel: localChannel,
-                initialState: defaultState,
+                unsignedInitialState: defaultState,
+                serverSignature: '0xSRVSIG',
             }),
         ).rejects.toThrow(Errors.MissingParameterError);
     });
@@ -112,7 +113,8 @@ describe('_prepareAndSignInitialState', () => {
         await expect(
             _prepareAndSignInitialState(deps, {
                 channel: defaultChannel,
-                initialState: localState,
+                unsignedInitialState: localState,
+                serverSignature: '0xSRVSIG',
             }),
         ).rejects.toThrow(Errors.InvalidParameterError);
     });

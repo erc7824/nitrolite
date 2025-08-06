@@ -45,13 +45,12 @@ export class TestNitroliteClient extends NitroliteClient {
         ws: TestWebSocket,
         { tokenAddress, amount, depositAmount }: { tokenAddress: Address; amount: bigint; depositAmount?: bigint }
     ) => {
-        const msg = await createCreateChannelMessage(
-            this.identity.messageSigner,
-            chain.id,
-            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+        const msg = await createCreateChannelMessage(this.identity.messageSigner, {
+            chain_id: chain.id,
+            token: tokenAddress,
             amount,
-            this.identity.sessionAddress,
-        );
+            session_key: this.identity.sessionAddress,
+        });
         const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
         expect(createResponse).toBeDefined();
 
@@ -65,11 +64,12 @@ export class TestNitroliteClient extends NitroliteClient {
 
         depositAmount = depositAmount ?? amount;
         const { initialState } = await this.depositAndCreateChannel(tokenAddress, depositAmount, {
-            initialState: convertRPCToClientState(
+            unsignedInitialState: convertRPCToClientState(
                 createParsedResponseParams.state,
                 createParsedResponseParams.serverSignature
             ),
             channel: convertRPCToClientChannel(createParsedResponseParams.channel),
+            serverSignature: createParsedResponseParams.serverSignature,
         });
 
         const openResponse = await openChannelPromise;

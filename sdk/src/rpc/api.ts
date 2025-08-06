@@ -27,6 +27,7 @@ import {
     GetLedgerTransactionsFilters,
     GetLedgerTransactionsRequestParams,
     TransferRequestParams,
+    CreateChannelRequestParams,
 } from './types/request';
 
 /**
@@ -411,22 +412,11 @@ export async function createApplicationMessage(
 
 export async function createCreateChannelMessage(
     signer: MessageSigner,
-    chainId: number,
-    token: Address,
-    amount: bigint,
-    sessionKeyAddress?: Hex,
+    params: CreateChannelRequestParams,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = [
-        {
-            chain_id: chainId,
-            token,
-            amount,
-            session_key: sessionKeyAddress,
-        },
-    ];
-    const request = NitroliteRPC.createRequest(requestId, RPCMethod.CreateChannel, params, timestamp);
+    const request = NitroliteRPC.createRequest(requestId, RPCMethod.CreateChannel, [params], timestamp);
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
     return JSON.stringify(signedRequest, (_, value) => (typeof value === 'bigint' ? value.toString() : value));
 }

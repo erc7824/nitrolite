@@ -60,15 +60,6 @@ export class BlockchainUtils {
         }
     }
 
-    async getChainId(): Promise<number> {
-        try {
-            const chainId = await this.client.getChainId();
-            return chainId;
-        } catch (error) {
-            throw new Error(`Error getting chain ID: ${error.message}`);
-        }
-    }
-
     async getBalance(address: `0x${string}`): Promise<bigint> {
         try {
             const balance = await this.client.getBalance({ address });

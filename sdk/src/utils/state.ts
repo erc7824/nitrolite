@@ -1,5 +1,5 @@
 import { keccak256, encodeAbiParameters, Address, Hex, recoverMessageAddress, encodePacked } from 'viem';
-import { State, StateHash, Signature, ChannelId } from '../client/types'; // Updated import path
+import { UnsignedState, State, StateHash, Signature, ChannelId } from '../client/types'; // Updated import path
 
 /**
  * Packs a channel state into a canonical format for hashing and signing.
@@ -7,7 +7,7 @@ import { State, StateHash, Signature, ChannelId } from '../client/types'; // Upd
  * @param state The state to pack.
  * @returns The packed state as Hex.
  */
-export function getPackedState(channelId: ChannelId, state: State): Hex {
+export function getPackedState(channelId: ChannelId, state: UnsignedState): Hex {
     return encodeAbiParameters(
         [
             { name: 'channelId', type: 'bytes32' },
@@ -40,7 +40,7 @@ export function getPackedState(channelId: ChannelId, state: State): Hex {
  * @param state The state struct
  * @returns The state hash as Hex
  */
-export function getStateHash(channelId: ChannelId, state: State): StateHash {
+export function getStateHash(channelId: ChannelId, state: UnsignedState): StateHash {
     return keccak256(getPackedState(channelId, state)) as StateHash;
 }
 
@@ -65,7 +65,7 @@ type SignMessageFn = (args: { message: { raw: Hex } }) => Promise<Hex>;
  */
 export async function signState(
     channelId: ChannelId,
-    state: State,
+    state: UnsignedState,
     signMessage: SignMessageFn,
 ): Promise<Signature> {
     const stateHash = getStateHash(channelId, state);

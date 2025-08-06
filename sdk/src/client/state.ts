@@ -34,17 +34,17 @@ export async function _prepareAndSignInitialState(
     deps: PreparerDependencies,
     params: CreateChannelParams,
 ): Promise<{ initialState: State; channelId: ChannelId }> {
-    const { channel, initialState } = params;
+    const { channel, unsignedInitialState, serverSignature } = params;
 
-    if (!initialState) {
+    if (!unsignedInitialState) {
         throw new Errors.MissingParameterError('Initial state is required for creating the channel');
     }
 
-    if (!initialState.data) {
+    if (!unsignedInitialState.data) {
         throw new Errors.MissingParameterError('State data is required for creating the channel');
     }
 
-    if (!initialState.allocations || initialState.allocations.length !== 2) {
+    if (!unsignedInitialState.allocations || unsignedInitialState.allocations.length !== 2) {
         throw new Errors.InvalidParameterError('Initial allocation amounts must be provided for both participants.');
     }
 
@@ -61,11 +61,11 @@ export async function _prepareAndSignInitialState(
     }
 
     const channelId = getChannelId(channel, deps.chainId);
-    const accountSignature = await signState(channelId, initialState, deps.stateWalletClient.signMessage);
+    const accountSignature = await signState(channelId, unsignedInitialState, deps.stateWalletClient.signMessage);
     const signedInitialState: State = {
-        ...initialState,
+        ...unsignedInitialState,
         // TODO: remove assumption, that current signer will always be the first participant
-        sigs: [accountSignature, ...initialState.sigs],
+        sigs: [accountSignature, serverSignature],
     };
 
     return { initialState: signedInitialState, channelId };

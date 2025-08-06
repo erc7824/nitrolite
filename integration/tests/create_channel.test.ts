@@ -62,13 +62,12 @@ describe('Create channel', () => {
             identity.walletAddress
         );
 
-        const msg = await createCreateChannelMessage(
-            identity.messageSigner,
-            chain.id,
-            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            depositAmount,
-            identity.sessionAddress,
-        );
+        const msg = await createCreateChannelMessage(identity.messageSigner, {
+            chain_id: chain.id,
+            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            amount: depositAmount,
+            session_key: identity.sessionAddress,
+        });
         const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
         expect(createResponse).toBeDefined();
 
@@ -84,11 +83,12 @@ describe('Create channel', () => {
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             depositAmount,
             {
-                initialState: convertRPCToClientState(
+                unsignedInitialState: convertRPCToClientState(
                     createParsedResponseParams.state,
                     createParsedResponseParams.serverSignature
                 ),
                 channel: convertRPCToClientChannel(createParsedResponseParams.channel),
+                serverSignature: createParsedResponseParams.serverSignature,
             }
         );
 
@@ -146,13 +146,12 @@ describe('Create channel', () => {
 
         expect(postBalance.rawBalance).toBe(prevBalance.rawBalance - depositAmount);
 
-        const msg = await createCreateChannelMessage(
-            identity.messageSigner,
-            chain.id,
-            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            depositAmount,
-            identity.sessionAddress,
-        );
+        const msg = await createCreateChannelMessage(identity.messageSigner, {
+            chain_id: chain.id,
+            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            amount: depositAmount,
+            session_key: identity.sessionAddress,
+        });
         const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
         expect(createResponse).toBeDefined();
 
@@ -169,11 +168,12 @@ describe('Create channel', () => {
             channelId,
             initialState,
         } = await client.createChannel({
-            initialState: convertRPCToClientState(
+            unsignedInitialState: convertRPCToClientState(
                 createParsedResponseParams.state,
                 createParsedResponseParams.serverSignature
             ),
             channel: convertRPCToClientChannel(createParsedResponseParams.channel),
+            serverSignature: createParsedResponseParams.serverSignature,
         });
 
         expect(channelId).toBeDefined();

@@ -9,8 +9,9 @@ import {
     convertRPCToClientChannel,
     convertRPCToClientState,
     createCreateChannelMessage,
+    parseChannelUpdateResponse,
+    parseCreateChannelResponse,
     RPCChannelStatus,
-    rpcResponseParser,
 } from '@erc7824/nitrolite';
 import { parseUnits } from 'viem';
 
@@ -71,7 +72,7 @@ describe('Create channel', () => {
         const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
         expect(createResponse).toBeDefined();
 
-        const { params: createParsedResponseParams } = rpcResponseParser.createChannel(createResponse);
+        const { params: createParsedResponseParams } = parseCreateChannelResponse(createResponse);
 
         const openChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),
@@ -102,7 +103,7 @@ describe('Create channel', () => {
         const openResponse = await openChannelPromise;
         expect(openResponse).toBeDefined();
 
-        const openParsedResponse = rpcResponseParser.channelUpdate(openResponse);
+        const openParsedResponse = parseChannelUpdateResponse(openResponse);
         const responseChannel = openParsedResponse.params;
 
         expect(responseChannel.adjudicator).toBe(CONFIG.ADDRESSES.DUMMY_ADJUDICATOR_ADDRESS);
@@ -155,7 +156,7 @@ describe('Create channel', () => {
         const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
         expect(createResponse).toBeDefined();
 
-        const { params: createParsedResponseParams } = rpcResponseParser.createChannel(createResponse);
+        const { params: createParsedResponseParams } = parseCreateChannelResponse(createResponse);
 
         const openChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),
@@ -186,7 +187,7 @@ describe('Create channel', () => {
         const openResponse = await openChannelPromise;
         expect(openResponse).toBeDefined();
 
-        const openParsedResponse = rpcResponseParser.channelUpdate(openResponse);
+        const openParsedResponse = parseChannelUpdateResponse(openResponse);
         const responseChannel = openParsedResponse.params;
 
         expect(responseChannel.adjudicator).toBe(CONFIG.ADDRESSES.DUMMY_ADJUDICATOR_ADDRESS);

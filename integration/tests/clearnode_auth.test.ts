@@ -9,7 +9,8 @@ import {
     createAuthVerifyMessage,
     createAuthVerifyMessageWithJWT,
     createEIP712AuthMessageSigner,
-    rpcResponseParser,
+    parseAuthChallengeResponse,
+    parseAuthVerifyResponse,
 } from '@erc7824/nitrolite';
 
 describe('Clearnode Authentication', () => {
@@ -25,8 +26,8 @@ describe('Clearnode Authentication', () => {
     const identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);
 
     const authRequestParams: AuthRequestParams = {
-        wallet: identity.walletAddress,
-        participant: identity.sessionAddress,
+        address: identity.walletAddress,
+        session_key: identity.sessionAddress,
         app_name: 'Test Domain',
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
@@ -39,7 +40,7 @@ describe('Clearnode Authentication', () => {
         {
             scope: authRequestParams.scope,
             application: authRequestParams.application,
-            participant: authRequestParams.participant,
+            participant: authRequestParams.session_key,
             expire: authRequestParams.expire,
             allowances: authRequestParams.allowances,
         },
@@ -59,7 +60,7 @@ describe('Clearnode Authentication', () => {
         const response = await ws.sendAndWaitForResponse(msg, getAuthChallengePredicate(), 1000);
         expect(response).toBeDefined();
 
-        parsedChallengeResponse = rpcResponseParser.authChallenge(response);
+        parsedChallengeResponse = parseAuthChallengeResponse(response);
         expect(parsedChallengeResponse.params.challengeMessage).toBeDefined();
     });
 
@@ -81,11 +82,11 @@ describe('Clearnode Authentication', () => {
         const response = await ws.sendAndWaitForResponse(msg, getAuthVerifyPredicate(), 1000);
         expect(response).toBeDefined();
 
-        const parsedAuthVerifyResponse = rpcResponseParser.authVerify(response);
+        const parsedAuthVerifyResponse = parseAuthVerifyResponse(response);
 
         expect(parsedAuthVerifyResponse.params.success).toBe(true);
-        expect(parsedAuthVerifyResponse.params.sessionKey).toBe(authRequestParams.participant);
-        expect(parsedAuthVerifyResponse.params.address).toBe(authRequestParams.wallet);
+        expect(parsedAuthVerifyResponse.params.sessionKey).toBe(authRequestParams.session_key);
+        expect(parsedAuthVerifyResponse.params.address).toBe(authRequestParams.address);
         expect(parsedAuthVerifyResponse.params.jwtToken).toBeDefined();
 
         jwtToken = parsedAuthVerifyResponse.params.jwtToken;
@@ -101,11 +102,11 @@ describe('Clearnode Authentication', () => {
         const response = await ws.sendAndWaitForResponse(msg, getAuthVerifyPredicate(), 1000);
         expect(response).toBeDefined();
 
-        const parsedAuthVerifyResponse = rpcResponseParser.authVerify(response);
+        const parsedAuthVerifyResponse = parseAuthVerifyResponse(response);
 
         expect(parsedAuthVerifyResponse.params.success).toBe(true);
-        expect(parsedAuthVerifyResponse.params.sessionKey).toBe(authRequestParams.participant);
-        expect(parsedAuthVerifyResponse.params.address).toBe(authRequestParams.wallet);
+        expect(parsedAuthVerifyResponse.params.sessionKey).toBe(authRequestParams.session_key);
+        expect(parsedAuthVerifyResponse.params.address).toBe(authRequestParams.address);
         expect(parsedAuthVerifyResponse.params.jwtToken).toBeUndefined();
     });
 });

@@ -6,60 +6,67 @@ import {
     GetLedgerEntriesResponseParams,
     BalanceUpdateResponseParams,
     GetLedgerTransactionsResponseParams,
-    TxType,
-    Transaction,
+    RPCTxType,
+    RPCTransaction,
     TransferNotificationResponseParams,
     TransferResponseParams,
+    RPCBalance,
+    RPCLedgerEntry,
 } from '../types';
-import { addressSchema, ParamsParser } from './common';
+import { addressSchema, dateSchema, decimalSchema, ParamsParser } from './common';
+
+const BalanceObjectSchema = z
+    .object({
+        asset: z.string(),
+        amount: decimalSchema,
+    })
+    .transform((b): RPCBalance => b);
 
 const GetLedgerBalancesParamsSchema = z
-    .array(
-        z.array(
-            z.object({
-                asset: z.string(),
-                amount: z.union([z.string(), z.number()]).transform((a) => a.toString()),
-            }),
-        ),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0])
-    .transform((arr) => arr as GetLedgerBalancesResponseParams[]);
+    .object({
+        ledger_balances: z.array(BalanceObjectSchema),
+    })
+    .transform(
+        (raw): GetLedgerBalancesResponseParams => ({
+            ledgerBalances: raw.ledger_balances,
+        }),
+    );
+
+const LedgerEntryObjectSchema = z
+    .object({
+        id: z.number(),
+        account_id: z.string(),
+        account_type: z.number(),
+        asset: z.string(),
+        participant: addressSchema,
+        credit: decimalSchema,
+        debit: decimalSchema,
+        created_at: dateSchema,
+    })
+    .transform(
+        (e): RPCLedgerEntry => ({
+            id: e.id,
+            accountId: e.account_id,
+            accountType: e.account_type,
+            asset: e.asset,
+            participant: e.participant,
+            credit: e.credit,
+            debit: e.debit,
+            createdAt: e.created_at,
+        }),
+    );
 
 const GetLedgerEntriesParamsSchema = z
-    .array(
-        z.array(
-            z
-                .object({
-                    id: z.number(),
-                    account_id: z.string(),
-                    account_type: z.number(),
-                    asset: z.string(),
-                    participant: addressSchema,
-                    credit: z.union([z.string(), z.number()]).transform((v) => v.toString()),
-                    debit: z.union([z.string(), z.number()]).transform((v) => v.toString()),
-                    created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
-                })
-                .transform(
-                    (e) =>
-                        ({
-                            id: e.id,
-                            accountId: e.account_id,
-                            accountType: e.account_type,
-                            asset: e.asset,
-                            participant: e.participant as Address,
-                            credit: e.credit,
-                            debit: e.debit,
-                            createdAt: e.created_at,
-                        }) as GetLedgerEntriesResponseParams,
-                ),
-        ),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0])
-    .transform((arr) => arr as GetLedgerEntriesResponseParams[]);
+    .object({
+        ledger_entries: z.array(LedgerEntryObjectSchema),
+    })
+    .transform(
+        (raw): GetLedgerEntriesResponseParams => ({
+            ledgerEntries: raw.ledger_entries,
+        }),
+    );
 
-export const txTypeEnum = z.nativeEnum(TxType);
+export const txTypeEnum = z.nativeEnum(RPCTxType);
 
 export const TransactionSchema = z
     .object({
@@ -71,15 +78,15 @@ export const TransactionSchema = z
         to_account_tag: z.string().optional(),
         asset: z.string(),
         amount: z.string(),
-        created_at: z.union([z.string(), z.date()]).transform((v) => new Date(v)),
+        created_at: dateSchema,
     })
     .transform(
-        (raw): Transaction => ({
+        (raw): RPCTransaction => ({
             id: raw.id,
             txType: raw.tx_type,
-            fromAccount: raw.from_account as Address,
+            fromAccount: raw.from_account,
             fromAccountTag: raw.from_account_tag,
-            toAccount: raw.to_account as Address,
+            toAccount: raw.to_account,
             toAccountTag: raw.to_account_tag,
             asset: raw.asset,
             amount: raw.amount,
@@ -88,30 +95,44 @@ export const TransactionSchema = z
     );
 
 const GetLedgerTransactionsParamsSchema = z
-    .array(z.array(TransactionSchema))
-    .refine((arr) => arr.length === 1)
-    .transform((arr): GetLedgerTransactionsResponseParams => arr[0]);
+    .object({
+        ledger_transactions: z.array(TransactionSchema),
+    })
+    .transform(
+        (raw): GetLedgerTransactionsResponseParams => ({
+            ledgerTransactions: raw.ledger_transactions,
+        }),
+    );
 
 const BalanceUpdateParamsSchema = z
-    .array(
-        z.array(
-            z
-                .object({ asset: z.string(), amount: z.union([z.string(), z.number()]).transform((a) => a.toString()) })
-                .transform((b) => ({ asset: b.asset, amount: b.amount }) as BalanceUpdateResponseParams),
-        ),
-    )
-    .refine((arr) => arr.length === 1)
-    .transform((arr) => arr[0]);
+    .object({
+        balance_updates: z.array(BalanceObjectSchema),
+    })
+    .transform(
+        (raw): BalanceUpdateResponseParams => ({
+            balanceUpdates: raw.balance_updates,
+        }),
+    );
 
 const TransferParamsSchema = z
-    .array(z.array(TransactionSchema))
-    .refine((arr) => arr.length === 1)
-    .transform((arr): TransferResponseParams => arr[0]);
+    .object({
+        transactions: z.array(TransactionSchema),
+    })
+    .transform(
+        (raw): TransferResponseParams => ({
+            transactions: raw.transactions,
+        }),
+    );
 
 const TransferNotificationParamsSchema = z
-    .array(z.array(TransactionSchema))
-    .refine((arr) => arr.length === 1)
-    .transform((arr): TransferNotificationResponseParams => arr[0]);
+    .object({
+        transactions: z.array(TransactionSchema),
+    })
+    .transform(
+        (raw): TransferNotificationResponseParams => ({
+            transactions: raw.transactions,
+        }),
+    );
 
 export const ledgerParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.GetLedgerBalances]: (params) => GetLedgerBalancesParamsSchema.parse(params),

@@ -85,7 +85,7 @@ func setupMockCustody(t *testing.T) (*Custody, *gorm.DB, func()) {
 		custody:            contract,
 		chainID:            uint32(chainID.Int64()),
 		adjudicatorAddress: newTestCommonAddress("0xAdjudicatorAddress"),
-		wsNotifier:         NewWSNotifier(func(userID string, method string, params ...any) {}, logger),
+		wsNotifier:         NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, logger),
 		logger:             logger,
 	}
 
@@ -310,7 +310,7 @@ func TestHandleCreatedEvent(t *testing.T) {
 			}
 
 			capturedNotifications := make(map[string][]Notification)
-			custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+			custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 				if capturedNotifications[userID] == nil {
 					capturedNotifications[userID] = make([]Notification, 0)
 				}
@@ -406,7 +406,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, finalAmount)
 
 		capturedNotifications := make(map[string][]Notification)
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
@@ -594,7 +594,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, channelAmount.BigInt())
 
 		capturedNotifications := make(map[string][]Notification)
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
@@ -665,7 +665,7 @@ func TestHandleChallengedEvent(t *testing.T) {
 		_, mockEvent := createMockChallengedEvent(t, custody.signer, tokenAddress, amount.BigInt())
 
 		capturedNotifications := make(map[string][]Notification)
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
@@ -741,7 +741,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		_, mockEvent := createMockResizedEvent(t, deltaAmount.BigInt())
 
 		capturedNotifications := make(map[string][]Notification)
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
@@ -901,7 +901,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		_, mockEvent := createMockResizedEvent(t, big.NewInt(500000))
 
 		capturedNotifications := make(map[string][]Notification)
-		custody.wsNotifier.notify = func(userID string, method string, params ...any) {
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
 
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,

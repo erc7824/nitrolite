@@ -1,6 +1,6 @@
-import { keccak256, encodeAbiParameters, Address } from 'viem';
+import { keccak256, encodeAbiParameters, Address, Hex } from 'viem';
 import { Channel, ChannelId, State } from '../client/types'; // Updated import path
-import { ChannelOperationState, RPCChannel, ServerSignature } from '../rpc';
+import { RPCChannel, RPCChannelOperationState } from '../rpc';
 
 /**
  * Compute the unique identifier for a channel based on its configuration.
@@ -66,7 +66,7 @@ export function convertRPCToClientChannel(ch: RPCChannel): Channel {
     };
 }
 
-export function convertRPCToClientState(s: ChannelOperationState, sig: ServerSignature): State {
+export function convertRPCToClientState(s: RPCChannelOperationState, sig: Hex): State {
     return {
         intent: s.intent,
         version: BigInt(s.version),

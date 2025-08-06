@@ -45,7 +45,8 @@ This is the core data that is passed around and signed.
 type UnsignedCommonState struct {
     Nonce             uint64       `json:"nonce"`               // Strictly increasing nonce to prevent replay attacks.
     StateData         []byte       `json:"state_data"`          // Flexible field for arbitrary application-level metadata.
-    ChainStates       []ChainState `json:"chain_states"`        // Details the user's token balances on each chain.
+    Balances          []TokenAmount `json:"balances"`            // User ledger balance on each chain
+    // ChainStates       []ChainState `json:"chain_states"`        // Details the user's token balances on each chain.
     ActiveSessionKeys []SessionKey `json:"active_session_keys"` // List of delegated, permissioned keys.
 }
 ```
@@ -53,11 +54,11 @@ type UnsignedCommonState struct {
 #### Supporting Structures
 
 ```go
-// ChainState details a user's funds on a single blockchain.
-type ChainState struct {
-    ChainID     uint32        `json:"chain_id"`
-    Allocations []TokenAmount `json:"allocations"`
-}
+// // ChainState details a user's funds on a single blockchain.
+// type ChainState struct {
+//     ChainID     uint32        `json:"chain_id"`
+//     Allocations []TokenAmount `json:"allocations"`
+// }
 
 // TokenAmount represents a quantity of a specific asset.
 type TokenAmount struct {

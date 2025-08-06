@@ -88,18 +88,19 @@ type CommonState struct {
 }
 
 type UnsignedCommonState struct {
-	Nonce             uint64       `json:"nonce"`               // Common state nonce
-	StateData         []byte       `json:"state_data"`          // Common state data
-	ChainStates       []ChainState `json:"chain_states"`        // User allocation on each chain
-	ActiveSessionKeys []SessionKey `json:"active_session_keys"` // List of active session keys.
+	Nonce     uint64 `json:"nonce"`      // Common state nonce
+	StateData []byte `json:"state_data"` // Common state data
+	// ChainStates       []ChainState  `json:"chain_states"`        // User allocation on each chain
+	Balances          []TokenAmount `json:"balances"`            // User ledger balance on each chain
+	ActiveSessionKeys []SessionKey  `json:"active_session_keys"` // List of active session keys.
 }
 
 // ActiveSessionKeys defines which keys can be used to sign new states or intents.
 
-type ChainState struct {
-	ChainID     uint32        `json:"chain_id"`
-	Allocations []TokenAmount `json:"allocations"`
-}
+// type ChainState struct {
+// 	ChainID     uint32        `json:"chain_id"`
+// 	Allocations []TokenAmount `json:"allocations"`
+// }
 
 type TokenAmount struct {
 	Asset  string          `json:"asset"` // Asset identifier on YN (todo: define strict formatting rules)

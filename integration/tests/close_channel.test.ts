@@ -75,14 +75,14 @@ describe('Close channel', () => {
 
         const closeChannelTxHash = await client.closeChannel({
             finalState: {
-                intent: closeParsedResponse.params.intent,
+                intent: closeParsedResponse.params.state.intent,
                 channelId: closeParsedResponse.params.channelId,
-                data: closeParsedResponse.params.stateData as Hex,
-                allocations: closeParsedResponse.params.allocations,
-                version: BigInt(closeParsedResponse.params.version),
+                data: closeParsedResponse.params.state.stateData as Hex,
+                allocations: closeParsedResponse.params.state.allocations,
+                version: BigInt(closeParsedResponse.params.state.version),
                 serverSignature: closeParsedResponse.params.serverSignature,
             },
-            stateData: closeParsedResponse.params.stateData as Hex,
+            stateData: closeParsedResponse.params.state.stateData as Hex,
         });
         expect(closeChannelTxHash).toBeDefined();
 

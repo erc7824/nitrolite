@@ -69,7 +69,7 @@ export interface ChannelData {
     lastValidState: State; // Last valid state of the channel recorded on-chain
 }
 
-interface UnsignedState {
+export interface UnsignedState {
     intent: StateIntent; // Intent of the state (uint8 enum in contract)
     version: bigint; // Version of the state (uint256 in contract)
     data: Hex; // Application data encoded (bytes in contract)
@@ -144,8 +144,9 @@ export interface NitroliteClientConfig {
  * Parameters required for creating a new state channel.
  */
 export interface CreateChannelParams {
-    initialAllocationAmounts: [bigint, bigint];
-    stateData?: Hex;
+    channel: Channel;
+    unsignedInitialState: UnsignedState;
+    serverSignature: Signature;
 }
 
 /**

@@ -259,6 +259,21 @@ export interface GetAppSessionsRequest extends GenericRPCMessage {
 }
 
 /**
+ * Represents the request parameters for the 'create_channel' RPC method.
+ */
+export interface CreateChannelRequestParams {
+    /** The blockchain network ID where the channel should be created. */
+    chain_id: number;
+    /** The token contract address for the channel. */
+    token: Address;
+    /** The initial amount to deposit in the channel (in raw token units). */
+    amount: bigint;
+    /** Optional session key address for the channel. */
+    session_key?: Hex;
+}
+export type CreateChannelRPCRequestParams = CreateChannelRequestParams; // for backward compatibility
+
+/**
  * Represents the request parameters for the 'resize_channel' RPC method.
  */
 export type ResizeChannelRequestParams = {
@@ -272,6 +287,14 @@ export type ResizeChannelRequestParams = {
     funds_destination: Address;
 };
 export type ResizeChannelRPCRequestParams = ResizeChannelRequestParams; // for backward compatibility
+
+/**
+ * Represents the request structure for the 'create_channel' RPC method.
+ */
+export interface CreateChannelRequest extends GenericRPCMessage {
+    method: RPCMethod.CreateChannel;
+    params: [CreateChannelRequestParams];
+}
 
 /**
  * Represents the request structure for the 'resize_channel' RPC method.
@@ -449,6 +472,7 @@ export type RPCRequest =
     | CloseAppSessionRequest
     | GetAppDefinitionRequest
     | GetAppSessionsRequest
+    | CreateChannelRequest
     | ResizeChannelRequest
     | CloseChannelRequest
     | GetChannelsRequest
@@ -476,6 +500,7 @@ export type RPCRequestParamsByMethod = {
     [RPCMethod.CloseAppSession]: CloseAppSessionRequestParams;
     [RPCMethod.GetAppDefinition]: GetAppDefinitionRequestParams;
     [RPCMethod.GetAppSessions]: GetAppSessionsRequestParams;
+    [RPCMethod.CreateChannel]: CreateChannelRequestParams;
     [RPCMethod.ResizeChannel]: ResizeChannelRequestParams;
     [RPCMethod.CloseChannel]: CloseChannelRequestParams;
     [RPCMethod.GetChannels]: GetChannelsRequestParams;

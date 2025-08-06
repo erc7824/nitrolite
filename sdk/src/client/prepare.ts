@@ -108,14 +108,11 @@ export class NitroliteTransactionPreparer {
      * @param params Parameters for channel creation. See {@link CreateChannelParams}.
      * @returns The prepared transaction data ({ to, data, value }).
      */
-    async prepareCreateChannelTransaction(
-        tokenAddress: Address,
-        params: CreateChannelParams,
-    ): Promise<PreparedTransaction> {
+    async prepareCreateChannelTransaction(params: CreateChannelParams): Promise<PreparedTransaction> {
         try {
-            const { channel, initialState } = await _prepareAndSignInitialState(tokenAddress, this.deps, params);
+            const { initialState } = await _prepareAndSignInitialState(this.deps, params);
 
-            return await this.deps.nitroliteService.prepareCreateChannel(channel, initialState);
+            return await this.deps.nitroliteService.prepareCreateChannel(params.channel, initialState);
         } catch (err) {
             if (err instanceof Errors.NitroliteError) throw err;
             throw new Errors.ContractCallError('prepareCreateChannelTransaction', err as Error, { params });
@@ -156,11 +153,11 @@ export class NitroliteTransactionPreparer {
         }
 
         try {
-            const { channel, initialState } = await _prepareAndSignInitialState(tokenAddress, this.deps, params);
+            const { initialState } = await _prepareAndSignInitialState(this.deps, params);
             const depositTx = await this.deps.nitroliteService.prepareDepositAndCreateChannel(
                 tokenAddress,
                 amount,
-                channel,
+                params.channel,
                 initialState,
             );
             transactions.push(depositTx);

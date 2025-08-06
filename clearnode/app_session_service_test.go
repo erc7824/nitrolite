@@ -67,11 +67,11 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		appSession, err := service.CreateApplication(params, rpcSigners)
 		require.NoError(t, err)
 		assert.NotNil(t, appSession)
-		assert.NotEmpty(t, appSession.SessionID)
+		assert.NotEmpty(t, appSession.AppSessionID)
 		assert.Equal(t, uint64(1), appSession.Version)
-		assert.Equal(t, ChannelStatusOpen, appSession.Status)
+		assert.Equal(t, ChannelStatusOpen, ChannelStatus(appSession.Status))
 
-		sessionAccountID := NewAccountID(appSession.SessionID)
+		sessionAccountID := NewAccountID(appSession.AppSessionID)
 
 		assert.Len(t, capturedNotifications, 2)
 		assertNotifications(t, capturedNotifications, userAddressA.Hex(), 1)
@@ -103,7 +103,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			expectedAmount, exists := expectedTxs[tx.FromAccount]
 			assert.True(t, exists, "Unexpected destination of a transaction: %s", tx.FromAccount)
 			assert.Equal(t, TransactionTypeAppDeposit, tx.Type, "Transaction type should be app deposit")
-			assert.Equal(t, appSession.SessionID, tx.ToAccount, "To account should be app session ID")
+			assert.Equal(t, appSession.AppSessionID, tx.ToAccount, "To account should be app session ID")
 			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
 			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
 			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
@@ -240,9 +240,9 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		newVersion, err := service.SubmitAppState(params, rpcSigners)
+		resp, err := service.SubmitAppState(params, rpcSigners)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(2), newVersion)
+		assert.Equal(t, uint64(2), resp.Version)
 
 		// Verify balances
 		appBalA, err := ledgerA.Balance(sessionAccountID, "usdc")
@@ -345,9 +345,9 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		newVersion, err := service.CloseApplication(params, rpcSigners)
+		resp, err := service.CloseApplication(params, rpcSigners)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(2), newVersion)
+		assert.Equal(t, uint64(2), resp.Version)
 
 		assert.Len(t, capturedNotifications, 2)
 		assertNotifications(t, capturedNotifications, userAddressA.Hex(), 1)
@@ -433,9 +433,9 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		newVersion, err := service.CloseApplication(params, rpcSigners)
+		resp, err := service.CloseApplication(params, rpcSigners)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(2), newVersion)
+		assert.Equal(t, uint64(2), resp.Version)
 
 		var closedSession AppSession
 		require.NoError(t, db.First(&closedSession, "session_id = ?", session.SessionID).Error)

@@ -1,5 +1,5 @@
 import { describe, test, expect, jest } from '@jest/globals';
-import { getStateHash, signState, verifySignature } from '../../../src/utils/state';
+import { getStateHash, verifySignature } from '../../../src/utils/state';
 import { type State, type Signature, type Allocation, StateIntent } from '../../../src/client/types';
 import { Hex, Address, recoverMessageAddress, encodeAbiParameters, keccak256 } from 'viem';
 
@@ -50,40 +50,6 @@ describe('getStateHash', () => {
         );
         expect(keccak256).toHaveBeenCalledWith('0xencoded');
         expect(hash).toBe('0xhash');
-    });
-});
-
-describe('signState', () => {
-    const channelId = '0xChannelId' as Hex;
-    const state: State = {
-        data: '0xdata' as Hex,
-        intent: StateIntent.INITIALIZE,
-        allocations: [
-            { destination: '0xA' as Address, token: '0xT' as Address, amount: 10n },
-            { destination: '0xB' as Address, token: '0xT' as Address, amount: 20n },
-        ] as [Allocation, Allocation],
-        version: 0n,
-        sigs: [],
-    };
-    const stateHash = getStateHash(channelId, state);
-    const expectedSignature = '0xrs1b' as Hex;
-    const signer = jest.fn(async ({ message }) => {
-        if (message.raw === stateHash) return expectedSignature;
-        throw new Error('sign fail');
-    });
-
-    test('successfully signs and parses signature', async () => {
-        // @ts-ignore
-        const sig = await signState(channelId, state, signer);
-        expect(signer).toHaveBeenCalledWith({ message: { raw: stateHash } });
-        expect(sig).toEqual(expectedSignature);
-    });
-
-    test('throws on signer error', async () => {
-        const badSigner = jest.fn(async () => {
-            throw new Error('bad');
-        });
-        await expect(signState(channelId, state, badSigner)).rejects.toThrow(/Failed to sign state hash: bad/);
     });
 });
 

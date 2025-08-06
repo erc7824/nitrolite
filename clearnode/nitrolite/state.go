@@ -81,26 +81,26 @@ CREATE TABLE user_keys (
 )
 */
 
-type CommonState struct {
-	State       UnsignedCommonState `json:"state"`
-	OwnerSig    Signature           `json:"owner_sig"`
-	NetworkSigs []Signature         `json:"network_sigs"`
+type State struct {
+	UnsignedState UnsignedState `json:"state"`
+	OwnerSig      Signature     `json:"owner_sig"`
+	NetworkSigs   []Signature   `json:"network_sigs"`
 }
 
-type UnsignedCommonState struct {
-	Nonce     uint64 `json:"nonce"`      // Common state nonce
-	StateData []byte `json:"state_data"` // Common state data
-	// ChainStates       []ChainState  `json:"chain_states"`        // User allocation on each chain
+type UnsignedState struct {
+	Nonce             uint64        `json:"nonce"`               // Common state nonce
+	Data              []byte        `json:"data"`                // Common state data
+	ChainStates       []ChainState  `json:"chain_states"`        // User allocation on each chain
 	Balances          []TokenAmount `json:"balances"`            // User ledger balance on each chain
 	ActiveSessionKeys []SessionKey  `json:"active_session_keys"` // List of active session keys.
 }
 
 // ActiveSessionKeys defines which keys can be used to sign new states or intents.
 
-// type ChainState struct {
-// 	ChainID     uint32        `json:"chain_id"`
-// 	Allocations []TokenAmount `json:"allocations"`
-// }
+type ChainState struct {
+	ChainID     uint32        `json:"chain_id"`
+	Allocations []TokenAmount `json:"allocations"`
+}
 
 type TokenAmount struct {
 	Asset  string          `json:"asset"` // Asset identifier on YN (todo: define strict formatting rules)
@@ -109,7 +109,7 @@ type TokenAmount struct {
 
 // SessionKey holds the public key and permissions for a delegated key.
 type SessionKey struct {
-	KeyAddress  common.Address        `json:"key_address"` // The public address of the session key.
+	Address     common.Address        `json:"address"` // The public address of the session key.
 	Permissions SessionKeyPermissions `json:"permissions"`
 }
 
@@ -134,20 +134,20 @@ type BatchTransferIntent struct {
 }
 
 type UnsignedBatchTransferIntent struct {
-	StateNonce  uint64         `json:"state_nonce"` // Must match the sender's current CommonState nonce.
+	StateNonce  uint64         `json:"state_nonce"` // Must match the sender's current State nonce.
 	Destination common.Address `json:"destination"` // YN account identifier.
 	Allocations []TokenAmount  `json:"allocations"` // The assets and amounts to be transferred.
 }
 
-// Validators sign the new CommonState both for sender and receiver, store them and return them to the users.
-// Users can then anytime submit the signed CommonState to the Custody contract to settle. User also needs to provide his signature for the CommonState.
+// Validators sign the new State both for sender and receiver, store them and return them to the users.
+// Users can then anytime submit the signed State to the Custody contract to settle. User also needs to provide his signature for the State.
 
-// As when Network create new CommonStates, they have only signatures of validators, they can not submit the CommonState to the Custody contract straight away.
+// As when Network create new CommonStates, they have only signatures of validators, they can not submit the State to the Custody contract straight away.
 // However, if network needs to source money the money user owes, it calls the Adjudicator contract.
 // Adjudicator contract accepts:
-// - last CommonState A signed by user and validators.
+// - last State A signed by user and validators.
 // - array of transfer intents signed by user. (Proofs)
-// - final CommonState C signed by validators.
+// - final State C signed by validators.
 
 // Adjudicator verifies that networkSigs achieve a signature quorum threshold.
 // Adjudicator contract verifies that provided signed transfer intents lead from state A to state C, so it can accept state C.
@@ -161,7 +161,7 @@ type SignedBatchWithdrawalIntent struct {
 
 // BatchWithdrawalIntent is a user's declaration of their intent to withdraw funds.
 type BatchWithdrawalIntent struct {
-	StateNonce  uint64         `json:"state_nonce"` // Must match the sender's current CommonState nonce.
+	StateNonce  uint64         `json:"state_nonce"` // Must match the sender's current State nonce.
 	ChainID     uint32         `json:"chain_id"`    // Chain to withdraw.
 	Destination common.Address `json:"destination"` // Destination for the withdrawn funds on the target chain, typically the owner's address.
 	Withdrawals []TokenAmount  `json:"withdrawals"` // A list of tokens and amounts to withdraw. Can be full or a partial amount.
@@ -184,8 +184,8 @@ type BatchWithdrawalIntent struct {
 
 // The Network validators monitor Deposit events.
 
-// Upon seeing a new Deposit event, the validators create a new UnsignedCommonState for the user.
+// Upon seeing a new Deposit event, the validators create a new UnsignedState for the user.
 // This new state will have an incremented nonce and an updated ChainStates with the deposited funds.
 
-// The validators sign this new CommonState and credit the user's account within the network.
+// The validators sign this new State and credit the user's account within the network.
 // The user doesn't need to sign a separate intent for deposits. // The Deposit event emitted by the contract is the authorization for the validators to update the user's state.

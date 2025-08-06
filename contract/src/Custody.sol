@@ -78,8 +78,8 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
     mapping(address account => Ledger ledger) internal _ledgers;
 
     // ========== Constructor ==========
-    // TODO: make sure the last nitrolite sdk npm package version used
-    constructor() EIP712("Nitrolite:Custody", "0.2.24") {
+
+    constructor() EIP712("Nitrolite:Custody", "0.3.0") {
         // No state initialization needed
     }
 

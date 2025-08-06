@@ -52,10 +52,10 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 	defer cleanup()
 
 	router.Config = &Config{
-		networks: map[string]*NetworkConfig{
-			"polygon": {Name: "polygon", ChainID: 137, InfuraURL: "https://polygon-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress1"},
-			"celo":    {Name: "celo", ChainID: 42220, InfuraURL: "https://celo-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress2"},
-			"base":    {Name: "base", ChainID: 8453, InfuraURL: "https://base-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress3"},
+		networks: map[uint32]*NetworkConfig{
+			137:   {ChainID: 137, InfuraURL: "https://polygon-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress1"},
+			42220: {ChainID: 42220, InfuraURL: "https://celo-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress2"},
+			8453:  {ChainID: 8453, InfuraURL: "https://base-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress3"},
 		},
 	}
 
@@ -68,17 +68,16 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 	assert.Equal(t, router.Signer.GetAddress().Hex(), configMap.BrokerAddress)
 	require.Len(t, configMap.Networks, 3, "Should have 3 supported networks")
 
-	expectedNetworks := map[string]uint32{
-		"polygon": 137,
-		"celo":    42220,
-		"base":    8453,
+	expectedNetworks := map[uint32]struct{}{
+		137:   {},
+		42220: {},
+		8453:  {},
 	}
 	for _, network := range configMap.Networks {
-		expectedChainID, exists := expectedNetworks[network.Name]
-		assert.True(t, exists, "Network %s should be in expected networks", network.Name)
-		assert.Equal(t, expectedChainID, network.ChainID, "Chain ID should match for %s", network.Name)
+		_, exists := expectedNetworks[network.ChainID]
+		assert.True(t, exists, "Network %d should be in expected networks", network.ChainID)
 		assert.Contains(t, network.CustodyAddress, "0xCustodyAddress", "Custody address should be present")
-		delete(expectedNetworks, network.Name)
+		delete(expectedNetworks, network.ChainID)
 	}
 	assert.Empty(t, expectedNetworks, "All expected networks should be found")
 }
@@ -165,7 +164,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 				ChannelID:   "0xChannel3",
 				Wallet:      participantWallet,
 				Participant: participantSigner,
-				Status:      ChannelStatusJoining,
+				Status:      ChannelStatusOpen,
 				Nonce:       3,
 				CreatedAt:   baseTime.Add(2 * time.Hour),
 			},
@@ -212,22 +211,17 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			{
 				name:               "Filter by status open",
 				params:             map[string]interface{}{"status": string(ChannelStatusOpen)},
-				expectedChannelIDs: []string{"0xOtherChannel", "0xChannel1"},
+				expectedChannelIDs: []string{"0xOtherChannel", "0xChannel3", "0xChannel1"},
 			},
 			{
 				name:               "Filter by participant and status open",
 				params:             map[string]interface{}{"participant": participantWallet, "status": string(ChannelStatusOpen)},
-				expectedChannelIDs: []string{"0xChannel1"},
+				expectedChannelIDs: []string{"0xChannel3", "0xChannel1"},
 			},
 			{
 				name:               "Filter by participant and status closed",
 				params:             map[string]interface{}{"participant": participantWallet, "status": string(ChannelStatusClosed)},
 				expectedChannelIDs: []string{"0xChannel2"},
-			},
-			{
-				name:               "Filter by participant and status joining",
-				params:             map[string]interface{}{"participant": participantWallet, "status": string(ChannelStatusJoining)},
-				expectedChannelIDs: []string{"0xChannel3"},
 			},
 			{
 				name:               "Filter by status closed only",
@@ -268,14 +262,14 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			{Wallet: "0xWallet1", Participant: "0xParticipant1", Status: ChannelStatusOpen, Nonce: 1},
 			{Wallet: "0xWallet2", Participant: "0xParticipant2", Status: ChannelStatusClosed, Nonce: 2},
 			{Wallet: "0xWallet3", Participant: "0xParticipant3", Status: ChannelStatusOpen, Nonce: 3},
-			{Wallet: "0xWallet4", Participant: "0xParticipant4", Status: ChannelStatusJoining, Nonce: 4},
-			{Wallet: "0xWallet5", Participant: "0xParticipant5", Status: ChannelStatusOpen, Nonce: 5},
-			{Wallet: "0xWallet6", Participant: "0xParticipant6", Status: ChannelStatusChallenged, Nonce: 6},
-			{Wallet: "0xWallet7", Participant: "0xParticipant7", Status: ChannelStatusOpen, Nonce: 7},
-			{Wallet: "0xWallet8", Participant: "0xParticipant8", Status: ChannelStatusClosed, Nonce: 8},
-			{Wallet: "0xWallet9", Participant: "0xParticipant9", Status: ChannelStatusOpen, Nonce: 9},
-			{Wallet: "0xWallet10", Participant: "0xParticipant10", Status: ChannelStatusJoining, Nonce: 10},
-			{Wallet: "0xWallet11", Participant: "0xParticipant11", Status: ChannelStatusOpen, Nonce: 11},
+			{Wallet: "0xWallet5", Participant: "0xParticipant5", Status: ChannelStatusOpen, Nonce: 4},
+			{Wallet: "0xWallet6", Participant: "0xParticipant6", Status: ChannelStatusChallenged, Nonce: 5},
+			{Wallet: "0xWallet7", Participant: "0xParticipant7", Status: ChannelStatusOpen, Nonce: 6},
+			{Wallet: "0xWallet8", Participant: "0xParticipant8", Status: ChannelStatusClosed, Nonce: 7},
+			{Wallet: "0xWallet9", Participant: "0xParticipant9", Status: ChannelStatusOpen, Nonce: 8},
+			{Wallet: "0xWallet10", Participant: "0xParticipant10", Status: ChannelStatusOpen, Nonce: 9},
+			{Wallet: "0xWallet11", Participant: "0xParticipant11", Status: ChannelStatusOpen, Nonce: 10},
+			{Wallet: "0xWallet12", Participant: "0xParticipant12", Status: ChannelStatusOpen, Nonce: 11},
 		}
 
 		for i := range testChannels {
@@ -315,7 +309,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			},
 			{name: "Pagination with status filter",
 				params:             map[string]interface{}{"status": "open", "limit": float64(3)},
-				expectedChannelIDs: []string{"0xChannel01", "0xChannel03", "0xChannel05"}, // Only open channels, first 3
+				expectedChannelIDs: []string{"0xChannel01", "0xChannel03", "0xChannel04"}, // Only open channels, first 3
 			},
 		}
 

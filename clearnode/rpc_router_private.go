@@ -72,26 +72,18 @@ type AppSessionResponse struct {
 	UpdatedAt          string   `json:"updated_at"`
 }
 
+type CreateChannelParams struct {
+	ChainID    uint32           `json:"chain_id" validate:"required"`
+	Token      string           `json:"token" validate:"required"`
+	Amount     *decimal.Decimal `json:"amount" validate:"required,bigint"`
+	SessionKey *string          `json:"session_key,omitempty" validate:"omitempty"`
+}
+
 type ResizeChannelParams struct {
 	ChannelID        string           `json:"channel_id"                          validate:"required"`
-	AllocateAmount   *decimal.Decimal `json:"allocate_amount,omitempty,string"           validate:"omitempty,required_without=ResizeAmount,bigint"`
-	ResizeAmount     *decimal.Decimal `json:"resize_amount,omitempty,string"             validate:"omitempty,required_without=AllocateAmount,bigint"`
+	AllocateAmount   *decimal.Decimal `json:"allocate_amount,omitempty"           validate:"omitempty,required_without=ResizeAmount,bigint"`
+	ResizeAmount     *decimal.Decimal `json:"resize_amount,omitempty"             validate:"omitempty,required_without=AllocateAmount,bigint"`
 	FundsDestination string           `json:"funds_destination"                   validate:"required"`
-}
-
-type ResizeChannelResponse struct {
-	ChannelID   string       `json:"channel_id"`
-	StateData   string       `json:"state_data"`
-	Intent      uint8        `json:"intent"`
-	Version     uint64       `json:"version"`
-	Allocations []Allocation `json:"allocations"`
-	Signature   Signature    `json:"server_signature"`
-}
-
-type Allocation struct {
-	Participant  string          `json:"destination"`
-	TokenAddress string          `json:"token"`
-	RawAmount    decimal.Decimal `json:"amount,string"`
 }
 
 type CloseChannelParams struct {
@@ -99,13 +91,29 @@ type CloseChannelParams struct {
 	FundsDestination string `json:"funds_destination"`
 }
 
-type CloseChannelResponse struct {
-	ChannelID        string       `json:"channel_id"`
-	Intent           uint8        `json:"intent"`
-	Version          uint64       `json:"version"`
-	StateData        string       `json:"state_data"`
-	FinalAllocations []Allocation `json:"allocations"`
-	Signature        Signature    `json:"server_signature"`
+type ChannelOperationResponse struct {
+	ChannelID string `json:"channel_id"`
+	Channel   *struct {
+		Participants [2]string `json:"participants"`
+		Adjudicator  string    `json:"adjudicator"`
+		Challenge    uint64    `json:"challenge"`
+		Nonce        uint64    `json:"nonce"`
+	} `json:"channel,omitempty"`
+	State          UnsignedState `json:"state"`
+	StateSignature Signature     `json:"server_signature"`
+}
+
+type UnsignedState struct {
+	Intent      uint8        `json:"intent"`
+	Version     uint64       `json:"version"`
+	Data        string       `json:"state_data"`
+	Allocations []Allocation `json:"allocations"`
+}
+
+type Allocation struct {
+	Participant  string          `json:"destination"`
+	TokenAddress string          `json:"token"`
+	RawAmount    decimal.Decimal `json:"amount"`
 }
 
 type ChannelResponse struct {
@@ -114,7 +122,7 @@ type ChannelResponse struct {
 	Status      ChannelStatus   `json:"status"`
 	Token       string          `json:"token"`
 	Wallet      string          `json:"wallet"`
-	RawAmount   decimal.Decimal `json:"amount,string"` // Total amount in the channel (user + broker)
+	RawAmount   decimal.Decimal `json:"amount"` // Total amount in the channel (user + broker)
 	ChainID     uint32          `json:"chain_id"`
 	Adjudicator string          `json:"adjudicator"`
 	Challenge   uint64          `json:"challenge"`
@@ -359,21 +367,17 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 		return
 	}
 
-	appSession, err := r.AppSessionService.CreateApplication(&params, rpcSigners)
+	resp, err := r.AppSessionService.CreateApplication(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to create application session", "error", err)
 		c.Fail(err, "failed to create application session")
 		return
 	}
 
-	c.Succeed(req.Method, AppSessionResponse{
-		AppSessionID: appSession.SessionID,
-		Version:      appSession.Version,
-		Status:       string(ChannelStatusOpen),
-	})
+	c.Succeed(req.Method, resp)
 	logger.Info("application session created",
 		"userID", c.UserID,
-		"sessionID", appSession.SessionID,
+		"sessionID", resp.AppSessionID,
 		"protocol", params.Definition.Protocol,
 		"participants", params.Definition.ParticipantWallets,
 		"challenge", params.Definition.Challenge,
@@ -401,22 +405,18 @@ func (r *RPCRouter) HandleSubmitAppState(c *RPCContext) {
 		return
 	}
 
-	newVersion, err := r.AppSessionService.SubmitAppState(&params, rpcSigners)
+	resp, err := r.AppSessionService.SubmitAppState(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to submit app state", "error", err)
 		c.Fail(err, "failed to submit app state")
 		return
 	}
 
-	c.Succeed(req.Method, AppSessionResponse{
-		AppSessionID: params.AppSessionID,
-		Version:      newVersion,
-		Status:       string(ChannelStatusOpen),
-	})
+	c.Succeed(req.Method, resp)
 	logger.Info("application session state submitted",
 		"userID", c.UserID,
 		"sessionID", params.AppSessionID,
-		"newVersion", newVersion,
+		"newVersion", resp.Version,
 		"allocations", params.Allocations,
 	)
 }
@@ -440,23 +440,52 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 		return
 	}
 
-	finalVersion, err := r.AppSessionService.CloseApplication(&params, rpcSigners)
+	resp, err := r.AppSessionService.CloseApplication(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to close application session", "error", err)
 		c.Fail(err, "failed to close application session")
 		return
 	}
 
-	c.Succeed(req.Method, AppSessionResponse{
-		AppSessionID: params.AppSessionID,
-		Version:      finalVersion,
-		Status:       string(ChannelStatusClosed),
-	})
+	c.Succeed(req.Method, resp)
 	logger.Info("application session closed",
 		"userID", c.UserID,
 		"sessionID", params.AppSessionID,
-		"finalVersion", finalVersion,
+		"finalVersion", resp.Version,
 		"allocations", params.Allocations,
+	)
+}
+
+// HandleCreateChannel processes a request to create a payment channel with broker
+func (r *RPCRouter) HandleCreateChannel(c *RPCContext) {
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+
+	var params CreateChannelParams
+	if err := parseParams(req.Params, &params); err != nil {
+		c.Fail(err, "failed to parse parameters")
+		return
+	}
+
+	rpcSigners, err := getWallets(&c.Message)
+	if err != nil {
+		logger.Error("failed to get wallets from RPC message", "error", err)
+		c.Fail(err, "failed to get wallets from RPC message")
+		return
+	}
+
+	resp, err := r.ChannelService.RequestCreate(common.HexToAddress(c.UserID), &params, rpcSigners, logger)
+	if err != nil {
+		logger.Error("failed to request channel create", "error", err)
+		c.Fail(err, "failed to request channel create")
+		return
+	}
+
+	c.Succeed(req.Method, resp)
+	logger.Info("channel create requested",
+		"userID", c.UserID,
+		"channelID", resp.ChannelID,
 	)
 }
 
@@ -479,7 +508,7 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 		return
 	}
 
-	resp, err := r.ChannelService.RequestResize(logger, &params, rpcSigners)
+	resp, err := r.ChannelService.RequestResize(&params, rpcSigners, logger)
 	if err != nil {
 		logger.Error("failed to request channel resize", "error", err)
 		c.Fail(err, "failed to request channel resize")
@@ -490,7 +519,6 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 	logger.Info("channel resize requested",
 		"userID", c.UserID,
 		"channelID", resp.ChannelID,
-		"newVersion", resp.Version,
 		"fundsDestination", params.FundsDestination,
 		"resizeAmount", params.ResizeAmount.String(),
 		"allocateAmount", params.AllocateAmount.String(),
@@ -535,7 +563,7 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 		return
 	}
 
-	resp, err := r.ChannelService.RequestClose(logger, &params, rpcSigners)
+	resp, err := r.ChannelService.RequestClose(&params, rpcSigners, logger)
 	if err != nil {
 		logger.Error("failed to request channel closure", "error", err)
 		c.Fail(err, "failed to request channel closure")
@@ -546,7 +574,6 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 	logger.Info("channel close requested",
 		"userID", c.UserID,
 		"channelID", resp.ChannelID,
-		"newVersion", resp.Version,
 		"fundsDestination", params.FundsDestination,
 	)
 }

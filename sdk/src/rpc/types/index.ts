@@ -20,7 +20,6 @@ export type ResponseData = [RequestID, RPCMethod, object[], Timestamp?];
 
 /** Represents the status of a channel. */
 export enum RPCChannelStatus {
-    Joining = 'joining',
     Open = 'open',
     Closed = 'closed',
     Challenged = 'challenged',
@@ -326,6 +325,7 @@ export enum RPCMethod {
     CloseAppSession = 'close_app_session',
     GetAppDefinition = 'get_app_definition',
     GetAppSessions = 'get_app_sessions',
+    CreateChannel = 'create_channel',
     ResizeChannel = 'resize_channel',
     CloseChannel = 'close_channel',
     GetChannels = 'get_channels',

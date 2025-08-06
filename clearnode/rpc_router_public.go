@@ -68,7 +68,6 @@ type GetLedgerTransactionsParams struct {
 }
 
 type NetworkInfo struct {
-	Name               string `json:"name"`
 	ChainID            uint32 `json:"chain_id"`
 	CustodyAddress     string `json:"custody_address"`
 	AdjudicatorAddress string `json:"adjudicator_address"`
@@ -99,9 +98,8 @@ func (r *RPCRouter) HandlePing(c *RPCContext) {
 func (r *RPCRouter) HandleGetConfig(c *RPCContext) {
 	supportedNetworks := make([]NetworkInfo, 0, len(r.Config.networks))
 
-	for name, networkConfig := range r.Config.networks {
+	for _, networkConfig := range r.Config.networks {
 		supportedNetworks = append(supportedNetworks, NetworkInfo{
-			Name:               name,
 			ChainID:            networkConfig.ChainID,
 			CustodyAddress:     networkConfig.CustodyAddress,
 			AdjudicatorAddress: networkConfig.AdjudicatorAddress,

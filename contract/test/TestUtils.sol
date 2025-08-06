@@ -53,12 +53,21 @@ library TestUtils {
         return abi.encodePacked(r, s, v);
     }
 
-    function signStateEIP191(Vm vm, Channel memory channel, State memory state, uint256 privateKey)
+    function signStateRaw(Vm vm, bytes32 channelId, State memory state, uint256 privateKey)
         internal
-        view
+        pure
         returns (bytes memory)
     {
-        bytes memory packedState = Utils.getPackedState(Utils.getChannelId(channel), state);
+        bytes memory packedState = Utils.getPackedState(channelId, state);
+        return sign(vm, privateKey, packedState);
+    }
+
+    function signStateEIP191(Vm vm, bytes32 channelId, State memory state, uint256 privateKey)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        bytes memory packedState = Utils.getPackedState(channelId, state);
         return TestUtils.signEIP191(vm, privateKey, packedState);
     }
 

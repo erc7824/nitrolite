@@ -238,7 +238,8 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         channelId = Utils.getChannelId(ch);
         if (_channels[channelId].stage != ChannelStatus.VOID) revert InvalidStatus();
 
-        if (initial.sigs.length != 1) revert InvalidStateSignatures();
+        if (initial.sigs.length == 0 || initial.sigs.length > PART_NUM) revert InvalidStateSignatures();
+
         // TODO: later we can lift the restriction that first sig must be from CLIENT
         if (
             !initial.verifyStateSignature(
@@ -280,6 +281,25 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
         _lockAccountFundsToChannel(wallet, channelId, creatorDeposit.token, creatorDeposit.amount);
 
         emit Created(channelId, wallet, ch, initial);
+
+        if (initial.sigs.length == PART_NUM) {
+            address serverAddress = ch.participants[SERVER_IDX];
+            if (!initial.verifyStateSignature(channelId, _domainSeparatorV4(), initial.sigs[SERVER_IDX], serverAddress))
+            {
+                revert InvalidStateSignatures();
+            }
+
+            meta.stage = ChannelStatus.ACTIVE;
+            Amount memory expectedDeposit = meta.expectedDeposits[SERVER_IDX];
+            meta.actualDeposits[SERVER_IDX] = expectedDeposit;
+            meta.wallets[SERVER_IDX] = serverAddress;
+            _ledgers[serverAddress].channels.add(channelId);
+
+            _lockAccountFundsToChannel(serverAddress, channelId, expectedDeposit.token, expectedDeposit.amount);
+
+            emit Joined(channelId, SERVER_IDX);
+            emit Opened(channelId);
+        }
 
         return channelId;
     }

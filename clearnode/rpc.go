@@ -38,13 +38,16 @@ func (r RPCMessage) GetRequestSignersMap() (map[string]struct{}, error) {
 	return recoveredAddresses, nil
 }
 
+// TODO: ensure that it accepts only structs or maps, and prevent passing primitive (and other DS) types
+type RPCDataParams = any
+
 // RPCData represents the common structure for both requests and responses
 // Format: [request_id, method, params, ts]
 type RPCData struct {
-	RequestID uint64 `json:"request_id" validate:"required"`
-	Method    string `json:"method" validate:"required"`
-	Params    []any  `json:"params" validate:"required"`
-	Timestamp uint64 `json:"ts" validate:"required"`
+	RequestID uint64        `json:"request_id" validate:"required"`
+	Method    string        `json:"method" validate:"required"`
+	Params    RPCDataParams `json:"params" validate:"required"`
+	Timestamp uint64        `json:"ts" validate:"required"`
 	rawBytes  []byte
 }
 
@@ -66,7 +69,7 @@ func (m *RPCData) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(rawArr[1], &m.Method); err != nil {
 		return fmt.Errorf("invalid method: %w", err)
 	}
-	// Element 2: []any Params
+	// Element 2: RPCDataParams Params
 	if err := json.Unmarshal(rawArr[2], &m.Params); err != nil {
 		return fmt.Errorf("invalid params: %w", err)
 	}
@@ -92,7 +95,7 @@ func (m RPCData) MarshalJSON() ([]byte, error) {
 }
 
 // CreateResponse is unchanged. It simply constructs an RPCMessage with a "res" array.
-func CreateResponse(id uint64, method string, responseParams []any) *RPCMessage {
+func CreateResponse(id uint64, method string, responseParams RPCDataParams) *RPCMessage {
 	return &RPCMessage{
 		Res: &RPCData{
 			RequestID: id,

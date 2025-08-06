@@ -3,7 +3,7 @@ import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { CONFIG } from '@/setup';
 import { getGetUserTagPredicate, TestWebSocket } from "@/ws";
-import { createGetUserTagMessage, rpcResponseParser } from "@erc7824/nitrolite";
+import { createGetUserTagMessage, parseGetUserTagResponse } from "@erc7824/nitrolite";
 
 describe('Get User Tag Integration', () => {
     let ws: TestWebSocket;
@@ -43,7 +43,7 @@ describe('Get User Tag Integration', () => {
 
             expect(response).toBeDefined();
 
-            const parsedResponse = rpcResponseParser.getUserTag(response);
+            const parsedResponse = parseGetUserTagResponse(response);
             expect(parsedResponse).toBeDefined();
             expect(parsedResponse.params).toBeDefined();
             expect(parsedResponse.params.tag).toBeDefined();
@@ -55,12 +55,12 @@ describe('Get User Tag Integration', () => {
             // First request
             const msg1 = await createGetUserTagMessage(identity.messageSigner);
             const response1 = await ws.sendAndWaitForResponse(msg1, getGetUserTagPredicate(), 5000);
-            const parsedResponse1 = rpcResponseParser.getUserTag(response1);
+            const parsedResponse1 = parseGetUserTagResponse(response1);
 
             // Second request
             const msg2 = await createGetUserTagMessage(identity.messageSigner);
             const response2 = await ws.sendAndWaitForResponse(msg2, getGetUserTagPredicate(), 5000);
-            const parsedResponse2 = rpcResponseParser.getUserTag(response2);
+            const parsedResponse2 = parseGetUserTagResponse(response2);
 
             expect(parsedResponse1.params.tag).toBe(parsedResponse2.params.tag);
         });
@@ -68,7 +68,7 @@ describe('Get User Tag Integration', () => {
         it('should return valid tag format', async () => {
             const msg = await createGetUserTagMessage(identity.messageSigner);
             const response = await ws.sendAndWaitForResponse(msg, getGetUserTagPredicate(), 5000);
-            const parsedResponse = rpcResponseParser.getUserTag(response);
+            const parsedResponse = parseGetUserTagResponse(response);
 
             // Verify the tag format matches expected pattern (e.g., 'UX123D8C')
             expect(parsedResponse.params.tag).toMatch(/^[A-Z0-9]+$/);

@@ -1,11 +1,13 @@
 # Clearnode Protocol Specification
 
 ## Overview
+
 The Clearnode protocol is a system for managing payment channels and virtual applications between participants. It provides a secure, efficient way to conduct transactions off-chain while retaining the ability to settle on-chain when required, with support for multiple blockchain networks.
 
 ## Protocol Flow
 
 ### 1. Blockchain Channels and Credit
+
 - The protocol accepts blockchain channels to credit participants' balances in the database ledger
 - Participants create on-chain channels through custody contracts (supported on multiple chains including Polygon, Celo, and Base)
 - Channel creation events from the blockchain are received through webhooks and processed by the `EventHandler`
@@ -13,6 +15,7 @@ The Clearnode protocol is a system for managing payment channels and virtual app
 - Each participant has an `Account` in the ledger tied to their address.
 
 ### 2. Virtual Application Creation
+
 - After being credited from on-chain channels, participants can create virtual applications with other participants
 - Virtual applications allow participants to allocate a portion of their balance for peer-to-peer transactions without requiring on-chain operations
 - The broker validates that:
@@ -25,11 +28,13 @@ The Clearnode protocol is a system for managing payment channels and virtual app
 - The broker sets up message routing between participants
 
 ### 3. Virtual Application Operations
+
 - Participants send both requests and responses to each other through virtual applications using WebSocket connections
 - Any message (request or response) with an AppID specified is forwarded to all other participants
 - The broker maintains a real-time bidirectional communication layer for message routing
 
 ### 4. Virtual Application Closure and Settlement
+
 - When participants wish to close a virtual application, authorized signers must provide signatures that meet the quorum threshold
 - The broker validates the signatures against the list of authorized signers and their weights registered during application creation
 - The broker validates the final allocation of funds between participants
@@ -43,6 +48,7 @@ The Clearnode protocol is a system for managing payment channels and virtual app
 ## Security Features
 
 ### Authentication and Authorization
+
 - All operations are authenticated using cryptographic signatures
 - The system uses ECDSA signatures compatible with Ethereum accounts
 - Virtual applications implement a multi-signature scheme:
@@ -61,6 +67,7 @@ The Clearnode protocol is a system for managing payment channels and virtual app
   - Tokens use ES256 signatures for verification
 
 ### Multi-Chain Support
+
 - The system supports multiple blockchain networks (currently Polygon, Celo, and Base)
 - Each network has its own custody contract address and connection details
 - Chain IDs are tracked with channels to ensure proper chain association
@@ -72,6 +79,7 @@ The Clearnode protocol is a system for managing payment channels and virtual app
 - The `get_channels` method returns all channels for a participant across all supported chains
 
 ## Benefits
+
 - Efficient, low-cost transactions by keeping most operations off-chain
 - Security guarantees of blockchain when needed
 - Participants can freely transact within their allocated funds in virtual applications
@@ -89,7 +97,7 @@ All messages exchanged between clients and clearnodes follow this standardized f
 
 ```json
 {
-  "req": [REQUEST_ID, METHOD, [PARAMETERS], TIMESTAMP],
+  "req": [REQUEST_ID, METHOD, PARAMETERS, TIMESTAMP],
   "sid": "APP_SESSION_ID", // AppId for Virtual Ledgers for Internal Communication
   "sig": ["SIGNATURE"]  // Client's signature of the entire "req" object
 }
@@ -102,7 +110,7 @@ All messages exchanged between clients and clearnodes follow this standardized f
 
 ```json
 {
-  "res": [REQUEST_ID, METHOD, [RESPONSE_DATA], TIMESTAMP],
+  "res": [REQUEST_ID, METHOD, RESPONSE_DATA, TIMESTAMP],
   "sid": "APP_SESSION_ID", // AppId for Virtual Ledgers for Internal Communication
   "sig": ["SIGNATURE"]
 }
@@ -111,14 +119,13 @@ All messages exchanged between clients and clearnodes follow this standardized f
 - The `sid` field serves as both the subject and destination pubsub topic for the message. There is a one-to-one mapping between topics and ledger accounts.
 - The `sig` field contains one or more signatures, of the `res` data.
 
-
 The structure breakdown:
 
 - `REQUEST_ID`: A unique identifier for the request/response pair (`uint64`)
 - `METHOD`: The name of the method being called (`string`)
-- `PARAMETERS`/`RESPONSE_DATA`: An array of parameters/response data (`[]any`)
+- `PARAMETERS`/`RESPONSE_DATA`: An object of parameters/response data (`map[string]any`)
 - `TIMESTAMP`: Unix timestamp of the request/response in milliseconds (`uint64`)
-- `APP_SESSION_ID` (`sid`): If specified, the message gets forwarded to all participants of a virtual app with thosn AppSessionID.
+- `APP_SESSION_ID` (`sid`): If specified, the message gets forwarded to all participants of a virtual app with those AppSessionID.
 - `SIGNATURE`: Cryptographic signatures of the message (`[]string`). Multiple signatures may be required for certain operations.
 
 ## Data Types
@@ -149,7 +156,7 @@ The client initiates authentication by sending an `auth_request` request with th
 
 ```json
 {
-  "req": [1, "auth_request", [{
+  "req": [1, "auth_request", {
     "address": "0x1234567890abcdef...",
     "session_key": "0x9876543210fedcba...", // Optional: If specified, enables delegation
     "app_name": "Example App", // Optional: Application name
@@ -162,7 +169,7 @@ The client initiates authentication by sending an `auth_request` request with th
     "scope": "app.create", // Optional: Permission scope
     "expire": "24h", // Optional: Session expiration time
     "application": "0xApplication1234..." // Optional: Application public address
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x5432abcdef..."]
 }
 ```
@@ -173,9 +180,9 @@ The server responds with a random string challenge token.
 
 ```json
 {
-  "res": [1, "auth_challenge", [{
+  "res": [1, "auth_challenge", {
     "challenge_message": "550e8400-e29b-41d4-a716-446655440000"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
@@ -186,10 +193,10 @@ The client sends a verification request with the challenge token signed by the c
 
 ```json
 {
-  "req": [2, "auth_verify", [{
+  "req": [2, "auth_verify", {
     "address": "0x1234567890abcdef...",
     "challenge": "550e8400-e29b-41d4-a716-446655440000"
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0x2345bcdef..."]
 }
 ```
@@ -206,16 +213,17 @@ If authentication is successful, the server responds with a success confirmation
 
 ```json
 {
-  "res": [2, "auth_verify", [{
+  "res": [2, "auth_verify", {
     "address": "0x1234567890abcdef...",
     "success": true,
     "jwt_token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9..." // JWT token for session management
-  }], 1619123456789],
+  }, 1619123456789],
   "sig": ["0xabcd1234..."]
 }
 ```
 
 The JWT token contains:
+
 - Policy information (wallet, participant, scope, application)
 - Asset allowances (if specified)
 - Standard JWT claims (expiration, issuer, etc.)
@@ -255,9 +263,9 @@ When an error occurs, the server responds with an error message:
 
 ```json
 {
-  "res": [REQUEST_ID, "error", [{
+  "res": [REQUEST_ID, "error", {
     "error": "Error message describing what went wrong"
-  }], TIMESTAMP],
+  }, TIMESTAMP],
   "sig": ["SIGNATURE"]
 }
 ```

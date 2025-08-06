@@ -5,7 +5,7 @@ import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import { getResizeChannelPredicate, TestWebSocket } from '@/ws';
-import { createResizeChannelMessage, rpcResponseParser } from '@erc7824/nitrolite';
+import { createResizeChannelMessage, parseResizeChannelResponse } from '@erc7824/nitrolite';
 import { Hex, parseUnits } from 'viem';
 
 describe('Resize channel', () => {
@@ -64,17 +64,15 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, [
-            {
-                channel_id: createResponseParams.channelId,
-                resize_amount: depositAmount,
-                allocate_amount: parseUnits('0', 6),
-                funds_destination: identity.walletAddress,
-            },
-        ]);
+        const msg = await createResizeChannelMessage(identity.messageSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: depositAmount,
+            allocate_amount: parseUnits('0', 6),
+            funds_destination: identity.walletAddress,
+        });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
-        const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
         expect(resizeResponseParams.channelId).toBe(createResponseParams.channelId);
         expect(resizeResponseParams.state.stateData).toBeDefined();
         expect(resizeResponseParams.state.intent).toBe(2); // StateIntent.RESIZE // TODO: add enum to sdk
@@ -155,17 +153,15 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, [
-            {
-                channel_id: createResponseParams.channelId,
-                resize_amount: -depositAmount,
-                allocate_amount: parseUnits('0', 6),
-                funds_destination: identity.walletAddress,
-            },
-        ]);
+        const msg = await createResizeChannelMessage(identity.messageSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: -depositAmount,
+            allocate_amount: parseUnits('0', 6),
+            funds_destination: identity.walletAddress,
+        });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
-        const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
         expect(resizeResponseParams.state.allocations).toBeDefined();
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);
@@ -237,17 +233,15 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, [
-            {
-                channel_id: createResponseParams.channelId,
-                resize_amount: parseUnits('0', 6),
-                allocate_amount: -depositAmount,
-                funds_destination: identity.walletAddress,
-            },
-        ]);
+        const msg = await createResizeChannelMessage(identity.messageSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: parseUnits('0', 6),
+            allocate_amount: -depositAmount,
+            funds_destination: identity.walletAddress,
+        });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
-        const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
         expect(resizeResponseParams.state.allocations).toBeDefined();
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);

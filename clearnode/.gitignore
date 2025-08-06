@@ -30,4 +30,4 @@ testing/signer_key_*.hex
 *.csv
 
 # Generated protobuf files
-nitrolite/network/proto/
+nitrolite/types/proto/

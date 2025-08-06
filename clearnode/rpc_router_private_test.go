@@ -1708,7 +1708,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		router.HandleCreateChannel(ctx)
 
 		res := assertResponse(t, ctx, "create_channel")
-		resObj, ok := res.Params[0].(ChannelOperationResponse)
+		resObj, ok := res.Params.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be CreateChannelResponse")
 
 		// Verify response structure
@@ -1861,7 +1861,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 
 		// This should work as zero amount channels are allowed
 		res := assertResponse(t, ctx, "create_channel")
-		resObj, ok := res.Params[0].(ChannelOperationResponse)
+		resObj, ok := res.Params.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be CreateChannelResponse")
 		require.True(t, resObj.State.Allocations[0].RawAmount.IsZero(), "User allocation should be zero")
 	})

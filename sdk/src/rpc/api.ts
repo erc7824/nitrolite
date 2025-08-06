@@ -484,7 +484,12 @@ export async function createCreateChannelMessage(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const request = NitroliteRPC.createRequest(requestId, RPCMethod.CreateChannel, [params], timestamp);
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.CreateChannel,
+        params,
+        requestId,
+        timestamp,
+    });
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
     return JSON.stringify(signedRequest, (_, value) => (typeof value === 'bigint' ? value.toString() : value));
 }

@@ -40,7 +40,7 @@ const ChannelOperationObjectSchema = ChannelOperationObject.transform(
             allocations: raw.state.allocations.map((a) => ({
                 destination: a.destination,
                 token: a.token,
-                amount: a.amount,
+                amount: BigInt(a.amount),
             })),
         },
         serverSignature: raw.server_signature,
@@ -98,7 +98,7 @@ const ChannelUpdateObjectSchema = ChannelUpdateObject.transform(
         participant: raw.participant,
         status: raw.status,
         token: raw.token,
-        amount: raw.amount,
+        amount: BigInt(raw.amount),
         chainId: raw.chain_id,
         adjudicator: raw.adjudicator,
         challenge: raw.challenge,

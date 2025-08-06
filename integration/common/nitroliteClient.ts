@@ -7,6 +7,7 @@ import {
     NitroliteClient,
     parseChannelUpdateResponse,
     parseCloseChannelResponse,
+    parseCreateChannelResponse,
     RPCChannelStatus,
 } from '@erc7824/nitrolite';
 import { Identity } from './identity';
@@ -55,7 +56,7 @@ export class TestNitroliteClient extends NitroliteClient {
         const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
         expect(createResponse).toBeDefined();
 
-        const { params: createParsedResponseParams } = rpcResponseParser.createChannel(createResponse);
+        const { params: createParsedResponseParams } = parseCreateChannelResponse(createResponse);
 
         const openChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),

@@ -31,7 +31,8 @@ export const addressSchema = z
     })
     .transform((v: string) => v as Address);
 
-export const bigIntSchema = z.string().transform((a) => BigInt(a));
+// TODO: add more validation for bigints if needed
+export const bigIntSchema = z.string();
 
 export const dateSchema = z.union([z.string(), z.date()]).transform((v) => new Date(v));
 

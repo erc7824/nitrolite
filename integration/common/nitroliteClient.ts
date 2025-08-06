@@ -1,6 +1,9 @@
 import {
     Allocation,
+    convertRPCToClientChannel,
+    convertRPCToClientState,
     createCloseChannelMessage,
+    createCreateChannelMessage,
     NitroliteClient,
     RPCChannelStatus,
     rpcResponseParser,
@@ -8,7 +11,12 @@ import {
 import { Identity } from './identity';
 import { Address, createPublicClient, Hex, http } from 'viem';
 import { chain, CONFIG } from './setup';
-import { getChannelUpdatePredicateWithStatus, getCloseChannelPredicate, TestWebSocket } from './ws';
+import {
+    getChannelUpdatePredicateWithStatus,
+    getCloseChannelPredicate,
+    getCreateChannelPredicate,
+    TestWebSocket,
+} from './ws';
 
 export class TestNitroliteClient extends NitroliteClient {
     constructor(private identity: Identity) {
@@ -35,9 +43,18 @@ export class TestNitroliteClient extends NitroliteClient {
 
     createAndWaitForChannel = async (
         ws: TestWebSocket,
-        { tokenAddress, amount, depositAmount }: { tokenAddress: Address; amount: bigint, depositAmount?: bigint }
+        { tokenAddress, amount, depositAmount }: { tokenAddress: Address; amount: bigint; depositAmount?: bigint }
     ) => {
-        depositAmount = depositAmount ?? amount;
+        const msg = await createCreateChannelMessage(this.identity.messageSigner, {
+            chain_id: chain.id,
+            token: tokenAddress,
+            amount,
+            session_key: this.identity.sessionAddress,
+        });
+        const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
+        expect(createResponse).toBeDefined();
+
+        const { params: createParsedResponseParams } = rpcResponseParser.createChannel(createResponse);
 
         const openChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),
@@ -45,9 +62,14 @@ export class TestNitroliteClient extends NitroliteClient {
             5000
         );
 
+        depositAmount = depositAmount ?? amount;
         const { initialState } = await this.depositAndCreateChannel(tokenAddress, depositAmount, {
-            initialAllocationAmounts: [amount, BigInt(0)],
-            stateData: '0x',
+            unsignedInitialState: convertRPCToClientState(
+                createParsedResponseParams.state,
+                createParsedResponseParams.serverSignature
+            ),
+            channel: convertRPCToClientChannel(createParsedResponseParams.channel),
+            serverSignature: createParsedResponseParams.serverSignature,
         });
 
         const openResponse = await openChannelPromise;
@@ -76,25 +98,25 @@ export class TestNitroliteClient extends NitroliteClient {
 
         await this.closeChannel({
             finalState: {
-                intent: closeParsedResponse.params.intent,
-                channelId: closeParsedResponse.params.channelId as Hex,
-                data: closeParsedResponse.params.stateData as Hex,
+                intent: closeParsedResponse.params.state.intent,
+                channelId: closeParsedResponse.params.channelId,
+                data: closeParsedResponse.params.state.stateData,
                 allocations: [
                     {
-                        destination: closeParsedResponse.params.allocations[0].destination as Address,
-                        token: closeParsedResponse.params.allocations[0].token as Address,
-                        amount: closeParsedResponse.params.allocations[0].amount,
+                        destination: closeParsedResponse.params.state.allocations[0].destination as Address,
+                        token: closeParsedResponse.params.state.allocations[0].token as Address,
+                        amount: closeParsedResponse.params.state.allocations[0].amount,
                     },
                     {
-                        destination: closeParsedResponse.params.allocations[1].destination as Address,
-                        token: closeParsedResponse.params.allocations[1].token as Address,
-                        amount: closeParsedResponse.params.allocations[1].amount,
+                        destination: closeParsedResponse.params.state.allocations[1].destination as Address,
+                        token: closeParsedResponse.params.state.allocations[1].token as Address,
+                        amount: closeParsedResponse.params.state.allocations[1].amount,
                     },
                 ] as [Allocation, Allocation],
-                version: BigInt(closeParsedResponse.params.version),
+                version: BigInt(closeParsedResponse.params.state.version),
                 serverSignature: closeParsedResponse.params.serverSignature,
             },
-            stateData: closeParsedResponse.params.stateData as Hex,
+            stateData: closeParsedResponse.params.state.stateData,
         });
 
         const closeChannelUpdateResponse = await closeChannelUpdateChannelPromise;

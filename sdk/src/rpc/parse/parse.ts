@@ -82,6 +82,7 @@ export const rpcResponseParser = {
     closeAppSession: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.CloseAppSession),
     getAppDefinition: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetAppDefinition),
     getAppSessions: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetAppSessions),
+    createChannel: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.CreateChannel),
     resizeChannel: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.ResizeChannel),
     closeChannel: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.CloseChannel),
     getChannels: (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetChannels),

@@ -27,6 +27,7 @@ import {
     GetLedgerTransactionsFilters,
     GetLedgerTransactionsRequestParams,
     TransferRequestParams,
+    CreateChannelRequestParams,
 } from './types/request';
 import { signRawECDSAMessage } from '../utils/sign';
 
@@ -408,6 +409,17 @@ export async function createApplicationMessage(
     const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
     return JSON.stringify(signedRequest);
+}
+
+export async function createCreateChannelMessage(
+    signer: MessageSigner,
+    params: CreateChannelRequestParams,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const request = NitroliteRPC.createRequest(requestId, RPCMethod.CreateChannel, [params], timestamp);
+    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+    return JSON.stringify(signedRequest, (_, value) => (typeof value === 'bigint' ? value.toString() : value));
 }
 
 /**

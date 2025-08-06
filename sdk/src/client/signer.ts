@@ -1,5 +1,5 @@
 import { Account, Address, Chain, Hex, ParseAccount, toHex, Transport, WalletClient } from 'viem';
-import { State } from './types';
+import { State, UnsignedState } from './types';
 import { getPackedState, getStateHash } from '../utils';
 import { signRawECDSAMessage } from '../utils/sign';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -24,7 +24,7 @@ export interface StateSigner {
      * @param state The state to sign.
      * @returns A Promise that resolves to the signature as a Hex string.
      */
-    signState(channelId: Hex, state: State): Promise<Hex>;
+    signState(channelId: Hex, state: UnsignedState): Promise<Hex>;
     /**
      * Sign a raw message.
      * @param message The message to sign as a Hex string.

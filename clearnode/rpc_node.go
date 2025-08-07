@@ -177,7 +177,12 @@ read_loop:
 
 		if err := getValidator().Struct(&msg); err != nil {
 			n.logger.Debug("message validation failed", "error", err, "message", string(messageBytes))
-			n.sendErrorResponse(rpcConn, msg.Req.RequestID, "message validation failed")
+			n.sendErrorResponse(rpcConn, 0, "message validation failed")
+			continue
+		}
+		if msg.Req == nil {
+			n.logger.Debug("message request is empty", "message", string(messageBytes))
+			n.sendErrorResponse(rpcConn, 0, "message request is empty")
 			continue
 		}
 

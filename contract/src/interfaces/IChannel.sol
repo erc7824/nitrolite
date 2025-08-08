@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-import {Channel, State, Signature, Amount} from "./Types.sol";
+import {Channel, State, Amount} from "./Types.sol";
 
 /**
  * @title State Channel Interface
@@ -76,7 +76,7 @@ interface IChannel {
      * @param sig Signature of the participant on the funding state
      * @return channelId Unique identifier for the joined channel
      */
-    function join(bytes32 channelId, uint256 index, Signature calldata sig) external returns (bytes32);
+    function join(bytes32 channelId, uint256 index, bytes calldata sig) external returns (bytes32);
 
     /**
      * @notice Finalizes a channel with a mutually signed closing state
@@ -110,7 +110,7 @@ interface IChannel {
         bytes32 channelId,
         State calldata candidate,
         State[] calldata proofs,
-        Signature calldata challengerSig
+        bytes calldata challengerSig
     ) external;
 
     /**

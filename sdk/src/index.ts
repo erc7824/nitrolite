@@ -5,5 +5,6 @@ export * from './client';
 export * from './client/services';
 export * from './client/types';
 export * from './client/state';
+export * from './client/signer';
 export * from './rpc';
 export * from './abis';

@@ -21,6 +21,7 @@ import {
     ResizeChannelParams,
     State,
 } from './types';
+import { StateSigner } from './signer';
 
 const CUSTODY_MIN_CHALLENGE_DURATION = 3600n;
 
@@ -36,7 +37,7 @@ export class NitroliteClient {
     public readonly challengeDuration: bigint;
     public readonly txPreparer: NitroliteTransactionPreparer;
     public readonly chainId: number;
-    private readonly stateWalletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
+    private readonly stateSigner: StateSigner;
     private readonly nitroliteService: NitroliteService;
     private readonly erc20Service: Erc20Service;
     private readonly sharedDeps: PreparerDependencies;
@@ -57,8 +58,7 @@ export class NitroliteClient {
 
         this.publicClient = config.publicClient;
         this.walletClient = config.walletClient;
-        // Determine which wallet client to use for state signing
-        this.stateWalletClient = config.stateWalletClient ?? config.walletClient;
+        this.stateSigner = config.stateSigner;
         this.account = config.walletClient.account;
         this.addresses = config.addresses;
         this.challengeDuration = config.challengeDuration;
@@ -79,7 +79,7 @@ export class NitroliteClient {
             account: this.account,
             walletClient: this.walletClient,
             challengeDuration: this.challengeDuration,
-            stateWalletClient: this.stateWalletClient,
+            stateSigner: this.stateSigner,
             chainId: this.chainId,
         };
 
@@ -128,16 +128,14 @@ export class NitroliteClient {
      * @returns The channel ID, the signed initial state, and the transaction hash.
      */
     async createChannel(
-        tokenAddress: Address,
         params: CreateChannelParams,
     ): Promise<{ channelId: ChannelId; initialState: State; txHash: Hash }> {
         try {
-            const { channel, initialState, channelId } = await _prepareAndSignInitialState(
-                tokenAddress,
+            const { initialState, channelId } = await _prepareAndSignInitialState(
                 this.sharedDeps,
                 params,
             );
-            const txHash = await this.nitroliteService.createChannel(channel, initialState);
+            const txHash = await this.nitroliteService.createChannel(params.channel, initialState);
 
             return { channelId, initialState, txHash };
         } catch (err) {
@@ -161,8 +159,7 @@ export class NitroliteClient {
         try {
             const owner = this.account.address;
             const spender = this.addresses.custody;
-            const { channel, initialState, channelId } = await _prepareAndSignInitialState(
-                tokenAddress,
+            const { initialState, channelId } = await _prepareAndSignInitialState(
                 this.sharedDeps,
                 params,
             );
@@ -183,7 +180,7 @@ export class NitroliteClient {
             const txHash = await this.nitroliteService.depositAndCreateChannel(
                 tokenAddress,
                 depositAmount,
-                channel,
+                params.channel,
                 initialState,
             );
 

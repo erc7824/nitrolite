@@ -55,11 +55,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-
-	balanceCheckerAbi, err = nitrolite.BalanceCheckerMetaData.GetAbi()
-	if err != nil {
-		panic(err)
-	}
 }
 
 type LogHandler func(ctx context.Context, l types.Log)

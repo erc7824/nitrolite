@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { RPCChannelStatus, RPCMethod } from '../types';
+import { Address, Hex } from 'viem';
 
 // --- Shared Interfaces & Classes ---
 
@@ -16,15 +17,33 @@ export class ParserParamsMissingError extends Error {
 
 // --- Shared Zod Schemas ---
 
-export const hexSchema = z.string().refine((val) => /^0x[0-9a-fA-F]*$/.test(val), {
-    message: 'Must be a 0x-prefixed hex string',
-});
+export const hexSchema = z
+    .string()
+    .refine((val) => /^0x[0-9a-fA-F]*$/.test(val), {
+        message: 'Must be a 0x-prefixed hex string',
+    })
+    .transform((v: string) => v as Hex);
 
-export const addressSchema = z.string().refine((val) => /^0x[0-9a-fA-F]{40}$/.test(val), {
-    message: 'Must be a 0x-prefixed hex string of 40 hex chars (EVM address)',
-});
+export const addressSchema = z
+    .string()
+    .refine((val) => /^0x[0-9a-fA-F]{40}$/.test(val), {
+        message: 'Must be a 0x-prefixed hex string of 40 hex chars (EVM address)',
+    })
+    .transform((v: string) => v as Address);
 
-export const statusEnum = z.enum(Object.values(RPCChannelStatus) as [string, ...string[]]);
+// TODO: add more validation for bigints if needed
+export const bigIntSchema = z.string();
+
+export const dateSchema = z.union([z.string(), z.date()]).transform((v) => new Date(v));
+
+export const decimalSchema = z
+    .union([z.string(), z.number()])
+    .transform((v) => v.toString())
+    .refine((val) => /^[+-]?((\d+(\.\d*)?)|(\.\d+))$/.test(val), {
+        message: 'Must be a valid decimal string',
+    });
+
+export const statusEnum = z.nativeEnum(RPCChannelStatus);
 
 // --- Shared Parser Functions ---
 

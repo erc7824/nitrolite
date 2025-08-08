@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/nitrolite"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,9 +41,9 @@ func TestRPCStoreStoreMessage(t *testing.T) {
 		"key1": "value1",
 		"key2": 42,
 	}
-	reqSig := []string{"sig1", "sig2"}
+	reqSig := []Signature{Signature(hexutil.MustDecode("0x1234")), Signature(hexutil.MustDecode("0x4567"))}
 	resBytes := []byte(`{"result": "ok"}`)
-	resSig := []string{"resSig1"}
+	resSig := []Signature{Signature(hexutil.MustDecode("0x4321"))}
 
 	// Create RPCData
 	req := &RPCData{
@@ -69,8 +71,9 @@ func TestRPCStoreStoreMessage(t *testing.T) {
 	assert.Equal(t, reqID, record.ReqID)
 	assert.Equal(t, method, record.Method)
 	assert.Equal(t, timestamp, record.Timestamp)
-	assert.ElementsMatch(t, reqSig, record.ReqSig)
-	assert.ElementsMatch(t, resSig, record.ResSig)
+
+	assert.ElementsMatch(t, nitrolite.SignaturesToStrings(reqSig), record.ReqSig)
+	assert.ElementsMatch(t, nitrolite.SignaturesToStrings(resSig), record.ResSig)
 	assert.Equal(t, resBytes, record.Response)
 
 	// Verify params were stored correctly
@@ -83,7 +86,7 @@ func TestRPCStoreStoreMessage(t *testing.T) {
 	// Extract the first element which is our original map
 	storedParams := storedParamsArray[0]
 	assert.Equal(t, "value1", storedParams["key1"])
-	assert.Equal(t, float64(42), storedParams["key2"]) // JSON unmarshals numbers as float64
+	assert.Equal(t, float64(42), storedParams["key2"]) // JSON unmarshal numbers as float64
 }
 
 // TestRPCStoreStoreMessageError tests error handling for StoreMessage
@@ -103,11 +106,11 @@ func TestRPCStoreStoreMessageError(t *testing.T) {
 		Params:    []any{make(chan int)}, // Channels cannot be marshalled to JSON
 		Timestamp: uint64(time.Now().Unix()),
 	}
-	reqSig := []string{"sig1"}
+	reqSig := []Signature{Signature([]byte("sig1"))}
 	resBytes := []byte(`{"result": "ok"}`)
-	resSig := []string{"resSig1"}
+	resSig := []Signature{Signature([]byte("resSig1"))}
 
-	// Attempt to store the message, should fail due to unmarshalable params
+	// Attempt to store the message, should fail due to unmarshal-able params
 	err := store.StoreMessage(sender, req, reqSig, resBytes, resSig)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "json")

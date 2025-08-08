@@ -554,7 +554,7 @@ const messageSigner = async (payload: RequestData | ResponsePayload): Promise<He
 ```
 
 ## Getting Channel Information
-Так
+
 After authenticating with a ClearNode, you can request information about your channels. This is useful to verify your connection is working correctly and to retrieve channel data.
 
 ```javascript

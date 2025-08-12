@@ -17,7 +17,7 @@ func (o *Operator) handleListChains() {
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Name", "ID", "Asset", "RPCs", "Last Used"})
+	t.AppendHeader(table.Row{"ID", "Asset", "RPCs", "Last Used"})
 	t.AppendSeparator()
 
 	for _, network := range o.config.Networks {
@@ -34,13 +34,12 @@ func (o *Operator) handleListChains() {
 		}
 
 		for _, asset := range network.Assets {
-			t.AppendRow(table.Row{network.ChainName, network.ChainID, asset.Symbol, numRPCs, lastUsed.Format(time.RFC3339)})
+			t.AppendRow(table.Row{network.ChainID, asset.Symbol, numRPCs, lastUsed.Format(time.RFC3339)})
 		}
 	}
 	t.SetColumnConfigs(
 		[]table.ColumnConfig{
 			{Number: 1, AutoMerge: true},
-			{Number: 2, AutoMerge: true},
 		},
 	)
 	t.Render()
@@ -54,7 +53,7 @@ func (o *Operator) handleListChannels() {
 
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"Chain", "Asset", "ID", "Balance"})
+	t.AppendHeader(table.Row{"ChainID", "Asset", "ID", "Balance"})
 	t.AppendSeparator()
 
 	for _, network := range o.config.Networks {
@@ -66,13 +65,12 @@ func (o *Operator) handleListChannels() {
 				channelBalance = decimal.NewFromBigInt(asset.RawChannelBalance, -int32(asset.Decimals))
 			}
 
-			t.AppendRow(table.Row{network.ChainName, asset.Symbol, channelID, fmtDec(channelBalance)})
+			t.AppendRow(table.Row{network.ChainID, asset.Symbol, channelID, fmtDec(channelBalance)})
 		}
 	}
 	t.SetColumnConfigs(
 		[]table.ColumnConfig{
 			{Number: 1, AutoMerge: true},
-			{Number: 2, AutoMerge: true},
 		},
 	)
 	t.Render()

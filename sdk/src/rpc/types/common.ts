@@ -75,8 +75,6 @@ export interface RPCChannelUpdateWithWallet extends RPCChannelUpdate {
  * Represents the network information for the 'get_config' RPC method.
  */
 export interface RPCNetworkInfo {
-    /** The name of the network (e.g., "Ethereum", "Polygon"). */
-    name: string;
     /** The chain ID of the network. */
     chainId: number;
     /** The custody contract address for the network. */

@@ -12,14 +12,12 @@ import { hexSchema, addressSchema, ParamsParser } from './common';
 
 const NetworkInfoObjectSchema = z
     .object({
-        name: z.string(),
         chain_id: z.number(),
         custody_address: addressSchema,
         adjudicator_address: addressSchema,
     })
     .transform(
         (raw): RPCNetworkInfo => ({
-            name: raw.name,
             chainId: raw.chain_id,
             custodyAddress: raw.custody_address,
             adjudicatorAddress: raw.adjudicator_address,

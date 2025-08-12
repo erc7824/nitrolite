@@ -244,7 +244,6 @@ describe('rpc response parsers', () => {
             broker_address: '0x1234567890123456789012345678901234567890',
             networks: [
                 {
-                    name: 'Ethereum',
                     chain_id: 1,
                     custody_address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
                     adjudicator_address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
@@ -263,7 +262,6 @@ describe('rpc response parsers', () => {
             brokerAddress: '0x1234567890123456789012345678901234567890',
             networks: [
                 {
-                    name: 'Ethereum',
                     chainId: 1,
                     custodyAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
                     adjudicatorAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',

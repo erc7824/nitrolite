@@ -258,7 +258,7 @@ func (o *Operator) reloadConfig() {
 				for _, channel := range channels {
 					if channel.ChainID == network.ChainID && channel.Token == asset.Token {
 						channelID = channel.ChannelID
-						rawChannelBalance = channel.RawAmount.BigInt()
+						rawChannelBalance = channel.RawAmount
 						break
 					}
 				}

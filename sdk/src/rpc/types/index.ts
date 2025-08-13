@@ -1,7 +1,10 @@
 import { Address, Hex } from 'viem';
+import { RPCAllowance } from './common';
 
 export * from './request';
 export * from './response';
+export * from './filters';
+export * from './common';
 
 /** Type alias for Request ID (uint64) */
 export type RequestID = number;
@@ -12,76 +15,18 @@ export type Timestamp = number;
 /** Type alias for Account ID (channelId or appId) */
 export type AccountID = Hex;
 
-/** Represents the data payload within a request message: [requestId, method, params, timestamp?]. */
-export type RequestData = [RequestID, RPCMethod, object[], Timestamp?];
-
-/** Represents the data payload within a successful response message: [requestId, method, result, timestamp?]. */
-export type ResponseData = [RequestID, RPCMethod, object[], Timestamp?];
-
-/** Represents the status of a channel. */
-export enum RPCChannelStatus {
-    Joining = 'joining',
-    Open = 'open',
-    Closed = 'closed',
-    Challenged = 'challenged',
-}
+/** Represents the data payload within a request or response message: [requestId, method, params, timestamp?]. */
+export type RPCData = [RequestID, RPCMethod, object, Timestamp?];
 
 /**
  * Represents a generic RPC message structure that includes common fields.
  * This interface is extended by specific RPC request and response types.
  */
 export interface GenericRPCMessage {
-    requestId: RequestID;
+    requestId?: RequestID;
     timestamp?: Timestamp;
     signatures?: Hex[];
 }
-
-/** Base type for asset allocations with common asset and amount fields. */
-export type AssetAllocation = {
-    /** The symbol of the asset (e.g., "USDC", "USDT", "ETH"). */
-    asset: string;
-    /** The amount of the asset. Must be a positive number. */
-    amount: string;
-};
-
-/**
- * Represents a generic RPC message structure that includes common fields.
- * This interface is extended by specific RPC request and response types.
- */
-export type Allowance = {
-    /** The symbol of the asset (e.g., "USDC", "USDT"). */
-    asset: string;
-    /** The amount of the asset that is allowed to be spent. */
-    amount: string;
-};
-
-/** Represents the allocation of assets within an application session.
- * This structure is used to define the initial allocation of assets among participants.
- * It includes the participant's address, the asset (usdc, usdt, etc) being allocated, and the amount.
- */
-export type AppSessionAllocation = AssetAllocation & {
-    /** The Ethereum address of the participant receiving the allocation. */
-    participant: Address;
-};
-
-/** Represents the allocation of assets for a transfer.
- * This structure is used to define the asset and amount being transferred.
- */
-export type TransferAllocation = AssetAllocation;
-
-/**
- * Represents the structure of an error object within an error response payload.
- */
-export interface NitroliteRPCErrorDetail {
-    /** The error message describing what went wrong. */
-    error: string;
-}
-
-/** Represents the data payload for an error response: [requestId, "error", [errorDetail], timestamp?]. */
-export type ErrorResponseData = [RequestID, 'error', [NitroliteRPCErrorDetail], Timestamp?];
-
-/** Union type for the 'res' payload, covering both success and error responses. */
-export type ResponsePayload = ResponseData | ErrorResponseData;
 
 /**
  * Defines the wire format for Nitrolite RPC messages, based on NitroRPC principles
@@ -90,11 +35,11 @@ export type ResponsePayload = ResponseData | ErrorResponseData;
  */
 export interface NitroliteRPCMessage {
     /** Contains the request payload if this is a request message. */
-    req?: RequestData;
+    req?: RPCData;
     /** Contains the response or error payload if this is a response message. */
-    res?: ResponsePayload;
+    res?: RPCData;
     /** Optional cryptographic signature(s) for message authentication. */
-    sig?: Hex[] | [''];
+    sig?: Hex[];
 }
 
 /**
@@ -107,79 +52,6 @@ export interface ApplicationRPCMessage extends NitroliteRPCMessage {
      * This field also serves as the destination pubsub topic for the message.
      */
     sid: Hex;
-}
-
-/**
- * Represents the result of parsing an incoming Nitrolite RPC response message.
- * Contains extracted fields and validation status.
- */
-export interface ParsedResponse {
-    /** Indicates if the message was successfully parsed and passed basic structural validation. */
-    isValid: boolean;
-    /** If isValid is false, contains a description of the parsing or validation error. */
-    error?: string;
-    /** Indicates if the parsed response represents an error (method === "error"). Undefined if isValid is false. */
-    isError?: boolean;
-    /** The Request ID from the response payload. Undefined if structure is invalid. */
-    requestId?: RequestID;
-    /** The method name from the response payload. Undefined if structure is invalid. */
-    method?: RPCMethod;
-    /** The extracted data payload (result array for success, error detail object for error). Undefined if structure is invalid or error payload malformed. */
-    data?: object[] | NitroliteRPCErrorDetail;
-    /** The Application Session ID from the message envelope. Undefined if structure is invalid. */
-    sid?: Hex;
-    /** The Timestamp from the response payload. Undefined if structure is invalid. */
-    timestamp?: Timestamp;
-}
-
-/**
- * Defines the structure of an application definition used when creating an application.
- */
-export interface AppDefinition {
-    /** The protocol identifier or name for the application logic (e.g., "NitroRPC/0.2"). */
-    protocol: string;
-    /** An array of participant addresses (Ethereum addresses) involved in the application. Must have at least 2 participants. */
-    participants: Hex[];
-    /** An array representing the relative weights or stakes of participants, often used for dispute resolution or allocation calculations. Order corresponds to the participants array. */
-    weights: number[];
-    /** The number of participants required to reach consensus or approve state updates. */
-    quorum: number;
-    /** A parameter related to the challenge period or mechanism within the application's protocol, in seconds. */
-    challenge: number;
-    /** A unique number used once, often for preventing replay attacks or ensuring uniqueness of the application instance. Must be non-zero. */
-    nonce?: number;
-}
-
-/**
- * Represents a channel update message sent over the RPC protocol.
- */
-export interface ChannelUpdate {
-    /** The unique identifier for the channel. */
-    channelId: Hex;
-    /** The Ethereum address of the participant. */
-    participant: Address;
-    /** The current status of the channel (e.g., "open", "closed"). */
-    status: RPCChannelStatus;
-    /** The token contract address. */
-    token: Address;
-    /** The wallet address associated with the channel. */
-    wallet: Address;
-    /** The total amount in the channel. */
-    amount: BigInt;
-    /** The chain ID where the channel exists. */
-    chainId: number;
-    /** The adjudicator contract address. */
-    adjudicator: Address;
-    /** The challenge period in seconds. */
-    challenge: number;
-    /** The nonce value for the channel. */
-    nonce: BigInt;
-    /** The version number of the channel. */
-    version: number;
-    /** The timestamp when the channel was created. */
-    createdAt: Date;
-    /** The timestamp when the channel was last updated. */
-    updatedAt: Date;
 }
 
 /**
@@ -218,11 +90,11 @@ export enum NitroliteErrorCode {
  * @param payload - The RequestData or ResponsePayload object (array) to sign.
  * @returns A Promise that resolves to the cryptographic signature as a Hex string.
  */
-export type MessageSigner = (payload: RequestData | ResponsePayload) => Promise<Hex>;
+export type MessageSigner = (payload: RPCData) => Promise<Hex>;
 
 /**
  * Defines the function signature for signing challenge state data.
- * This signer is specifically used for signing state challenges in the form of keccak256(abi.encode(stateHash, 'challenge')).
+ * This signer is specifically used for signing state challenges in the form of keccak256(abi.encodePacked(packedState, 'challenge')).
  *
  * @param stateHash - The state hash as a Hex string
  * @returns A Promise that resolves to the cryptographic signature as a Hex string.
@@ -237,7 +109,7 @@ export type ChallengeStateSigner = (stateHash: Hex) => Promise<Hex>;
  * @returns A Promise that resolves to true if the signature is valid for the given payload and address, false otherwise.
  */
 export type SingleMessageVerifier = (
-    payload: RequestData | ResponsePayload,
+    payload: RPCData,
     signature: Hex,
     address: Address,
 ) => Promise<boolean>;
@@ -251,7 +123,7 @@ export type SingleMessageVerifier = (
  * @returns A Promise that resolves to true if all required signatures from the expected signers are present and valid, false otherwise.
  */
 export type MultiMessageVerifier = (
-    payload: RequestData | ResponsePayload,
+    payload: RPCData,
     signatures: Hex[],
     expectedSigners: Address[],
 ) => Promise<boolean>;
@@ -266,11 +138,7 @@ export interface PartialEIP712AuthMessage {
     application: Address;
     participant: Address;
     expire: string;
-    // TODO: use Allowance type after replacing symbol with asset
-    allowances: {
-        asset: string;
-        amount: string;
-    }[];
+    allowances: RPCAllowance[];
 }
 
 /**
@@ -326,6 +194,7 @@ export enum RPCMethod {
     CloseAppSession = 'close_app_session',
     GetAppDefinition = 'get_app_definition',
     GetAppSessions = 'get_app_sessions',
+    CreateChannel = 'create_channel',
     ResizeChannel = 'resize_channel',
     CloseChannel = 'close_channel',
     GetChannels = 'get_channels',

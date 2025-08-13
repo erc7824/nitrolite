@@ -154,7 +154,7 @@ func NewMetricsWithRegistry(registry prometheus.Registerer) *Metrics {
 	return metrics
 }
 
-func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[string]*Custody, logger Logger) {
+func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[uint32]*Custody, logger Logger) {
 	logger = logger.NewSystem("metrics")
 	dbTicker := time.NewTicker(15 * time.Second)
 	defer dbTicker.Stop()

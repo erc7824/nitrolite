@@ -21,17 +21,16 @@ import {
     createECDSAMessageSigner,
 } from '../../../src/rpc/api';
 import {
-    CreateAppSessionRequest,
     MessageSigner,
     AuthChallengeResponse,
     RPCMethod,
-    RPCChannelStatus,
-    RequestData,
-    TransferAllocation,
     ResizeChannelRequestParams,
     AuthRequestParams,
     CloseAppSessionRequestParams,
-    TxType,
+    RPCChannelStatus,
+    RPCTransferAllocation,
+    RPCTxType,
+    RPCData,
 } from '../../../src/rpc/types';
 
 describe('API message creators', () => {
@@ -49,8 +48,8 @@ describe('API message creators', () => {
 
     test('createAuthRequestMessage', async () => {
         const authRequest: AuthRequestParams = {
-            wallet: clientAddress,
-            participant: clientAddress,
+            address: clientAddress,
+            session_key: clientAddress,
             app_name: 'test-app',
             allowances: [],
             expire: '',
@@ -64,20 +63,28 @@ describe('API message creators', () => {
             req: [
                 requestId,
                 RPCMethod.AuthRequest,
-                [clientAddress, clientAddress, 'test-app', [], '', '', clientAddress],
+                {
+                    address: clientAddress,
+                    session_key: clientAddress,
+                    app_name: 'test-app',
+                    allowances: [],
+                    expire: '',
+                    scope: '',
+                    application: clientAddress,
+                },
                 timestamp,
             ],
-            sig: [''],
+            sig: [],
         });
     });
 
     test('createAuthVerifyMessageFromChallenge', async () => {
         const challenge = 'challenge123';
         const msgStr = await createAuthVerifyMessageFromChallenge(signer, challenge, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.AuthVerify, [[{ challenge }]], timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.AuthVerify, { challenge }, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.AuthVerify, [[{ challenge }]], timestamp],
+            req: [requestId, RPCMethod.AuthVerify, { challenge }, timestamp],
             sig: ['0xsig'],
         });
     });
@@ -98,10 +105,10 @@ describe('API message creators', () => {
         test('successful challenge flow', async () => {
             const msgStr = await createAuthVerifyMessage(signer, rawResponse, requestId, timestamp);
             const challenge = 'c8261773-2619-4fbe-9514-96392f87e7b2';
-            expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.AuthVerify, [{ challenge }], timestamp]);
+            expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.AuthVerify, { challenge }, timestamp]);
             const parsed = JSON.parse(msgStr);
             expect(parsed).toEqual({
-                req: [requestId, RPCMethod.AuthVerify, [{ challenge }], timestamp],
+                req: [requestId, RPCMethod.AuthVerify, { challenge }, timestamp],
                 sig: ['0xsig'],
             });
         });
@@ -109,37 +116,37 @@ describe('API message creators', () => {
 
     test('createPingMessage', async () => {
         const msgStr = await createPingMessage(signer, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Ping, [], timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Ping, {}, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.Ping, [], timestamp],
+            req: [requestId, RPCMethod.Ping, {}, timestamp],
             sig: ['0xsig'],
         });
     });
 
     test('createGetConfigMessage', async () => {
         const msgStr = await createGetConfigMessage(signer, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetConfig, [], timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetConfig, {}, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetConfig, [], timestamp],
+            req: [requestId, RPCMethod.GetConfig, {}, timestamp],
             sig: ['0xsig'],
         });
     });
 
     test('createGetUserTagMessage', async () => {
         const msgStr = await createGetUserTagMessage(signer, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetUserTag, [], timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetUserTag, {}, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetUserTag, [], timestamp],
+            req: [requestId, RPCMethod.GetUserTag, {}, timestamp],
             sig: ['0xsig'],
         });
     });
 
     test('createGetLedgerBalancesMessage', async () => {
         const participant = '0x0123124124124100000000000000000000000000' as Address;
-        const ledgerParams = [{ participant }];
+        const ledgerParams = { participant };
         const msgStr = await createGetLedgerBalancesMessage(signer, participant, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerBalances, ledgerParams, timestamp]);
         const parsed = JSON.parse(msgStr);
@@ -150,7 +157,7 @@ describe('API message creators', () => {
     });
 
     test('createGetAppDefinitionMessage', async () => {
-        const appParams = [{ app_session_id: appId }];
+        const appParams = { app_session_id: appId };
         const msgStr = await createGetAppDefinitionMessage(signer, appId, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetAppDefinition, appParams, timestamp]);
         const parsed = JSON.parse(msgStr);
@@ -161,30 +168,28 @@ describe('API message creators', () => {
     });
 
     test('createAppSessionMessage', async () => {
-        const params = [
-            {
-                definition: {
-                    protocol: 'p',
-                    participants: [],
-                    weights: [],
-                    quorum: 0,
-                    challenge: 0,
-                    nonce: 0,
-                },
-                allocations: [
-                    {
-                        participant: '0xAaBbCcDdEeFf0011223344556677889900aAbBcC' as Address,
-                        asset: 'usdc',
-                        amount: '0.0',
-                    },
-                    {
-                        participant: '0x00112233445566778899AaBbCcDdEeFf00112233' as Address,
-                        asset: 'usdc',
-                        amount: '200.0',
-                    },
-                ],
+        const params = {
+            definition: {
+                protocol: 'p',
+                participants: [],
+                weights: [],
+                quorum: 0,
+                challenge: 0,
+                nonce: 0,
             },
-        ];
+            allocations: [
+                {
+                    participant: '0xAaBbCcDdEeFf0011223344556677889900aAbBcC' as Address,
+                    asset: 'usdc',
+                    amount: '0.0',
+                },
+                {
+                    participant: '0x00112233445566778899AaBbCcDdEeFf00112233' as Address,
+                    asset: 'usdc',
+                    amount: '200.0',
+                },
+            ],
+        };
         const msgStr = await createAppSessionMessage(signer, params, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.CreateAppSession, params, timestamp]);
         const parsed = JSON.parse(msgStr);
@@ -195,7 +200,7 @@ describe('API message creators', () => {
     });
 
     test('createCloseAppSessionMessage', async () => {
-        const closeParams: CloseAppSessionRequestParams[] = [{ app_session_id: appId, allocations: [] }];
+        const closeParams: CloseAppSessionRequestParams = { app_session_id: appId, allocations: [] };
         const msgStr = await createCloseAppSessionMessage(signer, closeParams, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.CloseAppSession, closeParams, timestamp]);
         const parsed = JSON.parse(msgStr);
@@ -206,7 +211,7 @@ describe('API message creators', () => {
     });
 
     test('createApplicationMessage', async () => {
-        const messageParams = ['hello'];
+        const messageParams = 'hello';
         const msgStr = await createApplicationMessage(signer, appId, messageParams, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Message, messageParams, timestamp]);
         const parsed = JSON.parse(msgStr);
@@ -222,7 +227,7 @@ describe('API message creators', () => {
         expect(signer).toHaveBeenCalledWith([
             requestId,
             RPCMethod.CloseChannel,
-            [{ channel_id: channelId, funds_destination: fundDestination }],
+            { channel_id: channelId, funds_destination: fundDestination },
             timestamp,
         ]);
         const parsed = JSON.parse(msgStr);
@@ -230,7 +235,7 @@ describe('API message creators', () => {
             req: [
                 requestId,
                 RPCMethod.CloseChannel,
-                [{ channel_id: channelId, funds_destination: fundDestination }],
+                { channel_id: channelId, funds_destination: fundDestination },
                 timestamp,
             ],
             sig: ['0xsig'],
@@ -243,28 +248,26 @@ describe('API message creators', () => {
         expect(signer).not.toHaveBeenCalled();
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.AuthVerify, [{ jwt: jwtToken }], timestamp],
-            sig: undefined,
+            req: [requestId, RPCMethod.AuthVerify, { jwt: jwtToken }, timestamp],
+            sig: [],
         });
     });
 
     test('createResizeChannelMessage', async () => {
-        const resizeParams: ResizeChannelRequestParams[] = [
-            {
-                channel_id: channelId,
-                funds_destination: fundDestination,
-                resize_amount: 1000n,
-            },
-        ];
+        const resizeParams: ResizeChannelRequestParams = {
+            channel_id: channelId,
+            funds_destination: fundDestination,
+            resize_amount: 1000n,
+        };
         const msgStr = await createResizeChannelMessage(signer, resizeParams, requestId, timestamp);
         // The signer should be called with the original bigint value
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.ResizeChannel, resizeParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         // The parsed message should have the stringified bigint
-        const resizeParamsExpected = resizeParams.map((param) => ({
-            ...param,
-            resize_amount: param.resize_amount?.toString(),
-        }));
+        const resizeParamsExpected = {
+            ...resizeParams,
+            resize_amount: resizeParams.resize_amount?.toString(),
+        };
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.ResizeChannel, resizeParamsExpected, timestamp],
             sig: ['0xsig'],
@@ -277,19 +280,19 @@ describe('API message creators', () => {
         expect(signer).toHaveBeenCalledWith([
             requestId,
             RPCMethod.GetChannels,
-            [{ participant, status: RPCChannelStatus.Open }],
+            { participant, status: RPCChannelStatus.Open },
             timestamp,
         ]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.GetChannels, [{ participant, status: RPCChannelStatus.Open }], timestamp],
+            req: [requestId, RPCMethod.GetChannels, { participant, status: RPCChannelStatus.Open }, timestamp],
             sig: ['0xsig'],
         });
     });
 
     test('createTransferMessage with destination address', async () => {
         const destination = '0x1234567890123456789012345678901234567890' as Address;
-        const allocations: TransferAllocation[] = [
+        const allocations: RPCTransferAllocation[] = [
             {
                 asset: 'usdc',
                 amount: '100.5',
@@ -301,17 +304,17 @@ describe('API message creators', () => {
         ];
         const transferParams = { destination, allocations };
         const msgStr = await createTransferMessage(signer, transferParams, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Transfer, [transferParams], timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Transfer, transferParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.Transfer, [transferParams], timestamp],
+            req: [requestId, RPCMethod.Transfer, transferParams, timestamp],
             sig: ['0xsig'],
         });
     });
 
     test('createTransferMessage with destination_user_tag', async () => {
         const destination_user_tag = 'UX123D8C';
-        const allocations: TransferAllocation[] = [
+        const allocations: RPCTransferAllocation[] = [
             {
                 asset: 'usdc',
                 amount: '100.5',
@@ -319,16 +322,16 @@ describe('API message creators', () => {
         ];
         const transferParams = { destination_user_tag, allocations };
         const msgStr = await createTransferMessage(signer, transferParams, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Transfer, [transferParams], timestamp]);
+        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Transfer, transferParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
-            req: [requestId, RPCMethod.Transfer, [transferParams], timestamp],
+            req: [requestId, RPCMethod.Transfer, transferParams, timestamp],
             sig: ['0xsig'],
         });
     });
 
     test('createTransferMessage validates destination parameters', async () => {
-        const allocations: TransferAllocation[] = [{ asset: 'usdc', amount: '100.5' }];
+        const allocations: RPCTransferAllocation[] = [{ asset: 'usdc', amount: '100.5' }];
 
         // Test missing both parameters
         await expect(createTransferMessage(signer, { allocations }, requestId, timestamp)).rejects.toThrow(
@@ -345,7 +348,7 @@ describe('API message creators', () => {
 
     test('createGetLedgerTransactionsMessage with no filters', async () => {
         const accountId = 'test-account';
-        const expectedParams = [{ account_id: accountId }];
+        const expectedParams = { account_id: accountId };
         const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, undefined, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
         const parsed = JSON.parse(msgStr);
@@ -359,21 +362,19 @@ describe('API message creators', () => {
         const accountId = 'test-account';
         const filters = {
             asset: 'usdc',
-            tx_type: TxType.Transfer,
+            tx_type: RPCTxType.Transfer,
             offset: 10,
             limit: 20,
             sort: 'desc' as const,
         };
-        const expectedParams = [
-            {
-                account_id: accountId,
-                asset: 'usdc',
-                tx_type: TxType.Transfer,
-                offset: 10,
-                limit: 20,
-                sort: 'desc',
-            },
-        ];
+        const expectedParams = {
+            account_id: accountId,
+            asset: 'usdc',
+            tx_type: RPCTxType.Transfer,
+            offset: 10,
+            limit: 20,
+            sort: 'desc',
+        };
         const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
         const parsed = JSON.parse(msgStr);
@@ -389,13 +390,11 @@ describe('API message creators', () => {
             asset: 'eth',
             limit: 5,
         };
-        const expectedParams = [
-            {
-                account_id: accountId,
-                asset: 'eth',
-                limit: 5,
-            },
-        ];
+        const expectedParams = {
+            account_id: accountId,
+            asset: 'eth',
+            limit: 5,
+        };
         const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
         const parsed = JSON.parse(msgStr);
@@ -409,18 +408,16 @@ describe('API message creators', () => {
         const accountId = 'test-account';
         const filters = {
             asset: '',
-            tx_type: TxType.Transfer,
+            tx_type: RPCTxType.Transfer,
             offset: 0,
             limit: undefined,
             sort: null as any,
         };
-        const expectedParams = [
-            {
-                account_id: accountId,
-                tx_type: TxType.Transfer,
-                offset: 0,
-            },
-        ];
+        const expectedParams = {
+            account_id: accountId,
+            tx_type: RPCTxType.Transfer,
+            offset: 0,
+        };
         const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
         const parsed = JSON.parse(msgStr);
@@ -432,12 +429,12 @@ describe('API message creators', () => {
 
     test('createECDSAMessageSigner', async () => {
         const privateKey = '0xb482c8fa261c29eaaa646703948e2cc2a2ff54411cc42d8fce9a161035dfb3dc';
-        const payload = [42, 'ping', [{ p1: 4337, p2: 7702 }], 20] as unknown as RequestData;
+        const payload: RPCData = [42, RPCMethod.Ping, { p1: 4337, p2: 7702 }, 20];
         const signer = createECDSAMessageSigner(privateKey);
         const signature = await signer(payload);
         expect(signature).toBeDefined();
         expect(signature).toEqual(
-            '0xebf96c7d3d64ab9195a341d3c922e2cb88ea592d2e229aa64d27e024f895e5720e68786c8b34a61d34a0b6f5e0f65dbe95f0a46dee9b7055df3e33f3209ea0d21b',
+            '0x7263178cbb9b9820491b3add77f83ebbab7df700fc30734a659b69bf0268073a2494ccbcf0ee3e98a9321f88385013a88aabe6a640d6411cda19fbbc197d38ac1c',
         );
     });
 });

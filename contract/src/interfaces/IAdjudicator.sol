@@ -19,6 +19,5 @@ interface IAdjudicator {
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
-        view
         returns (bool valid);
 }

@@ -3,16 +3,18 @@ package clearnet
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
 )
 
 type RPCRequest struct {
-	Req RPCData  `json:"req"`
-	Sig []string `json:"sig"`
+	Req RPCData            `json:"req"`
+	Sig []unisig.Signature `json:"sig"`
 }
 
 type RPCResponse struct {
-	Res RPCData  `json:"res"`
-	Sig []string `json:"sig"`
+	Res RPCData            `json:"res"`
+	Sig []unisig.Signature `json:"sig"`
 }
 
 // RPCData represents the common structure for both requests and responses
@@ -20,7 +22,7 @@ type RPCResponse struct {
 type RPCData struct {
 	RequestID uint64 `json:"request_id" validate:"required"`
 	Method    string `json:"method" validate:"required"`
-	Params    []any  `json:"params" validate:"required"`
+	Params    any    `json:"params" validate:"required"`
 	Timestamp uint64 `json:"ts" validate:"required"`
 }
 

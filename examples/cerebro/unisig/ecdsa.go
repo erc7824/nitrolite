@@ -31,7 +31,7 @@ func (s *EcdsaSigner) Address() common.Address {
 }
 
 // Sign creates an ECDSA signature for the provided message
-func (s *EcdsaSigner) Sign(msg []byte) ([]byte, error) {
+func (s *EcdsaSigner) Sign(msg []byte) (Signature, error) {
 	signature, err := crypto.Sign(msg, s.privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign data: %w", err)
@@ -39,6 +39,10 @@ func (s *EcdsaSigner) Sign(msg []byte) ([]byte, error) {
 
 	if len(signature) != 65 {
 		return nil, fmt.Errorf("invalid signature length: got %d, want 65", len(signature))
+	}
+
+	if signature[64] < 27 {
+		signature[64] += 27
 	}
 
 	return signature, nil

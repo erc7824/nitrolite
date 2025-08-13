@@ -15,9 +15,9 @@ type OperatorConfig struct {
 	Signer        unisig.Signer
 }
 
-func (c OperatorConfig) GetNetworkByName(name string) *NetworkConfig {
+func (c OperatorConfig) GetNetworkByID(chainID uint32) *NetworkConfig {
 	for _, network := range c.Networks {
-		if network.ChainName == name {
+		if network.ChainID == chainID {
 			return &network
 		}
 	}
@@ -39,7 +39,6 @@ func (c OperatorConfig) GetSymbolsOfEnabledAssets() []string {
 }
 
 type NetworkConfig struct {
-	ChainName          string
 	ChainID            uint32
 	AdjudicatorAddress common.Address
 	CustodyAddress     common.Address

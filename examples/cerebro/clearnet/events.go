@@ -38,12 +38,7 @@ type ChannelRes struct {
 }
 
 func (c *ClearnodeClient) handleChannelsEvent(event RPCData) {
-	if len(event.Params) < 1 {
-		fmt.Println("Invalid channels event format")
-		return
-	}
-
-	channelsData, err := json.Marshal(event.Params[0])
+	channelsData, err := json.Marshal(event.Params)
 	if err != nil {
 		fmt.Printf("Failed to marshal channels data: %s\n", err.Error())
 		return
@@ -75,12 +70,7 @@ func (c *ClearnodeClient) handleChannelsEvent(event RPCData) {
 }
 
 func (c *ClearnodeClient) handleBalancesEvent(event RPCData) {
-	if len(event.Params) < 1 {
-		fmt.Println("Invalid channels event format")
-		return
-	}
-
-	channelsData, err := json.Marshal(event.Params[0])
+	channelsData, err := json.Marshal(event.Params)
 	if err != nil {
 		fmt.Printf("Failed to marshal channels data: %s\n", err.Error())
 		return
@@ -111,12 +101,7 @@ type AssetRes struct {
 }
 
 func (c *ClearnodeClient) handleAssetsEvent(event RPCData) {
-	if len(event.Params) < 1 {
-		fmt.Println("Invalid assets event format")
-		return
-	}
-
-	assetsData, err := json.Marshal(event.Params[0])
+	assetsData, err := json.Marshal(event.Params)
 	if err != nil {
 		fmt.Printf("Failed to marshal assets data: %s\n", err.Error())
 		return

@@ -265,7 +265,7 @@ func (o *Operator) handleResizeChannel(args []string) {
 			fmtDec(custodyBalance), assetSymbol)
 		return
 	}
-	rawResizeAmount := resizeAmount.Shift(int32(asset.Decimals))
+	rawResizeAmount := resizeAmount.Shift(int32(asset.Decimals)).BigInt()
 
 	fmt.Printf("How much %s do you want to allocate (+)into/(-)out channel?\n", assetSymbol)
 	fmt.Println("That's the amount moved between unified balance and channel.")
@@ -282,7 +282,7 @@ func (o *Operator) handleResizeChannel(args []string) {
 			fmtDec(unifiedBalance), assetSymbol)
 		return
 	}
-	rawAllocateAmount := allocateAmount.Shift(int32(asset.Decimals))
+	rawAllocateAmount := allocateAmount.Shift(int32(asset.Decimals)).BigInt()
 
 	if newChannelBalance := channelBalance.Add(allocateAmount).Add(resizeAmount); newChannelBalance.LessThan(decimal.Zero) {
 		fmt.Printf("New channel amount must not be negative after resize: %s\n", fmtDec(newChannelBalance))
@@ -340,7 +340,7 @@ func convertAllocationRes(a clearnet.AllocationRes) custody.Allocation {
 	return custody.Allocation{
 		Destination: common.HexToAddress(a.Destination),
 		Token:       common.HexToAddress(a.Token),
-		Amount:      a.Amount.BigInt(),
+		Amount:      a.Amount,
 	}
 }
 

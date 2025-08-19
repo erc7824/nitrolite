@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind/v2"
@@ -31,7 +30,8 @@ func (c *CustodyClient) OpenChannel(
 	wallet, signer unisig.Signer,
 	chainID uint32, chainRPC string,
 	custodyAddress, adjudicatorAddress, brokerAddress, tokenAddress common.Address,
-	challenge uint64,
+	challenge, nonce uint64,
+	brokerSig unisig.Signature,
 ) (string, error) {
 	client, err := ethclient.Dial(chainRPC)
 	if err != nil {
@@ -53,7 +53,7 @@ func (c *CustodyClient) OpenChannel(
 		Adjudicator:  adjudicatorAddress,
 		Participants: []common.Address{signer.Address(), brokerAddress},
 		Challenge:    challenge,
-		Nonce:        generateNonce(),
+		Nonce:        nonce,
 	}
 	initial := State{
 		Intent:  1, // IntentINITIALIZE
@@ -83,11 +83,12 @@ func (c *CustodyClient) OpenChannel(
 		return "", fmt.Errorf("failed to encode initial state: %w", err)
 	}
 
-	sig, err := signNitroData(signer, initialStateData)
+	dataHash := crypto.Keccak256Hash(initialStateData)
+	userSig, err := signer.Sign(dataHash.Bytes())
 	if err != nil {
 		return "", fmt.Errorf("failed to sign initial state: %w", err)
 	}
-	initial.Sigs = []Signature{sig}
+	initial.Sigs = [][]byte{userSig, brokerSig}
 
 	txOpts := signerTxOpts(wallet, chainID)
 	gasPrice, err := client.SuggestGasPrice(context.Background())
@@ -116,7 +117,7 @@ func (c *CustodyClient) CloseChannel(
 	channelID common.Hash,
 	version *big.Int,
 	allocations []Allocation,
-	brokerSig Signature,
+	brokerSig unisig.Signature,
 ) error {
 	client, err := ethclient.Dial(chainRPC)
 	if err != nil {
@@ -139,11 +140,12 @@ func (c *CustodyClient) CloseChannel(
 		return fmt.Errorf("failed to encode initial state: %w", err)
 	}
 
-	userSig, err := signNitroData(signer, stateData)
+	dataHash := crypto.Keccak256Hash(stateData)
+	userSig, err := signer.Sign(dataHash.Bytes())
 	if err != nil {
 		return fmt.Errorf("failed to sign initial state: %w", err)
 	}
-	state.Sigs = []Signature{userSig, brokerSig}
+	state.Sigs = [][]byte{userSig, brokerSig}
 
 	txOpts := signerTxOpts(wallet, chainID)
 	gasPrice, err := client.SuggestGasPrice(context.Background())
@@ -173,7 +175,7 @@ func (c *CustodyClient) Resize(
 	version *big.Int,
 	data []byte,
 	allocations []Allocation,
-	brokerSig Signature,
+	brokerSig unisig.Signature,
 ) error {
 	client, err := ethclient.Dial(chainRPC)
 	if err != nil {
@@ -201,11 +203,12 @@ func (c *CustodyClient) Resize(
 		return fmt.Errorf("failed to encode initial state: %w", err)
 	}
 
-	userSig, err := signNitroData(signer, stateData)
+	dataHash := crypto.Keccak256Hash(stateData)
+	userSig, err := signer.Sign(dataHash.Bytes())
 	if err != nil {
 		return fmt.Errorf("failed to sign initial state: %w", err)
 	}
-	state.Sigs = []Signature{userSig, brokerSig}
+	state.Sigs = [][]byte{userSig, brokerSig}
 
 	txOpts := signerTxOpts(wallet, chainID)
 	gasPrice, err := client.SuggestGasPrice(context.Background())
@@ -424,30 +427,6 @@ func GetChannelID(ch Channel, chainID uint32) (common.Hash, error) {
 	return crypto.Keccak256Hash(packed), nil
 }
 
-// generateNonce generates a nonce based on the current time in nanoseconds.
-// it is totally suitable for use in custody channels as a unique identifier.
-func generateNonce() uint64 {
-	return uint64(time.Now().UnixNano())
-}
-
-func signNitroData(s unisig.Signer, data []byte) (Signature, error) {
-	message := crypto.Keccak256(data)
-	sig, err := s.Sign(message)
-	if err != nil {
-		return Signature{}, err
-	}
-
-	if sig[64] < 27 {
-		sig[64] += 27 // Adjust signature version
-	}
-
-	return Signature{
-		V: sig[64],
-		R: [32]byte(sig[:32]),
-		S: [32]byte(sig[32:64]),
-	}, nil
-}
-
 func signerTxOpts(signer unisig.Signer, chainID uint32) *bind.TransactOpts {
 	bigChainID := big.NewInt(int64(chainID))
 	signingMethod := types.LatestSignerForChainID(bigChainID)
@@ -460,6 +439,10 @@ func signerTxOpts(signer unisig.Signer, chainID uint32) *bind.TransactOpts {
 		sig, err := signer.Sign(hash)
 		if err != nil {
 			return nil, err
+		}
+
+		if sig[64] >= 27 {
+			sig[64] -= 27
 		}
 
 		return tx.WithSignature(signingMethod, sig)

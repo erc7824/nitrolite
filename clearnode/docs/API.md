@@ -25,6 +25,13 @@
 | `close_channel` | Closes a payment channel | Private |
 | `resize_channel` | Adjusts channel capacity | Private |
 
+**Legenda**
+
+| Access | Authentication required |
+|--------|-------------------------|
+| Private | Yes |
+| Public | No |
+
 ## Authentication
 
 ### Authentication Request

@@ -31,5 +31,8 @@ jobs:
           cache-dependency-path: '${{ inputs.project-path }}/go.sum'
 
       - name: Test
-        run: go test -v ./...
+        run: go test -cover -covermode=atomic -coverprofile=coverage.txt -v ./...
         working-directory: ${{ inputs.project-path }}
+      - uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

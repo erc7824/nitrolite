@@ -44,7 +44,7 @@ func (r *RPCRouter) SendChannelUpdate(channel Channel) {
 		Adjudicator: channel.Adjudicator,
 		Challenge:   channel.Challenge,
 		Nonce:       channel.Nonce,
-		Version:     channel.Version,
+		State:       channel.State,
 		CreatedAt:   channel.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   channel.UpdatedAt.Format(time.RFC3339),
 	}

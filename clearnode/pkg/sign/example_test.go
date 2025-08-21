@@ -1,0 +1,101 @@
+package sign_test
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign/ethereum"
+)
+
+// ExampleSigner demonstrates creating a signer and signing a message.
+func ExampleSigner() {
+	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" // Example private key
+
+	// Create a new signer. It returns the generic sign.Signer interface.
+	signer, err := ethereum.NewEthereumSigner(pkHex)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// You can now use the signer for generic operations.
+	fmt.Println("Address:", signer.PrivateKey().PublicKey().Address())
+
+	message := []byte("hello world")
+	signature, err := signer.PrivateKey().Sign(message)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Signature length:", len(signature))
+	// Output:
+	// Address: 0x1Be31A94361a391bBaFB2a4CCd704F57dc04d4bb
+	// Signature length: 65
+}
+
+// ExampleSignature_String demonstrates the String method of Signature.
+func ExampleSignature_String() {
+	sig := sign.Signature([]byte{0x01, 0x02, 0x03, 0x04})
+	fmt.Println(sig.String())
+	// Output:
+	// 0x01020304
+}
+
+// ExampleSignature_MarshalJSON demonstrates JSON marshaling of signatures.
+func ExampleSignature_MarshalJSON() {
+	sig := sign.Signature([]byte{0x01, 0x02, 0x03, 0x04})
+	jsonData, err := sig.MarshalJSON()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(jsonData))
+	// Output:
+	// "0x01020304"
+}
+
+// ExampleSignature_UnmarshalJSON demonstrates JSON unmarshaling of signatures.
+func ExampleSignature_UnmarshalJSON() {
+	var sig sign.Signature
+	jsonData := []byte(`"0x01020304"`)
+
+	err := sig.UnmarshalJSON(jsonData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("%x\n", []byte(sig))
+	// Output:
+	// 01020304
+}
+
+// Example_blockchainSpecificFeatures demonstrates using blockchain-specific features.
+// This shows how to call EIP-712 recovery for Ethereum directly from the implementation package.
+func Example_blockchainSpecificFeatures() {
+	// Example message for standard recovery
+	message := []byte("hello world")
+
+	// Create a signature using our signer
+	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+	signer, err := ethereum.NewEthereumSigner(pkHex)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	signature, err := signer.PrivateKey().Sign(message)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Call the function directly from the `ethereum` package for message recovery
+	recoveredAddr, err := ethereum.RecoverAddress(message, signature)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
+
+	// Verify it matches the signer's address
+	signerAddr := signer.PrivateKey().PublicKey().Address().String()
+	fmt.Printf("Addresses match: %t\n", recoveredAddr == signerAddr)
+	// Output:
+	// Addresses match: true
+}

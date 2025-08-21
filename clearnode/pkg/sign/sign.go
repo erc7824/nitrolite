@@ -7,6 +7,29 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
+// Signer is an interface for a blockchain-agnostic signer.
+type Signer interface {
+	PrivateKey() PrivateKey // Private key implements PrivateKey interface.
+}
+
+// PrivateKey is an interface for a blockchain-agnostic private key.
+type PrivateKey interface {
+	PublicKey() PublicKey
+	Sign(data []byte) (Signature, error) // Sign generates a signature for the given data.
+	Bytes() []byte
+}
+
+// PublicKey is an interface for a blockchain-agnostic public key.
+type PublicKey interface {
+	Address() Address
+	Bytes() []byte
+}
+
+// Address is an interface for a blockchain-specific address.
+type Address interface {
+	fmt.Stringer // All addresses must have a string representation.
+}
+
 // Signature is a generic byte slice representing a cryptographic signature.
 type Signature []byte
 
@@ -32,32 +55,4 @@ func (s *Signature) UnmarshalJSON(data []byte) error {
 // String implements the fmt.Stringer interface
 func (s Signature) String() string {
 	return hexutil.Encode(s)
-}
-
-// Address is an interface for a blockchain-specific address.
-type Address interface {
-	fmt.Stringer // All addresses must have a string representation.
-}
-
-// PublicKey is an interface for a blockchain-agnostic public key.
-type PublicKey interface {
-	Address() Address
-	Bytes() []byte
-}
-
-// PrivateKey is an interface for a blockchain-agnostic private key.
-type PrivateKey interface {
-	PublicKey() PublicKey
-	// Sign generates a signature for the given data.
-	// Note: Any hashing must be done by the specific implementation.
-	Sign(data []byte) (Signature, error)
-	Bytes() []byte
-}
-
-// Signer is an interface for a blockchain-agnostic signer.
-// It provides methods to access the address, public key, and private key.
-type Signer interface {
-	Address() Address
-	PublicKey() PublicKey
-	PrivateKey() PrivateKey
 }

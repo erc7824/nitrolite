@@ -12,11 +12,14 @@ import TabItem from '@theme/TabItem';
 
 This release focuses on streamlining channel creation, improving API consistency, and adding support for modern signature standards.
 
-### Smart Contract
+### Nitrolite SDK
 
-- Channels can now become operational immediately after the `create(...)` method call if all participant signatures are provided. In such case, for other participants the funds are transferred from the account specified in `participants` array.
-- Changed the `Signature` type from `{r, s, v}` struct to `bytes`.
-- Added support for [EIP-191](https://eip.tools/eip/191), [EIP-712](https://eip.tools/eip/712), [EIP-1271](https://eip.tools/eip/1271), and [EIP-6492](https://eip.tools/eip/6492) signatures.
+- Replaced an optional NitroliteClient `stateWalletClient` field with a required `StateSigner` interface to handle state signing operations (via `signState(channelId, state)`).
+- Added `WalletStateSigner` (using viem's `WalletClient`) and `SessionStateSigner` (using raw private key account) classes to provide convenient implementations of the `StateSigner` interface.
+- Updated `CreateChannel(...)` method to support the improved channel creation flow.
+- Changed the `Signature` type from `{r, s, v}` struct to `Hex`.
+- Added pagination types and parameters for requests to ClearNode pagination-supporting endpoints.
+- Standardized Responses: The data returned from CloseChannel() and ResizeChannel() has been updated to have consistent format.
 
 ### Clearnode API
 
@@ -27,14 +30,11 @@ This release focuses on streamlining channel creation, improving API consistency
 
 The v0.3.0 API documentation can be found in the [API docs of the ClearNode](https://github.com/erc7824/nitrolite/blob/fcbf8a737ea5643234e8d01f14ee9344b3d0198b/clearnode/docs/API.md).
 
-### Nitrolite SDK
+### Smart Contract
 
-- Replaced an optional NitroliteClient `stateWalletClient` field with a required `StateSigner` interface to handle state signing operations (via `signState(channelId, state)`).
-- Added `WalletStateSigner` (using viem's `WalletClient`) and `SessionStateSigner` (using raw private key account) classes to provide convenient implementations of the `StateSigner` interface.
-- Updated `CreateChannel(...)` method to support the improved channel creation flow.
-- Changed the `Signature` type from `{r, s, v}` struct to `Hex`.
-- Added pagination parameter and types to ClearNode pagination-supporting endpoints.
-- Standardized Responses: The data returned from CloseChannel() and ResizeChannel() has been updated to have consistent format.
+- Channels can now become operational immediately after the `create(...)` method call if all participant signatures are provided. In such case, for participants other than sender ("creator") the funds are transferred from the account specified in `participants` array.
+- Changed the `Signature` type from `{r, s, v}` struct to `bytes`.
+- Added support for [EIP-191](https://eip.tools/eip/191), [EIP-712](https://eip.tools/eip/712), [EIP-1271](https://eip.tools/eip/1271), and [EIP-6492](https://eip.tools/eip/6492) signatures.
 
 # Migration Guide
 

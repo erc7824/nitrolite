@@ -13,6 +13,7 @@ import (
 
 // Ensure our types implement the interfaces at compile time.
 var _ sign.Signer = (*Signer)(nil)
+var _ sign.AddressRecoverer = (*Signer)(nil)
 var _ sign.PrivateKey = (*PrivateKey)(nil)
 var _ sign.PublicKey = (*PublicKey)(nil)
 var _ sign.Address = (*Address)(nil)
@@ -61,6 +62,11 @@ type Signer struct {
 func (s *Signer) Address() sign.Address       { return s.privateKey.PublicKey().Address() }
 func (s *Signer) PublicKey() sign.PublicKey   { return s.privateKey.PublicKey() }
 func (s *Signer) PrivateKey() sign.PrivateKey { return s.privateKey }
+
+// RecoverAddress implements the AddressRecoverer interface.
+func (s *Signer) RecoverAddress(message []byte, signature sign.Signature) (string, error) {
+	return RecoverAddress(message, signature)
+}
 
 // NewSignerFromHex creates a new Ethereum signer from a hex-encoded private key.
 func NewEthereumSigner(privateKeyHex string) (sign.Signer, error) {

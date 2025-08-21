@@ -99,3 +99,36 @@ func Example_blockchainSpecificFeatures() {
 	// Output:
 	// Addresses match: true
 }
+
+// Example_genericAddressRecovery demonstrates using the generic AddressRecoverer interface.
+func Example_genericAddressRecovery() {
+	message := []byte("hello world")
+	
+	// Create a signer
+	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+	signer, err := ethereum.NewEthereumSigner(pkHex)
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	// Sign the message
+	signature, err := signer.PrivateKey().Sign(message)
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	// Use the generic AddressRecoverer interface
+	if recoverer, ok := signer.(sign.AddressRecoverer); ok {
+		recoveredAddr, err := recoverer.RecoverAddress(message, signature)
+		if err != nil {
+			log.Fatal(err)
+		}
+		
+		signerAddr := signer.PrivateKey().PublicKey().Address().String()
+		fmt.Printf("Generic recovery works: %t\n", recoveredAddr == signerAddr)
+	} else {
+		fmt.Println("Signer does not support address recovery")
+	}
+	// Output:
+	// Generic recovery works: true
+}

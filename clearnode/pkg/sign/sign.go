@@ -12,6 +12,11 @@ type Signer interface {
 	PrivateKey() PrivateKey // Private key implements PrivateKey interface.
 }
 
+// AddressRecoverer is an optional interface that signers can implement
+type AddressRecoverer interface {
+	RecoverAddress(message []byte, signature Signature) (string, error)
+}
+
 // PrivateKey is an interface for a blockchain-agnostic private key.
 type PrivateKey interface {
 	PublicKey() PublicKey

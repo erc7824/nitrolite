@@ -8,36 +8,6 @@ keywords: [migration, upgrade, breaking changes, nitrolite, erc7824]
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-## 0.3.0 Changelog
-
-This release focuses on streamlining channel creation, improving API consistency, and adding support for modern signature standards.
-
-### Nitrolite SDK
-
-- Replaced an optional NitroliteClient `stateWalletClient` field with a required `StateSigner` interface to handle state signing operations (via `signState(channelId, state)`).
-- Added `WalletStateSigner` (using viem's `WalletClient`) and `SessionStateSigner` (using raw private key account) classes to provide convenient implementations of the `StateSigner` interface.
-- Updated `CreateChannel(...)` method parameters to support the improved channel creation flow.
-- Standardized the request types in all Clearnode API methods, so that now `params` is an object instead of an array. This improves type safety and clarity.
-- Standardized `CreateChannel`, `CloseChannel`, and `ResizeChannel` method response types.
-- Changed the `Signature` type from `{r, s, v}` struct to `Hex`.
-- Added pagination types and parameters for requests to ClearNode pagination-supporting endpoints.
-
-### Clearnode API
-
-- Added `create_channel` method to facilitate the improved, single-transaction channel opening flow. The response includes the `Channel` and `State` structs, alongside with the `serverSignature` for the initial state.
-- Standardized the request structure in all Clearnode API methods, so that now `parameters` is an object instead of an array. This improves type safety and clarity.
-- Standardized `create_channel`, `close_channel`, and `resize_channel` method responses.
-- Added `metadata` struct to the `get_channels`, `get_app_sessions`, `get_ledger_entries`, and `get_ledger_transactions` method responses to provide additional pagination information: current page, number of items per page, total pages, and total items.
-
-The v0.3.0 API documentation can be found in the [API docs of the ClearNode](https://github.com/erc7824/nitrolite/blob/fcbf8a737ea5643234e8d01f14ee9344b3d0198b/clearnode/docs/API.md).
-
-### Smart Contract
-
-- Channels can now become operational immediately after the `create(...)` method call if all participant signatures are provided. In such case, for participants other than sender ("creator") the funds are transferred from the account specified in `participants` array.
-- Changed the `Signature` type from `{r, s, v}` struct to `bytes`.
-- Added `EIP712AdjudicatorBase` to support EIP-712 typed structured data signatures in Adjudicator contracts.
-- Added support for [EIP-191](https://eip.tools/eip/191), [EIP-712](https://eip.tools/eip/712), [EIP-1271](https://eip.tools/eip/1271), and [EIP-6492](https://eip.tools/eip/6492) signatures.
-
 # Migration Guide
 
 If you are coming from an earlier version of Nitrolite, you will need to account for the following breaking changes.

@@ -23,6 +23,15 @@ type Address struct{ common.Address }
 
 func (a Address) String() string { return a.Address.Hex() }
 
+// Equals returns true if this address equals the other address.
+func (a Address) Equals(other sign.Address) bool {
+	if otherAddr, ok := other.(Address); ok {
+		return a.Address == otherAddr.Address
+	}
+	// Fallback to string comparison for cross-blockchain compatibility
+	return a.String() == other.String()
+}
+
 // PublicKey implements the sign.PublicKey interface for Ethereum.
 type PublicKey struct{ *ecdsa.PublicKey }
 

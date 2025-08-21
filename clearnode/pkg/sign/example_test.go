@@ -103,27 +103,27 @@ func Example_blockchainSpecificFeatures() {
 // Example_genericAddressRecovery demonstrates using the generic AddressRecoverer interface.
 func Example_genericAddressRecovery() {
 	message := []byte("hello world")
-	
+
 	// Create a signer
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 	signer, err := ethereum.NewEthereumSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	// Sign the message
 	signature, err := signer.PrivateKey().Sign(message)
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	// Use the generic AddressRecoverer interface
 	if recoverer, ok := signer.(sign.AddressRecoverer); ok {
 		recoveredAddr, err := recoverer.RecoverAddress(message, signature)
 		if err != nil {
 			log.Fatal(err)
 		}
-		
+
 		signerAddr := signer.PrivateKey().PublicKey().Address().String()
 		fmt.Printf("Generic recovery works: %t\n", recoveredAddr == signerAddr)
 	} else {
@@ -131,4 +131,34 @@ func Example_genericAddressRecovery() {
 	}
 	// Output:
 	// Generic recovery works: true
+}
+
+// ExampleAddress_comparison demonstrates address comparison methods.
+func ExampleAddress_comparison() {
+	// Create two different signers
+	pkHex1 := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+	pkHex2 := "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+
+	signer1, err := ethereum.NewEthereumSigner(pkHex1)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	signer2, err := ethereum.NewEthereumSigner(pkHex2)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Get their addresses
+	addr1 := signer1.PrivateKey().PublicKey().Address()
+	addr2 := signer2.PrivateKey().PublicKey().Address()
+	addr1Copy := signer1.PrivateKey().PublicKey().Address()
+
+	// Test equality
+	fmt.Printf("addr1 equals addr2: %t\n", addr1.Equals(addr2))
+	fmt.Printf("addr1 equals addr1Copy: %t\n", addr1.Equals(addr1Copy))
+
+	// Output:
+	// addr1 equals addr2: false
+	// addr1 equals addr1Copy: true
 }

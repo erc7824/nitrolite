@@ -33,6 +33,9 @@ type PublicKey interface {
 // Address is an interface for a blockchain-specific address.
 type Address interface {
 	fmt.Stringer // All addresses must have a string representation.
+
+	// Equals returns true if this address equals the other address.
+	Equals(other Address) bool
 }
 
 // Signature is a generic byte slice representing a cryptographic signature.

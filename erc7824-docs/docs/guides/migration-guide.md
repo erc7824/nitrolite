@@ -8,6 +8,22 @@ keywords: [migration, upgrade, breaking changes, nitrolite, erc7824]
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
+## 0.3.0 Changelog
+
+This release focuses on streamlining channel creation, improving API consistency, and adding support for modern signature standards.
+
+Smart Contract:
+- The process for opening a channel has been optimized to require one transaction instead of two. Channels can now become operational immediately if all participant signatures are provided during the creation call.
+- Support for multiple signature types (EIP-712, EIP-191, Raw ECDSA, EOA) have been added.
+
+Clearnode API:
+- New create_channel Method: A new RPC method, create_channel, has been introduced to facilitate the improved, single-transaction channel opening flow.
+- The create_channel, close_channel, and resize_channel methods now return state body in a consistent, standardized format.
+
+Nitrolite SDK:
+- The SDK includes a new CreateChannel() function that utilizes the latest contract and API improvements.
+- Standardized Responses: The data returned from CloseChannel() and ResizeChannel() has been updated to have consistent format.
+
 # Migration Guide
 
 If you are coming from an earlier version of Nitrolite, you will need to make sure to update the following APIs listed below.

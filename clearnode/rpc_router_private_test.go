@@ -931,7 +931,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -959,7 +961,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		resObj, ok := res.Params.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be ChannelOperationResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
-		require.Equal(t, ch.Version+1, resObj.State.Version)
+		require.Equal(t, ch.State.Version+1, resObj.State.Version)
 
 		// New channel amount should be initial + 200
 		expected := initialRawAmount.Add(allocateAmount)
@@ -969,8 +971,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
-		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
-		require.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
+		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount)     // Should remain unchanged
+		require.Equal(t, ch.State.Version, unchangedChannel.State.Version) // Should remain unchanged
 		require.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
@@ -997,7 +999,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1070,7 +1074,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1109,7 +1115,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}).Error)
 
 		ch := Channel{
@@ -1120,7 +1128,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1154,7 +1164,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1192,7 +1204,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1234,7 +1248,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1280,7 +1296,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1326,7 +1344,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1366,7 +1386,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1400,7 +1422,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1448,7 +1472,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1478,7 +1504,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		resObj, ok := res.Params.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
-		require.Equal(t, ch.Version+1, resObj.State.Version)
+		require.Equal(t, ch.State.Version+1, resObj.State.Version)
 
 		// New channel amount should be initial + AllocateAmount + ResizeAmount = 1000 + 150 + 100 = 1250
 		expected := initialRawAmount.Add(allocateAmount).Add(resizeAmount)
@@ -1488,8 +1514,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
-		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
-		require.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
+		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount)     // Should remain unchanged
+		require.Equal(t, ch.State.Version, unchangedChannel.State.Version) // Should remain unchanged
 		require.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
@@ -1518,7 +1544,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1548,7 +1576,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		resObj, ok := res.Params.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
-		require.Equal(t, ch.Version+1, resObj.State.Version)
+		require.Equal(t, ch.State.Version+1, resObj.State.Version)
 
 		// New channel amount should be initial + AllocateAmount + ResizeAmount = 0 + 100 - 100 = 0
 		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(decimal.Zero), "Combined allocation+resize amount mismatch")
@@ -1557,8 +1585,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
-		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount) // Should remain unchanged
-		require.Equal(t, ch.Version, unchangedChannel.Version)         // Should remain unchanged
+		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount)     // Should remain unchanged
+		require.Equal(t, ch.State.Version, unchangedChannel.State.Version) // Should remain unchanged
 		require.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
@@ -1595,7 +1623,9 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
-			Version:     2,
+			State: UnsignedState{
+				Version: 2,
+			},
 		}
 		require.NoError(t, db.Create(&ch).Error)
 
@@ -1618,7 +1648,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		resObj, ok := res.Params.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be CloseChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
-		require.Equal(t, ch.Version+1, resObj.State.Version)
+		require.Equal(t, ch.State.Version+1, resObj.State.Version)
 
 		// Final allocation should send full balance to destination
 		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(initialRawAmount), "Primary allocation mismatch")
@@ -1645,7 +1675,9 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 				Token:       asset.Token,
 				ChainID:     137,
 				RawAmount:   initialRawAmount,
-				Version:     2,
+				State: UnsignedState{
+					Version: 2,
+				},
 			},
 			{
 				ChannelID:   "0xChanToClose",
@@ -1655,7 +1687,9 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 				Token:       asset.Token,
 				ChainID:     137,
 				RawAmount:   initialRawAmount,
-				Version:     2,
+				State: UnsignedState{
+					Version: 2,
+				},
 			},
 		}
 
@@ -1716,7 +1750,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		require.NotNil(t, resObj.State, "State should not be nil")
 
 		// Verify state structure
-		require.Equal(t, uint8(1), resObj.State.Intent, "Intent should be INITIALIZE (1)")
+		require.Equal(t, StateIntent(StateIntentInitialize), resObj.State.Intent, "Intent should be INITIALIZE (1)")
 		require.Equal(t, uint64(0), resObj.State.Version, "Version should be 0")
 		require.Len(t, resObj.State.Allocations, 2, "Should have 2 allocations")
 		require.NotEmpty(t, resObj.StateSignature, "Should have 1 signature")
@@ -1793,7 +1827,9 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 			Token:       asset.Token,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(500),
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 		}
 		require.NoError(t, db.Create(&existingChannel).Error)
 

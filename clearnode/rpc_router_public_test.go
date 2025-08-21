@@ -12,11 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createRPCContext(id int, method string, params any) *RPCContext {
-	var rpcParams []any
-	if params != nil {
-		paramsJSON, _ := json.Marshal(params)
-		rpcParams = []any{json.RawMessage(paramsJSON)}
+func createRPCContext(id int, method string, params RPCDataParams) *RPCContext {
+	if params == nil {
+		params = struct{}{}
 	}
 
 	return &RPCContext{
@@ -25,10 +23,10 @@ func createRPCContext(id int, method string, params any) *RPCContext {
 			Req: &RPCData{
 				RequestID: uint64(id),
 				Method:    method,
-				Params:    rpcParams,
+				Params:    params,
 				Timestamp: uint64(time.Now().Unix()),
 			},
-			Sig: []string{"dummy-signature"},
+			Sig: []Signature{Signature([]byte("dummy-signature"))},
 		},
 	}
 }
@@ -52,10 +50,10 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 	defer cleanup()
 
 	router.Config = &Config{
-		networks: map[string]*NetworkConfig{
-			"polygon": {Name: "polygon", ChainID: 137, InfuraURL: "https://polygon-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress1"},
-			"celo":    {Name: "celo", ChainID: 42220, InfuraURL: "https://celo-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress2"},
-			"base":    {Name: "base", ChainID: 8453, InfuraURL: "https://base-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress3"},
+		networks: map[uint32]*NetworkConfig{
+			137:   {ChainID: 137, InfuraURL: "https://polygon-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress1"},
+			42220: {ChainID: 42220, InfuraURL: "https://celo-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress2"},
+			8453:  {ChainID: 8453, InfuraURL: "https://base-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress3"},
 		},
 	}
 
@@ -63,22 +61,21 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 	router.HandleGetConfig(ctx)
 
 	res := assertResponse(t, ctx, "get_config")
-	configMap, ok := res.Params[0].(BrokerConfig)
+	configMap, ok := res.Params.(BrokerConfig)
 	require.True(t, ok, "Response should contain a BrokerConfig")
 	assert.Equal(t, router.Signer.GetAddress().Hex(), configMap.BrokerAddress)
 	require.Len(t, configMap.Networks, 3, "Should have 3 supported networks")
 
-	expectedNetworks := map[string]uint32{
-		"polygon": 137,
-		"celo":    42220,
-		"base":    8453,
+	expectedNetworks := map[uint32]struct{}{
+		137:   {},
+		42220: {},
+		8453:  {},
 	}
 	for _, network := range configMap.Networks {
-		expectedChainID, exists := expectedNetworks[network.Name]
-		assert.True(t, exists, "Network %s should be in expected networks", network.Name)
-		assert.Equal(t, expectedChainID, network.ChainID, "Chain ID should match for %s", network.Name)
+		_, exists := expectedNetworks[network.ChainID]
+		assert.True(t, exists, "Network %d should be in expected networks", network.ChainID)
 		assert.Contains(t, network.CustodyAddress, "0xCustodyAddress", "Custody address should be present")
-		delete(expectedNetworks, network.Name)
+		delete(expectedNetworks, network.ChainID)
 	}
 	assert.Empty(t, expectedNetworks, "All expected networks should be found")
 }
@@ -117,12 +114,11 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 			router.HandleGetAssets(ctx)
 
 			res := assertResponse(t, ctx, "get_assets")
-			require.Len(t, res.Params, 1, "Response should contain an array of AssetResponse")
-			responseAssets, ok := res.Params[0].([]GetAssetsResponse)
-			require.True(t, ok, "Response parameter should be a slice of AssetResponse")
-			assert.Len(t, responseAssets, len(tc.expectedTokenNames), "Should return expected number of assets")
+			responseAssets, ok := res.Params.(GetAssetsResponse)
+			require.True(t, ok, "Response parameter should be a GetAssetsResponse")
+			assert.Len(t, responseAssets.Assets, len(tc.expectedTokenNames), "Should return expected number of assets")
 
-			for idx, asset := range responseAssets {
+			for idx, asset := range responseAssets.Assets {
 				assert.True(t, asset.Token == tc.expectedTokenNames[idx], "Should include token %s", tc.expectedTokenNames[idx])
 			}
 		})
@@ -165,7 +161,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 				ChannelID:   "0xChannel3",
 				Wallet:      participantWallet,
 				Participant: participantSigner,
-				Status:      ChannelStatusJoining,
+				Status:      ChannelStatusOpen,
 				Nonce:       3,
 				CreatedAt:   baseTime.Add(2 * time.Hour),
 			},
@@ -212,22 +208,17 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			{
 				name:               "Filter by status open",
 				params:             map[string]interface{}{"status": string(ChannelStatusOpen)},
-				expectedChannelIDs: []string{"0xOtherChannel", "0xChannel1"},
+				expectedChannelIDs: []string{"0xOtherChannel", "0xChannel3", "0xChannel1"},
 			},
 			{
 				name:               "Filter by participant and status open",
 				params:             map[string]interface{}{"participant": participantWallet, "status": string(ChannelStatusOpen)},
-				expectedChannelIDs: []string{"0xChannel1"},
+				expectedChannelIDs: []string{"0xChannel3", "0xChannel1"},
 			},
 			{
 				name:               "Filter by participant and status closed",
 				params:             map[string]interface{}{"participant": participantWallet, "status": string(ChannelStatusClosed)},
 				expectedChannelIDs: []string{"0xChannel2"},
-			},
-			{
-				name:               "Filter by participant and status joining",
-				params:             map[string]interface{}{"participant": participantWallet, "status": string(ChannelStatusJoining)},
-				expectedChannelIDs: []string{"0xChannel3"},
 			},
 			{
 				name:               "Filter by status closed only",
@@ -242,12 +233,11 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 				router.HandleGetChannels(ctx)
 
 				res := assertResponse(t, ctx, "get_channels")
-				require.Len(t, res.Params, 1, "Response should contain a slice of ChannelResponse")
-				responseChannels, ok := res.Params[0].([]ChannelResponse)
-				require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
-				assert.Len(t, responseChannels, len(tc.expectedChannelIDs), "Should return expected number of channels")
+				responseChannels, ok := res.Params.(GetChannelsResponse)
+				require.True(t, ok, "Response parameter should be a GetChannelsResponse")
+				assert.Len(t, responseChannels.Channels, len(tc.expectedChannelIDs), "Should return expected number of channels")
 
-				for idx, channel := range responseChannels {
+				for idx, channel := range responseChannels.Channels {
 					assert.True(t, channel.ChannelID == tc.expectedChannelIDs[idx], "%d-th result (%s) should equal %s", idx, channel.ChannelID, tc.expectedChannelIDs[idx])
 				}
 			})
@@ -268,14 +258,14 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			{Wallet: "0xWallet1", Participant: "0xParticipant1", Status: ChannelStatusOpen, Nonce: 1},
 			{Wallet: "0xWallet2", Participant: "0xParticipant2", Status: ChannelStatusClosed, Nonce: 2},
 			{Wallet: "0xWallet3", Participant: "0xParticipant3", Status: ChannelStatusOpen, Nonce: 3},
-			{Wallet: "0xWallet4", Participant: "0xParticipant4", Status: ChannelStatusJoining, Nonce: 4},
-			{Wallet: "0xWallet5", Participant: "0xParticipant5", Status: ChannelStatusOpen, Nonce: 5},
-			{Wallet: "0xWallet6", Participant: "0xParticipant6", Status: ChannelStatusChallenged, Nonce: 6},
-			{Wallet: "0xWallet7", Participant: "0xParticipant7", Status: ChannelStatusOpen, Nonce: 7},
-			{Wallet: "0xWallet8", Participant: "0xParticipant8", Status: ChannelStatusClosed, Nonce: 8},
-			{Wallet: "0xWallet9", Participant: "0xParticipant9", Status: ChannelStatusOpen, Nonce: 9},
-			{Wallet: "0xWallet10", Participant: "0xParticipant10", Status: ChannelStatusJoining, Nonce: 10},
-			{Wallet: "0xWallet11", Participant: "0xParticipant11", Status: ChannelStatusOpen, Nonce: 11},
+			{Wallet: "0xWallet5", Participant: "0xParticipant5", Status: ChannelStatusOpen, Nonce: 4},
+			{Wallet: "0xWallet6", Participant: "0xParticipant6", Status: ChannelStatusChallenged, Nonce: 5},
+			{Wallet: "0xWallet7", Participant: "0xParticipant7", Status: ChannelStatusOpen, Nonce: 6},
+			{Wallet: "0xWallet8", Participant: "0xParticipant8", Status: ChannelStatusClosed, Nonce: 7},
+			{Wallet: "0xWallet9", Participant: "0xParticipant9", Status: ChannelStatusOpen, Nonce: 8},
+			{Wallet: "0xWallet10", Participant: "0xParticipant10", Status: ChannelStatusOpen, Nonce: 9},
+			{Wallet: "0xWallet11", Participant: "0xParticipant11", Status: ChannelStatusOpen, Nonce: 10},
+			{Wallet: "0xWallet12", Participant: "0xParticipant12", Status: ChannelStatusOpen, Nonce: 11},
 		}
 
 		for i := range testChannels {
@@ -315,7 +305,7 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 			},
 			{name: "Pagination with status filter",
 				params:             map[string]interface{}{"status": "open", "limit": float64(3)},
-				expectedChannelIDs: []string{"0xChannel01", "0xChannel03", "0xChannel05"}, // Only open channels, first 3
+				expectedChannelIDs: []string{"0xChannel01", "0xChannel03", "0xChannel04"}, // Only open channels, first 3
 			},
 		}
 
@@ -325,13 +315,12 @@ func TestRPCRouterHandleGetChannels(t *testing.T) {
 				router.HandleGetChannels(ctx)
 
 				res := assertResponse(t, ctx, "get_channels")
-				require.Len(t, res.Params, 1, "Response should contain an array of ChannelResponse")
-				responseChannels, ok := res.Params[0].([]ChannelResponse)
-				require.True(t, ok, "Response parameter should be a slice of ChannelResponse")
-				assert.Len(t, responseChannels, len(tc.expectedChannelIDs), "Should return expected number of channels")
+				responseChannels, ok := res.Params.(GetChannelsResponse)
+				require.True(t, ok, "Response parameter should be a GetChannelsResponse")
+				assert.Len(t, responseChannels.Channels, len(tc.expectedChannelIDs), "Should return expected number of channels")
 
 				// Check channel IDs are included in expected order
-				for idx, channel := range responseChannels {
+				for idx, channel := range responseChannels.Channels {
 					assert.Equal(t, tc.expectedChannelIDs[idx], channel.ChannelID, "Should include channel %s at position %d", tc.expectedChannelIDs[idx], idx)
 				}
 			})
@@ -362,7 +351,7 @@ func TestRPCRouterHandleGetAppDefinition(t *testing.T) {
 		router.HandleGetAppDefinition(ctx)
 
 		res := assertResponse(t, ctx, "get_app_definition")
-		def, ok := res.Params[0].(AppDefinition)
+		def, ok := res.Params.(AppDefinition)
 		require.True(t, ok)
 		assert.Equal(t, session.Protocol, def.Protocol)
 		assert.EqualValues(t, session.ParticipantWallets, def.ParticipantWallets)
@@ -509,13 +498,12 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 
 				res := assertResponse(t, ctx, "get_app_sessions")
 				assert.Equal(t, uint64(idx), res.RequestID)
-				require.Len(t, res.Params, 1, "Response should contain an array of AppSessionResponse")
 
-				sessionResponses, ok := res.Params[0].([]AppSessionResponse)
-				require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
-				assert.Len(t, sessionResponses, len(tc.expectedSessionIDs), "Should return expected number of app sessions")
+				sessionResponses, ok := res.Params.(GetAppSessionsResponse)
+				require.True(t, ok, "Response parameter should be a GetAppSessionsResponse")
+				assert.Len(t, sessionResponses.AppSessions, len(tc.expectedSessionIDs), "Should return expected number of app sessions")
 
-				for idx, sessionResponse := range sessionResponses {
+				for idx, sessionResponse := range sessionResponses.AppSessions {
 					assert.True(t, sessionResponse.AppSessionID == tc.expectedSessionIDs[idx], "Should include session %s", tc.expectedSessionIDs[idx])
 				}
 			})
@@ -597,13 +585,12 @@ func TestRPCRouterHandleGetAppSessions(t *testing.T) {
 				router.HandleGetAppSessions(ctx)
 
 				res := assertResponse(t, ctx, "get_app_sessions")
-				require.Len(t, res.Params, 1, "Response should contain an array of AppSessionResponse")
-				responseSessions, ok := res.Params[0].([]AppSessionResponse)
-				require.True(t, ok, "Response parameter should be a slice of AppSessionResponse")
-				assert.Len(t, responseSessions, len(tc.expectedSessionIDs), "Should return expected number of sessions")
+				responseSessions, ok := res.Params.(GetAppSessionsResponse)
+				require.True(t, ok, "Response parameter should be a GetAppSessionsResponse")
+				assert.Len(t, responseSessions.AppSessions, len(tc.expectedSessionIDs), "Should return expected number of sessions")
 
 				// Check session IDs are in expected order
-				for idx, session := range responseSessions {
+				for idx, session := range responseSessions.AppSessions {
 					assert.True(t, session.AppSessionID == tc.expectedSessionIDs[idx], "Retrieved %d-th session ID should be equal %s", idx, tc.expectedSessionIDs[idx])
 				}
 			})
@@ -747,13 +734,12 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 
 				res := assertResponse(t, ctx, "get_ledger_entries")
 				assert.Equal(t, uint64(idx+1), res.RequestID)
-				require.Len(t, res.Params, 1, "Response should contain an array of Entry objects")
 
-				entries, ok := res.Params[0].([]LedgerEntryResponse)
-				require.True(t, ok, "Response parameter should be a slice of Entry")
-				assert.Len(t, entries, tc.expectedCount, "Should return expected number of entries")
+				entries, ok := res.Params.(GetLedgerEntriesResponse)
+				require.True(t, ok, "Response parameter should be a GetLedgerEntriesResponse")
+				assert.Len(t, entries.LedgerEntries, tc.expectedCount, "Should return expected number of entries")
 
-				tc.validateFunc(t, entries)
+				tc.validateFunc(t, entries.LedgerEntries)
 			})
 		}
 	})
@@ -831,13 +817,12 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 				router.HandleGetLedgerEntries(c)
 
 				res := assertResponse(t, c, "get_ledger_entries")
-				require.Len(t, res.Params, 1, "Response should contain an array of LedgerEntryResponse")
-				responseEntries, ok := res.Params[0].([]LedgerEntryResponse)
-				require.True(t, ok, "Response parameter should be a slice of LedgerEntryResponse")
-				assert.Len(t, responseEntries, len(tc.expectedToken), "Should return expected number of entries")
+				responseEntries, ok := res.Params.(GetLedgerEntriesResponse)
+				require.True(t, ok, "Response parameter should be a GetLedgerEntriesResponse")
+				assert.Len(t, responseEntries.LedgerEntries, len(tc.expectedToken), "Should return expected number of entries")
 
 				// Check token names are included in expected order
-				for idx, entry := range responseEntries {
+				for idx, entry := range responseEntries.LedgerEntries {
 					assert.Equal(t, tc.expectedToken[idx], entry.Asset, "Should include token %s at position %d", tc.expectedToken[idx], idx)
 				}
 			})
@@ -998,16 +983,17 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 				router.HandleGetLedgerTransactions(c)
 
 				res := assertResponse(t, c, "get_ledger_transactions")
-				require.Len(t, res.Params, 1, "Response should contain one parameter")
 
 				// Unmarshal the actual transaction data
-				var transactions []TransactionResponse
+				var resp GetLedgerTransactionsResponse
+				require.NotNil(t, res.Params, "Response parameter should not be nil")
 				// We need to marshal the interface{} back to JSON, then unmarshal into our concrete type.
-				respBytes, err := json.Marshal(res.Params[0])
+				respBytes, err := json.Marshal(res.Params)
 				require.NoError(t, err)
-				err = json.Unmarshal(respBytes, &transactions)
-				require.NoError(t, err, "Response parameter should be a slice of TransactionResponse")
+				err = json.Unmarshal(respBytes, &resp)
+				require.NoError(t, err, "Response parameter should be a GetLedgerTransactionsResponse")
 
+				transactions := resp.LedgerTransactions
 				// Assert the expected number of transactions were returned
 				assert.Len(t, transactions, tc.expectedLen)
 
@@ -1120,14 +1106,14 @@ func TestRPCRouterHandleGetTransactions(t *testing.T) {
 				router.HandleGetLedgerTransactions(ctx)
 
 				res := assertResponse(t, ctx, "get_ledger_transactions")
-				require.Len(t, res.Params, 1, "Response should contain an array of TransactionResponse")
 
-				var transactions []TransactionResponse
-				respBytes, err := json.Marshal(res.Params[0])
+				var resp GetLedgerTransactionsResponse
+				respBytes, err := json.Marshal(res.Params)
 				require.NoError(t, err)
-				err = json.Unmarshal(respBytes, &transactions)
+				err = json.Unmarshal(respBytes, &resp)
 				require.NoError(t, err)
 
+				transactions := resp.LedgerTransactions
 				assert.Len(t, transactions, tc.expectedCount, "Should return expected number of transactions")
 
 				// For non-filter tests, verify order

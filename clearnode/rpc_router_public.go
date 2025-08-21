@@ -11,11 +11,15 @@ type GetAssetsParams struct {
 	ChainID *uint32 `json:"chain_id,omitempty"` // Optional chain ID to filter assets
 }
 
-type GetAssetsResponse struct {
+type AssetResponse struct {
 	Token    string `json:"token"`
 	ChainID  uint32 `json:"chain_id"`
 	Symbol   string `json:"symbol"`
 	Decimals uint8  `json:"decimals"`
+}
+
+type GetAssetsResponse struct {
+	Assets []AssetResponse `json:"assets"`
 }
 
 type GetChannelsParams struct {
@@ -68,7 +72,6 @@ type GetLedgerTransactionsParams struct {
 }
 
 type NetworkInfo struct {
-	Name               string `json:"name"`
 	ChainID            uint32 `json:"chain_id"`
 	CustodyAddress     string `json:"custody_address"`
 	AdjudicatorAddress string `json:"adjudicator_address"`
@@ -91,17 +94,36 @@ type TransactionResponse struct {
 	CreatedAt      time.Time       `json:"created_at"`
 }
 
+type GetChannelsResponse struct {
+	Channels []ChannelResponse `json:"channels"`
+}
+
+type GetAppSessionsResponse struct {
+	AppSessions []AppSessionResponse `json:"app_sessions"`
+}
+
+type GetLedgerEntriesResponse struct {
+	LedgerEntries []LedgerEntryResponse `json:"ledger_entries"`
+}
+
+type GetLedgerTransactionsResponse struct {
+	LedgerTransactions []TransactionResponse `json:"ledger_transactions"`
+}
+
+type ErrorResponse struct {
+	Error string `json:"error"` // The error message to send back to the client
+}
+
 func (r *RPCRouter) HandlePing(c *RPCContext) {
-	c.Succeed("pong")
+	c.Succeed("pong", nil)
 }
 
 // HandleGetConfig returns the broker configuration
 func (r *RPCRouter) HandleGetConfig(c *RPCContext) {
 	supportedNetworks := make([]NetworkInfo, 0, len(r.Config.networks))
 
-	for name, networkConfig := range r.Config.networks {
+	for _, networkConfig := range r.Config.networks {
 		supportedNetworks = append(supportedNetworks, NetworkInfo{
-			Name:               name,
 			ChainID:            networkConfig.ChainID,
 			CustodyAddress:     networkConfig.CustodyAddress,
 			AdjudicatorAddress: networkConfig.AdjudicatorAddress,
@@ -136,9 +158,13 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 		return
 	}
 
-	resp := make([]GetAssetsResponse, 0, len(assets))
+	respAssets := make([]AssetResponse, 0, len(assets))
 	for _, asset := range assets {
-		resp = append(resp, GetAssetsResponse(asset))
+		respAssets = append(respAssets, AssetResponse(asset))
+	}
+
+	resp := GetAssetsResponse{
+		Assets: respAssets,
 	}
 
 	c.Succeed(req.Method, resp)
@@ -168,9 +194,9 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 		return
 	}
 
-	response := make([]ChannelResponse, 0, len(channels))
+	respChannels := make([]ChannelResponse, 0, len(channels))
 	for _, channel := range channels {
-		response = append(response, ChannelResponse{
+		respChannels = append(respChannels, ChannelResponse{
 			ChannelID:   channel.ChannelID,
 			Participant: channel.Participant,
 			Status:      channel.Status,
@@ -187,7 +213,11 @@ func (r *RPCRouter) HandleGetChannels(c *RPCContext) {
 		})
 	}
 
-	c.Succeed(req.Method, response)
+	resp := GetChannelsResponse{
+		Channels: respChannels,
+	}
+
+	c.Succeed(req.Method, resp)
 	logger.Info("channels retrieved", "participant", params.Participant, "status", params.Status)
 }
 
@@ -245,9 +275,9 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 	}
 
 	// TODO: update response format accordingly to create struct
-	resp := make([]AppSessionResponse, len(sessions))
+	respAppSessions := make([]AppSessionResponse, len(sessions))
 	for i, session := range sessions {
-		resp[i] = AppSessionResponse{
+		respAppSessions[i] = AppSessionResponse{
 			AppSessionID:       session.SessionID,
 			Status:             string(session.Status),
 			ParticipantWallets: session.ParticipantWallets,
@@ -261,6 +291,10 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 			CreatedAt:          session.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:          session.UpdatedAt.Format(time.RFC3339),
 		}
+	}
+
+	resp := GetAppSessionsResponse{
+		AppSessions: respAppSessions,
 	}
 
 	c.Succeed(req.Method, resp)
@@ -295,9 +329,9 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 		return
 	}
 
-	resp := make([]LedgerEntryResponse, len(entries))
+	respLedgerEntries := make([]LedgerEntryResponse, len(entries))
 	for i, entry := range entries {
-		resp[i] = LedgerEntryResponse{
+		respLedgerEntries[i] = LedgerEntryResponse{
 			ID:          entry.ID,
 			AccountID:   entry.AccountID,
 			AccountType: entry.AccountType,
@@ -307,6 +341,10 @@ func (r *RPCRouter) HandleGetLedgerEntries(c *RPCContext) {
 			Debit:       entry.Debit,
 			CreatedAt:   entry.CreatedAt,
 		}
+	}
+
+	resp := GetLedgerEntriesResponse{
+		LedgerEntries: respLedgerEntries,
 	}
 
 	c.Succeed(req.Method, resp)
@@ -343,11 +381,15 @@ func (r *RPCRouter) HandleGetLedgerTransactions(c *RPCContext) {
 		return
 	}
 
-	resp, err := FormatTransactions(r.DB, transactions)
+	respLedgerTransactions, err := FormatTransactions(r.DB, transactions)
 	if err != nil {
 		logger.Error("failed to format transactions", "error", err)
 		c.Fail(err, "failed to return transactions")
 		return
+	}
+
+	resp := GetLedgerTransactionsResponse{
+		LedgerTransactions: respLedgerTransactions,
 	}
 
 	c.Succeed(req.Method, resp)

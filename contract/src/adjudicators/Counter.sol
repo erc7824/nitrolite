@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
-import {Channel, State, Allocation, Signature, StateIntent} from "../interfaces/Types.sol";
+import {Channel, State, Allocation, StateIntent} from "../interfaces/Types.sol";
 import {Utils} from "../Utils.sol";
 
 /**
@@ -32,7 +32,6 @@ contract Counter is IAdjudicator {
      */
     function adjudicate(Channel calldata chan, State calldata candidate, State[] calldata proofs)
         external
-        view
         override
         returns (bool valid)
     {
@@ -59,7 +58,7 @@ contract Counter is IAdjudicator {
         // proof is Initialize State
         if (candidate.version == 1) {
             return proofs[0].validateTransitionTo(candidate) && _validateAppTransitionTo(proofs[0].data, candidate.data)
-                && proofs[0].validateInitialState(chan) && _validateStateSig(chan, candidate);
+                && proofs[0].validateInitialState(chan, Utils.NO_EIP712_SUPPORT) && _validateStateSig(chan, candidate);
         }
 
         bytes memory proofData = proofs[0].data;
@@ -85,7 +84,7 @@ contract Counter is IAdjudicator {
         return candidateDataDecoded.target == previousDataDecoded.target;
     }
 
-    function _validateStateSig(Channel calldata chan, State calldata state) internal view returns (bool) {
+    function _validateStateSig(Channel calldata chan, State calldata state) internal returns (bool) {
         if (state.sigs.length != 1) {
             return false;
         }
@@ -97,6 +96,8 @@ contract Counter is IAdjudicator {
             signerIdx = 1; // guest signer
         }
 
-        return Utils.verifySignature(Utils.getStateHash(chan, state), state.sigs[0], chan.participants[signerIdx]);
+        return state.verifyStateSignature(
+            Utils.getChannelId(chan), Utils.NO_EIP712_SUPPORT, state.sigs[0], chan.participants[signerIdx]
+        );
     }
 }

@@ -2,10 +2,11 @@ import { Address, createWalletClient, Hex, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { chain } from './setup';
 import { createECDSAMessageSigner } from '@erc7824/nitrolite';
+import { SessionKeyStateSigner } from '@erc7824/nitrolite/dist/client/signer';
 
 export class Identity {
     public walletClient = null;
-    public stateWalletClient = null;
+    public stateSigner = null;
     public walletAddress: Address;
     public sessionAddress: Address;
     public messageSigner = null;
@@ -20,21 +21,8 @@ export class Identity {
             transport: http(),
         });
 
-        const sessionAccount = privateKeyToAccount(sessionPrivateKey);
-        this.sessionAddress = sessionAccount.address;
-
-        this.stateWalletClient = {
-            ...this.walletClient,
-            account: {
-                address: this.sessionAddress,
-            },
-            signMessage: async ({ message: { raw } }: { message: { raw: string } }) => {
-                const flatSignature = await sessionAccount.sign({ hash: raw as Hex });
-
-                return flatSignature as Hex;
-            },
-        };
-
+        this.stateSigner = new SessionKeyStateSigner(sessionPrivateKey);
         this.messageSigner = createECDSAMessageSigner(sessionPrivateKey);
+        this.sessionAddress = this.stateSigner.getAddress();
     }
 }

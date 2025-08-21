@@ -5,7 +5,7 @@ import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import { getResizeChannelPredicate, TestWebSocket } from '@/ws';
-import { createResizeChannelMessage, rpcResponseParser } from '@erc7824/nitrolite';
+import { createResizeChannelMessage, parseResizeChannelResponse } from '@erc7824/nitrolite';
 import { Hex, parseUnits } from 'viem';
 
 describe('Resize channel', () => {
@@ -64,46 +64,40 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, [
-            {
-                channel_id: createResponseParams.channelId,
-                resize_amount: depositAmount,
-                allocate_amount: parseUnits('0', 6),
-                funds_destination: identity.walletAddress,
-            },
-        ]);
+        const msg = await createResizeChannelMessage(identity.messageSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: depositAmount,
+            allocate_amount: parseUnits('0', 6),
+            funds_destination: identity.walletAddress,
+        });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
-        const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
         expect(resizeResponseParams.channelId).toBe(createResponseParams.channelId);
-        expect(resizeResponseParams.stateData).toBeDefined();
-        expect(resizeResponseParams.intent).toBe(2); // StateIntent.RESIZE // TODO: add enum to sdk
-        expect(resizeResponseParams.version).toBe(createResponseParams.version + 1);
-        expect(resizeResponseParams.stateHash).toBeDefined();
+        expect(resizeResponseParams.state.stateData).toBeDefined();
+        expect(resizeResponseParams.state.intent).toBe(2); // StateIntent.RESIZE // TODO: add enum to sdk
+        expect(resizeResponseParams.state.version).toBe(createResponseParams.version + 1);
 
         expect(resizeResponseParams.serverSignature).toBeDefined();
-        expect(resizeResponseParams.serverSignature.v).toBeDefined();
-        expect(resizeResponseParams.serverSignature.r).toBeDefined();
-        expect(resizeResponseParams.serverSignature.s).toBeDefined();
 
-        expect(resizeResponseParams.allocations).toBeDefined();
-        expect(resizeResponseParams.allocations).toHaveLength(2);
-        expect(String(resizeResponseParams.allocations[0].destination)).toBe(identity.walletAddress);
-        expect(String(resizeResponseParams.allocations[0].token)).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(String(resizeResponseParams.allocations[0].amount)).toBe(
+        expect(resizeResponseParams.state.allocations).toBeDefined();
+        expect(resizeResponseParams.state.allocations).toHaveLength(2);
+        expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);
+        expect(String(resizeResponseParams.state.allocations[0].token)).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
             (depositAmount * BigInt(6)).toString() // 500 + 100
         );
-        expect(String(resizeResponseParams.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
-        expect(String(resizeResponseParams.allocations[1].token)).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(String(resizeResponseParams.allocations[1].amount)).toBe('0');
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].token)).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
         const resizeChannelTxHash = await client.resizeChannel({
             resizeState: {
                 channelId: resizeResponseParams.channelId as Hex,
-                intent: resizeResponseParams.intent,
-                version: BigInt(resizeResponseParams.version),
-                data: resizeResponseParams.stateData as Hex,
-                allocations: resizeResponseParams.allocations,
+                intent: resizeResponseParams.state.intent,
+                version: BigInt(resizeResponseParams.state.version),
+                data: resizeResponseParams.state.stateData as Hex,
+                allocations: resizeResponseParams.state.allocations,
                 serverSignature: resizeResponseParams.serverSignature,
             },
             proofStates: [
@@ -159,33 +153,31 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, [
-            {
-                channel_id: createResponseParams.channelId,
-                resize_amount: -depositAmount,
-                allocate_amount: parseUnits('0', 6),
-                funds_destination: identity.walletAddress,
-            },
-        ]);
+        const msg = await createResizeChannelMessage(identity.messageSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: -depositAmount,
+            allocate_amount: parseUnits('0', 6),
+            funds_destination: identity.walletAddress,
+        });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
-        const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
-        expect(resizeResponseParams.allocations).toBeDefined();
-        expect(resizeResponseParams.allocations).toHaveLength(2);
-        expect(String(resizeResponseParams.allocations[0].destination)).toBe(identity.walletAddress);
-        expect(String(resizeResponseParams.allocations[0].amount)).toBe(
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
+        expect(resizeResponseParams.state.allocations).toBeDefined();
+        expect(resizeResponseParams.state.allocations).toHaveLength(2);
+        expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);
+        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
             (depositAmount * BigInt(4)).toString() // 500 - 100
         );
-        expect(String(resizeResponseParams.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
-        expect(String(resizeResponseParams.allocations[1].amount)).toBe('0');
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
         const resizeChannelTxHash = await client.resizeChannel({
             resizeState: {
                 channelId: resizeResponseParams.channelId as Hex,
-                intent: resizeResponseParams.intent,
-                version: BigInt(resizeResponseParams.version),
-                data: resizeResponseParams.stateData as Hex,
-                allocations: resizeResponseParams.allocations,
+                intent: resizeResponseParams.state.intent,
+                version: BigInt(resizeResponseParams.state.version),
+                data: resizeResponseParams.state.stateData as Hex,
+                allocations: resizeResponseParams.state.allocations,
                 serverSignature: resizeResponseParams.serverSignature,
             },
             proofStates: [
@@ -241,33 +233,31 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, [
-            {
-                channel_id: createResponseParams.channelId,
-                resize_amount: parseUnits('0', 6),
-                allocate_amount: -depositAmount,
-                funds_destination: identity.walletAddress,
-            },
-        ]);
+        const msg = await createResizeChannelMessage(identity.messageSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: parseUnits('0', 6),
+            allocate_amount: -depositAmount,
+            funds_destination: identity.walletAddress,
+        });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
-        const { params: resizeResponseParams } = rpcResponseParser.resizeChannel(resizeResponse);
-        expect(resizeResponseParams.allocations).toBeDefined();
-        expect(resizeResponseParams.allocations).toHaveLength(2);
-        expect(String(resizeResponseParams.allocations[0].destination)).toBe(identity.walletAddress);
-        expect(String(resizeResponseParams.allocations[0].amount)).toBe(
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
+        expect(resizeResponseParams.state.allocations).toBeDefined();
+        expect(resizeResponseParams.state.allocations).toHaveLength(2);
+        expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);
+        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
             (depositAmount * BigInt(4)).toString() // 500 - 100
         );
-        expect(String(resizeResponseParams.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
-        expect(String(resizeResponseParams.allocations[1].amount)).toBe('0');
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
         const resizeChannelTxHash = await client.resizeChannel({
             resizeState: {
                 channelId: resizeResponseParams.channelId as Hex,
-                intent: resizeResponseParams.intent,
-                version: BigInt(resizeResponseParams.version),
-                data: resizeResponseParams.stateData as Hex,
-                allocations: resizeResponseParams.allocations,
+                intent: resizeResponseParams.state.intent,
+                version: BigInt(resizeResponseParams.state.version),
+                data: resizeResponseParams.state.stateData as Hex,
+                allocations: resizeResponseParams.state.allocations,
                 serverSignature: resizeResponseParams.serverSignature,
             },
             proofStates: [

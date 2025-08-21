@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 	"syscall"
 
 	"golang.org/x/term"
@@ -44,11 +45,17 @@ func (o *Operator) handleImportRPC(args []string) {
 		fmt.Println("Usage: import rpc <chain_name>")
 		return
 	}
-	chainName := args[2]
+	chainIDStr := args[2]
 
-	network := o.config.GetNetworkByName(chainName)
+	chainID, ok := new(big.Int).SetString(chainIDStr, 10)
+	if !ok {
+		fmt.Printf("Invalid chain ID: %s.\n", chainIDStr)
+		return
+	}
+
+	network := o.config.GetNetworkByID(uint32(chainID.Uint64()))
 	if network == nil {
-		fmt.Printf("Unknown chain: %s.\n", chainName)
+		fmt.Printf("Unknown chain: %s.\n", chainIDStr)
 		return
 	}
 
@@ -63,5 +70,5 @@ func (o *Operator) handleImportRPC(args []string) {
 		fmt.Printf("Failed to import chain RPC: %s\n", err.Error())
 		return
 	}
-	fmt.Printf("RPC URL for %s imported successfully!\n", chainName)
+	fmt.Printf("RPC URL for chain %s imported successfully!\n", chainID.String())
 }

@@ -1,14 +1,24 @@
 import {
     Allocation,
+    convertRPCToClientChannel,
+    convertRPCToClientState,
     createCloseChannelMessage,
+    createCreateChannelMessage,
     NitroliteClient,
+    parseChannelUpdateResponse,
+    parseCloseChannelResponse,
+    parseCreateChannelResponse,
     RPCChannelStatus,
-    rpcResponseParser,
 } from '@erc7824/nitrolite';
 import { Identity } from './identity';
 import { Address, createPublicClient, Hex, http } from 'viem';
 import { chain, CONFIG } from './setup';
-import { getChannelUpdatePredicateWithStatus, getCloseChannelPredicate, TestWebSocket } from './ws';
+import {
+    getChannelUpdatePredicateWithStatus,
+    getCloseChannelPredicate,
+    getCreateChannelPredicate,
+    TestWebSocket,
+} from './ws';
 
 export class TestNitroliteClient extends NitroliteClient {
     constructor(private identity: Identity) {
@@ -21,7 +31,7 @@ export class TestNitroliteClient extends NitroliteClient {
             // @ts-ignore
             publicClient,
             walletClient: identity.walletClient,
-            stateWalletClient: identity.stateWalletClient,
+            stateSigner: identity.stateSigner,
             account: identity.walletClient.account,
             chainId: chain.id,
             challengeDuration: BigInt(CONFIG.DEFAULT_CHALLENGE_TIMEOUT), // min
@@ -35,9 +45,18 @@ export class TestNitroliteClient extends NitroliteClient {
 
     createAndWaitForChannel = async (
         ws: TestWebSocket,
-        { tokenAddress, amount, depositAmount }: { tokenAddress: Address; amount: bigint, depositAmount?: bigint }
+        { tokenAddress, amount, depositAmount }: { tokenAddress: Address; amount: bigint; depositAmount?: bigint }
     ) => {
-        depositAmount = depositAmount ?? amount;
+        const msg = await createCreateChannelMessage(this.identity.messageSigner, {
+            chain_id: chain.id,
+            token: tokenAddress,
+            amount,
+            session_key: this.identity.sessionAddress,
+        });
+        const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
+        expect(createResponse).toBeDefined();
+
+        const { params: createParsedResponseParams } = parseCreateChannelResponse(createResponse);
 
         const openChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),
@@ -45,14 +64,19 @@ export class TestNitroliteClient extends NitroliteClient {
             5000
         );
 
+        depositAmount = depositAmount ?? amount;
         const { initialState } = await this.depositAndCreateChannel(tokenAddress, depositAmount, {
-            initialAllocationAmounts: [amount, BigInt(0)],
-            stateData: '0x',
+            unsignedInitialState: convertRPCToClientState(
+                createParsedResponseParams.state,
+                createParsedResponseParams.serverSignature
+            ),
+            channel: convertRPCToClientChannel(createParsedResponseParams.channel),
+            serverSignature: createParsedResponseParams.serverSignature,
         });
 
         const openResponse = await openChannelPromise;
 
-        const openParsedResponse = rpcResponseParser.channelUpdate(openResponse);
+        const openParsedResponse = parseChannelUpdateResponse(openResponse);
         const responseChannel = openParsedResponse.params;
 
         return { params: responseChannel, initialState };
@@ -66,7 +90,7 @@ export class TestNitroliteClient extends NitroliteClient {
         );
 
         const closeResponse = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
-        const closeParsedResponse = rpcResponseParser.closeChannel(closeResponse);
+        const closeParsedResponse = parseCloseChannelResponse(closeResponse);
 
         const closeChannelUpdateChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Closed),
@@ -76,33 +100,29 @@ export class TestNitroliteClient extends NitroliteClient {
 
         await this.closeChannel({
             finalState: {
-                intent: closeParsedResponse.params.intent,
-                channelId: closeParsedResponse.params.channelId as Hex,
-                data: closeParsedResponse.params.stateData as Hex,
+                intent: closeParsedResponse.params.state.intent,
+                channelId: closeParsedResponse.params.channelId,
+                data: closeParsedResponse.params.state.stateData,
                 allocations: [
                     {
-                        destination: closeParsedResponse.params.allocations[0].destination as Address,
-                        token: closeParsedResponse.params.allocations[0].token as Address,
-                        amount: closeParsedResponse.params.allocations[0].amount,
+                        destination: closeParsedResponse.params.state.allocations[0].destination as Address,
+                        token: closeParsedResponse.params.state.allocations[0].token as Address,
+                        amount: closeParsedResponse.params.state.allocations[0].amount,
                     },
                     {
-                        destination: closeParsedResponse.params.allocations[1].destination as Address,
-                        token: closeParsedResponse.params.allocations[1].token as Address,
-                        amount: closeParsedResponse.params.allocations[1].amount,
+                        destination: closeParsedResponse.params.state.allocations[1].destination as Address,
+                        token: closeParsedResponse.params.state.allocations[1].token as Address,
+                        amount: closeParsedResponse.params.state.allocations[1].amount,
                     },
                 ] as [Allocation, Allocation],
-                version: BigInt(closeParsedResponse.params.version),
-                serverSignature: {
-                    v: +closeParsedResponse.params.serverSignature.v,
-                    r: closeParsedResponse.params.serverSignature.r as Hex,
-                    s: closeParsedResponse.params.serverSignature.s as Hex,
-                },
+                version: BigInt(closeParsedResponse.params.state.version),
+                serverSignature: closeParsedResponse.params.serverSignature,
             },
-            stateData: closeParsedResponse.params.stateData as Hex,
+            stateData: closeParsedResponse.params.state.stateData,
         });
 
         const closeChannelUpdateResponse = await closeChannelUpdateChannelPromise;
-        const closeChannelUpdateParsedResponse = rpcResponseParser.channelUpdate(closeChannelUpdateResponse);
+        const closeChannelUpdateParsedResponse = parseChannelUpdateResponse(closeChannelUpdateResponse);
         const responseChannel = closeChannelUpdateParsedResponse.params;
 
         return { params: responseChannel };

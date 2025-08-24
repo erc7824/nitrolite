@@ -30,13 +30,13 @@ func TestSigner(t *testing.T) {
 		t.Run("With 0x Prefix", func(t *testing.T) {
 			signer, err := NewEthereumSigner(testPrivKey)
 			require.NoError(t, err)
-			assert.True(t, strings.EqualFold(testAddress, signer.PrivateKey().PublicKey().Address().String()))
+			assert.True(t, strings.EqualFold(testAddress, signer.PublicKey().Address().String()))
 		})
 
 		t.Run("Without 0x Prefix", func(t *testing.T) {
 			signer, err := NewEthereumSigner(strings.TrimPrefix(testPrivKey, "0x"))
 			require.NoError(t, err)
-			assert.True(t, strings.EqualFold(testAddress, signer.PrivateKey().PublicKey().Address().String()))
+			assert.True(t, strings.EqualFold(testAddress, signer.PublicKey().Address().String()))
 		})
 
 		t.Run("With Invalid Key", func(t *testing.T) {
@@ -47,11 +47,10 @@ func TestSigner(t *testing.T) {
 
 	t.Run("Getters", func(t *testing.T) {
 		signer := setupSigner(t)
-		pubKey := signer.PrivateKey().PublicKey()
+		pubKey := signer.PublicKey()
 		pubKeyBytes := pubKey.Bytes()
 
-		assert.True(t, strings.EqualFold(testAddress, signer.PrivateKey().PublicKey().Address().String()))
-		assert.Len(t, signer.PrivateKey().Bytes(), 32)
+		assert.True(t, strings.EqualFold(testAddress, signer.PublicKey().Address().String()))
 		assert.Len(t, pubKeyBytes, 65)
 		assert.Equal(t, byte(0x04), pubKeyBytes[0])
 		assert.True(t, strings.EqualFold(testAddress, pubKey.Address().String()))
@@ -63,13 +62,13 @@ func TestSignAndRecover(t *testing.T) {
 		signer := setupSigner(t)
 		message := []byte("test message for signing")
 
-		signature, err := signer.PrivateKey().Sign(message)
+		signature, err := signer.Sign(message)
 		require.NoError(t, err)
 
 		recoveredAddress, err := RecoverAddress(message, signature)
 		require.NoError(t, err)
 
-		assert.True(t, strings.EqualFold(signer.PrivateKey().PublicKey().Address().String(), recoveredAddress))
+		assert.True(t, strings.EqualFold(signer.PublicKey().Address().String(), recoveredAddress.String()))
 	})
 
 	t.Run("EIP-712", func(t *testing.T) {
@@ -102,14 +101,14 @@ func TestSignAndRecover(t *testing.T) {
 		recoveredSigner, err := RecoverAddressEIP712(typedData, signature)
 		require.NoError(t, err)
 
-		assert.True(t, strings.EqualFold(expectedAddr, recoveredSigner))
+		assert.True(t, strings.EqualFold(expectedAddr, recoveredSigner.String()))
 	})
 }
 
 func TestRecoveryErrors(t *testing.T) {
 	signer := setupSigner(t)
 	message := []byte("some data to sign")
-	signature, err := signer.PrivateKey().Sign(message)
+	signature, err := signer.Sign(message)
 	require.NoError(t, err)
 
 	// This is a minimal but structurally valid TypedData object for testing error paths.
@@ -137,14 +136,14 @@ func TestRecoveryErrors(t *testing.T) {
 
 		recoveredAddr, err := RecoverAddress(message, malformedSig)
 		if err == nil {
-			assert.NotEqual(t, signer.PrivateKey().PublicKey().Address().String(), recoveredAddr)
+			assert.NotEqual(t, signer.PublicKey().Address().String(), recoveredAddr.String())
 		} else {
 			assert.ErrorContains(t, err, "signature recovery failed")
 		}
 
 		recoveredAddr712, err := RecoverAddressEIP712(validTypedData, malformedSig)
 		if err == nil {
-			assert.NotEqual(t, signer.PrivateKey().PublicKey().Address().String(), recoveredAddr712)
+			assert.NotEqual(t, signer.PublicKey().Address().String(), recoveredAddr712.String())
 		} else {
 			assert.ErrorContains(t, err, "signature recovery failed")
 		}

@@ -9,19 +9,13 @@ import (
 
 // Signer is an interface for a blockchain-agnostic signer.
 type Signer interface {
-	PrivateKey() PrivateKey // Private key implements PrivateKey interface.
+	PublicKey() PublicKey                // Public key associated with this signer.
+	Sign(data []byte) (Signature, error) // Sign generates a signature for the given data.
 }
 
 // AddressRecoverer is an optional interface that signers can implement
 type AddressRecoverer interface {
-	RecoverAddress(message []byte, signature Signature) (string, error)
-}
-
-// PrivateKey is an interface for a blockchain-agnostic private key.
-type PrivateKey interface {
-	PublicKey() PublicKey
-	Sign(data []byte) (Signature, error) // Sign generates a signature for the given data.
-	Bytes() []byte
+	RecoverAddress(message []byte, signature Signature) (Address, error)
 }
 
 // PublicKey is an interface for a blockchain-agnostic public key.

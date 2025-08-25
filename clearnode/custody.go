@@ -346,14 +346,11 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 
 		if challengedVersion < localVersion {
 			if channel.UserStateSignature != nil && channel.ServerStateSignature != nil {
-				go func() {
-					// Submit current local state to smart contract
-					txHash, err := c.Checkpoint(channelID, channel.State, *channel.UserStateSignature, *channel.ServerStateSignature, []nitrolite.State{})
-					if err != nil {
-						logger.Error("failed to checkpoint local state", "error", err)
-					}
-					logger.Info("submitted local state successfully", "txHash", txHash.Hex())
-				}()
+				if err := CreateCheckpoint(tx, channelID, c.chainID, channel.State, *channel.UserStateSignature, *channel.ServerStateSignature); err != nil {
+					logger.Error("failed to create checkpoint", "error", err)
+				} else {
+					logger.Info("created checkpoint action", "channelId", channelID, "localVersion", localVersion, "challengedVersion", challengedVersion)
+				}
 			}
 		}
 		channel.Status = ChannelStatusChallenged

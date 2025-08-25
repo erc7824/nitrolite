@@ -74,7 +74,7 @@ func NewChannelNotification(channel Channel) *Notification {
 			Adjudicator: channel.Adjudicator,
 			Challenge:   channel.Challenge,
 			Nonce:       channel.Nonce,
-			State:       channel.State,
+			Version:     channel.State.Version,
 			CreatedAt:   channel.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:   channel.UpdatedAt.Format(time.RFC3339),
 		},

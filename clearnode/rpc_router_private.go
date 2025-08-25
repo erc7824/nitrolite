@@ -113,7 +113,7 @@ type ChannelResponse struct {
 	Adjudicator string          `json:"adjudicator"`
 	Challenge   uint64          `json:"challenge"`
 	Nonce       uint64          `json:"nonce"`
-	State       UnsignedState   `json:"state"`
+	Version     uint64          `json:"version"`
 	CreatedAt   string          `json:"created_at"`
 	UpdatedAt   string          `json:"updated_at"`
 }

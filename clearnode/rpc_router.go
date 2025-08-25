@@ -142,7 +142,7 @@ func (r *RPCRouter) HandleAuthenticated(userID string, send SendRPCMessageFunc) 
 			Adjudicator: ch.Adjudicator,
 			Challenge:   ch.Challenge,
 			Nonce:       ch.Nonce,
-			State:       ch.State,
+			Version:     ch.State.Version,
 			CreatedAt:   ch.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:   ch.UpdatedAt.Format(time.RFC3339),
 		})

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 	"testing"
 	"time"
@@ -972,7 +973,6 @@ func TestHandleEventWithInvalidChannel(t *testing.T) {
 }
 
 func TestChallengeHandling(t *testing.T) {
-	// Create a test channel with state version 5
 	channelID := "0x0000000000000000000000001234567890abcdef1234567890abcdef12345678"
 	initialState := UnsignedState{
 		Intent:  StateIntent(StateIntentOperate),
@@ -992,10 +992,14 @@ func TestChallengeHandling(t *testing.T) {
 		},
 	}
 
-	t.Run("Outdated challenge state submitted", func(t *testing.T) {
-		custody, db, _ := setupMockCustody(t)
+	userSig := Signature{1, 2, 3}
+	serverSig := Signature{4, 5, 6}
 
-		_, err := CreateChannel(
+	t.Run("Challenge with older state creates checkpoint action", func(t *testing.T) {
+		custody, db, cleanup := setupMockCustody(t)
+		defer cleanup()
+
+		channel, err := CreateChannel(
 			db,
 			channelID,
 			"0xWallet123456789",
@@ -1003,25 +1007,28 @@ func TestChallengeHandling(t *testing.T) {
 			1,
 			3600,
 			"0xAdjudicator123456789",
-			1,
+			custody.chainID,
 			"0xToken123456789",
 			decimal.NewFromInt(1500),
 			initialState,
 		)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		// Create challenged event with lower version (double-spend attack)
+		channel.UserStateSignature = &userSig
+		channel.ServerStateSignature = &serverSig
+		require.NoError(t, db.Save(&channel).Error)
+
 		challengedEvent := &nitrolite.CustodyChallenged{
 			ChannelId: [32]byte(common.HexToHash(channelID)),
 			State: nitrolite.State{
 				Intent:  0,
-				Version: big.NewInt(3), // Lower version
-				Data:    []byte("data"),
+				Version: big.NewInt(3), // Older version - should trigger checkpoint
+				Data:    []byte("attack-data"),
 				Allocations: []nitrolite.Allocation{
 					{
 						Destination: common.HexToAddress("0xUser123456789"),
 						Token:       common.HexToAddress("0xToken123456789"),
-						Amount:      big.NewInt(2000), // Trying to withdraw more
+						Amount:      big.NewInt(2000),
 					},
 					{
 						Destination: common.HexToAddress("0xBroker123456789"),
@@ -1038,22 +1045,37 @@ func TestChallengeHandling(t *testing.T) {
 
 		custody.handleChallenged(custody.logger, challengedEvent)
 
-		// TODO: verify that custody.custody.Checkpoint has been called
-
 		// Verify channel is marked as challenged
 		var updatedChannel Channel
 		err = db.Where("channel_id = ?", channelID).First(&updatedChannel).Error
-		if err != nil {
-			t.Fatalf("Failed to fetch updated channel: %v", err)
-		}
-		t.Logf("Updated channel status: %s (expected: challenged)", updatedChannel.Status)
+		require.NoError(t, err)
 		assert.Equal(t, ChannelStatusChallenged, updatedChannel.Status)
+
+		// Verify checkpoint action was created
+		var action BlockchainAction
+		err = db.Where("channel_id = ? AND action_type = ?", channelID, ActionTypeCheckpoint).First(&action).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, ActionTypeCheckpoint, action.Type)
+		assert.Equal(t, channelID, action.Channel)
+		assert.Equal(t, custody.chainID, action.ChainID)
+		assert.Equal(t, StatusPending, action.Status)
+		assert.Equal(t, 0, action.Retries)
+
+		// Verify checkpoint data is correct
+		var checkpointData CheckpointData
+		err = json.Unmarshal([]byte(action.Data), &checkpointData)
+		require.NoError(t, err)
+		assert.Equal(t, initialState, checkpointData.State)
+		assert.Equal(t, userSig, checkpointData.UserSig)
+		assert.Equal(t, serverSig, checkpointData.ServerSig)
 	})
 
-	t.Run("Correct challenge state submitted", func(t *testing.T) {
-		custody, db, _ := setupMockCustody(t)
+	t.Run("Challenge with same version - no checkpoint needed", func(t *testing.T) {
+		custody, db, cleanup := setupMockCustody(t)
+		defer cleanup()
 
-		_, err := CreateChannel(
+		channel, err := CreateChannel(
 			db,
 			channelID,
 			"0xWallet123456789",
@@ -1061,20 +1083,23 @@ func TestChallengeHandling(t *testing.T) {
 			1,
 			3600,
 			"0xAdjudicator123456789",
-			1,
+			custody.chainID,
 			"0xToken123456789",
 			decimal.NewFromInt(1500),
 			initialState,
 		)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		// Create challenged event with same version
+		channel.UserStateSignature = &userSig
+		channel.ServerStateSignature = &serverSig
+		require.NoError(t, db.Save(&channel).Error)
+
 		challengedEvent := &nitrolite.CustodyChallenged{
 			ChannelId: [32]byte(common.HexToHash(channelID)),
 			State: nitrolite.State{
 				Intent:  0,
-				Version: big.NewInt(5), // Same version as local
-				Data:    []byte("valid-challenge-data"),
+				Version: big.NewInt(5), // Same version - no checkpoint needed
+				Data:    []byte("valid-data"),
 				Allocations: []nitrolite.Allocation{
 					{
 						Destination: common.HexToAddress("0xUser123456789"),
@@ -1099,10 +1124,13 @@ func TestChallengeHandling(t *testing.T) {
 		// Verify channel is marked as challenged
 		var updatedChannel Channel
 		err = db.Where("channel_id = ?", channelID).First(&updatedChannel).Error
-		if err != nil {
-			t.Fatalf("Failed to fetch updated channel: %v", err)
-		}
-		t.Logf("Updated channel status: %s (expected: challenged)", updatedChannel.Status)
+		require.NoError(t, err)
 		assert.Equal(t, ChannelStatusChallenged, updatedChannel.Status)
+
+		// Verify NO checkpoint action was created
+		var count int64
+		err = db.Model(&BlockchainAction{}).Where("channel_id = ? AND action_type = ?", channelID, ActionTypeCheckpoint).Count(&count).Error
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), count, "No checkpoint action should be created for same version")
 	})
 }

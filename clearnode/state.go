@@ -11,10 +11,10 @@ import (
 type StateIntent uint8
 
 const (
-	StateIntentOperate    uint8 = 0 // Operate the state application
-	StateIntentInitialize uint8 = 1 // Initial funding state
-	StateIntentResize     uint8 = 2 // Resize state
-	StateIntentFinalize   uint8 = 3 // Final closing state
+	StateIntentOperate    StateIntent = 0 // Operate the state application
+	StateIntentInitialize StateIntent = 1 // Initial funding state
+	StateIntentResize     StateIntent = 2 // Resize state
+	StateIntentFinalize   StateIntent = 3 // Final closing state
 )
 
 type UnsignedState struct {
@@ -35,8 +35,13 @@ func (u *UnsignedState) Scan(value interface{}) error {
 		return nil
 	}
 
-	bytes, ok := value.([]byte)
-	if !ok {
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
 		return fmt.Errorf("cannot scan %T into UnsignedState", value)
 	}
 

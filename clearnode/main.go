@@ -83,6 +83,13 @@ func main() {
 		go client.ListenEvents(context.Background())
 	}
 
+	// Start blockchain action worker for all custody clients
+	// TODO: This can be moved to a separate worker process in the future for better scalability
+	if len(custodyClients) > 0 {
+		worker := NewBlockchainWorker(db, custodyClients, logger)
+		worker.Start(context.Background())
+	}
+
 	metricsListenAddr := ":4242"
 	metricsEndpoint := "/metrics"
 	// Set up a separate mux for metrics

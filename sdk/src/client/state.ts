@@ -1,6 +1,12 @@
-import { Address, encodeAbiParameters, Hex, keccak256 } from 'viem';
+import { Address, Hex } from 'viem';
 import * as Errors from '../errors';
-import { generateChannelNonce, getChannelId, getStateHash, removeQuotesFromRS, signState } from '../utils';
+import {
+    generateChannelNonce,
+    getChannelId,
+    getPackedChallengeState,
+    getPackedState,
+    getStateHash,
+} from '../utils';
 import { PreparerDependencies } from './prepare';
 import {
     ChallengeChannelParams,
@@ -17,75 +23,51 @@ import {
 /**
  * Shared logic for preparing the channel object, initial state, and signing it.
  * Used by both direct execution (createChannel) and preparation (prepareCreateChannelTransaction).
- * @param tokenAddress The address of the token for the channel.
  * @param deps - The dependencies needed (account, addresses, walletClient, challengeDuration). See {@link PreparerDependencies}.
  * @param params - Parameters for channel creation. See {@link CreateChannelParams}.
- * @returns An object containing the channel object, the signed initial state, and the channel ID.
+ * @returns An object containing the signed initial state, and the channel ID.
  * @throws {Errors.MissingParameterError} If the default adjudicator address is missing.
  * @throws {Errors.InvalidParameterError} If participants are invalid.
  */
 export async function _prepareAndSignInitialState(
-    tokenAddress: Address,
     deps: PreparerDependencies,
     params: CreateChannelParams,
-): Promise<{ channel: Channel; initialState: State; channelId: ChannelId }> {
-    const { initialAllocationAmounts, stateData } = params;
+): Promise<{ initialState: State; channelId: ChannelId }> {
+    const { channel, unsignedInitialState, serverSignature } = params;
 
-    if (!stateData) {
+    if (!unsignedInitialState) {
+        throw new Errors.MissingParameterError('Initial state is required for creating the channel');
+    }
+
+    if (!unsignedInitialState.data) {
         throw new Errors.MissingParameterError('State data is required for creating the channel');
     }
 
-    const channelNonce = generateChannelNonce(deps.account.address);
-
-    const participants: [Hex, Hex] = [deps.account.address, deps.addresses.guestAddress];
-    const channelParticipants: [Hex, Hex] = [deps.stateWalletClient.account.address, deps.addresses.guestAddress];
-    const adjudicatorAddress = deps.addresses.adjudicator;
-    if (!adjudicatorAddress) {
-        throw new Errors.MissingParameterError(
-            'Default adjudicator address is not configured in addresses.adjudicator',
-        );
-    }
-
-    const challengeDuration = deps.challengeDuration;
-
-    if (!participants || participants.length !== 2) {
-        throw new Errors.InvalidParameterError('Channel must have two participants.');
-    }
-
-    if (!initialAllocationAmounts || initialAllocationAmounts.length !== 2) {
+    if (!unsignedInitialState.allocations || unsignedInitialState.allocations.length !== 2) {
         throw new Errors.InvalidParameterError('Initial allocation amounts must be provided for both participants.');
     }
 
-    const channel: Channel = {
-        participants: channelParticipants,
-        adjudicator: adjudicatorAddress,
-        challenge: challengeDuration,
-        nonce: channelNonce,
-    };
+    if (!channel) {
+        throw new Errors.MissingParameterError("Channel's fixed part is required for creating the channel");
+    }
+
+    if (!channel?.adjudicator) {
+        throw new Errors.MissingParameterError('Adjudicator address is required for creating the channel');
+    }
+
+    if (!channel.participants || channel.participants.length !== 2) {
+        throw new Errors.InvalidParameterError('Channel must have exactly two participants.');
+    }
 
     const channelId = getChannelId(channel, deps.chainId);
-
-    const stateToSign: State = {
-        data: stateData,
-        intent: StateIntent.INITIALIZE,
-        allocations: [
-            { destination: participants[0], token: tokenAddress, amount: initialAllocationAmounts[0] },
-            { destination: participants[1], token: tokenAddress, amount: initialAllocationAmounts[1] },
-        ],
-        // The state version is set to 0 for the initial state.
-        version: 0n,
-        sigs: [],
+    const accountSignature = await deps.stateSigner.signState(channelId, unsignedInitialState);
+    const signedInitialState: State = {
+        ...unsignedInitialState,
+        // TODO: remove assumption, that current signer will always be the first participant
+        sigs: [accountSignature, serverSignature],
     };
 
-    const stateHash = getStateHash(channelId, stateToSign);
-
-    const accountSignature = await signState(stateHash, deps.stateWalletClient.signMessage);
-    const initialState: State = {
-        ...stateToSign,
-        sigs: [accountSignature],
-    };
-
-    return { channel, initialState, channelId };
+    return { initialState: signedInitialState, channelId };
 }
 
 /**
@@ -105,17 +87,8 @@ export async function _prepareAndSignChallengeState(
     challengerSig: Signature;
 }> {
     const { channelId, candidateState, proofStates = [] } = params;
-
-    const stateHash = getStateHash(channelId, candidateState);
-    const encoded = encodeAbiParameters(
-        [
-            { type: 'bytes32', name: 'stateHash' },
-            { type: 'string', name: 'challenge' },
-        ],
-        [stateHash, 'challenge'],
-    );
-    const challengeHash = keccak256(encoded) as Hex;
-    const challengerSig = await signState(challengeHash, deps.stateWalletClient.signMessage);
+    const challengeMsg = getPackedChallengeState(channelId, candidateState);
+    const challengerSig = await deps.stateSigner.signRawMessage(challengeMsg);
 
     return { channelId, candidateState, proofs: proofStates, challengerSig };
 }
@@ -138,7 +111,6 @@ export async function _prepareAndSignResizeState(
     }
 
     const channelId = resizeState.channelId;
-    const serverSignature = removeQuotesFromRS(resizeState.serverSignature);
 
     const stateToSign: State = {
         data: resizeState.data,
@@ -148,14 +120,12 @@ export async function _prepareAndSignResizeState(
         sigs: [],
     };
 
-    const stateHash = getStateHash(channelId, stateToSign);
-
-    const accountSignature = await signState(stateHash, deps.stateWalletClient.signMessage);
+    const accountSignature = await deps.stateSigner.signState(channelId, stateToSign);
 
     // Create a new state with signatures in the requested style
     const resizeStateWithSigs: State = {
         ...stateToSign,
-        sigs: [accountSignature, serverSignature],
+        sigs: [accountSignature, resizeState.serverSignature],
     };
 
     let proofs: State[] = [...proofStates];
@@ -181,7 +151,6 @@ export async function _prepareAndSignFinalState(
     }
 
     const channelId = finalState.channelId;
-    const serverSignature = removeQuotesFromRS(finalState.serverSignature);
 
     const stateToSign: State = {
         data: stateData,
@@ -191,14 +160,12 @@ export async function _prepareAndSignFinalState(
         sigs: [],
     };
 
-    const stateHash = getStateHash(channelId, stateToSign);
-
-    const accountSignature = await signState(stateHash, deps.stateWalletClient.signMessage);
+    const accountSignature = await deps.stateSigner.signState(channelId, stateToSign);
 
     // Create a new state with signatures in the requested style
     const finalStateWithSigs: State = {
         ...stateToSign,
-        sigs: [accountSignature, serverSignature],
+        sigs: [accountSignature, finalState.serverSignature],
     };
 
     return { finalStateWithSigs, channelId };

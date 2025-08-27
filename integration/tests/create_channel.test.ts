@@ -3,9 +3,16 @@ import { BlockchainUtils } from '@/blockchainUtils';
 import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
-import { CONFIG } from '@/setup';
-import { getChannelUpdatePredicateWithStatus, TestWebSocket } from '@/ws';
-import { RPCChannelStatus, rpcResponseParser } from '@erc7824/nitrolite';
+import { chain, CONFIG } from '@/setup';
+import { getChannelUpdatePredicateWithStatus, getCreateChannelPredicate, TestWebSocket } from '@/ws';
+import {
+    convertRPCToClientChannel,
+    convertRPCToClientState,
+    createCreateChannelMessage,
+    parseChannelUpdateResponse,
+    parseCreateChannelResponse,
+    RPCChannelStatus,
+} from '@erc7824/nitrolite';
 import { parseUnits } from 'viem';
 
 describe('Create channel', () => {
@@ -56,11 +63,17 @@ describe('Create channel', () => {
             identity.walletAddress
         );
 
-        const joiningChannelPromise = ws.waitForMessage(
-            getChannelUpdatePredicateWithStatus(RPCChannelStatus.Joining),
-            undefined,
-            5000
-        );
+        const msg = await createCreateChannelMessage(identity.messageSigner, {
+            chain_id: chain.id,
+            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            amount: depositAmount,
+            session_key: identity.sessionAddress,
+        });
+        const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
+        expect(createResponse).toBeDefined();
+
+        const { params: createParsedResponseParams } = parseCreateChannelResponse(createResponse);
+
         const openChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),
             undefined,
@@ -71,8 +84,12 @@ describe('Create channel', () => {
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             depositAmount,
             {
-                initialAllocationAmounts: [depositAmount, BigInt(0)],
-                stateData: '0x',
+                unsignedInitialState: convertRPCToClientState(
+                    createParsedResponseParams.state,
+                    createParsedResponseParams.serverSignature
+                ),
+                channel: convertRPCToClientChannel(createParsedResponseParams.channel),
+                serverSignature: createParsedResponseParams.serverSignature,
             }
         );
 
@@ -83,13 +100,10 @@ describe('Create channel', () => {
         const receipt = await blockUtils.waitForTransaction(txHash);
         expect(receipt).toBeDefined();
 
-        const joiningResponse = await joiningChannelPromise;
-        expect(joiningResponse).toBeDefined();
-
         const openResponse = await openChannelPromise;
         expect(openResponse).toBeDefined();
 
-        const openParsedResponse = rpcResponseParser.channelUpdate(openResponse);
+        const openParsedResponse = parseChannelUpdateResponse(openResponse);
         const responseChannel = openParsedResponse.params;
 
         expect(responseChannel.adjudicator).toBe(CONFIG.ADDRESSES.DUMMY_ADJUDICATOR_ADDRESS);
@@ -133,6 +147,17 @@ describe('Create channel', () => {
 
         expect(postBalance.rawBalance).toBe(prevBalance.rawBalance - depositAmount);
 
+        const msg = await createCreateChannelMessage(identity.messageSigner, {
+            chain_id: chain.id,
+            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            amount: depositAmount,
+            session_key: identity.sessionAddress,
+        });
+        const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
+        expect(createResponse).toBeDefined();
+
+        const { params: createParsedResponseParams } = parseCreateChannelResponse(createResponse);
+
         const openChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),
             undefined,
@@ -143,9 +168,13 @@ describe('Create channel', () => {
             txHash: createChannelTxHash,
             channelId,
             initialState,
-        } = await client.createChannel(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS, {
-            initialAllocationAmounts: [depositAmount, BigInt(0)],
-            stateData: '0x',
+        } = await client.createChannel({
+            unsignedInitialState: convertRPCToClientState(
+                createParsedResponseParams.state,
+                createParsedResponseParams.serverSignature
+            ),
+            channel: convertRPCToClientChannel(createParsedResponseParams.channel),
+            serverSignature: createParsedResponseParams.serverSignature,
         });
 
         expect(channelId).toBeDefined();
@@ -158,7 +187,7 @@ describe('Create channel', () => {
         const openResponse = await openChannelPromise;
         expect(openResponse).toBeDefined();
 
-        const openParsedResponse = rpcResponseParser.channelUpdate(openResponse);
+        const openParsedResponse = parseChannelUpdateResponse(openResponse);
         const responseChannel = openParsedResponse.params;
 
         expect(responseChannel.adjudicator).toBe(CONFIG.ADDRESSES.DUMMY_ADJUDICATOR_ADDRESS);

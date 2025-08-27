@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -168,10 +167,10 @@ read_loop:
 			}
 		}
 
-		var msg RPCMessage
+		msg := RPCMessage{Req: &RPCData{}}
 		if err := json.Unmarshal(messageBytes, &msg); err != nil {
 			n.logger.Debug("invalid message format", "error", err, "message", string(messageBytes))
-			n.sendErrorResponse(rpcConn, 0, "invalid message format")
+			n.sendErrorResponse(rpcConn, msg.Req.RequestID, "invalid message format")
 			continue
 		}
 
@@ -246,7 +245,7 @@ type RPCHandler func(c *RPCContext)
 
 // SendRPCMessageFunc is a function type for sending RPC notifications to a connection.
 // It's provided to event handlers to allow server-initiated messages.
-type SendRPCMessageFunc func(method string, params ...any)
+type SendRPCMessageFunc func(method string, params RPCDataParams)
 
 // RPCContext contains all the information about an RPC request and provides
 // methods for handlers to process and respond to the request.
@@ -280,7 +279,7 @@ func (c *RPCContext) Next() {
 
 // Succeed sets a successful response with the given method and parameters.
 // This should be called by handlers to indicate successful processing.
-func (c *RPCContext) Succeed(method string, params ...any) {
+func (c *RPCContext) Succeed(method string, params RPCDataParams) {
 	c.Message.Res = &RPCData{
 		RequestID: c.Message.Req.RequestID,
 		Method:    method,
@@ -330,7 +329,7 @@ func (c *RPCContext) Fail(err error, fallbackMessage string) {
 	c.Message.Res = &RPCData{
 		RequestID: c.Message.Req.RequestID,
 		Method:    "error",
-		Params:    []any{message},
+		Params:    ErrorResponse{Error: message},
 		Timestamp: uint64(time.Now().UnixMilli()),
 	}
 }
@@ -360,7 +359,7 @@ func prepareRawRPCResponse(signer *Signer, data *RPCData) ([]byte, error) {
 
 	responseMessage := &RPCMessage{
 		Res: data,
-		Sig: []string{hexutil.Encode(signature)},
+		Sig: []Signature{signature},
 	}
 	resMessageBytes, err := json.Marshal(responseMessage)
 	if err != nil {
@@ -372,9 +371,9 @@ func prepareRawRPCResponse(signer *Signer, data *RPCData) ([]byte, error) {
 
 // prepareRawNotification creates a signed server-initiated notification message.
 // Unlike responses, notifications don't correspond to a specific request.
-func prepareRawNotification(signer *Signer, method string, params ...any) ([]byte, error) {
+func prepareRawNotification(signer *Signer, method string, params RPCDataParams) ([]byte, error) {
 	if params == nil {
-		params = []any{}
+		params = struct{}{}
 	}
 
 	data := &RPCData{
@@ -469,8 +468,8 @@ func (wn *RPCNode) OnAuthenticated(handler func(userID string, send SendRPCMessa
 
 // Notify sends a server-initiated notification to a specific authenticated user.
 // If the user is not connected, the notification is silently dropped.
-func (wn *RPCNode) Notify(userID, method string, params ...any) {
-	message, err := prepareRawNotification(wn.signer, method, params...)
+func (wn *RPCNode) Notify(userID, method string, params RPCDataParams) {
+	message, err := prepareRawNotification(wn.signer, method, params)
 	if err != nil {
 		wn.logger.Error("failed to prepare notification message", "error", err, "userID", userID, "method", method)
 		return
@@ -482,8 +481,8 @@ func (wn *RPCNode) Notify(userID, method string, params ...any) {
 // getSendMessageFunc creates a SendRPCMessageFunc for a specific connection.
 // The returned function can be used to send notifications to that connection.
 func (wn *RPCNode) getSendMessageFunc(conn *RPCConnection) SendRPCMessageFunc {
-	return func(method string, params ...any) {
-		message, err := prepareRawNotification(wn.signer, method, params...)
+	return func(method string, params RPCDataParams) {
+		message, err := prepareRawNotification(wn.signer, method, params)
 		if err != nil {
 			wn.logger.Error("failed to prepare notification message", "error", err, "method", method)
 			return
@@ -512,7 +511,7 @@ func (wn *RPCNode) sendErrorResponse(conn *RPCConnection, requestID uint64, mess
 	data := &RPCData{
 		RequestID: requestID,
 		Method:    "error",
-		Params:    []any{message},
+		Params:    ErrorResponse{Error: message},
 		Timestamp: uint64(time.Now().UnixMilli()),
 	}
 

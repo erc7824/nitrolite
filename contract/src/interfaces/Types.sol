@@ -6,15 +6,10 @@ pragma solidity ^0.8.13;
  * @notice Shared types used in the Nitrolite state channel system
  */
 
-/**
- * @notice Signature structure for digital signatures
- * @dev Used for off-chain signatures verification in the state channel protocol
- */
-struct Signature {
-    uint8 v; // Recovery ID
-    bytes32 r; // R component of the signature
-    bytes32 s; // S component of the signature
-}
+/// @dev EIP-712 domain separator type hash for state channel protocol
+bytes32 constant STATE_TYPEHASH = keccak256(
+    "AllowStateHash(bytes32 channelId,uint8 intent,uint256 version,bytes data,Allocation[] allocations)Allocation(address destination,address token,uint256 amount)"
+);
 
 /**
  * @notice Amount structure for token value storage
@@ -80,7 +75,7 @@ struct State {
     uint256 version; // State version incremental number to compare most recent
     bytes data; // Application data encoded, decoded by the adjudicator for business logic
     Allocation[] allocations; // Combined asset allocation and destination for each participant
-    Signature[] sigs; // stateHash signatures from participants
+    bytes[] sigs; // stateHash signatures from participants
 }
 
 /**

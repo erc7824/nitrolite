@@ -14,16 +14,17 @@ import (
 // - {PREFIX}_INFURA_URL: The Infura endpoint URL for the network
 // - {PREFIX}_CUSTODY_CONTRACT_ADDRESS: The custody contract address
 var knownNetworks = map[string]uint32{
-	"POLYGON":     137,
-	"ETH_SEPOLIA": 11155111,
-	"CELO":        42220,
-	"BASE":        8453,
-	"WORLD_CHAIN": 480,
-	"ROOTSTOCK":   30,
-	"FLOW":        747,
-	"LOCALNET":    1337,
-	"ETH_MAINNET": 1,
-	"ANVIL":       31337,
+	"POLYGON":       137,
+	"ETH_SEPOLIA":   11155111,
+	"LINEA_MAINNET": 59144,
+	"CELO":          42220,
+	"BASE":          8453,
+	"WORLD_CHAIN":   480,
+	"ROOTSTOCK":     30,
+	"FLOW":          747,
+	"LOCALNET":      1337,
+	"ETH_MAINNET":   1,
+	"ANVIL":         31337,
 }
 
 // NetworkConfig represents configuration for a blockchain network
@@ -39,7 +40,7 @@ type NetworkConfig struct {
 
 // Config represents the overall application configuration
 type Config struct {
-	networks      map[string]*NetworkConfig
+	networks      map[uint32]*NetworkConfig
 	privateKeyHex string
 	dbConf        DatabaseConfig
 	msgExpiryTime int // Time in seconds for message timestamp validation
@@ -92,7 +93,7 @@ func LoadConfig(logger Logger) (*Config, error) {
 	logger.Info("set message expiry time", "value", messageTimestampExpiry)
 
 	config := Config{
-		networks:      make(map[string]*NetworkConfig),
+		networks:      make(map[uint32]*NetworkConfig),
 		privateKeyHex: privateKeyHex,
 		dbConf:        dbConf,
 		msgExpiryTime: messageTimestampExpiry,
@@ -137,7 +138,7 @@ func LoadConfig(logger Logger) (*Config, error) {
 		// Only add network if both required variables are present
 		if infuraURL != "" && custodyAddress != "" && adjudicatorAddress != "" && balanceCheckerAddress != "" {
 			networkLower := strings.ToLower(network)
-			config.networks[networkLower] = &NetworkConfig{
+			config.networks[chainID] = &NetworkConfig{
 				Name:                  networkLower,
 				ChainID:               chainID,
 				InfuraURL:             infuraURL,

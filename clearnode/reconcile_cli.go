@@ -11,14 +11,17 @@ import (
 )
 
 // runReconcileCli is the entry point for the reconcile command line interface.
-// Example: clearnode reconcile eth_mainnet 1000000 2000000
+// Example: clearnode reconcile 1 1000000 2000000
 func runReconcileCli(logger Logger) {
 	logger = logger.NewSystem("reconcile")
 	if len(os.Args) < 5 {
 		logger.Fatal("Usage: clearnode reconcile <network> <block_start> <block_end>")
 	}
 
-	networkName := os.Args[2]
+	networkID, ok := new(big.Int).SetString(os.Args[2], 10)
+	if !ok {
+		logger.Fatal("Invalid network ID", "value", os.Args[2])
+	}
 	blockStart, ok := new(big.Int).SetString(os.Args[3], 10)
 	if !ok {
 		logger.Fatal("Invalid block start", "value", os.Args[3])
@@ -34,9 +37,9 @@ func runReconcileCli(logger Logger) {
 		logger.Fatal("Failed to load configuration", "error", err)
 	}
 
-	network, ok := config.networks[networkName]
+	network, ok := config.networks[uint32(networkID.Uint64())]
 	if !ok {
-		logger.Fatal("Network is not configured", "network", networkName)
+		logger.Fatal("Network is not configured", "network", networkID.Uint64())
 	}
 
 	client, err := ethclient.Dial(network.InfuraURL)
@@ -57,7 +60,7 @@ func runReconcileCli(logger Logger) {
 	custody, err := NewCustody(
 		signer,
 		db,
-		NewWSNotifier(func(userID, method string, params ...any) {}, logger),
+		NewWSNotifier(func(userID, method string, params RPCDataParams) {}, logger),
 		network.InfuraURL,
 		network.CustodyAddress,
 		network.AdjudicatorAddress,

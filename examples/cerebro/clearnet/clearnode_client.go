@@ -3,13 +3,11 @@ package clearnet
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/gorilla/websocket"
 	"github.com/shopspring/decimal"
 
@@ -32,7 +30,6 @@ type ClearnodeClient struct {
 }
 
 type NetworkInfo struct {
-	Name               string `json:"name"`
 	ChainID            uint32 `json:"chain_id"`
 	CustodyAddress     string `json:"custody_address"`
 	AdjudicatorAddress string `json:"adjudicator_address"`
@@ -66,15 +63,15 @@ func NewClearnodeClient(wsURL string) (*ClearnodeClient, error) {
 }
 
 func (c *ClearnodeClient) GetConfig() (*BrokerConfig, error) {
-	res, err := c.request("get_config", nil)
+	res, err := c.request("get_config", nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch config: %w", err)
 	}
-	if res.Res.Method != "get_config" || len(res.Res.Params) < 1 {
+	if res.Res.Method != "get_config" {
 		return nil, fmt.Errorf("unexpected response to config request: %v", res.Res)
 	}
 
-	configJSON, err := json.Marshal(res.Res.Params[0])
+	configJSON, err := json.Marshal(res.Res.Params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal config data: %w", err)
 	}
@@ -87,26 +84,42 @@ func (c *ClearnodeClient) GetConfig() (*BrokerConfig, error) {
 	return &config, nil
 }
 
+type GetAssetsReq struct {
+	ChainID *uint32 `json:"chain_id"`
+}
+
+type GetAssetsRes struct {
+	Assets []AssetRes `json:"assets"`
+}
+
 func (c *ClearnodeClient) GetSupportedAssets() ([]AssetRes, error) {
-	res, err := c.request("get_assets", nil)
+	res, err := c.request("get_assets", nil, GetAssetsReq{ChainID: nil})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch assets: %w", err)
 	}
-	if res.Res.Method != "get_assets" || len(res.Res.Params) < 1 {
+	if res.Res.Method != "get_assets" {
 		return nil, fmt.Errorf("unexpected response to assets request: %v", res.Res)
 	}
 
-	assetsJSON, err := json.Marshal(res.Res.Params[0])
+	assetsJSON, err := json.Marshal(res.Res.Params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal assets data: %w", err)
 	}
 
-	var assets []AssetRes
-	if err := json.Unmarshal(assetsJSON, &assets); err != nil {
-		return nil, fmt.Errorf("failed to parse assets: %w", err)
+	var assetsRes GetAssetsRes
+	if err := json.Unmarshal(assetsJSON, &assetsRes); err != nil {
+		return nil, fmt.Errorf("failed to parse assets: %w, %s", err, string(assetsJSON))
 	}
 
-	return assets, nil
+	return assetsRes.Assets, nil
+}
+
+type GetLedgerBalancesReq struct {
+	AccountID string `json:"account_id,omitempty"`
+}
+
+type GetLedgerBalancesRes struct {
+	LedgerBalances []BalanceRes `json:"ledger_balances"`
 }
 
 type BalanceRes struct {
@@ -115,25 +128,29 @@ type BalanceRes struct {
 }
 
 func (c *ClearnodeClient) GetLedgerBalances() ([]BalanceRes, error) {
-	res, err := c.request("get_ledger_balances", nil)
+	res, err := c.request("get_ledger_balances", nil, GetLedgerBalancesReq{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch balances: %w", err)
 	}
-	if res.Res.Method != "get_ledger_balances" || len(res.Res.Params) < 1 {
+	if res.Res.Method != "get_ledger_balances" {
 		return nil, fmt.Errorf("unexpected response to get_ledger_balances request: %v", res.Res)
 	}
 
-	assetsJSON, err := json.Marshal(res.Res.Params[0])
+	assetsJSON, err := json.Marshal(res.Res.Params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal assets data: %w", err)
 	}
 
-	var balances []BalanceRes
-	if err := json.Unmarshal(assetsJSON, &balances); err != nil {
+	var balancesRes GetLedgerBalancesRes
+	if err := json.Unmarshal(assetsJSON, &balancesRes); err != nil {
 		return nil, fmt.Errorf("failed to parse assets: %w", err)
 	}
 
-	return balances, nil
+	return balancesRes.LedgerBalances, nil
+}
+
+type GetChannelsRes struct {
+	Channels []ChannelRes `json:"channels"`
 }
 
 func (c *ClearnodeClient) GetChannels(participant, status string) ([]ChannelRes, error) {
@@ -146,46 +163,82 @@ func (c *ClearnodeClient) GetChannels(participant, status string) ([]ChannelRes,
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch channels: %w", err)
 	}
-	if res.Res.Method != "get_channels" || len(res.Res.Params) < 1 {
+	if res.Res.Method != "get_channels" {
 		return nil, fmt.Errorf("unexpected response to channels request: %v", res.Res)
 	}
 
-	channelsJSON, err := json.Marshal(res.Res.Params[0])
+	channelsJSON, err := json.Marshal(res.Res.Params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal channels data: %w", err)
 	}
 
-	var channels []ChannelRes
-	if err := json.Unmarshal(channelsJSON, &channels); err != nil {
+	var channelsRes GetChannelsRes
+	if err := json.Unmarshal(channelsJSON, &channelsRes); err != nil {
 		return nil, fmt.Errorf("failed to parse channels: %w", err)
 	}
 
-	return channels, nil
+	return channelsRes.Channels, nil
 }
 
-type ChannelClosureRes struct {
-	ChannelID        string          `json:"channel_id"`
-	Intent           uint8           `json:"intent"`
-	Version          uint64          `json:"version"`
-	StateData        string          `json:"state_data"`
-	FinalAllocations []AllocationRes `json:"allocations"`
-	StateHash        string          `json:"state_hash"`
-	Signature        SignatureRes    `json:"server_signature"`
+type ChannelOperationRes struct {
+	ChannelID string `json:"channel_id"`
+	Channel   *struct {
+		Participants [2]string `json:"participants"`
+		Adjudicator  string    `json:"adjudicator"`
+		Challenge    uint64    `json:"challenge"`
+		Nonce        uint64    `json:"nonce"`
+	} `json:"channel,omitempty"`
+	State          UnsignedState    `json:"state"`
+	StateSignature unisig.Signature `json:"server_signature"`
+}
+
+type UnsignedState struct {
+	Intent      uint8           `json:"intent"`
+	Version     uint64          `json:"version"`
+	Data        string          `json:"state_data"`
+	Allocations []AllocationRes `json:"allocations"`
 }
 
 type AllocationRes struct {
-	Destination string   `json:"destination"`
-	Token       string   `json:"token"`
-	Amount      *big.Int `json:"amount"`
+	Destination string          `json:"destination"`
+	Token       string          `json:"token"`
+	Amount      decimal.Decimal `json:"amount"`
 }
 
-type SignatureRes struct {
-	V uint8  `json:"v,string"`
-	R string `json:"r"`
-	S string `json:"s"`
+func (c *ClearnodeClient) RequestChannelCreation(chainID uint32, signerAddress, assetAddress common.Address) (*ChannelOperationRes, error) {
+	if c.signer == nil {
+		return nil, fmt.Errorf("client not authenticated")
+	}
+
+	params := map[string]any{
+		"chain_id":    chainID,
+		"session_key": c.signer.Address().Hex(),
+		"token":       assetAddress.Hex(),
+		"amount":      decimal.NewFromInt(0), // Default to 0
+	}
+
+	res, err := c.request("create_channel", nil, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to request channel creation: %w", err)
+	}
+	if res.Res.Method != "create_channel" {
+		return nil, fmt.Errorf("unexpected response to create_channel: %v", res.Res)
+	}
+
+	opResJSON, err := json.Marshal(res.Res.Params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal creation response: %w", err)
+	}
+
+	var opRes ChannelOperationRes
+	if err := json.Unmarshal(opResJSON, &opRes); err != nil {
+		return nil, fmt.Errorf("failed to parse channels: %w", err)
+	}
+
+	return &opRes, nil
 }
 
-func (c *ClearnodeClient) RequestChannelClosure(walletAddress common.Address, channelID string) (*ChannelClosureRes, error) {
+func (c *ClearnodeClient) RequestChannelClosure(walletAddress common.Address, channelID string) (*ChannelOperationRes, error) {
 	if c.signer == nil {
 		return nil, fmt.Errorf("client not authenticated")
 	}
@@ -199,34 +252,24 @@ func (c *ClearnodeClient) RequestChannelClosure(walletAddress common.Address, ch
 	if err != nil {
 		return nil, fmt.Errorf("failed to request channel closure: %w", err)
 	}
-	if res.Res.Method != "close_channel" || len(res.Res.Params) < 1 {
+	if res.Res.Method != "close_channel" {
 		return nil, fmt.Errorf("unexpected response to close_channel: %v", res.Res)
 	}
 
-	closureResJSON, err := json.Marshal(res.Res.Params[0])
+	opResJSON, err := json.Marshal(res.Res.Params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal closure response: %w", err)
 	}
 
-	var closureRes ChannelClosureRes
-	if err := json.Unmarshal(closureResJSON, &closureRes); err != nil {
+	var opRes ChannelOperationRes
+	if err := json.Unmarshal(opResJSON, &opRes); err != nil {
 		return nil, fmt.Errorf("failed to parse channels: %w", err)
 	}
 
-	return &closureRes, nil
+	return &opRes, nil
 }
 
-type ChannelResizeRes struct {
-	ChannelID   string          `json:"channel_id"`
-	Intent      uint8           `json:"intent"`
-	Version     uint64          `json:"version"`
-	StateData   string          `json:"state_data"`
-	Allocations []AllocationRes `json:"allocations"`
-	StateHash   string          `json:"state_hash"`
-	Signature   SignatureRes    `json:"server_signature"`
-}
-
-func (c *ClearnodeClient) RequestChannelResize(walletAddress common.Address, channelID string, allocateAmount, resizeAmount *big.Int) (*ChannelResizeRes, error) {
+func (c *ClearnodeClient) RequestChannelResize(walletAddress common.Address, channelID string, allocateAmount, resizeAmount decimal.Decimal) (*ChannelOperationRes, error) {
 	if c.signer == nil {
 		return nil, fmt.Errorf("client not authenticated")
 	}
@@ -242,21 +285,21 @@ func (c *ClearnodeClient) RequestChannelResize(walletAddress common.Address, cha
 	if err != nil {
 		return nil, fmt.Errorf("failed to request channel resize: %w", err)
 	}
-	if res.Res.Method != "resize_channel" || len(res.Res.Params) < 1 {
+	if res.Res.Method != "resize_channel" {
 		return nil, fmt.Errorf("unexpected response to resize_channel: %v", res.Res)
 	}
 
-	resizeResJSON, err := json.Marshal(res.Res.Params[0])
+	opResJSON, err := json.Marshal(res.Res.Params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal closure response: %w", err)
 	}
 
-	var resizeRes ChannelResizeRes
-	if err := json.Unmarshal(resizeResJSON, &resizeRes); err != nil {
+	var opRes ChannelOperationRes
+	if err := json.Unmarshal(opResJSON, &opRes); err != nil {
 		return nil, fmt.Errorf("failed to parse channels: %w", err)
 	}
 
-	return &resizeRes, nil
+	return &opRes, nil
 }
 
 type TransferReq struct {
@@ -305,11 +348,11 @@ func (c *ClearnodeClient) Transfer(transferByTag bool, destinationValue string, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to transfer: %w", err)
 	}
-	if res.Res.Method != "transfer" || len(res.Res.Params) < 1 {
+	if res.Res.Method != "transfer" {
 		return nil, fmt.Errorf("unexpected response to transfer: %v", res.Res)
 	}
 
-	resizeResJSON, err := json.Marshal(res.Res.Params[0])
+	resizeResJSON, err := json.Marshal(res.Res.Params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal closure response: %w", err)
 	}
@@ -361,7 +404,7 @@ func (c *ClearnodeClient) pingPeriodically() {
 	defer c.exit() // Ensure exit channel is closed when done
 
 	for range ticker.C {
-		res, err := c.request("ping", nil)
+		res, err := c.request("ping", nil, nil)
 		if err != nil {
 			fmt.Printf("Error sending ping: %s\n", err.Error())
 			return
@@ -374,7 +417,7 @@ func (c *ClearnodeClient) pingPeriodically() {
 	}
 }
 
-func (c *ClearnodeClient) request(method string, sigs []string, params ...any) (*RPCResponse, error) {
+func (c *ClearnodeClient) request(method string, sigs []unisig.Signature, params any) (*RPCResponse, error) {
 	if params == nil {
 		params = []any{} // Ensure params is never nil
 	}
@@ -392,7 +435,7 @@ func (c *ClearnodeClient) request(method string, sigs []string, params ...any) (
 		if err != nil {
 			return nil, fmt.Errorf("error signing RPC data: %w", err)
 		}
-		sigs = []string{hexutil.Encode(sig)}
+		sigs = []unisig.Signature{sig}
 	}
 
 	req := RPCRequest{

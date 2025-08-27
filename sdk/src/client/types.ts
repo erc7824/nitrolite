@@ -1,5 +1,6 @@
 import { Account, Hex, PublicClient, WalletClient, Chain, Transport, ParseAccount, Address } from 'viem';
 import { ContractAddresses } from '../abis';
+import { StateSigner } from './signer';
 
 /**
  * Channel identifier
@@ -12,13 +13,10 @@ export type ChannelId = Hex;
 export type StateHash = Hex;
 
 /**
- * Signature structure used for state channel operations
+ * Signature type used when signing states
+ * @dev Hex is used to support EIP-1271 and EIP-6492 signatures.
  */
-export interface Signature {
-    v: number;
-    r: Hex;
-    s: Hex;
-}
+export type Signature = Hex;
 
 /**
  * Allocation structure representing fund distribution
@@ -71,7 +69,7 @@ export interface ChannelData {
     lastValidState: State; // Last valid state of the channel recorded on-chain
 }
 
-interface UnsignedState {
+export interface UnsignedState {
     intent: StateIntent; // Intent of the state (uint8 enum in contract)
     version: bigint; // Version of the state (uint256 in contract)
     data: Hex; // Application data encoded (bytes in contract)
@@ -128,14 +126,9 @@ export interface NitroliteClientConfig {
     walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
 
     /**
-     * Optional: A separate viem WalletClient used *only* for signing off-chain state updates (`signMessage`).
-     * Provide this if you want to use a different key (e.g., a "hot" key from localStorage)
-     * for state signing than the one used for on-chain transactions.
-     * If omitted, `walletClient` will be used for state signing.
-     * @dev Note that the client's `signMessage` function should NOT add an EIP-191 prefix to the message signed. See {@link SignMessageFn} for details.
-     * viem's `signMessage` can operate in `raw` mode, which suffice.
+     * Implementation of the StateSigner interface used for signing protocol states.
      */
-    stateWalletClient?: WalletClient<Transport, Chain, ParseAccount<Account>>;
+    stateSigner: StateSigner;
 
     /** Contract addresses required by the SDK. */
     addresses: ContractAddresses;
@@ -151,8 +144,9 @@ export interface NitroliteClientConfig {
  * Parameters required for creating a new state channel.
  */
 export interface CreateChannelParams {
-    initialAllocationAmounts: [bigint, bigint];
-    stateData?: Hex;
+    channel: Channel;
+    unsignedInitialState: UnsignedState;
+    serverSignature: Signature;
 }
 
 /**

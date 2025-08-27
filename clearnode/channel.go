@@ -13,7 +13,6 @@ import (
 type ChannelStatus string
 
 var (
-	ChannelStatusJoining    ChannelStatus = "joining"
 	ChannelStatusOpen       ChannelStatus = "open"
 	ChannelStatusClosed     ChannelStatus = "closed"
 	ChannelStatusChallenged ChannelStatus = "challenged"
@@ -44,15 +43,13 @@ func (Channel) TableName() string {
 }
 
 // CreateChannel creates a new channel in the database
-// For real channels, participantB is always the broker application
 func CreateChannel(tx *gorm.DB, channelID, wallet, participantSigner string, nonce uint64, challenge uint64, adjudicator string, chainID uint32, tokenAddress string, amount decimal.Decimal) (Channel, error) {
-
 	channel := Channel{
 		ChannelID:   channelID,
 		Wallet:      wallet,
 		Participant: participantSigner,
-		ChainID:     chainID, // Set the network ID for channels
-		Status:      ChannelStatusJoining,
+		ChainID:     chainID,
+		Status:      ChannelStatusOpen,
 		Nonce:       nonce,
 		Adjudicator: adjudicator,
 		Challenge:   challenge,

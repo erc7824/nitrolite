@@ -3,8 +3,9 @@ package clearnet
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"sort"
+
+	"github.com/shopspring/decimal"
 )
 
 func (c *ClearnodeClient) handleEvent(event RPCData) {
@@ -25,24 +26,19 @@ func (c *ClearnodeClient) handleEvent(event RPCData) {
 }
 
 type ChannelRes struct {
-	ChannelID   string   `json:"channel_id"`
-	Participant string   `json:"participant"`
-	Status      string   `json:"status"`
-	Token       string   `json:"token"`
-	RawAmount   *big.Int `json:"amount"` // Total amount in the channel (user + broker)
-	ChainID     uint32   `json:"chain_id"`
-	Adjudicator string   `json:"adjudicator"`
-	Challenge   uint64   `json:"challenge"`
-	UpdatedAt   string   `json:"updated_at"`
+	ChannelID   string          `json:"channel_id"`
+	Participant string          `json:"participant"`
+	Status      string          `json:"status"`
+	Token       string          `json:"token"`
+	RawAmount   decimal.Decimal `json:"amount"` // Total amount in the channel (user + broker)
+	ChainID     uint32          `json:"chain_id"`
+	Adjudicator string          `json:"adjudicator"`
+	Challenge   uint64          `json:"challenge"`
+	UpdatedAt   string          `json:"updated_at"`
 }
 
 func (c *ClearnodeClient) handleChannelsEvent(event RPCData) {
-	if len(event.Params) < 1 {
-		fmt.Println("Invalid channels event format")
-		return
-	}
-
-	channelsData, err := json.Marshal(event.Params[0])
+	channelsData, err := json.Marshal(event.Params)
 	if err != nil {
 		fmt.Printf("Failed to marshal channels data: %s\n", err.Error())
 		return
@@ -74,12 +70,7 @@ func (c *ClearnodeClient) handleChannelsEvent(event RPCData) {
 }
 
 func (c *ClearnodeClient) handleBalancesEvent(event RPCData) {
-	if len(event.Params) < 1 {
-		fmt.Println("Invalid channels event format")
-		return
-	}
-
-	channelsData, err := json.Marshal(event.Params[0])
+	channelsData, err := json.Marshal(event.Params)
 	if err != nil {
 		fmt.Printf("Failed to marshal channels data: %s\n", err.Error())
 		return
@@ -110,12 +101,7 @@ type AssetRes struct {
 }
 
 func (c *ClearnodeClient) handleAssetsEvent(event RPCData) {
-	if len(event.Params) < 1 {
-		fmt.Println("Invalid assets event format")
-		return
-	}
-
-	assetsData, err := json.Marshal(event.Params[0])
+	assetsData, err := json.Marshal(event.Params)
 	if err != nil {
 		fmt.Printf("Failed to marshal assets data: %s\n", err.Error())
 		return

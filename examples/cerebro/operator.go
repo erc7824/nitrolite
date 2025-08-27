@@ -258,7 +258,7 @@ func (o *Operator) reloadConfig() {
 				for _, channel := range channels {
 					if channel.ChainID == network.ChainID && channel.Token == asset.Token {
 						channelID = channel.ChannelID
-						rawChannelBalance = channel.RawAmount
+						rawChannelBalance = channel.RawAmount.BigInt()
 						break
 					}
 				}
@@ -274,7 +274,6 @@ func (o *Operator) reloadConfig() {
 		}
 
 		o.config.Networks = append(o.config.Networks, NetworkConfig{
-			ChainName:          network.Name,
 			ChainID:            network.ChainID,
 			CustodyAddress:     common.HexToAddress(network.CustodyAddress),
 			AdjudicatorAddress: common.HexToAddress(network.AdjudicatorAddress),
@@ -294,8 +293,7 @@ func (o *Operator) getChainSuggestions(filterEnabled int) []prompt.Suggest {
 
 		if include {
 			suggestions = append(suggestions, prompt.Suggest{
-				Text:        network.ChainName,
-				Description: fmt.Sprintf("Chain %s (ID: %d)", network.ChainName, network.ChainID),
+				Text: fmt.Sprintf("%d", network.ChainID),
 			})
 		}
 	}
@@ -303,10 +301,10 @@ func (o *Operator) getChainSuggestions(filterEnabled int) []prompt.Suggest {
 }
 
 // getAssetSuggestions returns a list of asset suggestions for a specific chain.
-// chainName is the name of the chain, and filterEnabled can be 0 (all assets),
+// chainIDStr is the ID of the chain, and filterEnabled can be 0 (all assets),
 // >0 (only enabled assets), or <0 (only disabled assets).
-func (o *Operator) getAssetSuggestions(chainName string, filterEnabled int) []prompt.Suggest {
-	if chainName == "" {
+func (o *Operator) getAssetSuggestions(chainIDStr string, filterEnabled int) []prompt.Suggest {
+	if chainIDStr == "" {
 		assetSymbols := o.config.GetSymbolsOfEnabledAssets()
 		suggestions := make([]prompt.Suggest, len(assetSymbols))
 		for i, symbol := range assetSymbols {
@@ -319,7 +317,12 @@ func (o *Operator) getAssetSuggestions(chainName string, filterEnabled int) []pr
 		return suggestions
 	}
 
-	network := o.config.GetNetworkByName(chainName)
+	chainID, ok := new(big.Int).SetString(chainIDStr, 10)
+	if !ok {
+		return nil
+	}
+
+	network := o.config.GetNetworkByID(uint32(chainID.Uint64()))
 	if network == nil {
 		return nil
 	}

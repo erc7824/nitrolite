@@ -36,7 +36,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddressB).Record(userAccountIDB, "usdc", decimal.NewFromInt(200)))
 
 		capturedNotifications := make(map[string][]Notification)
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {
 
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
@@ -67,11 +67,11 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		appSession, err := service.CreateApplication(params, rpcSigners)
 		require.NoError(t, err)
 		assert.NotNil(t, appSession)
-		assert.NotEmpty(t, appSession.SessionID)
+		assert.NotEmpty(t, appSession.AppSessionID)
 		assert.Equal(t, uint64(1), appSession.Version)
-		assert.Equal(t, ChannelStatusOpen, appSession.Status)
+		assert.Equal(t, ChannelStatusOpen, ChannelStatus(appSession.Status))
 
-		sessionAccountID := NewAccountID(appSession.SessionID)
+		sessionAccountID := NewAccountID(appSession.AppSessionID)
 
 		assert.Len(t, capturedNotifications, 2)
 		assertNotifications(t, capturedNotifications, userAddressA.Hex(), 1)
@@ -103,7 +103,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			expectedAmount, exists := expectedTxs[tx.FromAccount]
 			assert.True(t, exists, "Unexpected destination of a transaction: %s", tx.FromAccount)
 			assert.Equal(t, TransactionTypeAppDeposit, tx.Type, "Transaction type should be app deposit")
-			assert.Equal(t, appSession.SessionID, tx.ToAccount, "To account should be app session ID")
+			assert.Equal(t, appSession.AppSessionID, tx.ToAccount, "To account should be app session ID")
 			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
 			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
 			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
@@ -117,7 +117,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(50))) // Not enough
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -148,7 +148,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			Status: ChannelStatusChallenged,
 		}).Error)
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -175,7 +175,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           "test-proto",
@@ -208,7 +208,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session",
 			Protocol:           "test-proto",
@@ -240,9 +240,9 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		newVersion, err := service.SubmitAppState(params, rpcSigners)
+		resp, err := service.SubmitAppState(params, rpcSigners)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(2), newVersion)
+		assert.Equal(t, uint64(2), resp.Version)
 
 		// Verify balances
 		appBalA, err := ledgerA.Balance(sessionAccountID, "usdc")
@@ -258,7 +258,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-negative",
 			Protocol:           "test-proto",
@@ -307,8 +307,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		defer cleanup()
 
 		capturedNotifications := make(map[string][]Notification)
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
-
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
@@ -345,9 +344,9 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		newVersion, err := service.CloseApplication(params, rpcSigners)
+		resp, err := service.CloseApplication(params, rpcSigners)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(2), newVersion)
+		assert.Equal(t, uint64(2), resp.Version)
 
 		assert.Len(t, capturedNotifications, 2)
 		assertNotifications(t, capturedNotifications, userAddressA.Hex(), 1)
@@ -395,7 +394,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		defer cleanup()
 
 		capturedNotifications := make(map[string][]Notification)
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {
 
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
@@ -433,9 +432,9 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			userAddressB.Hex(): {},
 		}
 
-		newVersion, err := service.CloseApplication(params, rpcSigners)
+		resp, err := service.CloseApplication(params, rpcSigners)
 		require.NoError(t, err)
-		assert.Equal(t, uint64(2), newVersion)
+		assert.Equal(t, uint64(2), resp.Version)
 
 		var closedSession AppSession
 		require.NoError(t, db.First(&closedSession, "session_id = ?", session.SessionID).Error)
@@ -457,7 +456,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params ...any) {}, nil))
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-close-negative",
 			Protocol:           "test-proto",

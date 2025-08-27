@@ -1,5 +1,6 @@
-import { keccak256, encodeAbiParameters, Address } from 'viem';
-import { Channel, ChannelId } from '../client/types'; // Updated import path
+import { keccak256, encodeAbiParameters, Address, Hex } from 'viem';
+import { Channel, ChannelId, State } from '../client/types'; // Updated import path
+import { RPCChannel, RPCChannelOperationState } from '../rpc';
 
 /**
  * Compute the unique identifier for a channel based on its configuration.
@@ -54,4 +55,27 @@ export function generateChannelNonce(address?: Address): bigint {
     const nonce = combinedNonce & maxInt64;
 
     return nonce;
+}
+
+export function convertRPCToClientChannel(ch: RPCChannel): Channel {
+    return {
+        participants: ch.participants,
+        adjudicator: ch.adjudicator,
+        challenge: BigInt(ch.challenge),
+        nonce: BigInt(ch.nonce),
+    };
+}
+
+export function convertRPCToClientState(s: RPCChannelOperationState, sig: Hex): State {
+    return {
+        intent: s.intent,
+        version: BigInt(s.version),
+        data: s.stateData,
+        allocations: s.allocations.map((a) => ({
+            token: a.token,
+            destination: a.destination,
+            amount: a.amount,
+        })),
+        sigs: [sig],
+    };
 }

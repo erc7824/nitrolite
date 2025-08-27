@@ -1,0 +1,68 @@
+config:
+  args: ["clearnode"]
+  logLevel: info
+  database:
+    driver: postgres
+    host: postgresql.core
+    port: 5432
+    name: clearnet_sandbox
+    user: clearnet_sandbox_admin
+  envSecret: ""
+  extraEnvs:
+    CLEARNODE_LOG_LEVEL: "debug"
+    POLYGON_AMOI_CUSTODY_CONTRACT_ADDRESS: "0x019B65A265EB3363822f2752141b3dF16131b262"
+    POLYGON_AMOI_ADJUDICATOR_ADDRESS: "0x7c7ccbc98469190849BCC6c926307794fDfB11F2"
+    POLYGON_AMOI_BALANCE_CHECKER_ADDRESS: "0x9d1E88627884e066B81A02d69BCB2437a520534C"
+    BASE_SEPOLIA_CUSTODY_CONTRACT_ADDRESS: "0x019B65A265EB3363822f2752141b3dF16131b262"
+    BASE_SEPOLIA_ADJUDICATOR_ADDRESS: "0x7c7ccbc98469190849BCC6c926307794fDfB11F2"
+    BASE_SEPOLIA_BALANCE_CHECKER_ADDRESS: "0x33e57a8900882B8D5A038eC3Aa844c19Acfc539A"
+    ETH_SEPOLIA_CUSTODY_CONTRACT_ADDRESS: "0x019B65A265EB3363822f2752141b3dF16131b262"
+    ETH_SEPOLIA_ADJUDICATOR_ADDRESS: "0x7c7ccbc98469190849BCC6c926307794fDfB11F2"
+    ETH_SEPOLIA_BALANCE_CHECKER_ADDRESS: "0x86700f6bc63a42ee645e204b361d7c0f643c111b"
+    LINEA_SEPOLIA_CUSTODY_CONTRACT_ADDRESS: "0x019B65A265EB3363822f2752141b3dF16131b262"
+    LINEA_SEPOLIA_ADJUDICATOR_ADDRESS: "0x7c7ccbc98469190849BCC6c926307794fDfB11F2"
+    LINEA_SEPOLIA_BALANCE_CHECKER_ADDRESS: "0x424A079B89571a515Fd6fe0ba614060D5Fd8E16A"
+    MSG_EXPIRY_TIME: "60"
+
+image:
+  repository: ghcr.io/erc7824/nitrolite/clearnode
+  tag: da7d96c
+
+service:
+  http:
+    enabled: true
+    port: 8000
+    path: /
+
+metrics:
+  enabled: true
+  podmonitoring:
+    enabled: true
+  port: 4242
+  endpoint: "/metrics"
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 256Mi
+    ephemeral-storage: 100Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+    ephemeral-storage: 100Mi
+
+autoscaling:
+  enabled: false
+
+networking:
+  externalHostname: sandboxnet.yellow.com
+  tlsClusterIssuer: zerossl-prod
+  gateway:
+    enabled: false
+  ingress:
+    enabled: true
+    className: nginx
+    tls:
+      enabled: true
+
+imagePullSecret: ghcr-pull

@@ -1,0 +1,17 @@
+{
+  "deployer": "0xE1e0f007bE430676e001A19cf892a116d72032Fa",
+  "deployedTo": "0x2c72919F5b256661d86b6006bccFa24C611409cA",
+  "transactionHash": "0x69dec9b6e8383f88e490e96f1bd8c5d661db447406ca89a5d4583deeeb3440a6",
+  "commit": "b8abc292b0db3b2038132d126e576507f064817d",
+  "timestamp": 1756296915,
+  "chainId": 84532,
+  "contractPath": "./src/PremintERC20.sol:PremintERC20",
+  "constructorArgs": [
+    "Yellow Test USD",
+    "ytest.USD",
+    "6",
+    "0xe10E77b07b497859D88fc3ebFe792d82D54f9604",
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+  ],
+  "comment": "SANDBOX v0.3.0"
+}

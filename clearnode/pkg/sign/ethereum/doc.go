@@ -1,15 +1,13 @@
 // Package ethereum provides Ethereum-specific implementation of the sign interfaces.
 //
 // This package implements the blockchain-agnostic signing interfaces defined in
-// the parent sign package specifically for the Ethereum ecosystem, including
-// support for standard message signing and EIP-712 structured data signing.
+// the parent sign package specifically for the Ethereum ecosystem.
 //
 // Features
 //
 //   - ECDSA signature generation using secp256k1 curve
 //   - Keccak-256 message hashing (Ethereum standard)
 //   - Address recovery from signatures
-//   - EIP-712 typed data signing support
 //   - Ethereum address format compatibility
 //
 // Usage
@@ -39,7 +37,7 @@
 //		}
 //	}
 //
-// Security
+// # Security
 //
 // Private keys are kept internal to the Signer struct and are never exposed
 // through the public API. This design supports hardware wallets and key

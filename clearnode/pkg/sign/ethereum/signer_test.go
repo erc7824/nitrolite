@@ -1,13 +1,11 @@
 package ethereum
 
 import (
-	"math/big"
 	"strings"
 	"testing"
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -61,8 +59,9 @@ func TestSignAndRecover(t *testing.T) {
 	t.Run("Message", func(t *testing.T) {
 		signer := setupSigner(t)
 		message := []byte("test message for signing")
+		msgHash := ethcrypto.Keccak256Hash(message)
 
-		signature, err := signer.Sign(message)
+		signature, err := signer.Sign(msgHash.Bytes())
 		require.NoError(t, err)
 
 		recoveredAddress, err := RecoverAddress(message, signature)
@@ -70,62 +69,19 @@ func TestSignAndRecover(t *testing.T) {
 
 		assert.True(t, strings.EqualFold(signer.PublicKey().Address().String(), recoveredAddress.String()))
 	})
-
-	t.Run("EIP-712", func(t *testing.T) {
-		typedData := apitypes.TypedData{
-			Types: apitypes.Types{
-				"EIP712Domain": {{Name: "name", Type: "string"}},
-				"Policy": {
-					{Name: "challenge", Type: "string"}, {Name: "scope", Type: "string"},
-					{Name: "wallet", Type: "address"}, {Name: "application", Type: "address"},
-					{Name: "participant", Type: "address"}, {Name: "expire", Type: "uint256"},
-					{Name: "allowances", Type: "Allowance[]"},
-				},
-				"Allowance": {{Name: "asset", Type: "string"}, {Name: "amount", Type: "uint256"}},
-			},
-			PrimaryType: "Policy",
-			Domain:      apitypes.TypedDataDomain{Name: "Yellow App Store"},
-			Message: map[string]interface{}{
-				"challenge": "a9d5b4fd-ef30-4bb6-b9b6-4f2778f004fd", "scope": "console",
-				"wallet": "0x21f7d1f35979b125f6f7918fc16cb9101e5882d7", "application": "0x21f7d1f35979b125f6f7918fc16cb9101e5882d7",
-				"participant": "0x6966978ce78df3228993aa46984eab6d68bbe195", "expire": "1748608702",
-				"allowances": []map[string]interface{}{{"asset": "usdc", "amount": big.NewInt(0)}},
-			},
-		}
-		expectedAddr := "0x21F7D1F35979B125f6F7918fC16Cb9101e5882d7"
-		precomputedSig := "0xe758880bc3d75e9433e0f50c9b40712b0bcf90f437a8c42ba6f8a5a3d144a5ce4b10b020c4eb728323daad49c4cc6329eaa45e3ea88c95d76e55b982f6a0a8741b"
-
-		signature, err := hexutil.Decode(precomputedSig)
-		require.NoError(t, err)
-
-		recoveredSigner, err := RecoverAddressEIP712(typedData, signature)
-		require.NoError(t, err)
-
-		assert.True(t, strings.EqualFold(expectedAddr, recoveredSigner.String()))
-	})
 }
 
 func TestRecoveryErrors(t *testing.T) {
 	signer := setupSigner(t)
 	message := []byte("some data to sign")
-	signature, err := signer.Sign(message)
+	msgHash := ethcrypto.Keccak256Hash(message)
+	signature, err := signer.Sign(msgHash.Bytes())
 	require.NoError(t, err)
-
-	// This is a minimal but structurally valid TypedData object for testing error paths.
-	validTypedData := apitypes.TypedData{
-		Types:       apitypes.Types{"EIP712Domain": {{Name: "name", Type: "string"}}, "Test": {{Name: "message", Type: "string"}}},
-		PrimaryType: "Test",
-		Domain:      apitypes.TypedDataDomain{Name: "Test Domain"},
-		Message:     map[string]interface{}{"message": "hello"},
-	}
 
 	t.Run("Invalid Signature Length", func(t *testing.T) {
 		shortSig := signature[:64]
 
 		_, err := RecoverAddress(message, shortSig)
-		assert.ErrorContains(t, err, "invalid signature length")
-
-		_, err = RecoverAddressEIP712(validTypedData, shortSig)
 		assert.ErrorContains(t, err, "invalid signature length")
 	})
 
@@ -137,13 +93,6 @@ func TestRecoveryErrors(t *testing.T) {
 		recoveredAddr, err := RecoverAddress(message, malformedSig)
 		if err == nil {
 			assert.NotEqual(t, signer.PublicKey().Address().String(), recoveredAddr.String())
-		} else {
-			assert.ErrorContains(t, err, "signature recovery failed")
-		}
-
-		recoveredAddr712, err := RecoverAddressEIP712(validTypedData, malformedSig)
-		if err == nil {
-			assert.NotEqual(t, signer.PublicKey().Address().String(), recoveredAddr712.String())
 		} else {
 			assert.ErrorContains(t, err, "signature recovery failed")
 		}

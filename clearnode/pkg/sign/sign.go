@@ -13,7 +13,7 @@ type Signer interface {
 	Sign(data []byte) (Signature, error) // Sign generates a signature for the given data.
 }
 
-// AddressRecoverer is an optional interface that signers can implement
+// AddressRecoverer is an interface for recovering addresses from signatures.
 type AddressRecoverer interface {
 	RecoverAddress(message []byte, signature Signature) (Address, error)
 }
@@ -34,6 +34,36 @@ type Address interface {
 
 // Signature is a generic byte slice representing a cryptographic signature.
 type Signature []byte
+
+// Algorithm represents the cryptographic algorithm used for signatures.
+type Algorithm uint8
+
+const (
+	AlgorithmKeccak256 Algorithm = iota
+	AlgorithmECDSA
+	AlgorithmUnknown = 255
+)
+
+// String returns the string representation of the algorithm.
+func (a Algorithm) String() string {
+	switch a {
+	case AlgorithmKeccak256:
+		return "Keccak256"
+	case AlgorithmECDSA:
+		return "ECDSA"
+	default:
+		return "Unknown"
+	}
+}
+
+// Alg returns the algorithm used for this signature based on its length and structure.
+func (s Signature) Alg() Algorithm {
+	if len(s) == 65 {
+		// Standard Ethereum signature format (r: 32 bytes, s: 32 bytes, v: 1 byte)
+		return AlgorithmKeccak256
+	}
+	return AlgorithmUnknown
+}
 
 // MarshalJSON implements the json.Marshaler interface, encoding the signature as a hex string.
 func (s Signature) MarshalJSON() ([]byte, error) {
@@ -57,4 +87,28 @@ func (s *Signature) UnmarshalJSON(data []byte) error {
 // String implements the fmt.Stringer interface
 func (s Signature) String() string {
 	return hexutil.Encode(s)
+}
+
+// Keccak256Recoverer implements AddressRecoverer for Keccak256-based signatures (Ethereum).
+type Keccak256Recoverer struct{}
+
+// RecoverAddress recovers the address from a Keccak256-based signature.
+// This is a placeholder implementation - actual recovery requires blockchain-specific logic.
+func (r *Keccak256Recoverer) RecoverAddress(message []byte, signature Signature) (Address, error) {
+	return nil, fmt.Errorf("Keccak256 recovery requires blockchain-specific implementation")
+}
+
+// NewAddressRecoverer creates an appropriate AddressRecoverer based on the signature algorithm.
+func NewAddressRecoverer(alg Algorithm) (AddressRecoverer, error) {
+	switch alg {
+	case AlgorithmKeccak256:
+		return &Keccak256Recoverer{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported algorithm: %s", alg.String())
+	}
+}
+
+// NewAddressRecovererFromSignature creates an AddressRecoverer based on signature algorithm detection.
+func NewAddressRecovererFromSignature(signature Signature) (AddressRecoverer, error) {
+	return NewAddressRecoverer(signature.Alg())
 }

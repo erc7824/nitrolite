@@ -117,18 +117,15 @@ func Example_addressRecoverer() {
 		log.Fatal(err)
 	}
 
-	// Use the generic AddressRecoverer interface
-	if recoverer, ok := signer.(sign.AddressRecoverer); ok {
-		recoveredAddr, err := recoverer.RecoverAddress(message, signature)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		signerAddr := signer.PublicKey().Address()
-		fmt.Printf("Generic recovery works: %t\n", recoveredAddr.Equals(signerAddr))
-	} else {
-		fmt.Println("Signer does not support address recovery")
+	// Use the dedicated AddressRecoverer
+	recoverer := &ethereum.AddressRecoverer{}
+	recoveredAddr, err := recoverer.RecoverAddress(message, signature)
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	signerAddr := signer.PublicKey().Address()
+	fmt.Printf("Generic recovery works: %t\n", recoveredAddr.Equals(signerAddr))
 	// Output:
 	// Generic recovery works: true
 }

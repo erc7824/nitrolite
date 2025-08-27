@@ -13,7 +13,7 @@ import (
 
 // Ensure our types implement the interfaces at compile time.
 var _ sign.Signer = (*Signer)(nil)
-var _ sign.AddressRecoverer = (*Signer)(nil)
+var _ sign.AddressRecoverer = (*AddressRecoverer)(nil)
 var _ sign.PublicKey = (*PublicKey)(nil)
 var _ sign.Address = (*Address)(nil)
 
@@ -21,6 +21,16 @@ var _ sign.Address = (*Address)(nil)
 type Address struct{ common.Address }
 
 func (a Address) String() string { return a.Address.Hex() }
+
+// NewAddress creates a new Ethereum address from a common.Address.
+func NewAddress(addr common.Address) Address {
+	return Address{addr}
+}
+
+// NewAddressFromHex creates a new Ethereum address from a hex string.
+func NewAddressFromHex(hexAddr string) Address {
+	return Address{common.HexToAddress(hexAddr)}
+}
 
 // Equals returns true if this address equals the other address.
 func (a Address) Equals(other sign.Address) bool {
@@ -39,6 +49,20 @@ func (p PublicKey) Address() sign.Address {
 }
 func (p PublicKey) Bytes() []byte { return ethcrypto.FromECDSAPub(p.PublicKey) }
 
+// NewPublicKey creates a new Ethereum public key from an ECDSA public key.
+func NewPublicKey(pub *ecdsa.PublicKey) PublicKey {
+	return PublicKey{pub}
+}
+
+// NewPublicKeyFromBytes creates a new Ethereum public key from raw bytes.
+func NewPublicKeyFromBytes(pubBytes []byte) (PublicKey, error) {
+	pub, err := ethcrypto.UnmarshalPubkey(pubBytes)
+	if err != nil {
+		return PublicKey{}, fmt.Errorf("failed to unmarshal public key: %w", err)
+	}
+	return PublicKey{pub}, nil
+}
+
 // Signer is the Ethereum implementation of the sign.Signer interface.
 type Signer struct {
 	privateKey *ecdsa.PrivateKey
@@ -46,6 +70,14 @@ type Signer struct {
 }
 
 func (s *Signer) PublicKey() sign.PublicKey { return s.publicKey }
+
+// AddressRecoverer implements the sign.AddressRecoverer interface for Ethereum.
+type AddressRecoverer struct{}
+
+// RecoverAddress implements the AddressRecoverer interface.
+func (r *AddressRecoverer) RecoverAddress(message []byte, signature sign.Signature) (sign.Address, error) {
+	return RecoverAddress(message, signature)
+}
 
 // Sign first hashes with Keccak256, as is standard for Ethereum.
 func (s *Signer) Sign(data []byte) (sign.Signature, error) {
@@ -58,12 +90,7 @@ func (s *Signer) Sign(data []byte) (sign.Signature, error) {
 	if sig[64] < 27 {
 		sig[64] += 27
 	}
-	return sig, nil
-}
-
-// RecoverAddress implements the AddressRecoverer interface.
-func (s *Signer) RecoverAddress(message []byte, signature sign.Signature) (sign.Address, error) {
-	return RecoverAddress(message, signature)
+	return sign.Signature(sig), nil
 }
 
 // NewSignerFromHex creates a new Ethereum signer from a hex-encoded private key.
@@ -107,7 +134,7 @@ func recoverAddressFromHash(hash []byte, sig sign.Signature) (common.Address, er
 	if len(sig) != 65 {
 		return common.Address{}, fmt.Errorf("invalid signature length")
 	}
-	localSig := make(sign.Signature, 65)
+	localSig := make([]byte, 65)
 	copy(localSig, sig)
 	if localSig[64] >= 27 {
 		localSig[64] -= 27

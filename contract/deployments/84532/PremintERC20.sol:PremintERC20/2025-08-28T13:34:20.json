@@ -1,9 +1,9 @@
 {
   "deployer": "0xE1e0f007bE430676e001A19cf892a116d72032Fa",
-  "deployedTo": "0x2c72919F5b256661d86b6006bccFa24C611409cA",
-  "transactionHash": "0x69dec9b6e8383f88e490e96f1bd8c5d661db447406ca89a5d4583deeeb3440a6",
-  "commit": "b8abc292b0db3b2038132d126e576507f064817d",
-  "timestamp": 1756296915,
+  "deployedTo": "0xDB9F293e3898c9E5536A3be1b0C56c89d2b32DEb",
+  "transactionHash": "0xcfb6a458bd3144d9a2e59bf91b745ac513881c4073720cb121eb964cd750fd6b",
+  "commit": "c9159047f86be7b11a74f00c3dd470229cba3fb9",
+  "timestamp": 1756388060,
   "chainId": 84532,
   "contractPath": "./src/PremintERC20.sol:PremintERC20",
   "constructorArgs": [

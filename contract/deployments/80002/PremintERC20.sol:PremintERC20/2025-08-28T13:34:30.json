@@ -1,10 +1,10 @@
 {
   "deployer": "0xE1e0f007bE430676e001A19cf892a116d72032Fa",
-  "deployedTo": "0x2c72919F5b256661d86b6006bccFa24C611409cA",
-  "transactionHash": "0x135adcca162408e6e0a8fc12cdc808c115dfc3a42679aa186d7c5c804ed49b61",
-  "commit": "b8abc292b0db3b2038132d126e576507f064817d",
-  "timestamp": 1756296761,
-  "chainId": 59141,
+  "deployedTo": "0xDB9F293e3898c9E5536A3be1b0C56c89d2b32DEb",
+  "transactionHash": "0x1417a04626c9fb77046f7e16f436a76f0f8e95b407e8c454a6af547628d7a65a",
+  "commit": "c9159047f86be7b11a74f00c3dd470229cba3fb9",
+  "timestamp": 1756388070,
+  "chainId": 80002,
   "contractPath": "./src/PremintERC20.sol:PremintERC20",
   "constructorArgs": [
     "Yellow Test USD",

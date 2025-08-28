@@ -20,32 +20,8 @@ on:
         required: true
 
 jobs:
-  build:
-    name: Build ${{ inputs.project-name }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: '${{ inputs.project-path }}/package.json'
-          cache: 'npm'
-          cache-dependency-path: '${{ inputs.project-path }}/package-lock.json'
-
-      - name: Install dependencies
-        run: npm ci
-        working-directory: ${{ inputs.project-path }}
-
-      - name: Build
-        run: npm run build
-        working-directory: ${{ inputs.project-path }}
-
   deploy:
     name: Deploy Clearnode
-    needs: build-and-publish-clearnode
     runs-on: ubuntu-latest
     permissions:
       contents: read

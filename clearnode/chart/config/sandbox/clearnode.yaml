@@ -26,7 +26,7 @@ config:
 
 image:
   repository: ghcr.io/erc7824/nitrolite/clearnode
-  tag: da7d96c
+  tag: 6069d30
 
 service:
   http:
@@ -55,7 +55,7 @@ autoscaling:
   enabled: false
 
 networking:
-  externalHostname: sandboxnet.yellow.com
+  externalHostname: clearnet-sandbox.yellow.com
   tlsClusterIssuer: zerossl-prod
   gateway:
     enabled: false

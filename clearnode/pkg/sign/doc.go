@@ -23,9 +23,9 @@
 //
 // Implementations should be imported from their respective blockchain packages:
 //
-//	import "github.com/erc7824/nitrolite/clearnode/pkg/sign/ethereum"
+//	import "github.com/erc7824/nitrolite/clearnode/pkg/sign/eth"
 //
-//	signer, err := ethereum.NewEthereumSigner(privateKeyHex)
+//	signer, err := eth.NewEthereumSigner(privateKeyHex)
 //	if err != nil {
 //		log.Fatal(err)
 //	}

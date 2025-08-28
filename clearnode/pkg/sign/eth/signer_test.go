@@ -1,4 +1,4 @@
-package ethereum
+package eth
 
 import (
 	"strings"
@@ -59,12 +59,12 @@ func TestSignAndRecover(t *testing.T) {
 	t.Run("Message", func(t *testing.T) {
 		signer := setupSigner(t)
 		message := []byte("test message for signing")
-		msgHash := ethcrypto.Keccak256Hash(message)
+		hash := ethcrypto.Keccak256Hash(message)
 
-		signature, err := signer.Sign(msgHash.Bytes())
+		signature, err := signer.Sign(hash.Bytes())
 		require.NoError(t, err)
 
-		recoveredAddress, err := RecoverAddress(message, signature)
+		recoveredAddress, err := RecoverAddress(hash.Bytes(), signature)
 		require.NoError(t, err)
 
 		assert.True(t, strings.EqualFold(signer.PublicKey().Address().String(), recoveredAddress.String()))
@@ -81,7 +81,8 @@ func TestRecoveryErrors(t *testing.T) {
 	t.Run("Invalid Signature Length", func(t *testing.T) {
 		shortSig := signature[:64]
 
-		_, err := RecoverAddress(message, shortSig)
+		hash := ethcrypto.Keccak256Hash(message)
+		_, err := RecoverAddress(hash.Bytes(), shortSig)
 		assert.ErrorContains(t, err, "invalid signature length")
 	})
 
@@ -90,7 +91,8 @@ func TestRecoveryErrors(t *testing.T) {
 		copy(malformedSig, signature)
 		malformedSig[30] = ^malformedSig[30] // Invert some bytes
 
-		recoveredAddr, err := RecoverAddress(message, malformedSig)
+		hash := ethcrypto.Keccak256Hash(message)
+		recoveredAddr, err := RecoverAddress(hash.Bytes(), malformedSig)
 		if err == nil {
 			assert.NotEqual(t, signer.PublicKey().Address().String(), recoveredAddr.String())
 		} else {

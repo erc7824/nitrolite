@@ -1,4 +1,4 @@
-// Package ethereum provides Ethereum-specific implementation of the sign interfaces.
+// Package eth provides Ethereum-specific implementation of the sign interfaces.
 //
 // This package implements the blockchain-agnostic signing interfaces defined in
 // the parent sign package specifically for the Ethereum ecosystem.
@@ -13,14 +13,15 @@
 // Usage
 //
 //	// Create a new Ethereum signer from a hex-encoded private key
-//	signer, err := ethereum.NewEthereumSigner(privateKeyHex)
+//	signer, err := eth.NewEthereumSigner(privateKeyHex)
 //	if err != nil {
 //		log.Fatal(err)
 //	}
 //
-//	// Sign a message
+//	// Sign a message (provide hash, not raw message)
 //	message := []byte("hello world")
-//	signature, err := signer.Sign(message)
+//	hash := ethcrypto.Keccak256Hash(message)
+//	signature, err := signer.Sign(hash.Bytes())
 //	if err != nil {
 //		log.Fatal(err)
 //	}
@@ -42,4 +43,4 @@
 // Private keys are kept internal to the Signer struct and are never exposed
 // through the public API. This design supports hardware wallets and key
 // management services that cannot or should not expose private key material.
-package ethereum
+package eth

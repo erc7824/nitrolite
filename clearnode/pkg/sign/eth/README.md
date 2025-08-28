@@ -1,4 +1,4 @@
-# Ethereum Signing Package (`ethereum`)
+# Ethereum Signing Package (`eth`)
 
 This package provides an implementation of the `sign` interfaces for Ethereum and other EVM-compatible blockchains.
 
@@ -9,7 +9,7 @@ It handles all Ethereum-specific cryptographic details, such as Keccak256 hashin
 
 See the Go package documentation and examples by running:
 ```bash
-go doc -all github.com/erc7824/nitrolite/clearnode/pkg/sign/ethereum
+go doc -all github.com/erc7824/nitrolite/clearnode/pkg/sign/eth
 ```
 
 Or view examples in your IDE or on pkg.go.dev.

@@ -1,11 +1,12 @@
-package ethereum_test
+package eth_test
 
 import (
 	"fmt"
 	"log"
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign/ethereum"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign/eth"
+	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
 // ExampleNewEthereumSigner demonstrates creating an Ethereum signer and signing a message.
@@ -13,7 +14,7 @@ func ExampleNewEthereumSigner() {
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" // Example private key
 
 	// Create a new Ethereum signer. It returns the generic sign.Signer interface.
-	signer, err := ethereum.NewEthereumSigner(pkHex)
+	signer, err := eth.NewEthereumSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -22,7 +23,8 @@ func ExampleNewEthereumSigner() {
 	fmt.Println("Address:", signer.PublicKey().Address())
 
 	message := []byte("hello world")
-	signature, err := signer.Sign(message)
+	hash := ethcrypto.Keccak256Hash(message)
+	signature, err := signer.Sign(hash.Bytes())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -76,18 +78,19 @@ func ExampleRecoverAddress() {
 
 	// Create a signature using our signer
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	signer, err := ethereum.NewEthereumSigner(pkHex)
+	signer, err := eth.NewEthereumSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	signature, err := signer.Sign(message)
+	hash := ethcrypto.Keccak256Hash(message)
+	signature, err := signer.Sign(hash.Bytes())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Call the function directly from the `ethereum` package for message recovery
-	recoveredAddr, err := ethereum.RecoverAddress(message, signature)
+	// Call the function directly from the `eth` package for hash recovery
+	recoveredAddr, err := eth.RecoverAddress(hash.Bytes(), signature)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
@@ -106,19 +109,20 @@ func Example_addressRecoverer() {
 
 	// Create a signer
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	signer, err := ethereum.NewEthereumSigner(pkHex)
+	signer, err := eth.NewEthereumSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Sign the message
-	signature, err := signer.Sign(message)
+	hash := ethcrypto.Keccak256Hash(message)
+	signature, err := signer.Sign(hash.Bytes())
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Use the dedicated AddressRecoverer
-	recoverer := &ethereum.AddressRecoverer{}
+	recoverer := &eth.AddressRecoverer{}
 	recoveredAddr, err := recoverer.RecoverAddress(message, signature)
 	if err != nil {
 		log.Fatal(err)
@@ -136,12 +140,12 @@ func ExampleAddress_Equals() {
 	pkHex1 := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 	pkHex2 := "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
 
-	signer1, err := ethereum.NewEthereumSigner(pkHex1)
+	signer1, err := eth.NewEthereumSigner(pkHex1)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	signer2, err := ethereum.NewEthereumSigner(pkHex2)
+	signer2, err := eth.NewEthereumSigner(pkHex2)
 	if err != nil {
 		log.Fatal(err)
 	}

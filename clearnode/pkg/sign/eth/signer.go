@@ -1,4 +1,4 @@
-package ethereum
+package eth
 
 import (
 	"crypto/ecdsa"
@@ -8,7 +8,6 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 )
 
 // Ensure our types implement the interfaces at compile time.
@@ -75,14 +74,15 @@ func (s *Signer) PublicKey() sign.PublicKey { return s.publicKey }
 type AddressRecoverer struct{}
 
 // RecoverAddress implements the AddressRecoverer interface.
+// It expects the message to be the original unhashed message and will hash it internally.
 func (r *AddressRecoverer) RecoverAddress(message []byte, signature sign.Signature) (sign.Address, error) {
-	return RecoverAddress(message, signature)
+	hash := ethcrypto.Keccak256Hash(message)
+	return RecoverAddress(hash.Bytes(), signature)
 }
 
-// Sign first hashes with Keccak256, as is standard for Ethereum.
-func (s *Signer) Sign(data []byte) (sign.Signature, error) {
-	hash := ethcrypto.Keccak256Hash(data)
-	sig, err := ethcrypto.Sign(hash.Bytes(), s.privateKey)
+// Sign expects the input data to be a hash (e.g., Keccak256 hash).
+func (s *Signer) Sign(hash []byte) (sign.Signature, error) {
+	sig, err := ethcrypto.Sign(hash, s.privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -106,33 +106,10 @@ func NewEthereumSigner(privateKeyHex string) (sign.Signer, error) {
 	}, nil
 }
 
-// RecoverAddressEIP712 is an Ethereum-specific function to recover an address from an EIP-712 signature.
-func RecoverAddressEIP712(typedData apitypes.TypedData, sig sign.Signature) (sign.Address, error) {
-	typedDataHash, _, err := apitypes.TypedDataAndHash(typedData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate EIP-712 hash: %w", err)
-	}
-	addr, err := recoverAddressFromHash(typedDataHash, sig)
-	if err != nil {
-		return nil, err
-	}
-	return Address{addr}, nil
-}
-
-// RecoverAddress is an Ethereum-specific function to recover an address from a standard message signature.
-func RecoverAddress(message []byte, sig sign.Signature) (sign.Address, error) {
-	msgHash := ethcrypto.Keccak256Hash(message)
-	addr, err := recoverAddressFromHash(msgHash.Bytes(), sig)
-	if err != nil {
-		return nil, err
-	}
-	return Address{addr}, nil
-}
-
-// recoverAddressFromHash is an internal helper for signature recovery.
-func recoverAddressFromHash(hash []byte, sig sign.Signature) (common.Address, error) {
+// RecoverAddress recovers an address from a signature using a pre-computed hash.
+func RecoverAddress(hash []byte, sig sign.Signature) (sign.Address, error) {
 	if len(sig) != 65 {
-		return common.Address{}, fmt.Errorf("invalid signature length")
+		return nil, fmt.Errorf("invalid signature length")
 	}
 	localSig := make([]byte, 65)
 	copy(localSig, sig)
@@ -141,7 +118,7 @@ func recoverAddressFromHash(hash []byte, sig sign.Signature) (common.Address, er
 	}
 	pubKey, err := ethcrypto.SigToPub(hash, localSig)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("signature recovery failed: %w", err)
+		return nil, fmt.Errorf("signature recovery failed: %w", err)
 	}
-	return ethcrypto.PubkeyToAddress(*pubKey), nil
+	return Address{ethcrypto.PubkeyToAddress(*pubKey)}, nil
 }

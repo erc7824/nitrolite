@@ -8,56 +8,55 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAlgorithm(t *testing.T) {
+func TestType(t *testing.T) {
 	t.Run("String representation", func(t *testing.T) {
 		tests := []struct {
-			alg      Algorithm
+			sigType Type
 			expected string
 		}{
-			{AlgorithmKeccak256, "Keccak256"},
-			{AlgorithmECDSA, "ECDSA"},
-			{AlgorithmUnknown, "Unknown"},
-			{Algorithm(99), "Unknown"},
+			{TypeEthereum, "Ethereum"},
+			{TypeUnknown, "Unknown"},
+			{Type(99), "Unknown"},
 		}
 
 		for _, test := range tests {
-			assert.Equal(t, test.expected, test.alg.String())
+			assert.Equal(t, test.expected, test.sigType.String())
 		}
 	})
 }
 
 func TestSignature(t *testing.T) {
-	t.Run("Algorithm detection", func(t *testing.T) {
+	t.Run("Type detection", func(t *testing.T) {
 		tests := []struct {
 			name     string
 			sig      Signature
-			expected Algorithm
+			expected Type
 		}{
 			{
 				name:     "Ethereum signature (65 bytes)",
 				sig:      make(Signature, 65),
-				expected: AlgorithmKeccak256,
+				expected: TypeEthereum,
 			},
 			{
 				name:     "Short signature",
 				sig:      make(Signature, 32),
-				expected: AlgorithmUnknown,
+				expected: TypeUnknown,
 			},
 			{
 				name:     "Long signature",
 				sig:      make(Signature, 128),
-				expected: AlgorithmUnknown,
+				expected: TypeUnknown,
 			},
 			{
 				name:     "Empty signature",
 				sig:      Signature{},
-				expected: AlgorithmUnknown,
+				expected: TypeUnknown,
 			},
 		}
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				assert.Equal(t, test.expected, test.sig.Alg())
+				assert.Equal(t, test.expected, test.sig.Type())
 			})
 		}
 	})
@@ -109,20 +108,20 @@ func TestSignature(t *testing.T) {
 
 func TestAddressRecoverer(t *testing.T) {
 	t.Run("NewAddressRecoverer with supported algorithm", func(t *testing.T) {
-		recoverer, err := NewAddressRecoverer(AlgorithmKeccak256)
+		recoverer, err := NewAddressRecoverer(TypeEthereum)
 		require.NoError(t, err)
 		assert.NotNil(t, recoverer)
 		
-		// Should be a Keccak256Recoverer
-		_, ok := recoverer.(*Keccak256Recoverer)
+		// Should be an EthereumRecoverer
+		_, ok := recoverer.(*EthereumRecoverer)
 		assert.True(t, ok)
 	})
 
 	t.Run("NewAddressRecoverer with unsupported algorithm", func(t *testing.T) {
-		recoverer, err := NewAddressRecoverer(AlgorithmECDSA)
+		recoverer, err := NewAddressRecoverer(Type(99))
 		assert.Error(t, err)
 		assert.Nil(t, recoverer)
-		assert.Contains(t, err.Error(), "unsupported algorithm: ECDSA")
+		assert.Contains(t, err.Error(), "unsupported signature type: Unknown")
 	})
 
 	t.Run("NewAddressRecovererFromSignature", func(t *testing.T) {
@@ -140,16 +139,16 @@ func TestAddressRecoverer(t *testing.T) {
 	})
 }
 
-func TestKeccak256Recoverer(t *testing.T) {
+func TestEthereumRecoverer(t *testing.T) {
 	t.Run("RecoverAddress returns placeholder error", func(t *testing.T) {
-		recoverer := &Keccak256Recoverer{}
+		recoverer := &EthereumRecoverer{}
 		message := []byte("test message")
 		signature := make(Signature, 65)
 		
 		addr, err := recoverer.RecoverAddress(message, signature)
 		assert.Error(t, err)
 		assert.Nil(t, addr)
-		assert.Contains(t, err.Error(), "Keccak256 recovery requires blockchain-specific implementation")
+		assert.Contains(t, err.Error(), "Ethereum recovery requires blockchain-specific implementation")
 	})
 }
 
@@ -163,8 +162,8 @@ func TestSignatureEdgeCases(t *testing.T) {
 
 	t.Run("Nil signature handling", func(t *testing.T) {
 		var sig Signature
-		// Empty signature should return Unknown algorithm (255)
-		result := sig.Alg()
+		// Empty signature should return Unknown type (255)
+		result := sig.Type()
 		assert.Equal(t, uint8(255), uint8(result))
 		assert.Equal(t, "Unknown", result.String())
 		assert.Equal(t, "0x", sig.String())

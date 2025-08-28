@@ -27,7 +27,7 @@ var knownNetworks = map[string]uint32{
 	"ANVIL":         31337,
 	"LINEA_SEPOLIA": 59141,
 	"BASE_SEPOLIA":  84532,
-	"POLYGON_AMOI":  80002,
+	"POLYGON_AMOY":  80002,
 }
 
 // NetworkConfig represents configuration for a blockchain network

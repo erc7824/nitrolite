@@ -40,7 +40,7 @@ type Type uint8
 
 const (
 	TypeEthereum Type = iota
-	TypeUnknown = 255
+	TypeUnknown       = 255
 )
 
 // String returns the string representation of the algorithm.
@@ -84,28 +84,4 @@ func (s *Signature) UnmarshalJSON(data []byte) error {
 // String implements the fmt.Stringer interface
 func (s Signature) String() string {
 	return hexutil.Encode(s)
-}
-
-// EthereumRecoverer implements AddressRecoverer for Ethereum signatures.
-type EthereumRecoverer struct{}
-
-// RecoverAddress recovers the address from an Ethereum signature.
-// This is a placeholder implementation - actual recovery requires blockchain-specific logic.
-func (r *EthereumRecoverer) RecoverAddress(message []byte, signature Signature) (Address, error) {
-	return nil, fmt.Errorf("Ethereum recovery requires blockchain-specific implementation")
-}
-
-// NewAddressRecoverer creates an appropriate AddressRecoverer based on the signature algorithm.
-func NewAddressRecoverer(sigType Type) (AddressRecoverer, error) {
-	switch sigType {
-	case TypeEthereum:
-		return &EthereumRecoverer{}, nil
-	default:
-		return nil, fmt.Errorf("unsupported signature type: %s", sigType.String())
-	}
-}
-
-// NewAddressRecovererFromSignature creates an AddressRecoverer based on signature algorithm detection.
-func NewAddressRecovererFromSignature(signature Signature) (AddressRecoverer, error) {
-	return NewAddressRecoverer(signature.Type())
 }

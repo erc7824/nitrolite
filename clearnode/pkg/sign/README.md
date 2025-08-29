@@ -17,15 +17,4 @@ This library separates generic interfaces from specific blockchain implementatio
 
 See the Go package documentation and examples by running:
 ```bash
-go doc -all github.com/erc7824/nitrolite/clearnode/pkg/sign
-```
-
-Or view examples in your IDE or on pkg.go.dev.
-
-## Extending the Library
-
-To add support for a new blockchain (e.g., Solana):
-
-1.  Create a new package (e.g., `sign/solana`).
-2.  Implement the interfaces defined in the `sign` package.
-3.  Provide a constructor (e.g., `NewSolanaSigner(...)`) that returns a `sign.Signer`.
+go doc -all [github.com/erc7824/nitrolite/clearnode/pkg/sign](https://github.com/erc7824/nitrolite/clearnode/pkg/sign)

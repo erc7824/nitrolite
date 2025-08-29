@@ -11,7 +11,7 @@
 //   - Address: Interface for blockchain addresses
 //   - AddressRecoverer: Optional interface for signature-based address recovery
 //
-// Security Design
+// # Security Design
 //
 // This package follows security best practices by:
 //   - Never exposing private key material through interfaces
@@ -21,19 +21,21 @@
 //
 // Usage
 //
-// Implementations should be imported from their respective blockchain packages:
-//
-//	import "github.com/erc7824/nitrolite/clearnode/pkg/sign/eth"
-//
-//	signer, err := eth.NewEthereumSigner(privateKeyHex)
+//	// Create a new Ethereum signer from a hex-encoded private key
+//	signer, err := sign.NewEthereumSigner(privateKeyHex)
 //	if err != nil {
-//		log.Fatal(err)
+//	    log.Fatal(err)
 //	}
 //
-//	signature, err := signer.Sign(data)
+//	// Sign a message (provide hash, not raw message)
+//	message := []byte("hello world")
+//	hash := ethcrypto.Keccak256Hash(message)
+//	signature, err := signer.Sign(hash.Bytes())
 //	if err != nil {
-//		log.Fatal(err)
+//	    log.Fatal(err)
 //	}
 //
+//	// Get the address
 //	address := signer.PublicKey().Address()
+//	fmt.Println("Address:", address.String())
 package sign

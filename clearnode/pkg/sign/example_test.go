@@ -1,11 +1,10 @@
-package eth_test
+package sign_test
 
 import (
 	"fmt"
 	"log"
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign/eth"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -14,7 +13,7 @@ func ExampleNewEthereumSigner() {
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" // Example private key
 
 	// Create a new Ethereum signer. It returns the generic sign.Signer interface.
-	signer, err := eth.NewEthereumSigner(pkHex)
+	signer, err := sign.NewEthereumSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -43,42 +42,14 @@ func ExampleSignature_String() {
 	// 0x01020304
 }
 
-// ExampleSignature_MarshalJSON demonstrates JSON marshaling of signatures.
-func ExampleSignature_MarshalJSON() {
-	sig := sign.Signature([]byte{0x01, 0x02, 0x03, 0x04})
-	jsonData, err := sig.MarshalJSON()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(string(jsonData))
-	// Output:
-	// "0x01020304"
-}
-
-// ExampleSignature_UnmarshalJSON demonstrates JSON unmarshaling of signatures.
-func ExampleSignature_UnmarshalJSON() {
-	var sig sign.Signature
-	jsonData := []byte(`"0x01020304"`)
-
-	err := sig.UnmarshalJSON(jsonData)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("%x\n", []byte(sig))
-	// Output:
-	// 01020304
-}
-
-// ExampleRecoverAddress demonstrates Ethereum-specific address recovery.
-// This shows how to call address recovery for Ethereum directly from the implementation package.
-func ExampleRecoverAddress() {
+// ExampleRecoverAddressFromHash demonstrates Ethereum-specific address recovery.
+func ExampleRecoverAddressFromHash() {
 	// Example message for standard recovery
 	message := []byte("hello world")
 
 	// Create a signature using our signer
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	signer, err := eth.NewEthereumSigner(pkHex)
+	signer, err := sign.NewEthereumSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -89,8 +60,8 @@ func ExampleRecoverAddress() {
 		log.Fatal(err)
 	}
 
-	// Call the function directly from the `eth` package for hash recovery
-	recoveredAddr, err := eth.RecoverAddress(hash.Bytes(), signature)
+	// Call the function directly from the `sign` package for hash recovery
+	recoveredAddr, err := sign.RecoverAddressFromHash(hash.Bytes(), signature)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
@@ -103,26 +74,27 @@ func ExampleRecoverAddress() {
 	// Addresses match: true
 }
 
-// Example_addressRecoverer demonstrates using the generic AddressRecoverer interface with Ethereum.
-func Example_addressRecoverer() {
+// ExampleEthereumAddressRecoverer demonstrates using the generic AddressRecoverer interface.
+func ExampleEthereumAddressRecoverer() {
 	message := []byte("hello world")
 
 	// Create a signer
 	pkHex := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	signer, err := eth.NewEthereumSigner(pkHex)
+	signer, err := sign.NewEthereumSigner(pkHex)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Sign the message
+	// Sign the message (note: Ethereum signers expect a hash)
 	hash := ethcrypto.Keccak256Hash(message)
 	signature, err := signer.Sign(hash.Bytes())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Use the dedicated AddressRecoverer
-	recoverer := &eth.AddressRecoverer{}
+	// Use the dedicated AddressRecoverer implementation
+	var recoverer sign.AddressRecoverer = &sign.EthereumAddressRecoverer{}
+	// The recoverer implementation will hash the raw message internally
 	recoveredAddr, err := recoverer.RecoverAddress(message, signature)
 	if err != nil {
 		log.Fatal(err)
@@ -132,34 +104,4 @@ func Example_addressRecoverer() {
 	fmt.Printf("Generic recovery works: %t\n", recoveredAddr.Equals(signerAddr))
 	// Output:
 	// Generic recovery works: true
-}
-
-// ExampleAddress_Equals demonstrates Ethereum address comparison methods.
-func ExampleAddress_Equals() {
-	// Create two different signers
-	pkHex1 := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-	pkHex2 := "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
-
-	signer1, err := eth.NewEthereumSigner(pkHex1)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	signer2, err := eth.NewEthereumSigner(pkHex2)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Get their addresses
-	addr1 := signer1.PublicKey().Address()
-	addr2 := signer2.PublicKey().Address()
-	addr1Copy := signer1.PublicKey().Address()
-
-	// Test equality
-	fmt.Printf("addr1 equals addr2: %t\n", addr1.Equals(addr2))
-	fmt.Printf("addr1 equals addr1Copy: %t\n", addr1.Equals(addr1Copy))
-
-	// Output:
-	// addr1 equals addr2: false
-	// addr1 equals addr1Copy: true
 }

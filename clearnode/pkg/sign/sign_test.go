@@ -11,7 +11,7 @@ import (
 func TestType(t *testing.T) {
 	t.Run("String representation", func(t *testing.T) {
 		tests := []struct {
-			sigType Type
+			sigType  Type
 			expected string
 		}{
 			{TypeEthereum, "Ethereum"},
@@ -63,20 +63,20 @@ func TestSignature(t *testing.T) {
 
 	t.Run("JSON marshaling", func(t *testing.T) {
 		sig := Signature{0x01, 0x02, 0x03}
-		
+
 		// Marshal to JSON
 		jsonData, err := json.Marshal(sig)
 		require.NoError(t, err)
-		
+
 		// Should be hex encoded
 		expected := `"0x010203"`
 		assert.Equal(t, expected, string(jsonData))
-		
+
 		// Unmarshal back
 		var unmarshaled Signature
 		err = json.Unmarshal(jsonData, &unmarshaled)
 		require.NoError(t, err)
-		
+
 		assert.Equal(t, sig, unmarshaled)
 	})
 
@@ -103,52 +103,6 @@ func TestSignature(t *testing.T) {
 		sig := Signature{0x01, 0x23, 0x45}
 		expected := "0x012345"
 		assert.Equal(t, expected, sig.String())
-	})
-}
-
-func TestAddressRecoverer(t *testing.T) {
-	t.Run("NewAddressRecoverer with supported algorithm", func(t *testing.T) {
-		recoverer, err := NewAddressRecoverer(TypeEthereum)
-		require.NoError(t, err)
-		assert.NotNil(t, recoverer)
-		
-		// Should be an EthereumRecoverer
-		_, ok := recoverer.(*EthereumRecoverer)
-		assert.True(t, ok)
-	})
-
-	t.Run("NewAddressRecoverer with unsupported algorithm", func(t *testing.T) {
-		recoverer, err := NewAddressRecoverer(Type(99))
-		assert.Error(t, err)
-		assert.Nil(t, recoverer)
-		assert.Contains(t, err.Error(), "unsupported signature type: Unknown")
-	})
-
-	t.Run("NewAddressRecovererFromSignature", func(t *testing.T) {
-		// Ethereum-sized signature
-		sig := make(Signature, 65)
-		recoverer, err := NewAddressRecovererFromSignature(sig)
-		require.NoError(t, err)
-		assert.NotNil(t, recoverer)
-		
-		// Unknown algorithm signature
-		shortSig := make(Signature, 32)
-		recoverer, err = NewAddressRecovererFromSignature(shortSig)
-		assert.Error(t, err)
-		assert.Nil(t, recoverer)
-	})
-}
-
-func TestEthereumRecoverer(t *testing.T) {
-	t.Run("RecoverAddress returns placeholder error", func(t *testing.T) {
-		recoverer := &EthereumRecoverer{}
-		message := []byte("test message")
-		signature := make(Signature, 65)
-		
-		addr, err := recoverer.RecoverAddress(message, signature)
-		assert.Error(t, err)
-		assert.Nil(t, addr)
-		assert.Contains(t, err.Error(), "Ethereum recovery requires blockchain-specific implementation")
 	})
 }
 

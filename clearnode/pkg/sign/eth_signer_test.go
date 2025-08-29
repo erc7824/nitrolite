@@ -1,10 +1,9 @@
-package eth
+package sign
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,14 +15,14 @@ const (
 )
 
 // setupSigner is a helper to create a signer for tests
-func setupSigner(t *testing.T) sign.Signer {
+func setupSigner(t *testing.T) Signer {
 	signer, err := NewEthereumSigner(testPrivKey)
 	require.NoError(t, err)
 	require.NotNil(t, signer)
 	return signer
 }
 
-func TestSigner(t *testing.T) {
+func TestEthereumSigner(t *testing.T) {
 	t.Run("Initialisation", func(t *testing.T) {
 		t.Run("With 0x Prefix", func(t *testing.T) {
 			signer, err := NewEthereumSigner(testPrivKey)
@@ -64,7 +63,7 @@ func TestSignAndRecover(t *testing.T) {
 		signature, err := signer.Sign(hash.Bytes())
 		require.NoError(t, err)
 
-		recoveredAddress, err := RecoverAddress(hash.Bytes(), signature)
+		recoveredAddress, err := RecoverAddressFromHash(hash.Bytes(), signature)
 		require.NoError(t, err)
 
 		assert.True(t, strings.EqualFold(signer.PublicKey().Address().String(), recoveredAddress.String()))
@@ -82,7 +81,7 @@ func TestRecoveryErrors(t *testing.T) {
 		shortSig := signature[:64]
 
 		hash := ethcrypto.Keccak256Hash(message)
-		_, err := RecoverAddress(hash.Bytes(), shortSig)
+		_, err := RecoverAddressFromHash(hash.Bytes(), shortSig)
 		assert.ErrorContains(t, err, "invalid signature length")
 	})
 
@@ -92,7 +91,7 @@ func TestRecoveryErrors(t *testing.T) {
 		malformedSig[30] = ^malformedSig[30] // Invert some bytes
 
 		hash := ethcrypto.Keccak256Hash(message)
-		recoveredAddr, err := RecoverAddress(hash.Bytes(), malformedSig)
+		recoveredAddr, err := RecoverAddressFromHash(hash.Bytes(), malformedSig)
 		if err == nil {
 			assert.NotEqual(t, signer.PublicKey().Address().String(), recoveredAddr.String())
 		} else {

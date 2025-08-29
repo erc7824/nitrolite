@@ -1750,7 +1750,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		require.NotNil(t, resObj.State, "State should not be nil")
 
 		// Verify state structure
-		require.Equal(t, StateIntent(StateIntentInitialize), resObj.State.Intent, "Intent should be INITIALIZE (1)")
+		require.Equal(t, StateIntentInitialize, resObj.State.Intent, "Intent should be INITIALIZE (1)")
 		require.Equal(t, uint64(0), resObj.State.Version, "Version should be 0")
 		require.Len(t, resObj.State.Allocations, 2, "Should have 2 allocations")
 		require.NotEmpty(t, resObj.StateSignature, "Should have 1 signature")

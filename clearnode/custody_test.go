@@ -1057,7 +1057,7 @@ func TestChallengeHandling(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ActionTypeCheckpoint, action.Type)
-		assert.Equal(t, channelID, action.Channel)
+		assert.Equal(t, channelID, action.ChannelID)
 		assert.Equal(t, custody.chainID, action.ChainID)
 		assert.Equal(t, StatusPending, action.Status)
 		assert.Equal(t, 0, action.Retries)

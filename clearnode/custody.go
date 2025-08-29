@@ -351,6 +351,8 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 				} else {
 					logger.Info("created checkpoint action", "channelId", channelID, "localVersion", localVersion, "challengedVersion", challengedVersion)
 				}
+			} else {
+				logger.Warn("detected newer local state in db without signatures", "channelId", channelID)
 			}
 		}
 		channel.Status = ChannelStatusChallenged

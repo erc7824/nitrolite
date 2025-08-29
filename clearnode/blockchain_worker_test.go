@@ -62,9 +62,9 @@ func TestGetPendingActions(t *testing.T) {
 
 		now := time.Now()
 		actions := []BlockchainAction{
-			{Type: ActionTypeCheckpoint, Channel: "channel3", ChainID: 1, Data: "{}", Status: StatusPending, Created: now.Add(2 * time.Second)},
-			{Type: ActionTypeCheckpoint, Channel: "channel1", ChainID: 1, Data: "{}", Status: StatusPending, Created: now},
-			{Type: ActionTypeCheckpoint, Channel: "channel2", ChainID: 1, Data: "{}", Status: StatusCompleted, Created: now.Add(1 * time.Second)},
+			{Type: ActionTypeCheckpoint, ChannelID: "channel3", ChainID: 1, Data: "{}", Status: StatusPending, Created: now.Add(2 * time.Second)},
+			{Type: ActionTypeCheckpoint, ChannelID: "channel1", ChainID: 1, Data: "{}", Status: StatusPending, Created: now},
+			{Type: ActionTypeCheckpoint, ChannelID: "channel2", ChainID: 1, Data: "{}", Status: StatusCompleted, Created: now.Add(1 * time.Second)},
 		}
 
 		for _, action := range actions {
@@ -75,8 +75,8 @@ func TestGetPendingActions(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Len(t, result, 2)
-		assert.Equal(t, "channel1", result[0].Channel)
-		assert.Equal(t, "channel3", result[1].Channel)
+		assert.Equal(t, "channel1", result[0].ChannelID)
+		assert.Equal(t, "channel3", result[1].ChannelID)
 	})
 
 	t.Run("Respects limit", func(t *testing.T) {
@@ -85,7 +85,7 @@ func TestGetPendingActions(t *testing.T) {
 
 		for i := range 5 {
 			action := BlockchainAction{
-				Type: ActionTypeCheckpoint, Channel: fmt.Sprintf("channel%d", i),
+				Type: ActionTypeCheckpoint, ChannelID: fmt.Sprintf("channel%d", i),
 				ChainID: 1, Data: "{}", Status: StatusPending, Created: time.Now(),
 			}
 			require.NoError(t, db.Create(&action).Error)
@@ -102,7 +102,7 @@ func TestGetPendingActions(t *testing.T) {
 
 		for i := range 3 {
 			action := BlockchainAction{
-				Type: ActionTypeCheckpoint, Channel: fmt.Sprintf("channel%d", i),
+				Type: ActionTypeCheckpoint, ChannelID: fmt.Sprintf("channel%d", i),
 				ChainID: 1, Data: "{}", Status: StatusPending, Created: time.Now(),
 			}
 			require.NoError(t, db.Create(&action).Error)
@@ -133,8 +133,8 @@ func TestProcessBatch(t *testing.T) {
 	defer cleanup()
 
 	actions := []BlockchainAction{
-		{ID: 1, Type: ActionTypeCheckpoint, Channel: "channel1", ChainID: 999, Data: validCheckpointData(t), Status: StatusPending},
-		{ID: 2, Type: ActionTypeCheckpoint, Channel: "channel2", ChainID: 999, Data: validCheckpointData(t), Status: StatusPending},
+		{ID: 1, Type: ActionTypeCheckpoint, ChannelID: "channel1", ChainID: 999, Data: validCheckpointData(t), Status: StatusPending},
+		{ID: 2, Type: ActionTypeCheckpoint, ChannelID: "channel2", ChainID: 999, Data: validCheckpointData(t), Status: StatusPending},
 	}
 
 	for _, action := range actions {
@@ -160,7 +160,7 @@ func TestProcessCheckpoint(t *testing.T) {
 		_, _, cleanup := setupWorker(t, map[uint32]*MockCustody{1: mock})
 		defer cleanup()
 
-		action := BlockchainAction{Channel: "test-channel", ChainID: 1, Data: validCheckpointData(t)}
+		action := BlockchainAction{ChannelID: "test-channel", ChainID: 1, Data: validCheckpointData(t)}
 
 		var data CheckpointData
 		err := json.Unmarshal([]byte(action.Data), &data)
@@ -172,7 +172,7 @@ func TestProcessCheckpoint(t *testing.T) {
 		_, _, cleanup := setupWorker(t, map[uint32]*MockCustody{1: {}})
 		defer cleanup()
 
-		action := BlockchainAction{Channel: "test-channel", ChainID: 1, Data: "invalid-json"}
+		action := BlockchainAction{ChannelID: "test-channel", ChainID: 1, Data: "invalid-json"}
 
 		var data CheckpointData
 		err := json.Unmarshal([]byte(action.Data), &data)
@@ -199,7 +199,7 @@ func TestProcessPending(t *testing.T) {
 
 		for i := range 12 {
 			action := BlockchainAction{
-				Type: ActionTypeCheckpoint, Channel: fmt.Sprintf("channel%d", i), ChainID: 888,
+				Type: ActionTypeCheckpoint, ChannelID: fmt.Sprintf("channel%d", i), ChainID: 888,
 				Data: validCheckpointData(t), Status: StatusPending, Created: time.Now(),
 			}
 			require.NoError(t, db.Create(&action).Error)
@@ -228,8 +228,8 @@ func TestCustodyRouting(t *testing.T) {
 		defer cleanup()
 
 		actions := []BlockchainAction{
-			{Type: ActionTypeCheckpoint, Channel: "channel1", ChainID: 1, Data: validCheckpointData(t), Status: StatusPending},
-			{Type: ActionTypeCheckpoint, Channel: "channel2", ChainID: 2, Data: validCheckpointData(t), Status: StatusPending},
+			{Type: ActionTypeCheckpoint, ChannelID: "channel1", ChainID: 1, Data: validCheckpointData(t), Status: StatusPending},
+			{Type: ActionTypeCheckpoint, ChannelID: "channel2", ChainID: 2, Data: validCheckpointData(t), Status: StatusPending},
 		}
 
 		for _, action := range actions {
@@ -246,7 +246,7 @@ func TestCustodyRouting(t *testing.T) {
 		worker, db, cleanup := setupWorker(t, map[uint32]*MockCustody{1: {}})
 		defer cleanup()
 
-		action := BlockchainAction{Type: ActionTypeCheckpoint, Channel: "channel1", ChainID: 999, Data: validCheckpointData(t), Status: StatusPending}
+		action := BlockchainAction{Type: ActionTypeCheckpoint, ChannelID: "channel1", ChainID: 999, Data: validCheckpointData(t), Status: StatusPending}
 		require.NoError(t, db.Create(&action).Error)
 
 		assert.NotContains(t, worker.custody, uint32(999))

@@ -85,6 +85,24 @@
 //
 // Error and Fatal level logs are recorded as span errors with appropriate status codes.
 //
+// # Using AddCallerSkip for Helper Functions
+//
+// When you wrap logging calls in helper functions, use AddCallerSkip(1) to ensure
+// the log output reports the correct source line from your application code,
+// not the helper itself.
+//
+//	func handleError(logger log.Logger, err error) {
+//	    // Skip this helper frame so the log points to the real caller
+//	    logger.AddCallerSkip(1).Error("operation failed", "err", err)
+//	}
+//
+//	func doSomething(logger log.Logger) {
+//	    err := someOperation()
+//	    if err != nil {
+//	        handleError(logger, err) // Log will point here, not inside handleError
+//	    }
+//	}
+//
 // # Testing
 //
 // For unit tests, use NoopLogger to avoid log output:

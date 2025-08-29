@@ -131,16 +131,33 @@ log.FromContext(ctx).Info("Operation info", "key", "value")
 
 ## Best Practices
 
-### Use Structured Logging
+### Structured Logging
 
-Always use key-value pairs instead of formatted strings:
+When writing logs, focus on events that are meaningful for understanding application behavior, diagnosing issues, or auditing important actions. Use clear, concise messages that describe what happened, not just that something happened.
+
+Always use key-value pairs for structured logging instead of embedding details in formatted strings. This makes logs easier to search, filter, and analyze.
+
+**Guidelines for key-value pairs:**
+- Use string keys that clearly describe the context (e.g., `"userID"`, `"orderID"`, `"status"`).
+- Include identifiers, parameters, or state relevant to the log message.
+- Prefer structured data over embedding details in the message string.
+- Avoid sensitive information unless necessary and ensure compliance with privacy requirements.
+
+**Examples:**
 
 ```go
-// GOOD
+// GOOD: Message describes the event, keys provide context
 logger.Info("User logged in", "userID", user.ID, "method", "oauth")
 
-// BAD
-logger.Info(fmt.Sprintf("User %s logged in using %s", user.ID, "oauth"))
+logger.Info("Order placed",
+    "orderID", order.ID,
+    "userID", user.ID,
+    "amount", order.Amount,
+    "status", order.Status,
+)
+
+// BAD: Context is only in the message, not structured
+logger.Info(fmt.Sprintf("Order %s placed by user %s", order.ID, user.ID))
 ```
 
 ### Contextual Enrichment

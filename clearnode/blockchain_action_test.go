@@ -36,7 +36,7 @@ func TestCreateCheckpoint(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ActionTypeCheckpoint, action.Type)
-		assert.Equal(t, "channel1", action.Channel)
+		assert.Equal(t, "channel1", action.ChannelID)
 		assert.Equal(t, uint32(1), action.ChainID)
 		assert.Equal(t, StatusPending, action.Status)
 		assert.Equal(t, 0, action.Retries)
@@ -72,14 +72,14 @@ func TestBlockchainAction_Fail(t *testing.T) {
 	defer cleanup()
 
 	action := &BlockchainAction{
-		Type:    ActionTypeCheckpoint,
-		Channel: "channel1",
-		ChainID: 1,
-		Data:    "{}",
-		Status:  StatusPending,
-		Retries: 2,
-		Created: time.Now(),
-		Updated: time.Now(),
+		Type:      ActionTypeCheckpoint,
+		ChannelID: "channel1",
+		ChainID:   1,
+		Data:      "{}",
+		Status:    StatusPending,
+		Retries:   2,
+		Created:   time.Now(),
+		Updated:   time.Now(),
 	}
 	require.NoError(t, db.Create(action).Error)
 
@@ -103,14 +103,14 @@ func TestBlockchainAction_Complete(t *testing.T) {
 	defer cleanup()
 
 	action := &BlockchainAction{
-		Type:    ActionTypeCheckpoint,
-		Channel: "channel1",
-		ChainID: 1,
-		Data:    "{}",
-		Status:  StatusPending,
-		Error:   "previous error",
-		Created: time.Now(),
-		Updated: time.Now(),
+		Type:      ActionTypeCheckpoint,
+		ChannelID: "channel1",
+		ChainID:   1,
+		Data:      "{}",
+		Status:    StatusPending,
+		Error:     "previous error",
+		Created:   time.Now(),
+		Updated:   time.Now(),
 	}
 	require.NoError(t, db.Create(action).Error)
 

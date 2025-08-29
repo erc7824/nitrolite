@@ -89,7 +89,11 @@ func (w *BlockchainWorker) processBatch(ctx context.Context, actions []Blockchai
 }
 
 func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainAction) {
-	logger := w.logger.With("id", action.ID).With("type", action.Type).With("channel", action.Channel).With("chain", action.ChainID)
+	logger := w.logger.
+		With("id", action.ID).
+		With("type", action.Type).
+		With("channel", action.ChannelID).
+		With("chain", action.ChainID)
 
 	custody, exists := w.custody[action.ChainID]
 	if !exists {
@@ -149,5 +153,5 @@ func (w *BlockchainWorker) processCheckpoint(_ context.Context, action Blockchai
 		return common.Hash{}, fmt.Errorf("unmarshal checkpoint data: %w", err)
 	}
 
-	return custody.Checkpoint(action.Channel, data.State, data.UserSig, data.ServerSig, []nitrolite.State{})
+	return custody.Checkpoint(action.ChannelID, data.State, data.UserSig, data.ServerSig, []nitrolite.State{})
 }

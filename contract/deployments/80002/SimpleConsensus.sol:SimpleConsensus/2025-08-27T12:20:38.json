@@ -1,0 +1,14 @@
+{
+  "deployer": "0xE1e0f007bE430676e001A19cf892a116d72032Fa",
+  "deployedTo": "0x7c7ccbc98469190849BCC6c926307794fDfB11F2",
+  "transactionHash": "0xc636d9affe2ec1f67ec2c6f1fb2506c484a78987e13e199f6be0ce44dcce5261",
+  "commit": "b8abc292b0db3b2038132d126e576507f064817d",
+  "timestamp": 1756297238,
+  "chainId": 80002,
+  "contractPath": "./src/adjudicators/SimpleConsensus.sol:SimpleConsensus",
+  "constructorArgs": [
+    "0xE1e0f007bE430676e001A19cf892a116d72032Fa",
+    "0x019B65A265EB3363822f2752141b3dF16131b262"
+  ],
+  "comment": "SANDBOX v0.3.0"
+}

@@ -1,0 +1,11 @@
+{
+  "deployer": "0xE1e0f007bE430676e001A19cf892a116d72032Fa",
+  "deployedTo": "0x019B65A265EB3363822f2752141b3dF16131b262",
+  "transactionHash": "0xf8f82496da03a6b88b95c1aa6d923d8eef3590729c09cb3135b8a62855240124",
+  "commit": "b8abc292b0db3b2038132d126e576507f064817d",
+  "timestamp": 1756297050,
+  "chainId": 80002,
+  "contractPath": "./src/Custody.sol:Custody",
+  "constructorArgs": [],
+  "comment": "SANDBOX v0.3.0"
+}

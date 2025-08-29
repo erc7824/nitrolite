@@ -106,6 +106,36 @@ func TestSignature(t *testing.T) {
 	})
 }
 
+func TestAddressRecovererFactory(t *testing.T) {
+	t.Run("NewAddressRecoverer with supported algorithm", func(t *testing.T) {
+		recoverer, err := NewAddressRecoverer(TypeEthereum)
+		require.NoError(t, err)
+		assert.NotNil(t, recoverer)
+
+		_, ok := recoverer.(*EthereumAddressRecoverer)
+		assert.True(t, ok)
+	})
+
+	t.Run("NewAddressRecoverer with unsupported algorithm", func(t *testing.T) {
+		recoverer, err := NewAddressRecoverer(Type(99))
+		assert.Error(t, err)
+		assert.Nil(t, recoverer)
+		assert.Contains(t, err.Error(), "unsupported signature type: Unknown")
+	})
+
+	t.Run("NewAddressRecovererFromSignature", func(t *testing.T) {
+		sig := make(Signature, 65)
+		recoverer, err := NewAddressRecovererFromSignature(sig)
+		require.NoError(t, err)
+		assert.NotNil(t, recoverer)
+
+		shortSig := make(Signature, 32)
+		recoverer, err = NewAddressRecovererFromSignature(shortSig)
+		assert.Error(t, err)
+		assert.Nil(t, recoverer)
+	})
+}
+
 func TestSignatureEdgeCases(t *testing.T) {
 	t.Run("Empty signature JSON marshaling", func(t *testing.T) {
 		sig := Signature{}
@@ -116,7 +146,6 @@ func TestSignatureEdgeCases(t *testing.T) {
 
 	t.Run("Nil signature handling", func(t *testing.T) {
 		var sig Signature
-		// Empty signature should return Unknown type (255)
 		result := sig.Type()
 		assert.Equal(t, uint8(255), uint8(result))
 		assert.Equal(t, "Unknown", result.String())

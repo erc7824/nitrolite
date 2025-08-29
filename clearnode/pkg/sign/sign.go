@@ -85,3 +85,18 @@ func (s *Signature) UnmarshalJSON(data []byte) error {
 func (s Signature) String() string {
 	return hexutil.Encode(s)
 }
+
+// NewAddressRecoverer creates an appropriate AddressRecoverer based on the signature algorithm.
+func NewAddressRecoverer(sigType Type) (AddressRecoverer, error) {
+	switch sigType {
+	case TypeEthereum:
+		return &EthereumAddressRecoverer{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported signature type: %s", sigType.String())
+	}
+}
+
+// NewAddressRecovererFromSignature creates an AddressRecoverer based on signature algorithm detection.
+func NewAddressRecovererFromSignature(signature Signature) (AddressRecoverer, error) {
+	return NewAddressRecoverer(signature.Type())
+}

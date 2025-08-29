@@ -22,34 +22,34 @@ func NewSpanLogger(lg Logger, ser SpanEventRecorder) Logger {
 
 // Debug logs a debug message to both the wrapped logger and the span.
 func (sl SpanLogger) Debug(msg string, keysAndValues ...any) {
-	sl.ser.RecordEvent(msg, sl.formFullKeysAndValues(LevelDebug, keysAndValues)...)
-	sl.lg.Debug(msg, sl.formLogKeysAndValues(keysAndValues)...)
+	sl.ser.RecordEvent(msg, sl.withLogContext(LevelDebug, keysAndValues)...)
+	sl.lg.Debug(msg, sl.withTraceContext(keysAndValues)...)
 }
 
 // Info logs an info message to both the wrapped logger and the span.
 func (sl SpanLogger) Info(msg string, keysAndValues ...any) {
-	sl.ser.RecordEvent(msg, sl.formFullKeysAndValues(LevelInfo, keysAndValues)...)
-	sl.lg.Info(msg, sl.formLogKeysAndValues(keysAndValues)...)
+	sl.ser.RecordEvent(msg, sl.withLogContext(LevelInfo, keysAndValues)...)
+	sl.lg.Info(msg, sl.withTraceContext(keysAndValues)...)
 }
 
 // Warn logs a warning message to both the wrapped logger and the span.
 func (sl SpanLogger) Warn(msg string, keysAndValues ...any) {
-	sl.ser.RecordEvent(msg, sl.formFullKeysAndValues(LevelWarn, keysAndValues)...)
-	sl.lg.Warn(msg, sl.formLogKeysAndValues(keysAndValues)...)
+	sl.ser.RecordEvent(msg, sl.withLogContext(LevelWarn, keysAndValues)...)
+	sl.lg.Warn(msg, sl.withTraceContext(keysAndValues)...)
 }
 
 // Error logs an error message to both the wrapped logger and the span.
 // The error is recorded as an error event in the span.
 func (sl SpanLogger) Error(msg string, keysAndValues ...any) {
-	sl.ser.RecordError(msg, sl.formFullKeysAndValues(LevelError, keysAndValues)...)
-	sl.lg.Error(msg, sl.formLogKeysAndValues(keysAndValues)...)
+	sl.ser.RecordError(msg, sl.withLogContext(LevelError, keysAndValues)...)
+	sl.lg.Error(msg, sl.withTraceContext(keysAndValues)...)
 }
 
 // Fatal logs a fatal message to both the wrapped logger and the span.
 // The error is recorded as an error event in the span.
 func (sl SpanLogger) Fatal(msg string, keysAndValues ...any) {
-	sl.ser.RecordError(msg, sl.formFullKeysAndValues(LevelFatal, keysAndValues)...)
-	sl.lg.Fatal(msg, sl.formLogKeysAndValues(keysAndValues)...)
+	sl.ser.RecordError(msg, sl.withLogContext(LevelFatal, keysAndValues)...)
+	sl.lg.Fatal(msg, sl.withTraceContext(keysAndValues)...)
 }
 
 // WithKV returns a new SpanLogger with the key-value pair added to the wrapped logger.
@@ -88,7 +88,10 @@ func (sl SpanLogger) AddCallerSkip(skip int) Logger {
 	}
 }
 
-func (sl SpanLogger) formLogKeysAndValues(keysAndValues []any) []any {
+// withTraceContext appends the current trace and span IDs to the provided slice of key-value pairs.
+// It returns a new slice containing the trace information followed by the original keys and values.
+// This is useful for ensuring that log entries include trace context for distributed tracing.
+func (sl SpanLogger) withTraceContext(keysAndValues []any) []any {
 	logKeysAndValues := append([]any{
 		"traceId", sl.ser.TraceID(),
 		"spanId", sl.ser.SpanID(),
@@ -97,7 +100,19 @@ func (sl SpanLogger) formLogKeysAndValues(keysAndValues []any) []any {
 	return logKeysAndValues
 }
 
-func (sl SpanLogger) formFullKeysAndValues(level Level, keysAndValues []any) []any {
+// withLogContext constructs a combined slice of key-value pairs for logging.
+// It prepends the log level and component name, appends all key-value pairs
+// from the underlying logger, and finally appends any additional key-value
+// pairs provided as input. This ensures that all log entries include consistent
+// context information.
+//
+// Parameters:
+//   - level: The log level to associate with the log entry.
+//   - keysAndValues: Additional key-value pairs to include in the log entry.
+//
+// Returns:
+//   - A slice of key-value pairs representing the complete log context.
+func (sl SpanLogger) withLogContext(level Level, keysAndValues []any) []any {
 	fullKeysAndValues := append([]any{
 		"level", string(level),
 		"component", sl.lg.Name(),

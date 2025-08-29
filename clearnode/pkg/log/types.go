@@ -2,34 +2,39 @@ package log
 
 // Logger is a logger interface.
 type Logger interface {
-	// Debug logs a message at debug level.
-	// keysAndValues are treated as key-value pairs (e.g., "key1", value1, "key2", value2).
+	// Debug logs a message for low-level debugging.
+	// Use for detailed information useful during development.
+	// keysAndValues lets you add structured context (e.g., "user", id).
 	Debug(msg string, keysAndValues ...any)
-	// Info logs a message at info level.
-	// keysAndValues are treated as key-value pairs (e.g., "key1", value1, "key2", value2).
+	// Info logs general information about application progress.
+	// Use for routine events or state changes.
+	// keysAndValues lets you add structured context (e.g., "module", name).
 	Info(msg string, keysAndValues ...any)
-	// Warn logs a message at warn level.
-	// keysAndValues are treated as key-value pairs (e.g., "key1", value1, "key2", value2).
+	// Warn logs a message for unexpected situations that aren't errors.
+	// Use when something might be wrong but the app can continue.
+	// keysAndValues lets you add structured context (e.g., "attempt", n).
 	Warn(msg string, keysAndValues ...any)
-	// Error logs a message at error level.
-	// keysAndValues are treated as key-value pairs (e.g., "key1", value1, "key2", value2).
+	// Error logs an error that prevents normal operation.
+	// Use for failures or problems that need attention.
+	// keysAndValues lets you add structured context (e.g., "error", err).
 	Error(msg string, keysAndValues ...any)
-	// Fatal logs a message at fatal level.
-	// keysAndValues are treated as key-value pairs (e.g., "key1", value1, "key2", value2).
+	// Fatal logs a critical error and may terminate the program.
+	// Use for unrecoverable failures.
+	// keysAndValues lets you add structured context (e.g., "reason", reason).
 	Fatal(msg string, keysAndValues ...any)
-	// WithKV returns a new logger with the given key-value pair.
+	// WithKV returns a logger with an extra key-value pair for all future logs.
+	// Use to add persistent context (e.g., component, request ID).
 	WithKV(key string, value any) Logger
-	// GetAllKV returns all key-value pairs associated with the logger.
-	// This is useful for retrieving context information.
+	// GetAllKV returns all persistent key-value pairs for this logger.
+	// Use to inspect logger context.
 	GetAllKV() []any
-	// WithName returns a new logger with the given name.
-	// This is useful for creating a logger with a specific purpose, like a component or module name.
+	// WithName returns a logger with a specific name (e.g., module or component).
+	// Use to identify the source of logs.
 	WithName(name string) Logger
-	// Name returns the name of the logger.
+	// Name returns the logger's name.
 	Name() string
-	// AddCallerSkip returns a new logger with increased caller skip.
-	// This is useful for skipping the logger's own call stack frame.
-	// If the logger does not support caller skipping, it should return itself.
+	// AddCallerSkip returns a logger that skips extra stack frames when reporting log source.
+	// Use when wrapping the logger in helpers; returns itself if unsupported.
 	AddCallerSkip(skip int) Logger
 }
 
@@ -41,9 +46,9 @@ const (
 	// LevelDebug is the most verbose level, used for debugging purposes.
 	LevelDebug Level = "debug"
 	// LevelInfo is used for informational messages.
-	LevelInfo  Level = "info"
+	LevelInfo Level = "info"
 	// LevelWarn is used for warning messages that indicate potential issues.
-	LevelWarn  Level = "warn"
+	LevelWarn Level = "warn"
 	// LevelError is used for error messages that indicate something went wrong.
 	LevelError Level = "error"
 	// LevelFatal is used for fatal errors that typically cause the program to exit.

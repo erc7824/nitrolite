@@ -10,6 +10,13 @@ import (
 
 var _ SpanEventRecorder = &OtelSpanEventRecorder{}
 
+const (
+	// Used when a value is missing for a key in attribute pairs
+	missingAttributeValue = "MISSING"
+	// Used as the key when an invalid (non-string) key is encountered
+	invalidAttributeKey = "invalidKeysAndValues"
+)
+
 // OtelSpanEventRecorder is a SpanEventRecorder implementation that records
 // events to an OpenTelemetry span. It converts log messages and their
 // associated key-value pairs into span events and attributes.
@@ -50,7 +57,7 @@ func (ser *OtelSpanEventRecorder) RecordError(name string, keysAndValues ...any)
 
 func kvToOtelAttributes(keysAndValues ...any) []attribute.KeyValue {
 	if len(keysAndValues)%2 != 0 {
-		keysAndValues = append(keysAndValues, "MISSING")
+		keysAndValues = append(keysAndValues, missingAttributeValue)
 	}
 
 	attributes := make([]attribute.KeyValue, 0, len(keysAndValues)/2)
@@ -60,12 +67,8 @@ func kvToOtelAttributes(keysAndValues ...any) []attribute.KeyValue {
 		if keyIsStr {
 			key = s
 		} else {
-			key = "invalidKeysAndValues"
-		}
-
-		if !keyIsStr {
 			attributes = append(attributes, attribute.String(
-				"invalidKeysAndValues",
+				invalidAttributeKey,
 				fmt.Sprint(keysAndValues[i:]),
 			))
 			break

@@ -16,7 +16,7 @@ export class DatabaseUtils {
 
     async cleanupDatabaseData(): Promise<void> {
         try {
-            const tables = ['app_sessions', 'channels', 'contract_events', 'ledger', 'rpc_store', 'signers', 'ledger_transactions'];
+            const tables = ['app_sessions', 'channels', 'contract_events', 'ledger', 'rpc_store', 'signers', 'ledger_transactions', 'blockchain_actions'];
 
             const client = await this.pool.connect();
             try {
@@ -41,6 +41,30 @@ export class DatabaseUtils {
         } catch (error) {
             console.error('Error during database data cleanup:', error);
             throw error;
+        }
+    }
+
+    async getBlockchainActions(filters: { channel_id?: string; action_type?: string }): Promise<any[]> {
+        const client = await this.pool.connect();
+        try {
+            let query = 'SELECT * FROM blockchain_actions WHERE 1=1';
+            const values: any[] = [];
+            let paramIndex = 1;
+
+            if (filters.channel_id) {
+                query += ` AND channel_id = $${paramIndex++}`;
+                values.push(filters.channel_id);
+            }
+
+            if (filters.action_type) {
+                query += ` AND action_type = $${paramIndex++}`;
+                values.push(filters.action_type);
+            }
+
+            const result = await client.query(query, values);
+            return result.rows;
+        } finally {
+            client.release();
         }
     }
 

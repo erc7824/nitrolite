@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"math/big"
 	"testing"
 	"time"
@@ -171,7 +172,7 @@ func createMockClosedEvent(t *testing.T, signer *Signer, token string, amount *b
 
 	finalState := nitrolite.State{
 		Intent:      2,
-		Version:     big.NewInt(1),
+		Version:     big.NewInt(2),
 		Data:        []byte{},
 		Allocations: allocation,
 		Sigs:        [][]byte{},
@@ -385,7 +386,9 @@ func TestHandleClosedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   initialRawAmount,
 			Nonce:       12345,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 			Challenge:   3600,
 			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
 			CreatedAt:   time.Now(),
@@ -426,7 +429,7 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		assert.Equal(t, ChannelStatusClosed, updatedChannel.Status)
 		assert.Equal(t, decimal.NewFromInt(0), updatedChannel.RawAmount, "Amount should be zero after closing")
-		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
+		assert.Greater(t, updatedChannel.State.Version, initialChannel.State.Version, "Version should be incremented")
 
 		var entries []Entry
 		err = db.Where("wallet = ?", walletAddr.Hex()).Find(&entries).Error
@@ -488,7 +491,9 @@ func TestHandleClosedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   initialRawAmount,
 			Nonce:       12345,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 			Challenge:   3600,
 			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
 			CreatedAt:   time.Now(),
@@ -571,7 +576,9 @@ func TestHandleClosedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   channelAmount,
 			Nonce:       12345,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 			Challenge:   3600,
 			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
 			CreatedAt:   time.Now(),
@@ -614,7 +621,7 @@ func TestHandleClosedEvent(t *testing.T) {
 
 		assert.Equal(t, ChannelStatusClosed, updatedChannel.Status)
 		assert.Equal(t, decimal.Zero.String(), updatedChannel.RawAmount.String(), "Amount should be zero after closing")
-		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
+		assert.Greater(t, updatedChannel.State.Version, initialChannel.State.Version, "Version should be incremented")
 
 		assertNotifications(t, capturedNotifications, walletAddr.Hex(), 2)
 		assert.Equal(t, ChannelUpdateEventType, capturedNotifications[walletAddr.Hex()][1].eventType)
@@ -653,7 +660,9 @@ func TestHandleChallengedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   amount,
 			Nonce:       12345,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 			Challenge:   3600,
 			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
 			CreatedAt:   time.Now(),
@@ -684,7 +693,7 @@ func TestHandleChallengedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ChannelStatusChallenged, updatedChannel.Status)
-		assert.Equal(t, uint64(2), updatedChannel.Version, "Version should be updated to match event")
+		assert.Equal(t, uint64(1), updatedChannel.State.Version, "Version should be updated to match event")
 		assert.Equal(t, initialChannel.RawAmount, updatedChannel.RawAmount, "Amount should not change")
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
@@ -720,7 +729,9 @@ func TestHandleResizedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   initialRawAmount,
 			Nonce:       12345,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 			Challenge:   3600,
 			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
 			CreatedAt:   time.Now(),
@@ -761,7 +772,7 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		assert.Equal(t, ChannelStatusOpen, updatedChannel.Status, "Status should remain open")
 		assert.Equal(t, expectedAmount, updatedChannel.RawAmount, "Amount should be increased by deltaAmount")
-		assert.Greater(t, updatedChannel.Version, initialChannel.Version, "Version should be incremented")
+		assert.Greater(t, updatedChannel.State.Version, initialChannel.State.Version, "Version should be incremented")
 
 		assert.Equal(t, initialChannel.CreatedAt.Unix(), updatedChannel.CreatedAt.Unix(), "CreatedAt should not change")
 		assert.True(t, updatedChannel.UpdatedAt.After(initialChannel.UpdatedAt), "UpdatedAt should increase")
@@ -821,7 +832,9 @@ func TestHandleResizedEvent(t *testing.T) {
 			ChainID:     custody.chainID,
 			RawAmount:   initialRawAmount,
 			Nonce:       12345,
-			Version:     1,
+			State: UnsignedState{
+				Version: 1,
+			},
 			Challenge:   3600,
 			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
 			CreatedAt:   time.Now(),
@@ -850,7 +863,7 @@ func TestHandleResizedEvent(t *testing.T) {
 
 		assert.Equal(t, ChannelStatusOpen, updatedChannel.Status)
 		assert.Equal(t, expectedAmount, updatedChannel.RawAmount)
-		assert.Greater(t, updatedChannel.Version, initialChannel.Version)
+		assert.Greater(t, updatedChannel.State.Version, initialChannel.State.Version)
 
 		walletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)
 		require.NoError(t, err)
@@ -956,5 +969,168 @@ func TestHandleEventWithInvalidChannel(t *testing.T) {
 		logger := custody.logger.With("event", "Resized")
 		// Should not panic when channel doesn't exist
 		custody.handleResized(logger, mockEvent)
+	})
+}
+
+func TestChallengeHandling(t *testing.T) {
+	channelID := "0x0000000000000000000000001234567890abcdef1234567890abcdef12345678"
+	initialState := UnsignedState{
+		Intent:  StateIntent(StateIntentOperate),
+		Version: 5,
+		Data:    "data",
+		Allocations: []Allocation{
+			{
+				Participant:  "0xUser123456789",
+				TokenAddress: "0xToken123456789",
+				RawAmount:    decimal.NewFromInt(1000),
+			},
+			{
+				Participant:  "0xBroker123456789",
+				TokenAddress: "0xToken123456789",
+				RawAmount:    decimal.NewFromInt(500),
+			},
+		},
+	}
+
+	userSig := Signature{1, 2, 3}
+	serverSig := Signature{4, 5, 6}
+
+	t.Run("Challenge with older state creates checkpoint action", func(t *testing.T) {
+		custody, db, cleanup := setupMockCustody(t)
+		defer cleanup()
+
+		channel, err := CreateChannel(
+			db,
+			channelID,
+			"0xWallet123456789",
+			"0xParticipant123456789",
+			1,
+			3600,
+			"0xAdjudicator123456789",
+			custody.chainID,
+			"0xToken123456789",
+			decimal.NewFromInt(1500),
+			initialState,
+		)
+		require.NoError(t, err)
+
+		channel.UserStateSignature = &userSig
+		channel.ServerStateSignature = &serverSig
+		require.NoError(t, db.Save(&channel).Error)
+
+		challengedEvent := &nitrolite.CustodyChallenged{
+			ChannelId: [32]byte(common.HexToHash(channelID)),
+			State: nitrolite.State{
+				Intent:  0,
+				Version: big.NewInt(3), // Older version - should trigger checkpoint
+				Data:    []byte("attack-data"),
+				Allocations: []nitrolite.Allocation{
+					{
+						Destination: common.HexToAddress("0xUser123456789"),
+						Token:       common.HexToAddress("0xToken123456789"),
+						Amount:      big.NewInt(2000),
+					},
+					{
+						Destination: common.HexToAddress("0xBroker123456789"),
+						Token:       common.HexToAddress("0xToken123456789"),
+						Amount:      big.NewInt(0),
+					},
+				},
+			},
+			Raw: types.Log{
+				TxHash: common.HexToHash("0x1111111111111111111111111111111111111111111111111111111111111111"),
+				Index:  0,
+			},
+		}
+
+		custody.handleChallenged(custody.logger, challengedEvent)
+
+		// Verify channel is marked as challenged
+		var updatedChannel Channel
+		err = db.Where("channel_id = ?", channelID).First(&updatedChannel).Error
+		require.NoError(t, err)
+		assert.Equal(t, ChannelStatusChallenged, updatedChannel.Status)
+
+		// Verify checkpoint action was created
+		var action BlockchainAction
+		err = db.Where("channel_id = ? AND action_type = ?", channelID, ActionTypeCheckpoint).First(&action).Error
+		require.NoError(t, err)
+
+		assert.Equal(t, ActionTypeCheckpoint, action.Type)
+		assert.Equal(t, channelID, action.ChannelID)
+		assert.Equal(t, custody.chainID, action.ChainID)
+		assert.Equal(t, StatusPending, action.Status)
+		assert.Equal(t, 0, action.Retries)
+
+		// Verify checkpoint data is correct
+		var checkpointData CheckpointData
+		err = json.Unmarshal([]byte(action.Data), &checkpointData)
+		require.NoError(t, err)
+		assert.Equal(t, initialState, checkpointData.State)
+		assert.Equal(t, userSig, checkpointData.UserSig)
+		assert.Equal(t, serverSig, checkpointData.ServerSig)
+	})
+
+	t.Run("Challenge with same version - no checkpoint needed", func(t *testing.T) {
+		custody, db, cleanup := setupMockCustody(t)
+		defer cleanup()
+
+		channel, err := CreateChannel(
+			db,
+			channelID,
+			"0xWallet123456789",
+			"0xParticipant123456789",
+			1,
+			3600,
+			"0xAdjudicator123456789",
+			custody.chainID,
+			"0xToken123456789",
+			decimal.NewFromInt(1500),
+			initialState,
+		)
+		require.NoError(t, err)
+
+		channel.UserStateSignature = &userSig
+		channel.ServerStateSignature = &serverSig
+		require.NoError(t, db.Save(&channel).Error)
+
+		challengedEvent := &nitrolite.CustodyChallenged{
+			ChannelId: [32]byte(common.HexToHash(channelID)),
+			State: nitrolite.State{
+				Intent:  0,
+				Version: big.NewInt(5), // Same version - no checkpoint needed
+				Data:    []byte("valid-data"),
+				Allocations: []nitrolite.Allocation{
+					{
+						Destination: common.HexToAddress("0xUser123456789"),
+						Token:       common.HexToAddress("0xToken123456789"),
+						Amount:      big.NewInt(1000),
+					},
+					{
+						Destination: common.HexToAddress("0xBroker123456789"),
+						Token:       common.HexToAddress("0xToken123456789"),
+						Amount:      big.NewInt(500),
+					},
+				},
+			},
+			Raw: types.Log{
+				TxHash: common.HexToHash("0x2222222222222222222222222222222222222222222222222222222222222222"),
+				Index:  0,
+			},
+		}
+
+		custody.handleChallenged(custody.logger, challengedEvent)
+
+		// Verify channel is marked as challenged
+		var updatedChannel Channel
+		err = db.Where("channel_id = ?", channelID).First(&updatedChannel).Error
+		require.NoError(t, err)
+		assert.Equal(t, ChannelStatusChallenged, updatedChannel.Status)
+
+		// Verify NO checkpoint action was created
+		var count int64
+		err = db.Model(&BlockchainAction{}).Where("channel_id = ? AND action_type = ?", channelID, ActionTypeCheckpoint).Count(&count).Error
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), count, "No checkpoint action should be created for same version")
 	})
 }

@@ -1,0 +1,88 @@
+package protocol
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+const (
+	// errorParamKey is the standard key used in Params to store error messages.
+	// When a Payload contains an error, it will be stored under this key.
+	errorParamKey = "error"
+)
+
+// Error represents an error in the RPC protocol that should be sent back to the client
+// in the RPC response. Unlike generic errors, Error messages are guaranteed to be
+// included in the error response sent to the client.
+//
+// Use Error when you want to provide specific, user-facing error messages in RPC responses.
+// For internal errors that should not be exposed to clients, use regular errors instead.
+//
+// Example:
+//
+//	// Client will receive this exact error message
+//	return protocol.Errorf("invalid wallet address: %s", addr)
+//
+//	// Client will receive a generic error message
+//	return fmt.Errorf("database connection failed")
+type Error struct {
+	err error
+}
+
+// Errorf creates a new Error with a formatted error message that will be sent
+// to the client in the RPC response. This is the preferred way to create client-facing
+// errors in RPC handlers.
+//
+// The error message should be clear, actionable, and safe to expose to external clients.
+// Avoid including sensitive information like internal system details, file paths, or
+// database specifics.
+//
+// Usage in RPC handlers:
+//
+//	// In a handler function that returns an error
+//	if amount.IsNegative() {
+//		return Errorf("invalid amount: cannot be negative")
+//	}
+//
+//	// With formatting for specific details
+//	if balance.LessThan(amount) {
+//		return Errorf("insufficient balance: need %s but have %s", amount, balance)
+//	}
+func Errorf(format string, args ...any) Error {
+	return Error{
+		err: fmt.Errorf(format, args...),
+	}
+}
+
+// Error implements the error interface for Error.
+// It returns the underlying error message that will be sent to clients.
+//
+// This method allows Error to be used anywhere a standard Go error is expected,
+// while maintaining the distinction that this error's message is safe for
+// external client consumption.
+func (e Error) Error() string {
+	return e.err.Error()
+}
+
+// NewErrorParams creates a Params map containing an error message.
+// This is a convenience function for creating standardized error parameters
+// that follow the protocol's error response convention.
+//
+// The error message is stored under the "error" key and properly JSON-encoded.
+//
+// Example usage:
+//
+//	// Creating error params for a validation failure
+//	errParams := NewErrorParams("invalid address format")
+//	payload := NewPayload(requestID, method, errParams)
+//
+//	// Creating error params from an existing error
+//	if err := validateAmount(amount); err != nil {
+//	    errParams := NewErrorParams(err.Error())
+//	    response := NewResponse(NewPayload(id, method, errParams))
+//	}
+//
+// The resulting Params will contain: {"error": "invalid address format"}
+func NewErrorParams(errMsg string) Params {
+	return Params{errorParamKey: json.RawMessage(fmt.Sprintf(`"%s"`, errMsg))}
+}

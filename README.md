@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/github/erc7824/nitrolite/graph/badge.svg?token=XASM4CIEFO)](https://codecov.io/github/erc7824/nitrolite)
+
 # Nitrolite: State Channel Framework
 
 Nitrolite is a lightweight, efficient state channel framework for Ethereum and other EVM-compatible blockchains, enabling off-chain interactions while maintaining on-chain security guarantees.

@@ -26,7 +26,7 @@ func setupTestSqlite(t testing.TB) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(uniqueDSN), &gorm.Config{})
 	require.NoError(t, err)
 
-	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{}, &LedgerTransaction{}, &UserTagModel{})
+	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{}, &LedgerTransaction{}, &UserTagModel{}, &UserActionLog{})
 	require.NoError(t, err)
 
 	return db

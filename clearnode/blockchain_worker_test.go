@@ -48,7 +48,7 @@ func setupWorker(t *testing.T, custodyClients map[uint32]CustodyInterface) (*Blo
 	return worker, db, cleanup
 }
 
-func validCheckpointData(t *testing.T) string {
+func validCheckpointData(t *testing.T) []byte {
 	t.Helper()
 	data := CheckpointData{
 		State:     UnsignedState{Version: 1},
@@ -57,15 +57,15 @@ func validCheckpointData(t *testing.T) string {
 	}
 	bytes, err := json.Marshal(data)
 	require.NoError(t, err)
-	return string(bytes)
+	return bytes
 }
 
 func TestGetPendingActionsForChain(t *testing.T) {
 	worker, db, cleanup := setupWorker(t, map[uint32]CustodyInterface{1: &MockCustody{}})
 	defer cleanup()
 
-	require.NoError(t, db.Create(&BlockchainAction{ChannelID: "ch1-b", ChainID: 1, Status: StatusPending, CreatedAt: time.Now()}).Error)
-	require.NoError(t, db.Create(&BlockchainAction{ChannelID: "ch1-a", ChainID: 1, Status: StatusPending, CreatedAt: time.Now().Add(-time.Second)}).Error)
+	require.NoError(t, db.Create(&BlockchainAction{ChannelID: "ch1-b", ChainID: 1, Status: StatusPending, Data: []byte{1}, CreatedAt: time.Now()}).Error)
+	require.NoError(t, db.Create(&BlockchainAction{ChannelID: "ch1-a", ChainID: 1, Status: StatusPending, Data: []byte{1}, CreatedAt: time.Now().Add(-time.Second)}).Error)
 
 	result, err := getActionsForChain(worker.db, 1, 5)
 	require.NoError(t, err)
@@ -134,7 +134,7 @@ func TestProcessAction(t *testing.T) {
 		worker, db, cleanup := setupWorker(t, map[uint32]CustodyInterface{1: mockCustody})
 		defer cleanup()
 
-		action := &BlockchainAction{Type: ActionTypeCheckpoint, ChainID: 1, Data: "invalid-json", Status: StatusPending}
+		action := &BlockchainAction{Type: ActionTypeCheckpoint, ChainID: 1, Data: []byte{1, 2, 3}, Status: StatusPending}
 		require.NoError(t, db.Create(action).Error)
 
 		worker.processAction(context.Background(), *action)

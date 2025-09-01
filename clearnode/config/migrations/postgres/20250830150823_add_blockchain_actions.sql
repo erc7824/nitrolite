@@ -4,7 +4,7 @@ CREATE TABLE blockchain_actions (
     action_type VARCHAR(50) NOT NULL,
     channel_id VARCHAR(66) NOT NULL,
     chain_id INTEGER NOT NULL,
-    action_data TEXT NOT NULL,
+    action_data JSONB NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     retry_count INTEGER NOT NULL DEFAULT 0,
     last_error TEXT,

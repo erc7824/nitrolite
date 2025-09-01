@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -22,17 +23,17 @@ const (
 )
 
 type BlockchainAction struct {
-	ID        int64        `gorm:"primary_key"`
-	Type      ActionType   `gorm:"column:action_type;not null"`
-	ChannelID string       `gorm:"column:channel_id;not null"`
-	ChainID   uint32       `gorm:"column:chain_id;not null"`
-	Data      string       `gorm:"column:action_data;type:text;not null"`
-	Status    ActionStatus `gorm:"column:status;not null"`
-	Retries   int          `gorm:"column:retry_count;default:0"`
-	Error     string       `gorm:"column:last_error;type:text"`
-	TxHash    string       `gorm:"column:transaction_hash"`
-	CreatedAt time.Time    `gorm:"column:created_at"`
-	UpdatedAt time.Time    `gorm:"column:updated_at"`
+	ID        int64          `gorm:"primary_key"`
+	Type      ActionType     `gorm:"column:action_type;not null"`
+	ChannelID string         `gorm:"column:channel_id;not null"`
+	ChainID   uint32         `gorm:"column:chain_id;not null"`
+	Data      datatypes.JSON `gorm:"column:action_data;type:text;not null"`
+	Status    ActionStatus   `gorm:"column:status;not null"`
+	Retries   int            `gorm:"column:retry_count;default:0"`
+	Error     string         `gorm:"column:last_error;type:text"`
+	TxHash    string         `gorm:"column:transaction_hash"`
+	CreatedAt time.Time      `gorm:"column:created_at"`
+	UpdatedAt time.Time      `gorm:"column:updated_at"`
 }
 
 func (BlockchainAction) TableName() string {
@@ -61,7 +62,7 @@ func CreateCheckpoint(tx *gorm.DB, channel string, chainID uint32, state Unsigne
 		Type:      ActionTypeCheckpoint,
 		ChannelID: channel,
 		ChainID:   chainID,
-		Data:      string(bytes),
+		Data:      bytes,
 		Status:    StatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),

@@ -24,6 +24,12 @@ var (
 
 var ErrCustodyEventAlreadyProcessed = errors.New("custody event already processed")
 
+type CustodyInterface interface {
+	Checkpoint(channelID string, state UnsignedState, userSig, serverSig Signature, proofs []nitrolite.State) (common.Hash, error)
+}
+
+var _ CustodyInterface = (*Custody)(nil)
+
 // Custody implements the BlockchainClient interface using the Custody contract
 type Custody struct {
 	client             Ethereum

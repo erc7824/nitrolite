@@ -86,8 +86,12 @@ func main() {
 	// Start blockchain action worker for all custody clients
 	// TODO: This can be moved to a separate worker process in the future for better scalability
 	if len(custodyClients) > 0 {
+		custodyClients := make(map[uint32]CustodyInterface, len(custodyClients))
+		for chainID, client := range custodyClients {
+			custodyClients[chainID] = client
+		}
 		worker := NewBlockchainWorker(db, custodyClients, logger)
-		worker.Start(context.Background())
+		go worker.Start(context.Background())
 	}
 
 	metricsListenAddr := ":4242"
@@ -102,7 +106,7 @@ func main() {
 		Handler: metricsMux,
 	}
 
-	// Start metrcis monitoring
+	// Start metrics monitoring
 	go metrics.RecordMetricsPeriodically(db, custodyClients, logger)
 
 	go func() {
@@ -138,7 +142,7 @@ func main() {
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := rpcServer.Shutdown(ctx); err != nil {
-		logger.Error("failed to shut down metrics server", "error", err)
+		logger.Error("failed to shut down RPC server", "error", err)
 	}
 
 	logger.Info("shutdown complete")

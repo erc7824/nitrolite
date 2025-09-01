@@ -31,8 +31,8 @@ type BlockchainAction struct {
 	Retries   int          `gorm:"column:retry_count;default:0"`
 	Error     string       `gorm:"column:last_error;type:text"`
 	TxHash    string       `gorm:"column:transaction_hash"`
-	Created   time.Time    `gorm:"column:created_at"`
-	Updated   time.Time    `gorm:"column:updated_at"`
+	CreatedAt time.Time    `gorm:"column:created_at"`
+	UpdatedAt time.Time    `gorm:"column:updated_at"`
 }
 
 func (BlockchainAction) TableName() string {
@@ -63,8 +63,8 @@ func CreateCheckpoint(tx *gorm.DB, channel string, chainID uint32, state Unsigne
 		ChainID:   chainID,
 		Data:      string(bytes),
 		Status:    StatusPending,
-		Created:   time.Now(),
-		Updated:   time.Now(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 
 	return tx.Create(action).Error
@@ -74,7 +74,7 @@ func (a *BlockchainAction) Fail(tx *gorm.DB, err string) error {
 	a.Status = StatusFailed
 	a.Error = err
 	a.Retries++
-	a.Updated = time.Now()
+	a.UpdatedAt = time.Now()
 	return tx.Save(a).Error
 }
 
@@ -82,10 +82,18 @@ func (a *BlockchainAction) Complete(tx *gorm.DB, txHash string) error {
 	a.Status = StatusCompleted
 	a.TxHash = txHash
 	a.Error = ""
-	a.Updated = time.Now()
+	a.UpdatedAt = time.Now()
 	return tx.Save(a).Error
 }
 
-func (a *BlockchainAction) CanRetry() bool {
-	return a.Retries < 5
+func getActionsForChain(db *gorm.DB, chainID uint32, limit int) ([]BlockchainAction, error) {
+	var actions []BlockchainAction
+	query := db.Where("status = ? AND chain_id = ?", StatusPending, chainID).Order("created_at ASC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Find(&actions).Error; err != nil {
+		return nil, fmt.Errorf("query pending actions for chain %d: %w", chainID, err)
+	}
+	return actions, nil
 }

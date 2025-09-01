@@ -42,8 +42,8 @@ func TestCreateCheckpoint(t *testing.T) {
 		assert.Equal(t, 0, action.Retries)
 		assert.Empty(t, action.Error)
 		assert.Empty(t, action.TxHash)
-		assert.False(t, action.Created.IsZero())
-		assert.False(t, action.Updated.IsZero())
+		assert.False(t, action.CreatedAt.IsZero())
+		assert.False(t, action.UpdatedAt.IsZero())
 
 		var data CheckpointData
 		err = json.Unmarshal([]byte(action.Data), &data)
@@ -78,8 +78,8 @@ func TestBlockchainAction_Fail(t *testing.T) {
 		Data:      "{}",
 		Status:    StatusPending,
 		Retries:   2,
-		Created:   time.Now(),
-		Updated:   time.Now(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	require.NoError(t, db.Create(action).Error)
 
@@ -109,8 +109,8 @@ func TestBlockchainAction_Complete(t *testing.T) {
 		Data:      "{}",
 		Status:    StatusPending,
 		Error:     "previous error",
-		Created:   time.Now(),
-		Updated:   time.Now(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}
 	require.NoError(t, db.Create(action).Error)
 
@@ -128,27 +128,6 @@ func TestBlockchainAction_Complete(t *testing.T) {
 	assert.Equal(t, StatusCompleted, dbAction.Status)
 	assert.Equal(t, txHash, dbAction.TxHash)
 	assert.Empty(t, dbAction.Error)
-}
-
-func TestBlockchainAction_CanRetry(t *testing.T) {
-	testCases := []struct {
-		name     string
-		retries  int
-		expected bool
-	}{
-		{"No retries yet", 0, true},
-		{"Few retries", 3, true},
-		{"At limit", 4, true},
-		{"At max retries", 5, false},
-		{"Exceeded max retries", 6, false},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			action := &BlockchainAction{Retries: tc.retries}
-			assert.Equal(t, tc.expected, action.CanRetry())
-		})
-	}
 }
 
 func TestBlockchainAction_TableName(t *testing.T) {

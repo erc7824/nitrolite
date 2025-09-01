@@ -10,7 +10,11 @@ CREATE TABLE blockchain_actions (
     last_error TEXT,
     transaction_hash VARCHAR(66),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_blockchain_actions_channel
+        FOREIGN KEY(channel_id)
+        REFERENCES channels(channel_id)
+        ON DELETE CASCADE
 );
 
 

@@ -102,19 +102,6 @@ type ChannelOperationResponse struct {
 	StateSignature Signature     `json:"server_signature"`
 }
 
-type UnsignedState struct {
-	Intent      uint8        `json:"intent"`
-	Version     uint64       `json:"version"`
-	Data        string       `json:"state_data"`
-	Allocations []Allocation `json:"allocations"`
-}
-
-type Allocation struct {
-	Participant  string          `json:"destination"`
-	TokenAddress string          `json:"token"`
-	RawAmount    decimal.Decimal `json:"amount"`
-}
-
 type ChannelResponse struct {
 	ChannelID   string          `json:"channel_id"`
 	Participant string          `json:"participant"`

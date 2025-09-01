@@ -26,7 +26,7 @@ func setupTestSqlite(t testing.TB) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(uniqueDSN), &gorm.Config{})
 	require.NoError(t, err)
 
-	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{}, &LedgerTransaction{}, &UserTagModel{}, &UserActionLog{})
+	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{}, &LedgerTransaction{}, &UserTagModel{}, &UserActionLog{}, &BlockchainAction{})
 	require.NoError(t, err)
 
 	return db
@@ -63,7 +63,7 @@ func setupTestPostgres(ctx context.Context, t testing.TB) (*gorm.DB, testcontain
 	db, err := gorm.Open(postgres.Open(url), &gorm.Config{})
 	require.NoError(t, err)
 
-	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{}, &LedgerTransaction{}, &UserTagModel{})
+	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{}, &LedgerTransaction{}, &UserTagModel{}, &BlockchainAction{})
 	require.NoError(t, err)
 
 	return db, postgresContainer

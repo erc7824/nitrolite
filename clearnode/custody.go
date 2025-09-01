@@ -24,6 +24,12 @@ var (
 
 var ErrCustodyEventAlreadyProcessed = errors.New("custody event already processed")
 
+type CustodyInterface interface {
+	Checkpoint(channelID string, state UnsignedState, userSig, serverSig Signature, proofs []nitrolite.State) (common.Hash, error)
+}
+
+var _ CustodyInterface = (*Custody)(nil)
+
 // Custody implements the BlockchainClient interface using the Custody contract
 type Custody struct {
 	client             Ethereum
@@ -105,6 +111,42 @@ func (c *Custody) ListenEvents(ctx context.Context) {
 	}
 
 	listenEvents(ctx, c.client, c.custodyAddr, c.chainID, c.blockStep, lastBlock, lastIndex, c.handleBlockChainEvent, c.logger)
+}
+
+// Checkpoint calls the checkpoint method on the custody contract
+func (c *Custody) Checkpoint(channelID string, newState UnsignedState, userSig, serverSig Signature, proofs []nitrolite.State) (common.Hash, error) {
+	// Convert string channelID to bytes32
+	channelIDBytes := common.HexToHash(channelID)
+
+	gasPrice, err := c.client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed to suggest gas price: %w", err)
+	}
+
+	nitroState := nitrolite.State{
+		Intent:  uint8(newState.Intent),
+		Version: big.NewInt(int64(newState.Version)),
+		Data:    []byte(newState.Data),
+		Sigs:    [][]byte{userSig, serverSig},
+	}
+
+	for _, alloc := range newState.Allocations {
+		nitroState.Allocations = append(nitroState.Allocations, nitrolite.Allocation{
+			Destination: common.HexToAddress(alloc.Participant),
+			Token:       common.HexToAddress(alloc.TokenAddress),
+			Amount:      alloc.RawAmount.BigInt(),
+		})
+	}
+
+	c.transactOpts.GasPrice = gasPrice.Add(gasPrice, gasPrice)
+
+	// Call the checkpoint method on the custody contract
+	tx, err := c.custody.Checkpoint(c.transactOpts, channelIDBytes, nitroState, proofs)
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("failed to checkpoint channel: %w", err)
+	}
+
+	return tx.Hash(), nil
 }
 
 // handleBlockChainEvent processes different event types received from the blockchain
@@ -213,6 +255,21 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 			return fmt.Errorf("an open channel with broker already exists: %s", existingOpenChannel.ChannelID)
 		}
 
+		// Record initial channel state
+		state := UnsignedState{
+			Intent:  StateIntent(ev.Initial.Intent),
+			Version: ev.Initial.Version.Uint64(),
+			Data:    string(ev.Initial.Data),
+		}
+		for _, alloc := range ev.Initial.Allocations {
+			state.Allocations = append(state.Allocations, Allocation{
+				Participant:  alloc.Destination.Hex(),
+				TokenAddress: alloc.Token.Hex(),
+				RawAmount:    decimal.NewFromBigInt(alloc.Amount, 0),
+			})
+		}
+		// NOTE: Signatures are not recorded with the initial state.
+
 		ch, err = CreateChannel(
 			tx,
 			channelID,
@@ -224,6 +281,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 			c.chainID,
 			tokenAddress,
 			decimal.NewFromBigInt(rawAmount, 0),
+			state,
 		)
 		if err != nil {
 			return err
@@ -287,9 +345,25 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 			return fmt.Errorf("error finding channel: %w", result.Error)
 		}
 
+		challengedVersion := ev.State.Version.Uint64()
+		localVersion := channel.State.Version
+
+		logger.Warn("challenge detected", "challengedVersion", challengedVersion, "localVersion", localVersion, "channelId", channelID)
+
+		if challengedVersion < localVersion {
+			if channel.UserStateSignature != nil && channel.ServerStateSignature != nil {
+				if err := CreateCheckpoint(tx, channelID, c.chainID, channel.State, *channel.UserStateSignature, *channel.ServerStateSignature); err != nil {
+					logger.Error("failed to create checkpoint", "error", err)
+				} else {
+					logger.Info("created checkpoint action", "channelId", channelID, "localVersion", localVersion, "challengedVersion", challengedVersion)
+				}
+			} else {
+				logger.Warn("detected newer local state in db without signatures", "channelId", channelID)
+			}
+		}
 		channel.Status = ChannelStatusChallenged
 		channel.UpdatedAt = time.Now()
-		channel.Version = ev.State.Version.Uint64()
+
 		if err := tx.Save(&channel).Error; err != nil {
 			return fmt.Errorf("error saving channel in database: %w", err)
 		}
@@ -335,9 +409,17 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			return fmt.Errorf("invalid resize, channel balance cannot be negative: %s", newRawAmount.String())
 		}
 
+		// Update state allocations
+		if len(ev.DeltaAllocations) == 2 && len(channel.State.Allocations) == 2 {
+			channel.State.Allocations[0].RawAmount = channel.State.Allocations[0].RawAmount.Add(decimal.NewFromBigInt(ev.DeltaAllocations[0], 0))
+			channel.State.Allocations[1].RawAmount = channel.State.Allocations[1].RawAmount.Add(decimal.NewFromBigInt(ev.DeltaAllocations[1], 0))
+		}
+
 		channel.RawAmount = decimal.NewFromBigInt(newRawAmount, 0)
 		channel.UpdatedAt = time.Now()
-		channel.Version++
+		channel.State.Version++
+		channel.ServerStateSignature = nil // Reset server signature
+		channel.UserStateSignature = nil   // Reset user signature
 		if err := tx.Save(&channel).Error; err != nil {
 			return fmt.Errorf("error saving channel in database: %w", err)
 		}
@@ -471,10 +553,31 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 
+		// Update channel state with final state
+		if len(ev.FinalState.Allocations) == 2 {
+			channel.State.Allocations = []Allocation{
+				{
+					Participant:  ev.FinalState.Allocations[0].Destination.Hex(),
+					TokenAddress: ev.FinalState.Allocations[0].Token.Hex(),
+					RawAmount:    decimal.NewFromBigInt(ev.FinalState.Allocations[0].Amount, 0),
+				},
+				{
+					Participant:  ev.FinalState.Allocations[1].Destination.Hex(),
+					TokenAddress: ev.FinalState.Allocations[1].Token.Hex(),
+					RawAmount:    decimal.NewFromBigInt(ev.FinalState.Allocations[1].Amount, 0),
+				},
+			}
+		}
+		channel.State.Version = ev.FinalState.Version.Uint64()
+		channel.State.Intent = StateIntent(ev.FinalState.Intent)
+		channel.State.Data = string(ev.FinalState.Data)
+		channel.ServerStateSignature = nil // Reset server signature
+		channel.UserStateSignature = nil   // Reset user signature
+
 		channel.Status = ChannelStatusClosed
 		channel.RawAmount = decimal.Zero
 		channel.UpdatedAt = time.Now()
-		channel.Version++
+
 		if err := tx.Save(&channel).Error; err != nil {
 			return fmt.Errorf("failed to close channel: %w", err)
 		}

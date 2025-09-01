@@ -143,21 +143,29 @@ Always use key-value pairs for structured logging instead of embedding details i
 - Prefer structured data over embedding details in the message string.
 - Avoid sensitive information unless necessary and ensure compliance with privacy requirements.
 
+**Lifecycle Logging Practice:**  
+If you emit a log/event that represents the start of a process (e.g., "processing", "starting", "pending"), always emit a corresponding terminal log/event (e.g., "processed", "completed", "stopped", or "failed").  
+This ensures:
+- **Symmetry and Traceability:** Every initiated action is explicitly finished or failed, avoiding ambiguity about system state.
+- **Observability/Monitoring:** Enables accurate measurement of durations, success rates, and detection of anomalies (such as stuck processes) in dashboards and alerting systems.
+- **Consistency with State Machines:** Logs should reflect state transitions, where each non-terminal state (like "processing") eventually leads to a terminal state ("completed" or "failed").
+- **Debugging and Replay:** Having both start and end logs allows for reliable system state reconstruction and easier debugging.
+
 **Examples:**
 
 ```go
-// GOOD: Message describes the event, keys provide context
-logger.Info("User logged in", "userID", user.ID, "method", "oauth")
+// GOOD: Logs both start and completion of a process
+logger.Info("Order processing started", "orderID", order.ID)
+err := processOrder(order)
+if err != nil {
+    logger.Error("Order processing failed", "orderID", order.ID, "error", err)
+} else {
+    logger.Info("Order processed", "orderID", order.ID)
+}
 
-logger.Info("Order placed",
-    "orderID", order.ID,
-    "userID", user.ID,
-    "amount", order.Amount,
-    "status", order.Status,
-)
-
-// BAD: Context is only in the message, not structured
-logger.Info(fmt.Sprintf("Order %s placed by user %s", order.ID, user.ID))
+// BAD: Only logs the start, leaving completion ambiguous
+logger.Info("Order processing started", "orderID", order.ID)
+// ... no corresponding "processed" or "failed" log
 ```
 
 ### Contextual Enrichment

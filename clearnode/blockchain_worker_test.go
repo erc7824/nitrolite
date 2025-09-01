@@ -88,6 +88,8 @@ func TestProcessAction(t *testing.T) {
 		var updatedAction BlockchainAction
 		require.NoError(t, db.First(&updatedAction, action.ID).Error)
 		assert.Equal(t, StatusCompleted, updatedAction.Status)
+		assert.Equal(t, 0, updatedAction.Retries)
+		assert.Equal(t, "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef", updatedAction.TxHash)
 	})
 
 	t.Run("Permanent failure for missing custody client", func(t *testing.T) {
@@ -102,9 +104,10 @@ func TestProcessAction(t *testing.T) {
 		var updatedAction BlockchainAction
 		require.NoError(t, db.First(&updatedAction, action.ID).Error)
 		assert.Equal(t, StatusFailed, updatedAction.Status)
+		assert.Contains(t, updatedAction.Error, "no custody client for chain 999")
 	})
 
-	t.Run("Transient error leaves action pending", func(t *testing.T) {
+	t.Run("Transient error on first attempt increments retries and leaves action pending", func(t *testing.T) {
 		mockCustody := &MockCustody{
 			checkpointFn: func() (common.Hash, error) {
 				return common.Hash{}, errors.New("RPC node is down")
@@ -113,7 +116,7 @@ func TestProcessAction(t *testing.T) {
 		worker, db, cleanup := setupWorker(t, map[uint32]CustodyInterface{1: mockCustody})
 		defer cleanup()
 
-		action := &BlockchainAction{Type: ActionTypeCheckpoint, ChainID: 1, Data: validCheckpointData(t), Status: StatusPending}
+		action := &BlockchainAction{Type: ActionTypeCheckpoint, ChainID: 1, Data: validCheckpointData(t), Status: StatusPending, Retries: 0}
 		require.NoError(t, db.Create(action).Error)
 
 		worker.processAction(context.Background(), *action)
@@ -122,6 +125,8 @@ func TestProcessAction(t *testing.T) {
 		var updatedAction BlockchainAction
 		require.NoError(t, db.First(&updatedAction, action.ID).Error)
 		assert.Equal(t, StatusPending, updatedAction.Status)
+		assert.Equal(t, 1, updatedAction.Retries)
+		assert.Equal(t, "RPC node is down", updatedAction.Error)
 	})
 
 	t.Run("Permanent failure for invalid action data fails the action", func(t *testing.T) {
@@ -138,5 +143,35 @@ func TestProcessAction(t *testing.T) {
 		var updatedAction BlockchainAction
 		require.NoError(t, db.First(&updatedAction, action.ID).Error)
 		assert.Equal(t, StatusFailed, updatedAction.Status)
+		assert.Contains(t, updatedAction.Error, "unmarshal checkpoint data")
+	})
+
+	t.Run("Action fails after 5 attempts", func(t *testing.T) {
+		mockCustody := &MockCustody{
+			checkpointFn: func() (common.Hash, error) {
+				return common.Hash{}, errors.New("RPC still down")
+			},
+		}
+		worker, db, cleanup := setupWorker(t, map[uint32]CustodyInterface{1: mockCustody})
+		defer cleanup()
+
+		action := &BlockchainAction{
+			Type:    ActionTypeCheckpoint,
+			ChainID: 1,
+			Data:    validCheckpointData(t),
+			Status:  StatusPending,
+			Retries: 4,
+		}
+		require.NoError(t, db.Create(action).Error)
+
+		worker.processAction(context.Background(), *action)
+
+		assert.Equal(t, 1, mockCustody.CallCount())
+		var updatedAction BlockchainAction
+		require.NoError(t, db.First(&updatedAction, action.ID).Error)
+
+		assert.Equal(t, StatusFailed, updatedAction.Status)
+		assert.Equal(t, 5, updatedAction.Retries)
+		assert.Contains(t, updatedAction.Error, "failed after 4 retries: RPC still down")
 	})
 }

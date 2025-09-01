@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -85,7 +86,8 @@ func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainA
 		With("id", action.ID).
 		With("type", action.Type).
 		With("channel", action.ChannelID).
-		With("chain", action.ChainID)
+		With("chain", action.ChainID).
+		With("attempt", action.Retries+1)
 
 	custody, exists := w.custody[action.ChainID]
 	if !exists {
@@ -108,9 +110,31 @@ func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainA
 	}
 
 	if err != nil {
-		logger.Error("processing attempt failed, will retry later", "error", err)
+		isFatalError := strings.Contains(err.Error(), "unmarshal checkpoint data")
+
+		if isFatalError {
+			logger.Error("action failed due to fatal data error", "error", err)
+			if failErr := action.Fail(w.db, err.Error()); failErr != nil {
+				logger.Error("failed to mark action as permanently failed", "error", failErr)
+			}
+		} else {
+			if action.Retries >= 4 {
+				logger.Warn("action failed after reaching max retries", "error", err)
+				finalErr := fmt.Errorf("failed after %d retries: %w", action.Retries, err)
+				if failErr := action.Fail(w.db, finalErr.Error()); failErr != nil {
+					logger.Error("failed to mark action as permanently failed", "error", failErr)
+				}
+			} else {
+				logger.Error("processing attempt failed, will retry later", "error", err)
+				if recordErr := action.RecordAttempt(w.db, err.Error()); recordErr != nil {
+					logger.Error("failed to record failed attempt", "error", recordErr)
+				}
+			}
+		}
 		return
 	}
+
+	// Success case
 	if err := action.Complete(w.db, txHash.Hex()); err != nil {
 		logger.Error("failed to mark action as completed", "error", err)
 		return
@@ -118,14 +142,11 @@ func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainA
 	logger.Info("action completed successfully", "txHash", txHash.Hex())
 }
 
-func (w *BlockchainWorker) processCheckpoint(_ context.Context, action BlockchainAction, custody CustodyInterface) (common.Hash, error) {
+func (w *BlockchainWorker) processCheckpoint(ctx context.Context, action BlockchainAction, custody CustodyInterface) (common.Hash, error) {
 	var data CheckpointData
 	if err := json.Unmarshal([]byte(action.Data), &data); err != nil {
-		failErr := fmt.Errorf("unmarshal checkpoint data: %w", err)
-		if err := action.Fail(w.db, failErr.Error()); err != nil {
-			w.logger.Error("failed to mark action as failed", "error", err)
-		}
-		return common.Hash{}, failErr
+		return common.Hash{}, fmt.Errorf("unmarshal checkpoint data: %w", err)
 	}
+
 	return custody.Checkpoint(action.ChannelID, data.State, data.UserSig, data.ServerSig, []nitrolite.State{})
 }

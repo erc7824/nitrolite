@@ -1,4 +1,4 @@
-package protocol
+package rpc
 
 import (
 	"encoding/json"
@@ -21,7 +21,7 @@ const (
 // Example:
 //
 //	// Client will receive this exact error message
-//	return protocol.Errorf("invalid wallet address: %s", addr)
+//	return rpc.Errorf("invalid wallet address: %s", addr)
 //
 //	// Client will receive a generic error message
 //	return fmt.Errorf("database connection failed")

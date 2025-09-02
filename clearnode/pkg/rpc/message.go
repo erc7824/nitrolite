@@ -1,4 +1,4 @@
-package protocol
+package rpc
 
 import (
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
@@ -59,7 +59,7 @@ func NewRequest(payload Payload, sig ...sign.Signature) Request {
 //	// Verify request signers
 //	addresses, err := request.GetSigners()
 //	if err != nil {
-//	    return protocol.Errorf("invalid signatures: %v", err)
+//	    return rpc.Errorf("invalid signatures: %v", err)
 //	}
 //
 //	// Check if a specific address signed the request

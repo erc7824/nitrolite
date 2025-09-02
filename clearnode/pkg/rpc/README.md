@@ -1,10 +1,10 @@
-# RPC Protocol Package
+# RPC Package
 
-The `pkg/rpc/protocol` package provides the core data structures and utilities for the Clearnode RPC protocol. This package implements a secure, signature-based RPC communication protocol suitable for blockchain and distributed systems.
+The `pkg/rpc` package provides the core data structures and utilities for the Clearnode RPC protocol. This package implements a secure, signature-based RPC communication protocol suitable for blockchain and distributed systems.
 
 ## Overview
 
-The protocol package defines the fundamental building blocks for RPC communication:
+The RPC package defines the fundamental building blocks for RPC communication:
 - **Request/Response Messages**: Structured messages with cryptographic signatures
 - **Payload Format**: Compact array-based JSON encoding for efficient transmission
 - **Error Handling**: Distinction between client-facing and internal errors
@@ -41,7 +41,7 @@ The package provides a specialized `Error` type for client-facing errors:
 ## Installation
 
 ```go
-import "github.com/erc7824/nitrolite/clearnode/pkg/rpc/protocol"
+import "github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 ```
 
 ## Basic Usage
@@ -50,7 +50,7 @@ import "github.com/erc7824/nitrolite/clearnode/pkg/rpc/protocol"
 
 ```go
 // Create parameters for the RPC method
-params, err := protocol.NewParams(map[string]interface{}{
+params, err := rpc.NewParams(map[string]interface{}{
     "address": "0x1234567890abcdef",
     "amount": "1000000000000000000",
 })
@@ -59,21 +59,21 @@ if err != nil {
 }
 
 // Create a payload
-payload := protocol.NewPayload(
+payload := rpc.NewPayload(
     12345,              // Request ID
     "wallet_transfer",  // Method name
     params,             // Parameters
 )
 
 // Create a request (signatures would be added by the transport layer)
-request := protocol.NewRequest(payload)
+request := rpc.NewRequest(payload)
 ```
 
 ### Creating a Response
 
 ```go
 // Create response parameters
-resultParams, err := protocol.NewParams(map[string]interface{}{
+resultParams, err := rpc.NewParams(map[string]interface{}{
     "txHash": "0xabcdef123456",
     "status": "confirmed",
 })
@@ -82,14 +82,14 @@ if err != nil {
 }
 
 // Create response payload
-responsePayload := protocol.NewPayload(
+responsePayload := rpc.NewPayload(
     12345,           // Same Request ID as the request
     "wallet_transfer", // Method name
     resultParams,      // Result parameters
 )
 
 // Create response
-response := protocol.NewResponse(responsePayload)
+response := rpc.NewResponse(responsePayload)
 ```
 
 ### Error Handling
@@ -97,11 +97,11 @@ response := protocol.NewResponse(responsePayload)
 ```go
 // Creating client-facing errors
 if amount < 0 {
-    return protocol.Errorf("invalid amount: cannot be negative")
+    return rpc.Errorf("invalid amount: cannot be negative")
 }
 
 if balance < amount {
-    return protocol.Errorf("insufficient balance: need %d but have %d", amount, balance)
+    return rpc.Errorf("insufficient balance: need %d but have %d", amount, balance)
 }
 
 // Internal errors (not exposed to clients) use standard Go errors
@@ -126,7 +126,7 @@ transferReq := TransferParams{
     Amount: "1000000000000000000",
 }
 
-params, err := protocol.NewParams(transferReq)
+params, err := rpc.NewParams(transferReq)
 if err != nil {
     return err
 }
@@ -134,7 +134,7 @@ if err != nil {
 // Extracting parameters into a struct
 var received TransferParams
 if err := params.Translate(&received); err != nil {
-    return protocol.Errorf("invalid parameters: %v", err)
+    return rpc.Errorf("invalid parameters: %v", err)
 }
 ```
 
@@ -144,7 +144,7 @@ if err := params.Translate(&received); err != nil {
 
 ```go
 // Create a request with multiple signatures
-request := protocol.NewRequest(
+request := rpc.NewRequest(
     payload,
     signature1,  // Primary signer
     signature2,  // Co-signer
@@ -158,7 +158,7 @@ request := protocol.NewRequest(
 // Verify request signatures
 signers, err := request.GetSigners()
 if err != nil {
-    return protocol.Errorf("invalid signatures: %v", err)
+    return rpc.Errorf("invalid signatures: %v", err)
 }
 
 // For responses, verify server signature
@@ -173,7 +173,7 @@ if err != nil {
 The payload automatically marshals to the compact array format:
 
 ```go
-payload := protocol.NewPayload(123, "test_method", params)
+payload := rpc.NewPayload(123, "test_method", params)
 data, _ := json.Marshal(payload)
 // Output: [123,"test_method",{...params...},1634567890123]
 ```
@@ -185,7 +185,7 @@ data, _ := json.Marshal(payload)
 maxAge := 5 * time.Minute
 requestTime := time.Unix(0, int64(payload.Timestamp)*int64(time.Millisecond))
 if time.Since(requestTime) > maxAge {
-    return protocol.Errorf("request expired: timestamp too old")
+    return rpc.Errorf("request expired: timestamp too old")
 }
 ```
 
@@ -194,7 +194,7 @@ if time.Since(requestTime) > maxAge {
 1. **Signature Verification**: Always verify signatures before processing requests
 2. **Timestamp Validation**: Implement replay protection using timestamps
 3. **Parameter Validation**: Thoroughly validate all parameters before processing
-4. **Error Messages**: Use `protocol.Errorf()` for safe client-facing errors
+4. **Error Messages**: Use `rpc.Errorf()` for safe client-facing errors
 5. **Request IDs**: Use unique request IDs to prevent duplicate processing
 
 ## Testing
@@ -202,7 +202,7 @@ if time.Since(requestTime) > maxAge {
 The package includes comprehensive tests for all components. Run tests with:
 
 ```bash
-go test ./pkg/rpc/protocol
+go test ./pkg/rpc
 ```
 
 ## Dependencies

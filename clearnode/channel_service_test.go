@@ -27,7 +27,9 @@ func seedChannel(t *testing.T, db *gorm.DB, channelID, participant, wallet, toke
 		Token:       token,
 		ChainID:     chainID,
 		RawAmount:   rawAmount,
-		Version:     version,
+		State: UnsignedState{
+			Version: version,
+		},
 	}
 	require.NoError(t, db.Create(&ch).Error)
 	return ch
@@ -109,7 +111,7 @@ func TestChannelService(t *testing.T) {
 
 		// Validate response
 		assert.Equal(t, ch.ChannelID, response.ChannelID)
-		assert.Equal(t, ch.Version+1, response.State.Version)
+		assert.Equal(t, ch.State.Version+1, response.State.Version)
 
 		// New channel amount should be initial + 200
 		expected := channelAmountRaw.Add(decimal.NewFromInt(200))
@@ -121,7 +123,7 @@ func TestChannelService(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, channel)
 		assert.Equal(t, channelAmountRaw, channel.RawAmount)
-		assert.Equal(t, ch.Version, channel.Version)
+		assert.Equal(t, ch.State.Version, channel.State.Version)
 		assert.Equal(t, ChannelStatusOpen, channel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
@@ -264,7 +266,7 @@ func TestChannelService(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, ch.ChannelID, response.ChannelID)
-		assert.Equal(t, ch.Version+1, response.State.Version)
+		assert.Equal(t, ch.State.Version+1, response.State.Version)
 
 		// Final allocation should send full balance to destination
 		assert.Equal(t, 0, response.State.Allocations[0].RawAmount.Cmp(channelAmountRaw), "Primary allocation mismatch")
@@ -303,7 +305,7 @@ func TestChannelService(t *testing.T) {
 		assert.NotNil(t, response.State, "State should not be nil")
 
 		// Verify state structure
-		assert.Equal(t, uint8(1), response.State.Intent, "Intent should be INITIALIZE (1)")
+		assert.Equal(t, StateIntent(StateIntentInitialize), response.State.Intent, "Intent should be INITIALIZE (1)")
 		assert.Equal(t, uint64(0), response.State.Version, "Version should be 0")
 		assert.Len(t, response.State.Allocations, 2, "Should have 2 allocations")
 		assert.NotEmpty(t, response.StateSignature, "Should have 1 signature")

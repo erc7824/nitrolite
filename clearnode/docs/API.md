@@ -26,6 +26,13 @@
 | `close_channel`           | Returns data and Broker signature to close a channel                     | Private |
 | `resize_channel`          | Returns data and Broker signature to adjust channel capacity             | Private |
 
+**Legenda**
+
+| Access | Authentication required |
+|--------|-------------------------|
+| Private | Yes |
+| Public | No |
+
 ## Authentication
 
 ### Authentication Request

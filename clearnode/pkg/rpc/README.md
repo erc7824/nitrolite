@@ -38,6 +38,14 @@ The package provides a specialized `Error` type for client-facing errors:
 - Internal errors remain hidden from external clients
 - Clear API for creating formatted error messages
 
+### Client Communication
+
+The package includes a `Dialer` interface and a WebSocket implementation for client-side RPC communication:
+- **Thread-safe**: Supports concurrent RPC calls
+- **Automatic reconnection**: Built-in ping/pong mechanism
+- **Event handling**: Separate channel for unsolicited server events
+- **Context support**: Full context cancellation and timeout support
+
 ## Installation
 
 ```go
@@ -189,6 +197,89 @@ if time.Since(requestTime) > maxAge {
 }
 ```
 
+### WebSocket Client Usage
+
+```go
+// Create and configure a WebSocket dialer
+cfg := rpc.DefaultWebsocketDialerConfig
+cfg.EventChanSize = 100  // Buffer for unsolicited events
+dialer := rpc.NewWebsocketDialer(cfg)
+
+// Connect to server (runs in background)
+ctx := context.Background()
+go dialer.Dial(ctx, "ws://localhost:8080/ws", func(err error) {
+    if err != nil {
+        log.Error("Connection closed", "error", err)
+    }
+})
+
+// Wait for connection to establish
+for !dialer.IsConnected() {
+    time.Sleep(100 * time.Millisecond)
+}
+
+// Make RPC calls with timeout
+callCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+defer cancel()
+
+params, _ := rpc.NewParams(map[string]string{"key": "value"})
+request := rpc.NewRequest(rpc.NewPayload(1, "get_status", params))
+response, err := dialer.Call(callCtx, &request)
+if err != nil {
+    log.Error("RPC call failed", "error", err)
+    return
+}
+
+// Process response
+var result map[string]interface{}
+if err := response.Res.Params.Translate(&result); err != nil {
+    log.Error("Invalid response", "error", err)
+}
+
+// Handle unsolicited events in the background
+go func() {
+    for event := range dialer.EventCh() {
+        if event == nil {
+            // Connection closed
+            break
+        }
+        log.Info("Received event", 
+            "method", event.Res.Method,
+            "requestID", event.Res.RequestID)
+    }
+}()
+```
+
+### Concurrent RPC Calls
+
+```go
+// The dialer supports concurrent calls from multiple goroutines
+var wg sync.WaitGroup
+
+for i := 0; i < 10; i++ {
+    wg.Add(1)
+    go func(id int) {
+        defer wg.Done()
+        
+        params, _ := rpc.NewParams(map[string]int{"id": id})
+        request := rpc.NewRequest(rpc.NewPayload(uint64(id), "process", params))
+        
+        ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+        defer cancel()
+        
+        resp, err := dialer.Call(ctx, &request)
+        if err != nil {
+            log.Error("Call failed", "id", id, "error", err)
+            return
+        }
+        
+        log.Info("Call succeeded", "id", id, "response", resp.Res.Method)
+    }(i)
+}
+
+wg.Wait()
+```
+
 ## Security Considerations
 
 1. **Signature Verification**: Always verify signatures before processing requests
@@ -197,12 +288,34 @@ if time.Since(requestTime) > maxAge {
 4. **Error Messages**: Use `rpc.Errorf()` for safe client-facing errors
 5. **Request IDs**: Use unique request IDs to prevent duplicate processing
 
+## Configuration Options
+
+### WebSocketDialerConfig
+
+The WebSocket dialer can be configured with the following options:
+
+```go
+type WebsocketDialerConfig struct {
+    // Duration to wait for WebSocket handshake (default: 5s)
+    HandshakeTimeout time.Duration
+    
+    // How often to send ping messages (default: 5s)
+    PingInterval time.Duration
+    
+    // Request ID used for ping messages (default: 100)
+    PingRequestID uint64
+    
+    // Buffer size for event channel (default: 100)
+    EventChanSize int
+}
+```
+
 ## Testing
 
 The package includes comprehensive tests for all components. Run tests with:
 
 ```bash
-go test ./pkg/rpc
+go test -race ./pkg/rpc
 ```
 
 ## Dependencies

@@ -11,6 +11,25 @@ const (
 	errorParamKey = "error"
 )
 
+// Dialer error messages
+var (
+	// Connection errors
+	ErrAlreadyConnected     = fmt.Errorf("already connected")
+	ErrNotConnected         = fmt.Errorf("not connected to server")
+	ErrConnectionTimeout    = fmt.Errorf("websocket connection timeout")
+	ErrReadingMessage       = fmt.Errorf("error reading message")
+	
+	// Request/Response errors
+	ErrNilRequest          = fmt.Errorf("request cannot be nil")
+	ErrMarshalingRequest   = fmt.Errorf("error marshaling request")
+	ErrSendingRequest      = fmt.Errorf("error sending request")
+	ErrNoResponse          = fmt.Errorf("no response received")
+	ErrSendingPing         = fmt.Errorf("error sending ping")
+	
+	// WebSocket specific errors
+	ErrDialingWebsocket    = fmt.Errorf("error dialing websocket server")
+)
+
 // Error represents an error in the RPC protocol that should be sent back to the client
 // in the RPC response. Unlike generic errors, Error messages are guaranteed to be
 // included in the error response sent to the client.

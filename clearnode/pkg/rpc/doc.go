@@ -94,6 +94,50 @@
 //  4. Thoroughly validate all parameters
 //  5. Use unique request IDs to prevent duplicate processing
 //
+// # Client Communication
+//
+// The package includes a Dialer interface and WebSocket implementation for client-side RPC:
+//
+//	// Create and configure a dialer
+//	cfg := rpc.DefaultWebsocketDialerConfig
+//	cfg.EventChanSize = 100  // Buffer for unsolicited events
+//	dialer := rpc.NewWebsocketDialer(cfg)
+//
+//	// Connect to server (in a goroutine as it blocks)
+//	go dialer.Dial(ctx, "ws://localhost:8080/ws", func(err error) {
+//	    if err != nil {
+//	        log.Error("Connection closed", "error", err)
+//	    }
+//	})
+//
+//	// Wait for connection
+//	for !dialer.IsConnected() {
+//	    time.Sleep(100 * time.Millisecond)
+//	}
+//
+//	// Send RPC requests
+//	params, _ := rpc.NewParams(map[string]string{"key": "value"})
+//	payload := rpc.NewPayload(1, "method_name", params)
+//	request := rpc.NewRequest(payload)
+//
+//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+//	defer cancel()
+//	response, err := dialer.Call(ctx, &request)
+//	if err != nil {
+//	    log.Error("RPC call failed", "error", err)
+//	}
+//
+//	// Handle unsolicited events
+//	go func() {
+//	    for event := range dialer.EventCh() {
+//	        if event == nil {
+//	            // Connection closed
+//	            break
+//	        }
+//	        log.Info("Received event", "method", event.Res.Method)
+//	    }
+//	}()
+//
 // # Example Usage
 //
 // Creating and sending a request:
@@ -133,7 +177,7 @@
 //
 //	// Process based on method
 //	switch request.Req.Method {
-//	case "wallet_transfer":
+//	case "transfer":
 //	    var params TransferParams
 //	    if err := request.Req.Params.Translate(&params); err != nil {
 //	        return rpc.Errorf("invalid parameters: %v", err)

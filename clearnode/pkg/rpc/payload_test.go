@@ -1,11 +1,11 @@
-package protocol_test
+package rpc_test
 
 import (
 	"encoding/json"
 	"testing"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc/protocol"
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,12 +13,12 @@ import (
 func TestNewPayload(t *testing.T) {
 	id := uint64(1)
 	method := "testMethod"
-	params := protocol.Params{
+	params := rpc.Params{
 		"param1": json.RawMessage("\"value1\""),
 		"param2": json.RawMessage("2"),
 	}
 
-	payload := protocol.NewPayload(id, method, params)
+	payload := rpc.NewPayload(id, method, params)
 	assert.Equal(t, id, payload.RequestID)
 	assert.Equal(t, method, payload.Method)
 	assert.Equal(t, params, payload.Params)
@@ -29,16 +29,16 @@ func TestPayloadUnmarshalJSON(t *testing.T) {
 	tcs := []struct {
 		name     string
 		input    string
-		expected protocol.Payload
+		expected rpc.Payload
 		errMsg   string
 	}{
 		{
 			name:  "valid payload",
 			input: `[1, "testMethod", {"param1": "value1", "param2": 2}, 1700000000000]`,
-			expected: protocol.Payload{
+			expected: rpc.Payload{
 				RequestID: 1,
 				Method:    "testMethod",
-				Params: protocol.Params{
+				Params: rpc.Params{
 					"param1": json.RawMessage("\"value1\""),
 					"param2": json.RawMessage("2"),
 				},
@@ -75,7 +75,7 @@ func TestPayloadUnmarshalJSON(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			var payload protocol.Payload
+			var payload rpc.Payload
 			err := json.Unmarshal([]byte(tc.input), &payload)
 			if tc.errMsg != "" {
 				require.Error(t, err)
@@ -91,15 +91,15 @@ func TestPayloadUnmarshalJSON(t *testing.T) {
 func TestPayloadMarshalJSON(t *testing.T) {
 	tcs := []struct {
 		name     string
-		input    protocol.Payload
+		input    rpc.Payload
 		expected string
 	}{
 		{
 			name: "valid payload",
-			input: protocol.Payload{
+			input: rpc.Payload{
 				RequestID: 1,
 				Method:    "testMethod",
-				Params: protocol.Params{
+				Params: rpc.Params{
 					"param1": json.RawMessage("\"value1\""),
 					"param2": json.RawMessage("2"),
 				},
@@ -109,10 +109,10 @@ func TestPayloadMarshalJSON(t *testing.T) {
 		},
 		{
 			name: "empty params",
-			input: protocol.Payload{
+			input: rpc.Payload{
 				RequestID: 2,
 				Method:    "anotherMethod",
-				Params:    protocol.Params{},
+				Params:    rpc.Params{},
 				Timestamp: 1700000001000,
 			},
 			expected: `[2,"anotherMethod",{},1700000001000]`,
@@ -132,7 +132,7 @@ func TestNewParams(t *testing.T) {
 	tcs := []struct {
 		name     string
 		input    any
-		expected protocol.Params
+		expected rpc.Params
 		errMsg   string
 	}{
 		{
@@ -141,7 +141,7 @@ func TestNewParams(t *testing.T) {
 				"param1": "value1",
 				"param2": 2,
 			},
-			expected: protocol.Params{
+			expected: rpc.Params{
 				"param1": json.RawMessage("\"value1\""),
 				"param2": json.RawMessage("2"),
 			},
@@ -151,13 +151,13 @@ func TestNewParams(t *testing.T) {
 			name:     "invalid non-map",
 			input:    []string{"not", "a", "map"},
 			expected: nil,
-			errMsg:   "error unmarshalling params: json: cannot unmarshal array into Go value of type protocol.Params",
+			errMsg:   "error unmarshalling params: json: cannot unmarshal array into Go value of type rpc.Params",
 		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			params, err := protocol.NewParams(tc.input)
+			params, err := rpc.NewParams(tc.input)
 			if tc.errMsg != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.errMsg)
@@ -175,7 +175,7 @@ func TestParamsTranslate(t *testing.T) {
 		Param2 int    `json:"param2"`
 	}
 
-	input := protocol.Params{
+	input := rpc.Params{
 		"param1": json.RawMessage("\"value1\""),
 		"param2": json.RawMessage("2"),
 	}
@@ -193,7 +193,7 @@ func TestParamsTranslate(t *testing.T) {
 	sliceOutput := []testObj{}
 	err = input.Translate(&sliceOutput)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "error unmarshalling params: json: cannot unmarshal object into Go value of type []protocol_test.testObj")
+	assert.Contains(t, err.Error(), "error unmarshalling params: json: cannot unmarshal object into Go value of type []rpc_test.testObj")
 
 	expectedMap := map[string]any{
 		"param1": "value1",
@@ -209,24 +209,24 @@ func TestParamsTranslate(t *testing.T) {
 func TestParamsError(t *testing.T) {
 	tcs := []struct {
 		name     string
-		input    protocol.Params
+		input    rpc.Params
 		expected string
 	}{
 		{
 			name: "with error",
-			input: protocol.Params{
+			input: rpc.Params{
 				"error": json.RawMessage("\"something went wrong\""),
 			},
 			expected: "something went wrong",
 		},
 		{
 			name:     "without error",
-			input:    protocol.Params{},
+			input:    rpc.Params{},
 			expected: "",
 		},
 		{
 			name: "malformed error",
-			input: protocol.Params{
+			input: rpc.Params{
 				"error": json.RawMessage("123"), // not a string
 			},
 			expected: "",

@@ -1,4 +1,4 @@
-package protocol
+package rpc
 
 import (
 	"encoding/json"
@@ -228,7 +228,7 @@ func NewParams(v any) (Params, error) {
 //	// In an RPC handler:
 //	var req BalanceRequest
 //	if err := payload.Params.Translate(&req); err != nil {
-//	    return protocol.Errorf("invalid parameters: %v", err)
+//	    return rpc.Errorf("invalid parameters: %v", err)
 //	}
 //	// req.Address and req.Block are now populated
 //

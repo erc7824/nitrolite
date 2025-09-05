@@ -26,7 +26,7 @@ var (
 	ErrNoResponse          = fmt.Errorf("no response received")
 	ErrSendingPing         = fmt.Errorf("error sending ping")
 	
-	// WebSocket specific errors
+	// WebSocket-specific errors
 	ErrDialingWebsocket    = fmt.Errorf("error dialing websocket server")
 )
 

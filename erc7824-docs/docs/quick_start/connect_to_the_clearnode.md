@@ -525,7 +525,7 @@ In methods that require signing messages, that are not part of the authenticatio
 There are also, several things to consider: this method SHOULD sign plain JSON payloads and NOT [ERC-191](https://eips.ethereum.org/EIPS/eip-191) data, because it allows signatures to be compatible with non-EVM chains. Since most of the libraries, like `ethers` or `viem`, use EIP-191 by default, you will need to overwrite the default behavior to sign plain JSON payloads.
 The other thing to consider is that providing an EOA private key directly in the code is not recommended for production applications. Instead, we are recommending to generate session keys -- temporary keys that are used for signing messages during the session. This way, you can avoid exposing your main wallet's private key and reduce the risk of compromising your funds.
 
-The simpliest implementation of a message signer function looks like this:
+The simplest implementation of a message signer function looks like this:
 
 > **Warning**
 > For this example use `ethers` library version `5.7.2`. The `ethers` library version `6.x` has breaking changes that are not allowed in this example.

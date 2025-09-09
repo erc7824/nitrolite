@@ -7,10 +7,10 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/log"
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/google/uuid"
 )
 
 // Client provides a high-level interface for interacting with a Clearnode RPC server.
@@ -25,16 +25,16 @@ import (
 //
 //	dialer := rpc.NewWebsocketDialer(rpc.DefaultWebsocketDialerConfig)
 //	client := rpc.NewClient(dialer)
-//	
+//
 //	// Register event handlers before connecting
 //	client.HandleBalanceUpdateEvent(func(ctx context.Context, notif BalanceUpdateNotification, sigs []sign.Signature) {
 //	    fmt.Printf("Balance updated: %v\n", notif.BalanceUpdates)
 //	})
-//	
+//
 //	// Connect and start listening for events
 //	go dialer.Dial(ctx, "ws://localhost:8080/ws", handleClosure)
 //	go client.ListenEvents(ctx, handleClosure)
-//	
+//
 //	// Make RPC calls
 //	config, sigs, err := client.GetConfig(ctx)
 type Client struct {
@@ -144,7 +144,7 @@ func (c *Client) ListenEvents(ctx context.Context, handleClosure func(err error)
 //
 //	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 //	defer cancel()
-//	
+//
 //	sigs, err := client.Ping(ctx)
 //	if err != nil {
 //	    log.Error("Server not responding", "error", err)
@@ -152,7 +152,6 @@ func (c *Client) ListenEvents(ctx context.Context, handleClosure func(err error)
 func (c *Client) Ping(ctx context.Context) ([]sign.Signature, error) {
 	var resSig []sign.Signature
 	res, err := c.call(ctx, PingMethod, nil)
-
 	if err != nil {
 		return resSig, err
 	}
@@ -165,8 +164,7 @@ func (c *Client) Ping(ctx context.Context) ([]sign.Signature, error) {
 }
 
 // GetConfig retrieves the current server configuration.
-// This includes network parameters, supported features, version information,
-// and other operational settings.
+// This includes network parameters and other operational settings.
 //
 // Parameters:
 //   - ctx: Context for timeout and cancellation
@@ -182,8 +180,7 @@ func (c *Client) Ping(ctx context.Context) ([]sign.Signature, error) {
 //	if err != nil {
 //	    return err
 //	}
-//	fmt.Printf("Server version: %s\n", config.Version)
-//	fmt.Printf("Network: %s\n", config.Network)
+//	fmt.Printf("Network: %+v\n", config.Networks)
 func (c *Client) GetConfig(ctx context.Context) (GetConfigResponse, []sign.Signature, error) {
 	var resParams GetConfigResponse
 	var resSig []sign.Signature
@@ -479,6 +476,10 @@ func (c *Client) AuthRequest(ctx context.Context, reqParams AuthRequestRequest) 
 		return resParams, resSig, err
 	}
 
+	if res.Res.Method != string(AuthChallengeMethod) {
+		return resParams, resSig, fmt.Errorf("unexpected response method: %s", res.Res.Method)
+	}
+
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
 	}
@@ -721,13 +722,21 @@ func (c *Client) GetRPCHistory(ctx context.Context, reqParams GetRPCHistoryReque
 //	    return err
 //	}
 //	fmt.Printf("Channel created: %s\n", channel.ChannelID)
-func (c *Client) CreateChannel(ctx context.Context, reqParams CreateChannelRequest, reqSig sign.Signature) (CreateChannelResponse, []sign.Signature, error) {
+func (c *Client) CreateChannel(ctx context.Context, req *Request) (CreateChannelResponse, []sign.Signature, error) {
+	if req == nil || req.Req.Method != string(CreateChannelMethod) {
+		return CreateChannelResponse{}, nil, ErrInvalidRequestMethod
+	}
+
 	var resParams CreateChannelResponse
 	var resSig []sign.Signature
 
-	res, err := c.call(ctx, CreateChannelMethod, &reqParams, reqSig)
+	res, err := c.Call(ctx, req)
 	if err != nil {
-		return resParams, resSig, err
+		return resParams, res.Sig, err
+	}
+
+	if err := res.Res.Params.Error(); err != nil {
+		return resParams, res.Sig, err
 	}
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
@@ -765,13 +774,21 @@ func (c *Client) CreateChannel(ctx context.Context, reqParams CreateChannelReque
 //	    return err
 //	}
 //	fmt.Printf("Channel resized: new capacity %s\n", updatedChannel.TotalCapacity)
-func (c *Client) ResizeChannel(ctx context.Context, reqParams ResizeChannelRequest, reqSig sign.Signature) (ResizeChannelResponse, []sign.Signature, error) {
+func (c *Client) ResizeChannel(ctx context.Context, req *Request) (ResizeChannelResponse, []sign.Signature, error) {
+	if req == nil || req.Req.Method != string(ResizeChannelMethod) {
+		return ResizeChannelResponse{}, nil, ErrInvalidRequestMethod
+	}
+
 	var resParams ResizeChannelResponse
 	var resSig []sign.Signature
 
-	res, err := c.call(ctx, ResizeChannelMethod, &reqParams, reqSig)
+	res, err := c.Call(ctx, req)
 	if err != nil {
-		return resParams, resSig, err
+		return resParams, res.Sig, err
+	}
+
+	if err := res.Res.Params.Error(); err != nil {
+		return resParams, res.Sig, err
 	}
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
@@ -811,13 +828,21 @@ func (c *Client) ResizeChannel(ctx context.Context, reqParams ResizeChannelReque
 //	    return err
 //	}
 //	fmt.Printf("Channel closing initiated. Finalization at: %v\n", closeResp.FinalizationTime)
-func (c *Client) CloseChannel(ctx context.Context, reqParams CloseChannelRequest, reqSig sign.Signature) (CloseChannelResponse, []sign.Signature, error) {
+func (c *Client) CloseChannel(ctx context.Context, req *Request) (CloseChannelResponse, []sign.Signature, error) {
+	if req == nil || req.Req.Method != string(CloseChannelMethod) {
+		return CloseChannelResponse{}, nil, ErrInvalidRequestMethod
+	}
+
 	var resParams CloseChannelResponse
 	var resSig []sign.Signature
 
-	res, err := c.call(ctx, CloseChannelMethod, &reqParams, reqSig)
+	res, err := c.Call(ctx, req)
 	if err != nil {
-		return resParams, resSig, err
+		return resParams, res.Sig, err
+	}
+
+	if err := res.Res.Params.Error(); err != nil {
+		return resParams, res.Sig, err
 	}
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
@@ -895,19 +920,27 @@ func (c *Client) Transfer(ctx context.Context, reqParams TransferRequest) (Trans
 //	}
 //	// Collect signatures from all participants
 //	sigs := []sign.Signature{aliceSig, bobSig, charlieSig}
-//	
+//
 //	session, serverSigs, err := client.CreateAppSession(ctx, req, sigs)
 //	if err != nil {
 //	    return err
 //	}
 //	fmt.Printf("Session created: %s\n", session.SessionID)
-func (c *Client) CreateAppSession(ctx context.Context, reqParams CreateAppSessionRequest, reqSigs []sign.Signature) (CreateAppSessionResponse, []sign.Signature, error) {
+func (c *Client) CreateAppSession(ctx context.Context, req *Request) (CreateAppSessionResponse, []sign.Signature, error) {
+	if req == nil || req.Req.Method != string(CreateAppSessionMethod) {
+		return CreateAppSessionResponse{}, nil, ErrInvalidRequestMethod
+	}
+
 	var resParams CreateAppSessionResponse
 	var resSig []sign.Signature
 
-	res, err := c.call(ctx, CreateAppSessionMethod, &reqParams, reqSigs...)
+	res, err := c.Call(ctx, req)
 	if err != nil {
-		return resParams, resSig, err
+		return resParams, res.Sig, err
+	}
+
+	if err := res.Res.Params.Error(); err != nil {
+		return resParams, res.Sig, err
 	}
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
@@ -941,19 +974,27 @@ func (c *Client) CreateAppSession(ctx context.Context, reqParams CreateAppSessio
 //	}
 //	// For a game requiring all players to sign
 //	sigs := []sign.Signature{aliceSig, bobSig, charlieSig}
-//	
+//
 //	stateResp, serverSigs, err := client.SubmitAppState(ctx, req, sigs)
 //	if err != nil {
 //	    return err
 //	}
 //	fmt.Printf("State updated to sequence %d\n", stateResp.SequenceNumber)
-func (c *Client) SubmitAppState(ctx context.Context, reqParams SubmitAppStateRequest, reqSigs []sign.Signature) (SubmitAppStateResponse, []sign.Signature, error) {
+func (c *Client) SubmitAppState(ctx context.Context, req *Request) (SubmitAppStateResponse, []sign.Signature, error) {
+	if req == nil || req.Req.Method != string(SubmitAppStateMethod) {
+		return SubmitAppStateResponse{}, nil, ErrInvalidRequestMethod
+	}
+
 	var resParams SubmitAppStateResponse
 	var resSig []sign.Signature
 
-	res, err := c.call(ctx, SubmitAppStateMethod, &reqParams, reqSigs...)
+	res, err := c.Call(ctx, req)
 	if err != nil {
-		return resParams, resSig, err
+		return resParams, res.Sig, err
+	}
+
+	if err := res.Res.Params.Error(); err != nil {
+		return resParams, res.Sig, err
 	}
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
@@ -990,19 +1031,27 @@ func (c *Client) SubmitAppState(ctx context.Context, reqParams SubmitAppStateReq
 //	}
 //	// All participants sign the final outcome
 //	sigs := []sign.Signature{aliceSig, bobSig, charlieSig}
-//	
+//
 //	closeResp, serverSigs, err := client.CloseAppSession(ctx, req, sigs)
 //	if err != nil {
 //	    return err
 //	}
 //	fmt.Printf("Session closed. Funds distributed per outcome.\n")
-func (c *Client) CloseAppSession(ctx context.Context, reqParams CloseAppSessionParams, reqSigs []sign.Signature) (CloseAppSessionResponse, []sign.Signature, error) {
+func (c *Client) CloseAppSession(ctx context.Context, req *Request) (CloseAppSessionResponse, []sign.Signature, error) {
+	if req == nil || req.Req.Method != string(CloseAppSessionMethod) {
+		return CloseAppSessionResponse{}, nil, ErrInvalidRequestMethod
+	}
+
 	var resParams CloseAppSessionResponse
 	var resSig []sign.Signature
 
-	res, err := c.call(ctx, CloseAppSessionMethod, &reqParams, reqSigs...)
+	res, err := c.Call(ctx, req)
 	if err != nil {
-		return resParams, resSig, err
+		return resParams, res.Sig, err
+	}
+
+	if err := res.Res.Params.Error(); err != nil {
+		return resParams, res.Sig, err
 	}
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
@@ -1033,17 +1082,13 @@ func (c *Client) CloseAppSession(ctx context.Context, reqParams CloseAppSessionP
 // 4. Sends via the Dialer's Call method
 // 5. Checks for protocol errors in the response
 func (c *Client) call(ctx context.Context, method Method, reqParams any, sigs ...sign.Signature) (*Response, error) {
-	params, err := NewParams(reqParams)
+	payload, err := c.PreparePayload(method, reqParams)
 	if err != nil {
 		return nil, err
 	}
 
 	req := NewRequest(
-		NewPayload(
-			uint64(time.Now().UnixMilli()),
-			string(method),
-			params,
-		),
+		payload,
 		sigs...,
 	)
 
@@ -1057,6 +1102,19 @@ func (c *Client) call(ctx context.Context, method Method, reqParams any, sigs ..
 	}
 
 	return res, nil
+}
+
+func (c *Client) PreparePayload(method Method, reqParams any) (Payload, error) {
+	params, err := NewParams(reqParams)
+	if err != nil {
+		return Payload{}, err
+	}
+
+	return NewPayload(
+		uint64(uuid.New().ID()),
+		string(method),
+		params,
+	), nil
 }
 
 // HandleBalanceUpdateEvent registers a handler for balance update notifications.

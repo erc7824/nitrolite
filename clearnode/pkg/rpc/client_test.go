@@ -143,10 +143,18 @@ func TestClient_Authentication(t *testing.T) {
 	jwtToken := "test.jwt.token"
 
 	// Auth request handler
-	dialer.RegisterHandler(rpc.AuthRequestMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
-		return createResponse(rpc.AuthRequestMethod, rpc.AuthRequestResponse{
+	dialer.RegisterHandler(rpc.AuthRequestMethod, func(_ rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
+		// Return auth_challenge as response method
+		params, err := rpc.NewParams(rpc.AuthRequestResponse{
 			ChallengeMessage: challengeUUID,
 		})
+		if err != nil {
+			return nil, err
+		}
+
+		payload := rpc.NewPayload(0, string(rpc.AuthChallengeMethod), params)
+		res := rpc.NewResponse(payload)
+		return &res, nil
 	})
 
 	// Auth verify handler (handles both signature and JWT)
@@ -204,9 +212,12 @@ func TestClient_Channels(t *testing.T) {
 		}
 		registerSimpleHandler(dialer, rpc.CreateChannelMethod, expected)
 
-		resp, _, err := client.CreateChannel(testCtx,
-			rpc.CreateChannelRequest{ChainID: testChainID, Token: testToken, Amount: &amount},
-			sign.Signature{})
+		req := rpc.CreateChannelRequest{ChainID: testChainID, Token: testToken, Amount: &amount}
+		payload, err := client.PreparePayload(rpc.CreateChannelMethod, req)
+		require.NoError(t, err)
+		fullReq := rpc.NewRequest(payload, sign.Signature{})
+
+		resp, _, err := client.CreateChannel(testCtx, &fullReq)
 		require.NoError(t, err)
 		assert.Equal(t, expected, resp)
 	})
@@ -348,13 +359,18 @@ func TestClient_AppSessions(t *testing.T) {
 		})
 
 		sigs := []sign.Signature{{}, {}}
-		resp, _, err := client.CreateAppSession(testCtx, rpc.CreateAppSessionRequest{
+		req := rpc.CreateAppSessionRequest{
 			Definition: appDef,
 			Allocations: []rpc.AppAllocation{
 				{ParticipantWallet: testWallet, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
 				{ParticipantWallet: testWallet2, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
 			},
-		}, sigs)
+		}
+		payload, err := client.PreparePayload(rpc.CreateAppSessionMethod, req)
+		require.NoError(t, err)
+		fullReq := rpc.NewRequest(payload, sigs...)
+
+		resp, _, err := client.CreateAppSession(testCtx, &fullReq)
 
 		require.NoError(t, err)
 		assert.Equal(t, "app123", resp.AppSessionID)
@@ -534,9 +550,14 @@ func TestClient_AdditionalMethods(t *testing.T) {
 		registerSimpleHandler(dialer, rpc.ResizeChannelMethod, resize)
 
 		amount := decimal.NewFromInt(2000)
-		resp, _, err := client.ResizeChannel(testCtx, rpc.ResizeChannelRequest{
+		req := rpc.ResizeChannelRequest{
 			ChannelID: "ch123", ResizeAmount: &amount, FundsDestination: testWallet,
-		}, sign.Signature{})
+		}
+		payload, err := client.PreparePayload(rpc.ResizeChannelMethod, req)
+		require.NoError(t, err)
+		fullReq := rpc.NewRequest(payload, sign.Signature{})
+
+		resp, _, err := client.ResizeChannel(testCtx, &fullReq)
 		require.NoError(t, err)
 		assert.Equal(t, rpc.StateIntentResize, resp.State.Intent)
 	})
@@ -548,9 +569,14 @@ func TestClient_AdditionalMethods(t *testing.T) {
 		}
 		registerSimpleHandler(dialer, rpc.CloseChannelMethod, closeResp)
 
-		resp, _, err := client.CloseChannel(testCtx, rpc.CloseChannelRequest{
+		req := rpc.CloseChannelRequest{
 			ChannelID: "ch123", FundsDestination: testWallet,
-		}, sign.Signature{})
+		}
+		payload, err := client.PreparePayload(rpc.CloseChannelMethod, req)
+		require.NoError(t, err)
+		fullReq := rpc.NewRequest(payload, sign.Signature{})
+
+		resp, _, err := client.CloseChannel(testCtx, &fullReq)
 		require.NoError(t, err)
 		assert.Equal(t, rpc.StateIntentFinalize, resp.State.Intent)
 	})
@@ -561,9 +587,15 @@ func TestClient_AdditionalMethods(t *testing.T) {
 		}
 		registerSimpleHandler(dialer, rpc.SubmitAppStateMethod, submit)
 
-		resp, _, err := client.SubmitAppState(testCtx, rpc.SubmitAppStateRequest{
+		sigs := []sign.Signature{{}, {}}
+		req := rpc.SubmitAppStateRequest{
 			AppSessionID: "app123",
-		}, []sign.Signature{{}, {}})
+		}
+		payload, err := client.PreparePayload(rpc.SubmitAppStateMethod, req)
+		require.NoError(t, err)
+		fullReq := rpc.NewRequest(payload, sigs...)
+
+		resp, _, err := client.SubmitAppState(testCtx, &fullReq)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 	})
@@ -574,9 +606,15 @@ func TestClient_AdditionalMethods(t *testing.T) {
 		}
 		registerSimpleHandler(dialer, rpc.CloseAppSessionMethod, closeApp)
 
-		resp, _, err := client.CloseAppSession(testCtx, rpc.CloseAppSessionParams{
+		sigs := []sign.Signature{{}, {}}
+		req := rpc.CloseAppSessionRequest{
 			AppSessionID: "app123",
-		}, []sign.Signature{{}, {}})
+		}
+		payload, err := client.PreparePayload(rpc.CloseAppSessionMethod, req)
+		require.NoError(t, err)
+		fullReq := rpc.NewRequest(payload, sigs...)
+
+		resp, _, err := client.CloseAppSession(testCtx, &fullReq)
 		require.NoError(t, err)
 		assert.Equal(t, "closed", resp.Status)
 	})

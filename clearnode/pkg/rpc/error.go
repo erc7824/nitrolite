@@ -21,11 +21,12 @@ var (
 	ErrReadingMessage    = fmt.Errorf("error reading message")
 
 	// Request/Response errors
-	ErrNilRequest        = fmt.Errorf("request cannot be nil")
-	ErrMarshalingRequest = fmt.Errorf("error marshaling request")
-	ErrSendingRequest    = fmt.Errorf("error sending request")
-	ErrNoResponse        = fmt.Errorf("no response received")
-	ErrSendingPing       = fmt.Errorf("error sending ping")
+	ErrNilRequest           = fmt.Errorf("request cannot be nil")
+	ErrInvalidRequestMethod = fmt.Errorf("invalid request method")
+	ErrMarshalingRequest    = fmt.Errorf("error marshaling request")
+	ErrSendingRequest       = fmt.Errorf("error sending request")
+	ErrNoResponse           = fmt.Errorf("no response received")
+	ErrSendingPing          = fmt.Errorf("error sending ping")
 
 	// WebSocket-specific errors
 	ErrDialingWebsocket = fmt.Errorf("error dialing websocket server")

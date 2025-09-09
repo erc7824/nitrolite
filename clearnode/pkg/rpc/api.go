@@ -46,6 +46,8 @@ const (
 	GetLedgerTransactionsMethod Method = "get_ledger_transactions"
 	// AuthRequestMethod initiates authentication with challenge generation.
 	AuthRequestMethod Method = "auth_request"
+	// AuthChallengeMethod is the response to an auth request with the challenge.
+	AuthChallengeMethod Method = "auth_challenge"
 	// AuthVerifyMethod verifies authentication via signature or JWT.
 	AuthVerifyMethod Method = "auth_verify"
 	// GetUserTagMethod returns the human-readable tag for a wallet (auth required).
@@ -359,8 +361,8 @@ type SubmitAppStateRequest struct {
 // SubmitAppStateResponse contains the updated application session.
 type SubmitAppStateResponse AppSession
 
-// CloseAppSessionParams specifies application session closure parameters.
-type CloseAppSessionParams struct {
+// CloseAppSessionRequest specifies application session closure parameters.
+type CloseAppSessionRequest struct {
 	// AppSessionID identifies the session to close
 	AppSessionID string `json:"app_session_id"`
 	// SessionData contains the final application state

@@ -51,6 +51,10 @@ type Payload struct {
 // The resulting payload will have the current timestamp and can be used
 // in either a Request or Response.
 func NewPayload(id uint64, method string, params Params) Payload {
+	if params == nil {
+		params = Params{}
+	}
+
 	return Payload{
 		RequestID: id,
 		Method:    method,
@@ -199,6 +203,10 @@ type Params map[string]json.RawMessage
 //
 // Returns an error if the value cannot be marshaled to JSON or is not a valid object.
 func NewParams(v any) (Params, error) {
+	if v == nil {
+		return Params{}, nil
+	}
+
 	data, err := json.Marshal(v)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling params: %w", err)

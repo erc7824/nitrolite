@@ -96,12 +96,25 @@
 //
 // # Client Communication
 //
-// The package includes a Dialer interface and WebSocket implementation for client-side RPC:
+// The package includes a Dialer interface and WebSocket implementation for client-side RPC.
+// For most use cases, the high-level Client type provides a more convenient interface:
 //
 //	// Create and configure a dialer
 //	cfg := rpc.DefaultWebsocketDialerConfig
 //	cfg.EventChanSize = 100  // Buffer for unsolicited events
 //	dialer := rpc.NewWebsocketDialer(cfg)
+//
+//	// Create a client
+//	client := rpc.NewClient(dialer)
+//
+//	// Register event handlers before connecting
+//	client.HandleBalanceUpdateEvent(func(ctx context.Context, notif rpc.BalanceUpdateNotification, sigs []sign.Signature) {
+//	    log.Info("Balance updated", "balances", notif.BalanceUpdates)
+//	})
+//
+//	client.HandleChannelUpdateEvent(func(ctx context.Context, notif rpc.ChannelUpdateNotification, sigs []sign.Signature) {
+//	    log.Info("Channel updated", "channelID", notif.ChannelID, "status", notif.Status)
+//	})
 //
 //	// Connect to server (in a goroutine as it blocks)
 //	go dialer.Dial(ctx, "ws://localhost:8080/ws", func(err error) {
@@ -110,12 +123,33 @@
 //	    }
 //	})
 //
+//	// Start listening for events
+//	go client.ListenEvents(ctx, func(err error) {
+//	    log.Info("Event listener stopped", "error", err)
+//	})
+//
 //	// Wait for connection
 //	for !dialer.IsConnected() {
 //	    time.Sleep(100 * time.Millisecond)
 //	}
 //
-//	// Send RPC requests
+//	// Use type-safe client methods
+//	config, sigs, err := client.GetConfig(ctx)
+//	if err != nil {
+//	    log.Error("Failed to get config", "error", err)
+//	}
+//
+//	// Make transfers
+//	transferResp, sigs, err := client.Transfer(ctx, rpc.TransferRequest{
+//	    From: myAddress,
+//	    To: recipientAddress,
+//	    Amount: "1000000000000000000",
+//	    Asset: "ETH",
+//	})
+//
+// For lower-level control, you can use the dialer directly:
+//
+//	// Send RPC requests manually
 //	params, _ := rpc.NewParams(map[string]string{"key": "value"})
 //	payload := rpc.NewPayload(1, "method_name", params)
 //	request := rpc.NewRequest(payload)
@@ -127,7 +161,7 @@
 //	    log.Error("RPC call failed", "error", err)
 //	}
 //
-//	// Handle unsolicited events
+//	// Handle unsolicited events manually
 //	go func() {
 //	    for event := range dialer.EventCh() {
 //	        if event == nil {

@@ -9,25 +9,26 @@ const (
 	// errorParamKey is the standard key used in Params to store error messages.
 	// When a Payload contains an error, it will be stored under this key.
 	errorParamKey = "error"
+	errorMethod   = "error"
 )
 
 // Dialer error messages
 var (
 	// Connection errors
-	ErrAlreadyConnected     = fmt.Errorf("already connected")
-	ErrNotConnected         = fmt.Errorf("not connected to server")
-	ErrConnectionTimeout    = fmt.Errorf("websocket connection timeout")
-	ErrReadingMessage       = fmt.Errorf("error reading message")
-	
+	ErrAlreadyConnected  = fmt.Errorf("already connected")
+	ErrNotConnected      = fmt.Errorf("not connected to server")
+	ErrConnectionTimeout = fmt.Errorf("websocket connection timeout")
+	ErrReadingMessage    = fmt.Errorf("error reading message")
+
 	// Request/Response errors
-	ErrNilRequest          = fmt.Errorf("request cannot be nil")
-	ErrMarshalingRequest   = fmt.Errorf("error marshaling request")
-	ErrSendingRequest      = fmt.Errorf("error sending request")
-	ErrNoResponse          = fmt.Errorf("no response received")
-	ErrSendingPing         = fmt.Errorf("error sending ping")
-	
+	ErrNilRequest        = fmt.Errorf("request cannot be nil")
+	ErrMarshalingRequest = fmt.Errorf("error marshaling request")
+	ErrSendingRequest    = fmt.Errorf("error sending request")
+	ErrNoResponse        = fmt.Errorf("no response received")
+	ErrSendingPing       = fmt.Errorf("error sending ping")
+
 	// WebSocket-specific errors
-	ErrDialingWebsocket    = fmt.Errorf("error dialing websocket server")
+	ErrDialingWebsocket = fmt.Errorf("error dialing websocket server")
 )
 
 // Error represents an error in the RPC protocol that should be sent back to the client

@@ -1,0 +1,111 @@
+services:
+  database:
+    image: postgres:17.2
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      retries: 5
+      start_period: 10s
+
+  db-init:
+    image: postgres:17.2
+    env_file:
+      - .env
+    volumes:
+      - ./config/migrations/postgres:/migrations
+    command: >
+      sh -c "
+        set -e
+        echo 'Waiting for database to be ready...'
+
+        until pg_isready -h database -p 5432 -U ${POSTGRES_USER}; do
+          echo 'Waiting for database connection...'
+          sleep 2
+        done
+
+        # Added -h database to this command
+       psql -h database -U $${POSTGRES_USER} -d $${POSTGRES_DB} -c \"
+          CREATE TABLE IF NOT EXISTS goose_db_version (
+            id serial PRIMARY KEY,
+            version_id int8 NOT NULL,
+            is_applied boolean NOT NULL DEFAULT true,
+            tstamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+        \"
+
+        echo 'Checking for migration files...'
+
+        echo 'Running pending migrations...'
+        for migration in /migrations/*.sql; do
+          filename=\$$(basename \$$migration) &&
+          version=\$$(echo \$$filename | grep -o '^[0-9]\\+') &&
+
+          if ! psql -h database -U $${POSTGRES_USER} -d $${POSTGRES_DB} -tAc \"SELECT 1 FROM goose_db_version WHERE version_id = \$$version\" | grep -q 1; then
+            echo \"Applying migration: \$$filename\"
+            sed -n '/^-- +goose Up/,/^-- +goose Down/p' \$$migration |
+            grep -v '^-- +goose' |
+            psql -h database -U $${POSTGRES_USER} -d $${POSTGRES_DB} &&
+            psql -h database -U $${POSTGRES_USER} -d $${POSTGRES_DB} -c \"INSERT INTO goose_db_version (version_id) VALUES (\$$version);\" &&
+            echo \"Successfully applied: \$$filename\"
+          fi
+        done
+
+        # Token Seeding Process
+        echo '--- Starting Token Seeding Process ---'
+        i=1
+        while true; do
+          address_var=\"TOKEN_$${i}_ADDRESS\"
+          eval \"address=\\\$\$${address_var}\"
+          if [ -z \"\$$address\" ]; then break; fi
+          
+          symbol_var=\"TOKEN_$${i}_SYMBOL\"
+          decimals_var=\"TOKEN_$${i}_DECIMALS\"
+          chain_id_var=\"TOKEN_$${i}_CHAIN_ID\"
+          eval \"symbol=\\\$\$${symbol_var}\"
+          eval \"decimals=\\\$\$${decimals_var}\"
+          eval \"chain_id=\\\$\$${chain_id_var}\"
+
+          # Added -h database to this command
+          TOKEN_EXISTS=\$$(psql -h database -d ${POSTGRES_DB} -t -c \"SELECT COUNT(*) FROM assets WHERE token = '\$$address' AND chain_id = \$$chain_id;\" | xargs)
+          
+          if [ \"\$$TOKEN_EXISTS\" -eq \"0\" ]; then
+            # Added -h database to this command
+            psql -h database -d ${POSTGRES_DB} -c \"
+              INSERT INTO assets (token, chain_id, symbol, decimals)
+              VALUES ('\$$address', \$$chain_id, '\$$symbol', \$$decimals);
+            \"
+          fi
+          i=\$$(($$i + 1))
+        done
+        echo '--- Token Seeding Process Complete ---'
+      "
+    depends_on:
+      database:
+        condition: service_healthy
+
+  clearnode:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+      - "4242:4242"
+    depends_on:
+      database:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local

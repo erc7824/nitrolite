@@ -12,9 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
 // ============================================================================

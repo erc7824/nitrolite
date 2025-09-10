@@ -1,19 +1,21 @@
 package rpc_test
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
+
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
 const (
@@ -48,7 +50,6 @@ func TestManualClient(t *testing.T) {
 	}
 
 	go dialer.Dial(ctx, sandboxWsRpcUrl, handleError)
-	go client.ListenEvents(ctx, handleError)
 
 	for !dialer.IsConnected() {
 		select {
@@ -60,6 +61,7 @@ func TestManualClient(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
+	go client.ListenEvents(ctx, handleError)
 
 	var jwtToken string
 	t.Run("Authenticate With Signature", func(t *testing.T) {
@@ -72,28 +74,37 @@ func TestManualClient(t *testing.T) {
 			Scope:              "",
 			ApplicationAddress: walletSigner.PublicKey().Address().String(),
 		}
-		authRes, _, err := client.AuthRequest(ctx, authReq)
+		authRes, _, err := client.AuthWithSig(ctx, authReq, walletSigner)
 		require.NoError(t, err)
 
-		challengeSig, err := signChallenge(walletSigner, authReq, authRes.ChallengeMessage.String())
-		require.NoError(t, err)
-
-		verifySigReq := rpc.AuthSigVerifyRequest{
-			Challenge: authRes.ChallengeMessage,
-		}
-		verifySigRes, _, err := client.AuthSigVerify(ctx, verifySigReq, challengeSig)
-		require.NoError(t, err)
-		require.True(t, verifySigRes.Success, "auth_sig_verify should succeed")
-		require.NotEmpty(t, verifySigRes.JwtToken, "jwt token should be set")
-		jwtToken = verifySigRes.JwtToken
+		require.True(t, authRes.Success, "auth_sig_verify should succeed")
+		require.NotEmpty(t, authRes.JwtToken, "jwt token should be set")
+		jwtToken = authRes.JwtToken
 	})
 
 	cancel()
+	fmt.Println("Context cancelled, restarting with JWT")
+
 	ctx, cancel = context.WithCancel(t.Context())
 	defer cancel()
 
+	assetSymbol := "usdc"
+	currentBalance := decimal.NewFromInt(-1)
+	currentBalanceMu := sync.RWMutex{}
+
+	client.HandleBalanceUpdateEvent(func(ctx context.Context, notif rpc.BalanceUpdateNotification, resSig []sign.Signature) {
+		for _, ledgerBalance := range notif.BalanceUpdates {
+			if ledgerBalance.Asset == assetSymbol {
+				currentBalanceMu.Lock()
+				defer currentBalanceMu.Unlock()
+
+				currentBalance = ledgerBalance.Amount
+				return
+			}
+		}
+	})
+
 	go dialer.Dial(ctx, sandboxWsRpcUrl, handleError)
-	go client.ListenEvents(ctx, handleError)
 
 	for !dialer.IsConnected() {
 		select {
@@ -105,16 +116,19 @@ func TestManualClient(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
+	fmt.Println("Reconnected")
+	go client.ListenEvents(ctx, handleError)
 
 	var appSessionID string
 	appAllocations := []rpc.AppAllocation{
 		{
 			ParticipantWallet: walletSigner.PublicKey().Address().String(),
-			AssetSymbol:       "usdc",
+			AssetSymbol:       assetSymbol,
 			Amount:            decimal.NewFromInt(1),
 		},
 	}
 
+	var balanceBeforeAppSession, balanceDuringAppSession, balanceAfterAppSession decimal.Decimal
 	tcs := []struct {
 		name string
 		fn   func(t *testing.T)
@@ -160,6 +174,11 @@ func TestManualClient(t *testing.T) {
 		{
 			name: "CreateAppSession",
 			fn: func(t *testing.T) {
+				// Record balance before app session
+				currentBalanceMu.RLock()
+				balanceBeforeAppSession = currentBalance
+				currentBalanceMu.RUnlock()
+
 				createAppReq := rpc.CreateAppSessionRequest{
 					Definition: rpc.AppDefinition{
 						Protocol: "NitroRPC/0.2",
@@ -192,6 +211,11 @@ func TestManualClient(t *testing.T) {
 				require.NoError(t, err)
 				fmt.Printf("App Session Created: %+v\n", createAppRes.AppSessionID)
 				appSessionID = createAppRes.AppSessionID
+
+				// Record balance during app session
+				currentBalanceMu.RLock()
+				balanceDuringAppSession = currentBalance
+				currentBalanceMu.RUnlock()
 			},
 		},
 		{
@@ -246,6 +270,11 @@ func TestManualClient(t *testing.T) {
 				closeAppRes, _, err := client.CloseAppSession(ctx, &closeAppFullReq)
 				require.NoError(t, err)
 				fmt.Printf("App Session closed with Version : %+v\n", closeAppRes.Version)
+
+				// Record balance after app session
+				currentBalanceMu.RLock()
+				balanceAfterAppSession = currentBalance
+				currentBalanceMu.RUnlock()
 			},
 		},
 	}
@@ -255,51 +284,7 @@ func TestManualClient(t *testing.T) {
 			tc.fn(t)
 		})
 	}
-}
 
-func signChallenge(signer sign.Signer, req rpc.AuthRequestRequest, token string) (sign.Signature, error) {
-	typedData := apitypes.TypedData{
-		Types: apitypes.Types{
-			"EIP712Domain": {
-				{Name: "name", Type: "string"},
-			},
-			"Policy": {
-				{Name: "challenge", Type: "string"},
-				{Name: "scope", Type: "string"},
-				{Name: "wallet", Type: "address"},
-				{Name: "application", Type: "address"},
-				{Name: "participant", Type: "address"},
-				{Name: "expire", Type: "uint256"},
-				{Name: "allowances", Type: "Allowance[]"},
-			},
-			"Allowance": {
-				{Name: "asset", Type: "string"},
-				{Name: "amount", Type: "uint256"},
-			}},
-		PrimaryType: "Policy",
-		Domain: apitypes.TypedDataDomain{
-			Name: req.AppName,
-		},
-		Message: map[string]interface{}{
-			"challenge":   token,
-			"scope":       req.Scope,
-			"wallet":      req.Address,
-			"application": req.ApplicationAddress,
-			"participant": req.SessionKey,
-			"expire":      req.Expire,
-			"allowances":  req.Allowances,
-		},
-	}
-
-	hash, _, err := apitypes.TypedDataAndHash(typedData)
-	if err != nil {
-		return sign.Signature{}, err
-	}
-
-	signature, err := signer.Sign(hash)
-	if err != nil {
-		return sign.Signature{}, err
-	}
-
-	return signature, nil
+	assert.Equal(t, balanceBeforeAppSession.IntPart(), balanceDuringAppSession.IntPart()+1)
+	assert.Equal(t, balanceBeforeAppSession.IntPart(), balanceAfterAppSession.IntPart())
 }

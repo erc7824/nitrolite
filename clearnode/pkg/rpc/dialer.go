@@ -144,6 +144,7 @@ func (d *WebsocketDialer) Dial(ctx context.Context, url string, handleClosure fu
 		conn: conn,
 		lg:   log.FromContext(ctx).WithName("ws-dialer"),
 	}
+	d.eventCh = make(chan *Response, d.cfg.EventChanSize)
 	d.mu.Unlock()
 
 	// Start background goroutines

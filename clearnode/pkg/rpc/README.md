@@ -4,11 +4,15 @@ The `pkg/rpc` package provides the core data structures and utilities for the Cl
 
 ## Overview
 
-The RPC package defines the fundamental building blocks for RPC communication:
-- **Request/Response Messages**: Structured messages with cryptographic signatures
-- **Payload Format**: Compact array-based JSON encoding for efficient transmission
-- **Error Handling**: Distinction between client-facing and internal errors
-- **Type Safety**: Strong typing with flexible parameter handling
+The RPC package provides a complete client implementation for interacting with the ClearNode RPC server:
+
+- **High-Level Client**: Type-safe methods for all RPC operations
+- **WebSocket Transport**: Persistent connection with automatic reconnection
+- **Event Handling**: Asynchronous notifications for balance updates, transfers, and channel changes
+- **Authentication**: Wallet-based authentication with JWT token support
+- **Channel Management**: Create, resize, and close payment channels
+- **Application Sessions**: Multi-party state channel applications
+- **Off-chain Transfers**: Instant, gas-free transfers within ClearNode
 
 ## Core Components
 
@@ -38,21 +42,60 @@ The package provides a specialized `Error` type for client-facing errors:
 - Internal errors remain hidden from external clients
 - Clear API for creating formatted error messages
 
-### Client Communication
+### High-Level Client API
 
-The package provides two levels of client functionality:
+The `Client` type provides convenient methods for all server operations:
 
-#### High-Level Client
+#### Public Methods (No Authentication Required)
+- `Ping()` - Check server connectivity
+- `GetConfig()` - Get server configuration and supported networks
+- `GetAssets()` - List supported tokens/assets
+- `GetChannels()` - Query payment channels
+- `GetAppSessions()` - List application sessions
+- `GetLedgerEntries()` - View ledger entries
+- `GetLedgerTransactions()` - View transaction history
 
-The `Client` type provides a type-safe, convenient interface for all RPC operations:
-- **Type-safe methods**: Dedicated methods for each RPC operation
-- **Event handling**: Simple registration of event handlers
-- **Automatic serialization**: Handles request/response marshaling
-- **Thread-safe**: Safe for concurrent use from multiple goroutines
+#### Authentication
+- `AuthWithSig()` - Authenticate using wallet signature
+- `AuthJWTVerify()` - Verify existing JWT token
 
-#### Low-Level Dialer
+#### Authenticated Methods
+- `GetUserTag()` - Get user's human-readable tag
+- `GetLedgerBalances()` - View account balances
+- `GetRPCHistory()` - View RPC call history
+- `CreateChannel()` - Request new payment channel
+- `ResizeChannel()` - Modify channel funding
+- `CloseChannel()` - Close payment channel
+- `Transfer()` - Transfer funds between ClearNode accounts
+- `CreateAppSession()` - Start multi-party application
+- `SubmitAppState()` - Update application state
+- `CloseAppSession()` - Close application session
 
-The `Dialer` interface and WebSocket implementation provide lower-level communication:
+### Event Handling
+
+The client supports real-time event notifications:
+
+```go
+// Register event handlers
+client.HandleBalanceUpdateEvent(func(ctx context.Context, notif BalanceUpdateNotification, sigs []sign.Signature) {
+    // Handle balance changes
+})
+
+client.HandleChannelUpdateEvent(func(ctx context.Context, notif ChannelUpdateNotification, sigs []sign.Signature) {
+    // Handle channel state changes
+})
+
+client.HandleTransferEvent(func(ctx context.Context, notif TransferNotification, sigs []sign.Signature) {
+    // Handle incoming/outgoing transfers
+})
+
+// Start listening for events
+go client.ListenEvents(ctx, handleClosure)
+```
+
+### Transport Layer
+
+The package includes a `Dialer` interface with a WebSocket implementation:
 - **Thread-safe**: Supports concurrent RPC calls
 - **Automatic reconnection**: Built-in ping/pong mechanism
 - **Event handling**: Separate channel for unsolicited server events
@@ -64,7 +107,139 @@ The `Dialer` interface and WebSocket implementation provide lower-level communic
 import "github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 ```
 
-## Basic Usage
+## Client Usage
+
+### Quick Start
+
+```go
+import "github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+
+// Create and connect client
+dialer := rpc.NewWebsocketDialer(rpc.DefaultWebsocketDialerConfig)
+client := rpc.NewClient(dialer)
+
+// Connect to server
+ctx := context.Background()
+go dialer.Dial(ctx, "wss://clearnet-sandbox.yellow.com/ws", func(err error) {
+    if err != nil {
+        log.Error("Connection error", "error", err)
+    }
+})
+
+// Wait for connection
+for !dialer.IsConnected() {
+    time.Sleep(100 * time.Millisecond)
+}
+
+// Set up event handlers
+client.HandleBalanceUpdateEvent(handleBalanceUpdate)
+go client.ListenEvents(ctx, handleClosure)
+
+// Get server configuration
+config, _, err := client.GetConfig(ctx)
+if err != nil {
+    log.Fatal("Failed to get config", "error", err)
+}
+
+// Authenticate
+walletSigner, _ := sign.NewEthereumSigner(walletPrivateKey)
+sessionSigner, _ := sign.NewEthereumSigner(sessionPrivateKey)
+
+authReq := rpc.AuthRequestRequest{
+    Address:            walletSigner.PublicKey().Address().String(),
+    SessionKey:         sessionSigner.PublicKey().Address().String(), // Different from Address
+    AppName:            "MyApp",
+    ApplicationAddress: appContractAddress,
+}
+
+authResp, _, err := client.AuthWithSig(ctx, authReq, walletSigner)
+if err != nil {
+    log.Fatal("Authentication failed", "error", err)
+}
+jwtToken := authResp.JwtToken // Store for future use
+
+// Make authenticated calls
+balances, _, err := client.GetLedgerBalances(ctx, rpc.GetLedgerBalancesRequest{})
+```
+
+### Channel Operations
+
+```go
+// Create a payment channel
+amount := decimal.NewFromInt(1000000)
+createReq := rpc.CreateChannelRequest{
+    ChainID:    1,
+    Token:      "0xUSDC",
+    Amount:     &amount,
+    SessionKey: &sessionKeyAddress, // Required
+}
+
+// Prepare and sign request
+payload, _ := client.PreparePayload(rpc.CreateChannelMethod, createReq)
+hash, _ := payload.Hash()
+sig, _ := sessionSigner.Sign(hash)
+fullReq := rpc.NewRequest(payload, sig)
+
+// Server returns signed channel state
+response, _, err := client.CreateChannel(ctx, &fullReq)
+if err != nil {
+    log.Fatal("Failed to create channel", "error", err)
+}
+
+// You must sign the state and submit to blockchain yourself
+stateHash := computeStateHash(response.State)
+mySignature, _ := sessionSigner.Sign(stateHash)
+// Submit response.StateSignature and mySignature to blockchain
+```
+
+### Off-chain Transfers
+
+```go
+// Transfer funds between ClearNode accounts (no blockchain interaction)
+transferReq := rpc.TransferRequest{
+    Destination: recipientAddress,
+    Allocations: []rpc.TransferAllocation{
+        {AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
+    },
+}
+
+response, _, err := client.Transfer(ctx, transferReq)
+if err != nil {
+    log.Fatal("Transfer failed", "error", err)
+}
+```
+
+### Application Sessions
+
+```go
+// Create multi-party application session
+createSessReq := rpc.CreateAppSessionRequest{
+    Definition: rpc.AppDefinition{
+        Protocol:           "game/v1",
+        ParticipantWallets: []string{player1, player2},
+        Weights:            []int64{1, 1},
+        Quorum:             2,
+        Challenge:          3600,
+        Nonce:              uint64(uuid.New().ID()),
+    },
+    Allocations: []rpc.AppAllocation{
+        {ParticipantWallet: player1, AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
+        {ParticipantWallet: player2, AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
+    },
+}
+
+payload, _ := client.PreparePayload(rpc.CreateAppSessionMethod, createSessReq)
+hash, _ := payload.Hash()
+
+// Both participants must sign
+sig1, _ := player1Signer.Sign(hash)
+sig2, _ := player2Signer.Sign(hash)
+fullReq := rpc.NewRequest(payload, sig1, sig2)
+
+response, _, err := client.CreateAppSession(ctx, &fullReq)
+```
+
+## Low-Level Usage
 
 ### Creating a Request
 
@@ -155,328 +330,6 @@ if err != nil {
 var received TransferParams
 if err := params.Translate(&received); err != nil {
     return rpc.Errorf("invalid parameters: %v", err)
-}
-```
-
-## Using the RPC Client
-
-The `Client` type provides a high-level interface for interacting with Clearnode RPC servers. It handles all the low-level details of request construction, signature management, and response parsing.
-
-### Client Setup
-
-```go
-// 1. Create a dialer configuration
-cfg := rpc.DefaultWebsocketDialerConfig
-cfg.EventChanSize = 100  // Adjust based on expected event volume
-
-// 2. Create the dialer
-dialer := rpc.NewWebsocketDialer(cfg)
-
-// 3. Create the client
-client := rpc.NewClient(dialer)
-
-// 4. Register event handlers (before connecting)
-client.HandleBalanceUpdateEvent(func(ctx context.Context, notif rpc.BalanceUpdateNotification, sigs []sign.Signature) {
-    for _, update := range notif.BalanceUpdates {
-        log.Info("Balance changed", 
-            "account", update.Account,
-            "asset", update.Asset,
-            "amount", update.Amount)
-    }
-})
-
-client.HandleChannelUpdateEvent(func(ctx context.Context, notif rpc.ChannelUpdateNotification, sigs []sign.Signature) {
-    log.Info("Channel updated",
-        "channelID", notif.ChannelID,
-        "status", notif.Status)
-})
-
-client.HandleTransferEvent(func(ctx context.Context, notif rpc.TransferNotification, sigs []sign.Signature) {
-    for _, tx := range notif.Transactions {
-        log.Info("Transfer",
-            "from", tx.FromAccount,
-            "to", tx.ToAccount,
-            "amount", tx.Amount)
-    }
-})
-
-// 5. Connect to the server
-ctx := context.Background()
-go dialer.Dial(ctx, "ws://localhost:8080/ws", func(err error) {
-    if err != nil {
-        log.Error("Connection closed", "error", err)
-    }
-})
-
-// 6. Start event listener
-go client.ListenEvents(ctx, func(err error) {
-    log.Info("Event listener stopped", "error", err)
-})
-
-// 7. Wait for connection to be established
-for !dialer.IsConnected() {
-    time.Sleep(100 * time.Millisecond)
-}
-```
-
-### Making RPC Calls
-
-#### Query Operations
-
-```go
-// Get server configuration
-config, sigs, err := client.GetConfig(ctx)
-if err != nil {
-    return fmt.Errorf("failed to get config: %w", err)
-}
-
-// Get asset information
-assetsResp, sigs, err := client.GetAssets(ctx, rpc.GetAssetsRequest{
-    AssetIDs: []string{"ETH", "USDC"},
-})
-
-// Get account balances
-balances, sigs, err := client.GetLedgerBalances(ctx, rpc.GetLedgerBalancesRequest{
-    Account: myAddress,
-    Assets: []string{"ETH", "USDC"},
-})
-
-// Get channels
-channels, sigs, err := client.GetChannels(ctx, rpc.GetChannelsRequest{
-    Participant: myAddress,
-    Status: "open",
-})
-```
-
-#### Authentication
-
-```go
-// Request authentication challenge
-authReq := rpc.AuthRequestRequest{
-    Address: myAddress,
-    Scope: []string{"read", "write"},
-}
-challenge, sigs, err := client.AuthRequest(ctx, authReq)
-if err != nil {
-    return fmt.Errorf("auth request failed: %w", err)
-}
-
-// Sign the challenge (using your signing library)
-signature := signChallenge(privateKey, challenge.Challenge)
-
-// Verify the signature
-verifyReq := rpc.AuthSigVerifyRequest{
-    Challenge: challenge.Challenge,
-    Address: myAddress,
-}
-authResp, sigs, err := client.AuthSigVerify(ctx, verifyReq, signature)
-if err != nil {
-    return fmt.Errorf("auth verify failed: %w", err)
-}
-
-// Use the auth token for subsequent requests
-log.Info("Authenticated", "token", authResp.Token)
-```
-
-#### Transfers
-
-```go
-// Simple transfer
-transferReq := rpc.TransferRequest{
-    From: myAddress,
-    To: recipientAddress,
-    Amount: "1000000000000000000", // 1 ETH
-    Asset: "ETH",
-    Memo: "Payment for services",
-}
-
-txResp, sigs, err := client.Transfer(ctx, transferReq)
-if err != nil {
-    return fmt.Errorf("transfer failed: %w", err)
-}
-
-log.Info("Transfer completed", 
-    "txID", txResp.TransactionID,
-    "status", txResp.Status)
-```
-
-#### Channel Operations
-
-```go
-// Create a channel
-createReq := rpc.CreateChannelRequest{
-    Participants: []string{myAddress, counterpartyAddress},
-    InitialBalances: map[string]string{
-        myAddress: "5000000000000000000", // 5 ETH
-        counterpartyAddress: "0",
-    },
-    Asset: "ETH",
-}
-
-// Sign the channel creation
-signature := signChannelCreation(privateKey, createReq)
-
-channelResp, sigs, err := client.CreateChannel(ctx, createReq, signature)
-if err != nil {
-    return fmt.Errorf("channel creation failed: %w", err)
-}
-
-log.Info("Channel created", "channelID", channelResp.ChannelID)
-
-// Later, close the channel
-closeReq := rpc.CloseChannelRequest{
-    ChannelID: channelResp.ChannelID,
-    FinalBalances: map[string]string{
-        myAddress: "3000000000000000000",
-        counterpartyAddress: "2000000000000000000",
-    },
-    Cooperative: true,
-}
-
-// Sign the close request
-closeSig := signChannelClose(privateKey, closeReq)
-
-closeResp, sigs, err := client.CloseChannel(ctx, closeReq, closeSig)
-if err != nil {
-    return fmt.Errorf("channel close failed: %w", err)
-}
-```
-
-#### Application Sessions
-
-```go
-// Create an app session (e.g., for a game)
-createSessionReq := rpc.CreateAppSessionRequest{
-    AppID: gameAppID,
-    Participants: []string{player1, player2, player3},
-    InitialState: initialGameState,
-    Timeout: 3600, // 1 hour
-}
-
-// Collect signatures from all participants
-sigs := []sign.Signature{player1Sig, player2Sig, player3Sig}
-
-session, serverSigs, err := client.CreateAppSession(ctx, createSessionReq, sigs)
-if err != nil {
-    return fmt.Errorf("session creation failed: %w", err)
-}
-
-// Submit state updates during the game
-stateUpdateReq := rpc.SubmitAppStateRequest{
-    SessionID: session.SessionID,
-    NewState: updatedGameState,
-    SequenceNumber: 42,
-}
-
-// All players must sign state updates
-updateSigs := []sign.Signature{player1Sig, player2Sig, player3Sig}
-
-stateResp, serverSigs, err := client.SubmitAppState(ctx, stateUpdateReq, updateSigs)
-if err != nil {
-    return fmt.Errorf("state update failed: %w", err)
-}
-
-// Close the session when done
-closeSessionReq := rpc.CloseAppSessionParams{
-    SessionID: session.SessionID,
-    FinalState: finalGameState,
-    Outcome: map[string]string{
-        player1: "2000000000000000000", // Player 1 wins 2 ETH
-        player2: "500000000000000000",   // Player 2 gets 0.5 ETH
-        player3: "500000000000000000",   // Player 3 gets 0.5 ETH
-    },
-}
-
-closeSigs := []sign.Signature{player1Sig, player2Sig, player3Sig}
-closeResp, serverSigs, err := client.CloseAppSession(ctx, closeSessionReq, closeSigs)
-```
-
-### Error Handling
-
-The client returns errors in several cases:
-
-```go
-resp, sigs, err := client.Transfer(ctx, transferReq)
-if err != nil {
-    // Check if it's an RPC protocol error
-    var rpcErr *rpc.Error
-    if errors.As(err, &rpcErr) {
-        // This is a client-facing error from the server
-        log.Error("RPC error", "message", rpcErr.Error())
-        return err
-    }
-    
-    // Network or other transport error
-    log.Error("Transport error", "error", err)
-    return err
-}
-```
-
-### Best Practices
-
-1. **Always register event handlers before connecting** - Events may arrive immediately after connection
-2. **Use contexts with timeouts** - Prevent hanging on network issues
-3. **Handle reconnection** - The dialer handles reconnection, but you may need to re-authenticate
-4. **Verify signatures** - Always verify server signatures on sensitive operations
-5. **Keep event handlers lightweight** - Don't block the event processing loop
-
-### Complete Example
-
-```go
-func runClient(ctx context.Context) error {
-    // Setup
-    cfg := rpc.DefaultWebsocketDialerConfig
-    dialer := rpc.NewWebsocketDialer(cfg)
-    client := rpc.NewClient(dialer)
-    
-    // Event handlers
-    client.HandleBalanceUpdateEvent(handleBalanceUpdate)
-    client.HandleChannelUpdateEvent(handleChannelUpdate)
-    client.HandleTransferEvent(handleTransfer)
-    
-    // Connect
-    errCh := make(chan error, 2)
-    go func() {
-        dialer.Dial(ctx, "ws://localhost:8080/ws", func(err error) {
-            errCh <- fmt.Errorf("connection closed: %w", err)
-        })
-    }()
-    
-    go func() {
-        client.ListenEvents(ctx, func(err error) {
-            errCh <- fmt.Errorf("event listener stopped: %w", err)
-        })
-    }()
-    
-    // Wait for connection
-    for !dialer.IsConnected() {
-        select {
-        case <-ctx.Done():
-            return ctx.Err()
-        case err := <-errCh:
-            return err
-        case <-time.After(100 * time.Millisecond):
-            // Continue waiting
-        }
-    }
-    
-    // Authenticate
-    if err := authenticate(ctx, client); err != nil {
-        return fmt.Errorf("authentication failed: %w", err)
-    }
-    
-    // Run main logic
-    if err := runMainLogic(ctx, client); err != nil {
-        return fmt.Errorf("main logic failed: %w", err)
-    }
-    
-    // Wait for shutdown
-    select {
-    case <-ctx.Done():
-        return ctx.Err()
-    case err := <-errCh:
-        return err
-    }
 }
 ```
 
@@ -646,11 +499,25 @@ type WebsocketDialerConfig struct {
 
 ## Testing
 
-The package includes comprehensive tests for all components. Run tests with:
+The package includes comprehensive tests:
 
+### Unit Tests
 ```bash
 go test -race ./pkg/rpc
 ```
+
+### Integration Tests
+The `client_manual_test.go` file contains integration tests that connect to a real ClearNode server. These tests demonstrate real-world usage patterns and verify the client works correctly with the current server deployment.
+
+```bash
+# Run manual tests (requires test credentials)
+TEST_WALLET_PK=<wallet_private_key> TEST_SESSION_PK=<session_private_key> \
+    go test -run TestManualClient ./pkg/rpc
+```
+
+The manual test serves two purposes:
+1. Verifies the client implementation works with the live server
+2. Provides working examples of all major client operations
 
 ## Dependencies
 

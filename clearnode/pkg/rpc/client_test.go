@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
-	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
 // Test helpers
@@ -27,7 +27,7 @@ var (
 )
 
 // setupClient creates a test client with mock dialer
-func setupClient(t *testing.T) (*rpc.Client, *MockDialer) {
+func setupClient() (*rpc.Client, *MockDialer) {
 	mockDialer := NewMockDialer()
 	client := rpc.NewClient(mockDialer)
 	return client, mockDialer
@@ -60,7 +60,7 @@ func registerErrorHandler(dialer *MockDialer, method rpc.Method, errMsg string) 
 }
 
 func TestClient_Ping(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 
 	// Ping returns pong
 	dialer.RegisterHandler(rpc.PingMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
@@ -75,7 +75,7 @@ func TestClient_Ping(t *testing.T) {
 }
 
 func TestClient_GetConfig(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 
 	config := rpc.BrokerConfig{
 		BrokerAddress: testWallet,
@@ -95,7 +95,7 @@ func TestClient_GetConfig(t *testing.T) {
 }
 
 func TestClient_GetAssets(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 
 	// Test data
 	assets := []rpc.Asset{
@@ -137,66 +137,27 @@ func TestClient_GetAssets(t *testing.T) {
 }
 
 func TestClient_Authentication(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 
-	challengeUUID := uuid.New()
 	jwtToken := "test.jwt.token"
 
-	// Auth request handler
-	dialer.RegisterHandler(rpc.AuthRequestMethod, func(_ rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
-		// Return auth_challenge as response method
-		params, err := rpc.NewParams(rpc.AuthRequestResponse{
-			ChallengeMessage: challengeUUID,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		payload := rpc.NewPayload(0, string(rpc.AuthChallengeMethod), params)
-		res := rpc.NewResponse(payload)
-		return &res, nil
-	})
-
-	// Auth verify handler (handles both signature and JWT)
+	// Auth verify handler for JWT
 	dialer.RegisterHandler(rpc.AuthVerifyMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
-		// Try signature verify
-		var sigReq rpc.AuthSigVerifyRequest
-		if params.Translate(&sigReq) == nil {
-			return createResponse(rpc.AuthVerifyMethod, rpc.AuthSigVerifyResponse{
-				Address: testWallet, SessionKey: "session123",
-				JwtToken: jwtToken, Success: true,
-			})
-		}
-
-		// Try JWT verify
 		return createResponse(rpc.AuthVerifyMethod, rpc.AuthJWTVerifyResponse{
 			Address: testWallet, SessionKey: "session123", Success: true,
 		})
 	})
 
-	// Test auth request
-	authResp, _, err := client.AuthRequest(testCtx, rpc.AuthRequestRequest{
-		Address: testWallet, SessionKey: "session123", AppName: "test",
-		Allowances: []rpc.Allowance{{Asset: testSymbol, Amount: "100"}},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, challengeUUID, authResp.ChallengeMessage)
-
-	// Test signature verify
-	sigResp, _, err := client.AuthSigVerify(testCtx,
-		rpc.AuthSigVerifyRequest{Challenge: challengeUUID}, sign.Signature{})
-	require.NoError(t, err)
-	assert.True(t, sigResp.Success)
-	assert.Equal(t, jwtToken, sigResp.JwtToken)
-
 	// Test JWT verify
 	jwtResp, _, err := client.AuthJWTVerify(testCtx, rpc.AuthJWTVerifyRequest{JWT: jwtToken})
 	require.NoError(t, err)
 	assert.True(t, jwtResp.Success)
+
+	// Note: AuthSigVerify test with signer is in client_internal_test.go
 }
 
 func TestClient_Channels(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 	amount := decimal.NewFromInt(1000)
 
 	t.Run("create", func(t *testing.T) {
@@ -238,7 +199,7 @@ func TestClient_Channels(t *testing.T) {
 }
 
 func TestClient_Ledger(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 
 	t.Run("balances", func(t *testing.T) {
 		balances := rpc.GetLedgerBalancesResponse{
@@ -301,7 +262,7 @@ func TestClient_Ledger(t *testing.T) {
 }
 
 func TestClient_Transfer(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 
 	dialer.RegisterHandler(rpc.TransferMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
 		// Async notification
@@ -334,7 +295,7 @@ func TestClient_Transfer(t *testing.T) {
 }
 
 func TestClient_AppSessions(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 
 	appDef := rpc.AppDefinition{
 		Protocol:           "game",
@@ -393,7 +354,7 @@ func TestClient_AppSessions(t *testing.T) {
 }
 
 func TestClient_EventHandling(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 
 	// Event channels
 	balanceReceived := make(chan rpc.BalanceUpdateNotification, 1)
@@ -463,7 +424,7 @@ func TestClient_EventHandling(t *testing.T) {
 }
 
 func TestClient_ErrorHandling(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 
 	// No handler registered
 	_, _, err := client.GetConfig(testCtx)
@@ -476,7 +437,7 @@ func TestClient_ErrorHandling(t *testing.T) {
 }
 
 func TestClient_ConcurrentOperations(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 
 	// Handler with delay
 	dialer.RegisterHandler(rpc.GetAssetsMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
@@ -504,7 +465,7 @@ func TestClient_ConcurrentOperations(t *testing.T) {
 
 // Additional test coverage for remaining methods
 func TestClient_AdditionalMethods(t *testing.T) {
-	client, dialer := setupClient(t)
+	client, dialer := setupClient()
 
 	t.Run("GetAppDefinition", func(t *testing.T) {
 		def := rpc.GetAppDefinitionResponse{

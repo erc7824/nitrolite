@@ -1,6 +1,7 @@
-// Package rpc provides client-side functionality for the Clearnode RPC protocol.
-// This file contains the Client implementation that handles RPC method calls,
-// event subscriptions, and manages the underlying connection through a Dialer.
+// Package rpc provides a high-level client for interacting with the ClearNode RPC server.
+//
+// The Client type wraps a Dialer to provide convenient methods for all RPC operations,
+// including authentication, channel management, application sessions, and event handling.
 package rpc
 
 import (
@@ -8,55 +9,56 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/signer/core/apitypes"
+	"github.com/google/uuid"
+
 	"github.com/erc7824/nitrolite/clearnode/pkg/log"
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
-	"github.com/google/uuid"
 )
 
-// Client provides a high-level interface for interacting with a Clearnode RPC server.
-// It wraps a Dialer implementation (e.g., WebSocket) and provides type-safe methods
-// for all RPC operations, automatic event handling, and thread-safe event handler
-// registration.
+// Client provides a high-level interface for interacting with the ClearNode RPC server.
+// It wraps a Dialer to provide convenient methods for all RPC operations and manages
+// event handlers for asynchronous notifications from the server.
 //
-// The Client is designed to be used concurrently from multiple goroutines and
-// maintains a registry of event handlers for processing unsolicited server events.
+// The Client is safe for concurrent use and supports:
+//   - All public RPC methods (no authentication required)
+//   - Authentication via wallet signature or JWT
+//   - Authenticated RPC methods (require prior authentication)
+//   - Event handling for balance updates, channel updates, and transfers
 //
 // Example usage:
 //
 //	dialer := rpc.NewWebsocketDialer(rpc.DefaultWebsocketDialerConfig)
 //	client := rpc.NewClient(dialer)
 //
-//	// Register event handlers before connecting
+//	// Connect to the server
+//	go dialer.Dial(ctx, "wss://server.example.com/ws", handleError)
+//
+//	// Set up event handlers
 //	client.HandleBalanceUpdateEvent(func(ctx context.Context, notif BalanceUpdateNotification, sigs []sign.Signature) {
-//	    fmt.Printf("Balance updated: %v\n", notif.BalanceUpdates)
+//	    fmt.Printf("Balance updated: %+v\n", notif.BalanceUpdates)
 //	})
 //
-//	// Connect and start listening for events
-//	go dialer.Dial(ctx, "ws://localhost:8080/ws", handleClosure)
-//	go client.ListenEvents(ctx, handleClosure)
+//	// Start listening for events
+//	go client.ListenEvents(ctx, handleError)
 //
 //	// Make RPC calls
-//	config, sigs, err := client.GetConfig(ctx)
+//	config, _, err := client.GetConfig(ctx)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 type Client struct {
 	Dialer
 	eventHandlers map[Event]any
 	mu            sync.RWMutex // protects eventHandlers
 }
 
-// NewClient creates a new RPC client with the provided dialer.
-// The dialer is responsible for establishing and maintaining the connection
-// to the RPC server. Common dialer implementations include WebsocketDialer.
-//
-// Parameters:
-//   - dialer: The Dialer implementation to use for communication
-//
-// Returns:
-//   - *Client: A new client instance ready for use
+// NewClient creates a new RPC client using the provided dialer.
+// The dialer must be connected before making RPC calls.
 //
 // Example:
 //
-//	cfg := rpc.DefaultWebsocketDialerConfig
-//	dialer := rpc.NewWebsocketDialer(cfg)
+//	dialer := rpc.NewWebsocketDialer(rpc.DefaultWebsocketDialerConfig)
 //	client := rpc.NewClient(dialer)
 func NewClient(dialer Dialer) *Client {
 	return &Client{
@@ -65,51 +67,47 @@ func NewClient(dialer Dialer) *Client {
 	}
 }
 
-// BalanceUpdateEventHandler is the callback function type for balance update events.
-// It receives the context, notification data, and server signatures for verification.
+// BalanceUpdateEventHandler processes balance update notifications from the server.
+// These notifications are sent when account balances change due to transfers,
+// channel operations, or application session updates.
 type BalanceUpdateEventHandler func(ctx context.Context, notif BalanceUpdateNotification, resSig []sign.Signature)
 
-// ChannelUpdateEventHandler is the callback function type for channel state change events.
-// It receives the context, notification data, and server signatures for verification.
+// ChannelUpdateEventHandler processes channel update notifications from the server.
+// These notifications are sent when a channel's state changes, including creation,
+// resizing, closure, or challenge events.
 type ChannelUpdateEventHandler func(ctx context.Context, notif ChannelUpdateNotification, resSig []sign.Signature)
 
-// TransferEventHandler is the callback function type for transfer events.
-// It receives the context, notification data, and server signatures for verification.
+// TransferEventHandler processes transfer notifications from the server.
+// These notifications are sent when transfers affect the authenticated user's account,
+// including both incoming and outgoing transfers.
 type TransferEventHandler func(ctx context.Context, notif TransferNotification, resSig []sign.Signature)
 
-// ListenEvents starts listening for unsolicited events from the server.
-// This method should be called in a separate goroutine after establishing
-// the connection through the dialer. It will continuously process events
-// until the context is cancelled or the connection is closed.
+// ListenEvents starts listening for asynchronous events from the server.
+// This method blocks until the context is cancelled or the connection is closed.
+// Events are dispatched to registered handlers based on their type.
 //
-// The method automatically routes events to their registered handlers based
-// on the event type. Unknown events are logged but do not cause errors.
+// The handleClosure callback is invoked when the event loop exits, either due to
+// context cancellation or connection closure. If an error occurred, it will be
+// passed to the callback.
 //
-// Parameters:
-//   - ctx: Context for cancellation and logging
-//   - handleClosure: Callback invoked when the event loop exits (err is nil for clean shutdown)
+// This method should be called in a goroutine after establishing the connection
+// and registering event handlers:
 //
-// Example usage:
-//
-//	// Start event listener in background
 //	go client.ListenEvents(ctx, func(err error) {
 //	    if err != nil {
-//	        log.Error("Event listener stopped with error", "error", err)
-//	    } else {
-//	        log.Info("Event listener stopped cleanly")
+//	        log.Error("Event listener closed with error", "error", err)
 //	    }
 //	})
-//
-// Note: Make sure to register event handlers before calling this method.
 func (c *Client) ListenEvents(ctx context.Context, handleClosure func(err error)) {
 	logger := log.FromContext(ctx)
+	eventCh := c.Dialer.EventCh()
 
 	for {
 		select {
 		case <-ctx.Done():
 			handleClosure(nil)
 			return
-		case event := <-c.EventCh():
+		case event := <-eventCh:
 			if event == nil {
 				handleClosure(nil)
 				return
@@ -130,24 +128,18 @@ func (c *Client) ListenEvents(ctx context.Context, handleClosure func(err error)
 }
 
 // Ping sends a ping request to the server to check connectivity and liveness.
-// The server should respond with a pong message. This method can be used
-// for health checks or to keep the connection alive.
+// Returns the response signatures if successful.
 //
-// Parameters:
-//   - ctx: Context for timeout and cancellation
-//
-// Returns:
-//   - []sign.Signature: Server signatures on the pong response
-//   - error: Error if the ping failed or received unexpected response
+// This method is useful for:
+//   - Testing the connection is alive
+//   - Measuring round-trip latency
+//   - Keeping the connection active
 //
 // Example:
 //
-//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-//	defer cancel()
-//
 //	sigs, err := client.Ping(ctx)
 //	if err != nil {
-//	    log.Error("Server not responding", "error", err)
+//	    log.Error("Ping failed", "error", err)
 //	}
 func (c *Client) Ping(ctx context.Context) ([]sign.Signature, error) {
 	var resSig []sign.Signature
@@ -163,24 +155,26 @@ func (c *Client) Ping(ctx context.Context) ([]sign.Signature, error) {
 	return resSig, nil
 }
 
-// GetConfig retrieves the current server configuration.
-// This includes network parameters and other operational settings.
+// GetConfig retrieves the server's configuration including supported networks.
+// This is typically the first call made by clients to discover available chains
+// and the server's wallet address.
 //
-// Parameters:
-//   - ctx: Context for timeout and cancellation
+// No authentication required.
 //
 // Returns:
-//   - GetConfigResponse: Server configuration data
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if the request failed
+//   - GetConfigResponse containing server address and network configurations
+//   - Response signatures for verification
+//   - Error if the request fails
 //
 // Example:
 //
 //	config, sigs, err := client.GetConfig(ctx)
 //	if err != nil {
-//	    return err
+//	    log.Fatal("Failed to get config", "error", err)
 //	}
-//	fmt.Printf("Network: %+v\n", config.Networks)
+//	for _, network := range config.Networks {
+//	    fmt.Printf("Chain %d: Custody=%s\n", network.ChainID, network.CustodyAddress)
+//	}
 func (c *Client) GetConfig(ctx context.Context) (GetConfigResponse, []sign.Signature, error) {
 	var resParams GetConfigResponse
 	var resSig []sign.Signature
@@ -197,30 +191,29 @@ func (c *Client) GetConfig(ctx context.Context) (GetConfigResponse, []sign.Signa
 	return resParams, resSig, nil
 }
 
-// GetAssets retrieves information about supported assets.
-// This includes asset addresses, decimals, symbols, and other metadata.
+// GetAssets retrieves the list of supported assets/tokens from the server.
+// Assets can be filtered by chain ID to get tokens for a specific network.
+//
+// No authentication required.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Request parameters for filtering assets
+//   - reqParams: Filter options (optional ChainID filter)
 //
 // Returns:
-//   - GetAssetsResponse: Asset information
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if the request failed
+//   - GetAssetsResponse containing the list of supported assets
+//   - Response signatures for verification
+//   - Error if the request fails
 //
 // Example:
 //
-//	req := GetAssetsRequest{
-//	    AssetIDs: []string{"ETH", "USDC"},
-//	}
-//	assets, sigs, err := client.GetAssets(ctx, req)
-//	if err != nil {
-//	    return err
-//	}
-//	for _, asset := range assets.Assets {
-//	    fmt.Printf("%s: %s (decimals: %d)\n", asset.Symbol, asset.Address, asset.Decimals)
-//	}
+//	// Get all assets
+//	assets, _, err := client.GetAssets(ctx, GetAssetsRequest{})
+//
+//	// Get assets for a specific chain
+//	ethChainID := uint32(1)
+//	ethAssets, _, err := client.GetAssets(ctx, GetAssetsRequest{
+//	    ChainID: &ethChainID,
+//	})
 func (c *Client) GetAssets(ctx context.Context, reqParams GetAssetsRequest) (GetAssetsResponse, []sign.Signature, error) {
 	var resParams GetAssetsResponse
 	var resSig []sign.Signature
@@ -237,29 +230,28 @@ func (c *Client) GetAssets(ctx context.Context, reqParams GetAssetsRequest) (Get
 	return resParams, resSig, nil
 }
 
-// GetAppDefinition retrieves the definition of a specific application.
-// This includes the application's code, ABI, version, and deployment information.
+// GetAppDefinition retrieves the protocol definition for a specific application session.
+// This includes the participants, consensus rules, and protocol parameters.
+//
+// No authentication required.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Request containing the app ID to query
+//   - reqParams: Contains the AppSessionID to query
 //
 // Returns:
-//   - GetAppDefinitionResponse: Application definition data
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if the request failed
+//   - GetAppDefinitionResponse with the application protocol details
+//   - Response signatures for verification
+//   - Error if the request fails or session not found
 //
 // Example:
 //
-//	req := GetAppDefinitionRequest{
-//	    AppID: "0xabc123...",
-//	}
-//	appDef, sigs, err := client.GetAppDefinition(ctx, req)
+//	def, _, err := client.GetAppDefinition(ctx, GetAppDefinitionRequest{
+//	    AppSessionID: "app123",
+//	})
 //	if err != nil {
-//	    return err
+//	    log.Error("Failed to get app definition", "error", err)
 //	}
-//	fmt.Printf("App version: %s\n", appDef.Version)
-//	fmt.Printf("Bytecode: %x\n", appDef.Bytecode)
+//	fmt.Printf("Protocol: %s, Participants: %v\n", def.Protocol, def.ParticipantWallets)
 func (c *Client) GetAppDefinition(ctx context.Context, reqParams GetAppDefinitionRequest) (GetAppDefinitionResponse, []sign.Signature, error) {
 	var resParams GetAppDefinitionResponse
 	var resSig []sign.Signature
@@ -276,31 +268,30 @@ func (c *Client) GetAppDefinition(ctx context.Context, reqParams GetAppDefinitio
 	return resParams, res.Sig, nil
 }
 
-// GetAppSessions retrieves information about application sessions.
-// This can be filtered by app ID, participants, or status.
+// GetAppSessions retrieves a list of application sessions with optional filters.
+// Sessions can be filtered by participant wallet address and status.
+//
+// No authentication required.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Request parameters for filtering sessions
+//   - reqParams: Filter and pagination options:
+//   - Participant: Filter by wallet address (optional)
+//   - Status: Filter by session state (e.g., "open", "closed") (optional)
+//   - ListOptions: Pagination (offset, limit) and sorting
 //
 // Returns:
-//   - GetAppSessionsResponse: Application session data
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if the request failed
+//   - GetAppSessionsResponse containing the filtered list of sessions
+//   - Response signatures for verification
+//   - Error if the request fails
 //
 // Example:
 //
-//	req := GetAppSessionsRequest{
-//	    AppID: "0xabc123...",
-//	    Status: "active",
-//	}
-//	sessions, sigs, err := client.GetAppSessions(ctx, req)
-//	if err != nil {
-//	    return err
-//	}
-//	for _, session := range sessions.Sessions {
-//	    fmt.Printf("Session %s: %d participants\n", session.ID, len(session.Participants))
-//	}
+//	// Get all open sessions for a specific participant
+//	sessions, _, err := client.GetAppSessions(ctx, GetAppSessionsRequest{
+//	    Participant: "0x1234...",
+//	    Status: "open",
+//	    ListOptions: ListOptions{Limit: 10},
+//	})
 func (c *Client) GetAppSessions(ctx context.Context, reqParams GetAppSessionsRequest) (GetAppSessionsResponse, []sign.Signature, error) {
 	var resParams GetAppSessionsResponse
 	var resSig []sign.Signature
@@ -317,30 +308,31 @@ func (c *Client) GetAppSessions(ctx context.Context, reqParams GetAppSessionsReq
 	return resParams, res.Sig, nil
 }
 
-// GetChannels retrieves information about payment channels.
-// This can be filtered by participant, status, or other criteria.
+// GetChannels retrieves a list of payment channels with optional filters.
+// Channels can be filtered by participant wallet address and status.
+//
+// No authentication required.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Request parameters for filtering channels
+//   - reqParams: Filter and pagination options:
+//   - Participant: Filter by wallet address (optional)
+//   - Status: Filter by channel state (e.g., "open", "closed", "challenged") (optional)
+//   - ListOptions: Pagination (offset, limit) and sorting
 //
 // Returns:
-//   - GetChannelsResponse: Channel information
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if the request failed
+//   - GetChannelsResponse containing the filtered list of channels
+//   - Response signatures for verification
+//   - Error if the request fails
 //
 // Example:
 //
-//	req := GetChannelsRequest{
-//	    Participant: myAddress,
+//	// Get all open channels for a user
+//	channels, _, err := client.GetChannels(ctx, GetChannelsRequest{
+//	    Participant: userWallet,
 //	    Status: "open",
-//	}
-//	channels, sigs, err := client.GetChannels(ctx, req)
-//	if err != nil {
-//	    return err
-//	}
+//	})
 //	for _, ch := range channels.Channels {
-//	    fmt.Printf("Channel %s: %s ↔ %s\n", ch.ID, ch.ParticipantA, ch.ParticipantB)
+//	    fmt.Printf("Channel %s: %s on chain %d\n", ch.ChannelID, ch.Status, ch.ChainID)
 //	}
 func (c *Client) GetChannels(ctx context.Context, reqParams GetChannelsRequest) (GetChannelsResponse, []sign.Signature, error) {
 	var resParams GetChannelsResponse
@@ -358,32 +350,30 @@ func (c *Client) GetChannels(ctx context.Context, reqParams GetChannelsRequest) 
 	return resParams, res.Sig, nil
 }
 
-// GetLedgerEntries retrieves ledger entries (debits and credits) for accounts.
-// This provides a detailed transaction history with individual ledger operations.
+// GetLedgerEntries retrieves double-entry bookkeeping entries from the ledger.
+// Entries can be filtered by account ID, asset, and wallet address.
+//
+// No authentication required.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Request parameters for filtering entries
+//   - reqParams: Filter and pagination options:
+//   - AccountID: Filter by account identifier (optional)
+//   - Asset: Filter by token/asset symbol (optional)
+//   - Wallet: Filter by participant wallet address (optional)
+//   - ListOptions: Pagination (offset, limit) and sorting
 //
 // Returns:
-//   - GetLedgerEntriesResponse: Ledger entry data
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if the request failed
+//   - GetLedgerEntriesResponse containing the filtered ledger entries
+//   - Response signatures for verification
+//   - Error if the request fails
 //
 // Example:
 //
-//	req := GetLedgerEntriesRequest{
-//	    Account: myAddress,
-//	    Limit: 100,
-//	    Offset: 0,
-//	}
-//	entries, sigs, err := client.GetLedgerEntries(ctx, req)
-//	if err != nil {
-//	    return err
-//	}
-//	for _, entry := range entries.Entries {
-//	    fmt.Printf("%s: %s %s\n", entry.Type, entry.Amount, entry.Asset)
-//	}
+//	entries, _, err := client.GetLedgerEntries(ctx, GetLedgerEntriesRequest{
+//	    Asset: "USDC",
+//	    Wallet: userWallet,
+//	    ListOptions: ListOptions{Limit: 50},
+//	})
 func (c *Client) GetLedgerEntries(ctx context.Context, reqParams GetLedgerEntriesRequest) (GetLedgerEntriesResponse, []sign.Signature, error) {
 	var resParams GetLedgerEntriesResponse
 	var resSig []sign.Signature
@@ -400,31 +390,35 @@ func (c *Client) GetLedgerEntries(ctx context.Context, reqParams GetLedgerEntrie
 	return resParams, res.Sig, nil
 }
 
-// GetLedgerTransactions retrieves complete transaction records.
-// Each transaction may contain multiple ledger entries.
+// GetLedgerTransactions retrieves ledger transactions (transfers between accounts).
+// Transactions can be filtered by account ID, asset, and transaction type.
+//
+// No authentication required.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Request parameters for filtering transactions
+//   - reqParams: Filter and pagination options:
+//   - AccountID: Filter by account (optional)
+//   - Asset: Filter by token/asset symbol (optional)
+//   - TxType: Filter by transaction type (optional)
+//   - ListOptions: Pagination (offset, limit) and sorting
 //
 // Returns:
-//   - GetLedgerTransactionsResponse: Transaction data
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if the request failed
+//   - GetLedgerTransactionsResponse containing the filtered transactions
+//   - Response signatures for verification
+//   - Error if the request fails
 //
 // Example:
 //
-//	req := GetLedgerTransactionsRequest{
-//	    Account: myAddress,
-//	    FromDate: time.Now().AddDate(0, -1, 0), // Last month
-//	    ToDate: time.Now(),
-//	}
-//	txs, sigs, err := client.GetLedgerTransactions(ctx, req)
-//	if err != nil {
-//	    return err
-//	}
-//	for _, tx := range txs.Transactions {
-//	    fmt.Printf("Tx %s: %s at %v\n", tx.ID, tx.Type, tx.Timestamp)
+//	// Get recent USDC transactions
+//	txns, _, err := client.GetLedgerTransactions(ctx, GetLedgerTransactionsRequest{
+//	    Asset: "USDC",
+//	    ListOptions: ListOptions{
+//	        Limit: 20,
+//	        Sort: &SortTypeDescending,
+//	    },
+//	})
+//	for _, tx := range txns.LedgerTransactions {
+//	    fmt.Printf("%s: %s from %s to %s\n", tx.TxType, tx.Amount, tx.FromAccount, tx.ToAccount)
 //	}
 func (c *Client) GetLedgerTransactions(ctx context.Context, reqParams GetLedgerTransactionsRequest) (GetLedgerTransactionsResponse, []sign.Signature, error) {
 	var resParams GetLedgerTransactionsResponse
@@ -442,32 +436,67 @@ func (c *Client) GetLedgerTransactions(ctx context.Context, reqParams GetLedgerT
 	return resParams, res.Sig, nil
 }
 
-// AuthRequest initiates an authentication flow by requesting a challenge.
-// The server returns a challenge that must be signed and submitted via AuthSigVerify.
+// AuthWithSig performs wallet-based authentication using a signature.
+// This method handles the complete authentication flow:
+//  1. Sends an auth request to get a challenge
+//  2. Signs the challenge using the provided signer
+//  3. Verifies the signature and receives a JWT token
+//
+// The JWT token returned should be stored and used for subsequent authenticated calls.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Authentication request parameters
+//   - reqParams: Authentication request containing:
+//   - Address: Main wallet address requesting authentication (cold wallet)
+//   - SessionKey: Address of a different key that will be used for signing during this session (hot wallet)
+//   - AppName: Name of the application
+//   - Allowances: Spending limits for the session
+//   - Expire: When the authentication expires (RFC3339 or empty)
+//   - Scope: Permission scope (e.g., "trade", "view", or empty)
+//   - ApplicationAddress: Contract address of the requesting application
+//   - signer: Signer interface to sign the challenge (should correspond to Address, not SessionKey)
 //
 // Returns:
-//   - AuthRequestResponse: Challenge data to be signed
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if the request failed
+//   - AuthSigVerifyResponse containing JWT token and success status
+//   - Response signatures for verification
+//   - Error if authentication fails
 //
 // Example:
 //
-//	req := AuthRequestRequest{
-//	    Address: myAddress,
-//	    Scope: []string{"read", "write"},
+//	walletSigner, _ := sign.NewEthereumSigner(walletPrivateKey)     // Main wallet
+//	sessionSigner, _ := sign.NewEthereumSigner(sessionPrivateKey)   // Session key
+//
+//	authReq := AuthRequestRequest{
+//	    Address:            walletSigner.PublicKey().Address().String(),   // Main wallet
+//	    SessionKey:         sessionSigner.PublicKey().Address().String(),  // Different key for session
+//	    AppName:            "MyDApp",
+//	    Allowances:         []Allowance{{Asset: "USDC", Amount: "1000"}},
+//	    ApplicationAddress: appContractAddress,
 //	}
-//	challenge, sigs, err := client.AuthRequest(ctx, req)
+//
+//	// Sign with main wallet, but SessionKey will be used for subsequent operations
+//	authRes, _, err := client.AuthWithSig(ctx, authReq, walletSigner)
 //	if err != nil {
-//	    return err
+//	    log.Fatal("Authentication failed", "error", err)
 //	}
-//	// Sign the challenge with your private key
-//	signature := signChallenge(challenge.Challenge)
-//	// Submit the signature via AuthSigVerify
-func (c *Client) AuthRequest(ctx context.Context, reqParams AuthRequestRequest) (AuthRequestResponse, []sign.Signature, error) {
+//	jwtToken := authRes.JwtToken // Store this for authenticated calls
+func (c *Client) AuthWithSig(ctx context.Context, reqParams AuthRequestRequest, signer sign.Signer) (AuthSigVerifyResponse, []sign.Signature, error) {
+	challengeRes, _, err := c.authRequest(ctx, reqParams)
+	if err != nil {
+		return AuthSigVerifyResponse{}, nil, fmt.Errorf("authentication request failed: %w", err)
+	}
+
+	chSig, err := signChallenge(signer, reqParams, challengeRes.ChallengeMessage.String())
+	if err != nil {
+		return AuthSigVerifyResponse{}, nil, fmt.Errorf("failed to sign challenge: %w", err)
+	}
+
+	verifyReq := AuthSigVerifyRequest{
+		Challenge: challengeRes.ChallengeMessage,
+	}
+	return c.authSigVerify(ctx, verifyReq, chSig)
+}
+
+func (c *Client) authRequest(ctx context.Context, reqParams AuthRequestRequest) (AuthRequestResponse, []sign.Signature, error) {
 	var resParams AuthRequestResponse
 	var resSig []sign.Signature
 
@@ -487,34 +516,7 @@ func (c *Client) AuthRequest(ctx context.Context, reqParams AuthRequestRequest) 
 	return resParams, res.Sig, nil
 }
 
-// AuthSigVerify completes signature-based authentication by submitting
-// a signed challenge. This must be called after AuthRequest with the
-// challenge signed by the user's private key.
-//
-// Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Verification request containing the original challenge
-//   - reqSig: Signature over the challenge
-//
-// Returns:
-//   - AuthSigVerifyResponse: Authentication token or session data
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if authentication failed
-//
-// Example:
-//
-//	// Assuming you have the challenge from AuthRequest
-//	signature := signWithPrivateKey(challenge.Challenge)
-//	verifyReq := AuthSigVerifyRequest{
-//	    Challenge: challenge.Challenge,
-//	    Address: myAddress,
-//	}
-//	authResp, sigs, err := client.AuthSigVerify(ctx, verifyReq, signature)
-//	if err != nil {
-//	    return err
-//	}
-//	fmt.Printf("Authenticated! Token: %s\n", authResp.Token)
-func (c *Client) AuthSigVerify(ctx context.Context, reqParams AuthSigVerifyRequest, reqSig sign.Signature) (AuthSigVerifyResponse, []sign.Signature, error) {
+func (c *Client) authSigVerify(ctx context.Context, reqParams AuthSigVerifyRequest, reqSig sign.Signature) (AuthSigVerifyResponse, []sign.Signature, error) {
 	var resParams AuthSigVerifyResponse
 	var resSig []sign.Signature
 
@@ -530,30 +532,25 @@ func (c *Client) AuthSigVerify(ctx context.Context, reqParams AuthSigVerifyReque
 	return resParams, res.Sig, nil
 }
 
-// AuthJWTVerify performs JWT-based authentication.
-// This is an alternative to signature-based auth for clients that
-// already have a valid JWT token from an external identity provider.
+// AuthJWTVerify verifies an existing JWT token and returns the associated session info.
+// This is useful for validating a stored JWT token before making authenticated calls.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Request containing the JWT token
+//   - reqParams: Contains the JWT token to verify
 //
 // Returns:
-//   - AuthJWTVerifyResponse: Session data or access token
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if authentication failed
+//   - AuthJWTVerifyResponse with address, session key, and success status
+//   - Response signatures for verification
+//   - Error if the JWT is invalid or expired
 //
 // Example:
 //
-//	req := AuthJWTVerifyRequest{
-//	    Token: jwtTokenFromOAuth,
-//	    Provider: "auth0",
+//	verifyReq := AuthJWTVerifyRequest{JWT: storedJwtToken}
+//	verifyRes, _, err := client.AuthJWTVerify(ctx, verifyReq)
+//	if err != nil || !verifyRes.Success {
+//	    // Token is invalid or expired, need to re-authenticate
+//	    authRes, _, err = client.AuthWithSig(ctx, authReq, signer)
 //	}
-//	authResp, sigs, err := client.AuthJWTVerify(ctx, req)
-//	if err != nil {
-//	    return err
-//	}
-//	fmt.Printf("JWT verified! User: %s\n", authResp.UserID)
 func (c *Client) AuthJWTVerify(ctx context.Context, reqParams AuthJWTVerifyRequest) (AuthJWTVerifyResponse, []sign.Signature, error) {
 	var resParams AuthJWTVerifyResponse
 	var resSig []sign.Signature
@@ -570,27 +567,24 @@ func (c *Client) AuthJWTVerify(ctx context.Context, reqParams AuthJWTVerifyReque
 	return resParams, res.Sig, nil
 }
 
-// GetUserTag retrieves the user tag (human-readable identifier) for the
-// authenticated account. User tags are unique aliases that can be used
-// instead of addresses for better UX.
+// GetUserTag returns the human-readable tag for the authenticated wallet.
+// User tags provide a friendly identifier for wallet addresses.
 //
-// Parameters:
-//   - ctx: Context for timeout and cancellation
+// Requires authentication.
 //
 // Returns:
-//   - GetUserTagResponse: User tag information
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if the request failed
-//
-// Note: This method requires authentication.
+//   - GetUserTagResponse containing the user's tag
+//   - Response signatures for verification
+//   - Error if not authenticated or request fails
 //
 // Example:
 //
-//	userTag, sigs, err := client.GetUserTag(ctx)
+//	tag, _, err := client.GetUserTag(ctx)
 //	if err != nil {
-//	    return err
+//	    log.Error("Failed to get user tag", "error", err)
+//	} else {
+//	    fmt.Printf("User tag: %s\n", tag.Tag)
 //	}
-//	fmt.Printf("Your user tag: @%s\n", userTag.Tag)
 func (c *Client) GetUserTag(ctx context.Context) (GetUserTagResponse, []sign.Signature, error) {
 	var resParams GetUserTagResponse
 	var resSig []sign.Signature
@@ -607,29 +601,27 @@ func (c *Client) GetUserTag(ctx context.Context) (GetUserTagResponse, []sign.Sig
 	return resParams, res.Sig, nil
 }
 
-// GetLedgerBalances retrieves current account balances for specified assets.
-// This provides the net balance after all debits and credits.
+// GetLedgerBalances retrieves account balances for the authenticated user.
+// Balances show the current amount of each asset held in the user's accounts.
+//
+// Requires authentication.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Request specifying accounts and assets to query
+//   - reqParams: Filter options:
+//   - AccountID: Filter balances by specific account (optional)
 //
 // Returns:
-//   - GetLedgerBalancesResponse: Current balance information
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if the request failed
+//   - GetLedgerBalancesResponse containing balance information by asset
+//   - Response signatures for verification
+//   - Error if not authenticated or request fails
 //
 // Example:
 //
-//	req := GetLedgerBalancesRequest{
-//	    Account: myAddress,
-//	    Assets: []string{"ETH", "USDC"},
-//	}
-//	balances, sigs, err := client.GetLedgerBalances(ctx, req)
+//	balances, _, err := client.GetLedgerBalances(ctx, GetLedgerBalancesRequest{})
 //	if err != nil {
-//	    return err
+//	    log.Fatal("Failed to get balances", "error", err)
 //	}
-//	for _, balance := range balances.Balances {
+//	for _, balance := range balances.LedgerBalances {
 //	    fmt.Printf("%s: %s\n", balance.Asset, balance.Amount)
 //	}
 func (c *Client) GetLedgerBalances(ctx context.Context, reqParams GetLedgerBalancesRequest) (GetLedgerBalancesResponse, []sign.Signature, error) {
@@ -648,33 +640,29 @@ func (c *Client) GetLedgerBalances(ctx context.Context, reqParams GetLedgerBalan
 	return resParams, res.Sig, nil
 }
 
-// GetRPCHistory retrieves the history of RPC calls made by the authenticated user.
-// This can be useful for debugging, auditing, or replaying operations.
+// GetRPCHistory retrieves the RPC call history for the authenticated user.
+// History entries include method calls with their parameters, results, and signatures.
+//
+// Requires authentication.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Request parameters for filtering history
+//   - reqParams: Pagination options (offset, limit, sort)
 //
 // Returns:
-//   - GetRPCHistoryResponse: Historical RPC data
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if the request failed
-//
-// Note: This method requires authentication.
+//   - GetRPCHistoryResponse containing historical RPC entries
+//   - Response signatures for verification
+//   - Error if not authenticated or request fails
 //
 // Example:
 //
-//	req := GetRPCHistoryRequest{
-//	    Methods: []string{"Transfer", "CreateChannel"},
-//	    Limit: 50,
-//	    Since: time.Now().Add(-24 * time.Hour),
-//	}
-//	history, sigs, err := client.GetRPCHistory(ctx, req)
+//	history, _, err := client.GetRPCHistory(ctx, GetRPCHistoryRequest{
+//	    ListOptions: ListOptions{Limit: 100},
+//	})
 //	if err != nil {
-//	    return err
+//	    log.Error("Failed to get RPC history", "error", err)
 //	}
-//	for _, call := range history.Calls {
-//	    fmt.Printf("%v: %s\n", call.Timestamp, call.Method)
+//	for _, entry := range history.RPCEntries {
+//	    fmt.Printf("[%d] %s by %s\n", entry.Timestamp, entry.Method, entry.Sender)
 //	}
 func (c *Client) GetRPCHistory(ctx context.Context, reqParams GetRPCHistoryRequest) (GetRPCHistoryResponse, []sign.Signature, error) {
 	var resParams GetRPCHistoryResponse
@@ -692,36 +680,55 @@ func (c *Client) GetRPCHistory(ctx context.Context, reqParams GetRPCHistoryReque
 	return resParams, res.Sig, nil
 }
 
-// CreateChannel creates a new payment channel between two participants.
-// This operation requires a signature from the channel creator and may
-// involve locking funds in the channel.
+// CreateChannel requests the server to create a new payment channel.
+// The server validates the request and returns a signed channel state that you must
+// then sign and submit to the blockchain yourself to open the channel on-chain.
+//
+// Requires authentication.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Channel creation parameters (participants, initial balances)
-//   - reqSig: Signature authorizing the channel creation
+//   - req: Prepared Request with CreateChannelMethod containing:
+//   - ChainID: Blockchain network identifier
+//   - Token: Asset/token address for the channel
+//   - Amount: Initial funding amount
+//   - SessionKey: Key that will control the channel (required for security)
 //
 // Returns:
-//   - CreateChannelResponse: Created channel information
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if channel creation failed
+//   - CreateChannelResponse with initial channel state and server signature
+//   - Response signatures for verification
+//   - Error if not authenticated, invalid request, or server rejects
+//
+// After receiving the response, you must:
+//  1. Sign the state yourself
+//  2. Submit both signatures to the blockchain to open the channel
 //
 // Example:
 //
-//	req := CreateChannelRequest{
-//	    Participants: []string{myAddress, counterpartyAddress},
-//	    InitialBalances: map[string]string{
-//	        myAddress: "1000000000000000000", // 1 ETH
-//	        counterpartyAddress: "0",
-//	    },
-//	    Asset: "ETH",
+//	amount := decimal.NewFromInt(1000000)
+//	createReq := CreateChannelRequest{
+//	    ChainID: 1,
+//	    Token: "0xUSDC",
+//	    Amount: &amount,
+//	    SessionKey: &sessionKeyAddress, // Required
 //	}
-//	signature := signChannelCreation(req)
-//	channel, sigs, err := client.CreateChannel(ctx, req, signature)
+//	payload, _ := client.PreparePayload(CreateChannelMethod, createReq)
+//
+//	hash, _ := payload.Hash()
+//	sig, err := sessionSigner.Sign(hash)
 //	if err != nil {
-//	    return err
+//	    log.Fatal("Failed to sign request", "error", err)
 //	}
-//	fmt.Printf("Channel created: %s\n", channel.ChannelID)
+//	fullReq := rpc.NewRequest(payload, sig)
+//
+//	response, _, err := client.CreateChannel(ctx, &fullReq)
+//	if err != nil {
+//	    log.Fatal("Failed to create channel", "error", err)
+//	}
+//
+//	// Now sign the state and submit to blockchain
+//	stateHash := computeStateHash(response.State)
+//	mySignature, _ := sessionSigner.Sign(stateHash)
+//	// Submit response.StateSignature and mySignature to blockchain
 func (c *Client) CreateChannel(ctx context.Context, req *Request) (CreateChannelResponse, []sign.Signature, error) {
 	if req == nil || req.Req.Method != string(CreateChannelMethod) {
 		return CreateChannelResponse{}, nil, ErrInvalidRequestMethod
@@ -746,34 +753,49 @@ func (c *Client) CreateChannel(ctx context.Context, req *Request) (CreateChannel
 	return resParams, res.Sig, nil
 }
 
-// ResizeChannel modifies the capacity of an existing channel by adding
-// or removing funds. This operation requires signatures from all participants.
+// ResizeChannel requests the server to modify channel funding.
+// The server returns a signed state update that you must sign and submit to the blockchain.
+//
+// Requires authentication.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Resize parameters (channel ID, new balances)
-//   - reqSig: Signature authorizing the resize
+//   - req: Prepared Request with ResizeChannelMethod containing:
+//   - ChannelID: ID of the channel to resize
+//   - AllocateAmount: Amount to move from your unified balance on ClearNode to the channel (optional)
+//   - ResizeAmount: Amount to move from custody ledger on Custody Smart Contract to the channel (optional)
+//   - FundsDestination: Where to send funds if reducing channel size
+//
+// AllocateAmount and ResizeAmount are mutually exclusive - provide only one.
 //
 // Returns:
-//   - ResizeChannelResponse: Updated channel information
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if resize failed
+//   - ResizeChannelResponse with updated channel state and server signature
+//   - Response signatures for verification
+//   - Error if not authenticated, invalid request, or server rejects
 //
 // Example:
 //
-//	req := ResizeChannelRequest{
-//	    ChannelID: channelID,
-//	    NewBalances: map[string]string{
-//	        myAddress: "2000000000000000000", // Increase to 2 ETH
-//	        counterpartyAddress: "0",
-//	    },
+//	// Move 500 tokens from your ClearNode balance to the channel
+//	allocateAmount := decimal.NewFromInt(500)
+//	resizeReq := ResizeChannelRequest{
+//	    ChannelID: "ch123",
+//	    AllocateAmount: &allocateAmount,
+//	    FundsDestination: walletAddress,
 //	}
-//	signature := signChannelResize(req)
-//	updatedChannel, sigs, err := client.ResizeChannel(ctx, req, signature)
+//	payload, _ := client.PreparePayload(ResizeChannelMethod, resizeReq)
+//
+//	hash, _ := payload.Hash()
+//	sig, err := sessionSigner.Sign(hash)
 //	if err != nil {
-//	    return err
+//	    log.Fatal("Failed to sign request", "error", err)
 //	}
-//	fmt.Printf("Channel resized: new capacity %s\n", updatedChannel.TotalCapacity)
+//	fullReq := rpc.NewRequest(payload, sig)
+//
+//	response, _, err := client.ResizeChannel(ctx, &fullReq)
+//	if err != nil {
+//	    log.Fatal("Failed to resize channel", "error", err)
+//	}
+//
+//	// Sign and submit the new state to blockchain
 func (c *Client) ResizeChannel(ctx context.Context, req *Request) (ResizeChannelResponse, []sign.Signature, error) {
 	if req == nil || req.Req.Method != string(ResizeChannelMethod) {
 		return ResizeChannelResponse{}, nil, ErrInvalidRequestMethod
@@ -798,36 +820,43 @@ func (c *Client) ResizeChannel(ctx context.Context, req *Request) (ResizeChannel
 	return resParams, res.Sig, nil
 }
 
-// CloseChannel initiates the closing of a payment channel.
-// This can be done cooperatively (with all participants' signatures)
-// or unilaterally (which may trigger a challenge period).
+// CloseChannel requests the server to close a payment channel.
+// The server returns a final signed state that you must sign and submit to the blockchain
+// to close the channel on-chain and recover your funds.
+//
+// Requires authentication.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Close parameters (channel ID, final state)
-//   - reqSig: Signature authorizing the close
+//   - req: Prepared Request with CloseChannelMethod containing:
+//   - ChannelID: ID of the channel to close
+//   - FundsDestination: Where to send the channel funds after closure
 //
 // Returns:
-//   - CloseChannelResponse: Close confirmation and timeline
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if close initiation failed
+//   - CloseChannelResponse with final channel state and server signature
+//   - Response signatures for verification
+//   - Error if not authenticated, invalid request, or server rejects
 //
 // Example:
 //
-//	req := CloseChannelRequest{
-//	    ChannelID: channelID,
-//	    FinalBalances: map[string]string{
-//	        myAddress: "1500000000000000000",
-//	        counterpartyAddress: "500000000000000000",
-//	    },
-//	    Cooperative: true,
+//	closeReq := CloseChannelRequest{
+//	    ChannelID: "ch123",
+//	    FundsDestination: walletAddress,
 //	}
-//	signature := signChannelClose(req)
-//	closeResp, sigs, err := client.CloseChannel(ctx, req, signature)
+//	payload, _ := client.PreparePayload(CloseChannelMethod, closeReq)
+//
+//	hash, _ := payload.Hash()
+//	sig, err := sessionSigner.Sign(hash)
 //	if err != nil {
-//	    return err
+//	    log.Fatal("Failed to sign request", "error", err)
 //	}
-//	fmt.Printf("Channel closing initiated. Finalization at: %v\n", closeResp.FinalizationTime)
+//	fullReq := rpc.NewRequest(payload, sig)
+//
+//	response, _, err := client.CloseChannel(ctx, &fullReq)
+//	if err != nil {
+//	    log.Error("Failed to close channel", "error", err)
+//	}
+//
+//	// Sign the final state and submit to blockchain to close channel
 func (c *Client) CloseChannel(ctx context.Context, req *Request) (CloseChannelResponse, []sign.Signature, error) {
 	if req == nil || req.Req.Method != string(CloseChannelMethod) {
 		return CloseChannelResponse{}, nil, ErrInvalidRequestMethod
@@ -852,35 +881,40 @@ func (c *Client) CloseChannel(ctx context.Context, req *Request) (CloseChannelRe
 	return resParams, res.Sig, nil
 }
 
-// Transfer moves funds between accounts. This can be a simple transfer
-// or a more complex multi-party transaction. The transfer is atomic -
-// either all operations succeed or all fail.
+// Transfer moves funds between accounts within the ClearNode system.
+// This is an off-chain transfer that updates balances on ClearNode without
+// touching the blockchain. Transfers are instant and gas-free.
+//
+// Requires authentication.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Transfer details (from, to, amount, asset)
+//   - reqParams: Transfer request containing:
+//   - Destination: Recipient's ClearNode account (wallet address)
+//   - DestinationUserTag: Recipient's human-readable tag (optional)
+//   - Allocations: List of assets and amounts to transfer
 //
 // Returns:
-//   - TransferResponse: Transfer confirmation and transaction ID
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if transfer failed
-//
-// Note: The request must be properly signed by the sender.
+//   - TransferResponse with created ledger transactions
+//   - Response signatures for verification
+//   - Error if not authenticated, insufficient balance, or transfer fails
 //
 // Example:
 //
-//	req := TransferRequest{
-//	    From: myAddress,
-//	    To: recipientAddress,
-//	    Amount: "1000000000000000000", // 1 ETH
-//	    Asset: "ETH",
-//	    Memo: "Payment for services",
+//	transferReq := TransferRequest{
+//	    Destination: "0xRecipient...",
+//	    Allocations: []TransferAllocation{
+//	        {AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
+//	        {AssetSymbol: "ETH", Amount: decimal.NewFromFloat(0.1)},
+//	    },
 //	}
-//	txResp, sigs, err := client.Transfer(ctx, req)
+//
+//	response, _, err := client.Transfer(ctx, transferReq)
 //	if err != nil {
-//	    return err
+//	    log.Fatal("Transfer failed", "error", err)
 //	}
-//	fmt.Printf("Transfer completed: %s\n", txResp.TransactionID)
+//	for _, tx := range response.Transactions {
+//	    fmt.Printf("Transferred %s %s to %s\n", tx.Amount, tx.Asset, tx.ToAccount)
+//	}
 func (c *Client) Transfer(ctx context.Context, reqParams TransferRequest) (TransferResponse, []sign.Signature, error) {
 	var resParams TransferResponse
 	var resSig []sign.Signature
@@ -897,35 +931,55 @@ func (c *Client) Transfer(ctx context.Context, reqParams TransferRequest) (Trans
 	return resParams, res.Sig, nil
 }
 
-// CreateAppSession creates a new application session for multi-party computation
-// or state channel applications. All participants must sign the session creation.
+// CreateAppSession starts a new virtual application session.
+// Application sessions enable multi-party state channel applications.
+//
+// Requires authentication and signatures from all participants.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Session parameters (app ID, participants, initial state)
-//   - reqSigs: Signatures from all participants
+//   - req: Prepared Request with CreateAppSessionMethod containing:
+//   - Definition: Application protocol and participants
+//   - Allocations: Initial asset distribution
+//   - SessionData: Application-specific initial state (optional)
+//
+// The request must be signed by all participants listed in the definition.
 //
 // Returns:
-//   - CreateAppSessionResponse: Created session information
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if session creation failed
+//   - CreateAppSessionResponse with session ID and details
+//   - Response signatures for verification
+//   - Error if not authenticated, missing signatures, or creation fails
 //
 // Example:
 //
-//	req := CreateAppSessionRequest{
-//	    AppID: appID,
-//	    Participants: []string{alice, bob, charlie},
-//	    InitialState: initialGameState,
-//	    Timeout: 3600, // 1 hour session timeout
+//	createSessReq := CreateAppSessionRequest{
+//	    Definition: AppDefinition{
+//	        Protocol: "game/v1",
+//	        ParticipantWallets: []string{player1, player2},
+//	        Weights: []int64{1, 1},
+//	        Quorum: 2,
+//	        Challenge: 3600,
+//	        Nonce: uint64(uuid.New().ID()),
+//	    },
+//	    Allocations: []AppAllocation{
+//	        {ParticipantWallet: player1, AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
+//	        {ParticipantWallet: player2, AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
+//	    },
 //	}
-//	// Collect signatures from all participants
-//	sigs := []sign.Signature{aliceSig, bobSig, charlieSig}
+//	payload, _ := client.PreparePayload(CreateAppSessionMethod, createSessReq)
+//	hash, _ := payload.Hash()
 //
-//	session, serverSigs, err := client.CreateAppSession(ctx, req, sigs)
+//	// Both participants must sign
+//	sig1, err := player1Signer.Sign(hash)
 //	if err != nil {
-//	    return err
+//	    log.Fatal("Player 1 sign failed", "error", err)
 //	}
-//	fmt.Printf("Session created: %s\n", session.SessionID)
+//	sig2, err := player2Signer.Sign(hash)
+//	if err != nil {
+//	    log.Fatal("Player 2 sign failed", "error", err)
+//	}
+//	fullReq := rpc.NewRequest(payload, sig1, sig2)
+//
+//	response, _, err := client.CreateAppSession(ctx, &fullReq)
 func (c *Client) CreateAppSession(ctx context.Context, req *Request) (CreateAppSessionResponse, []sign.Signature, error) {
 	if req == nil || req.Req.Method != string(CreateAppSessionMethod) {
 		return CreateAppSessionResponse{}, nil, ErrInvalidRequestMethod
@@ -950,36 +1004,51 @@ func (c *Client) CreateAppSession(ctx context.Context, req *Request) (CreateAppS
 	return resParams, res.Sig, nil
 }
 
-// SubmitAppState submits a new state update for an application session.
-// State updates must be signed by the required participants according
-// to the application's rules (e.g., all participants, majority, etc.).
+// SubmitAppState updates an application session's state.
+// Requires signatures from enough participants to meet the session's quorum requirement.
+//
+// Requires authentication and sufficient signatures to satisfy quorum.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: State update (session ID, new state, sequence number)
-//   - reqSigs: Signatures from required participants
+//   - req: Prepared Request with SubmitAppStateMethod containing:
+//   - AppSessionID: ID of the session to update
+//   - Allocations: New asset distribution
+//   - SessionData: New application state (optional)
+//
+// The request must include signatures totaling at least the quorum weight.
+// For example, if quorum is 2 and all participants have weight 1, you need
+// signatures from at least 2 participants.
 //
 // Returns:
-//   - SubmitAppStateResponse: State update confirmation
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if state update failed
+//   - SubmitAppStateResponse with updated session details and new version
+//   - Response signatures for verification
+//   - Error if not authenticated, insufficient signatures, or invalid state
 //
 // Example:
 //
-//	req := SubmitAppStateRequest{
-//	    SessionID: sessionID,
-//	    NewState: updatedGameState,
-//	    SequenceNumber: 42,
-//	    StateHash: computeStateHash(updatedGameState),
+//	updateReq := SubmitAppStateRequest{
+//	    AppSessionID: "app123",
+//	    Allocations: []AppAllocation{
+//	        {ParticipantWallet: winner, AssetSymbol: "USDC", Amount: decimal.NewFromInt(190)},
+//	        {ParticipantWallet: loser, AssetSymbol: "USDC", Amount: decimal.NewFromInt(10)},
+//	    },
+//	    SessionData: &gameResultData,
 //	}
-//	// For a game requiring all players to sign
-//	sigs := []sign.Signature{aliceSig, bobSig, charlieSig}
+//	payload, _ := client.PreparePayload(SubmitAppStateMethod, updateReq)
+//	hash, _ := payload.Hash()
 //
-//	stateResp, serverSigs, err := client.SubmitAppState(ctx, req, sigs)
+//	// Get signatures to meet quorum (e.g., both players if quorum=2)
+//	sig1, err := player1Signer.Sign(hash)
 //	if err != nil {
-//	    return err
+//	    log.Fatal("Failed to sign", "error", err)
 //	}
-//	fmt.Printf("State updated to sequence %d\n", stateResp.SequenceNumber)
+//	sig2, err := player2Signer.Sign(hash)
+//	if err != nil {
+//	    log.Fatal("Failed to sign", "error", err)
+//	}
+//	fullReq := rpc.NewRequest(payload, sig1, sig2)
+//
+//	response, _, err := client.SubmitAppState(ctx, &fullReq)
 func (c *Client) SubmitAppState(ctx context.Context, req *Request) (SubmitAppStateResponse, []sign.Signature, error) {
 	if req == nil || req.Req.Method != string(SubmitAppStateMethod) {
 		return SubmitAppStateResponse{}, nil, ErrInvalidRequestMethod
@@ -1004,39 +1073,49 @@ func (c *Client) SubmitAppState(ctx context.Context, req *Request) (SubmitAppSta
 	return resParams, res.Sig, nil
 }
 
-// CloseAppSession closes an application session and finalizes its state.
-// This distributes any funds or assets according to the final state.
-// Can be done cooperatively or through timeout/dispute resolution.
+// CloseAppSession closes an application session and distributes final assets.
+// Requires signatures from enough participants to meet the quorum requirement.
+//
+// Requires authentication and sufficient signatures to satisfy quorum.
 //
 // Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - reqParams: Close parameters (session ID, final state, outcome)
-//   - reqSigs: Signatures from required participants
+//   - req: Prepared Request with CloseAppSessionMethod containing:
+//   - AppSessionID: ID of the session to close
+//   - SessionData: Final application state (optional)
+//   - Allocations: Final asset distribution
+//
+// The request must include signatures totaling at least the quorum weight.
+// Typically, all participants should sign to agree on the final distribution.
 //
 // Returns:
-//   - CloseAppSessionResponse: Session closure confirmation
-//   - []sign.Signature: Server signatures for verification
-//   - error: Error if closure failed
+//   - CloseAppSessionResponse with closed session details
+//   - Response signatures for verification
+//   - Error if not authenticated, insufficient signatures, or closure fails
 //
 // Example:
 //
-//	req := CloseAppSessionParams{
-//	    SessionID: sessionID,
-//	    FinalState: finalGameState,
-//	    Outcome: map[string]string{
-//	        alice: "1000000000000000000", // Alice wins 1 ETH
-//	        bob: "500000000000000000",   // Bob gets 0.5 ETH
-//	        charlie: "500000000000000000", // Charlie gets 0.5 ETH
+//	closeReq := CloseAppSessionRequest{
+//	    AppSessionID: "app123",
+//	    Allocations: []AppAllocation{
+//	        {ParticipantWallet: player1, AssetSymbol: "USDC", Amount: decimal.NewFromInt(150)},
+//	        {ParticipantWallet: player2, AssetSymbol: "USDC", Amount: decimal.NewFromInt(50)},
 //	    },
 //	}
-//	// All participants sign the final outcome
-//	sigs := []sign.Signature{aliceSig, bobSig, charlieSig}
+//	payload, _ := client.PreparePayload(CloseAppSessionMethod, closeReq)
+//	hash, _ := payload.Hash()
 //
-//	closeResp, serverSigs, err := client.CloseAppSession(ctx, req, sigs)
+//	// Get signatures to meet quorum (typically all participants)
+//	sig1, err := player1Signer.Sign(hash)
 //	if err != nil {
-//	    return err
+//	    log.Fatal("Failed to sign", "error", err)
 //	}
-//	fmt.Printf("Session closed. Funds distributed per outcome.\n")
+//	sig2, err := player2Signer.Sign(hash)
+//	if err != nil {
+//	    log.Fatal("Failed to sign", "error", err)
+//	}
+//	fullReq := rpc.NewRequest(payload, sig1, sig2)
+//
+//	response, _, err := client.CloseAppSession(ctx, &fullReq)
 func (c *Client) CloseAppSession(ctx context.Context, req *Request) (CloseAppSessionResponse, []sign.Signature, error) {
 	if req == nil || req.Req.Method != string(CloseAppSessionMethod) {
 		return CloseAppSessionResponse{}, nil, ErrInvalidRequestMethod
@@ -1061,26 +1140,6 @@ func (c *Client) CloseAppSession(ctx context.Context, req *Request) (CloseAppSes
 	return resParams, res.Sig, nil
 }
 
-// call is an internal helper method that constructs and sends RPC requests.
-// It handles the common pattern of creating a request with proper timestamp,
-// sending it through the dialer, and checking for errors in the response.
-//
-// Parameters:
-//   - ctx: Context for timeout and cancellation
-//   - method: The RPC method to invoke
-//   - reqParams: Request parameters (can be nil for methods without params)
-//   - sigs: Optional signatures to include with the request
-//
-// Returns:
-//   - *Response: The server's response
-//   - error: Error from transport, server, or response parsing
-//
-// This method:
-// 1. Converts parameters to the Params type
-// 2. Creates a timestamped payload with auto-generated request ID
-// 3. Wraps payload and signatures in a Request
-// 4. Sends via the Dialer's Call method
-// 5. Checks for protocol errors in the response
 func (c *Client) call(ctx context.Context, method Method, reqParams any, sigs ...sign.Signature) (*Response, error) {
 	payload, err := c.PreparePayload(method, reqParams)
 	if err != nil {
@@ -1104,6 +1163,26 @@ func (c *Client) call(ctx context.Context, method Method, reqParams any, sigs ..
 	return res, nil
 }
 
+// PreparePayload creates a Payload for an RPC method call.
+// This helper method generates a unique request ID and packages the parameters.
+//
+// Parameters:
+//   - method: The RPC method to call
+//   - reqParams: The request parameters (can be nil for methods without parameters)
+//
+// Returns:
+//   - Payload ready to be wrapped in a Request
+//   - Error if parameter marshaling fails
+//
+// Example:
+//
+//	req := GetAssetsRequest{ChainID: &chainID}
+//	payload, err := client.PreparePayload(GetAssetsMethod, req)
+//	if err != nil {
+//	    log.Fatal("Failed to prepare payload", "error", err)
+//	}
+//	// Now create a Request with the payload and any required signatures
+//	fullReq := rpc.NewRequest(payload)
 func (c *Client) PreparePayload(method Method, reqParams any) (Payload, error) {
 	params, err := NewParams(reqParams)
 	if err != nil {
@@ -1118,28 +1197,20 @@ func (c *Client) PreparePayload(method Method, reqParams any) (Payload, error) {
 }
 
 // HandleBalanceUpdateEvent registers a handler for balance update notifications.
-// The handler will be called whenever account balances change due to transfers,
-// channel operations, or application session updates.
+// The handler will be called whenever the server sends a balance update event.
+// Only one handler can be registered at a time; subsequent calls override the previous handler.
 //
-// Only one handler can be registered per event type. Calling this method
-// multiple times will replace the previous handler.
-//
-// Parameters:
-//   - handler: Callback function to handle balance updates
-//
-// Example usage:
+// Example:
 //
 //	client.HandleBalanceUpdateEvent(func(ctx context.Context, notif BalanceUpdateNotification, sigs []sign.Signature) {
 //	    for _, balance := range notif.BalanceUpdates {
-//	        fmt.Printf("Balance changed - %s: %s\n", balance.Asset, balance.Amount)
+//	        fmt.Printf("Balance changed: %s = %s\n", balance.Asset, balance.Amount)
 //	    }
 //	})
 func (c *Client) HandleBalanceUpdateEvent(handler BalanceUpdateEventHandler) {
 	c.setEventHandler(BalanceUpdateEvent, handler)
 }
 
-// handleBalanceUpdateEvent is an internal method that processes balance update events.
-// It retrieves the registered handler and invokes it with the notification data.
 func (c *Client) handleBalanceUpdateEvent(ctx context.Context, event *Response) {
 	logger := log.FromContext(ctx)
 	handler, ok := c.getEventHandler(BalanceUpdateEvent).(BalanceUpdateEventHandler)
@@ -1157,30 +1228,19 @@ func (c *Client) handleBalanceUpdateEvent(ctx context.Context, event *Response) 
 	handler(ctx, notif, event.Sig)
 }
 
-// HandleChannelUpdateEvent registers a handler for channel state change notifications.
-// The handler will be called whenever a channel's state changes (created, resized,
-// closed, or challenged).
+// HandleChannelUpdateEvent registers a handler for channel update notifications.
+// The handler will be called whenever a channel's state changes.
+// Only one handler can be registered at a time; subsequent calls override the previous handler.
 //
-// Only one handler can be registered per event type. Calling this method
-// multiple times will replace the previous handler.
-//
-// Parameters:
-//   - handler: Callback function to handle channel updates
-//
-// Example usage:
+// Example:
 //
 //	client.HandleChannelUpdateEvent(func(ctx context.Context, notif ChannelUpdateNotification, sigs []sign.Signature) {
-//	    fmt.Printf("Channel %s updated - Status: %s\n", notif.ChannelID, notif.Status)
-//	    if notif.Status == ChannelStatusChallenged {
-//	        // Handle challenge scenario
-//	    }
+//	    fmt.Printf("Channel %s updated: status=%s\n", notif.ChannelID, notif.Status)
 //	})
 func (c *Client) HandleChannelUpdateEvent(handler ChannelUpdateEventHandler) {
 	c.setEventHandler(ChannelUpdateEvent, handler)
 }
 
-// handleChannelUpdateEvent is an internal method that processes channel update events.
-// It retrieves the registered handler and invokes it with the notification data.
 func (c *Client) handleChannelUpdateEvent(ctx context.Context, event *Response) {
 	logger := log.FromContext(ctx)
 	handler, ok := c.getEventHandler(ChannelUpdateEvent).(ChannelUpdateEventHandler)
@@ -1199,32 +1259,22 @@ func (c *Client) handleChannelUpdateEvent(ctx context.Context, event *Response) 
 }
 
 // HandleTransferEvent registers a handler for transfer notifications.
-// The handler will be called whenever a transfer affects the user's account,
-// including both incoming and outgoing transfers.
+// The handler will be called for both incoming and outgoing transfers.
+// Only one handler can be registered at a time; subsequent calls override the previous handler.
 //
-// Only one handler can be registered per event type. Calling this method
-// multiple times will replace the previous handler.
-//
-// Parameters:
-//   - handler: Callback function to handle transfer notifications
-//
-// Example usage:
+// Example:
 //
 //	client.HandleTransferEvent(func(ctx context.Context, notif TransferNotification, sigs []sign.Signature) {
 //	    for _, tx := range notif.Transactions {
-//	        direction := "sent"
 //	        if tx.ToAccount == myAccount {
-//	            direction = "received"
+//	            fmt.Printf("Received %s %s from %s\n", tx.Amount, tx.Asset, tx.FromAccount)
 //	        }
-//	        fmt.Printf("Transfer %s: %s %s\n", direction, tx.Amount, tx.Asset)
 //	    }
 //	})
 func (c *Client) HandleTransferEvent(handler TransferEventHandler) {
 	c.setEventHandler(TransferEvent, handler)
 }
 
-// handleTransferEvent is an internal method that processes transfer events.
-// It retrieves the registered handler and invokes it with the notification data.
 func (c *Client) handleTransferEvent(ctx context.Context, event *Response) {
 	logger := log.FromContext(ctx)
 	handler, ok := c.getEventHandler(TransferEvent).(TransferEventHandler)
@@ -1242,12 +1292,6 @@ func (c *Client) handleTransferEvent(ctx context.Context, event *Response) {
 	handler(ctx, notif, event.Sig)
 }
 
-// setEventHandler stores a handler for a specific event type.
-// This method is thread-safe and can be called concurrently.
-//
-// Parameters:
-//   - event: The event type to handle
-//   - handler: The handler function (must match the appropriate type)
 func (c *Client) setEventHandler(event Event, handler any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -1255,17 +1299,56 @@ func (c *Client) setEventHandler(event Event, handler any) {
 	c.eventHandlers[event] = handler
 }
 
-// getEventHandler retrieves the handler for a specific event type.
-// This method is thread-safe and can be called concurrently.
-//
-// Parameters:
-//   - event: The event type to get the handler for
-//
-// Returns:
-//   - any: The handler function or nil if no handler is registered
 func (c *Client) getEventHandler(event Event) any {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	return c.eventHandlers[event]
+}
+
+func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (sign.Signature, error) {
+	typedData := apitypes.TypedData{
+		Types: apitypes.Types{
+			"EIP712Domain": {
+				{Name: "name", Type: "string"},
+			},
+			"Policy": {
+				{Name: "challenge", Type: "string"},
+				{Name: "scope", Type: "string"},
+				{Name: "wallet", Type: "address"},
+				{Name: "application", Type: "address"},
+				{Name: "participant", Type: "address"},
+				{Name: "expire", Type: "uint256"},
+				{Name: "allowances", Type: "Allowance[]"},
+			},
+			"Allowance": {
+				{Name: "asset", Type: "string"},
+				{Name: "amount", Type: "uint256"},
+			}},
+		PrimaryType: "Policy",
+		Domain: apitypes.TypedDataDomain{
+			Name: req.AppName,
+		},
+		Message: map[string]any{
+			"challenge":   token,
+			"scope":       req.Scope,
+			"wallet":      req.Address,
+			"application": req.ApplicationAddress,
+			"participant": req.SessionKey,
+			"expire":      req.Expire,
+			"allowances":  req.Allowances,
+		},
+	}
+
+	hash, _, err := apitypes.TypedDataAndHash(typedData)
+	if err != nil {
+		return sign.Signature{}, err
+	}
+
+	signature, err := signer.Sign(hash)
+	if err != nil {
+		return sign.Signature{}, err
+	}
+
+	return signature, nil
 }

@@ -96,36 +96,24 @@
 //
 // # Client Communication
 //
-// The package includes a Dialer interface and WebSocket implementation for client-side RPC.
-// For most use cases, the high-level Client type provides a more convenient interface:
+// The package provides two levels of client APIs:
 //
-//	// Create and configure a dialer
-//	cfg := rpc.DefaultWebsocketDialerConfig
-//	cfg.EventChanSize = 100  // Buffer for unsolicited events
-//	dialer := rpc.NewWebsocketDialer(cfg)
+// 1. Low-level Dialer interface for direct RPC communication
+// 2. High-level Client type with methods for all ClearNode operations
 //
-//	// Create a client
+// ## High-Level Client (Recommended)
+//
+// The Client type provides convenient methods for all RPC operations:
+//
+//	// Create client with WebSocket dialer
+//	dialer := rpc.NewWebsocketDialer(rpc.DefaultWebsocketDialerConfig)
 //	client := rpc.NewClient(dialer)
 //
-//	// Register event handlers before connecting
-//	client.HandleBalanceUpdateEvent(func(ctx context.Context, notif rpc.BalanceUpdateNotification, sigs []sign.Signature) {
-//	    log.Info("Balance updated", "balances", notif.BalanceUpdates)
-//	})
-//
-//	client.HandleChannelUpdateEvent(func(ctx context.Context, notif rpc.ChannelUpdateNotification, sigs []sign.Signature) {
-//	    log.Info("Channel updated", "channelID", notif.ChannelID, "status", notif.Status)
-//	})
-//
-//	// Connect to server (in a goroutine as it blocks)
-//	go dialer.Dial(ctx, "ws://localhost:8080/ws", func(err error) {
+//	// Connect to server
+//	go dialer.Dial(ctx, "wss://server.example.com/ws", func(err error) {
 //	    if err != nil {
 //	        log.Error("Connection closed", "error", err)
 //	    }
-//	})
-//
-//	// Start listening for events
-//	go client.ListenEvents(ctx, func(err error) {
-//	    log.Info("Event listener stopped", "error", err)
 //	})
 //
 //	// Wait for connection
@@ -133,44 +121,73 @@
 //	    time.Sleep(100 * time.Millisecond)
 //	}
 //
-//	// Use type-safe client methods
-//	config, sigs, err := client.GetConfig(ctx)
-//	if err != nil {
-//	    log.Error("Failed to get config", "error", err)
-//	}
-//
-//	// Make transfers
-//	transferResp, sigs, err := client.Transfer(ctx, rpc.TransferRequest{
-//	    From: myAddress,
-//	    To: recipientAddress,
-//	    Amount: "1000000000000000000",
-//	    Asset: "ETH",
+//	// Set up event handlers
+//	client.HandleBalanceUpdateEvent(func(ctx context.Context, notif rpc.BalanceUpdateNotification, sigs []sign.Signature) {
+//	    log.Info("Balance updated", "balances", notif.BalanceUpdates)
 //	})
 //
-// For lower-level control, you can use the dialer directly:
+//	// Start event listener
+//	go client.ListenEvents(ctx, func(err error) {
+//	    log.Info("Event listener stopped", "error", err)
+//	})
 //
-//	// Send RPC requests manually
+//	// Make RPC calls
+//	config, _, err := client.GetConfig(ctx)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+//	// Authenticate
+//	authReq := rpc.AuthRequestRequest{
+//	    Address:            walletAddress,
+//	    SessionKey:         sessionKeyAddress,
+//	    AppName:            "MyApp",
+//	    ApplicationAddress: appAddress,
+//	}
+//	authResp, _, err := client.AuthWithSig(ctx, authReq, walletSigner)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	jwtToken := authResp.JwtToken
+//
+//	// Make authenticated calls
+//	balances, _, err := client.GetLedgerBalances(ctx, rpc.GetLedgerBalancesRequest{})
+//
+// ## Low-Level Dialer
+//
+// For direct RPC communication without the convenience methods:
+//
 //	params, _ := rpc.NewParams(map[string]string{"key": "value"})
 //	payload := rpc.NewPayload(1, "method_name", params)
 //	request := rpc.NewRequest(payload)
 //
-//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-//	defer cancel()
 //	response, err := dialer.Call(ctx, &request)
 //	if err != nil {
 //	    log.Error("RPC call failed", "error", err)
 //	}
 //
-//	// Handle unsolicited events manually
+//	// Handle events manually
 //	go func() {
 //	    for event := range dialer.EventCh() {
 //	        if event == nil {
-//	            // Connection closed
 //	            break
 //	        }
 //	        log.Info("Received event", "method", event.Res.Method)
 //	    }
 //	}()
+//
+// # API Types
+//
+// The package includes comprehensive type definitions for the ClearNode RPC API:
+//
+// - Request/Response types for all RPC methods
+// - Asset and network configuration types  
+// - Payment channel state and operations
+// - Application session management
+// - Ledger and transaction types
+// - Event notification types
+//
+// All monetary values use decimal.Decimal for arbitrary precision arithmetic.
 //
 // # Example Usage
 //
@@ -218,4 +235,16 @@
 //	    }
 //	    // ... handle transfer ...
 //	}
+// # Testing
+//
+// The package includes a comprehensive test suite with mock implementations:
+//
+// - client_test.go: Unit tests for all client methods
+// - client_internal_test.go: Tests for internal authentication methods
+// - client_manual_test.go: Integration tests against live server (requires credentials)
+//
+// The manual test demonstrates real-world usage patterns and can be run with:
+//
+//	TEST_WALLET_PK=<wallet_private_key> TEST_SESSION_PK=<session_private_key> go test -run TestManualClient
+//
 package rpc

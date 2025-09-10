@@ -147,6 +147,7 @@ func (c *Client) Ping(ctx context.Context) ([]sign.Signature, error) {
 	if err != nil {
 		return resSig, err
 	}
+	resSig = res.Sig
 
 	if res.Res.Method != string(PongMethod) {
 		return resSig, fmt.Errorf("unexpected response method: %s", res.Res.Method)
@@ -183,6 +184,7 @@ func (c *Client) GetConfig(ctx context.Context) (GetConfigResponse, []sign.Signa
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -222,6 +224,7 @@ func (c *Client) GetAssets(ctx context.Context, reqParams GetAssetsRequest) (Get
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -260,6 +263,7 @@ func (c *Client) GetAppDefinition(ctx context.Context, reqParams GetAppDefinitio
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -300,6 +304,7 @@ func (c *Client) GetAppSessions(ctx context.Context, reqParams GetAppSessionsReq
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -342,6 +347,7 @@ func (c *Client) GetChannels(ctx context.Context, reqParams GetChannelsRequest) 
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -382,6 +388,7 @@ func (c *Client) GetLedgerEntries(ctx context.Context, reqParams GetLedgerEntrie
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -428,6 +435,7 @@ func (c *Client) GetLedgerTransactions(ctx context.Context, reqParams GetLedgerT
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -504,6 +512,7 @@ func (c *Client) authRequest(ctx context.Context, reqParams AuthRequestRequest) 
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if res.Res.Method != string(AuthChallengeMethod) {
 		return resParams, resSig, fmt.Errorf("unexpected response method: %s", res.Res.Method)
@@ -524,6 +533,7 @@ func (c *Client) authSigVerify(ctx context.Context, reqParams AuthSigVerifyReque
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -559,6 +569,7 @@ func (c *Client) AuthJWTVerify(ctx context.Context, reqParams AuthJWTVerifyReque
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -593,6 +604,7 @@ func (c *Client) GetUserTag(ctx context.Context) (GetUserTagResponse, []sign.Sig
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -632,6 +644,7 @@ func (c *Client) GetLedgerBalances(ctx context.Context, reqParams GetLedgerBalan
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -672,6 +685,7 @@ func (c *Client) GetRPCHistory(ctx context.Context, reqParams GetRPCHistoryReque
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -741,6 +755,7 @@ func (c *Client) CreateChannel(ctx context.Context, req *Request) (CreateChannel
 	if err != nil {
 		return resParams, res.Sig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Error(); err != nil {
 		return resParams, res.Sig, err
@@ -808,6 +823,7 @@ func (c *Client) ResizeChannel(ctx context.Context, req *Request) (ResizeChannel
 	if err != nil {
 		return resParams, res.Sig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Error(); err != nil {
 		return resParams, res.Sig, err
@@ -869,6 +885,7 @@ func (c *Client) CloseChannel(ctx context.Context, req *Request) (CloseChannelRe
 	if err != nil {
 		return resParams, res.Sig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Error(); err != nil {
 		return resParams, res.Sig, err
@@ -923,6 +940,7 @@ func (c *Client) Transfer(ctx context.Context, reqParams TransferRequest) (Trans
 	if err != nil {
 		return resParams, resSig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -992,6 +1010,7 @@ func (c *Client) CreateAppSession(ctx context.Context, req *Request) (CreateAppS
 	if err != nil {
 		return resParams, res.Sig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Error(); err != nil {
 		return resParams, res.Sig, err
@@ -1061,6 +1080,7 @@ func (c *Client) SubmitAppState(ctx context.Context, req *Request) (SubmitAppSta
 	if err != nil {
 		return resParams, res.Sig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Error(); err != nil {
 		return resParams, res.Sig, err
@@ -1128,6 +1148,7 @@ func (c *Client) CloseAppSession(ctx context.Context, req *Request) (CloseAppSes
 	if err != nil {
 		return resParams, res.Sig, err
 	}
+	resSig = res.Sig
 
 	if err := res.Res.Params.Error(); err != nil {
 		return resParams, res.Sig, err

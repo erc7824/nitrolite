@@ -109,27 +109,20 @@
 //	dialer := rpc.NewWebsocketDialer(rpc.DefaultWebsocketDialerConfig)
 //	client := rpc.NewClient(dialer)
 //
-//	// Connect to server
-//	go dialer.Dial(ctx, "wss://server.example.com/ws", func(err error) {
-//	    if err != nil {
-//	        log.Error("Connection closed", "error", err)
-//	    }
-//	})
-//
-//	// Wait for connection
-//	for !dialer.IsConnected() {
-//	    time.Sleep(100 * time.Millisecond)
-//	}
-//
 //	// Set up event handlers
 //	client.HandleBalanceUpdateEvent(func(ctx context.Context, notif rpc.BalanceUpdateNotification, sigs []sign.Signature) {
 //	    log.Info("Balance updated", "balances", notif.BalanceUpdates)
 //	})
 //
-//	// Start event listener
-//	go client.ListenEvents(ctx, func(err error) {
-//	    log.Info("Event listener stopped", "error", err)
+//	// Connect to server and start event handling
+//	err := client.Start(ctx, "wss://server.example.com/ws", func(err error) {
+//	    if err != nil {
+//	        log.Error("Connection closed", "error", err)
+//	    }
 //	})
+//	if err != nil {
+//	    log.Fatal("Failed to start client", "error", err)
+//	}
 //
 //	// Make RPC calls
 //	config, _, err := client.GetConfig(ctx)

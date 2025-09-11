@@ -48,7 +48,7 @@ import (
 //	    log.Fatal(err)
 //	}
 type Client struct {
-	Dialer
+	dialer        Dialer
 	eventHandlers map[Event]any
 	mu            sync.RWMutex // protects eventHandlers
 }
@@ -62,9 +62,62 @@ type Client struct {
 //	client := rpc.NewClient(dialer)
 func NewClient(dialer Dialer) *Client {
 	return &Client{
-		Dialer:        dialer,
+		dialer:        dialer,
 		eventHandlers: make(map[Event]any),
 	}
+}
+
+// Start establishes a connection to the RPC server and begins listening for events.
+// This method combines connection establishment and event handling in a single call,
+// simplifying the client initialization process.
+//
+// The method will:
+// 1. Establish a WebSocket connection to the specified URL
+// 2. Start listening for server events in the background
+// 3. Return immediately after successful connection (non-blocking)
+//
+// Parameters:
+//   - ctx: Context for the connection lifetime (canceling stops the connection)
+//   - url: WebSocket URL to connect to (e.g., "wss://server.example.com/ws")
+//   - handleClosure: Callback invoked when the connection closes (with error if any)
+//
+// Returns an error if the initial connection fails (e.g., invalid URL, network error).
+// After a successful return, the connection runs in the background until the context
+// is canceled or a connection error occurs.
+//
+// Example:
+//
+//	client := rpc.NewClient(dialer)
+//	
+//	// Set up event handlers before starting
+//	client.HandleBalanceUpdateEvent(handleBalanceUpdate)
+//	
+//	// Start the client
+//	err := client.Start(ctx, "wss://server.example.com/ws", func(err error) {
+//	    if err != nil {
+//	        log.Error("Connection closed", "error", err)
+//	    }
+//	})
+//	if err != nil {
+//	    log.Fatal("Failed to start client", "error", err)
+//	}
+//	
+//	// Now you can make RPC calls
+//	config, _, err := client.GetConfig(ctx)
+func (c *Client) Start(ctx context.Context, url string, handleClosure func(err error)) error {
+	parentCtx, cancel := context.WithCancel(ctx)
+	childHandleClosure := func(err error) {
+		cancel()
+		handleClosure(err)
+	}
+
+	if err := c.dialer.Dial(parentCtx, url, childHandleClosure); err != nil {
+		return err
+	}
+
+	go c.listenEvents(parentCtx)
+
+	return nil
 }
 
 // BalanceUpdateEventHandler processes balance update notifications from the server.
@@ -82,35 +135,28 @@ type ChannelUpdateEventHandler func(ctx context.Context, notif ChannelUpdateNoti
 // including both incoming and outgoing transfers.
 type TransferEventHandler func(ctx context.Context, notif TransferNotification, resSig []sign.Signature)
 
-// ListenEvents starts listening for asynchronous events from the server.
-// This method blocks until the context is cancelled or the connection is closed.
-// Events are dispatched to registered handlers based on their type.
+// listenEvents is an internal method that listens for asynchronous events from the server.
+// This method is automatically started by the Start() method and runs in a background goroutine.
+// It blocks until the context is cancelled, continuously reading from the dialer's event channel
+// and dispatching events to registered handlers based on their type.
 //
-// The handleClosure callback is invoked when the event loop exits, either due to
-// context cancellation or connection closure. If an error occurred, it will be
-// passed to the callback.
+// Events are received through a separate channel from RPC responses, allowing
+// the server to push notifications without client requests. When an event is received,
+// it's routed to the appropriate handler (balance update, channel update, or transfer).
 //
-// This method should be called in a goroutine after establishing the connection
-// and registering event handlers:
-//
-//	go client.ListenEvents(ctx, func(err error) {
-//	    if err != nil {
-//	        log.Error("Event listener closed with error", "error", err)
-//	    }
-//	})
-func (c *Client) ListenEvents(ctx context.Context, handleClosure func(err error)) {
+// This method is not intended to be called directly by users. Event handling is
+// automatically managed when calling Start().
+func (c *Client) listenEvents(ctx context.Context) {
 	logger := log.FromContext(ctx)
-	eventCh := c.Dialer.EventCh()
+	eventCh := c.dialer.EventCh()
 
 	for {
 		select {
 		case <-ctx.Done():
-			handleClosure(nil)
 			return
 		case event := <-eventCh:
 			if event == nil {
-				handleClosure(nil)
-				return
+				continue
 			}
 
 			switch event.Res.Method {
@@ -751,7 +797,7 @@ func (c *Client) CreateChannel(ctx context.Context, req *Request) (CreateChannel
 	var resParams CreateChannelResponse
 	var resSig []sign.Signature
 
-	res, err := c.Call(ctx, req)
+	res, err := c.dialer.Call(ctx, req)
 	if err != nil {
 		return resParams, res.Sig, err
 	}
@@ -819,7 +865,7 @@ func (c *Client) ResizeChannel(ctx context.Context, req *Request) (ResizeChannel
 	var resParams ResizeChannelResponse
 	var resSig []sign.Signature
 
-	res, err := c.Call(ctx, req)
+	res, err := c.dialer.Call(ctx, req)
 	if err != nil {
 		return resParams, res.Sig, err
 	}
@@ -881,7 +927,7 @@ func (c *Client) CloseChannel(ctx context.Context, req *Request) (CloseChannelRe
 	var resParams CloseChannelResponse
 	var resSig []sign.Signature
 
-	res, err := c.Call(ctx, req)
+	res, err := c.dialer.Call(ctx, req)
 	if err != nil {
 		return resParams, res.Sig, err
 	}
@@ -1006,7 +1052,7 @@ func (c *Client) CreateAppSession(ctx context.Context, req *Request) (CreateAppS
 	var resParams CreateAppSessionResponse
 	var resSig []sign.Signature
 
-	res, err := c.Call(ctx, req)
+	res, err := c.dialer.Call(ctx, req)
 	if err != nil {
 		return resParams, res.Sig, err
 	}
@@ -1076,7 +1122,7 @@ func (c *Client) SubmitAppState(ctx context.Context, req *Request) (SubmitAppSta
 	var resParams SubmitAppStateResponse
 	var resSig []sign.Signature
 
-	res, err := c.Call(ctx, req)
+	res, err := c.dialer.Call(ctx, req)
 	if err != nil {
 		return resParams, res.Sig, err
 	}
@@ -1144,7 +1190,7 @@ func (c *Client) CloseAppSession(ctx context.Context, req *Request) (CloseAppSes
 	var resParams CloseAppSessionResponse
 	var resSig []sign.Signature
 
-	res, err := c.Call(ctx, req)
+	res, err := c.dialer.Call(ctx, req)
 	if err != nil {
 		return resParams, res.Sig, err
 	}
@@ -1172,7 +1218,7 @@ func (c *Client) call(ctx context.Context, method Method, reqParams any, sigs ..
 		sigs...,
 	)
 
-	res, err := c.Call(ctx, &req)
+	res, err := c.dialer.Call(ctx, &req)
 	if err != nil {
 		return nil, err
 	}

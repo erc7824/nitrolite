@@ -6,7 +6,6 @@ import (
 	"os"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
@@ -42,26 +41,14 @@ func TestManualClient(t *testing.T) {
 	dialer := rpc.NewWebsocketDialer(rpc.DefaultWebsocketDialerConfig)
 	client := rpc.NewClient(dialer)
 
-	ctx, cancel := context.WithCancel(t.Context())
-
 	errCh := make(chan error, 1)
 	handleError := func(err error) {
 		errCh <- err
 	}
 
-	go dialer.Dial(ctx, sandboxWsRpcUrl, handleError)
-
-	for !dialer.IsConnected() {
-		select {
-		case err := <-errCh:
-			if err != nil {
-				t.Fatalf("connection error: %v", err)
-			}
-		default:
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-	go client.ListenEvents(ctx, handleError)
+	ctx, cancel := context.WithCancel(t.Context())
+	err = client.Start(ctx, sandboxWsRpcUrl, handleError)
+	require.NoError(t, err)
 
 	var jwtToken string
 	t.Run("Authenticate With Signature", func(t *testing.T) {
@@ -104,20 +91,8 @@ func TestManualClient(t *testing.T) {
 		}
 	})
 
-	go dialer.Dial(ctx, sandboxWsRpcUrl, handleError)
-
-	for !dialer.IsConnected() {
-		select {
-		case err := <-errCh:
-			if err != nil {
-				t.Fatalf("connection error: %v", err)
-			}
-		default:
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-	fmt.Println("Reconnected")
-	go client.ListenEvents(ctx, handleError)
+	err = client.Start(ctx, sandboxWsRpcUrl, handleError)
+	require.NoError(t, err)
 
 	var appSessionID string
 	appAllocations := []rpc.AppAllocation{

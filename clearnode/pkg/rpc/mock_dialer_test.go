@@ -45,8 +45,9 @@ func (d *MockDialer) RegisterHandler(method rpc.Method, handler MockCallHandler)
 
 // Dial is a no-op for the mock dialer since no actual connection is made.
 // It simulates an always-connected state.
-func (d *MockDialer) Dial(ctx context.Context, url string, handleClosure func(err error)) {
+func (d *MockDialer) Dial(ctx context.Context, url string, handleClosure func(err error)) error {
 	// No-op for mock dialer - always connected
+	return nil
 }
 
 // IsConnected always returns true for the mock dialer.

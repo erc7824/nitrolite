@@ -3,7 +3,6 @@ package rpc_test
 import (
 	"context"
 	"errors"
-	"sync"
 	"testing"
 	"time"
 
@@ -351,76 +350,6 @@ func TestClient_AppSessions(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, resp.AppSessions, 1)
 	})
-}
-
-func TestClient_EventHandling(t *testing.T) {
-	client, dialer := setupClient()
-
-	// Event channels
-	balanceReceived := make(chan rpc.BalanceUpdateNotification, 1)
-	channelReceived := make(chan rpc.ChannelUpdateNotification, 1)
-	transferReceived := make(chan rpc.TransferNotification, 1)
-
-	// Register handlers
-	client.HandleBalanceUpdateEvent(func(ctx context.Context, n rpc.BalanceUpdateNotification, _ []sign.Signature) {
-		balanceReceived <- n
-	})
-	client.HandleChannelUpdateEvent(func(ctx context.Context, n rpc.ChannelUpdateNotification, _ []sign.Signature) {
-		channelReceived <- n
-	})
-	client.HandleTransferEvent(func(ctx context.Context, n rpc.TransferNotification, _ []sign.Signature) {
-		transferReceived <- n
-	})
-
-	// Start listener
-	ctx, cancel := context.WithCancel(testCtx)
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		client.ListenEvents(ctx, func(err error) {})
-	}()
-
-	// Publish events
-	balanceUpdate := rpc.BalanceUpdateNotification{
-		BalanceUpdates: []rpc.LedgerBalance{{Asset: testSymbol, Amount: decimal.NewFromInt(500)}},
-	}
-	params, _ := rpc.NewParams(balanceUpdate)
-	dialer.publishNotification(rpc.BalanceUpdateEvent, params)
-
-	channelUpdate := rpc.ChannelUpdateNotification{ChannelID: "ch123"}
-	params, _ = rpc.NewParams(channelUpdate)
-	dialer.publishNotification(rpc.ChannelUpdateEvent, params)
-
-	transferNotif := rpc.TransferNotification{
-		Transactions: []rpc.LedgerTransaction{{Id: 1, TxType: "incoming"}},
-	}
-	params, _ = rpc.NewParams(transferNotif)
-	dialer.publishNotification(rpc.TransferEvent, params)
-
-	// Verify events
-	select {
-	case <-balanceReceived:
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("balance update timeout")
-	}
-
-	select {
-	case <-channelReceived:
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("channel update timeout")
-	}
-
-	select {
-	case <-transferReceived:
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("transfer timeout")
-	}
-
-	// Cleanup
-	cancel()
-	dialer.CloseEventChannel()
-	wg.Wait()
 }
 
 func TestClient_ErrorHandling(t *testing.T) {

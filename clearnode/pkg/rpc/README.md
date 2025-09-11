@@ -89,8 +89,7 @@ client.HandleTransferEvent(func(ctx context.Context, notif TransferNotification,
     // Handle incoming/outgoing transfers
 })
 
-// Start listening for events
-go client.ListenEvents(ctx, handleClosure)
+// Event listening starts automatically when you call Start()
 ```
 
 ### Transport Layer
@@ -114,26 +113,23 @@ import "github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 ```go
 import "github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 
-// Create and connect client
+// Create client
 dialer := rpc.NewWebsocketDialer(rpc.DefaultWebsocketDialerConfig)
 client := rpc.NewClient(dialer)
 
-// Connect to server
-ctx := context.Background()
-go dialer.Dial(ctx, "wss://clearnet-sandbox.yellow.com/ws", func(err error) {
-    if err != nil {
-        log.Error("Connection error", "error", err)
-    }
-})
-
-// Wait for connection
-for !dialer.IsConnected() {
-    time.Sleep(100 * time.Millisecond)
-}
-
 // Set up event handlers
 client.HandleBalanceUpdateEvent(handleBalanceUpdate)
-go client.ListenEvents(ctx, handleClosure)
+
+// Connect to server and start listening for events
+ctx := context.Background()
+err := client.Start(ctx, "wss://clearnet-sandbox.yellow.com/ws", func(err error) {
+    if err != nil {
+        log.Error("Connection closed", "error", err)
+    }
+})
+if err != nil {
+    log.Fatal("Failed to start client", "error", err)
+}
 
 // Get server configuration
 config, _, err := client.GetConfig(ctx)
@@ -392,17 +388,18 @@ cfg := rpc.DefaultWebsocketDialerConfig
 cfg.EventChanSize = 100  // Buffer for unsolicited events
 dialer := rpc.NewWebsocketDialer(cfg)
 
-// Connect to server (runs in background)
+// Create client for high-level API
+client := rpc.NewClient(dialer)
+
+// Connect to server and start event handling
 ctx := context.Background()
-go dialer.Dial(ctx, "ws://localhost:8080/ws", func(err error) {
+err := client.Start(ctx, "ws://localhost:8080/ws", func(err error) {
     if err != nil {
         log.Error("Connection closed", "error", err)
     }
 })
-
-// Wait for connection to establish
-for !dialer.IsConnected() {
-    time.Sleep(100 * time.Millisecond)
+if err != nil {
+    log.Fatal("Failed to start client", "error", err)
 }
 
 // Make RPC calls with timeout

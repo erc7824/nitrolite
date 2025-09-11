@@ -158,36 +158,6 @@ jwtToken := authResp.JwtToken // Store for future use
 balances, _, err := client.GetLedgerBalances(ctx, rpc.GetLedgerBalancesRequest{})
 ```
 
-### Channel Operations
-
-```go
-// Create a payment channel
-amount := decimal.NewFromInt(1000000)
-createReq := rpc.CreateChannelRequest{
-    ChainID:    1,
-    Token:      "0xUSDC",
-    Amount:     &amount,
-    SessionKey: &sessionKeyAddress, // Required
-}
-
-// Prepare and sign request
-payload, _ := client.PreparePayload(rpc.CreateChannelMethod, createReq)
-hash, _ := payload.Hash()
-sig, _ := sessionSigner.Sign(hash)
-fullReq := rpc.NewRequest(payload, sig)
-
-// Server returns signed channel state
-response, _, err := client.CreateChannel(ctx, &fullReq)
-if err != nil {
-    log.Fatal("Failed to create channel", "error", err)
-}
-
-// You must sign the state and submit to blockchain yourself
-stateHash := computeStateHash(response.State)
-mySignature, _ := sessionSigner.Sign(stateHash)
-// Submit response.StateSignature and mySignature to blockchain
-```
-
 ### Off-chain Transfers
 
 ```go
@@ -233,6 +203,36 @@ sig2, _ := player2Signer.Sign(hash)
 fullReq := rpc.NewRequest(payload, sig1, sig2)
 
 response, _, err := client.CreateAppSession(ctx, &fullReq)
+```
+
+### Channel Operations
+
+```go
+// Create a payment channel
+amount := decimal.NewFromInt(1000000)
+createReq := rpc.CreateChannelRequest{
+    ChainID:    1,
+    Token:      "0xUSDC",
+    Amount:     &amount,
+    SessionKey: &sessionKeyAddress, // Required
+}
+
+// Prepare and sign request
+payload, _ := client.PreparePayload(rpc.CreateChannelMethod, createReq)
+hash, _ := payload.Hash()
+sig, _ := sessionSigner.Sign(hash)
+fullReq := rpc.NewRequest(payload, sig)
+
+// Server returns signed channel state
+response, _, err := client.CreateChannel(ctx, &fullReq)
+if err != nil {
+    log.Fatal("Failed to create channel", "error", err)
+}
+
+// You must sign the state and submit to blockchain yourself
+stateHash := computeStateHash(response.State)
+mySignature, _ := sessionSigner.Sign(stateHash)
+// Submit response.StateSignature and mySignature to blockchain
 ```
 
 ## Low-Level Usage
@@ -367,17 +367,6 @@ The payload automatically marshals to the compact array format:
 payload := rpc.NewPayload(123, "test_method", params)
 data, _ := json.Marshal(payload)
 // Output: [123,"test_method",{...params...},1634567890123]
-```
-
-### Timestamp Validation
-
-```go
-// Validate request timestamp (example: 5-minute window)
-maxAge := 5 * time.Minute
-requestTime := time.Unix(0, int64(payload.Timestamp)*int64(time.Millisecond))
-if time.Since(requestTime) > maxAge {
-    return rpc.Errorf("request expired: timestamp too old")
-}
 ```
 
 ### WebSocket Client Usage

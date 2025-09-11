@@ -88,10 +88,10 @@ func NewClient(dialer Dialer) *Client {
 // Example:
 //
 //	client := rpc.NewClient(dialer)
-//	
+//
 //	// Set up event handlers before starting
 //	client.HandleBalanceUpdateEvent(handleBalanceUpdate)
-//	
+//
 //	// Start the client
 //	err := client.Start(ctx, "wss://server.example.com/ws", func(err error) {
 //	    if err != nil {
@@ -101,7 +101,7 @@ func NewClient(dialer Dialer) *Client {
 //	if err != nil {
 //	    log.Fatal("Failed to start client", "error", err)
 //	}
-//	
+//
 //	// Now you can make RPC calls
 //	config, _, err := client.GetConfig(ctx)
 func (c *Client) Start(ctx context.Context, url string, handleClosure func(err error)) error {
@@ -1390,7 +1390,7 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 			},
 			"Allowance": {
 				{Name: "asset", Type: "string"},
-				{Name: "amount", Type: "uint256"},
+				{Name: "amount", Type: "uint256"}, // FIXME: currently allowance amount is string, so it will fail if there are some allowances
 			}},
 		PrimaryType: "Policy",
 		Domain: apitypes.TypedDataDomain{

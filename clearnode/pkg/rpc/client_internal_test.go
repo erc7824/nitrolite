@@ -126,7 +126,7 @@ func TestSignChallenge(t *testing.T) {
 		SessionKey:         "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
 		AppName:            "TestApp",
 		ApplicationAddress: "0x1111111111111111111111111111111111111111",
-		Allowances:         []Allowance{}, // FIXME: it will work only if Allowance.Amount is *big.Int
+		Allowances:         []Allowance{},
 		Expire:             "3600",
 		Scope:              "trade",
 	}

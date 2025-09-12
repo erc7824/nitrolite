@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -23,7 +24,7 @@ type MockCustody struct {
 
 var _ CustodyInterface = (*MockCustody)(nil)
 
-func (m *MockCustody) Checkpoint(channelID string, state UnsignedState, userSig, serverSig Signature, proofs []nitrolite.State) (common.Hash, error) {
+func (m *MockCustody) Checkpoint(channelID common.Hash, state UnsignedState, userSig, serverSig Signature, proofs []nitrolite.State) (common.Hash, error) {
 	m.mu.Lock()
 	m.callCount++
 	m.mu.Unlock()
@@ -89,7 +90,8 @@ func TestProcessAction(t *testing.T) {
 		require.NoError(t, db.First(&updatedAction, action.ID).Error)
 		assert.Equal(t, StatusCompleted, updatedAction.Status)
 		assert.Equal(t, 0, updatedAction.Retries)
-		assert.Equal(t, "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef", updatedAction.TxHash)
+		expected := common.HexToHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
+		assert.Equal(t, expected, updatedAction.TxHash)
 	})
 
 	t.Run("Permanent failure for missing custody client", func(t *testing.T) {
@@ -160,7 +162,7 @@ func TestProcessAction(t *testing.T) {
 			ChainID: 1,
 			Data:    validCheckpointData(t),
 			Status:  StatusPending,
-			Retries: 4,
+			Retries: maxActionRetries,
 		}
 		require.NoError(t, db.Create(action).Error)
 
@@ -171,7 +173,7 @@ func TestProcessAction(t *testing.T) {
 		require.NoError(t, db.First(&updatedAction, action.ID).Error)
 
 		assert.Equal(t, StatusFailed, updatedAction.Status)
-		assert.Equal(t, 5, updatedAction.Retries)
-		assert.Contains(t, updatedAction.Error, "failed after 4 retries: RPC still down")
+		assert.Equal(t, maxActionRetries, updatedAction.Retries)
+		assert.Contains(t, updatedAction.Error, fmt.Sprintf("failed after %d retries: RPC still down", maxActionRetries))
 	})
 }

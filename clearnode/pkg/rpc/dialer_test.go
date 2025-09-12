@@ -28,7 +28,7 @@ func TestWebsocketDialer_BasicConnection(t *testing.T) {
 	cfg.EventChanSize = 10
 	dialer := rpc.NewWebsocketDialer(cfg)
 
-	connectDialer(t, ctx, dialer, server.Listener.Addr().String())
+	errorCh := connectDialer(t, ctx, dialer, server.Listener.Addr().String())
 
 	// Test basic call
 	params, err := rpc.NewParams(map[string]interface{}{"key": "value"})
@@ -38,6 +38,13 @@ func TestWebsocketDialer_BasicConnection(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "response_test", resp.Res.Method)
 	assert.Equal(t, req.Req.RequestID, resp.Res.RequestID)
+
+	// Ensure no errors occurred
+	select {
+	case err := <-errorCh:
+		require.NoError(t, err)
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 func TestWebsocketDialer_ConnectionFailure(t *testing.T) {
@@ -48,19 +55,11 @@ func TestWebsocketDialer_ConnectionFailure(t *testing.T) {
 	defer cancel()
 
 	errorCh := make(chan error, 1)
-	go dialer.Dial(ctx, "ws://invalid-url-that-does-not-exist:12345", func(err error) {
+	err := dialer.Dial(ctx, "ws://invalid-url-that-does-not-exist:12345", func(err error) {
 		errorCh <- err
 	})
-
-	select {
-	case err := <-errorCh:
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "error dialing websocket server")
-	case <-time.After(3 * time.Second):
-		t.Fatal("timeout waiting for connection error")
-	}
-
-	// Verify not connected
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "error dialing websocket server")
 	assert.False(t, dialer.IsConnected())
 }
 
@@ -73,12 +72,19 @@ func TestWebsocketDialer_ContextCancellation(t *testing.T) {
 	dialer := rpc.NewWebsocketDialer(cfg)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	connectDialer(t, ctx, dialer, server.Listener.Addr().String())
+	errorCh := connectDialer(t, ctx, dialer, server.Listener.Addr().String())
 	cancel() // Cancel the context to trigger closure
 
 	// Verify not connected after cancel
 	time.Sleep(100 * time.Millisecond)
 	assert.False(t, dialer.IsConnected())
+
+	// Ensure no errors occurred
+	select {
+	case err := <-errorCh:
+		require.NoError(t, err)
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 func TestWebsocketDialer_MultipleRequests(t *testing.T) {
@@ -90,7 +96,7 @@ func TestWebsocketDialer_MultipleRequests(t *testing.T) {
 	cfg.EventChanSize = 10
 	dialer := rpc.NewWebsocketDialer(cfg)
 
-	connectDialer(t, ctx, dialer, server.Listener.Addr().String())
+	errorCh := connectDialer(t, ctx, dialer, server.Listener.Addr().String())
 
 	// Send multiple requests concurrently
 	var wg sync.WaitGroup
@@ -118,6 +124,13 @@ func TestWebsocketDialer_MultipleRequests(t *testing.T) {
 	}
 
 	wg.Wait()
+
+	// Ensure no errors occurred
+	select {
+	case err := <-errorCh:
+		require.NoError(t, err)
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 func TestWebsocketDialer_RequestTimeout(t *testing.T) {
@@ -141,7 +154,7 @@ func TestWebsocketDialer_RequestTimeout(t *testing.T) {
 	cfg := rpc.DefaultWebsocketDialerConfig
 	dialer := rpc.NewWebsocketDialer(cfg)
 
-	connectDialer(t, ctx, dialer, server.Listener.Addr().String())
+	errorCh := connectDialer(t, ctx, dialer, server.Listener.Addr().String())
 
 	// Test timeout
 	var params rpc.Params
@@ -153,6 +166,13 @@ func TestWebsocketDialer_RequestTimeout(t *testing.T) {
 	_, err := dialer.Call(callCtx, &req)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no response received")
+
+	// Ensure no errors occurred
+	select {
+	case err := <-errorCh:
+		require.NoError(t, err)
+	case <-time.After(100 * time.Millisecond):
+	}
 }
 
 func TestWebsocketDialer_UnsolicitedEvents(t *testing.T) {
@@ -210,7 +230,7 @@ func TestWebsocketDialer_UnsolicitedEvents(t *testing.T) {
 	cfg.EventChanSize = 10
 	dialer := rpc.NewWebsocketDialer(cfg)
 
-	connectDialer(t, ctx, dialer, server.Listener.Addr().String())
+	errorCh := connectDialer(t, ctx, dialer, server.Listener.Addr().String())
 
 	// Check event channel for unsolicited event
 	select {
@@ -220,6 +240,13 @@ func TestWebsocketDialer_UnsolicitedEvents(t *testing.T) {
 		assert.Equal(t, uint64(9999), event.Res.RequestID)
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for unsolicited event")
+	}
+
+	// Ensure no errors occurred
+	select {
+	case err := <-errorCh:
+		require.NoError(t, err)
+	case <-time.After(100 * time.Millisecond):
 	}
 }
 
@@ -269,34 +296,16 @@ func createEchoServer(t *testing.T, extraHandlers map[string]func(*rpc.Request) 
 	}))
 }
 
-func connectDialer(t *testing.T, ctx context.Context, dialer *rpc.WebsocketDialer, addr string) {
-	connected := make(chan struct{})
+func connectDialer(t *testing.T, ctx context.Context, dialer *rpc.WebsocketDialer, addr string) <-chan error {
 	errorCh := make(chan error, 1)
 
-	go func() {
-		dialer.Dial(ctx, "ws://"+addr, func(err error) {
-			if err != nil {
-				errorCh <- err
-			}
-		})
-	}()
-
-	go func() {
-		for i := 0; i < 100; i++ {
-			if dialer.IsConnected() {
-				close(connected)
-				return
-			}
-			time.Sleep(10 * time.Millisecond)
+	err := dialer.Dial(ctx, "ws://"+addr, func(err error) {
+		if err != nil {
+			errorCh <- err
 		}
-	}()
+	})
+	require.NoError(t, err)
+	require.True(t, dialer.IsConnected())
 
-	select {
-	case <-connected:
-		// Success
-	case err := <-errorCh:
-		t.Fatalf("connection error: %v", err)
-	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for connection")
-	}
+	return errorCh
 }

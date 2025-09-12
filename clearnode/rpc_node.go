@@ -377,7 +377,7 @@ func prepareRawNotification(signer *Signer, method string, params RPCDataParams)
 	}
 
 	data := &RPCData{
-		RequestID: uint64(time.Now().UnixMilli()),
+		RequestID: 0, // Notifications have no request ID
 		Method:    method,
 		Params:    params,
 		Timestamp: uint64(time.Now().UnixMilli()),

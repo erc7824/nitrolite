@@ -18,7 +18,7 @@ type Dialer interface {
 	// Dial establishes a connection to the specified URL.
 	// This method is designed to be called in a goroutine as it blocks until the connection is closed.
 	// The handleClosure callback is invoked when the connection is closed, with an error if any.
-	Dial(ctx context.Context, url string, handleClosure func(err error))
+	Dial(ctx context.Context, url string, handleClosure func(err error)) error
 
 	// IsConnected returns true if the dialer has an active connection.
 	IsConnected() bool
@@ -103,10 +103,9 @@ func NewWebsocketDialer(cfg WebsocketDialerConfig) *WebsocketDialer {
 //	        log.Error("Connection closed", "error", err)
 //	    }
 //	})
-func (d *WebsocketDialer) Dial(ctx context.Context, url string, handleClosure func(err error)) {
+func (d *WebsocketDialer) Dial(ctx context.Context, url string, handleClosure func(err error)) error {
 	if d.IsConnected() {
-		handleClosure(ErrAlreadyConnected)
-		return
+		return ErrAlreadyConnected
 	}
 
 	dialer := websocket.Dialer{
@@ -117,8 +116,7 @@ func (d *WebsocketDialer) Dial(ctx context.Context, url string, handleClosure fu
 	// Establish WebSocket connection
 	conn, _, err := dialer.DialContext(ctx, url, nil)
 	if err != nil {
-		handleClosure(fmt.Errorf("%w: %w", ErrDialingWebsocket, err))
-		return
+		return fmt.Errorf("%w: %w", ErrDialingWebsocket, err)
 	}
 
 	// Create a cancelable context for managing goroutines
@@ -129,12 +127,12 @@ func (d *WebsocketDialer) Dial(ctx context.Context, url string, handleClosure fu
 	// Track the first error that causes closure
 	var closureErr error
 	childHandleClosure := func(err error) {
-		cancel() // Cancel context to stop other goroutines
-		wg.Done()
-
 		if err != nil && closureErr == nil {
 			closureErr = err
 		}
+
+		cancel() // Cancel context to stop other goroutines
+		wg.Done()
 	}
 
 	// Store connection context
@@ -144,6 +142,7 @@ func (d *WebsocketDialer) Dial(ctx context.Context, url string, handleClosure fu
 		conn: conn,
 		lg:   log.FromContext(ctx).WithName("ws-dialer"),
 	}
+	d.eventCh = make(chan *Response, d.cfg.EventChanSize)
 	d.mu.Unlock()
 
 	// Start background goroutines
@@ -152,8 +151,12 @@ func (d *WebsocketDialer) Dial(ctx context.Context, url string, handleClosure fu
 	go d.pingPeriodically(parentCtx, childHandleClosure)
 
 	// Wait for all goroutines to finish before calling the closure handler
-	wg.Wait()
-	handleClosure(closureErr)
+	go func() {
+		wg.Wait()
+		handleClosure(closureErr)
+	}()
+
+	return nil
 }
 
 // IsConnected returns true if the dialer has an active connection
@@ -183,8 +186,6 @@ func (d *WebsocketDialer) closeOnContextDone(ctx context.Context, handleClosure 
 	d.responseSinks = make(map[uint64]chan *Response)
 	d.mu.Unlock()
 
-	// Send nil to signal event channel closure
-	d.eventCh <- nil
 	handleClosure(err)
 }
 
@@ -365,5 +366,8 @@ func (d *WebsocketDialer) pingPeriodically(ctx context.Context, handleClosure fu
 //	    log.Info("Received event", "method", event.Res.Method)
 //	}
 func (d *WebsocketDialer) EventCh() <-chan *Response {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	return d.eventCh
 }

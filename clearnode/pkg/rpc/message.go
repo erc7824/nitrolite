@@ -144,7 +144,6 @@ func (r Response) GetSigners() ([]sign.Address, error) {
 //
 // Parameters:
 //   - requestID: The ID from the original request
-//   - method: The method name from the original request
 //   - errMsg: The error message to send to the client
 //   - sig: Optional signatures to authenticate the error response
 //
@@ -152,18 +151,16 @@ func (r Response) GetSigners() ([]sign.Address, error) {
 //
 //	// In an RPC handler when an error occurs
 //	if err := validateRequest(request); err != nil {
-//	    return NewErrorResponse(request.Req.RequestID, request.Req.Method,
-//	        err.Error(), serverSignature)
+//	    return NewErrorResponse(request.Req.RequestID, err.Error(), serverSignature)
 //	}
 //
 //	// Creating an error response without signatures
-//	errorResponse := NewErrorResponse(12345, "wallet_transfer",
-//	    "insufficient balance")
+//	errorResponse := NewErrorResponse(12345, "insufficient balance")
 //
 // The resulting response will have params in the format: {"error": "<errMsg>"}
-func NewErrorResponse(requestID uint64, method string, errMsg string, sig ...sign.Signature) Response {
+func NewErrorResponse(requestID uint64, errMsg string, sig ...sign.Signature) Response {
 	errParams := NewErrorParams(errMsg)
-	errPayload := NewPayload(requestID, method, errParams)
+	errPayload := NewPayload(requestID, errorMethod, errParams)
 	return NewResponse(errPayload, sig...)
 }
 

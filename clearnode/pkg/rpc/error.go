@@ -21,7 +21,7 @@ var (
 	ErrReadingMessage    = fmt.Errorf("error reading message")
 
 	// Request/Response errors
-	ErrNilRequest           = fmt.Errorf("request cannot be nil")
+	ErrNilRequest           = fmt.Errorf("nil request")
 	ErrInvalidRequestMethod = fmt.Errorf("invalid request method")
 	ErrMarshalingRequest    = fmt.Errorf("error marshaling request")
 	ErrSendingRequest       = fmt.Errorf("error sending request")

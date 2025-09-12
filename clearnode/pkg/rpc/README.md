@@ -4,8 +4,6 @@ The `pkg/rpc` package provides the core data structures and utilities for the Cl
 
 ## Overview
 
-The RPC package provides a complete client implementation for interacting with the ClearNode RPC server:
-
 - **High-Level Client**: Type-safe methods for all RPC operations
 - **WebSocket Transport**: Persistent connection with automatic reconnection
 - **Event Handling**: Asynchronous notifications for balance updates, transfers, and channel changes
@@ -120,9 +118,12 @@ client := rpc.NewClient(dialer)
 // Set up event handlers
 client.HandleBalanceUpdateEvent(handleBalanceUpdate)
 
+// Example server URL (use your actual server)
+serverRpcWsUrl := "wss://clearnet-sandbox.yellow.com/ws"
+
 // Connect to server and start listening for events
 ctx := context.Background()
-err := client.Start(ctx, "wss://clearnet-sandbox.yellow.com/ws", func(err error) {
+err := client.Start(ctx, serverRpcWsUrl, func(err error) {
     if err != nil {
         log.Error("Connection closed", "error", err)
     }

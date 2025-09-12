@@ -113,7 +113,7 @@ A multiplayer snake game that uses state channels for secure, off-chain gameplay
 - **State channel integration**: Secure payments and state signing
 - **Fair fund distribution**: Based on game outcome
 
-[Learn more about Snake](examples/cerebro)
+[Learn more about cerebro](/examples/cerebro)
 
 ### Tic Tac Toe
 

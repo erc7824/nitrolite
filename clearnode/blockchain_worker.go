@@ -13,6 +13,19 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	// actionBatchSize determines how many blockchain actions to process at once
+	actionBatchSize = 20
+
+	// maxActionRetries is the maximum number of times to retry a failed action
+	maxActionRetries = 5
+
+	// chainWorkerTickInterval is how frequently each chain worker checks for new actions
+	chainWorkerTickInterval = 30 * time.Second
+
+	unmarshalCheckpointDataError = "unmarshal checkpoint data"
+)
+
 type BlockchainWorker struct {
 	db      *gorm.DB
 	custody map[uint32]CustodyInterface
@@ -45,7 +58,7 @@ func (w *BlockchainWorker) runChainWorker(ctx context.Context, wg *sync.WaitGrou
 	chainLogger := w.logger.With("chain", chainID)
 	chainLogger.Info("chain worker started")
 
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(chainWorkerTickInterval)
 	defer ticker.Stop()
 
 	w.processActionsForChain(ctx, chainID, chainLogger)
@@ -54,6 +67,7 @@ func (w *BlockchainWorker) runChainWorker(ctx context.Context, wg *sync.WaitGrou
 		select {
 		case <-ctx.Done():
 			chainLogger.Info("chain worker stopping")
+			defer chainLogger.Info("chain worker stopped")
 			return
 		case <-ticker.C:
 			w.processActionsForChain(ctx, chainID, chainLogger)
@@ -62,7 +76,7 @@ func (w *BlockchainWorker) runChainWorker(ctx context.Context, wg *sync.WaitGrou
 }
 
 func (w *BlockchainWorker) processActionsForChain(ctx context.Context, chainID uint32, logger Logger) {
-	actions, err := getActionsForChain(w.db, chainID, 5)
+	actions, err := getActionsForChain(w.db, chainID, actionBatchSize)
 	if err != nil {
 		logger.Error("failed to get pending actions for chain", "error", err)
 		return
@@ -110,7 +124,7 @@ func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainA
 	}
 
 	if err != nil {
-		isFatalError := strings.Contains(err.Error(), "unmarshal checkpoint data")
+		isFatalError := strings.Contains(err.Error(), unmarshalCheckpointDataError)
 
 		if isFatalError {
 			logger.Error("action failed due to fatal data error", "error", err)
@@ -118,10 +132,13 @@ func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainA
 				logger.Error("failed to mark action as permanently failed", "error", failErr)
 			}
 		} else {
-			if action.Retries >= 4 {
+			if action.Retries == maxActionRetries {
 				logger.Warn("action failed after reaching max retries", "error", err)
-				finalErr := fmt.Errorf("failed after %d retries: %w", action.Retries, err)
-				if failErr := action.Fail(w.db, finalErr.Error()); failErr != nil {
+				finalErr := fmt.Errorf("failed after %d retries: %w", maxActionRetries, err)
+				action.Status = StatusFailed
+				action.Error = finalErr.Error()
+				action.UpdatedAt = time.Now()
+				if failErr := w.db.Save(&action).Error; failErr != nil {
 					logger.Error("failed to mark action as permanently failed", "error", failErr)
 				}
 			} else {
@@ -135,7 +152,7 @@ func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainA
 	}
 
 	// Success case
-	if err := action.Complete(w.db, txHash.Hex()); err != nil {
+	if err := action.Complete(w.db, txHash); err != nil {
 		logger.Error("failed to mark action as completed", "error", err)
 		return
 	}
@@ -145,8 +162,8 @@ func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainA
 func (w *BlockchainWorker) processCheckpoint(ctx context.Context, action BlockchainAction, custody CustodyInterface) (common.Hash, error) {
 	var data CheckpointData
 	if err := json.Unmarshal([]byte(action.Data), &data); err != nil {
-		return common.Hash{}, fmt.Errorf("unmarshal checkpoint data: %w", err)
+		return common.Hash{}, fmt.Errorf("%s: %w", unmarshalCheckpointDataError, err)
 	}
 
-	return custody.Checkpoint(action.ChannelID, data.State, data.UserSig, data.ServerSig, []nitrolite.State{})
+	return custody.Checkpoint(common.HexToHash(action.ChannelID), data.State, data.UserSig, data.ServerSig, []nitrolite.State{})
 }

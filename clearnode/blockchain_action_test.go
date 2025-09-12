@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -114,7 +115,7 @@ func TestBlockchainAction_Complete(t *testing.T) {
 	}
 	require.NoError(t, db.Create(action).Error)
 
-	txHash := "0xabcdef1234567890"
+	txHash := common.HexToHash("0xabcdef1234567890")
 	err := action.Complete(db, txHash)
 	require.NoError(t, err)
 
@@ -162,8 +163,8 @@ func TestCheckpointData_Serialization(t *testing.T) {
 }
 
 func TestConstants(t *testing.T) {
-	assert.Equal(t, ActionType("checkpoint"), ActionTypeCheckpoint)
-	assert.Equal(t, ActionStatus("pending"), StatusPending)
-	assert.Equal(t, ActionStatus("completed"), StatusCompleted)
-	assert.Equal(t, ActionStatus("failed"), StatusFailed)
+	assert.Equal(t, BlockchainActionType("checkpoint"), ActionTypeCheckpoint)
+	assert.Equal(t, BlockchainActionStatus("pending"), StatusPending)
+	assert.Equal(t, BlockchainActionStatus("completed"), StatusCompleted)
+	assert.Equal(t, BlockchainActionStatus("failed"), StatusFailed)
 }

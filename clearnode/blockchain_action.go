@@ -26,7 +26,7 @@ const (
 type BlockchainAction struct {
 	ID        int64                  `gorm:"primary_key"`
 	Type      BlockchainActionType   `gorm:"column:action_type;not null"`
-	ChannelID string                 `gorm:"column:channel_id;not null"`
+	ChannelID common.Hash            `gorm:"column:channel_id;not null"`
 	ChainID   uint32                 `gorm:"column:chain_id;not null"`
 	Data      datatypes.JSON         `gorm:"column:action_data;type:text;not null"`
 	Status    BlockchainActionStatus `gorm:"column:status;not null"`
@@ -47,7 +47,7 @@ type CheckpointData struct {
 	ServerSig Signature     `json:"server_sig"`
 }
 
-func CreateCheckpoint(tx *gorm.DB, channel string, chainID uint32, state UnsignedState, userSig, serverSig Signature) error {
+func CreateCheckpoint(tx *gorm.DB, channel common.Hash, chainID uint32, state UnsignedState, userSig, serverSig Signature) error {
 	data := CheckpointData{
 		State:     state,
 		UserSig:   userSig,

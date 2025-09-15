@@ -327,7 +327,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 
 func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenged) {
 	logger = logger.With("event", "Challenged")
-	channelID := common.Hash(ev.ChannelId).Hex()
+	channelID := common.Hash(ev.ChannelId)
 	logger.Debug("parsed event", "channelId", channelID)
 
 	var channel Channel
@@ -337,7 +337,7 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 			return err
 		}
 
-		result := tx.Where("channel_id = ?", channelID).First(&channel)
+		result := tx.Where("channel_id = ?", channelID.Hex()).First(&channel)
 		if result.Error != nil {
 			return fmt.Errorf("error finding channel: %w", result.Error)
 		}

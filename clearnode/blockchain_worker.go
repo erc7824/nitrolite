@@ -165,5 +165,5 @@ func (w *BlockchainWorker) processCheckpoint(ctx context.Context, action Blockch
 		return common.Hash{}, fmt.Errorf("%s: %w", unmarshalCheckpointDataError, err)
 	}
 
-	return custody.Checkpoint(common.HexToHash(action.ChannelID), data.State, data.UserSig, data.ServerSig, []nitrolite.State{})
+	return custody.Checkpoint(action.ChannelID, data.State, data.UserSig, data.ServerSig, []nitrolite.State{})
 }

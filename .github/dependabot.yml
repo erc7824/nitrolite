@@ -9,8 +9,14 @@ updates:
     directory: "/nitrolite/sdk/" # Location of package manifests
     schedule:
       interval: "daily"
+    labels:
+      - "dependencies"
+      - "gomod"
 
   - package-ecosystem: "gomod" # See documentation for possible values
     directory: "/clearnode/" # Location of package manifests
     schedule:
       interval: "daily"
+    labels:
+      - "dependencies"
+      - "gomod"

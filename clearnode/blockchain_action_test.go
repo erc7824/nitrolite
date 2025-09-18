@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,16 +28,17 @@ func TestCreateCheckpoint(t *testing.T) {
 		}
 		userSig := Signature{1, 2, 3}
 		serverSig := Signature{4, 5, 6}
+		channelId := common.HexToHash("0xchannel1")
 
-		err := CreateCheckpoint(db, "channel1", 1, state, userSig, serverSig)
+		err := CreateCheckpoint(db, channelId, 1, state, userSig, serverSig)
 		require.NoError(t, err)
 
 		var action BlockchainAction
-		err = db.Where("channel_id = ?", "channel1").First(&action).Error
+		err = db.Where("channel_id = ?", channelId).First(&action).Error
 		require.NoError(t, err)
 
 		assert.Equal(t, ActionTypeCheckpoint, action.Type)
-		assert.Equal(t, "channel1", action.ChannelID)
+		assert.Equal(t, channelId, action.ChannelID)
 		assert.Equal(t, uint32(1), action.ChainID)
 		assert.Equal(t, StatusPending, action.Status)
 		assert.Equal(t, 0, action.Retries)
@@ -54,6 +56,8 @@ func TestCreateCheckpoint(t *testing.T) {
 	})
 
 	t.Run("Database error", func(t *testing.T) {
+		channelId := common.HexToHash("0xchannel1")
+
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
@@ -61,19 +65,21 @@ func TestCreateCheckpoint(t *testing.T) {
 		require.NoError(t, err)
 		sqlDB.Close()
 
-		err = CreateCheckpoint(db, "channel", 1, UnsignedState{}, Signature{}, Signature{})
+		err = CreateCheckpoint(db, channelId, 1, UnsignedState{}, Signature{}, Signature{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "database is closed")
 	})
 }
 
 func TestBlockchainAction_Fail(t *testing.T) {
+	channelId := common.HexToHash("0xchannel1")
+
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	action := &BlockchainAction{
 		Type:      ActionTypeCheckpoint,
-		ChannelID: "channel1",
+		ChannelID: channelId,
 		ChainID:   1,
 		Data:      []byte{1},
 		Status:    StatusPending,
@@ -99,12 +105,14 @@ func TestBlockchainAction_Fail(t *testing.T) {
 }
 
 func TestBlockchainAction_Complete(t *testing.T) {
+	channelId := common.HexToHash("0xchannel1")
+
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	action := &BlockchainAction{
 		Type:      ActionTypeCheckpoint,
-		ChannelID: "channel1",
+		ChannelID: channelId,
 		ChainID:   1,
 		Data:      []byte{1},
 		Status:    StatusPending,
@@ -114,7 +122,7 @@ func TestBlockchainAction_Complete(t *testing.T) {
 	}
 	require.NoError(t, db.Create(action).Error)
 
-	txHash := "0xabcdef1234567890"
+	txHash := common.HexToHash("0xabcdef1234567890")
 	err := action.Complete(db, txHash)
 	require.NoError(t, err)
 
@@ -162,8 +170,8 @@ func TestCheckpointData_Serialization(t *testing.T) {
 }
 
 func TestConstants(t *testing.T) {
-	assert.Equal(t, ActionType("checkpoint"), ActionTypeCheckpoint)
-	assert.Equal(t, ActionStatus("pending"), StatusPending)
-	assert.Equal(t, ActionStatus("completed"), StatusCompleted)
-	assert.Equal(t, ActionStatus("failed"), StatusFailed)
+	assert.Equal(t, BlockchainActionType("checkpoint"), ActionTypeCheckpoint)
+	assert.Equal(t, BlockchainActionStatus("pending"), StatusPending)
+	assert.Equal(t, BlockchainActionStatus("completed"), StatusCompleted)
+	assert.Equal(t, BlockchainActionStatus("failed"), StatusFailed)
 }

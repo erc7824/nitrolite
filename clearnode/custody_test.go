@@ -973,7 +973,7 @@ func TestHandleEventWithInvalidChannel(t *testing.T) {
 }
 
 func TestChallengeHandling(t *testing.T) {
-	channelID := "0x0000000000000000000000001234567890abcdef1234567890abcdef12345678"
+	channelID := common.HexToHash("0x0000000000000000000000001234567890abcdef1234567890abcdef12345678")
 	initialState := UnsignedState{
 		Intent:  StateIntent(StateIntentOperate),
 		Version: 5,
@@ -1001,7 +1001,7 @@ func TestChallengeHandling(t *testing.T) {
 
 		channel, err := CreateChannel(
 			db,
-			channelID,
+			channelID.Hex(),
 			"0xWallet123456789",
 			"0xParticipant123456789",
 			1,
@@ -1019,7 +1019,7 @@ func TestChallengeHandling(t *testing.T) {
 		require.NoError(t, db.Save(&channel).Error)
 
 		challengedEvent := &nitrolite.CustodyChallenged{
-			ChannelId: [32]byte(common.HexToHash(channelID)),
+			ChannelId: [32]byte(channelID),
 			State: nitrolite.State{
 				Intent:  0,
 				Version: big.NewInt(3), // Older version - should trigger checkpoint
@@ -1047,7 +1047,7 @@ func TestChallengeHandling(t *testing.T) {
 
 		// Verify channel is marked as challenged
 		var updatedChannel Channel
-		err = db.Where("channel_id = ?", channelID).First(&updatedChannel).Error
+		err = db.Where("channel_id = ?", channelID.Hex()).First(&updatedChannel).Error
 		require.NoError(t, err)
 		assert.Equal(t, ChannelStatusChallenged, updatedChannel.Status)
 
@@ -1077,7 +1077,7 @@ func TestChallengeHandling(t *testing.T) {
 
 		channel, err := CreateChannel(
 			db,
-			channelID,
+			channelID.Hex(),
 			"0xWallet123456789",
 			"0xParticipant123456789",
 			1,
@@ -1095,7 +1095,7 @@ func TestChallengeHandling(t *testing.T) {
 		require.NoError(t, db.Save(&channel).Error)
 
 		challengedEvent := &nitrolite.CustodyChallenged{
-			ChannelId: [32]byte(common.HexToHash(channelID)),
+			ChannelId: [32]byte(channelID),
 			State: nitrolite.State{
 				Intent:  0,
 				Version: big.NewInt(5), // Same version - no checkpoint needed
@@ -1123,13 +1123,13 @@ func TestChallengeHandling(t *testing.T) {
 
 		// Verify channel is marked as challenged
 		var updatedChannel Channel
-		err = db.Where("channel_id = ?", channelID).First(&updatedChannel).Error
+		err = db.Where("channel_id = ?", channelID.Hex()).First(&updatedChannel).Error
 		require.NoError(t, err)
 		assert.Equal(t, ChannelStatusChallenged, updatedChannel.Status)
 
 		// Verify NO checkpoint action was created
 		var count int64
-		err = db.Model(&BlockchainAction{}).Where("channel_id = ? AND action_type = ?", channelID, ActionTypeCheckpoint).Count(&count).Error
+		err = db.Model(&BlockchainAction{}).Where("channel_id = ? AND action_type = ?", channelID.Hex(), ActionTypeCheckpoint).Count(&count).Error
 		require.NoError(t, err)
 		assert.Equal(t, int64(0), count, "No checkpoint action should be created for same version")
 	})

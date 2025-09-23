@@ -104,7 +104,7 @@ func init() {
 	if logLevel == "" {
 		logLevel = "info" // Default log level
 	}
-	zapLevel, err := log.LevelFromString(logLevel)
+	zapLevel, err := log.Parse(logLevel)
 	if err != nil {
 		zapLevel = log.LevelInfo // Fallback to Info level if parsing fails
 	}

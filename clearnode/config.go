@@ -14,20 +14,22 @@ import (
 // - {PREFIX}_INFURA_URL: The Infura endpoint URL for the network
 // - {PREFIX}_CUSTODY_CONTRACT_ADDRESS: The custody contract address
 var knownNetworks = map[string]uint32{
-	"POLYGON":       137,
-	"ETH_SEPOLIA":   11155111,
-	"LINEA_MAINNET": 59144,
-	"CELO":          42220,
-	"BASE":          8453,
-	"WORLD_CHAIN":   480,
-	"ROOTSTOCK":     30,
-	"FLOW":          747,
-	"LOCALNET":      1337,
-	"ETH_MAINNET":   1,
-	"ANVIL":         31337,
-	"LINEA_SEPOLIA": 59141,
-	"BASE_SEPOLIA":  84532,
-	"POLYGON_AMOY":  80002,
+	"POLYGON":          137,
+	"ETH_SEPOLIA":      11155111,
+	"LINEA_MAINNET":    59144,
+	"CELO":             42220,
+	"BASE":             8453,
+	"WORLD_CHAIN":      480,
+	"ROOTSTOCK":        30,
+	"FLOW":             747,
+	"LOCALNET":         1337,
+	"ETH_MAINNET":      1,
+	"ANVIL":            31337,
+	"LINEA_SEPOLIA":    59141,
+	"BASE_SEPOLIA":     84532,
+	"POLYGON_AMOY":     80002,
+	"XRPL_EVM_MAINNET": 1440000,
+	"XRPL_EVM_TESTNET": 1449000,
 }
 
 // NetworkConfig represents configuration for a blockchain network

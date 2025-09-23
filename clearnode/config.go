@@ -11,7 +11,7 @@ import (
 
 // knownNetworks maps network name prefixes to their respective chain IDs.
 // Each prefix is used to find corresponding environment variables:
-// - {PREFIX}_INFURA_URL: The Infura endpoint URL for the network
+// - {PREFIX}_BLOCKCHAIN_RPC: The Blockchain RPC endpoint URL for the network
 // - {PREFIX}_CUSTODY_CONTRACT_ADDRESS: The custody contract address
 var knownNetworks = map[string]uint32{
 	"POLYGON":          137,
@@ -36,7 +36,7 @@ var knownNetworks = map[string]uint32{
 type NetworkConfig struct {
 	Name                  string
 	ChainID               uint32
-	InfuraURL             string
+	BlockchainRPC         string
 	CustodyAddress        string
 	AdjudicatorAddress    string
 	BalanceCHeckerAddress string // TODO: add balance checker method into our smart contract
@@ -107,7 +107,7 @@ func LoadConfig(logger Logger) (*Config, error) {
 	// Process each network
 	envs := os.Environ()
 	for network, chainID := range knownNetworks {
-		infuraURL := ""
+		blockchainRPC := ""
 		custodyAddress := ""
 		adjudicatorAddress := ""
 		balanceCheckerAddress := ""
@@ -123,8 +123,8 @@ func LoadConfig(logger Logger) (*Config, error) {
 			key := parts[0]
 			value := parts[1]
 
-			if strings.HasPrefix(key, network+"_INFURA_URL") {
-				infuraURL = value
+			if strings.HasPrefix(key, network+"_BLOCKCHAIN_RPC") {
+				blockchainRPC = value
 			} else if strings.HasPrefix(key, network+"_CUSTODY_CONTRACT_ADDRESS") {
 				custodyAddress = value
 			} else if strings.HasPrefix(key, network+"_ADJUDICATOR_ADDRESS") {
@@ -141,12 +141,12 @@ func LoadConfig(logger Logger) (*Config, error) {
 		}
 
 		// Only add network if both required variables are present
-		if infuraURL != "" && custodyAddress != "" && adjudicatorAddress != "" && balanceCheckerAddress != "" {
+		if blockchainRPC != "" && custodyAddress != "" && adjudicatorAddress != "" && balanceCheckerAddress != "" {
 			networkLower := strings.ToLower(network)
 			config.networks[chainID] = &NetworkConfig{
 				Name:                  networkLower,
 				ChainID:               chainID,
-				InfuraURL:             infuraURL,
+				BlockchainRPC:         blockchainRPC,
 				CustodyAddress:        custodyAddress,
 				AdjudicatorAddress:    adjudicatorAddress,
 				BalanceCHeckerAddress: balanceCheckerAddress,

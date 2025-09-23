@@ -80,7 +80,7 @@ func TestChannelService(t *testing.T) {
 		137: {
 			Name:               "polygon",
 			ChainID:            chainID,
-			InfuraURL:          "https://polygon-mainnet.infura.io/v3/test",
+			BlockchainRPC:      "https://polygon-mainnet.infura.io/v3/test",
 			CustodyAddress:     "0x2e189bd6f6FD3EB59fd97FcA03251d93Af4E522a",
 			AdjudicatorAddress: "0xdadB0d80178819F2319190D340ce9A924f783711",
 		},

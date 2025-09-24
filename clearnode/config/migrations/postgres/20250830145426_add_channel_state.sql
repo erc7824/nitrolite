@@ -10,7 +10,7 @@ SET state = json_build_object(
     'intent', 1,
     'version', version,
     'state_data', '',
-    'allocations', '[]'
+    'allocations', '[]'::jsonb
 )::text;
 
 ALTER TABLE channels ALTER COLUMN state SET NOT NULL;

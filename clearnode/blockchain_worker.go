@@ -41,14 +41,15 @@ func NewBlockchainWorker(db *gorm.DB, custody map[uint32]CustodyInterface, logge
 }
 
 func (w *BlockchainWorker) Start(ctx context.Context) {
-	w.logger.Info("starting blockchain worker with dedicated workers for each chain")
+	w.logger.Debug("starting blockchain worker with dedicated workers for each chain")
 	var wg sync.WaitGroup
 	for chainID := range w.custody {
 		wg.Add(1)
 		go w.runChainWorker(ctx, &wg, chainID)
 	}
+	w.logger.Info("blockchain workers started")
 	<-ctx.Done()
-	w.logger.Info("shutdown signal received, waiting for chain workers to stop...")
+	w.logger.Debug("shutdown signal received, waiting for chain workers to stop...")
 	wg.Wait()
 	w.logger.Info("all chain workers have stopped")
 }
@@ -56,7 +57,7 @@ func (w *BlockchainWorker) Start(ctx context.Context) {
 func (w *BlockchainWorker) runChainWorker(ctx context.Context, wg *sync.WaitGroup, chainID uint32) {
 	defer wg.Done()
 	chainLogger := w.logger.With("chain", chainID)
-	chainLogger.Info("chain worker started")
+	chainLogger.Info("chain worker started", "chainId", chainID)
 
 	ticker := time.NewTicker(chainWorkerTickInterval)
 	defer ticker.Stop()
@@ -66,7 +67,7 @@ func (w *BlockchainWorker) runChainWorker(ctx context.Context, wg *sync.WaitGrou
 	for {
 		select {
 		case <-ctx.Done():
-			chainLogger.Info("chain worker stopping")
+			chainLogger.Debug("chain worker stopping")
 			defer chainLogger.Info("chain worker stopped")
 			return
 		case <-ticker.C:

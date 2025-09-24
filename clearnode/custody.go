@@ -383,6 +383,11 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 	channelID := common.Hash(ev.ChannelId).Hex()
 	logger.Debug("parsed event", "channelId", channelID, "deltaAllocations", ev.DeltaAllocations)
 
+	if len(ev.DeltaAllocations) != 2 {
+		logger.Error("invalid resize, unsupported number of allocations in resize event", "count", len(ev.DeltaAllocations), "channelId", channelID)
+		return
+	}
+
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
@@ -407,7 +412,8 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 		}
 
 		// Update state allocations
-		if len(ev.DeltaAllocations) == 2 && len(channel.State.Allocations) == 2 {
+		// TODO: remove this check by implying that stored channel is correct
+		if len(channel.State.Allocations) == 2 {
 			channel.State.Allocations[0].RawAmount = channel.State.Allocations[0].RawAmount.Add(decimal.NewFromBigInt(ev.DeltaAllocations[0], 0))
 			channel.State.Allocations[1].RawAmount = channel.State.Allocations[1].RawAmount.Add(decimal.NewFromBigInt(ev.DeltaAllocations[1], 0))
 		}

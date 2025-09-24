@@ -102,7 +102,7 @@ func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainA
 		With("type", action.Type).
 		With("channel", action.ChannelID).
 		With("chain", action.ChainID).
-		With("attempt", action.Retries+1)
+		With("attempt", action.Retries)
 
 	custody, exists := w.custody[action.ChainID]
 	if !exists {
@@ -133,14 +133,12 @@ func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainA
 				logger.Error("failed to mark action as permanently failed", "error", failErr)
 			}
 		} else {
-			if action.Retries == maxActionRetries {
+			if action.Retries >= maxActionRetries {
 				logger.Warn("action failed after reaching max retries", "error", err)
-				finalErr := fmt.Errorf("failed after %d retries: %w", maxActionRetries, err)
-				action.Status = StatusFailed
-				action.Error = finalErr.Error()
-				action.UpdatedAt = time.Now()
-				if failErr := w.db.Save(&action).Error; failErr != nil {
-					logger.Error("failed to mark action as permanently failed", "error", failErr)
+				finalErr := fmt.Errorf("failed after %d retries: %w", action.Retries, err)
+
+				if saveErr := action.FailNoRetry(w.db, finalErr.Error()); saveErr != nil {
+					logger.Error("failed to mark action as permanently failed", "error", saveErr)
 				}
 			} else {
 				logger.Error("processing attempt failed, will retry later", "error", err)

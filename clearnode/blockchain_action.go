@@ -80,6 +80,13 @@ func (a *BlockchainAction) Fail(tx *gorm.DB, err string) error {
 	return tx.Save(a).Error
 }
 
+func (a *BlockchainAction) FailNoRetry(tx *gorm.DB, err string) error {
+	a.Status = StatusFailed
+	a.Error = err
+	a.UpdatedAt = time.Now()
+	return tx.Save(a).Error
+}
+
 func (a *BlockchainAction) RecordAttempt(tx *gorm.DB, attemptErr string) error {
 	a.Retries++
 	a.Error = attemptErr

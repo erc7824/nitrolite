@@ -143,7 +143,7 @@ Clearnode requires the following environment variables to be properly configured
 | `POLYGON_ADJUDICATOR_ADDRESS` | Polygon adjudicator contract address | Required if using Polygon | - |
 | `POLYGON_BALANCE_CHECKER_ADDRESS` | Polygon balance checker contract address | Required if using Polygon | - |
 
-Multiple networks can be added. For each supported network (POLYGON, ETH_SEPOLIA, CELO, BASE, WORLD_CHAIN, LOCALNET), you can specify the corresponding BLOCKCHAIN_RPC, CUSTODY_CONTRACT_ADDRESS, ADJUDICATOR_ADDRESS, and BALANCE_CHECKER_ADDRESS environment variables.
+Multiple networks can be added. For each supported network you can specify the corresponding BLOCKCHAIN_RPC, CUSTODY_CONTRACT_ADDRESS, ADJUDICATOR_ADDRESS, and BALANCE_CHECKER_ADDRESS environment variables.
 
 ## Running with Docker
 

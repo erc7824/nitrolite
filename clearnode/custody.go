@@ -47,8 +47,8 @@ type Custody struct {
 }
 
 // NewCustody initializes the Ethereum client and custody contract wrapper.
-func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, infuraURL, custodyAddressStr, adjudicatorAddr, balanceCheckerAddr string, chain uint32, blockStep uint64, logger Logger) (*Custody, error) {
-	client, err := ethclient.Dial(infuraURL)
+func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, blockchainRPC, custodyAddressStr, adjudicatorAddr, balanceCheckerAddr string, chain uint32, blockStep uint64, logger Logger) (*Custody, error) {
+	client, err := ethclient.Dial(blockchainRPC)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to blockchain node: %w", err)
 	}

@@ -74,7 +74,7 @@ func main() {
 	}
 
 	for chainID, network := range config.networks {
-		client, err := NewCustody(signer, db, wsNotifier, network.InfuraURL, network.CustodyAddress, network.AdjudicatorAddress, network.BalanceCHeckerAddress, network.ChainID, network.BlockStep, logger)
+		client, err := NewCustody(signer, db, wsNotifier, network.BlockchainRPC, network.CustodyAddress, network.AdjudicatorAddress, network.BalanceCHeckerAddress, network.ChainID, network.BlockStep, logger)
 		if err != nil {
 			logger.Warn("failed to initialize blockchain client", "chainID", chainID, "error", err)
 			continue

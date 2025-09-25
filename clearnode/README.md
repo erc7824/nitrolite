@@ -138,12 +138,12 @@ Clearnode requires the following environment variables to be properly configured
 | `HTTP_PORT` | Port for the HTTP/WebSocket server | No | 8000 |
 | `METRICS_PORT` | Port for Prometheus metrics | No | 4242 |
 | `MSG_EXPIRY_TIME` | Time in seconds for message timestamp validation | No | 60 |
-| `POLYGON_INFURA_URL` | Polygon RPC endpoint URL | At least one network required | - |
+| `POLYGON_BLOCKCHAIN_RPC` | Polygon RPC endpoint URL | At least one network required | - |
 | `POLYGON_CUSTODY_CONTRACT_ADDRESS` | Polygon custody contract address | Required if using Polygon | - |
 | `POLYGON_ADJUDICATOR_ADDRESS` | Polygon adjudicator contract address | Required if using Polygon | - |
 | `POLYGON_BALANCE_CHECKER_ADDRESS` | Polygon balance checker contract address | Required if using Polygon | - |
 
-Multiple networks can be added. For each supported network (POLYGON, ETH_SEPOLIA, CELO, BASE, WORLD_CHAIN, LOCALNET), you can specify the corresponding INFURA_URL, CUSTODY_CONTRACT_ADDRESS, ADJUDICATOR_ADDRESS, and BALANCE_CHECKER_ADDRESS environment variables.
+Multiple networks can be added. For each supported network you can specify the corresponding BLOCKCHAIN_RPC, CUSTODY_CONTRACT_ADDRESS, ADJUDICATOR_ADDRESS, and BALANCE_CHECKER_ADDRESS environment variables.
 
 ## Running with Docker
 
@@ -155,7 +155,7 @@ Multiple networks can be added. For each supported network (POLYGON, ETH_SEPOLIA
 BROKER_PRIVATE_KEY=your_private_key
 DATABASE_DRIVER=postgres
 CLEARNODE_DATABASE_URL=file:./dev.db 
-POLYGON_INFURA_URL=https://polygon-mainnet.infura.io/v3/your_infura_key
+POLYGON_BLOCKCHAIN_RPC=https://polygon-mainnet.infura.io/v3/your_infura_key
 POLYGON_CUSTODY_CONTRACT_ADDRESS=0xYourContractAddress
 POLYGON_ADJUDICATOR_ADDRESS=0xYourAdjudicatorAddress
 ```

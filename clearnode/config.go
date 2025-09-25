@@ -11,32 +11,35 @@ import (
 
 // knownNetworks maps network name prefixes to their respective chain IDs.
 // Each prefix is used to find corresponding environment variables:
-// - {PREFIX}_INFURA_URL: The Infura endpoint URL for the network
+// - {PREFIX}_BLOCKCHAIN_RPC: The Blockchain RPC endpoint URL for the network
 // - {PREFIX}_CUSTODY_CONTRACT_ADDRESS: The custody contract address
 var knownNetworks = map[string]uint32{
-	"POLYGON":          137,
-	"ETH_SEPOLIA":      11155111,
-	"LINEA_MAINNET":    59144,
-	"CELO":             42220,
-	"BASE":             8453,
-	"WORLD_CHAIN":      480,
-	"ROOTSTOCK":        30,
-	"FLOW":             747,
-	"LOCALNET":         1337,
-	"ETH_MAINNET":      1,
-	"ANVIL":            31337,
+	// Mainnets
+	"POLYGON":     137,
+	"LINEA":       59144,
+	"CELO":        42220,
+	"BASE":        8453,
+	"WORLD_CHAIN": 480,
+	"ROOTSTOCK":   30,
+	"FLOW":        747,
+	"ETHEREUM":    1,
+	"XRPL_EVM":    1440000,
+	// Testnets
+	"ETHEREUM_SEPOLIA": 11155111,
 	"LINEA_SEPOLIA":    59141,
 	"BASE_SEPOLIA":     84532,
 	"POLYGON_AMOY":     80002,
-	"XRPL_EVM_MAINNET": 1440000,
 	"XRPL_EVM_TESTNET": 1449000,
+	// Local/Devnets
+	"LOCALNET": 1337,
+	"ANVIL":    31337,
 }
 
 // NetworkConfig represents configuration for a blockchain network
 type NetworkConfig struct {
 	Name                  string
 	ChainID               uint32
-	InfuraURL             string
+	BlockchainRPC         string
 	CustodyAddress        string
 	AdjudicatorAddress    string
 	BalanceCHeckerAddress string // TODO: add balance checker method into our smart contract
@@ -107,7 +110,7 @@ func LoadConfig(logger Logger) (*Config, error) {
 	// Process each network
 	envs := os.Environ()
 	for network, chainID := range knownNetworks {
-		infuraURL := ""
+		blockchainRPC := ""
 		custodyAddress := ""
 		adjudicatorAddress := ""
 		balanceCheckerAddress := ""
@@ -123,8 +126,8 @@ func LoadConfig(logger Logger) (*Config, error) {
 			key := parts[0]
 			value := parts[1]
 
-			if strings.HasPrefix(key, network+"_INFURA_URL") {
-				infuraURL = value
+			if strings.HasPrefix(key, network+"_BLOCKCHAIN_RPC") {
+				blockchainRPC = value
 			} else if strings.HasPrefix(key, network+"_CUSTODY_CONTRACT_ADDRESS") {
 				custodyAddress = value
 			} else if strings.HasPrefix(key, network+"_ADJUDICATOR_ADDRESS") {
@@ -141,12 +144,12 @@ func LoadConfig(logger Logger) (*Config, error) {
 		}
 
 		// Only add network if both required variables are present
-		if infuraURL != "" && custodyAddress != "" && adjudicatorAddress != "" && balanceCheckerAddress != "" {
+		if blockchainRPC != "" && custodyAddress != "" && adjudicatorAddress != "" && balanceCheckerAddress != "" {
 			networkLower := strings.ToLower(network)
 			config.networks[chainID] = &NetworkConfig{
 				Name:                  networkLower,
 				ChainID:               chainID,
-				InfuraURL:             infuraURL,
+				BlockchainRPC:         blockchainRPC,
 				CustodyAddress:        custodyAddress,
 				AdjudicatorAddress:    adjudicatorAddress,
 				BalanceCHeckerAddress: balanceCheckerAddress,

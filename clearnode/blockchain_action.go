@@ -5,35 +5,36 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
-type ActionType string
-type ActionStatus string
+type BlockchainActionType string
+type BlockchainActionStatus string
 
 const (
-	ActionTypeCheckpoint ActionType = "checkpoint"
+	ActionTypeCheckpoint BlockchainActionType = "checkpoint"
 )
 
 const (
-	StatusPending   ActionStatus = "pending"
-	StatusCompleted ActionStatus = "completed"
-	StatusFailed    ActionStatus = "failed"
+	StatusPending   BlockchainActionStatus = "pending"
+	StatusCompleted BlockchainActionStatus = "completed"
+	StatusFailed    BlockchainActionStatus = "failed"
 )
 
 type BlockchainAction struct {
-	ID        int64          `gorm:"primary_key"`
-	Type      ActionType     `gorm:"column:action_type;not null"`
-	ChannelID string         `gorm:"column:channel_id;not null"`
-	ChainID   uint32         `gorm:"column:chain_id;not null"`
-	Data      datatypes.JSON `gorm:"column:action_data;type:text;not null"`
-	Status    ActionStatus   `gorm:"column:status;not null"`
-	Retries   int            `gorm:"column:retry_count;default:0"`
-	Error     string         `gorm:"column:last_error;type:text"`
-	TxHash    string         `gorm:"column:transaction_hash"`
-	CreatedAt time.Time      `gorm:"column:created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at"`
+	ID        int64                  `gorm:"primary_key"`
+	Type      BlockchainActionType   `gorm:"column:action_type;not null"`
+	ChannelID common.Hash            `gorm:"column:channel_id;not null"`
+	ChainID   uint32                 `gorm:"column:chain_id;not null"`
+	Data      datatypes.JSON         `gorm:"column:action_data;type:text;not null"`
+	Status    BlockchainActionStatus `gorm:"column:status;not null"`
+	Retries   int                    `gorm:"column:retry_count;default:0"`
+	Error     string                 `gorm:"column:last_error;type:text"`
+	TxHash    common.Hash            `gorm:"column:transaction_hash"`
+	CreatedAt time.Time              `gorm:"column:created_at"`
+	UpdatedAt time.Time              `gorm:"column:updated_at"`
 }
 
 func (BlockchainAction) TableName() string {
@@ -46,7 +47,7 @@ type CheckpointData struct {
 	ServerSig Signature     `json:"server_sig"`
 }
 
-func CreateCheckpoint(tx *gorm.DB, channel string, chainID uint32, state UnsignedState, userSig, serverSig Signature) error {
+func CreateCheckpoint(tx *gorm.DB, channel common.Hash, chainID uint32, state UnsignedState, userSig, serverSig Signature) error {
 	data := CheckpointData{
 		State:     state,
 		UserSig:   userSig,
@@ -79,6 +80,13 @@ func (a *BlockchainAction) Fail(tx *gorm.DB, err string) error {
 	return tx.Save(a).Error
 }
 
+func (a *BlockchainAction) FailNoRetry(tx *gorm.DB, err string) error {
+	a.Status = StatusFailed
+	a.Error = err
+	a.UpdatedAt = time.Now()
+	return tx.Save(a).Error
+}
+
 func (a *BlockchainAction) RecordAttempt(tx *gorm.DB, attemptErr string) error {
 	a.Retries++
 	a.Error = attemptErr
@@ -86,7 +94,7 @@ func (a *BlockchainAction) RecordAttempt(tx *gorm.DB, attemptErr string) error {
 	return tx.Save(a).Error
 }
 
-func (a *BlockchainAction) Complete(tx *gorm.DB, txHash string) error {
+func (a *BlockchainAction) Complete(tx *gorm.DB, txHash common.Hash) error {
 	a.Status = StatusCompleted
 	a.TxHash = txHash
 	a.Error = ""

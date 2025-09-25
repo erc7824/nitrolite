@@ -25,7 +25,7 @@ var (
 var ErrCustodyEventAlreadyProcessed = errors.New("custody event already processed")
 
 type CustodyInterface interface {
-	Checkpoint(channelID string, state UnsignedState, userSig, serverSig Signature, proofs []nitrolite.State) (common.Hash, error)
+	Checkpoint(channelID common.Hash, state UnsignedState, userSig, serverSig Signature, proofs []nitrolite.State) (common.Hash, error)
 }
 
 var _ CustodyInterface = (*Custody)(nil)
@@ -114,10 +114,7 @@ func (c *Custody) ListenEvents(ctx context.Context) {
 }
 
 // Checkpoint calls the checkpoint method on the custody contract
-func (c *Custody) Checkpoint(channelID string, newState UnsignedState, userSig, serverSig Signature, proofs []nitrolite.State) (common.Hash, error) {
-	// Convert string channelID to bytes32
-	channelIDBytes := common.HexToHash(channelID)
-
+func (c *Custody) Checkpoint(channelID common.Hash, newState UnsignedState, userSig, serverSig Signature, proofs []nitrolite.State) (common.Hash, error) {
 	gasPrice, err := c.client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed to suggest gas price: %w", err)
@@ -141,7 +138,7 @@ func (c *Custody) Checkpoint(channelID string, newState UnsignedState, userSig, 
 	c.transactOpts.GasPrice = gasPrice.Add(gasPrice, gasPrice)
 
 	// Call the checkpoint method on the custody contract
-	tx, err := c.custody.Checkpoint(c.transactOpts, channelIDBytes, nitroState, proofs)
+	tx, err := c.custody.Checkpoint(c.transactOpts, channelID, nitroState, proofs)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("failed to checkpoint channel: %w", err)
 	}
@@ -330,7 +327,7 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 
 func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenged) {
 	logger = logger.With("event", "Challenged")
-	channelID := common.Hash(ev.ChannelId).Hex()
+	channelID := common.Hash(ev.ChannelId)
 	logger.Debug("parsed event", "channelId", channelID)
 
 	var channel Channel
@@ -340,7 +337,7 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 			return err
 		}
 
-		result := tx.Where("channel_id = ?", channelID).First(&channel)
+		result := tx.Where("channel_id = ?", channelID.Hex()).First(&channel)
 		if result.Error != nil {
 			return fmt.Errorf("error finding channel: %w", result.Error)
 		}
@@ -358,7 +355,7 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 					logger.Info("created checkpoint action", "channelId", channelID, "localVersion", localVersion, "challengedVersion", challengedVersion)
 				}
 			} else {
-				logger.Warn("detected newer local state in db without signatures", "channelId", channelID)
+				logger.Warn("detected local state in db without signatures that is newer than a challenged one", "channelId", channelID)
 			}
 		}
 		channel.Status = ChannelStatusChallenged
@@ -386,6 +383,11 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 	channelID := common.Hash(ev.ChannelId).Hex()
 	logger.Debug("parsed event", "channelId", channelID, "deltaAllocations", ev.DeltaAllocations)
 
+	if len(ev.DeltaAllocations) != 2 {
+		logger.Error("invalid resize, unsupported number of allocations in resize event", "count", len(ev.DeltaAllocations), "channelId", channelID)
+		return
+	}
+
 	var channel Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
@@ -410,7 +412,8 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 		}
 
 		// Update state allocations
-		if len(ev.DeltaAllocations) == 2 && len(channel.State.Allocations) == 2 {
+		// TODO: remove this check by implying that stored channel is correct
+		if len(channel.State.Allocations) == 2 {
 			channel.State.Allocations[0].RawAmount = channel.State.Allocations[0].RawAmount.Add(decimal.NewFromBigInt(ev.DeltaAllocations[0], 0))
 			channel.State.Allocations[1].RawAmount = channel.State.Allocations[1].RawAmount.Add(decimal.NewFromBigInt(ev.DeltaAllocations[1], 0))
 		}
@@ -423,7 +426,6 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 		if err := tx.Save(&channel).Error; err != nil {
 			return fmt.Errorf("error saving channel in database: %w", err)
 		}
-
 		if len(ev.DeltaAllocations) == 0 {
 			return nil
 		}

@@ -51,9 +51,9 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 
 	router.Config = &Config{
 		networks: map[uint32]*NetworkConfig{
-			137:   {ChainID: 137, InfuraURL: "https://polygon-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress1"},
-			42220: {ChainID: 42220, InfuraURL: "https://celo-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress2"},
-			8453:  {ChainID: 8453, InfuraURL: "https://base-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress3"},
+			137:   {ChainID: 137, BlockchainRPC: "https://polygon-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress1"},
+			42220: {ChainID: 42220, BlockchainRPC: "https://celo-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress2"},
+			8453:  {ChainID: 8453, BlockchainRPC: "https://base-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress3"},
 		},
 	}
 

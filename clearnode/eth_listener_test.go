@@ -13,10 +13,10 @@ import (
 func TestReconcileBlockRange(t *testing.T) {
 	t.Skip("for manual testing only")
 
-	infuraURL := "CHANGE_ME"
+	blockchainRPC := "CHANGE_ME"
 	contractAddress := common.HexToAddress("CHANGE_ME")
 
-	client, err := ethclient.Dial(infuraURL)
+	client, err := ethclient.Dial(blockchainRPC)
 	require.NoError(t, err, "Failed to connect to Ethereum client")
 
 	chainID, err := client.ChainID(context.TODO())

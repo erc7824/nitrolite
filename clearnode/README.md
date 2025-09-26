@@ -1,4 +1,4 @@
-[![codecov](https://codecov.io/github/erc7824/nitrolite/graph/badge.svg?token=XASM4CIEFO)](https://codecov.io/github/erc7824/nitrolite)
+[![codecov](https://codecov.io/github/erc7824/nitrolite/graph/badge.svg)](https://codecov.io/github/erc7824/nitrolite)
 [![Go Reference](https://pkg.go.dev/badge/github.com/erc7824/nitrolite/clearnode.svg)](https://pkg.go.dev/github.com/erc7824/nitrolite/clearnode)
 [![Go Report Card](https://goreportcard.com/badge/github.com/erc7824/nitrolite/clearnode)](https://goreportcard.com/report/github.com/erc7824/nitrolite/clearnode)
 

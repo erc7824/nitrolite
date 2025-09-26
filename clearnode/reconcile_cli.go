@@ -42,7 +42,7 @@ func runReconcileCli(logger Logger) {
 		logger.Fatal("Network is not configured", "network", networkID.Uint64())
 	}
 
-	client, err := ethclient.Dial(network.InfuraURL)
+	client, err := ethclient.Dial(network.BlockchainRPC)
 	if err != nil {
 		logger.Fatal("Failed to connect to Ethereum node", "error", err)
 	}
@@ -61,7 +61,7 @@ func runReconcileCli(logger Logger) {
 		signer,
 		db,
 		NewWSNotifier(func(userID, method string, params RPCDataParams) {}, logger),
-		network.InfuraURL,
+		network.BlockchainRPC,
 		network.CustodyAddress,
 		network.AdjudicatorAddress,
 		network.BalanceCHeckerAddress,

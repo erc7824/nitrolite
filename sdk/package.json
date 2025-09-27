@@ -60,7 +60,7 @@
     "dependencies": {
         "abitype": "^0.10.3",
         "viem": "^2.5.0",
-        "zod": "^3.25.67"
+        "zod": "^3.25.76"
     },
     "devDependencies": {
         "@ethereumjs/blockchain": "^10.0.0",

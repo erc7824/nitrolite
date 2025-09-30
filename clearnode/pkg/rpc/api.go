@@ -18,6 +18,36 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
+// ===========================================================================
+// Protocol Versioning
+// ============================================================================
+
+// Version represents the protocol version.
+// This is used to provide backward compatibility as the API evolves.
+type Version string
+
+const (
+	// VersionNitroRPCv0_2 is the initial supported version of the NitroRPC protocol.
+	VersionNitroRPCv0_2 Version = "NitroRPC/0.2"
+)
+
+var (
+	// supportedProtocolVersions lists all protocol versions supported by the broker.
+	supportedProtocolVersions = map[string]bool{
+		VersionNitroRPCv0_2.String(): true,
+	}
+)
+
+// String returns the string representation of the version.
+func (v Version) String() string {
+	return string(v)
+}
+
+// IsSupportedVersion checks if the given version is supported by the broker.
+func IsSupportedVersion(version Version) bool {
+	return supportedProtocolVersions[version.String()]
+}
+
 // ============================================================================
 // RPC Method Constants
 // ============================================================================
@@ -487,8 +517,8 @@ type TransferAllocation struct {
 
 // AppDefinition defines the protocol for a multi-party application.
 type AppDefinition struct {
-	// Protocol identifies the application type
-	Protocol string `json:"protocol"`
+	// Protocol identifies the version of the application protocol
+	Protocol Version `json:"protocol"`
 	// ParticipantWallets lists the wallet addresses of all participants
 	ParticipantWallets []string `json:"participants"`
 	// Weights defines the signature weight for each participant
@@ -511,8 +541,8 @@ type AppSession struct {
 	ParticipantWallets []string `json:"participants"`
 	// SessionData contains application-specific state
 	SessionData string `json:"session_data,omitempty"`
-	// Protocol identifies the application type
-	Protocol string `json:"protocol"`
+	// Protocol identifies the version of the application protocol
+	Protocol Version `json:"protocol"`
 	// Challenge is the dispute timeout period
 	Challenge uint64 `json:"challenge"`
 	// Weights defines participant signature weights

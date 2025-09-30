@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +48,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           ProtocolNitroRPCv02.String(),
+				Protocol:           rpc.VersionNitroRPCv0_2,
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 1},
 				Quorum:             2,
@@ -120,7 +121,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           ProtocolNitroRPCv02.String(),
+				Protocol:           rpc.VersionNitroRPCv0_2,
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 0},
 				Quorum:             1,
@@ -151,7 +152,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           ProtocolNitroRPCv02.String(),
+				Protocol:           rpc.VersionNitroRPCv0_2,
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 0},
 				Quorum:             1,
@@ -178,7 +179,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           ProtocolNitroRPCv02.String(),
+				Protocol:           rpc.VersionNitroRPCv0_2,
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 0},
 				Quorum:             1,
@@ -211,7 +212,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session",
-			Protocol:           ProtocolNitroRPCv02,
+			Protocol:           rpc.VersionNitroRPCv0_2,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
@@ -261,7 +262,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-negative",
-			Protocol:           ProtocolNitroRPCv02,
+			Protocol:           rpc.VersionNitroRPCv0_2,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
@@ -317,7 +318,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 
 		session := &AppSession{
 			SessionID:          "test-session-close",
-			Protocol:           ProtocolNitroRPCv02,
+			Protocol:           rpc.VersionNitroRPCv0_2,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
@@ -405,7 +406,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 
 		session := &AppSession{
 			SessionID:          "test-session-close",
-			Protocol:           ProtocolNitroRPCv02,
+			Protocol:           rpc.VersionNitroRPCv0_2,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
@@ -459,7 +460,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-close-negative",
-			Protocol:           ProtocolNitroRPCv02,
+			Protocol:           rpc.VersionNitroRPCv0_2,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,

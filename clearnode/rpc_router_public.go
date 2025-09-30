@@ -3,6 +3,7 @@ package main
 import (
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 )
@@ -33,12 +34,12 @@ type GetAppDefinitionParams struct {
 }
 
 type AppDefinition struct {
-	Protocol           string   `json:"protocol"`
-	ParticipantWallets []string `json:"participants"`
-	Weights            []int64  `json:"weights"` // Signature weight for each participant.
-	Quorum             uint64   `json:"quorum"`
-	Challenge          uint64   `json:"challenge"`
-	Nonce              uint64   `json:"nonce"`
+	Protocol           rpc.Version `json:"protocol"`
+	ParticipantWallets []string    `json:"participants"`
+	Weights            []int64     `json:"weights"` // Signature weight for each participant.
+	Quorum             uint64      `json:"quorum"`
+	Challenge          uint64      `json:"challenge"`
+	Nonce              uint64      `json:"nonce"`
 }
 
 type GetAppSessionParams struct {
@@ -245,7 +246,7 @@ func (r *RPCRouter) HandleGetAppDefinition(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, AppDefinition{
-		Protocol:           vApp.Protocol.String(),
+		Protocol:           vApp.Protocol,
 		ParticipantWallets: vApp.ParticipantWallets,
 		Weights:            vApp.Weights,
 		Quorum:             vApp.Quorum,

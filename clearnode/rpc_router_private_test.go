@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -632,7 +633,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 
 		ts := uint64(time.Now().Unix())
 		def := AppDefinition{
-			Protocol:           ProtocolNitroRPCv02.String(),
+			Protocol:           rpc.VersionNitroRPCv0_2,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
@@ -704,7 +705,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 
 		ts := uint64(time.Now().Unix())
 		def := AppDefinition{
-			Protocol:           ProtocolNitroRPCv02.String(),
+			Protocol:           rpc.VersionNitroRPCv0_2,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,

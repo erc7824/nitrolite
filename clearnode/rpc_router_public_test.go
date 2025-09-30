@@ -353,7 +353,7 @@ func TestRPCRouterHandleGetAppDefinition(t *testing.T) {
 		res := assertResponse(t, ctx, "get_app_definition")
 		def, ok := res.Params.(AppDefinition)
 		require.True(t, ok)
-		assert.Equal(t, session.Protocol.String(), def.Protocol)
+		assert.Equal(t, session.Protocol, def.Protocol)
 		assert.EqualValues(t, session.ParticipantWallets, def.ParticipantWallets)
 		assert.EqualValues(t, session.Weights, def.Weights)
 		assert.Equal(t, session.Quorum, def.Quorum)

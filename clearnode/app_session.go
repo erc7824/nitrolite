@@ -3,13 +3,14 @@ package main
 import (
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/lib/pq"
 )
 
 // AppSession represents a virtual payment application session between participants
 type AppSession struct {
 	ID                 uint           `gorm:"primaryKey"`
-	Protocol           Protocol       `gorm:"column:protocol;default:'NitroRPC/0.2';not null"`
+	Protocol           rpc.Version    `gorm:"column:protocol;default:'NitroRPC/0.2';not null"`
 	SessionID          string         `gorm:"column:session_id;not null;uniqueIndex"`
 	Challenge          uint64         `gorm:"column:challenge;"`
 	Nonce              uint64         `gorm:"column:nonce;not null"`

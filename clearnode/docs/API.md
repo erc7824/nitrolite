@@ -300,7 +300,7 @@ Supports pagination and sorting.
           "0x00112233445566778899AaBbCcDdEeFf00112233"
         ],
         "session_data": "{\"gameType\":\"rps\",\"rounds\":5,\"currentRound\":3,\"scores\":{\"0x1234567890abcdef\":2,\"0x00112233445566778899AaBbCcDdEeFf00112233\":1}}",
-        "protocol": "NitroAura",
+        "protocol": "NitroRPC/0.2",
         "challenge": 86400,
         "weights": [50, 50],
         "quorum": 100,
@@ -315,7 +315,7 @@ Supports pagination and sorting.
           "0xAaBbCcDdEeFf0011223344556677889900aAbBcC"
         ],
         "session_data": "{\"gameType\":\"snake\",\"boardSize\":20,\"snakeLength\":5,\"score\":150,\"level\":3,\"gameState\":\"active\"}",
-        "protocol": "NitroSnake",
+        "protocol": "NitroRPC/0.2",
         "challenge": 86400,
         "weights": [70, 30],
         "quorum": 100,
@@ -712,6 +712,8 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
 
 Creates a virtual application between participants.
 Participants must agree on signature weights and a quorum; this quorum is required to submit an intermediate state or close an app session. The create app session request must be signed by all participants with non-zero allocations.
+
+**Important**: The `protocol` field in the definition must be set to "NitroRPC/0.2". This is the only supported protocol version for app sessions.
 
 The optional `session_data` field can be used to store application-specific data that will be preserved throughout the session lifecycle. This enables applications to maintain custom state information such as configuration settings, business logic state, or any other data needed for the application.
 

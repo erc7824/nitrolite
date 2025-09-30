@@ -156,7 +156,7 @@ func TestManualClient(t *testing.T) {
 
 				createAppReq := rpc.CreateAppSessionRequest{
 					Definition: rpc.AppDefinition{
-						Protocol: "NitroRPC/0.2",
+						Protocol: rpc.VersionNitroRPCv0_2,
 						ParticipantWallets: []string{
 							walletSigner.PublicKey().Address().String(),
 							sign.NewEthereumAddress(common.Address{}).Hex(),

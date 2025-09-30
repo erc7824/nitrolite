@@ -29,12 +29,15 @@ type Version string
 const (
 	// VersionNitroRPCv0_2 is the initial supported version of the NitroRPC protocol.
 	VersionNitroRPCv0_2 Version = "NitroRPC/0.2"
+	// VersionNitroRPCv0_4 introduces intents for application session state updates.
+	VersionNitroRPCv0_4 Version = "NitroRPC/0.4"
 )
 
 var (
 	// supportedProtocolVersions lists all protocol versions supported by the broker.
 	supportedProtocolVersions = map[string]bool{
 		VersionNitroRPCv0_2.String(): true,
+		VersionNitroRPCv0_4.String(): true,
 	}
 )
 
@@ -383,6 +386,10 @@ type CreateAppSessionResponse AppSession
 type SubmitAppStateRequest struct {
 	// AppSessionID identifies the session to update
 	AppSessionID string `json:"app_session_id"`
+	// Intent indicates the purpose of the state update (operate, deposit, withdraw)
+	Intent AppSessionIntent `json:"intent"`
+	// Version is the new state version number
+	Version uint64 `json:"version"`
 	// Allocations defines the new asset distribution
 	Allocations []AppAllocation `json:"allocations"`
 	// SessionData contains the new application state
@@ -568,6 +575,18 @@ type AppAllocation struct {
 	// Amount allocated to the participant
 	Amount decimal.Decimal `json:"amount"`
 }
+
+// AppSessionIntent indicates the purpose of an application state update.
+type AppSessionIntent string
+
+const (
+	// AppSessionIntentOperate is for normal application operation
+	AppSessionIntentOperate AppSessionIntent = "operate"
+	// AppSessionIntentDeposit is for adding funds to the session
+	AppSessionIntentDeposit AppSessionIntent = "deposit"
+	// AppSessionIntentWithdraw is for removing funds from the session
+	AppSessionIntentWithdraw AppSessionIntent = "withdraw"
+)
 
 // ============================================================================
 // Channel Types

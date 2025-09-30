@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -39,9 +40,11 @@ type CreateAppSessionParams struct {
 }
 
 type SubmitAppStateParams struct {
-	AppSessionID string          `json:"app_session_id"`
-	Allocations  []AppAllocation `json:"allocations"`
-	SessionData  *string         `json:"session_data"`
+	AppSessionID string               `json:"app_session_id"`
+	Intent       rpc.AppSessionIntent `json:"intent"`
+	Version      uint64               `json:"version"`
+	Allocations  []AppAllocation      `json:"allocations"`
+	SessionData  *string              `json:"session_data"`
 }
 
 type CloseAppSessionParams struct {

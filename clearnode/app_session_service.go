@@ -133,6 +133,25 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 		}
 		sessionAccountID := NewAccountID(appSession.SessionID)
 
+		newVersion = appSession.Version + 1
+		switch appSession.Protocol {
+		case rpc.VersionNitroRPCv0_2:
+			// nothing additional to check
+		case rpc.VersionNitroRPCv0_4:
+			if newVersion != params.Version {
+				return RPCErrorf("invalid version: expected %d, got %d", newVersion, params.Version)
+			}
+
+			switch params.Intent {
+			case rpc.AppSessionIntentOperate:
+				// no additional actions needed
+			default:
+				return RPCErrorf("unsupported intent: %s", params.Intent)
+			}
+		default:
+			return RPCErrorf("unsupported protocol: %s", appSession.Protocol)
+		}
+
 		appSessionBalance, err := getAppSessionBalances(tx, sessionAccountID)
 		if err != nil {
 			return err
@@ -177,7 +196,6 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 			return err
 		}
 
-		newVersion = appSession.Version + 1
 		updates := map[string]any{
 			"version": newVersion,
 		}

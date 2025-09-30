@@ -9,6 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
+
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 )
 
 // AppSessionService handles the business logic for app sessions.
@@ -23,6 +25,9 @@ func NewAppSessionService(db *gorm.DB, wsNotifier *WSNotifier) *AppSessionServic
 }
 
 func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}) (AppSessionResponse, error) {
+	if !rpc.IsSupportedVersion(params.Definition.Protocol) {
+		return AppSessionResponse{}, RPCErrorf("unsupported protocol: %s", params.Definition.Protocol)
+	}
 	if len(params.Definition.ParticipantWallets) < 2 {
 		return AppSessionResponse{}, RPCErrorf("invalid number of participants")
 	}

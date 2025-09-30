@@ -9,14 +9,14 @@ import {
     GetAppSessionsResponseParams,
     RPCAppSession,
 } from '../types';
-import { hexSchema, addressSchema, statusEnum, ParamsParser, dateSchema } from './common';
+import { hexSchema, addressSchema, statusEnum, ParamsParser, dateSchema, protocolVersionEnum } from './common';
 
 const AppSessionObjectSchema = z
     .object({
         app_session_id: hexSchema,
         status: statusEnum,
         participants: z.array(addressSchema),
-        protocol: z.string(),
+        protocol: protocolVersionEnum,
         challenge: z.number(),
         weights: z.array(z.number()),
         quorum: z.number(),
@@ -75,7 +75,7 @@ const CloseAppSessionParamsSchema = z
 
 const GetAppDefinitionParamsSchema = z
     .object({
-        protocol: z.string(),
+        protocol: protocolVersionEnum,
         participants: z.array(addressSchema),
         weights: z.array(z.number()),
         quorum: z.number(),

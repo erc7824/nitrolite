@@ -41,7 +41,7 @@ An AppSession represents a virtual payment application session between multiple 
 
 **Fields:**
 - `SessionID` (string): Unique identifier for the session
-- `Protocol` (string): Protocol version used (e.g., "NitroRPC/0.2")
+- `Protocol` (string): Protocol version used (must be "NitroRPC/0.2")
 - `Challenge` (uint64): Challenge period for disputes
 - `Nonce` (uint64): Sequence number for state updates
 - `ParticipantWallets` (string[]): List of participant wallet addresses
@@ -51,6 +51,8 @@ An AppSession represents a virtual payment application session between multiple 
 - `Status` (enum): Current state of the session (matches Channel status options)
 
 AppSessions enable multi-party payment applications with consensus mechanisms through weighted signatures. The quorum system allows for flexible governance models where decisions require signatures from participants whose combined weights meet or exceed the quorum threshold.
+
+**Note:** The protocol field is enforced to be "NitroRPC/0.2" for all app sessions. This is the only supported protocol version.
 
 ## Ledger Entry
 

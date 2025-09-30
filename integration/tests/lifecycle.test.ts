@@ -32,6 +32,7 @@ import {
     parseGetLedgerBalancesResponse,
     parseResizeChannelResponse,
     parseSubmitAppStateResponse,
+    ProtocolVersion,
 } from '@erc7824/nitrolite';
 import { Hex, parseUnits } from 'viem';
 
@@ -254,7 +255,7 @@ describe('Close channel', () => {
 
     it('should create app session', async () => {
         const definition: RPCAppDefinition = {
-            protocol: 'nitroliterpc',
+            protocol: ProtocolVersion.NitroRPC_0_2,
             participants: [appIdentity.walletAddress, appCPIdentity.walletAddress],
             weights: [100, 0],
             quorum: 100,

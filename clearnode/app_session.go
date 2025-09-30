@@ -9,7 +9,7 @@ import (
 // AppSession represents a virtual payment application session between participants
 type AppSession struct {
 	ID                 uint           `gorm:"primaryKey"`
-	Protocol           string         `gorm:"column:protocol;default:'NitroRPC/0.2';not null"`
+	Protocol           Protocol       `gorm:"column:protocol;default:'NitroRPC/0.2';not null"`
 	SessionID          string         `gorm:"column:session_id;not null;uniqueIndex"`
 	Challenge          uint64         `gorm:"column:challenge;"`
 	Nonce              uint64         `gorm:"column:nonce;not null"`

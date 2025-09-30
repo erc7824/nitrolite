@@ -47,7 +47,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           "test-proto",
+				Protocol:           ProtocolNitroRPCv02.String(),
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 1},
 				Quorum:             2,
@@ -120,7 +120,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           "test-proto",
+				Protocol:           ProtocolNitroRPCv02.String(),
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 0},
 				Quorum:             1,
@@ -151,7 +151,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           "test-proto",
+				Protocol:           ProtocolNitroRPCv02.String(),
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 0},
 				Quorum:             1,
@@ -178,7 +178,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           "test-proto",
+				Protocol:           ProtocolNitroRPCv02.String(),
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 0},
 				Quorum:             1,
@@ -211,7 +211,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session",
-			Protocol:           "test-proto",
+			Protocol:           ProtocolNitroRPCv02,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
@@ -261,7 +261,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-negative",
-			Protocol:           "test-proto",
+			Protocol:           ProtocolNitroRPCv02,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
@@ -317,7 +317,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 
 		session := &AppSession{
 			SessionID:          "test-session-close",
-			Protocol:           "test-proto",
+			Protocol:           ProtocolNitroRPCv02,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
@@ -405,7 +405,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 
 		session := &AppSession{
 			SessionID:          "test-session-close",
-			Protocol:           "test-proto",
+			Protocol:           ProtocolNitroRPCv02,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
@@ -459,7 +459,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
 			SessionID:          "test-session-close-negative",
-			Protocol:           "test-proto",
+			Protocol:           ProtocolNitroRPCv02,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,

@@ -23,6 +23,9 @@ func NewAppSessionService(db *gorm.DB, wsNotifier *WSNotifier) *AppSessionServic
 }
 
 func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rpcSigners map[string]struct{}) (AppSessionResponse, error) {
+	if !IsSupportedProtocol(Protocol(params.Definition.Protocol)) {
+		return AppSessionResponse{}, RPCErrorf("unsupported protocol: %s", params.Definition.Protocol)
+	}
 	if len(params.Definition.ParticipantWallets) < 2 {
 		return AppSessionResponse{}, RPCErrorf("invalid number of participants")
 	}
@@ -87,7 +90,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 		}
 
 		session := &AppSession{
-			Protocol:           params.Definition.Protocol,
+			Protocol:           Protocol(params.Definition.Protocol),
 			SessionID:          appSessionID,
 			ParticipantWallets: params.Definition.ParticipantWallets,
 			Status:             ChannelStatusOpen,

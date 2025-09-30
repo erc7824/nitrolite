@@ -245,7 +245,7 @@ func (r *RPCRouter) HandleGetAppDefinition(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, AppDefinition{
-		Protocol:           vApp.Protocol,
+		Protocol:           vApp.Protocol.String(),
 		ParticipantWallets: vApp.ParticipantWallets,
 		Weights:            vApp.Weights,
 		Quorum:             vApp.Quorum,
@@ -282,7 +282,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 			Status:             string(session.Status),
 			ParticipantWallets: session.ParticipantWallets,
 			SessionData:        session.SessionData,
-			Protocol:           session.Protocol,
+			Protocol:           session.Protocol.String(),
 			Challenge:          session.Challenge,
 			Weights:            session.Weights,
 			Quorum:             session.Quorum,

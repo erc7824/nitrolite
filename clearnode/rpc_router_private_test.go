@@ -632,7 +632,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 
 		ts := uint64(time.Now().Unix())
 		def := AppDefinition{
-			Protocol:           "test-proto",
+			Protocol:           ProtocolNitroRPCv02.String(),
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,
@@ -704,7 +704,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 
 		ts := uint64(time.Now().Unix())
 		def := AppDefinition{
-			Protocol:           "test-proto",
+			Protocol:           ProtocolNitroRPCv02.String(),
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
 			Quorum:             2,

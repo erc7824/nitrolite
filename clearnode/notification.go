@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -40,9 +41,10 @@ type Notification struct {
 type EventType string
 
 const (
-	BalanceUpdateEventType EventType = "bu"
-	ChannelUpdateEventType EventType = "cu"
-	TransferEventType      EventType = "tr"
+	BalanceUpdateEventType    EventType = "bu"
+	ChannelUpdateEventType    EventType = "cu"
+	TransferEventType         EventType = "tr"
+	AppSessionUpdateEventType EventType = "au"
 )
 
 func (e EventType) String() string {
@@ -87,5 +89,33 @@ func NewTransferNotification(wallet string, transferredAllocations TransferRespo
 		userID:    wallet,
 		eventType: TransferEventType,
 		data:      transferredAllocations,
+	}
+}
+
+// NewAppSessionNotification creates a notification for an app session update event
+func NewAppSessionNotification(participant string, appSession AppSession, participantAllocations map[string]map[string]decimal.Decimal) *Notification {
+	response := AppSessionResponse{
+		AppSessionID:       appSession.SessionID,
+		Status:             string(appSession.Status),
+		ParticipantWallets: appSession.ParticipantWallets,
+		SessionData:        appSession.SessionData,
+		Protocol:           string(appSession.Protocol),
+		Challenge:          appSession.Challenge,
+		Weights:            appSession.Weights,
+		Quorum:             appSession.Quorum,
+		Version:            appSession.Version,
+		Nonce:              appSession.Nonce,
+	}
+
+	return &Notification{
+		userID:    participant,
+		eventType: AppSessionUpdateEventType,
+		data: struct {
+			AppSessionResponse
+			ParticipantAllocations map[string]map[string]decimal.Decimal `json:"participant_allocations"` // participant -> asset -> amount
+		}{
+			AppSessionResponse:     response,
+			ParticipantAllocations: participantAllocations,
+		},
 	}
 }

@@ -139,17 +139,17 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 			// nothing additional to check
 		case rpc.VersionNitroRPCv0_4:
 			if newVersion != params.Version {
-				return RPCErrorf("invalid version: expected %d, got %d", newVersion, params.Version)
+				return RPCErrorf("incorrect app state: incorrect version: expected %d, got %d", newVersion, params.Version)
 			}
 
 			switch params.Intent {
 			case rpc.AppSessionIntentOperate:
 				// no additional actions needed
 			default:
-				return RPCErrorf("unsupported intent: %s", params.Intent)
+				return RPCErrorf("incorrect app state: unsupported intent: %s", params.Intent)
 			}
 		default:
-			return RPCErrorf("unsupported protocol: %s", appSession.Protocol)
+			return RPCErrorf("incorrect app state: unsupported protocol: %s", appSession.Protocol)
 		}
 
 		appSessionBalance, err := getAppSessionBalances(tx, sessionAccountID)
@@ -160,7 +160,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 		allocationSum := map[string]decimal.Decimal{}
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsNegative() {
-				return RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+				return RPCErrorf("incorrect app state: negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 
 			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
@@ -169,7 +169,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 			}
 
 			if _, ok := participantWeights[walletAddress]; !ok {
-				return RPCErrorf("allocation to non-participant %s", walletAddress)
+				return RPCErrorf("incorrect app state: allocation to non-participant %s", walletAddress)
 			}
 
 			userAddress := common.HexToAddress(walletAddress)

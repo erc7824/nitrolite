@@ -387,8 +387,10 @@ type SubmitAppStateRequest struct {
 	// AppSessionID identifies the session to update
 	AppSessionID string `json:"app_session_id"`
 	// Intent indicates the purpose of the state update (operate, deposit, withdraw)
+	// Required since protocol version: NitroRPC/0.4
 	Intent AppSessionIntent `json:"intent"`
 	// Version is the new state version number
+	// Required since protocol version: NitroRPC/0.4
 	Version uint64 `json:"version"`
 	// Allocations defines the new asset distribution
 	Allocations []AppAllocation `json:"allocations"`

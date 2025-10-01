@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -352,7 +353,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 
 		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		session := &AppSession{
-			SessionID:          "test-session-v04-operate",
+			SessionID:          "test-session-v04-invalid-version",
 			Protocol:           rpc.VersionNitroRPCv0_4,
 			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 			Weights:            []int64{1, 1},
@@ -385,7 +386,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		}
 
 		_, err := service.SubmitAppState(params, rpcSigners)
-		require.Equal(t, RPCErrorf("invalid version: expected %d, got %d", 2, params.Version), err)
+		require.Equal(t, fmt.Sprintf("incorrect app state: incorrect version: expected %d, got %d", 2, params.Version), err.Error())
 	})
 }
 

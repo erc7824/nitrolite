@@ -772,12 +772,62 @@ This means that the sum of the weights of signers must reach the specified thres
 
 The optional `session_data` field can be used to update application-specific data associated with the session, allowing applications to track progress, update configurations, or store any custom state changes during the session lifecycle.
 
+#### NitroRPC/0.2
+
 **Request:**
 
 ```json
 {
   "req": [1, "submit_app_state", {
     "app_session_id": "0x3456789012abcdef...",
+    "allocations": [
+      {
+        "participant": "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
+        "asset": "usdc",
+        "amount": "0.0"
+      },
+      {
+        "participant": "0x00112233445566778899AaBbCcDdEeFf00112233",
+        "asset": "usdc",
+        "amount": "200.0"
+      }
+    ],
+    "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"finished\",\"winner\":\"0x00112233445566778899AaBbCcDdEeFf00112233\",\"endCondition\":\"checkmate\"}" // Optional
+  }, 1619123456789],
+  "sig": ["0x9876fedcba...", "0x8765fedcba..."]
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "submit_app_state", {
+    "app_session_id": "0x3456789012abcdef...",
+    "version": "567",
+    "status": "open"
+  }, 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+#### NitroRPC/0.4
+
+NitroRPC/0.4 introduces the following changes:
+
+- The `intent` field is now required and must be set to either `operate`, `deposit` or `withdraw`. It indicates the purpose of the state update.
+- The `version` field is now required and must be set to the expected next version number of the app session state. This ensures that state updates are applied in the correct order and prevents replay attacks.
+
+The response remains unchanged.
+
+**Request:**
+
+```json
+{
+  "req": [1, "submit_app_state", {
+    "app_session_id": "0x3456789012abcdef...",
+    "intent": "operate",
+    "version": 2,
     "allocations": [
       {
         "participant": "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",

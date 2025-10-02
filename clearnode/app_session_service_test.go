@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -227,6 +228,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
+			Version:      100, // should neither break nor be used
 			Allocations: []AppAllocation{
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
@@ -291,6 +293,100 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		_, err := service.SubmitAppState(params, rpcSigners)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "negative allocation: -50 for asset usdc")
+	})
+
+	t.Run("NitroRPCv0.4_OperateSuccess", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
+		session := &AppSession{
+			SessionID:          "test-session-v04-operate",
+			Protocol:           rpc.VersionNitroRPCv0_4,
+			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
+			Weights:            []int64{1, 1},
+			Quorum:             2,
+			Status:             ChannelStatusOpen,
+			Version:            1,
+		}
+		require.NoError(t, db.Create(session).Error)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		ledgerA := GetWalletLedger(db, userAddressA)
+		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+
+		params := &SubmitAppStateParams{
+			AppSessionID: session.SessionID,
+			Intent:       rpc.AppSessionIntentOperate,
+			Version:      2,
+			Allocations: []AppAllocation{
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+			},
+		}
+
+		// Mock ledger balances for the app session
+		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, "usdc", decimal.NewFromInt(0)))
+
+		rpcSigners := map[string]struct{}{
+			userAddressA.Hex(): {},
+			userAddressB.Hex(): {},
+		}
+
+		resp, err := service.SubmitAppState(params, rpcSigners)
+		require.NoError(t, err)
+		assert.Equal(t, uint64(2), resp.Version)
+
+		// Verify balances
+		appBalA, err := ledgerA.Balance(sessionAccountID, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(50), appBalA)
+
+		appBalB, err := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, decimal.NewFromInt(50), appBalB)
+	})
+
+	t.Run("NitroRPCv0.4_OperateInvalidVersion", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
+		session := &AppSession{
+			SessionID:          "test-session-v04-invalid-version",
+			Protocol:           rpc.VersionNitroRPCv0_4,
+			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
+			Weights:            []int64{1, 1},
+			Quorum:             2,
+			Status:             ChannelStatusOpen,
+			Version:            1,
+		}
+		require.NoError(t, db.Create(session).Error)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		ledgerA := GetWalletLedger(db, userAddressA)
+		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+
+		params := &SubmitAppStateParams{
+			AppSessionID: session.SessionID,
+			Intent:       rpc.AppSessionIntentOperate,
+			Version:      3,
+			Allocations: []AppAllocation{
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+			},
+		}
+
+		// Mock ledger balances for the app session
+		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, "usdc", decimal.NewFromInt(0)))
+
+		rpcSigners := map[string]struct{}{
+			userAddressA.Hex(): {},
+			userAddressB.Hex(): {},
+		}
+
+		_, err := service.SubmitAppState(params, rpcSigners)
+		require.Equal(t, fmt.Sprintf("incorrect app state: incorrect version: expected %d, got %d", 2, params.Version), err.Error())
 	})
 }
 

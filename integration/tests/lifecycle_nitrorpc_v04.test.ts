@@ -32,7 +32,8 @@ import {
     parseGetLedgerBalancesResponse,
     parseResizeChannelResponse,
     parseSubmitAppStateResponse,
-    ProtocolVersion,
+    RPCProtocolVersion,
+    RPCAppStateIntent,
 } from '@erc7824/nitrolite';
 import { Hex, parseUnits } from 'viem';
 
@@ -58,6 +59,8 @@ describe('Close channel', () => {
     let channelId: Hex;
     let cpChannelId: Hex;
     let appSessionId: string;
+
+    let currentVersion = 1;
 
     const fetchAndParseAppSessions = async () => {
         const getAppSessionsMsg = await createGetAppSessionsMessage(
@@ -101,6 +104,14 @@ describe('Close channel', () => {
         moveCount: 1,
     };
 
+    const SESSION_DATA_ACTIVE_2 = {
+        gameType: GAME_TYPE,
+        timeControl: TIME_CONTROL,
+        gameState: 'active',
+        currentMove: 'e4e6',
+        moveCount: 2,
+    };
+
     const SESSION_DATA_FINISHED = {
         gameType: GAME_TYPE,
         timeControl: TIME_CONTROL,
@@ -110,12 +121,15 @@ describe('Close channel', () => {
     };
 
     const submitAppStateUpdate = async (
+        intent: RPCAppStateIntent,
+        version: number,
         allocations: RPCAppSessionAllocation[],
-        sessionData: object,
-        expectedVersion: number
+        sessionData: object
     ) => {
-        const submitAppStateMsg = await createSubmitAppStateMessage(appIdentity.messageSigner, {
+        const submitAppStateMsg = await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_4>(appIdentity.messageSigner, {
             app_session_id: appSessionId as Hex,
+            intent,
+            version,
             allocations,
             session_data: JSON.stringify(sessionData),
         });
@@ -130,7 +144,7 @@ describe('Close channel', () => {
         expect(submitAppStateParsedResponse).toBeDefined();
         expect(submitAppStateParsedResponse.params.appSessionId).toBe(appSessionId);
         expect(submitAppStateParsedResponse.params.status).toBe(RPCChannelStatus.Open);
-        expect(submitAppStateParsedResponse.params.version).toBe(expectedVersion);
+        expect(submitAppStateParsedResponse.params.version).toBe(version);
 
         return submitAppStateParsedResponse;
     };
@@ -255,7 +269,7 @@ describe('Close channel', () => {
 
     it('should create app session', async () => {
         const definition: RPCAppDefinition = {
-            protocol: ProtocolVersion.NitroRPC_0_2,
+            protocol: RPCProtocolVersion.NitroRPC_0_4,
             participants: [appIdentity.walletAddress, appCPIdentity.walletAddress],
             weights: [100, 0],
             quorum: 100,
@@ -297,7 +311,30 @@ describe('Close channel', () => {
         appSessionId = createAppSessionParsedResponse.params.appSessionId;
     });
 
-    it('should submit state with updated session_data', async () => {
+    it('should submit state with updated version and session_data', async () => {
+        const allocations = [
+            {
+                participant: appIdentity.walletAddress,
+                asset: 'USDC',
+                amount: (decimalDepositAmount / BigInt(4) * BigInt(3)).toString(), // 75 USDC
+            },
+            {
+                participant: appCPIdentity.walletAddress,
+                asset: 'USDC',
+                amount: (decimalDepositAmount / BigInt(4)).toString(), // 25 USDC
+            },
+        ];
+
+        await submitAppStateUpdate(RPCAppStateIntent.Operate, ++currentVersion, allocations, SESSION_DATA_ACTIVE);
+    });
+
+    it('should verify sessionData changes after updates', async () => {
+        const { sessionData } = await fetchAndParseAppSessions();
+
+        expect(sessionData).toEqual(SESSION_DATA_ACTIVE);
+    });
+
+    it('should submit state with version updated again and session data', async () => {
         const allocations = [
             {
                 participant: appIdentity.walletAddress,
@@ -311,13 +348,47 @@ describe('Close channel', () => {
             },
         ];
 
-        await submitAppStateUpdate(allocations, SESSION_DATA_ACTIVE, 2);
+        await submitAppStateUpdate(RPCAppStateIntent.Operate, ++currentVersion, allocations, SESSION_DATA_ACTIVE_2);
     });
 
     it('should verify sessionData changes after updates', async () => {
         const { sessionData } = await fetchAndParseAppSessions();
 
-        expect(sessionData).toEqual(SESSION_DATA_ACTIVE);
+        expect(sessionData).toEqual(SESSION_DATA_ACTIVE_2);
+    });
+
+    it('should return error on skipping version number', async () => {
+        const allocations = [
+            {
+                participant: appIdentity.walletAddress,
+                asset: 'USDC',
+                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+            },
+            {
+                participant: appCPIdentity.walletAddress,
+                asset: 'USDC',
+                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+            },
+        ];
+
+        try {
+            await submitAppStateUpdate(RPCAppStateIntent.Operate, currentVersion + 42, allocations, SESSION_DATA_ACTIVE_2);
+        } catch (e) {
+            expect((e as Error).message).toMatch(
+                `RPC Error: incorrect app state: incorrect version: expected ${
+                    currentVersion + 1
+                }, got ${currentVersion + 42}`
+            );
+            return;
+        }
+
+        throw new Error('Expected error was not thrown');
+    });
+
+    it('should verify sessionData remain unchanged after failed update', async () => {
+        const { sessionData } = await fetchAndParseAppSessions();
+
+        expect(sessionData).toEqual(SESSION_DATA_ACTIVE_2);
     });
 
     it('should close app session', async () => {
@@ -334,7 +405,7 @@ describe('Close channel', () => {
             },
         ];
 
-        await closeAppSessionWithState(allocations, SESSION_DATA_FINISHED, 3);
+        await closeAppSessionWithState(allocations, SESSION_DATA_FINISHED, ++currentVersion);
     });
 
     it('should verify sessionData changes after closing', async () => {

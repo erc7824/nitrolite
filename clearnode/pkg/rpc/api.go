@@ -126,6 +126,8 @@ const (
 	ChannelUpdateEvent Event = "cu"
 	// TransferEvent notifies clients of incoming transfers.
 	TransferEvent Event = "tr"
+	// AppSessionUpdateEvent notifies clients of app session state changes.
+	AppSessionUpdateEvent Event = "au"
 )
 
 // String returns the string representation of the event.
@@ -435,6 +437,14 @@ type ChannelUpdateNotification Channel
 type TransferNotification struct {
 	// Transactions contains the ledger transactions for the transfer
 	Transactions []LedgerTransaction `json:"transactions"`
+}
+
+// AppSessionUpdateNotification is sent when an application session's state changes.
+// This includes session creation, state updates, and session closure.
+type AppSessionUpdateNotification struct {
+	AppSession
+	// ParticipantAllocations contains each participant's asset allocations
+	ParticipantAllocations map[string]map[string]decimal.Decimal `json:"participant_allocations"`
 }
 
 // ============================================================================

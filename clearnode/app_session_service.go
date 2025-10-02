@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -132,6 +133,9 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
 		if err != nil {
+			if params.Intent == rpc.AppSessionIntentDeposit && strings.Contains(err.Error(), "quorum not met") {
+				return RPCErrorf("incorrect deposit request: quorum not reached")
+			}
 			return err
 		}
 		sessionAccountID := NewAccountID(appSession.SessionID)
@@ -150,7 +154,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 			}
 			switch params.Intent {
 			case rpc.AppSessionIntentDeposit:
-				depositParticipants, err := s.handleDepositIntent(tx, appSession, params, rpcSigners, sessionAccountID, appSessionBalance)
+				depositParticipants, err := s.handleDepositIntent(tx, appSession, params, rpcSigners, sessionAccountID)
 				if err != nil {
 					return err
 				}
@@ -166,8 +170,8 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 				return RPCErrorf("unsupported intent: %s", params.Intent)
 			}
 		case appSession.Protocol == rpc.VersionNitroRPCv0_2:
-			if params.Intent == rpc.AppSessionIntentDeposit {
-				return RPCErrorf("incorrect deposit request: deposits are not supported in this app protocol version")
+			if params.Intent != "" || params.Version != 0 {
+				return RPCErrorf("incorrect request: specified parameters are not supported in this protocol")
 			}
 			err := s.handleOperateIntent(tx, params, participantWeights, sessionAccountID, appSessionBalance)
 			if err != nil {
@@ -202,12 +206,15 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 		return AppSessionResponse{}, err
 	}
 
+	// Notify only participants whose balances were affected by deposit operations
 	for participant := range participants {
 		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
 	}
 
 	participantAllocations, err := getParticipantAllocations(s.db, updatedAppSession, NewAccountID(params.AppSessionID))
-	if err == nil {
+	if err != nil {
+		fmt.Printf("failed to get participant allocations for app session %s, notifications will not be sent: %v\n", updatedAppSession.SessionID, err)
+	} else {
 		for _, participant := range updatedAppSession.ParticipantWallets {
 			s.wsNotifier.Notify(NewAppSessionNotification(participant, updatedAppSession, participantAllocations))
 		}
@@ -301,6 +308,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 		return AppSessionResponse{}, err
 	}
 
+	// Notify only participants who received non-zero allocations during session closure
 	for participant := range participants {
 		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
 	}
@@ -399,23 +407,18 @@ func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppSt
 		}
 	}
 
-	return verifyAllocations(appSessionBalance, allocationSum)
+	if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
+		return RPCErrorf("incorrect operate request: non-zero allocation sum delta")
+	}
+	return nil
 }
 
-func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSession, params *SubmitAppStateParams, rpcSigners map[string]struct{}, sessionAccountID AccountID, appSessionBalance map[string]decimal.Decimal) (map[string]bool, error) {
+func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSession, params *SubmitAppStateParams, rpcSigners map[string]struct{}, sessionAccountID AccountID) (map[string]bool, error) {
 	participants := make(map[string]bool)
 
-	currentAllocations := make(map[string]map[string]decimal.Decimal)
-	for _, participant := range appSession.ParticipantWallets {
-		currentAllocations[participant] = make(map[string]decimal.Decimal)
-		for asset := range appSessionBalance {
-			ledger := GetWalletLedger(tx, common.HexToAddress(participant))
-			currentBalance, err := ledger.Balance(sessionAccountID, asset)
-			if err != nil {
-				return nil, RPCErrorf("failed to get current allocation for participant %s asset %s: %w", participant, asset, err)
-			}
-			currentAllocations[participant][asset] = currentBalance
-		}
+	currentAllocations, err := getParticipantAllocations(tx, appSession, sessionAccountID)
+	if err != nil {
+		return nil, RPCErrorf("failed to get current allocations: %w", err)
 	}
 
 	noDeposits := true
@@ -463,7 +466,7 @@ func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSessi
 	}
 
 	if noDeposits {
-		return nil, RPCErrorf("incorrect deposit request: no increased allocations")
+		return nil, RPCErrorf("incorrect deposit request: non-positive allocation sum delta")
 	}
 
 	return participants, nil

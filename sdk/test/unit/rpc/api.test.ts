@@ -31,7 +31,7 @@ import {
     RPCTransferAllocation,
     RPCTxType,
     RPCData,
-    ProtocolVersion,
+    RPCProtocolVersion,
 } from '../../../src/rpc/types';
 
 describe('API message creators', () => {
@@ -171,7 +171,7 @@ describe('API message creators', () => {
     test('createAppSessionMessage', async () => {
         const params = {
             definition: {
-                protocol: ProtocolVersion.NitroRPC_0_2,
+                protocol: RPCProtocolVersion.NitroRPC_0_2,
                 participants: [],
                 weights: [],
                 quorum: 0,

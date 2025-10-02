@@ -9,7 +9,7 @@ import {
     RPCAllowance,
     GetLedgerTransactionsFilters,
     RPCAppStateIntent,
-    ProtocolVersion,
+    RPCProtocolVersion,
 } from '.';
 
 /**
@@ -367,9 +367,9 @@ export type SubmitAppStateRequestParamsV04 = {
 /**
  * Maps protocol versions to their corresponding submit_app_state parameter types.
  */
-export type SubmitAppStateParamsByProtocol = {
-    [ProtocolVersion.NitroRPC_0_2]: SubmitAppStateRequestParamsV02;
-    [ProtocolVersion.NitroRPC_0_4]: SubmitAppStateRequestParamsV04;
+export type SubmitAppStateParamsPerProtocol = {
+    [RPCProtocolVersion.NitroRPC_0_2]: SubmitAppStateRequestParamsV02;
+    [RPCProtocolVersion.NitroRPC_0_4]: SubmitAppStateRequestParamsV04;
 };
 
 /**

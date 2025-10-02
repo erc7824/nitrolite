@@ -32,7 +32,7 @@ import {
     parseGetLedgerBalancesResponse,
     parseResizeChannelResponse,
     parseSubmitAppStateResponse,
-    ProtocolVersion,
+    RPCProtocolVersion,
 } from '@erc7824/nitrolite';
 import { Hex, parseUnits } from 'viem';
 
@@ -114,7 +114,7 @@ describe('Close channel', () => {
         sessionData: object,
         expectedVersion: number
     ) => {
-        const submitAppStateMsg = await createSubmitAppStateMessage<ProtocolVersion.NitroRPC_0_2>(appIdentity.messageSigner, {
+        const submitAppStateMsg = await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_2>(appIdentity.messageSigner, {
             app_session_id: appSessionId as Hex,
             allocations,
             session_data: JSON.stringify(sessionData),
@@ -255,7 +255,7 @@ describe('Close channel', () => {
 
     it('should create app session', async () => {
         const definition: RPCAppDefinition = {
-            protocol: ProtocolVersion.NitroRPC_0_2,
+            protocol: RPCProtocolVersion.NitroRPC_0_2,
             participants: [appIdentity.walletAddress, appCPIdentity.walletAddress],
             weights: [100, 0],
             quorum: 100,

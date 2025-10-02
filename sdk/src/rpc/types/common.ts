@@ -21,7 +21,7 @@ export enum RPCTxType {
 /**
  * Represents the protocol version and is used to provide backward compatibility as the API evolves.
  */
-export enum ProtocolVersion {
+export enum RPCProtocolVersion {
     // NitroRPC_0_2 is the initial supported version of the NitroRPC protocol
     NitroRPC_0_2 = 'NitroRPC/0.2',
     // NitroRPC_0_4 adds support for App Session deposits and withdrawals
@@ -33,7 +33,7 @@ export enum ProtocolVersion {
  */
 export interface RPCAppDefinition {
     /** Protocol identifies the version of the application protocol */
-    protocol: ProtocolVersion;
+    protocol: RPCProtocolVersion;
     /** An array of participant addresses (Ethereum addresses) involved in the application. Must have at least 2 participants. */
     participants: Hex[];
     /** An array representing the relative weights or stakes of participants, often used for dispute resolution or allocation calculations. Order corresponds to the participants array. */
@@ -145,7 +145,7 @@ export interface RPCAppSession {
     /** List of participant Ethereum addresses. */
     participants: Address[];
     /** Protocol identifies the version of the application protocol */
-    protocol: ProtocolVersion;
+    protocol: RPCProtocolVersion;
     /** The challenge period in seconds. */
     challenge: number;
     /** The signature weights for each participant. */

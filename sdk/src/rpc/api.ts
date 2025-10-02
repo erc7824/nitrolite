@@ -16,14 +16,14 @@ import {
     RPCData,
     GetLedgerTransactionsFilters,
     RPCChannelStatus,
-    ProtocolVersion,
+    RPCProtocolVersion,
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
 import {
     CloseAppSessionRequestParams,
     CreateAppSessionRequestParams,
-    SubmitAppStateParamsByProtocol,
+    SubmitAppStateParamsPerProtocol,
     ResizeChannelRequestParams,
     GetLedgerTransactionsRequestParams,
     TransferRequestParams,
@@ -422,9 +422,9 @@ export async function createAppSessionMessage(
  *   allocations: [...]
  * });
  */
-export async function createSubmitAppStateMessage<P extends ProtocolVersion>(
+export async function createSubmitAppStateMessage<P extends RPCProtocolVersion>(
     signer: MessageSigner,
-    params: SubmitAppStateParamsByProtocol[P],
+    params: SubmitAppStateParamsPerProtocol[P],
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {

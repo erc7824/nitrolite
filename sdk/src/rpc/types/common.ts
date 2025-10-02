@@ -24,6 +24,8 @@ export enum RPCTxType {
 export enum ProtocolVersion {
     // NitroRPC_0_2 is the initial supported version of the NitroRPC protocol
     NitroRPC_0_2 = 'NitroRPC/0.2',
+    // NitroRPC_0_4 adds support for App Session deposits and withdrawals
+    NitroRPC_0_4 = 'NitroRPC/0.4',
 }
 
 /**
@@ -121,6 +123,15 @@ export interface RPCLedgerEntry {
     debit: string;
     /** The timestamp when the entry was created. */
     createdAt: Date;
+}
+
+export enum RPCAppStateIntent {
+    /** Intent for a standard state update */
+    Operate = 'operate',
+    /** Intent for depositing funds into the app session */
+    Deposit = 'deposit',
+    /** Intent for withdrawing funds from the app session */
+    Withdraw = 'withdraw',
 }
 
 /**

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -131,11 +130,8 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 	var updatedAppSession AppSession
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
+		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners, params.Intent)
 		if err != nil {
-			if params.Intent == rpc.AppSessionIntentDeposit && strings.Contains(err.Error(), "quorum not met") {
-				return RPCErrorf("incorrect deposit request: quorum not reached")
-			}
 			return err
 		}
 		sessionAccountID := NewAccountID(appSession.SessionID)
@@ -147,8 +143,8 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 			return err
 		}
 
-		switch {
-		case appSession.Protocol == rpc.VersionNitroRPCv0_4:
+		switch appSession.Protocol {
+		case rpc.VersionNitroRPCv0_4:
 			if newVersion != params.Version {
 				return RPCErrorf("incorrect app state: incorrect version: expected %d, got %d", newVersion, params.Version)
 			}
@@ -161,6 +157,14 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 				for participant := range depositParticipants {
 					participants[participant] = true
 				}
+			case rpc.AppSessionIntentWithdraw:
+				withdrawalParticipants, err := s.handleWithdrawIntent(tx, appSession, params, sessionAccountID)
+				if err != nil {
+					return err
+				}
+				for participant := range withdrawalParticipants {
+					participants[participant] = true
+				}
 			case rpc.AppSessionIntentOperate:
 				err := s.handleOperateIntent(tx, params, participantWeights, sessionAccountID, appSessionBalance)
 				if err != nil {
@@ -169,7 +173,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 			default:
 				return RPCErrorf("unsupported intent: %s", params.Intent)
 			}
-		case appSession.Protocol == rpc.VersionNitroRPCv0_2:
+		case rpc.VersionNitroRPCv0_2:
 			if params.Intent != "" || params.Version != 0 {
 				return RPCErrorf("incorrect request: specified parameters are not supported in this protocol")
 			}
@@ -236,7 +240,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 	participants := make(map[string]bool)
 	var newVersion uint64
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
+		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners, "")
 		if err != nil {
 			return err
 		}
@@ -258,8 +262,8 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 				walletAddress = alloc.ParticipantWallet
 			}
 
-			if _, ok := participantWeights[walletAddress]; !ok {
-				return RPCErrorf("allocation to non-participant %s", walletAddress)
+			if err := validateAppParticipant(walletAddress, participantWeights); err != nil {
+				return err
 			}
 
 			userAddress := common.HexToAddress(walletAddress)
@@ -372,7 +376,7 @@ func getParticipantAllocations(db *gorm.DB, appSession AppSession, sessionAccoun
 	return participantAllocations, nil
 }
 
-func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppStateParams, participantWeights map[string]int64, sessionAccountID AccountID, appSessionBalance map[string]decimal.Decimal) error {
+func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppStateParams, appParticipants map[string]int64, sessionAccountID AccountID, appSessionBalance map[string]decimal.Decimal) error {
 	allocationSum := map[string]decimal.Decimal{}
 	for _, alloc := range params.Allocations {
 		if alloc.Amount.IsNegative() {
@@ -384,8 +388,8 @@ func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppSt
 			walletAddress = alloc.ParticipantWallet
 		}
 
-		if _, ok := participantWeights[walletAddress]; !ok {
-			return RPCErrorf("allocation to non-participant %s", walletAddress)
+		if err := validateAppParticipant(walletAddress, appParticipants); err != nil {
+			return err
 		}
 
 		userAddress := common.HexToAddress(walletAddress)
@@ -472,7 +476,66 @@ func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSessi
 	return participants, nil
 }
 
-func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct{}) (AppSession, map[string]int64, error) {
+func (s *AppSessionService) handleWithdrawIntent(tx *gorm.DB, appSession AppSession, params *SubmitAppStateParams, sessionAccountID AccountID) (map[string]bool, error) {
+	participants := make(map[string]bool)
+
+	currentAllocations, err := getParticipantAllocations(tx, appSession, sessionAccountID)
+	if err != nil {
+		return nil, RPCErrorf("failed to get current allocations: %w", err)
+	}
+
+	noWithdrawals := true
+
+	for _, alloc := range params.Allocations {
+		if alloc.Amount.IsNegative() {
+			return nil, RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+		}
+
+		walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
+		if walletAddress == "" {
+			walletAddress = alloc.ParticipantWallet
+		}
+
+		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
+		if alloc.Amount.LessThan(currentAmount) {
+			withdrawalAmount := currentAmount.Sub(alloc.Amount)
+			noWithdrawals = false
+
+			userAddress := common.HexToAddress(walletAddress)
+			userAccountID := NewAccountID(walletAddress)
+			ledger := GetWalletLedger(tx, userAddress)
+
+			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, withdrawalAmount.Neg()); err != nil {
+				return nil, RPCErrorf("failed to debit session account: %w", err)
+			}
+			if err := ledger.Record(userAccountID, alloc.AssetSymbol, withdrawalAmount); err != nil {
+				return nil, RPCErrorf("failed to credit user account: %w", err)
+			}
+			_, err = RecordLedgerTransaction(tx, TransactionTypeAppWithdrawal, sessionAccountID, userAccountID, alloc.AssetSymbol, withdrawalAmount)
+			if err != nil {
+				return nil, RPCErrorf("failed to record transaction: %w", err)
+			}
+
+			participants[walletAddress] = true
+		}
+	}
+
+	if noWithdrawals {
+		return nil, RPCErrorf("incorrect withdrawal request: non-decreased allocation sum delta")
+	}
+
+	return participants, nil
+}
+
+// validateAppParticipant checks if wallet exists in participant weights
+func validateAppParticipant(walletAddress string, participantWeights map[string]int64) error {
+	if _, ok := participantWeights[walletAddress]; !ok {
+		return RPCErrorf("allocation to non-participant %s", walletAddress)
+	}
+	return nil
+}
+
+func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct{}, intent rpc.AppSessionIntent) (AppSession, map[string]int64, error) {
 	var session AppSession
 	if err := tx.Where("session_id = ? AND status = ?", appSessionID, ChannelStatusOpen).
 		Order("nonce DESC").First(&session).Error; err != nil {
@@ -497,7 +560,16 @@ func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct
 	}
 
 	if totalWeight < int64(session.Quorum) {
-		return AppSession{}, nil, RPCErrorf("quorum not met: %d / %d", totalWeight, session.Quorum)
+		err := fmt.Sprintf("quorum not reached: %d / %d", totalWeight, session.Quorum)
+		switch intent {
+		case rpc.AppSessionIntentDeposit:
+			return AppSession{}, nil, RPCErrorf("incorrect deposit request: %s", err)
+		case rpc.AppSessionIntentWithdraw:
+			return AppSession{}, nil, RPCErrorf("incorrect withdrawal request: %s", err)
+		default:
+			return AppSession{}, nil, RPCErrorf("incorrect submit_state request: %s", err)
+		}
+
 	}
 
 	return session, participantWeights, nil

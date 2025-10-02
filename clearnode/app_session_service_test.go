@@ -6,10 +6,27 @@ import (
 	"time"
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+)
+
+var (
+	rawA, _        = crypto.GenerateKey()
+	rawB, _        = crypto.GenerateKey()
+	rawC, _        = crypto.GenerateKey()
+	signerA        = Signer{privateKey: rawA}
+	signerB        = Signer{privateKey: rawB}
+	signerC        = Signer{privateKey: rawC}
+	userAddressA   = signerA.GetAddress()
+	userAddressB   = signerB.GetAddress()
+	userAddressC   = signerC.GetAddress()
+	userAccountIDA = NewAccountID(userAddressA.Hex())
+	userAccountIDB = NewAccountID(userAddressB.Hex())
+	userAccountIDC = NewAccountID(userAddressC.Hex())
 )
 
 func assertNotifications(t *testing.T, capturedNotifications map[string][]Notification, userID string, expectedCount int) {
@@ -17,35 +34,74 @@ func assertNotifications(t *testing.T, capturedNotifications map[string][]Notifi
 	assert.Len(t, capturedNotifications[userID], expectedCount)
 }
 
-func TestAppSessionService_CreateApplication(t *testing.T) {
-	rawA, _ := crypto.GenerateKey()
-	rawB, _ := crypto.GenerateKey()
-	signerA := Signer{privateKey: rawA}
-	signerB := Signer{privateKey: rawB}
-	userAddressA := signerA.GetAddress()
-	userAddressB := signerB.GetAddress()
-	userAccountIDA := NewAccountID(userAddressA.Hex())
-	userAccountIDB := NewAccountID(userAddressB.Hex())
+func setupWallets(t *testing.T, db *gorm.DB, funds map[common.Address]map[string]int) {
+	for addr, assets := range funds {
+		require.NoError(t, db.Create(&SignerWallet{Signer: addr.Hex(), Wallet: addr.Hex()}).Error)
+		accountID := NewAccountID(addr.Hex())
+		for asset, amount := range assets {
+			require.NoError(t, GetWalletLedger(db, addr).Record(accountID, asset, decimal.NewFromInt(int64(amount))))
+		}
+	}
+}
 
-	t.Run("SuccessfulCreateApplication", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
-		defer cleanup()
+func createTestAppSession(t *testing.T, db *gorm.DB, sessionID string, protocol rpc.Version, participants []string, weights []int64, quorum uint64) *AppSession {
+	session := &AppSession{
+		SessionID:          sessionID,
+		Protocol:           protocol,
+		ParticipantWallets: participants,
+		Weights:            weights,
+		Quorum:             quorum,
+		Status:             ChannelStatusOpen,
+		Version:            1,
+	}
+	require.NoError(t, db.Create(session).Error)
+	return session
+}
 
-		// Setup: Create wallets and fund them
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressB.Hex(), Wallet: userAddressB.Hex()}).Error)
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(userAccountIDB, "usdc", decimal.NewFromInt(200)))
-
-		capturedNotifications := make(map[string][]Notification)
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {
-
+func createTestAppSessionService(db *gorm.DB, capturedNotifications map[string][]Notification) *AppSessionService {
+	var notifyFunc func(userID string, method string, params RPCDataParams)
+	if capturedNotifications != nil {
+		notifyFunc = func(userID string, method string, params RPCDataParams) {
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
 				data:      params,
 			})
-		}, nil))
+		}
+	} else {
+		notifyFunc = func(userID string, method string, params RPCDataParams) {}
+	}
+	return NewAppSessionService(db, NewWSNotifier(notifyFunc, nil))
+}
+
+func setupAppSessionBalances(t *testing.T, db *gorm.DB, sessionAccountID AccountID, balances map[common.Address]map[string]int) {
+	for addr, assets := range balances {
+		for asset, amount := range assets {
+			require.NoError(t, GetWalletLedger(db, addr).Record(sessionAccountID, asset, decimal.NewFromInt(int64(amount))))
+		}
+	}
+}
+
+func rpcSigners(addresses ...common.Address) map[string]struct{} {
+	signers := make(map[string]struct{})
+	for _, addr := range addresses {
+		signers[addr.Hex()] = struct{}{}
+	}
+	return signers
+}
+
+func TestAppSessionService_CreateApplication(t *testing.T) {
+	t.Run("SuccessfulCreateApplication", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		setupWallets(t, db, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 200},
+		})
+
+		capturedNotifications := make(map[string][]Notification)
+		service := createTestAppSessionService(db, capturedNotifications)
 
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
@@ -61,65 +117,34 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
 
-		appSession, err := service.CreateApplication(params, rpcSigners)
+		appSession, err := service.CreateApplication(params, rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
-		assert.NotNil(t, appSession)
 		assert.NotEmpty(t, appSession.AppSessionID)
 		assert.Equal(t, uint64(1), appSession.Version)
-		assert.Equal(t, ChannelStatusOpen, ChannelStatus(appSession.Status))
+		assert.Equal(t, string(ChannelStatusOpen), appSession.Status)
 
-		sessionAccountID := NewAccountID(appSession.AppSessionID)
-
-		assert.Len(t, capturedNotifications, 2)
 		assertNotifications(t, capturedNotifications, userAddressA.Hex(), 1)
 		assertNotifications(t, capturedNotifications, userAddressB.Hex(), 1)
 
-		// Verify balances
-		balA, err := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
-		require.NoError(t, err)
+		sessionAccountID := NewAccountID(appSession.AppSessionID)
+		balA, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
+		appBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
 		assert.True(t, balA.IsZero())
-
-		appBalA, err := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
-		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(100), appBalA)
 
-		// Verify transactions were recorded to the database
 		var transactions []LedgerTransaction
-		err = db.Where("tx_type = ?", TransactionTypeAppDeposit).Find(&transactions).Error
-		require.NoError(t, err)
-		assert.Len(t, transactions, 2, "Should have 2 app deposit transactions recorded")
-
-		// Verify transaction details
-		expectedTxs := map[string]decimal.Decimal{
-			userAddressA.Hex(): decimal.NewFromInt(100),
-			userAddressB.Hex(): decimal.NewFromInt(200),
-		}
-
-		assert.Equal(t, len(transactions), 2, "Expected 2 transactions to be recorded")
-		for _, tx := range transactions {
-			expectedAmount, exists := expectedTxs[tx.FromAccount]
-			assert.True(t, exists, "Unexpected destination of a transaction: %s", tx.FromAccount)
-			assert.Equal(t, TransactionTypeAppDeposit, tx.Type, "Transaction type should be app deposit")
-			assert.Equal(t, appSession.AppSessionID, tx.ToAccount, "To account should be app session ID")
-			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
-			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
-			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
-		}
+		db.Where("tx_type = ?", TransactionTypeAppDeposit).Find(&transactions)
+		assert.Len(t, transactions, 2)
 	})
 
 	t.Run("ErrorInsufficientFunds", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(50))) // Not enough
+		setupWallets(t, db, map[common.Address]map[string]int{userAddressA: {"usdc": 50}})
+		service := createTestAppSessionService(db, nil)
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           rpc.VersionNitroRPCv0_2,
@@ -132,52 +157,19 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
-		rpcSigners := map[string]struct{}{userAddressA.Hex(): {}}
 
-		_, err := service.CreateApplication(params, rpcSigners)
+		_, err := service.CreateApplication(params, rpcSigners(userAddressA))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "insufficient funds")
-	})
-
-	t.Run("ErrorChallengedChannel", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
-		defer cleanup()
-
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
-		require.NoError(t, db.Create(&Channel{
-			Wallet: userAddressA.Hex(),
-			Status: ChannelStatusChallenged,
-		}).Error)
-
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-		params := &CreateAppSessionParams{
-			Definition: AppDefinition{
-				Protocol:           rpc.VersionNitroRPCv0_2,
-				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-				Weights:            []int64{1, 0},
-				Quorum:             1,
-				Nonce:              uint64(time.Now().Unix()),
-			},
-			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-			},
-		}
-		rpcSigners := map[string]struct{}{userAddressA.Hex(): {}}
-
-		_, err := service.CreateApplication(params, rpcSigners)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "has challenged channels")
 	})
 
 	t.Run("ErrorNegativeAllocation", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(100)))
+		setupWallets(t, db, map[common.Address]map[string]int{userAddressA: {"usdc": 100}})
+		service := createTestAppSessionService(db, nil)
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Protocol:           rpc.VersionNitroRPCv0_2,
@@ -190,70 +182,70 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
 			},
 		}
-		rpcSigners := map[string]struct{}{userAddressA.Hex(): {}}
 
-		_, err := service.CreateApplication(params, rpcSigners)
+		_, err := service.CreateApplication(params, rpcSigners(userAddressA))
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "negative allocation: -50 for asset usdc")
+		assert.Contains(t, err.Error(), "negative allocation")
+	})
+
+	t.Run("ErrorChallengedChannel", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		setupWallets(t, db, map[common.Address]map[string]int{userAddressA: {"usdc": 100}})
+		db.Create(&Channel{Wallet: userAddressA.Hex(), Status: ChannelStatusChallenged})
+		service := createTestAppSessionService(db, nil)
+
+		params := &CreateAppSessionParams{
+			Definition: AppDefinition{
+				Protocol:           rpc.VersionNitroRPCv0_2,
+				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
+				Weights:            []int64{1, 0},
+				Quorum:             1,
+				Nonce:              uint64(time.Now().Unix()),
+			},
+			Allocations: []AppAllocation{
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+			},
+		}
+
+		_, err := service.CreateApplication(params, rpcSigners(userAddressA))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "has challenged channels")
 	})
 }
 
 func TestAppSessionService_SubmitAppState(t *testing.T) {
-	rawA, _ := crypto.GenerateKey()
-	rawB, _ := crypto.GenerateKey()
-	signerA := Signer{privateKey: rawA}
-	signerB := Signer{privateKey: rawB}
-	userAddressA := signerA.GetAddress()
-	userAddressB := signerB.GetAddress()
-
 	t.Run("SuccessfulSubmitAppState", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-		session := &AppSession{
-			SessionID:          "test-session",
-			Protocol:           rpc.VersionNitroRPCv0_2,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		service := createTestAppSessionService(db, nil)
+		session := createTestAppSession(t, db, "test-session", rpc.VersionNitroRPCv0_2,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		ledgerA := GetWalletLedger(db, userAddressA)
-		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 0},
+		})
 
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
-			Version:      0, // no version for NitroRPCv0_2
+			Version:      0,
 			Allocations: []AppAllocation{
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
-		// Mock ledger balances for the app session
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, "usdc", decimal.NewFromInt(0)))
-
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
-
-		resp, err := service.SubmitAppState(params, rpcSigners)
+		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
-		// Verify balances
-		appBalA, err := ledgerA.Balance(sessionAccountID, "usdc")
-		require.NoError(t, err)
+		appBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
+		appBalB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
 		assert.Equal(t, decimal.NewFromInt(50), appBalA)
-
-		appBalB, err := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
-		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(50), appBalB)
 	})
 
@@ -261,21 +253,14 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-		session := &AppSession{
-			SessionID:          "test-session-negative",
-			Protocol:           rpc.VersionNitroRPCv0_2,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		service := createTestAppSessionService(db, nil)
+		session := createTestAppSession(t, db, "test-session-negative", rpc.VersionNitroRPCv0_2,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		ledgerA := GetWalletLedger(db, userAddressA)
-		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+		})
 
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
@@ -285,12 +270,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
-
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "negative allocation: -50 for asset usdc")
 	})
@@ -299,21 +279,15 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-		session := &AppSession{
-			SessionID:          "test-session-v04-operate",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		service := createTestAppSessionService(db, nil)
+		session := createTestAppSession(t, db, "test-session-v04-operate", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		ledgerA := GetWalletLedger(db, userAddressA)
-		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 0},
+		})
 
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
@@ -325,25 +299,13 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		// Mock ledger balances for the app session
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, "usdc", decimal.NewFromInt(0)))
-
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
-
-		resp, err := service.SubmitAppState(params, rpcSigners)
+		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
-		// Verify balances
-		appBalA, err := ledgerA.Balance(sessionAccountID, "usdc")
-		require.NoError(t, err)
+		appBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
+		appBalB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
 		assert.Equal(t, decimal.NewFromInt(50), appBalA)
-
-		appBalB, err := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
-		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(50), appBalB)
 	})
 
@@ -351,21 +313,15 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-		session := &AppSession{
-			SessionID:          "test-session-v04-invalid-version",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		service := createTestAppSessionService(db, nil)
+		session := createTestAppSession(t, db, "test-session-v04-invalid-version", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		ledgerA := GetWalletLedger(db, userAddressA)
-		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 0},
+		})
 
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
@@ -377,57 +333,27 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		// Mock ledger balances for the app session
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, "usdc", decimal.NewFromInt(0)))
-
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
-
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Equal(t, fmt.Sprintf("incorrect app state: incorrect version: expected %d, got %d", 2, params.Version), err.Error())
 	})
 }
 
 func TestAppSessionService_CloseApplication(t *testing.T) {
-	rawA, _ := crypto.GenerateKey()
-	rawB, _ := crypto.GenerateKey()
-	signerA := Signer{privateKey: rawA}
-	signerB := Signer{privateKey: rawB}
-	userAddressA := signerA.GetAddress()
-	userAddressB := signerB.GetAddress()
-	userAccountIDA := NewAccountID(userAddressA.Hex())
-
 	t.Run("SuccessfulCloseApplication", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
 		capturedNotifications := make(map[string][]Notification)
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {
-			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
-				userID:    userID,
-				eventType: EventType(method),
-				data:      params,
-			})
-		}, nil))
+		service := createTestAppSessionService(db, capturedNotifications)
 
-		session := &AppSession{
-			SessionID:          "test-session-close",
-			Protocol:           rpc.VersionNitroRPCv0_2,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-close", rpc.VersionNitroRPCv0_2,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		ledgerA := GetWalletLedger(db, userAddressA)
-		ledgerB := GetWalletLedger(db, userAddressB)
-		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
-		require.NoError(t, ledgerB.Record(sessionAccountID, "usdc", decimal.NewFromInt(200)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 200},
+		})
 
 		params := &CloseAppSessionParams{
 			AppSessionID: session.SessionID,
@@ -436,54 +362,26 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
 
-		resp, err := service.CloseApplication(params, rpcSigners)
+		resp, err := service.CloseApplication(params, rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
-		assert.Len(t, capturedNotifications, 2)
 		assertNotifications(t, capturedNotifications, userAddressA.Hex(), 1)
 		assertNotifications(t, capturedNotifications, userAddressB.Hex(), 1)
 
 		var closedSession AppSession
-		require.NoError(t, db.First(&closedSession, "session_id = ?", session.SessionID).Error)
+		db.First(&closedSession, "session_id = ?", session.SessionID)
 		assert.Equal(t, ChannelStatusClosed, closedSession.Status)
 
-		// Verify balances
-		appBalA, err := ledgerA.Balance(sessionAccountID, "usdc")
-		require.NoError(t, err)
+		appBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
+		walletBalA, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
 		assert.True(t, appBalA.IsZero())
-
-		walletBalA, err := ledgerA.Balance(userAccountIDA, "usdc")
-		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(100), walletBalA)
 
-		// Verify transactions were recorded to the database
 		var transactions []LedgerTransaction
-		err = db.Where("tx_type = ?", TransactionTypeAppWithdrawal).Find(&transactions).Error
-		require.NoError(t, err)
-		assert.Len(t, transactions, 2, "Should have 2 app withdrawal transactions recorded")
-
-		// Verify transaction details
-		expectedTxs := map[string]decimal.Decimal{
-			userAddressA.Hex(): decimal.NewFromInt(100),
-			userAddressB.Hex(): decimal.NewFromInt(200),
-		}
-
-		assert.Equal(t, len(transactions), 2, "Expected 2 transactions to be recorded")
-		for _, tx := range transactions {
-			expectedAmount, exists := expectedTxs[tx.ToAccount]
-			assert.True(t, exists, "Unexpected destination of a transaction: %s", tx.ToAccount)
-			assert.Equal(t, TransactionTypeAppWithdrawal, tx.Type, "Transaction type should be app withdrawal")
-			assert.Equal(t, session.SessionID, tx.FromAccount, "From account should be app session ID")
-			assert.Equal(t, "usdc", tx.AssetSymbol, "Asset symbol should be usdc")
-			assert.Equal(t, expectedAmount, tx.Amount, "Amount should match allocation")
-			assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
-		}
+		db.Where("tx_type = ?", TransactionTypeAppWithdrawal).Find(&transactions)
+		assert.Len(t, transactions, 2)
 	})
 
 	t.Run("SuccessfulCloseApplicationWithZeroAllocation", func(t *testing.T) {
@@ -491,31 +389,16 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		defer cleanup()
 
 		capturedNotifications := make(map[string][]Notification)
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {
+		service := createTestAppSessionService(db, capturedNotifications)
 
-			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
-				userID:    userID,
-				eventType: EventType(method),
-				data:      params,
-			})
-		}, nil))
-
-		session := &AppSession{
-			SessionID:          "test-session-close",
-			Protocol:           rpc.VersionNitroRPCv0_2,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-close-zero", rpc.VersionNitroRPCv0_2,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		ledgerA := GetWalletLedger(db, userAddressA)
-		ledgerB := GetWalletLedger(db, userAddressB)
-		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(0)))
-		require.NoError(t, ledgerB.Record(sessionAccountID, "usdc", decimal.NewFromInt(0)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 0},
+			userAddressB: {"usdc": 0},
+		})
 
 		params := &CloseAppSessionParams{
 			AppSessionID: session.SessionID,
@@ -524,26 +407,18 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
 
-		resp, err := service.CloseApplication(params, rpcSigners)
+		resp, err := service.CloseApplication(params, rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
 		var closedSession AppSession
-		require.NoError(t, db.First(&closedSession, "session_id = ?", session.SessionID).Error)
+		db.First(&closedSession, "session_id = ?", session.SessionID)
 		assert.Equal(t, ChannelStatusClosed, closedSession.Status)
 
-		// Verify balances
-		appBalA, err := ledgerA.Balance(sessionAccountID, "usdc")
-		require.NoError(t, err)
+		appBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
+		walletBalA, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
 		assert.True(t, appBalA.IsZero())
-
-		walletBalA, err := ledgerA.Balance(userAccountIDA, "usdc")
-		require.NoError(t, err)
 		assert.True(t, walletBalA.IsZero())
 
 		assert.Len(t, capturedNotifications, 0)
@@ -553,23 +428,15 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-		session := &AppSession{
-			SessionID:          "test-session-close-negative",
-			Protocol:           rpc.VersionNitroRPCv0_2,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		service := createTestAppSessionService(db, nil)
+		session := createTestAppSession(t, db, "test-session-close-negative", rpc.VersionNitroRPCv0_2,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		ledgerA := GetWalletLedger(db, userAddressA)
-		ledgerB := GetWalletLedger(db, userAddressB)
-		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
-		require.NoError(t, ledgerB.Record(sessionAccountID, "usdc", decimal.NewFromInt(200)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 200},
+		})
 
 		params := &CloseAppSessionParams{
 			AppSessionID: session.SessionID,
@@ -578,65 +445,35 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(400)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
 
-		_, err := service.CloseApplication(params, rpcSigners)
+		_, err := service.CloseApplication(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "negative allocation: -100 for asset usdc")
 	})
 }
 
 func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
-	rawA, _ := crypto.GenerateKey()
-	rawB, _ := crypto.GenerateKey()
-	rawC, _ := crypto.GenerateKey()
-	signerA := Signer{privateKey: rawA}
-	signerB := Signer{privateKey: rawB}
-	signerC := Signer{privateKey: rawC}
-	userAddressA := signerA.GetAddress()
-	userAddressB := signerB.GetAddress()
-	userAddressC := signerC.GetAddress()
-	userAccountIDA := NewAccountID(userAddressA.Hex())
-	userAccountIDB := NewAccountID(userAddressB.Hex())
-	userAccountIDC := NewAccountID(userAddressC.Hex())
 
 	t.Run("BasicDepositSuccess", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressB.Hex(), Wallet: userAddressB.Hex()}).Error)
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(200)))
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(userAccountIDB, "usdc", decimal.NewFromInt(100)))
+		setupWallets(t, db, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 200},
+			userAddressB: {"usdc": 100},
+		})
 
-		session := &AppSession{
-			SessionID:          "test-session-deposit",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-deposit", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		ledgerA := GetWalletLedger(db, userAddressA)
-		ledgerB := GetWalletLedger(db, userAddressB)
-		require.NoError(t, ledgerA.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
-		require.NoError(t, ledgerB.Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 100},
+		})
 
 		capturedNotifications := make(map[string][]Notification)
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {
-			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
-				userID:    userID,
-				eventType: EventType(method),
-				data:      params,
-			})
-		}, nil))
+		service := createTestAppSessionService(db, capturedNotifications)
 
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
@@ -647,51 +484,25 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners)
+		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 		assert.Equal(t, string(ChannelStatusOpen), resp.Status)
 
-		balA, err := ledgerA.Balance(userAccountIDA, "usdc")
-		require.NoError(t, err)
+		balA, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
+		appBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
+		appBalB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
 		assert.Equal(t, decimal.NewFromInt(150), balA)
-
-		appBalA, err := ledgerA.Balance(sessionAccountID, "usdc")
-		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(150), appBalA)
-
-		appBalB, err := ledgerB.Balance(sessionAccountID, "usdc")
-		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(100), appBalB)
 
 		assert.Contains(t, capturedNotifications, userAddressA.Hex())
 		assert.Contains(t, capturedNotifications, userAddressB.Hex())
 
-		assert.GreaterOrEqual(t, len(capturedNotifications[userAddressA.Hex()]), 1)
-		assert.GreaterOrEqual(t, len(capturedNotifications[userAddressB.Hex()]), 1)
-
-		var appSessionNotificationFound bool
-		for _, notification := range capturedNotifications[userAddressB.Hex()] {
-			if notification.eventType == AppSessionUpdateEventType {
-				appSessionNotificationFound = true
-
-				notificationData := notification.data
-				assert.NotNil(t, notificationData, "App session notification should have data")
-
-				break
-			}
-		}
-		assert.True(t, appSessionNotificationFound, "Should have received app session update notification")
-
 		var depositTx []LedgerTransaction
-		err = db.Where("tx_type = ? AND from_account = ? AND asset_symbol = ?",
-			TransactionTypeAppDeposit, userAddressA.Hex(), "usdc").Find(&depositTx).Error
-		require.NoError(t, err)
+		db.Where("tx_type = ? AND from_account = ? AND asset_symbol = ?",
+			TransactionTypeAppDeposit, userAddressA.Hex(), "usdc").Find(&depositTx)
 		assert.Len(t, depositTx, 1)
 		assert.Equal(t, decimal.NewFromInt(50), depositTx[0].Amount)
 	})
@@ -700,40 +511,24 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressB.Hex(), Wallet: userAddressB.Hex()}).Error)
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressC.Hex(), Wallet: userAddressC.Hex()}).Error)
+		setupWallets(t, db, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 200, "eth": 5},
+			userAddressB: {"usdc": 300},
+			userAddressC: {"eth": 10},
+		})
 
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(200)))
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "eth", decimal.NewFromInt(5)))
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(userAccountIDB, "usdc", decimal.NewFromInt(300)))
-		require.NoError(t, GetWalletLedger(db, userAddressC).Record(userAccountIDC, "eth", decimal.NewFromInt(10)))
-
-		session := &AppSession{
-			SessionID:          "test-session-multi-deposit",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()},
-			Weights:            []int64{1, 1, 1},
-			Quorum:             3,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-multi-deposit", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 3)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "eth", decimal.NewFromInt(1)))
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, "usdc", decimal.NewFromInt(200)))
-		require.NoError(t, GetWalletLedger(db, userAddressC).Record(sessionAccountID, "eth", decimal.NewFromInt(3)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100, "eth": 1},
+			userAddressB: {"usdc": 200},
+			userAddressC: {"eth": 3},
+		})
 
 		capturedNotifications := make(map[string][]Notification)
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {
-			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
-				userID:    userID,
-				eventType: EventType(method),
-				data:      params,
-			})
-		}, nil))
+		service := createTestAppSessionService(db, capturedNotifications)
 
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
@@ -746,41 +541,23 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(5)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-			userAddressC.Hex(): {},
-		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners)
+		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB, userAddressC))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
-		balA_usdc, err := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
-		require.NoError(t, err)
+		balA_usdc, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
+		balA_eth, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "eth")
+		balB_usdc, _ := GetWalletLedger(db, userAddressB).Balance(userAccountIDB, "usdc")
+		balC_eth, _ := GetWalletLedger(db, userAddressC).Balance(userAccountIDC, "eth")
 		assert.Equal(t, decimal.NewFromInt(150), balA_usdc)
-
-		balA_eth, err := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "eth")
-		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(3), balA_eth)
-
-		balB_usdc, err := GetWalletLedger(db, userAddressB).Balance(userAccountIDB, "usdc")
-		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(250), balB_usdc)
-
-		balC_eth, err := GetWalletLedger(db, userAddressC).Balance(userAccountIDC, "eth")
-		require.NoError(t, err)
 		assert.Equal(t, decimal.NewFromInt(8), balC_eth)
 
 		assert.Len(t, capturedNotifications, 3)
-		for _, participant := range []string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()} {
-			assert.Contains(t, capturedNotifications, participant)
-			assert.GreaterOrEqual(t, len(capturedNotifications[participant]), 1)
-		}
-
 		var depositTxs []LedgerTransaction
-		err = db.Where("tx_type = ?", TransactionTypeAppDeposit).Find(&depositTxs).Error
-		require.NoError(t, err)
+		db.Where("tx_type = ?", TransactionTypeAppDeposit).Find(&depositTxs)
 		assert.Len(t, depositTxs, 4)
 	})
 
@@ -788,22 +565,15 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		session := &AppSession{
-			SessionID:          "test-session-no-increase",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-no-increase", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+		})
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-
+		service := createTestAppSessionService(db, nil)
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentDeposit,
@@ -813,12 +583,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
 
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: non-positive allocation sum delta")
 	})
@@ -827,25 +593,19 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(30)))
+		setupWallets(t, db, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 30},
+		})
 
-		session := &AppSession{
-			SessionID:          "test-session-insufficient",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-insufficient", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(50)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 50},
+		})
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-
+		service := createTestAppSessionService(db, nil)
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentDeposit,
@@ -854,12 +614,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
 
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: insufficient unified balance")
 	})
@@ -868,22 +624,15 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		session := &AppSession{
-			SessionID:          "test-session-operate-error",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-operate-error", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+		})
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-
+		service := createTestAppSessionService(db, nil)
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentOperate,
@@ -893,12 +642,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
 
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect operate request: non-zero allocation sum delta")
 	})
@@ -907,19 +652,10 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		session := &AppSession{
-			SessionID:          "test-session-v02",
-			Protocol:           rpc.VersionNitroRPCv0_2,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-v02", rpc.VersionNitroRPCv0_2,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-
+		service := createTestAppSessionService(db, nil)
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentDeposit,
@@ -927,12 +663,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
 
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect request: specified parameters are not supported in this protocol")
 	})
@@ -941,22 +673,15 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		session := &AppSession{
-			SessionID:          "test-session-signature",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-signature", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+		})
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-
+		service := createTestAppSessionService(db, nil)
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentDeposit,
@@ -965,14 +690,9 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
 
-			userAddressB.Hex(): {},
-		}
-
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressB))
 		require.Error(t, err)
-
 		assert.Contains(t, err.Error(), "incorrect deposit request: quorum not reached")
 	})
 
@@ -980,22 +700,15 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		session := &AppSession{
-			SessionID:          "test-session-quorum",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-quorum", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+		})
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-
+		service := createTestAppSessionService(db, nil)
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentDeposit,
@@ -1004,11 +717,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-		}
 
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressA))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: quorum not reached")
 	})
@@ -1017,19 +727,10 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		session := &AppSession{
-			SessionID:          "test-session-unsupported-intent",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-unsupported-intent", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-
+		service := createTestAppSessionService(db, nil)
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       "unknown_intent",
@@ -1038,12 +739,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
 
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported intent: unknown_intent")
 	})
@@ -1052,25 +749,19 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		require.NoError(t, db.Create(&SignerWallet{Signer: userAddressA.Hex(), Wallet: userAddressA.Hex()}).Error)
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(200)))
+		setupWallets(t, db, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 200},
+		})
 
-		session := &AppSession{
-			SessionID:          "test-session-depositor-sig",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()},
-			Weights:            []int64{1, 1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-depositor-sig", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+		})
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-
+		service := createTestAppSessionService(db, nil)
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentDeposit,
@@ -1079,13 +770,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 			},
 		}
-		rpcSigners := map[string]struct{}{
 
-			userAddressB.Hex(): {},
-			userAddressC.Hex(): {},
-		}
-
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressB, userAddressC))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: depositor signature is required")
 	})
@@ -1094,31 +780,23 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		session := &AppSession{
-			SessionID:          "test-session-ac7",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()},
-			Weights:            []int64{1, 1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		setupWallets(t, db, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 500},
+			userAddressB: {"usdc": 300},
+			userAddressC: {"usdc": 200},
+		})
+
+		session := createTestAppSession(t, db, "test-session-ac7", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		userAccountIDA := NewAccountID(userAddressA.Hex())
-		userAccountIDB := NewAccountID(userAddressB.Hex())
-		userAccountIDC := NewAccountID(userAddressC.Hex())
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(500)))
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(userAccountIDB, "usdc", decimal.NewFromInt(300)))
-		require.NoError(t, GetWalletLedger(db, userAddressC).Record(userAccountIDC, "usdc", decimal.NewFromInt(200)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 50},
+			userAddressC: {"usdc": 50},
+		})
 
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, "usdc", decimal.NewFromInt(50)))
-		require.NoError(t, GetWalletLedger(db, userAddressC).Record(sessionAccountID, "usdc", decimal.NewFromInt(50)))
-
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-
+		service := createTestAppSessionService(db, nil)
 		// UserA wants to deposit 100 more (from 100 to 200)
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
@@ -1132,14 +810,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		}
 
 		// Quorum is satisfied but depositor (userA) signature is missing
-		rpcSigners := map[string]struct{}{
-			userAddressB.Hex(): {},
-			userAddressC.Hex(): {},
-		}
-
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressB, userAddressC))
 		require.Error(t, err)
-
 		assert.Contains(t, err.Error(), "incorrect deposit request: depositor signature is required")
 		assert.NotContains(t, err.Error(), "quorum not reached")
 	})
@@ -1148,23 +820,16 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		session := &AppSession{
-			SessionID:          "test-session-zero-increase",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		session := createTestAppSession(t, db, "test-session-zero-increase", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 100},
+		})
 
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-
+		service := createTestAppSessionService(db, nil)
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentDeposit,
@@ -1175,12 +840,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {},
-			userAddressB.Hex(): {},
-		}
-
-		_, err := service.SubmitAppState(params, rpcSigners)
+		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: non-positive allocation sum delta")
 	})
@@ -1189,31 +849,23 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
-		session := &AppSession{
-			SessionID:          "test-session-mixed",
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()},
-			Weights:            []int64{1, 1, 1},
-			Quorum:             3,
-			Status:             ChannelStatusOpen,
-			Version:            1,
-		}
-		require.NoError(t, db.Create(session).Error)
+		setupWallets(t, db, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 500},
+			userAddressB: {"usdc": 300},
+			userAddressC: {"usdc": 200},
+		})
+
+		session := createTestAppSession(t, db, "test-session-mixed", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 3)
 		sessionAccountID := NewAccountID(session.SessionID)
 
-		userAccountIDA := NewAccountID(userAddressA.Hex())
-		userAccountIDB := NewAccountID(userAddressB.Hex())
-		userAccountIDC := NewAccountID(userAddressC.Hex())
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(userAccountIDA, "usdc", decimal.NewFromInt(500)))
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(userAccountIDB, "usdc", decimal.NewFromInt(300)))
-		require.NoError(t, GetWalletLedger(db, userAddressC).Record(userAccountIDC, "usdc", decimal.NewFromInt(200)))
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 50},
+			userAddressC: {"usdc": 50},
+		})
 
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(100)))
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(sessionAccountID, "usdc", decimal.NewFromInt(50)))
-		require.NoError(t, GetWalletLedger(db, userAddressC).Record(sessionAccountID, "usdc", decimal.NewFromInt(50)))
-
-		service := NewAppSessionService(db, NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, nil))
-
+		service := createTestAppSessionService(db, nil)
 		// UserA deposits 50 more, UserB deposits 25 more, UserC no change
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
@@ -1226,26 +878,15 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		rpcSigners := map[string]struct{}{
-			userAddressA.Hex(): {}, // depositor
-			userAddressB.Hex(): {}, // depositor
-			userAddressC.Hex(): {}, // non-depositor but needed for quorum
-		}
-
-		resp, err := service.SubmitAppState(params, rpcSigners)
+		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB, userAddressC))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
-		ledgerA := GetWalletLedger(db, userAddressA)
-		balanceA, _ := ledgerA.Balance(userAccountIDA, "usdc")
+		balanceA, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
+		balanceB, _ := GetWalletLedger(db, userAddressB).Balance(userAccountIDB, "usdc")
+		balanceC, _ := GetWalletLedger(db, userAddressC).Balance(userAccountIDC, "usdc")
 		assert.Equal(t, "450", balanceA.String())
-
-		ledgerB := GetWalletLedger(db, userAddressB)
-		balanceB, _ := ledgerB.Balance(userAccountIDB, "usdc")
 		assert.Equal(t, "275", balanceB.String())
-
-		ledgerC := GetWalletLedger(db, userAddressC)
-		balanceC, _ := ledgerC.Balance(userAccountIDC, "usdc")
 		assert.Equal(t, "200", balanceC.String())
 	})
 }

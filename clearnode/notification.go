@@ -44,7 +44,7 @@ const (
 	BalanceUpdateEventType    EventType = "bu"
 	ChannelUpdateEventType    EventType = "cu"
 	TransferEventType         EventType = "tr"
-	AppSessionUpdateEventType EventType = "au"
+	AppSessionUpdateEventType EventType = "asu"
 )
 
 func (e EventType) String() string {

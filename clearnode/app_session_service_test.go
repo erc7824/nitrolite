@@ -386,7 +386,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		}
 
 		_, err := service.SubmitAppState(params, rpcSigners)
-		require.Equal(t, fmt.Sprintf("invalid version: expected %d, got %d", 2, params.Version), err.Error())
+		require.Equal(t, fmt.Sprintf("incorrect app state: incorrect version: expected %d, got %d", 2, params.Version), err.Error())
 	})
 }
 

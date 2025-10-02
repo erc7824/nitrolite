@@ -127,7 +127,7 @@ const (
 	// TransferEvent notifies clients of incoming transfers.
 	TransferEvent Event = "tr"
 	// AppSessionUpdateEvent notifies clients of app session state changes.
-	AppSessionUpdateEvent Event = "au"
+	AppSessionUpdateEvent Event = "asu"
 )
 
 // String returns the string representation of the event.
@@ -442,7 +442,7 @@ type TransferNotification struct {
 // AppSessionUpdateNotification is sent when an application session's state changes.
 // This includes session creation, state updates, and session closure.
 type AppSessionUpdateNotification struct {
-	AppSession
+	AppSession AppSession `json:"app_session"`
 	// ParticipantAllocations contains each participant's asset allocations
 	ParticipantAllocations map[string]map[string]decimal.Decimal `json:"participant_allocations"`
 }

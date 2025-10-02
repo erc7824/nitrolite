@@ -150,7 +150,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 		switch {
 		case appSession.Protocol == rpc.VersionNitroRPCv0_4:
 			if newVersion != params.Version {
-				return RPCErrorf("invalid version: expected %d, got %d", newVersion, params.Version)
+				return RPCErrorf("incorrect app state: incorrect version: expected %d, got %d", newVersion, params.Version)
 			}
 			switch params.Intent {
 			case rpc.AppSessionIntentDeposit:

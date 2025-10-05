@@ -15,6 +15,10 @@ import {
 } from '@erc7824/nitrolite';
 import { Hex } from 'viem';
 
+export function toRaw(amount: bigint, decimals: number = 6): bigint {
+    return amount * BigInt(10 ** decimals);
+}
+
 /**
  * Creates test channels with the specified deposit amount.
  */

@@ -4,17 +4,14 @@ import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import {
-    getGetLedgerBalancesPredicate,
     TestWebSocket,
     getResizeChannelPredicate,
     getCloseChannelPredicate,
 } from '@/ws';
 import {
     createCloseChannelMessage,
-    createGetLedgerBalancesMessage,
     createResizeChannelMessage,
     parseCloseChannelResponse,
-    parseGetLedgerBalancesResponse,
     parseResizeChannelResponse,
     RPCProtocolVersion,
 } from '@erc7824/nitrolite';
@@ -28,15 +25,17 @@ import {
     authenticateAppWithAllowances,
     createTestAppSession,
     getLedgerBalances,
+    toRaw,
 } from '@/testHelpers';
 import {
     submitAppStateUpdate_v02,
     closeAppSessionWithState,
 } from '@/testAppSessionHelpers';
 
-describe('Close channel', () => {
-    const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
-    const decimalDepositAmount = BigInt(100);
+describe('nitrorpc_v02 lifecycle', () => {
+    const onChainDepositAmount = BigInt(1000);
+
+    const appSessionDepositAmount = BigInt(100);
 
     let aliceWS: TestWebSocket;
     let alice: Identity;
@@ -113,17 +112,17 @@ describe('Close channel', () => {
     });
 
     it('should create and init two channels', async () => {
-        [aliceChannelId, bobChannelId] = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], depositAmount * BigInt(10)); // 10 times deposit for app session
+        [aliceChannelId, bobChannelId] = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], toRaw(onChainDepositAmount));
     });
 
     it('should create app session with allowance for participant to deposit', async () => {
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, decimalDepositAmount);
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, appSessionDepositAmount);
     });
 
     it('should take snapshot of ledger balances', async () => {
         const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
-        expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(10)).toString());
+        expect(ledgerBalances[0].amount).toBe((onChainDepositAmount).toString());
         expect(ledgerBalances[0].asset).toBe('USDC');
     });
 
@@ -133,7 +132,7 @@ describe('Close channel', () => {
             bobAppIdentity,
             aliceAppWS,
             RPCProtocolVersion.NitroRPC_0_2,
-            decimalDepositAmount,
+            appSessionDepositAmount,
             SESSION_DATA_WAITING
         );
     });
@@ -143,12 +142,12 @@ describe('Close channel', () => {
             {
                 participant: aliceAppIdentity.walletAddress,
                 asset: 'USDC',
-                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: 'USDC',
-                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
         ];
 
@@ -171,7 +170,7 @@ describe('Close channel', () => {
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: 'USDC',
-                amount: decimalDepositAmount.toString(),
+                amount: appSessionDepositAmount.toString(),
             },
         ];
 
@@ -188,14 +187,14 @@ describe('Close channel', () => {
     it('should update ledger balances for providing side', async () => {
         const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
-        expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(9)).toString()); // 1000 - 100
+        expect(ledgerBalances[0].amount).toBe((appSessionDepositAmount * BigInt(9)).toString()); // 1000 - 100
         expect(ledgerBalances[0].asset).toBe('USDC');
     });
 
     it('should update ledger balances for receiving side', async () => {
         const ledgerBalances = await getLedgerBalances(bobAppIdentity, bobWS);
         expect(ledgerBalances).toHaveLength(1);
-        expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(11)).toString()); // 1000 + 100
+        expect(ledgerBalances[0].amount).toBe((appSessionDepositAmount * BigInt(11)).toString()); // 1000 + 100
         expect(ledgerBalances[0].asset).toBe('USDC');
     });
 
@@ -223,13 +222,13 @@ describe('Close channel', () => {
         expect(closeReceipt).toBeDefined();
 
         const postCloseAccountBalance = await aliceClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(postCloseAccountBalance).toBe(depositAmount * BigInt(9)); // 1000 - 100
+        expect(postCloseAccountBalance).toBe(toRaw(onChainDepositAmount - appSessionDepositAmount)); // 1000 - 100
     });
 
     it('should resize channel by withdrawing received funds from app to channel', async () => {
         const msg = await createResizeChannelMessage(bob.messageSigner, {
             channel_id: bobChannelId,
-            allocate_amount: depositAmount,
+            allocate_amount: toRaw(appSessionDepositAmount),
             funds_destination: bob.walletAddress,
         });
 
@@ -240,7 +239,7 @@ describe('Close channel', () => {
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(bob.walletAddress);
         expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
-            (depositAmount * BigInt(11)).toString() // 1000 + 100
+            (toRaw(onChainDepositAmount + appSessionDepositAmount)).toString() // 1000 + 100
         );
         expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
@@ -264,7 +263,7 @@ describe('Close channel', () => {
                         {
                             destination: bob.walletAddress,
                             token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-                            amount: depositAmount * BigInt(10),
+                            amount: toRaw(onChainDepositAmount)
                         },
                         {
                             destination: CONFIG.ADDRESSES.GUEST_ADDRESS,
@@ -306,7 +305,7 @@ describe('Close channel', () => {
         expect(closeReceipt).toBeDefined();
 
         const postCloseAccountBalance = await bobClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(postCloseAccountBalance).toBe(depositAmount * BigInt(11)); // 1000 + 100
+        expect(postCloseAccountBalance).toBe(toRaw(onChainDepositAmount + appSessionDepositAmount)); // 1000 + 100
     });
 
     it('should withdraw funds from channel for providing side', async () => {
@@ -317,7 +316,7 @@ describe('Close channel', () => {
 
         const withdrawalTxHash = await aliceClient.withdrawal(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            depositAmount * BigInt(9)
+            toRaw(onChainDepositAmount - appSessionDepositAmount) // 1000 - 100
         );
         expect(withdrawalTxHash).toBeDefined();
 
@@ -328,7 +327,7 @@ describe('Close channel', () => {
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             alice.walletAddress
         );
-        expect(postWithdrawalBalance.rawBalance - preWithdrawalBalance.rawBalance).toBe(depositAmount * BigInt(9)); // + 900
+        expect(postWithdrawalBalance.rawBalance - preWithdrawalBalance.rawBalance).toBe(toRaw(onChainDepositAmount - appSessionDepositAmount)); // + 900
 
         const accountBalance = await aliceClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
         expect(accountBalance).toBe(BigInt(0));
@@ -342,7 +341,7 @@ describe('Close channel', () => {
 
         const withdrawalTxHash = await bobClient.withdrawal(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            depositAmount * BigInt(11)
+            toRaw(onChainDepositAmount + appSessionDepositAmount) // 1000 + 100
         );
         expect(withdrawalTxHash).toBeDefined();
 
@@ -353,7 +352,7 @@ describe('Close channel', () => {
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             bob.walletAddress
         );
-        expect(postWithdrawalBalance.rawBalance - preWithdrawalBalance.rawBalance).toBe(depositAmount * BigInt(11)); // + 1100
+        expect(postWithdrawalBalance.rawBalance - preWithdrawalBalance.rawBalance).toBe(toRaw(onChainDepositAmount + appSessionDepositAmount)); // + 1100
 
         const accountBalance = await bobClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
         expect(accountBalance).toBe(BigInt(0));

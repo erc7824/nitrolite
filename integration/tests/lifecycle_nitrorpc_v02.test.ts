@@ -194,7 +194,7 @@ describe('Close channel', () => {
         appWS.close();
         cpWS.close();
 
-        await databaseUtils.cleanupDatabaseData();
+        await databaseUtils.resetClearnodeState();
         await blockUtils.resetSnapshot();
 
         await databaseUtils.close();

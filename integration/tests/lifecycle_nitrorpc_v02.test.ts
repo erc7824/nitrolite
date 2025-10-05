@@ -27,11 +27,12 @@ import {
     createTestChannels,
     authenticateAppWithAllowances,
     createTestAppSession,
+    getLedgerBalances,
 } from '@/testHelpers';
 import {
     submitAppStateUpdate_v02,
     closeAppSessionWithState,
-} from '@/appSessionHelpers';
+} from '@/testAppSessionHelpers';
 
 describe('Close channel', () => {
     const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
@@ -120,20 +121,7 @@ describe('Close channel', () => {
     });
 
     it('should take snapshot of ledger balances', async () => {
-        const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
-            aliceAppIdentity.messageSigner,
-            aliceAppIdentity.walletAddress
-        );
-        const getLedgerBalancesResponse = await aliceAppWS.sendAndWaitForResponse(
-            getLedgerBalancesMsg,
-            getGetLedgerBalancesPredicate(),
-            1000
-        );
-
-        const getLedgerBalancesParsedResponse = parseGetLedgerBalancesResponse(getLedgerBalancesResponse);
-        expect(getLedgerBalancesParsedResponse).toBeDefined();
-
-        const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
+        const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(10)).toString());
         expect(ledgerBalances[0].asset).toBe('USDC');
@@ -198,40 +186,14 @@ describe('Close channel', () => {
     });
 
     it('should update ledger balances for providing side', async () => {
-        const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
-            alice.messageSigner,
-            alice.walletAddress
-        );
-        const getLedgerBalancesResponse = await aliceWS.sendAndWaitForResponse(
-            getLedgerBalancesMsg,
-            getGetLedgerBalancesPredicate(),
-            1000
-        );
-
-        const getLedgerBalancesParsedResponse = parseGetLedgerBalancesResponse(getLedgerBalancesResponse);
-        expect(getLedgerBalancesParsedResponse).toBeDefined();
-
-        const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
+        const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(9)).toString()); // 1000 - 100
         expect(ledgerBalances[0].asset).toBe('USDC');
     });
 
     it('should update ledger balances for receiving side', async () => {
-        const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
-            bob.messageSigner,
-            bob.walletAddress
-        );
-        const getLedgerBalancesResponse = await bobWS.sendAndWaitForResponse(
-            getLedgerBalancesMsg,
-            getGetLedgerBalancesPredicate(),
-            1000
-        );
-
-        const getLedgerBalancesParsedResponse = parseGetLedgerBalancesResponse(getLedgerBalancesResponse);
-        expect(getLedgerBalancesParsedResponse).toBeDefined();
-
-        const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
+        const ledgerBalances = await getLedgerBalances(bobAppIdentity, bobWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(11)).toString()); // 1000 + 100
         expect(ledgerBalances[0].asset).toBe('USDC');

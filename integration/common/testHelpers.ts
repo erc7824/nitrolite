@@ -1,7 +1,7 @@
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
-import { TestWebSocket, getCreateAppSessionPredicate } from '@/ws';
+import { TestWebSocket, getCreateAppSessionPredicate, getGetLedgerBalancesPredicate } from '@/ws';
 import { createAuthSessionWithClearnode } from '@/auth';
 import {
     RPCAppDefinition,
@@ -9,6 +9,9 @@ import {
     createAppSessionMessage,
     parseCreateAppSessionResponse,
     RPCChannelStatus,
+    createGetLedgerBalancesMessage,
+    parseGetLedgerBalancesResponse,
+    RPCBalance,
 } from '@erc7824/nitrolite';
 import { Hex } from 'viem';
 
@@ -113,4 +116,26 @@ export async function createTestAppSession(
     expect(createAppSessionParsedResponse.params.version).toBeDefined();
 
     return createAppSessionParsedResponse.params.appSessionId;
+}
+
+/**
+ * Fetches and returns ledger balances for the given app identity.
+ * Expects at least one balance to exist.
+ * Returns an array of balances.
+ * */
+export async function getLedgerBalances(appIdentity: Identity, appWS: TestWebSocket): Promise<RPCBalance[]> {
+    const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
+        appIdentity.messageSigner,
+        appIdentity.walletAddress
+    );
+    const getLedgerBalancesResponse = await appWS.sendAndWaitForResponse(
+        getLedgerBalancesMsg,
+        getGetLedgerBalancesPredicate(),
+        1000
+    );
+
+    const getLedgerBalancesParsedResponse = parseGetLedgerBalancesResponse(getLedgerBalancesResponse);
+    expect(getLedgerBalancesParsedResponse).toBeDefined();
+
+    return getLedgerBalancesParsedResponse.params.ledgerBalances;
 }

@@ -9,6 +9,12 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	ErrGetAccountBalance        = "failed to get account balance"
+	ErrDebitSourceAccount       = "failed to debit source account"
+	ErrCreditDestinationAccount = "failed to credit destination account"
+)
+
 // Entry represents a ledger entry in the database
 type Entry struct {
 	ID          uint            `gorm:"primaryKey"`

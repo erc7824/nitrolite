@@ -185,7 +185,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		_, err := service.CreateApplication(params, rpcSigners(userAddressA))
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "negative allocation")
+		assert.Contains(t, err.Error(), ErrNegativeAllocation)
 	})
 
 	t.Run("ErrorChallengedChannel", func(t *testing.T) {
@@ -272,7 +272,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 
 		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "negative allocation: -50 for asset usdc")
+		assert.Contains(t, err.Error(), ErrNegativeAllocation)
 	})
 
 	t.Run("NitroRPCv0.4_OperateSuccess", func(t *testing.T) {
@@ -1110,6 +1110,6 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 
 		_, err := service.CloseApplication(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "negative allocation: -100 for asset usdc")
+		assert.Contains(t, err.Error(), ErrNegativeAllocation)
 	})
 }

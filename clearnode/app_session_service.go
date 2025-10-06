@@ -13,6 +13,11 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 )
 
+const (
+	ErrNegativeAllocation = "negative allocation"
+	ErrRecordTransaction  = "failed to record transaction"
+)
+
 // AppSessionService handles the business logic for app sessions.
 type AppSessionService struct {
 	db         *gorm.DB
@@ -55,7 +60,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 				}
 			}
 			if alloc.Amount.IsNegative() {
-				return RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+				return RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 			walletAddress := alloc.ParticipantWallet
 			if wallet := GetWalletBySigner(alloc.ParticipantWallet); wallet != "" {
@@ -71,7 +76,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			ledger := GetWalletLedger(tx, userAddress)
 			balance, err := ledger.Balance(userAccountID, alloc.AssetSymbol)
 			if err != nil {
-				return RPCErrorf("failed to get participant balance: %w", err)
+				return RPCErrorf(ErrGetAccountBalance+": %w", err)
 			}
 
 			if alloc.Amount.GreaterThan(balance) {
@@ -79,14 +84,14 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			}
 
 			if err = ledger.Record(userAccountID, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
-				return RPCErrorf("failed to debit source account: %w", err)
+				return RPCErrorf(ErrDebitSourceAccount+": %w", err)
 			}
 			if err = ledger.Record(sessionAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return RPCErrorf("failed to credit destination account: %w", err)
+				return RPCErrorf(ErrCreditDestinationAccount+": %w", err)
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppDeposit, userAccountID, sessionAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
-				return RPCErrorf("failed to record transaction: %w", err)
+				return RPCErrorf(ErrRecordTransaction+": %w", err)
 			}
 			participantsWithUpdatedBalance[walletAddress] = true
 		}
@@ -254,7 +259,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 		allocationSum := map[string]decimal.Decimal{}
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsNegative() {
-				return RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+				return RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 
 			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
@@ -276,14 +281,14 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 
 			// Debit session, credit participant
 			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, balance.Neg()); err != nil {
-				return RPCErrorf("failed to debit session: %w", err)
+				return RPCErrorf(ErrDebitSourceAccount+": %w", err)
 			}
 			if err := ledger.Record(userAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return RPCErrorf("failed to credit participant: %w", err)
+				return RPCErrorf(ErrCreditDestinationAccount+": %w", err)
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppWithdrawal, sessionAccountID, userAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
-				return RPCErrorf("failed to record transaction: %w", err)
+				return RPCErrorf(ErrRecordTransaction+": %w", err)
 			}
 
 			if !alloc.Amount.IsZero() {
@@ -380,7 +385,7 @@ func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppSt
 	allocationSum := map[string]decimal.Decimal{}
 	for _, alloc := range params.Allocations {
 		if alloc.Amount.IsNegative() {
-			return RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+			return RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 		}
 
 		walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
@@ -396,7 +401,7 @@ func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppSt
 		ledger := GetWalletLedger(tx, userAddress)
 		balance, err := ledger.Balance(sessionAccountID, alloc.AssetSymbol)
 		if err != nil {
-			return RPCErrorf("failed to get session balance for asset %s", alloc.AssetSymbol)
+			return RPCErrorf(ErrGetAccountBalance+": %w", err)
 		}
 
 		diff := alloc.Amount.Sub(balance)
@@ -418,7 +423,7 @@ func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppSt
 }
 
 func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSession, params *SubmitAppStateParams, rpcSigners map[string]struct{}, sessionAccountID AccountID) (map[string]bool, error) {
-	participants := make(map[string]bool)
+	participantsWithUpdatedBalance := make(map[string]bool)
 
 	currentAllocations, err := getParticipantAllocations(tx, appSession, sessionAccountID)
 	if err != nil {
@@ -436,7 +441,7 @@ func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSessi
 		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
 		if alloc.Amount.GreaterThan(currentAmount) {
 			if alloc.Amount.IsNegative() {
-				return nil, RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+				return nil, RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 			depositAmount := alloc.Amount.Sub(currentAmount)
 			noDeposits = false
@@ -450,7 +455,7 @@ func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSessi
 			ledger := GetWalletLedger(tx, userAddress)
 			balance, err := ledger.Balance(userAccountID, alloc.AssetSymbol)
 			if err != nil {
-				return nil, RPCErrorf("failed to get participant balance: %w", err)
+				return nil, RPCErrorf(ErrGetAccountBalance+": %w", err)
 			}
 
 			if depositAmount.GreaterThan(balance) {
@@ -458,17 +463,17 @@ func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSessi
 			}
 
 			if err := ledger.Record(userAccountID, alloc.AssetSymbol, depositAmount.Neg()); err != nil {
-				return nil, RPCErrorf("failed to debit source account: %w", err)
+				return nil, RPCErrorf(ErrDebitSourceAccount+": %w", err)
 			}
 			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, depositAmount); err != nil {
-				return nil, RPCErrorf("failed to credit destination account: %w", err)
+				return nil, RPCErrorf(ErrCreditDestinationAccount+": %w", err)
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppDeposit, userAccountID, sessionAccountID, alloc.AssetSymbol, depositAmount)
 			if err != nil {
-				return nil, RPCErrorf("failed to record transaction: %w", err)
+				return nil, RPCErrorf(ErrRecordTransaction+": %w", err)
 			}
 
-			participants[walletAddress] = true
+			participantsWithUpdatedBalance[walletAddress] = true
 		} else if alloc.Amount.LessThan(currentAmount) {
 			return nil, RPCErrorf("incorrect deposit request: decreased allocation for participant %s", walletAddress)
 		}
@@ -478,11 +483,11 @@ func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSessi
 		return nil, RPCErrorf("incorrect deposit request: non-positive allocations sum delta")
 	}
 
-	return participants, nil
+	return participantsWithUpdatedBalance, nil
 }
 
 func (s *AppSessionService) handleWithdrawIntent(tx *gorm.DB, appSession AppSession, params *SubmitAppStateParams, sessionAccountID AccountID) (map[string]bool, error) {
-	participants := make(map[string]bool)
+	participantsWithUpdatedBalance := make(map[string]bool)
 
 	currentAllocations, err := getParticipantAllocations(tx, appSession, sessionAccountID)
 	if err != nil {
@@ -511,17 +516,17 @@ func (s *AppSessionService) handleWithdrawIntent(tx *gorm.DB, appSession AppSess
 			ledger := GetWalletLedger(tx, userAddress)
 
 			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, withdrawalAmount.Neg()); err != nil {
-				return nil, RPCErrorf("failed to debit session account: %w", err)
+				return nil, RPCErrorf(ErrDebitSourceAccount+": %w", err)
 			}
 			if err := ledger.Record(userAccountID, alloc.AssetSymbol, withdrawalAmount); err != nil {
-				return nil, RPCErrorf("failed to credit user account: %w", err)
+				return nil, RPCErrorf(ErrCreditDestinationAccount+": %w", err)
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppWithdrawal, sessionAccountID, userAccountID, alloc.AssetSymbol, withdrawalAmount)
 			if err != nil {
-				return nil, RPCErrorf("failed to record transaction: %w", err)
+				return nil, RPCErrorf(ErrRecordTransaction+": %w", err)
 			}
 
-			participants[walletAddress] = true
+			participantsWithUpdatedBalance[walletAddress] = true
 		} else if alloc.Amount.GreaterThan(currentAmount) {
 			return nil, RPCErrorf("incorrect withdrawal request: increased allocation for participant %s", walletAddress)
 		}
@@ -531,7 +536,7 @@ func (s *AppSessionService) handleWithdrawIntent(tx *gorm.DB, appSession AppSess
 		return nil, RPCErrorf("incorrect withdrawal request: non-negative allocation sum delta")
 	}
 
-	return participants, nil
+	return participantsWithUpdatedBalance, nil
 }
 
 // validateAppParticipant checks if wallet exists in participant weights

@@ -155,8 +155,8 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 	ledger := GetWalletLedger(s.db, common.HexToAddress(channel.Wallet))
 	balance, err := ledger.Balance(NewAccountID(channel.Wallet), asset.Symbol)
 	if err != nil {
-		logger.Error("failed to get participant balance", "error", err)
-		return ChannelOperationResponse{}, RPCErrorf("failed to get participant balance for asset %s", asset.Symbol)
+		logger.Error(ErrGetAccountBalance, "error", err)
+		return ChannelOperationResponse{}, RPCErrorf(ErrGetAccountBalance+" for asset %s", asset.Symbol)
 	}
 
 	rawBalance := balance.Shift(int32(asset.Decimals))
@@ -252,8 +252,8 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 	ledger := GetWalletLedger(s.db, common.HexToAddress(channel.Wallet))
 	balance, err := ledger.Balance(NewAccountID(channel.Wallet), asset.Symbol)
 	if err != nil {
-		logger.Error("failed to get participant balance", "error", err)
-		return ChannelOperationResponse{}, RPCErrorf("failed to get participant balance for asset %s", asset.Symbol)
+		logger.Error(ErrGetAccountBalance, "error", err)
+		return ChannelOperationResponse{}, RPCErrorf(ErrGetAccountBalance+" for asset %s", asset.Symbol)
 	}
 	if balance.IsNegative() {
 		logger.Error("negative balance", "balance", balance.String())

@@ -5,6 +5,7 @@ import (
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/lib/pq"
+	"gorm.io/gorm"
 )
 
 // AppSession represents a virtual payment application session between participants
@@ -26,4 +27,13 @@ type AppSession struct {
 
 func (AppSession) TableName() string {
 	return "app_sessions"
+}
+
+func getAppSession(tx *gorm.DB, sessionID, status string) (*AppSession, error) {
+	var appSession AppSession
+	if err := tx.Where("session_id = ? AND status = ?", sessionID, status).
+		Order("nonce DESC").First(&appSession).Error; err != nil {
+		return nil, err
+	}
+	return &appSession, nil
 }

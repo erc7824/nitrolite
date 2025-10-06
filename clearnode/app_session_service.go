@@ -21,50 +21,42 @@ const (
 // UpdateResult represents the result of an app session update operation.
 type UpdateResult struct {
 	ParticipantsAffected map[string]bool
-	UpdatedAppSession    AppSession
+	UpdatedAppSession    *AppSession
 }
 
 // AppSessionUpdater defines the interface for handling different app session update intents.
 type AppSessionUpdater interface {
 	Update(ctx context.Context, tx *gorm.DB) (UpdateResult, error)
-	GetAppSession() AppSession
 }
 
 // DepositUpdater handles deposit intent updates.
 type DepositUpdater struct {
-	appSession         AppSession
-	params             *SubmitAppStateParams
-	participantWeights map[string]int64
-	rpcSigners         map[string]struct{}
+	appSession *AppSession
+	params     *SubmitAppStateParams
+	rpcSigners map[string]struct{}
 }
 
 // NewDepositUpdater creates a new DepositUpdater.
-func NewDepositUpdater(ctx context.Context, tx *gorm.DB, params *SubmitAppStateParams, rpcSigners map[string]struct{}) (*DepositUpdater, error) {
-	appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners, params.Intent)
-	if err != nil {
-		return nil, err
-	}
-
+func NewDepositUpdater(params *SubmitAppStateParams, appSession *AppSession, rpcSigners map[string]struct{}) (*DepositUpdater, error) {
 	return &DepositUpdater{
-		appSession:         appSession,
-		params:             params,
-		participantWeights: participantWeights,
-		rpcSigners:         rpcSigners,
+		appSession: appSession,
+		params:     params,
+		rpcSigners: rpcSigners,
 	}, nil
-}
-
-// GetAppSession returns the app session.
-func (d *DepositUpdater) GetAppSession() AppSession {
-	return d.appSession
 }
 
 // Update implements the AppSessionUpdater interface for deposit intents.
 func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult, error) {
+	participantWeights, err := verifyQuorum(d.appSession, d.rpcSigners, d.params.Intent)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+
 	sessionAccountID := NewAccountID(d.params.AppSessionID)
 
 	participantsWithUpdatedBalance := make(map[string]bool)
 
-	currentAllocations, err := getParticipantAllocations(tx, d.appSession, sessionAccountID)
+	currentAllocations, err := getParticipantAllocations(tx, *d.appSession, sessionAccountID)
 	if err != nil {
 		return UpdateResult{}, RPCErrorf("failed to get current allocations: %w", err)
 	}
@@ -83,7 +75,7 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 				return UpdateResult{}, RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 
-			if err := validateAppParticipant(walletAddress, d.participantWeights); err != nil {
+			if err := validateAppParticipant(walletAddress, participantWeights); err != nil {
 				return UpdateResult{}, err
 			}
 
@@ -137,38 +129,31 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 
 // WithdrawUpdater handles withdraw intent updates.
 type WithdrawUpdater struct {
-	appSession         AppSession
-	params             *SubmitAppStateParams
-	participantWeights map[string]int64
-	rpcSigners         map[string]struct{}
+	appSession *AppSession
+	params     *SubmitAppStateParams
+	rpcSigners map[string]struct{}
 }
 
 // NewWithdrawUpdater creates a new WithdrawUpdater.
-func NewWithdrawUpdater(ctx context.Context, tx *gorm.DB, params *SubmitAppStateParams, rpcSigners map[string]struct{}) (*WithdrawUpdater, error) {
-	appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners, params.Intent)
-	if err != nil {
-		return nil, err
-	}
-
+func NewWithdrawUpdater(params *SubmitAppStateParams, appSession *AppSession, rpcSigners map[string]struct{}) (*WithdrawUpdater, error) {
 	return &WithdrawUpdater{
-		appSession:         appSession,
-		params:             params,
-		participantWeights: participantWeights,
-		rpcSigners:         rpcSigners,
+		appSession: appSession,
+		params:     params,
+		rpcSigners: rpcSigners,
 	}, nil
-}
-
-// GetAppSession returns the app session.
-func (w *WithdrawUpdater) GetAppSession() AppSession {
-	return w.appSession
 }
 
 // Update implements the AppSessionUpdater interface for withdraw intents.
 func (w *WithdrawUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult, error) {
+	_, err := verifyQuorum(w.appSession, w.rpcSigners, w.params.Intent)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+
 	sessionAccountID := NewAccountID(w.params.AppSessionID)
 	participantsWithUpdatedBalance := make(map[string]bool)
 
-	currentAllocations, err := getParticipantAllocations(tx, w.appSession, sessionAccountID)
+	currentAllocations, err := getParticipantAllocations(tx, *w.appSession, sessionAccountID)
 	if err != nil {
 		return UpdateResult{}, RPCErrorf("failed to get current allocations: %w", err)
 	}
@@ -225,34 +210,27 @@ func (w *WithdrawUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult
 
 // OperateUpdater handles operate intent updates.
 type OperateUpdater struct {
-	appSession         AppSession
-	params             *SubmitAppStateParams
-	participantWeights map[string]int64
-	rpcSigners         map[string]struct{}
+	appSession *AppSession
+	params     *SubmitAppStateParams
+	rpcSigners map[string]struct{}
 }
 
 // NewOperateUpdater creates a new OperateUpdater.
-func NewOperateUpdater(ctx context.Context, tx *gorm.DB, params *SubmitAppStateParams, rpcSigners map[string]struct{}) (*OperateUpdater, error) {
-	appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners, params.Intent)
-	if err != nil {
-		return nil, err
-	}
-
+func NewOperateUpdater(params *SubmitAppStateParams, appSession *AppSession, rpcSigners map[string]struct{}) (*OperateUpdater, error) {
 	return &OperateUpdater{
-		appSession:         appSession,
-		params:             params,
-		participantWeights: participantWeights,
-		rpcSigners:         rpcSigners,
+		appSession: appSession,
+		params:     params,
+		rpcSigners: rpcSigners,
 	}, nil
-}
-
-// GetAppSession returns the app session.
-func (o *OperateUpdater) GetAppSession() AppSession {
-	return o.appSession
 }
 
 // Update implements the AppSessionUpdater interface for operate intents.
 func (o *OperateUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult, error) {
+	participantWeights, err := verifyQuorum(o.appSession, o.rpcSigners, o.params.Intent)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+
 	sessionAccountID := NewAccountID(o.params.AppSessionID)
 	appSessionBalance, err := getAppSessionBalances(tx, sessionAccountID)
 	if err != nil {
@@ -270,7 +248,7 @@ func (o *OperateUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 			walletAddress = alloc.ParticipantWallet
 		}
 
-		if err := validateAppParticipant(walletAddress, o.participantWeights); err != nil {
+		if err := validateAppParticipant(walletAddress, participantWeights); err != nil {
 			return UpdateResult{}, err
 		}
 
@@ -430,22 +408,10 @@ func (s *AppSessionService) SubmitAppState(ctx context.Context, params *SubmitAp
 		var updater AppSessionUpdater
 		var err error
 
-		switch params.Intent {
-		case rpc.AppSessionIntentDeposit:
-			updater, err = NewDepositUpdater(ctx, tx, params, rpcSigners)
-		case rpc.AppSessionIntentWithdraw:
-			updater, err = NewWithdrawUpdater(ctx, tx, params, rpcSigners)
-		case rpc.AppSessionIntentOperate:
-			updater, err = NewOperateUpdater(ctx, tx, params, rpcSigners)
-		case "":
-			updater, err = NewOperateUpdater(ctx, tx, params, rpcSigners)
-		default:
-			return RPCErrorf("incorrect app state: unsupported intent: %s", params.Intent)
-		}
+		appSession, err := getAppSession(tx, params.AppSessionID, "open")
 		if err != nil {
-			return err
+			return RPCErrorf("an open app session not found: %w", err)
 		}
-		appSession := updater.GetAppSession()
 
 		// Protocol-specific validation
 		switch appSession.Protocol {
@@ -461,12 +427,29 @@ func (s *AppSessionService) SubmitAppState(ctx context.Context, params *SubmitAp
 			return RPCErrorf("incorrect app state: unsupported protocol: %s", appSession.Protocol)
 		}
 
+		switch params.Intent {
+		case rpc.AppSessionIntentDeposit:
+			updater, err = NewDepositUpdater(params, appSession, rpcSigners)
+		case rpc.AppSessionIntentWithdraw:
+			updater, err = NewWithdrawUpdater(params, appSession, rpcSigners)
+		case rpc.AppSessionIntentOperate:
+			updater, err = NewOperateUpdater(params, appSession, rpcSigners)
+		case "":
+			updater, err = NewOperateUpdater(params, appSession, rpcSigners)
+		default:
+			return RPCErrorf("incorrect app state: unsupported intent: %s", params.Intent)
+		}
+		if err != nil {
+			return err
+		}
+
 		result, err := updater.Update(ctx, tx)
 		if err != nil {
 			return err
 		}
+
 		participants = result.ParticipantsAffected
-		updatedAppSession = result.UpdatedAppSession
+		updatedAppSession = *result.UpdatedAppSession
 
 		if params.SessionData != nil {
 			updatedAppSession.SessionData = *params.SessionData
@@ -515,15 +498,20 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 	participantsWithUpdatedBalance := make(map[string]bool)
 	var newVersion uint64
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners, "")
+		session, err := getAppSession(tx, params.AppSessionID, "open")
+		if err != nil {
+			return RPCErrorf("an open app session not found: %w", err)
+		}
+
+		participantWeights, err := verifyQuorum(session, rpcSigners, "")
 		if err != nil {
 			return err
 		}
-		sessionAccountID := NewAccountID(appSession.SessionID)
+		sessionAccountID := NewAccountID(session.SessionID)
 
 		appSessionBalance, err := getAppSessionBalances(tx, sessionAccountID)
 		if err != nil {
-			return err
+			return RPCErrorf("failed to get app session balances: %w", err)
 		}
 
 		allocationSum := map[string]decimal.Decimal{}
@@ -571,7 +559,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 			return err
 		}
 
-		newVersion = appSession.Version + 1
+		newVersion = session.Version + 1
 		updates := map[string]any{
 			"status":  ChannelStatusClosed,
 			"version": newVersion,
@@ -580,7 +568,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 			updates["session_data"] = *params.SessionData
 		}
 
-		return tx.Model(&appSession).Updates(updates).Error
+		return tx.Model(&session).Updates(updates).Error
 	})
 
 	if err != nil {
@@ -659,13 +647,7 @@ func validateAppParticipant(walletAddress string, participantWeights map[string]
 	return nil
 }
 
-func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct{}, intent rpc.AppSessionIntent) (AppSession, map[string]int64, error) {
-	var session AppSession
-	if err := tx.Where("session_id = ? AND status = ?", appSessionID, ChannelStatusOpen).
-		Order("nonce DESC").First(&session).Error; err != nil {
-		return AppSession{}, nil, RPCErrorf("the app session %s is not open", appSessionID)
-	}
-
+func verifyQuorum(session *AppSession, rpcSigners map[string]struct{}, intent rpc.AppSessionIntent) (map[string]int64, error) {
 	participantWeights := make(map[string]int64, len(session.ParticipantWallets))
 	for i, addr := range session.ParticipantWallets {
 		participantWeights[addr] = session.Weights[i]
@@ -675,7 +657,7 @@ func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct
 	for wallet := range rpcSigners {
 		weight, ok := participantWeights[wallet]
 		if !ok {
-			return AppSession{}, nil, RPCErrorf("signature from unknown participant wallet %s", wallet)
+			return nil, RPCErrorf("signature from unknown participant wallet %s", wallet)
 		}
 		totalWeight += weight
 	}
@@ -684,16 +666,16 @@ func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct
 		err := fmt.Sprintf("quorum not reached: %d / %d", totalWeight, session.Quorum)
 		switch intent {
 		case rpc.AppSessionIntentDeposit:
-			return AppSession{}, nil, RPCErrorf("incorrect deposit request: %s", err)
+			return nil, RPCErrorf("incorrect deposit request: %s", err)
 		case rpc.AppSessionIntentWithdraw:
-			return AppSession{}, nil, RPCErrorf("incorrect withdrawal request: %s", err)
+			return nil, RPCErrorf("incorrect withdrawal request: %s", err)
 		default:
-			return AppSession{}, nil, RPCErrorf("incorrect submit_state request: %s", err)
+			return nil, RPCErrorf("incorrect submit_state request: %s", err)
 		}
 
 	}
 
-	return session, participantWeights, nil
+	return participantWeights, nil
 }
 
 // prepareAppAllocations converts map format to AppAllocation slice for notifications

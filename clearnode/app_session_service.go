@@ -13,6 +13,277 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 )
 
+const (
+	ErrNegativeAllocation = "negative allocation"
+	ErrRecordTransaction  = "failed to record transaction"
+)
+
+// UpdateResult represents the result of an app session update operation.
+type UpdateResult struct {
+	ParticipantsAffected map[string]bool
+	UpdatedAppSession    *AppSession
+}
+
+// AppSessionUpdater defines the interface for handling different app session update intents.
+type AppSessionUpdater interface {
+	Update(ctx context.Context, tx *gorm.DB) (UpdateResult, error)
+}
+
+// DepositUpdater handles deposit intent updates.
+type DepositUpdater struct {
+	appSession *AppSession
+	params     *SubmitAppStateParams
+	rpcSigners map[string]struct{}
+}
+
+// NewDepositUpdater creates a new DepositUpdater.
+func NewDepositUpdater(params *SubmitAppStateParams, appSession *AppSession, rpcSigners map[string]struct{}) (*DepositUpdater, error) {
+	return &DepositUpdater{
+		appSession: appSession,
+		params:     params,
+		rpcSigners: rpcSigners,
+	}, nil
+}
+
+// Update implements the AppSessionUpdater interface for deposit intents.
+func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult, error) {
+	participantWeights, err := verifyQuorum(d.appSession, d.rpcSigners, d.params.Intent)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+
+	sessionAccountID := NewAccountID(d.params.AppSessionID)
+
+	participantsWithUpdatedBalance := make(map[string]bool)
+
+	currentAllocations, err := getParticipantAllocations(tx, *d.appSession, sessionAccountID)
+	if err != nil {
+		return UpdateResult{}, RPCErrorf("failed to get current allocations: %w", err)
+	}
+
+	noDeposits := true
+
+	for _, alloc := range d.params.Allocations {
+		walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
+		if walletAddress == "" {
+			walletAddress = alloc.ParticipantWallet
+		}
+
+		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
+		if alloc.Amount.GreaterThan(currentAmount) {
+			if alloc.Amount.IsNegative() {
+				return UpdateResult{}, RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+			}
+
+			if err := validateAppParticipant(walletAddress, participantWeights); err != nil {
+				return UpdateResult{}, err
+			}
+
+			depositAmount := alloc.Amount.Sub(currentAmount)
+			noDeposits = false
+
+			if _, ok := d.rpcSigners[alloc.ParticipantWallet]; !ok {
+				return UpdateResult{}, RPCErrorf("incorrect deposit request: depositor signature is required")
+			}
+
+			userAddress := common.HexToAddress(walletAddress)
+			userAccountID := NewAccountID(walletAddress)
+			ledger := GetWalletLedger(tx, userAddress)
+			balance, err := ledger.Balance(userAccountID, alloc.AssetSymbol)
+			if err != nil {
+				return UpdateResult{}, RPCErrorf(ErrGetAccountBalance+": %w", err)
+			}
+
+			if depositAmount.GreaterThan(balance) {
+				return UpdateResult{}, RPCErrorf("incorrect deposit request: insufficient unified balance")
+			}
+
+			if err := ledger.Record(userAccountID, alloc.AssetSymbol, depositAmount.Neg()); err != nil {
+				return UpdateResult{}, RPCErrorf(ErrDebitSourceAccount+": %w", err)
+			}
+			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, depositAmount); err != nil {
+				return UpdateResult{}, RPCErrorf(ErrCreditDestinationAccount+": %w", err)
+			}
+			_, err = RecordLedgerTransaction(tx, TransactionTypeAppDeposit, userAccountID, sessionAccountID, alloc.AssetSymbol, depositAmount)
+			if err != nil {
+				return UpdateResult{}, RPCErrorf(ErrRecordTransaction+": %w", err)
+			}
+
+			participantsWithUpdatedBalance[walletAddress] = true
+		} else if alloc.Amount.LessThan(currentAmount) {
+			return UpdateResult{}, RPCErrorf("incorrect deposit request: decreased allocation for participant %s", walletAddress)
+		}
+	}
+
+	if noDeposits {
+		return UpdateResult{}, RPCErrorf("incorrect deposit request: non-positive allocations sum delta")
+	}
+
+	d.appSession.Version++
+
+	return UpdateResult{
+		ParticipantsAffected: participantsWithUpdatedBalance,
+		UpdatedAppSession:    d.appSession,
+	}, nil
+}
+
+// WithdrawUpdater handles withdraw intent updates.
+type WithdrawUpdater struct {
+	appSession *AppSession
+	params     *SubmitAppStateParams
+	rpcSigners map[string]struct{}
+}
+
+// NewWithdrawUpdater creates a new WithdrawUpdater.
+func NewWithdrawUpdater(params *SubmitAppStateParams, appSession *AppSession, rpcSigners map[string]struct{}) (*WithdrawUpdater, error) {
+	return &WithdrawUpdater{
+		appSession: appSession,
+		params:     params,
+		rpcSigners: rpcSigners,
+	}, nil
+}
+
+// Update implements the AppSessionUpdater interface for withdraw intents.
+func (w *WithdrawUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult, error) {
+	_, err := verifyQuorum(w.appSession, w.rpcSigners, w.params.Intent)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+
+	sessionAccountID := NewAccountID(w.params.AppSessionID)
+	participantsWithUpdatedBalance := make(map[string]bool)
+
+	currentAllocations, err := getParticipantAllocations(tx, *w.appSession, sessionAccountID)
+	if err != nil {
+		return UpdateResult{}, RPCErrorf("failed to get current allocations: %w", err)
+	}
+
+	noWithdrawals := true
+
+	for _, alloc := range w.params.Allocations {
+		if alloc.Amount.IsNegative() {
+			return UpdateResult{}, RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+		}
+
+		walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
+		if walletAddress == "" {
+			walletAddress = alloc.ParticipantWallet
+		}
+
+		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
+		if alloc.Amount.LessThan(currentAmount) {
+			withdrawalAmount := currentAmount.Sub(alloc.Amount)
+			noWithdrawals = false
+
+			userAddress := common.HexToAddress(walletAddress)
+			userAccountID := NewAccountID(walletAddress)
+			ledger := GetWalletLedger(tx, userAddress)
+
+			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, withdrawalAmount.Neg()); err != nil {
+				return UpdateResult{}, RPCErrorf(ErrDebitSourceAccount+": %w", err)
+			}
+			if err := ledger.Record(userAccountID, alloc.AssetSymbol, withdrawalAmount); err != nil {
+				return UpdateResult{}, RPCErrorf(ErrCreditDestinationAccount+": %w", err)
+			}
+			_, err = RecordLedgerTransaction(tx, TransactionTypeAppWithdrawal, sessionAccountID, userAccountID, alloc.AssetSymbol, withdrawalAmount)
+			if err != nil {
+				return UpdateResult{}, RPCErrorf(ErrRecordTransaction+": %w", err)
+			}
+
+			participantsWithUpdatedBalance[walletAddress] = true
+		} else if alloc.Amount.GreaterThan(currentAmount) {
+			return UpdateResult{}, RPCErrorf("incorrect withdrawal request: increased allocation for participant %s", walletAddress)
+		}
+	}
+
+	if noWithdrawals {
+		return UpdateResult{}, RPCErrorf("incorrect withdrawal request: non-negative allocations sum delta")
+	}
+
+	w.appSession.Version++
+
+	return UpdateResult{
+		ParticipantsAffected: participantsWithUpdatedBalance,
+		UpdatedAppSession:    w.appSession,
+	}, nil
+}
+
+// OperateUpdater handles operate intent updates.
+type OperateUpdater struct {
+	appSession *AppSession
+	params     *SubmitAppStateParams
+	rpcSigners map[string]struct{}
+}
+
+// NewOperateUpdater creates a new OperateUpdater.
+func NewOperateUpdater(params *SubmitAppStateParams, appSession *AppSession, rpcSigners map[string]struct{}) (*OperateUpdater, error) {
+	return &OperateUpdater{
+		appSession: appSession,
+		params:     params,
+		rpcSigners: rpcSigners,
+	}, nil
+}
+
+// Update implements the AppSessionUpdater interface for operate intents.
+func (o *OperateUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult, error) {
+	participantWeights, err := verifyQuorum(o.appSession, o.rpcSigners, o.params.Intent)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+
+	sessionAccountID := NewAccountID(o.params.AppSessionID)
+	appSessionBalance, err := getAppSessionBalances(tx, sessionAccountID)
+	if err != nil {
+		return UpdateResult{}, err
+	}
+
+	allocationSum := map[string]decimal.Decimal{}
+	for _, alloc := range o.params.Allocations {
+		if alloc.Amount.IsNegative() {
+			return UpdateResult{}, RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+		}
+
+		walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
+		if walletAddress == "" {
+			walletAddress = alloc.ParticipantWallet
+		}
+
+		if err := validateAppParticipant(walletAddress, participantWeights); err != nil {
+			return UpdateResult{}, err
+		}
+
+		userAddress := common.HexToAddress(walletAddress)
+		ledger := GetWalletLedger(tx, userAddress)
+		balance, err := ledger.Balance(sessionAccountID, alloc.AssetSymbol)
+		if err != nil {
+			return UpdateResult{}, RPCErrorf(ErrGetAccountBalance+": %w", err)
+		}
+
+		diff := alloc.Amount.Sub(balance)
+		if !diff.IsZero() {
+			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, diff); err != nil {
+				return UpdateResult{}, RPCErrorf("failed to update session balance: %w", err)
+			}
+		}
+
+		if !alloc.Amount.IsZero() {
+			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
+		}
+	}
+
+	if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
+		return UpdateResult{}, RPCErrorf("incorrect operate request: non-zero allocations sum delta: %w", err)
+	}
+
+	o.appSession.Version++
+
+	// Operate intent doesn't affect participant balances for notifications
+	return UpdateResult{
+		ParticipantsAffected: make(map[string]bool),
+		UpdatedAppSession:    o.appSession,
+	}, nil
+}
+
 // AppSessionService handles the business logic for app sessions.
 type AppSessionService struct {
 	db         *gorm.DB
@@ -37,8 +308,13 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 	if params.Definition.Nonce == 0 {
 		return AppSessionResponse{}, RPCErrorf("nonce is zero or not provided")
 	}
+	for i, weight := range params.Definition.Weights {
+		if weight < 0 {
+			return AppSessionResponse{}, RPCErrorf("participant %s weight cannot be negative", params.Definition.ParticipantWallets[i])
+		}
+	}
 
-	// Generate a unique ID for the virtual application
+	// Generate a unique ID for the application session
 	appBytes, err := json.Marshal(params.Definition)
 	if err != nil {
 		return AppSessionResponse{}, RPCErrorf("failed to generate app session ID")
@@ -46,7 +322,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
 	sessionAccountID := NewAccountID(appSessionID)
 
-	participants := make(map[string]bool)
+	participantsWithUpdatedBalance := make(map[string]bool)
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsPositive() {
@@ -55,7 +331,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 				}
 			}
 			if alloc.Amount.IsNegative() {
-				return RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+				return RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 			walletAddress := alloc.ParticipantWallet
 			if wallet := GetWalletBySigner(alloc.ParticipantWallet); wallet != "" {
@@ -71,7 +347,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			ledger := GetWalletLedger(tx, userAddress)
 			balance, err := ledger.Balance(userAccountID, alloc.AssetSymbol)
 			if err != nil {
-				return RPCErrorf("failed to check participant balance: %w", err)
+				return RPCErrorf(ErrGetAccountBalance+": %w", err)
 			}
 
 			if alloc.Amount.GreaterThan(balance) {
@@ -79,16 +355,16 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			}
 
 			if err = ledger.Record(userAccountID, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
-				return RPCErrorf("failed to debit source account: %w", err)
+				return RPCErrorf(ErrDebitSourceAccount+": %w", err)
 			}
 			if err = ledger.Record(sessionAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return RPCErrorf("failed to credit destination account: %w", err)
+				return RPCErrorf(ErrCreditDestinationAccount+": %w", err)
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppDeposit, userAccountID, sessionAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
-				return RPCErrorf("failed to record transaction: %w", err)
+				return RPCErrorf(ErrRecordTransaction+": %w", err)
 			}
-			participants[walletAddress] = true
+			participantsWithUpdatedBalance[walletAddress] = true
 		}
 
 		session := &AppSession{
@@ -113,7 +389,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 		return AppSessionResponse{}, err
 	}
 
-	for participant := range participants {
+	for participant := range participantsWithUpdatedBalance {
 		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
 	}
 
@@ -124,95 +400,91 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 	}, nil
 }
 
-func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSigners map[string]struct{}) (AppSessionResponse, error) {
-	var newVersion uint64
+func (s *AppSessionService) SubmitAppState(ctx context.Context, params *SubmitAppStateParams, rpcSigners map[string]struct{}) (AppSessionResponse, error) {
+	participants := make(map[string]bool)
+	var updatedAppSession AppSession
+
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
+		var updater AppSessionUpdater
+		var err error
+
+		appSession, err := getAppSession(tx, params.AppSessionID, "open")
 		if err != nil {
-			return err
+			return RPCErrorf("an open app session not found: %w", err)
 		}
-		sessionAccountID := NewAccountID(appSession.SessionID)
 
-		newVersion = appSession.Version + 1
+		// Protocol-specific validation
 		switch appSession.Protocol {
-		case rpc.VersionNitroRPCv0_2:
-			// nothing additional to check
 		case rpc.VersionNitroRPCv0_4:
-			if newVersion != params.Version {
-				return RPCErrorf("incorrect app state: incorrect version: expected %d, got %d", newVersion, params.Version)
+			if appSession.Version+1 != params.Version {
+				return RPCErrorf("incorrect app state: incorrect version: expected %d, got %d", appSession.Version+1, params.Version)
 			}
-
-			switch params.Intent {
-			case rpc.AppSessionIntentOperate:
-				// no additional actions needed
-			default:
-				return RPCErrorf("incorrect app state: unsupported intent: %s", params.Intent)
+		case rpc.VersionNitroRPCv0_2:
+			if params.Intent != "" || params.Version != 0 {
+				return RPCErrorf("incorrect request: specified parameters are not supported in this protocol")
 			}
 		default:
 			return RPCErrorf("incorrect app state: unsupported protocol: %s", appSession.Protocol)
 		}
 
-		appSessionBalance, err := getAppSessionBalances(tx, sessionAccountID)
+		switch params.Intent {
+		case rpc.AppSessionIntentDeposit:
+			updater, err = NewDepositUpdater(params, appSession, rpcSigners)
+		case rpc.AppSessionIntentWithdraw:
+			updater, err = NewWithdrawUpdater(params, appSession, rpcSigners)
+		case rpc.AppSessionIntentOperate:
+			updater, err = NewOperateUpdater(params, appSession, rpcSigners)
+		case "":
+			updater, err = NewOperateUpdater(params, appSession, rpcSigners)
+		default:
+			return RPCErrorf("incorrect app state: unsupported intent: %s", params.Intent)
+		}
 		if err != nil {
 			return err
 		}
 
-		allocationSum := map[string]decimal.Decimal{}
-		for _, alloc := range params.Allocations {
-			if alloc.Amount.IsNegative() {
-				return RPCErrorf("incorrect app state: negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
-			}
-
-			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
-			if walletAddress == "" {
-				walletAddress = alloc.ParticipantWallet
-			}
-
-			if _, ok := participantWeights[walletAddress]; !ok {
-				return RPCErrorf("incorrect app state: allocation to non-participant %s", walletAddress)
-			}
-
-			userAddress := common.HexToAddress(walletAddress)
-			ledger := GetWalletLedger(tx, userAddress)
-			balance, err := ledger.Balance(sessionAccountID, alloc.AssetSymbol)
-			if err != nil {
-				return RPCErrorf("failed to get session balance for asset %s", alloc.AssetSymbol)
-			}
-
-			// Reset participant allocation in app session to the new amount
-			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, balance.Neg()); err != nil {
-				return RPCErrorf("failed to debit session: %w", err)
-			}
-			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return RPCErrorf("failed to credit participant: %w", err)
-			}
-
-			if !alloc.Amount.IsZero() {
-				allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
-			}
-		}
-
-		if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
+		result, err := updater.Update(ctx, tx)
+		if err != nil {
 			return err
 		}
 
-		updates := map[string]any{
-			"version": newVersion,
-		}
+		participants = result.ParticipantsAffected
+		updatedAppSession = *result.UpdatedAppSession
+
 		if params.SessionData != nil {
-			updates["session_data"] = *params.SessionData
+			updatedAppSession.SessionData = *params.SessionData
 		}
 
-		return tx.Model(&appSession).Updates(updates).Error
+		err = tx.Save(&updatedAppSession).Error
+		if err != nil {
+			return err
+		}
+
+		return nil
 	})
 
 	if err != nil {
 		return AppSessionResponse{}, err
 	}
 
+	// Notify only participants whose balances were affected by deposit operations
+	for participant := range participants {
+		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
+	}
+
+	participantAllocations, err := getParticipantAllocations(s.db, updatedAppSession, NewAccountID(params.AppSessionID))
+	if err != nil {
+		logger := LoggerFromContext(ctx)
+		logger.Error("failed to get participant allocations for app session, notifications will not be sent", "sessionID", updatedAppSession.SessionID, "error", err)
+	} else {
+		for _, participant := range updatedAppSession.ParticipantWallets {
+			s.wsNotifier.Notify(NewAppSessionNotification(participant, updatedAppSession, prepareAppAllocations(participantAllocations)))
+		}
+	}
+
 	return AppSessionResponse{
 		AppSessionID: params.AppSessionID,
-		Version:      newVersion,
+		Version:      updatedAppSession.Version,
 		Status:       string(ChannelStatusOpen),
 	}, nil
 }
@@ -223,24 +495,29 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 		return AppSessionResponse{}, RPCErrorf("missing required parameters: app_id or allocations")
 	}
 
-	participants := make(map[string]bool)
+	participantsWithUpdatedBalance := make(map[string]bool)
 	var newVersion uint64
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners)
+		session, err := getAppSession(tx, params.AppSessionID, "open")
+		if err != nil {
+			return RPCErrorf("an open app session not found: %w", err)
+		}
+
+		participantWeights, err := verifyQuorum(session, rpcSigners, "")
 		if err != nil {
 			return err
 		}
-		sessionAccountID := NewAccountID(appSession.SessionID)
+		sessionAccountID := NewAccountID(session.SessionID)
 
 		appSessionBalance, err := getAppSessionBalances(tx, sessionAccountID)
 		if err != nil {
-			return err
+			return RPCErrorf("failed to get app session balances: %w", err)
 		}
 
 		allocationSum := map[string]decimal.Decimal{}
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsNegative() {
-				return RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+				return RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 
 			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
@@ -248,8 +525,8 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 				walletAddress = alloc.ParticipantWallet
 			}
 
-			if _, ok := participantWeights[walletAddress]; !ok {
-				return RPCErrorf("allocation to non-participant %s", walletAddress)
+			if err := validateAppParticipant(walletAddress, participantWeights); err != nil {
+				return err
 			}
 
 			userAddress := common.HexToAddress(walletAddress)
@@ -262,19 +539,19 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 
 			// Debit session, credit participant
 			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, balance.Neg()); err != nil {
-				return RPCErrorf("failed to debit session: %w", err)
+				return RPCErrorf(ErrDebitSourceAccount+": %w", err)
 			}
 			if err := ledger.Record(userAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return RPCErrorf("failed to credit participant: %w", err)
+				return RPCErrorf(ErrCreditDestinationAccount+": %w", err)
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppWithdrawal, sessionAccountID, userAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
-				return RPCErrorf("failed to record transaction: %w", err)
+				return RPCErrorf(ErrRecordTransaction+": %w", err)
 			}
 
 			if !alloc.Amount.IsZero() {
 				allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
-				participants[walletAddress] = true
+				participantsWithUpdatedBalance[walletAddress] = true
 			}
 		}
 
@@ -282,7 +559,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 			return err
 		}
 
-		newVersion = appSession.Version + 1
+		newVersion = session.Version + 1
 		updates := map[string]any{
 			"status":  ChannelStatusClosed,
 			"version": newVersion,
@@ -291,14 +568,15 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 			updates["session_data"] = *params.SessionData
 		}
 
-		return tx.Model(&appSession).Updates(updates).Error
+		return tx.Model(&session).Updates(updates).Error
 	})
 
 	if err != nil {
 		return AppSessionResponse{}, err
 	}
 
-	for participant := range participants {
+	// Notify only participants who received non-zero allocations during session closure
+	for participant := range participantsWithUpdatedBalance {
 		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
 	}
 
@@ -339,14 +617,37 @@ func (s *AppSessionService) GetAppSessions(participantWallet string, status stri
 	return sessions, nil
 }
 
-// verifyQuorum loads an open AppSession, verifies signatures meet quorum
-func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct{}) (AppSession, map[string]int64, error) {
-	var session AppSession
-	if err := tx.Where("session_id = ? AND status = ?", appSessionID, ChannelStatusOpen).
-		Order("nonce DESC").First(&session).Error; err != nil {
-		return AppSession{}, nil, RPCErrorf("virtual app %s is not opened", appSessionID)
+func getParticipantAllocations(db *gorm.DB, appSession AppSession, sessionAccountID AccountID) (map[string]map[string]decimal.Decimal, error) {
+	participantAllocations := make(map[string]map[string]decimal.Decimal)
+
+	for _, participant := range appSession.ParticipantWallets {
+		participantAllocations[participant] = make(map[string]decimal.Decimal)
+
+		ledger := GetWalletLedger(db, common.HexToAddress(participant))
+		balances, err := ledger.GetBalances(sessionAccountID)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, balance := range balances {
+			if !balance.Amount.IsZero() {
+				participantAllocations[participant][balance.Asset] = balance.Amount
+			}
+		}
 	}
 
+	return participantAllocations, nil
+}
+
+// validateAppParticipant checks if wallet exists in participant weights
+func validateAppParticipant(walletAddress string, participantWeights map[string]int64) error {
+	if _, ok := participantWeights[walletAddress]; !ok {
+		return RPCErrorf("allocation to non-participant %s", walletAddress)
+	}
+	return nil
+}
+
+func verifyQuorum(session *AppSession, rpcSigners map[string]struct{}, intent rpc.AppSessionIntent) (map[string]int64, error) {
 	participantWeights := make(map[string]int64, len(session.ParticipantWallets))
 	for i, addr := range session.ParticipantWallets {
 		participantWeights[addr] = session.Weights[i]
@@ -356,17 +657,40 @@ func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct
 	for wallet := range rpcSigners {
 		weight, ok := participantWeights[wallet]
 		if !ok {
-			return AppSession{}, nil, RPCErrorf("signature from unknown participant wallet %s", wallet)
-		}
-		if weight <= 0 {
-			return AppSession{}, nil, RPCErrorf("zero weight for signer %s", wallet)
+			return nil, RPCErrorf("signature from unknown participant wallet %s", wallet)
 		}
 		totalWeight += weight
 	}
 
 	if totalWeight < int64(session.Quorum) {
-		return AppSession{}, nil, RPCErrorf("quorum not met: %d / %d", totalWeight, session.Quorum)
+		err := fmt.Sprintf("quorum not reached: %d / %d", totalWeight, session.Quorum)
+		switch intent {
+		case rpc.AppSessionIntentDeposit:
+			return nil, RPCErrorf("incorrect deposit request: %s", err)
+		case rpc.AppSessionIntentWithdraw:
+			return nil, RPCErrorf("incorrect withdrawal request: %s", err)
+		default:
+			return nil, RPCErrorf("incorrect submit_state request: %s", err)
+		}
+
 	}
 
-	return session, participantWeights, nil
+	return participantWeights, nil
+}
+
+// prepareAppAllocations converts map format to AppAllocation slice for notifications
+func prepareAppAllocations(participantAllocations map[string]map[string]decimal.Decimal) []AppAllocation {
+	var allocations []AppAllocation
+	for participant, assetMap := range participantAllocations {
+		for asset, amount := range assetMap {
+			if !amount.IsZero() {
+				allocations = append(allocations, AppAllocation{
+					ParticipantWallet: participant,
+					AssetSymbol:       asset,
+					Amount:            amount,
+				})
+			}
+		}
+	}
+	return allocations
 }

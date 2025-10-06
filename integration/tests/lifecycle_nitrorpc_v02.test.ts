@@ -66,16 +66,14 @@ describe('nitrorpc_v02 lifecycle', () => {
     };
 
     const SESSION_DATA_ACTIVE = {
-        gameType: GAME_TYPE,
-        timeControl: TIME_CONTROL,
+        ...SESSION_DATA_WAITING,
         gameState: 'active',
         currentMove: 'e2e4',
         moveCount: 1,
     };
 
     const SESSION_DATA_FINISHED = {
-        gameType: GAME_TYPE,
-        timeControl: TIME_CONTROL,
+        ...SESSION_DATA_WAITING,
         gameState: 'finished',
         winner: 'white',
         endCondition: 'checkmate',

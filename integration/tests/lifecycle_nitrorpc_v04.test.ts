@@ -73,24 +73,20 @@ describe('nitrorpc_v04 lifecycle', () => {
     };
 
     const SESSION_DATA_ACTIVE = {
-        gameType: GAME_TYPE,
-        timeControl: TIME_CONTROL,
+        ...SESSION_DATA_WAITING,
         gameState: 'active',
         currentMove: 'e2e4',
         moveCount: 1,
     };
 
     const SESSION_DATA_ACTIVE_2 = {
-        gameType: GAME_TYPE,
-        timeControl: TIME_CONTROL,
-        gameState: 'active',
+        ...SESSION_DATA_ACTIVE,
         currentMove: 'e4e6',
         moveCount: 2,
     };
 
     const SESSION_DATA_FINISHED = {
-        gameType: GAME_TYPE,
-        timeControl: TIME_CONTROL,
+        ...SESSION_DATA_WAITING,
         gameState: 'finished',
         winner: 'white',
         endCondition: 'checkmate',
@@ -276,14 +272,14 @@ describe('nitrorpc_v04 lifecycle', () => {
         expect(sessionData).toEqual(SESSION_DATA_FINISHED);
     });
 
-    it('should update ledger balances for providing side', async () => {
+    it('should update ledger balances for participant sending', async () => {
         const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((finalAliceAmount).toString()); // 1000 - 100 - 50 + 25 = 875
         expect(ledgerBalances[0].asset).toBe('USDC');
     });
 
-    it('should update ledger balances for receiving side', async () => {
+    it('should update ledger balances for participant receiving', async () => {
         const ledgerBalances = await getLedgerBalances(bobAppIdentity, bobWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((finalBobAmount).toString()); // 1000 + 100 + 25 = 1125
@@ -400,7 +396,7 @@ describe('nitrorpc_v04 lifecycle', () => {
         expect(postCloseAccountBalance).toBe(toRaw(finalBobAmount)); // 1000 + 100 + 25 = 1125
     });
 
-    it('should withdraw funds from channel for providing side', async () => {
+    it('should withdraw funds from channel for participant sending', async () => {
         const preWithdrawalBalance = await blockUtils.getErc20Balance(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             alice.walletAddress
@@ -425,7 +421,7 @@ describe('nitrorpc_v04 lifecycle', () => {
         expect(accountBalance).toBe(BigInt(0));
     });
 
-    it('should withdraw funds from channel for receiving side', async () => {
+    it('should withdraw funds from channel for participant receiving', async () => {
         const preWithdrawalBalance = await blockUtils.getErc20Balance(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             bob.walletAddress

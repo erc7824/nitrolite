@@ -279,7 +279,7 @@ describe('App session state v0.4 error cases', () => {
             } catch (e) {
                 expect((e as Error).message).toMatch(/RPC Error.*incorrect deposit request.*quorum not reached/i);
 
-                const { sessionData } = await fetchAndParseAppSessions(aliceAppWS, bobAppIdentity, appSessionId);
+                const { sessionData } = await fetchAndParseAppSessions(bobWS, bobAppIdentity, appSessionId);
                 expect(sessionData).toEqual(START_SESSION_DATA);
                 return;
             }
@@ -381,11 +381,11 @@ describe('App session state v0.4 error cases', () => {
 
             try {
                 // Bob signs and constitutes 0% of quorum
-                await submitAppStateUpdate_v04(aliceAppWS, bobAppIdentity, appSessionId, RPCAppStateIntent.Withdraw, currentVersion + 2, allocations, { state: 'test' });
+                await submitAppStateUpdate_v04(bobWS, bobAppIdentity, appSessionId, RPCAppStateIntent.Withdraw, currentVersion + 2, allocations, { state: 'test' });
             } catch (e) {
                 expect((e as Error).message).toMatch(/RPC Error.*incorrect withdrawal request.*quorum not reached/i);
 
-                const { sessionData } = await fetchAndParseAppSessions(aliceAppWS, bobAppIdentity, appSessionId);
+                const { sessionData } = await fetchAndParseAppSessions(bobWS, bobAppIdentity, appSessionId);
                 expect(sessionData).toEqual(INTERMEDIATE_SESSION_DATA);
                 return;
             }

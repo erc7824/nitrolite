@@ -62,11 +62,11 @@ describe('App session state v0.4 error cases', () => {
                 amount: '0',
             },
         ];
-
-        await blockUtils.makeSnapshot();
     });
 
     beforeEach(async () => {
+        await blockUtils.makeSnapshot();
+
         [aliceChannelId, bobChannelId] = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], toRaw(onChainDepositAmount));
 
         await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, appSessionDepositAmount);

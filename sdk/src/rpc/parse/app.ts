@@ -9,7 +9,13 @@ import {
     GetAppSessionsResponseParams,
     RPCAppSession,
 } from '../types';
-import { hexSchema, addressSchema, statusEnum, ParamsParser, dateSchema, protocolVersionEnum } from './common';
+import { hexSchema, addressSchema, statusEnum, ParamsParser, dateSchema, protocolVersionEnum, bigIntSchema } from './common';
+
+const AppAllocationObject = z.object({
+    participant: addressSchema,
+    asset: z.string(),
+    amount: bigIntSchema,
+});
 
 const AppSessionObject = z.object({
     app_session_id: hexSchema,
@@ -107,7 +113,7 @@ const GetAppSessionsParamsSchema = z
 const AppSessionUpdateObjectSchema = z
     .object({
         ...AppSessionObject.shape,
-        participant_allocations: z.record(z.string(), z.record(z.string(), z.string())), // participant -> asset -> amount
+        participant_allocations: z.array(AppAllocationObject),
     })
     .transform((raw) => ({
         appSessionId: raw.app_session_id,
@@ -122,7 +128,11 @@ const AppSessionUpdateObjectSchema = z
         nonce: raw.nonce,
         createdAt: raw.created_at,
         updatedAt: raw.updated_at,
-        participantAllocations: raw.participant_allocations,
+        participantAllocations: raw.participant_allocations.map((a) => ({
+                participant: a.participant,
+                asset: a.asset,
+                amount: BigInt(a.amount),
+            })),
     }));
 
 const AppSessionUpdateParamsSchema = AppSessionUpdateObjectSchema;

@@ -1,0 +1,38 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model LedgerEntry {
+  id           Int      @id
+  accountId    String   @map("account_id")
+  accountType  Int      @map("account_type")
+  asset        String
+  createdAt    DateTime @map("created_at")
+  credit       Decimal  @db.Decimal(18, 8)
+  debit        Decimal  @db.Decimal(18, 8)
+  participant  String
+}
+
+model Channel {
+  channelId     String   @id @map("channel_id")
+  adjudicator   String
+  amount        BigInt
+  chainId       Int      @map("chain_id")
+  challenge     Int
+  createdAt     DateTime @map("created_at")
+  nonce         BigInt
+  participant   String
+  status        String
+  token         String
+  updatedAt     DateTime @map("updated_at")
+  version       Int
+  wallet        String
+
+  @@index([chainId])
+  @@index([token])
+} 

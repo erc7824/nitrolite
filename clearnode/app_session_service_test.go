@@ -388,23 +388,24 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 }
 
 func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
-
+	depositorAddress := userAddressA
+	depositorAccountID := userAccountIDA
 	t.Run("BasicDepositSuccess", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
 		setupWallets(t, db, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 200},
-			userAddressB: {"usdc": 100},
+			depositorAddress: {"usdc": 200},
+			userAddressB:     {"usdc": 100},
 		})
 
 		session := createTestAppSession(t, db, "test-session-deposit", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+			[]string{depositorAddress.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 100},
-			userAddressB: {"usdc": 100},
+			depositorAddress: {"usdc": 100},
+			userAddressB:     {"usdc": 100},
 		})
 
 		capturedNotifications := make(map[string][]Notification)
@@ -415,29 +416,29 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		resp, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 		assert.Equal(t, string(ChannelStatusOpen), resp.Status)
 
-		balA, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
-		appBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
+		balA, _ := GetWalletLedger(db, depositorAddress).Balance(depositorAccountID, "usdc")
+		appBalA, _ := GetWalletLedger(db, depositorAddress).Balance(sessionAccountID, "usdc")
 		appBalB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
 		assert.Equal(t, decimal.NewFromInt(150), balA)
 		assert.Equal(t, decimal.NewFromInt(150), appBalA)
 		assert.Equal(t, decimal.NewFromInt(100), appBalB)
 
-		assert.Contains(t, capturedNotifications, userAddressA.Hex())
+		assert.Contains(t, capturedNotifications, depositorAddress.Hex())
 		assert.Contains(t, capturedNotifications, userAddressB.Hex())
 
 		var depositTx []LedgerTransaction
 		db.Where("tx_type = ? AND from_account = ? AND asset_symbol = ?",
-			TransactionTypeAppDeposit, userAddressA.Hex(), "usdc").Find(&depositTx)
+			TransactionTypeAppDeposit, depositorAddress.Hex(), "usdc").Find(&depositTx)
 		assert.Len(t, depositTx, 1)
 		assert.Equal(t, decimal.NewFromInt(50), depositTx[0].Amount)
 	})
@@ -447,19 +448,19 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		defer cleanup()
 
 		setupWallets(t, db, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 200, "eth": 5},
-			userAddressB: {"usdc": 300},
-			userAddressC: {"eth": 10},
+			depositorAddress: {"usdc": 200, "eth": 5},
+			userAddressB:     {"usdc": 300},
+			userAddressC:     {"eth": 10},
 		})
 
 		session := createTestAppSession(t, db, "test-session-multi-deposit", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 3)
+			[]string{depositorAddress.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 3)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 100, "eth": 1},
-			userAddressB: {"usdc": 200},
-			userAddressC: {"eth": 3},
+			depositorAddress: {"usdc": 100, "eth": 1},
+			userAddressB:     {"usdc": 200},
+			userAddressC:     {"eth": 3},
 		})
 
 		capturedNotifications := make(map[string][]Notification)
@@ -470,19 +471,19 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(3)},
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(3)},
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(250)},
 				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(5)},
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB, userAddressC))
+		resp, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB, userAddressC))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
-		balA_usdc, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
-		balA_eth, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "eth")
+		balA_usdc, _ := GetWalletLedger(db, depositorAddress).Balance(depositorAccountID, "usdc")
+		balA_eth, _ := GetWalletLedger(db, depositorAddress).Balance(depositorAccountID, "eth")
 		balB_usdc, _ := GetWalletLedger(db, userAddressB).Balance(userAccountIDB, "usdc")
 		balC_eth, _ := GetWalletLedger(db, userAddressC).Balance(userAccountIDC, "eth")
 		assert.Equal(t, decimal.NewFromInt(150), balA_usdc)
@@ -501,11 +502,11 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		defer cleanup()
 
 		session := createTestAppSession(t, db, "test-session-no-increase", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+			[]string{depositorAddress.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 100},
+			depositorAddress: {"usdc": 100},
 		})
 
 		service := createTestAppSessionService(db, nil)
@@ -514,12 +515,12 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: non-positive allocations sum delta")
 	})
@@ -529,15 +530,15 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		defer cleanup()
 
 		setupWallets(t, db, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 30},
+			depositorAddress: {"usdc": 30},
 		})
 
 		session := createTestAppSession(t, db, "test-session-insufficient", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+			[]string{depositorAddress.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 50},
+			depositorAddress: {"usdc": 50},
 		})
 
 		service := createTestAppSessionService(db, nil)
@@ -546,11 +547,11 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: insufficient unified balance")
 	})
@@ -560,18 +561,18 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		defer cleanup()
 
 		session := createTestAppSession(t, db, "test-session-v02", rpc.VersionNitroRPCv0_2,
-			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+			[]string{depositorAddress.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 
 		service := createTestAppSessionService(db, nil)
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentDeposit,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect request: specified parameters are not supported in this protocol")
 	})
@@ -581,11 +582,11 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		defer cleanup()
 
 		session := createTestAppSession(t, db, "test-session-signature", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+			[]string{depositorAddress.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 100},
+			depositorAddress: {"usdc": 100},
 		})
 
 		service := createTestAppSessionService(db, nil)
@@ -594,7 +595,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 			},
 		}
 
@@ -608,11 +609,11 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		defer cleanup()
 
 		session := createTestAppSession(t, db, "test-session-quorum", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+			[]string{depositorAddress.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 100},
+			depositorAddress: {"usdc": 100},
 		})
 
 		service := createTestAppSessionService(db, nil)
@@ -621,11 +622,11 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA))
+		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: quorum not reached")
 	})
@@ -635,17 +636,17 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		defer cleanup()
 
 		setupWallets(t, db, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 500},
+			depositorAddress: {"usdc": 500},
 			userAddressB: {"usdc": 300},
 			userAddressC: {"usdc": 200},
 		})
 
 		session := createTestAppSession(t, db, "test-session-ac7", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 2)
+			[]string{depositorAddress.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 100},
+			depositorAddress: {"usdc": 100},
 			userAddressB: {"usdc": 50},
 			userAddressC: {"usdc": 50},
 		})
@@ -657,7 +658,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
@@ -675,11 +676,11 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		defer cleanup()
 
 		session := createTestAppSession(t, db, "test-session-zero-increase", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+			[]string{depositorAddress.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 100},
+			depositorAddress: {"usdc": 100},
 			userAddressB: {"usdc": 100},
 		})
 
@@ -689,12 +690,12 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)}, // no change
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)}, // no change
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)}, // no change
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: non-positive allocations sum delta")
 	})
@@ -704,16 +705,16 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		defer cleanup()
 
 		setupWallets(t, db, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 200},
+			depositorAddress: {"usdc": 200},
 			userAddressB: {"usdc": 100},
 		})
 
 		session := createTestAppSession(t, db, "test-session-decreased", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+			[]string{depositorAddress.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 100},
+			depositorAddress: {"usdc": 100},
 			userAddressB: {"usdc": 50},
 		})
 
@@ -723,12 +724,12 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(80)}, // decrease from 100 to 80
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(80)}, // decrease from 100 to 80
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)}, // no change
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: decreased allocation for participant")
 	})
@@ -738,17 +739,17 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		defer cleanup()
 
 		setupWallets(t, db, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 500},
+			depositorAddress: {"usdc": 500},
 			userAddressB: {"usdc": 300},
 			userAddressC: {"usdc": 200},
 		})
 
 		session := createTestAppSession(t, db, "test-session-mixed", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 3)
+			[]string{depositorAddress.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 3)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 100},
+			depositorAddress: {"usdc": 100},
 			userAddressB: {"usdc": 50},
 			userAddressC: {"usdc": 50},
 		})
@@ -760,17 +761,17 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)}, // +50
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)}, // +50
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(75)},  // +25
 				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},  // no change
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB, userAddressC))
+		resp, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB, userAddressC))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
-		balanceA, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
+		balanceA, _ := GetWalletLedger(db, depositorAddress).Balance(userAccountIDA, "usdc")
 		balanceB, _ := GetWalletLedger(db, userAddressB).Balance(userAccountIDB, "usdc")
 		balanceC, _ := GetWalletLedger(db, userAddressC).Balance(userAccountIDC, "usdc")
 		assert.Equal(t, "450", balanceA.String())
@@ -780,23 +781,24 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 }
 
 func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
-
+	withdrawerAddress := userAddressA
+	withdrawerAccountID := userAccountIDA
 	t.Run("BasicWithdrawalSuccess", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
 		setupWallets(t, db, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 100},
-			userAddressB: {"usdc": 50},
+			withdrawerAddress: {"usdc": 100},
+			userAddressB:      {"usdc": 50},
 		})
 
 		session := createTestAppSession(t, db, "test-session-withdraw", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+			[]string{withdrawerAddress.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 150},
-			userAddressB: {"usdc": 100},
+			withdrawerAddress: {"usdc": 150},
+			userAddressB:      {"usdc": 100},
 		})
 
 		capturedNotifications := make(map[string][]Notification)
@@ -807,29 +809,29 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			Intent:       rpc.AppSessionIntentWithdraw,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{ParticipantWallet: withdrawerAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		resp, err := service.SubmitAppState(params, rpcSigners(withdrawerAddress, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 		assert.Equal(t, string(ChannelStatusOpen), resp.Status)
 
-		balA, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
-		appBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
-		appBalB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
-		assert.Equal(t, decimal.NewFromInt(150), balA)    // 100 initial + 50 withdrawn
-		assert.Equal(t, decimal.NewFromInt(100), appBalA) // 150 - 50
-		assert.Equal(t, decimal.NewFromInt(100), appBalB)
+		withdrawerBalance, _ := GetWalletLedger(db, withdrawerAddress).Balance(withdrawerAccountID, "usdc")
+		withdrawerAppBalance, _ := GetWalletLedger(db, withdrawerAddress).Balance(sessionAccountID, "usdc")
+		participantAppBalance, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
+		assert.Equal(t, decimal.NewFromInt(150), withdrawerBalance)    // 100 initial + 50 withdrawn
+		assert.Equal(t, decimal.NewFromInt(100), withdrawerAppBalance) // 150 - 50
+		assert.Equal(t, decimal.NewFromInt(100), participantAppBalance)
 
-		assert.Contains(t, capturedNotifications, userAddressA.Hex())
+		assert.Contains(t, capturedNotifications, withdrawerAddress.Hex())
 		assert.Contains(t, capturedNotifications, userAddressB.Hex())
 
 		var withdrawTx []LedgerTransaction
 		db.Where("tx_type = ? AND to_account = ? AND asset_symbol = ?",
-			TransactionTypeAppWithdrawal, userAddressA.Hex(), "usdc").Find(&withdrawTx)
+			TransactionTypeAppWithdrawal, withdrawerAddress.Hex(), "usdc").Find(&withdrawTx)
 		assert.Len(t, withdrawTx, 1)
 		assert.Equal(t, decimal.NewFromInt(50), withdrawTx[0].Amount)
 	})
@@ -839,19 +841,19 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 		defer cleanup()
 
 		setupWallets(t, db, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 50, "eth": 2},
-			userAddressB: {"usdc": 100},
-			userAddressC: {"eth": 5},
+			withdrawerAddress: {"usdc": 50, "eth": 2},
+			userAddressB:      {"usdc": 100},
+			userAddressC:      {"eth": 5},
 		})
 
 		session := createTestAppSession(t, db, "test-session-multi-withdraw", rpc.VersionNitroRPCv0_4,
-			[]string{userAddressA.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 3)
+			[]string{withdrawerAddress.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 3)
 		sessionAccountID := NewAccountID(session.SessionID)
 
 		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
-			userAddressA: {"usdc": 150, "eth": 5},
-			userAddressB: {"usdc": 250},
-			userAddressC: {"eth": 8},
+			withdrawerAddress: {"usdc": 150, "eth": 5},
+			userAddressB:      {"usdc": 250},
+			userAddressC:      {"eth": 8},
 		})
 
 		capturedNotifications := make(map[string][]Notification)
@@ -862,25 +864,25 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			Intent:       rpc.AppSessionIntentWithdraw,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)}, // withdraw 50
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(3)},    // withdraw 2
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)}, // withdraw 50
-				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(5)},    // withdraw 3
+				{ParticipantWallet: withdrawerAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)}, // withdraw 50
+				{ParticipantWallet: withdrawerAddress.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(3)},    // withdraw 2
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},      // withdraw 50
+				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(5)},         // withdraw 3
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB, userAddressC))
+		resp, err := service.SubmitAppState(params, rpcSigners(withdrawerAddress, userAddressB, userAddressC))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
-		balA_usdc, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "usdc")
-		balA_eth, _ := GetWalletLedger(db, userAddressA).Balance(userAccountIDA, "eth")
-		balB_usdc, _ := GetWalletLedger(db, userAddressB).Balance(userAccountIDB, "usdc")
-		balC_eth, _ := GetWalletLedger(db, userAddressC).Balance(userAccountIDC, "eth")
-		assert.Equal(t, decimal.NewFromInt(100), balA_usdc) // 50 + 50 withdrawn
-		assert.Equal(t, decimal.NewFromInt(4), balA_eth)    // 2 + 2 withdrawn
-		assert.Equal(t, decimal.NewFromInt(150), balB_usdc) // 100 + 50 withdrawn
-		assert.Equal(t, decimal.NewFromInt(8), balC_eth)    // 5 + 3 withdrawn
+		withdrawerUsdcBalance, _ := GetWalletLedger(db, withdrawerAddress).Balance(withdrawerAccountID, "usdc")
+		withdrawerEthBalance, _ := GetWalletLedger(db, withdrawerAddress).Balance(withdrawerAccountID, "eth")
+		participant1UsdcBalance, _ := GetWalletLedger(db, userAddressB).Balance(userAccountIDB, "usdc")
+		participant2EthBalance, _ := GetWalletLedger(db, userAddressC).Balance(userAccountIDC, "eth")
+		assert.Equal(t, decimal.NewFromInt(100), withdrawerUsdcBalance)   // 50 + 50 withdrawn
+		assert.Equal(t, decimal.NewFromInt(4), withdrawerEthBalance)      // 2 + 2 withdrawn
+		assert.Equal(t, decimal.NewFromInt(150), participant1UsdcBalance) // 100 + 50 withdrawn
+		assert.Equal(t, decimal.NewFromInt(8), participant2EthBalance)    // 5 + 3 withdrawn
 
 		assert.Len(t, capturedNotifications, 3)
 		var withdrawTxs []LedgerTransaction

@@ -71,7 +71,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			ledger := GetWalletLedger(tx, userAddress)
 			balance, err := ledger.Balance(userAccountID, alloc.AssetSymbol)
 			if err != nil {
-				return RPCErrorf("failed to get participant  balance: %w", err)
+				return RPCErrorf("failed to get participant balance: %w", err)
 			}
 
 			if alloc.Amount.GreaterThan(balance) {
@@ -171,7 +171,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 					return err
 				}
 			default:
-				return RPCErrorf("unsupported intent: %s", params.Intent)
+				return RPCErrorf("incorrect app state: unsupported intent: %s", params.Intent)
 			}
 		case rpc.VersionNitroRPCv0_2:
 			if params.Intent != "" || params.Version != 0 {
@@ -412,7 +412,7 @@ func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppSt
 	}
 
 	if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
-		return RPCErrorf("incorrect operate request: non-zero allocation sum delta")
+		return RPCErrorf("incorrect operate request: non-zero allocations sum delta")
 	}
 	return nil
 }
@@ -450,7 +450,7 @@ func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSessi
 			ledger := GetWalletLedger(tx, userAddress)
 			balance, err := ledger.Balance(userAccountID, alloc.AssetSymbol)
 			if err != nil {
-				return nil, RPCErrorf("failed to get participant  balance: %w", err)
+				return nil, RPCErrorf("failed to get participant balance: %w", err)
 			}
 
 			if depositAmount.GreaterThan(balance) {

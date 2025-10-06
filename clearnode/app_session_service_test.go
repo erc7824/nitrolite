@@ -362,7 +362,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 
 		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "incorrect operate request: non-zero allocation sum delta")
+		assert.Contains(t, err.Error(), "incorrect operate request: non-zero allocations sum delta")
 	})
 	t.Run("UnsupportedIntentError", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
@@ -383,7 +383,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 
 		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "unsupported intent: unknown_intent")
+		assert.Contains(t, err.Error(), "incorrect app state: unsupported intent: unknown_intent")
 	})
 }
 

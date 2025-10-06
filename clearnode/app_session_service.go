@@ -46,7 +46,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 	appSessionID := crypto.Keccak256Hash(appBytes).Hex()
 	sessionAccountID := NewAccountID(appSessionID)
 
-	participants := make(map[string]bool)
+	participantsWithUpdatedBalance := make(map[string]bool)
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		for _, alloc := range params.Allocations {
 			if alloc.Amount.IsPositive() {
@@ -88,7 +88,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 			if err != nil {
 				return RPCErrorf("failed to record transaction: %w", err)
 			}
-			participants[walletAddress] = true
+			participantsWithUpdatedBalance[walletAddress] = true
 		}
 
 		session := &AppSession{
@@ -113,7 +113,7 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 		return AppSessionResponse{}, err
 	}
 
-	for participant := range participants {
+	for participant := range participantsWithUpdatedBalance {
 		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
 	}
 
@@ -237,7 +237,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 		return AppSessionResponse{}, RPCErrorf("missing required parameters: app_id or allocations")
 	}
 
-	participants := make(map[string]bool)
+	participantsWithUpdatedBalance := make(map[string]bool)
 	var newVersion uint64
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		appSession, participantWeights, err := verifyQuorum(tx, params.AppSessionID, rpcSigners, "")
@@ -288,7 +288,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 
 			if !alloc.Amount.IsZero() {
 				allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
-				participants[walletAddress] = true
+				participantsWithUpdatedBalance[walletAddress] = true
 			}
 		}
 
@@ -313,7 +313,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcS
 	}
 
 	// Notify only participants who received non-zero allocations during session closure
-	for participant := range participants {
+	for participant := range participantsWithUpdatedBalance {
 		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
 	}
 

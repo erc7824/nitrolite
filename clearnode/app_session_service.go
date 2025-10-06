@@ -399,11 +399,11 @@ func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppSt
 			return RPCErrorf("failed to get session balance for asset %s", alloc.AssetSymbol)
 		}
 
-		if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, balance.Neg()); err != nil {
-			return RPCErrorf("failed to debit session: %w", err)
-		}
-		if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
-			return RPCErrorf("failed to credit participant: %w", err)
+		diff := alloc.Amount.Sub(balance)
+		if !diff.IsZero() {
+			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, diff); err != nil {
+				return RPCErrorf("failed to update session balance: %w", err)
+			}
 		}
 
 		if !alloc.Amount.IsZero() {

@@ -120,6 +120,8 @@ const AppSessionUpdateObjectSchema = z
         quorum: raw.quorum,
         version: raw.version,
         nonce: raw.nonce,
+        createdAt: raw.created_at,
+        updatedAt: raw.updated_at,
         participantAllocations: raw.participant_allocations,
     }));
 

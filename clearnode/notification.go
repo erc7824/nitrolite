@@ -104,6 +104,8 @@ func NewAppSessionNotification(participant string, appSession AppSession, partic
 		Quorum:             appSession.Quorum,
 		Version:            appSession.Version,
 		Nonce:              appSession.Nonce,
+		CreatedAt:          appSession.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:          appSession.UpdatedAt.Format(time.RFC3339),
 	}
 
 	return &Notification{

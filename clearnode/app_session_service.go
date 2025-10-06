@@ -422,7 +422,7 @@ func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppSt
 	}
 
 	if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
-		return RPCErrorf("incorrect operate request: non-zero allocations sum delta")
+		return RPCErrorf("incorrect operate request: %w", err)
 	}
 	return nil
 }
@@ -543,7 +543,7 @@ func (s *AppSessionService) handleWithdrawIntent(tx *gorm.DB, appSession AppSess
 	}
 
 	if noWithdrawals {
-		return nil, RPCErrorf("incorrect withdrawal request: non-negative allocation sum delta")
+		return nil, RPCErrorf("incorrect withdrawal request: non-negative allocations sum delta")
 	}
 
 	return participantsWithUpdatedBalance, nil

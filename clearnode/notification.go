@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -93,7 +92,7 @@ func NewTransferNotification(wallet string, transferredAllocations TransferRespo
 }
 
 // NewAppSessionNotification creates a notification for an app session update event
-func NewAppSessionNotification(participant string, appSession AppSession, participantAllocations map[string]map[string]decimal.Decimal) *Notification {
+func NewAppSessionNotification(participant string, appSession AppSession, participantAllocations []AppAllocation) *Notification {
 	response := AppSessionResponse{
 		AppSessionID:       appSession.SessionID,
 		Status:             string(appSession.Status),
@@ -112,7 +111,7 @@ func NewAppSessionNotification(participant string, appSession AppSession, partic
 		eventType: AppSessionUpdateEventType,
 		data: struct {
 			AppSessionResponse
-			ParticipantAllocations map[string]map[string]decimal.Decimal `json:"participant_allocations"` // participant -> asset -> amount
+			ParticipantAllocations []AppAllocation `json:"participant_allocations"`
 		}{
 			AppSessionResponse:     response,
 			ParticipantAllocations: participantAllocations,

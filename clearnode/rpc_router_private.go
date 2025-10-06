@@ -295,7 +295,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			ledger := GetWalletLedger(tx, fromAddress)
 			balance, err := ledger.Balance(fromAccountID, alloc.AssetSymbol)
 			if err != nil {
-				return RPCErrorf("failed to check participant balance: %w", err)
+				return RPCErrorf("failed to get participant  balance: %w", err)
 			}
 			if alloc.Amount.GreaterThan(balance) {
 				return RPCErrorf("insufficient funds: %s for asset %s", fromWallet, alloc.AssetSymbol)

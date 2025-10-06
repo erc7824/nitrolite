@@ -444,7 +444,7 @@ type TransferNotification struct {
 type AppSessionUpdateNotification struct {
 	AppSession AppSession `json:"app_session"`
 	// ParticipantAllocations contains each participant's asset allocations
-	ParticipantAllocations map[string]map[string]decimal.Decimal `json:"participant_allocations"`
+	ParticipantAllocations []AppAllocation `json:"participant_allocations"`
 }
 
 // ============================================================================

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -239,7 +240,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -270,7 +271,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), ErrNegativeAllocation)
 	})
@@ -299,7 +300,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -333,7 +334,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
 		require.Equal(t, fmt.Sprintf("incorrect app state: incorrect version: expected %d, got %d", 2, params.Version), err.Error())
 	})
 
@@ -360,7 +361,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect operate request: non-zero allocations sum delta")
 	})
@@ -381,7 +382,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect app state: unsupported intent: unknown_intent")
 	})
@@ -421,7 +422,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 		assert.Equal(t, string(ChannelStatusOpen), resp.Status)
@@ -478,7 +479,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB, userAddressC))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB, userAddressC))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -520,7 +521,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: non-positive allocations sum delta")
 	})
@@ -551,7 +552,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: insufficient unified balance")
 	})
@@ -572,7 +573,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect request: specified parameters are not supported in this protocol")
 	})
@@ -599,7 +600,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: quorum not reached")
 	})
@@ -626,7 +627,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: quorum not reached")
 	})
@@ -665,7 +666,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		}
 
 		// Quorum is satisfied but depositor (userA) signature is missing
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressB, userAddressC))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressB, userAddressC))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: depositor signature is required")
 		assert.NotContains(t, err.Error(), "quorum not reached")
@@ -695,7 +696,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: non-positive allocations sum delta")
 	})
@@ -729,7 +730,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: decreased allocation for participant")
 	})
@@ -767,7 +768,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(depositorAddress, userAddressB, userAddressC))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB, userAddressC))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -814,7 +815,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(withdrawerAddress, userAddressB))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(withdrawerAddress, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 		assert.Equal(t, string(ChannelStatusOpen), resp.Status)
@@ -871,7 +872,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(params, rpcSigners(withdrawerAddress, userAddressB, userAddressC))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(withdrawerAddress, userAddressB, userAddressC))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -913,7 +914,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect withdrawal request: non-negative allocations sum delta")
 	})
@@ -935,7 +936,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect request: specified parameters are not supported in this protocol")
 	})
@@ -969,7 +970,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect withdrawal request: increased allocation for participant")
 	})
@@ -996,7 +997,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB)) // Only 2 signers, need 3
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB)) // Only 2 signers, need 3
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect withdrawal request: quorum not reached")
 	})

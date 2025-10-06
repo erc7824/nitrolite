@@ -412,7 +412,7 @@ func (r *RPCRouter) HandleSubmitAppState(c *RPCContext) {
 		return
 	}
 
-	resp, err := r.AppSessionService.SubmitAppState(&params, rpcSigners)
+	resp, err := r.AppSessionService.SubmitAppState(ctx, &params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to submit app state", "error", err)
 		c.Fail(err, "failed to submit app state")

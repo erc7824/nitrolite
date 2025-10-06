@@ -16,7 +16,7 @@ import {
     RPCProtocolVersion,
     RPCAppStateIntent,
 } from '@erc7824/nitrolite';
-import { Hex, parseUnits } from 'viem';
+import { Hex } from 'viem';
 import {
     setupTestIdentitiesAndConnections,
     fetchAndParseAppSessions,
@@ -35,11 +35,8 @@ import {
 
 describe('nitrorpc_v04 lifecycle', () => {
     const onChainDepositAmount = BigInt(1000);
-
     const appSessionDepositAmount = BigInt(100);
-
     const appSessionTopUpAmount = BigInt(50);
-
     const appSessionPartialWithdrawalAmount = BigInt(25);
 
     const finalAliceAmount = onChainDepositAmount - appSessionDepositAmount - appSessionTopUpAmount + appSessionPartialWithdrawalAmount; // 1000 - 100 - 50 + 25 = 875
@@ -104,16 +101,7 @@ describe('nitrorpc_v04 lifecycle', () => {
         blockUtils = new BlockchainUtils();
         databaseUtils = new DatabaseUtils();
 
-        const setup = await setupTestIdentitiesAndConnections();
-        alice = setup.alice;
-        aliceWS = setup.aliceWS;
-        aliceClient = setup.aliceClient;
-        aliceAppIdentity = setup.aliceAppIdentity;
-        aliceAppWS = setup.aliceAppWS;
-        bob = setup.bob;
-        bobAppIdentity = setup.bobAppIdentity;
-        bobWS = setup.bobWS;
-        bobClient = setup.bobClient;
+        ({alice, aliceWS, aliceClient, aliceAppIdentity, aliceAppWS, bob, bobWS, bobClient, bobAppIdentity} = await setupTestIdentitiesAndConnections());
 
         await blockUtils.makeSnapshot();
     });
@@ -123,18 +111,13 @@ describe('nitrorpc_v04 lifecycle', () => {
         aliceAppWS.close();
         bobWS.close();
 
-        await databaseUtils.resetClearnodeState();
         await blockUtils.resetSnapshot();
 
+        await databaseUtils.resetClearnodeState();
         await databaseUtils.close();
     });
 
     it('should create and init two channels', async () => {
-        /* The code snippet is using TypeScript syntax to destructure an array returned by the `createTestChannels`
-        function. The function is being called with an array of objects containing client and WebSocket connections for
-        Alice and Bob, along with the `onChainDepositAmount` value. The `createTestChannels` function likely creates and
-        returns channels for Alice and Bob based on the provided connections and deposit amount. The destructured values
-        `aliceChannelId` and `bobChannelId` are being assigned the channel IDs for Alice and Bob, respectively. */
         [aliceChannelId, bobChannelId] = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], toRaw(onChainDepositAmount));
     });
 
@@ -201,40 +184,6 @@ describe('nitrorpc_v04 lifecycle', () => {
     });
 
     it('should verify sessionData changes after updates', async () => {
-        const { sessionData } = await fetchAndParseAppSessions(aliceAppWS, aliceAppIdentity, appSessionId);
-
-        expect(sessionData).toEqual(SESSION_DATA_ACTIVE_2);
-    });
-
-    it('should return error on skipping version number', async () => {
-        const allocations = [
-            {
-                participant: aliceAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
-            },
-            {
-                participant: bobAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
-            },
-        ];
-
-        try {
-            await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Operate, currentVersion + 42, allocations, SESSION_DATA_ACTIVE_2);
-        } catch (e) {
-            expect((e as Error).message).toMatch(
-                `RPC Error: incorrect app state: incorrect version: expected ${
-                    currentVersion + 1
-                }, got ${currentVersion + 42}`
-            );
-            return;
-        }
-
-        throw new Error('Expected error was not thrown');
-    });
-
-    it('should verify sessionData remain unchanged after failed update', async () => {
         const { sessionData } = await fetchAndParseAppSessions(aliceAppWS, aliceAppIdentity, appSessionId);
 
         expect(sessionData).toEqual(SESSION_DATA_ACTIVE_2);

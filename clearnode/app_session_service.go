@@ -422,7 +422,7 @@ func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppSt
 	}
 
 	if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
-		return RPCErrorf("incorrect operate request: %w", err)
+		return RPCErrorf("incorrect operate request: non-zero allocations sum delta")
 	}
 	return nil
 }
@@ -508,7 +508,7 @@ func (s *AppSessionService) handleWithdrawIntent(tx *gorm.DB, appSession AppSess
 
 	for _, alloc := range params.Allocations {
 		if alloc.Amount.IsNegative() {
-			return nil, RPCErrorf("negative allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
+			return nil, RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 		}
 
 		walletAddress := GetWalletBySigner(alloc.ParticipantWallet)

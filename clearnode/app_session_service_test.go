@@ -362,7 +362,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 
 		_, err := service.SubmitAppState(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "incorrect operate request: asset usdc not fully redistributed")
+		assert.Contains(t, err.Error(), "incorrect operate request: non-zero allocations sum delta")
 	})
 	t.Run("UnsupportedIntentError", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)

@@ -155,7 +155,7 @@ func (s *AppSessionService) SubmitAppState(params *SubmitAppStateParams, rpcSign
 			}
 			switch params.Intent {
 			case rpc.AppSessionIntentDeposit:
-				depositParticipants, err := s.handleDepositIntent(tx, appSession, params, rpcSigners, sessionAccountID)
+				depositParticipants, err := s.handleDepositIntent(tx, appSession, params, participantWeights, rpcSigners, sessionAccountID)
 				if err != nil {
 					return err
 				}
@@ -422,7 +422,7 @@ func (s *AppSessionService) handleOperateIntent(tx *gorm.DB, params *SubmitAppSt
 	return nil
 }
 
-func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSession, params *SubmitAppStateParams, rpcSigners map[string]struct{}, sessionAccountID AccountID) (map[string]bool, error) {
+func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSession, params *SubmitAppStateParams, appParticipants map[string]int64, rpcSigners map[string]struct{}, sessionAccountID AccountID) (map[string]bool, error) {
 	participantsWithUpdatedBalance := make(map[string]bool)
 
 	currentAllocations, err := getParticipantAllocations(tx, appSession, sessionAccountID)
@@ -443,6 +443,11 @@ func (s *AppSessionService) handleDepositIntent(tx *gorm.DB, appSession AppSessi
 			if alloc.Amount.IsNegative() {
 				return nil, RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
+
+			if err := validateAppParticipant(walletAddress, appParticipants); err != nil {
+				return nil, err
+			}
+
 			depositAmount := alloc.Amount.Sub(currentAmount)
 			noDeposits = false
 

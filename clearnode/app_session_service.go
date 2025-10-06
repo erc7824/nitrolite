@@ -42,6 +42,11 @@ func (s *AppSessionService) CreateApplication(params *CreateAppSessionParams, rp
 	if params.Definition.Nonce == 0 {
 		return AppSessionResponse{}, RPCErrorf("nonce is zero or not provided")
 	}
+	for i, weight := range params.Definition.Weights {
+		if weight < 0 {
+			return AppSessionResponse{}, RPCErrorf("participant %s weight cannot be negative", params.Definition.ParticipantWallets[i])
+		}
+	}
 
 	// Generate a unique ID for the virtual application
 	appBytes, err := json.Marshal(params.Definition)
@@ -556,7 +561,7 @@ func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct
 	var session AppSession
 	if err := tx.Where("session_id = ? AND status = ?", appSessionID, ChannelStatusOpen).
 		Order("nonce DESC").First(&session).Error; err != nil {
-		return AppSession{}, nil, RPCErrorf("virtual app %s is not opened", appSessionID)
+		return AppSession{}, nil, RPCErrorf("the app session %s is not open", appSessionID)
 	}
 
 	participantWeights := make(map[string]int64, len(session.ParticipantWallets))
@@ -569,9 +574,6 @@ func verifyQuorum(tx *gorm.DB, appSessionID string, rpcSigners map[string]struct
 		weight, ok := participantWeights[wallet]
 		if !ok {
 			return AppSession{}, nil, RPCErrorf("signature from unknown participant wallet %s", wallet)
-		}
-		if weight <= 0 {
-			return AppSession{}, nil, RPCErrorf("zero weight for signer %s", wallet)
 		}
 		totalWeight += weight
 	}

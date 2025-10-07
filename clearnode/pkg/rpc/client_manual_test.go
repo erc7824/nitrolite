@@ -21,7 +21,7 @@ const (
 	uatWsRpcUrl = "wss://canarynet.yellow.com/ws"
 )
 
-func TestManualClientNitroRPCv0_2(t *testing.T) {
+func TestManualClient(t *testing.T) {
 	walletPK := os.Getenv("TEST_WALLET_PK")
 	if walletPK == "" {
 		t.Skip("TEST_WALLET_PK not set, skipping manual client test")
@@ -451,7 +451,7 @@ func TestManualClientNitroRPCv0_2(t *testing.T) {
 			},
 		},
 		{
-			name: "CloseAppSession_v0_2",
+			name: "CloseAppSession_v0_4",
 			fn: func(t *testing.T) {
 				currentBalanceMu.RLock()
 				balanceBefore := currentBalance.IntPart()

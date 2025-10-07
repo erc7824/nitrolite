@@ -2,6 +2,8 @@ package rpc
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -10,7 +12,12 @@ import (
 )
 
 var (
-	defaultResponseWriteDuration = 5 * time.Second // Default timeout for writing responses to WebSocket
+	// defaultWsConnWriteTimeout is the default maximum duration to wait for a write to complete.
+	defaultWsConnWriteTimeout = 5 * time.Second
+	// defaultWsConnProcessBufferSize is the default size of the buffer for processing incoming messages.
+	defaultWsConnProcessBufferSize = 10
+	// defaultWsConnWriteBufferSize is the default size of the buffer for outgoing messages.
+	defaultWsConnWriteBufferSize = 10
 )
 
 type Connection interface {
@@ -22,10 +29,21 @@ type Connection interface {
 	SetUserID(userID string)
 	// RawRequests returns the channel for processing incoming requests
 	RawRequests() <-chan []byte
-	// Write sends a message to the connection's write sink
-	WriteRawResponse(message []byte)
+	// WriteRawResponse sends a raw response message to the connection's write sink
+	// Returns true if the message was successfully queued, false if it timed out
+	WriteRawResponse(message []byte) bool
 	// Serve starts the connection's lifecycle, handling reads and writes
 	Serve(parentCtx context.Context, handleClosure func(error))
+}
+
+// GorillaWsConnectionAdapter abstracts the methods of a WebSocket connection needed by WebsocketConnection.
+type GorillaWsConnectionAdapter interface {
+	// ReadMessage reads a message from the WebSocket connection.
+	ReadMessage() (messageType int, p []byte, err error)
+	// NextWriter returns a writer for the next message to be sent on the WebSocket connection.
+	NextWriter(messageType int) (io.WriteCloser, error)
+	// Close closes the WebSocket connection.
+	Close() error
 }
 
 // WebsocketConnection represents an active WebSocket connection.
@@ -38,12 +56,14 @@ type WebsocketConnection struct {
 	// UserID is the authenticated user's identifier (empty if not authenticated)
 	userID string
 	// websocketConn is the underlying WebSocket connection
-	websocketConn *websocket.Conn
+	websocketConn GorillaWsConnectionAdapter
+	// writeTimeout is the maximum duration to wait for a write to complete
+	writeTimeout time.Duration
+
 	// logger is used for logging events related to this connection
 	logger log.Logger
-	// onMessageSentHandlers are callbacks that are called when a message is sent
-	onMessageSentHandlers []func()
-
+	// onMessageSentHandler is called when a message is sent
+	onMessageSentHandler func([]byte)
 	// writeSink is the channel for sending messages to this connection
 	writeSink chan []byte
 	// processSink is the channel for processing incoming messages
@@ -55,23 +75,54 @@ type WebsocketConnection struct {
 	mu sync.RWMutex
 }
 
+type WebsocketConnectionConfig struct {
+	ConnectionID  string
+	UserID        string
+	WebsocketConn GorillaWsConnectionAdapter
+
+	WriteTimeout         time.Duration
+	WriteBufferSize      int
+	ProcessBufferSize    int
+	Logger               log.Logger
+	OnMessageSentHandler func([]byte)
+}
+
 // NewWebsocketConnection creates a new Connection instance.
-func NewWebsocketConnection(connID, userID string, websocketConn *websocket.Conn, logger log.Logger, onMessageSentHandlers ...func()) *WebsocketConnection {
-	if onMessageSentHandlers == nil {
-		onMessageSentHandlers = []func(){}
+func NewWebsocketConnection(config WebsocketConnectionConfig) (*WebsocketConnection, error) {
+	if config.ConnectionID == "" {
+		return nil, fmt.Errorf("connection ID cannot be empty")
+	}
+	if config.WebsocketConn == nil {
+		return nil, fmt.Errorf("websocket connection cannot be nil")
+	}
+	if config.Logger == nil {
+		config.Logger = log.NewNoopLogger()
+	}
+	if config.WriteTimeout <= 0 {
+		config.WriteTimeout = defaultWsConnWriteTimeout
+	}
+	if config.WriteBufferSize <= 0 {
+		config.WriteBufferSize = defaultWsConnWriteBufferSize
+	}
+	if config.ProcessBufferSize <= 0 {
+		config.ProcessBufferSize = defaultWsConnProcessBufferSize
+	}
+	if config.OnMessageSentHandler == nil {
+		config.OnMessageSentHandler = func([]byte) {}
 	}
 
 	return &WebsocketConnection{
-		connectionID:          connID,
-		userID:                userID,
-		websocketConn:         websocketConn,
-		logger:                logger.WithKV("connectionID", connID),
-		onMessageSentHandlers: onMessageSentHandlers,
+		connectionID:  config.ConnectionID,
+		userID:        config.UserID,
+		websocketConn: config.WebsocketConn,
+		writeTimeout:  config.WriteTimeout,
 
-		writeSink:   make(chan []byte, 10),
-		processSink: make(chan []byte, 10),
-		closeConnCh: make(chan struct{}, 1),
-	}
+		logger:               config.Logger.WithKV("connectionID", config.ConnectionID),
+		onMessageSentHandler: config.OnMessageSentHandler,
+		writeSink:            make(chan []byte, config.WriteBufferSize),
+		processSink:          make(chan []byte, config.ProcessBufferSize),
+		closeConnCh:          make(chan struct{}, 1),
+	}, nil
 }
 
 // Serve starts the connection's lifecycle.
@@ -89,10 +140,15 @@ func (conn *WebsocketConnection) Serve(parentCtx context.Context, handleClosure 
 	// Create a child context that can be cancelled to stop all goroutines
 	childCtx, cancel := context.WithCancel(parentCtx)
 	wg := &sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(3)
 
 	var closureErr error
+	var closureErrMu sync.Mutex
 	childHandleClosure := func(err error) {
+		closureErrMu.Lock()
+		defer closureErrMu.Unlock()
+
+		// Capture the first error encountered
 		if err != nil && closureErr == nil {
 			closureErr = err
 		}
@@ -113,6 +169,11 @@ func (conn *WebsocketConnection) Serve(parentCtx context.Context, handleClosure 
 	go func() {
 		// Wait for all goroutines to finish
 		wg.Wait()
+
+		closureErrMu.Lock()
+		defer closureErrMu.Unlock()
+
+		// Invoke the closure handler with any error that occurred
 		handleClosure(closureErr)
 
 		// Close the WebSocket connection
@@ -149,8 +210,8 @@ func (conn *WebsocketConnection) RawRequests() <-chan []byte {
 // WriteRawResponse sends a message to the connection's write sink.
 // If the write operation takes too long, it signals the connection to close.
 // This is useful for preventing hangs if the client is unresponsive.
-func (conn *WebsocketConnection) WriteRawResponse(message []byte) {
-	timer := time.NewTimer(defaultResponseWriteDuration)
+func (conn *WebsocketConnection) WriteRawResponse(message []byte) bool {
+	timer := time.NewTimer(conn.writeTimeout)
 	defer timer.Stop()
 
 	select {
@@ -159,9 +220,9 @@ func (conn *WebsocketConnection) WriteRawResponse(message []byte) {
 		case conn.closeConnCh <- struct{}{}:
 		default:
 		}
-		return
+		return false
 	case conn.writeSink <- message:
-		return
+		return true
 	}
 }
 
@@ -222,10 +283,7 @@ func (conn *WebsocketConnection) writeMessages(ctx context.Context, handleClosur
 				continue
 			}
 
-			// Call all message sent handlers
-			for _, handler := range conn.onMessageSentHandlers {
-				handler()
-			}
+			conn.onMessageSentHandler(messageBytes)
 		}
 	}
 }

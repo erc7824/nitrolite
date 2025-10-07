@@ -124,9 +124,13 @@ func (d *WebsocketDialer) Dial(parentCtx context.Context, url string, handleClos
 	wg := sync.WaitGroup{}
 	wg.Add(3) // We'll start 3 goroutines
 
-	// Track the first error that causes closure
 	var closureErr error
+	var closureErrMu sync.Mutex
 	childHandleClosure := func(err error) {
+		closureErrMu.Lock()
+		defer closureErrMu.Unlock()
+
+		// Capture the first error encountered
 		if err != nil && closureErr == nil {
 			closureErr = err
 		}
@@ -153,6 +157,11 @@ func (d *WebsocketDialer) Dial(parentCtx context.Context, url string, handleClos
 	// Wait for all goroutines to finish before calling the closure handler
 	go func() {
 		wg.Wait()
+
+		closureErrMu.Lock()
+		defer closureErrMu.Unlock()
+
+		// Invoke the closure handler with any error that occurred
 		handleClosure(closureErr)
 	}()
 

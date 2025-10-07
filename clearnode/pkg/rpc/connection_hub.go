@@ -28,6 +28,10 @@ func NewConnectionHub() *ConnectionHub {
 // Add adds a connection to the hub.
 // If the connection has a UserID, it also updates the auth mapping.
 func (hub *ConnectionHub) Add(conn Connection) error {
+	if conn == nil {
+		return fmt.Errorf("connection cannot be nil")
+	}
+
 	connID := conn.ConnectionID()
 	userID := conn.UserID()
 
@@ -141,7 +145,6 @@ func (hub *ConnectionHub) Publish(userID string, response []byte) {
 	for connID := range connIDs {
 		conn := hub.connections[connID]
 		if conn == nil {
-			delete(connIDs, connID)
 			continue // Skip if connection is nil or write sink is not set
 		}
 

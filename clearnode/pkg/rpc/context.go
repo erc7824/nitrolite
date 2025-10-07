@@ -93,7 +93,7 @@ func (c *Context) Fail(err error, fallbackMessage string) {
 		message = err.Error()
 	}
 	if message == "" {
-		message = nodeDefaultErrorMessage
+		message = defaultNodeErrorMessage
 	}
 
 	c.Response = NewErrorResponse(

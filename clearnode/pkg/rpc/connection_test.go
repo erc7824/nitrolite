@@ -1,163 +1,210 @@
-package rpc
+package rpc_test
 
 import (
+	"context"
+	"io"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/log"
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 )
 
-func TestConnectionWrite(t *testing.T) {
-	logger := log.NewNoopLogger()
+func TestNewWebsocketConnection(t *testing.T) {
+	cfg := rpc.WebsocketConnectionConfig{}
+	_, err := rpc.NewWebsocketConnection(cfg)
+	require.Equal(t, "connection ID cannot be empty", err.Error())
 
-	t.Run("successful write", func(t *testing.T) {
-		connID := "conn1"
-		userID := "user1"
-		writeChan := make(chan []byte, 1)
-		processSink := make(chan []byte, 1)
-		closeChan := make(chan struct{}, 1)
-		conn := &WebsocketConnection{
-			connectionID: connID,
-			userID:       userID,
-			logger:       logger.WithKV("connectionID", connID),
-			writeSink:    writeChan,
-			processSink:  processSink,
-			closeConnCh:  closeChan,
-		}
+	cfg.ConnectionID = "conn1"
+	_, err = rpc.NewWebsocketConnection(cfg)
+	require.Equal(t, "websocket connection cannot be nil", err.Error())
 
-		message := []byte("test message")
-		conn.WriteRawResponse(message)
+	cfg.WebsocketConn = &websocket.Conn{}
+	conn, err := rpc.NewWebsocketConnection(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+	require.Equal(t, cfg.ConnectionID, conn.ConnectionID())
+	require.Equal(t, cfg.UserID, conn.UserID())
+	require.Equal(t, 10, cap(conn.RawRequests()))
 
-		select {
-		case received := <-writeChan:
-			assert.Equal(t, message, received)
-		case <-time.After(100 * time.Millisecond):
-			t.Fatal("message not received")
-		}
-
-		assert.Empty(t, closeChan, "close channel should be empty")
-	})
-
-	t.Run("write timeout triggers connection close", func(t *testing.T) {
-		connID := "conn1"
-		userID := "user1"
-		writeChan := make(chan []byte)
-		processSink := make(chan []byte, 1)
-		closeChan := make(chan struct{}, 1)
-		conn := &WebsocketConnection{
-			connectionID: connID,
-			userID:       userID,
-			logger:       logger.WithKV("connectionID", connID),
-			writeSink:    writeChan,
-			processSink:  processSink,
-			closeConnCh:  closeChan,
-		}
-
-		originalTimeout := defaultResponseWriteDuration
-		defaultResponseWriteDuration = 50 * time.Millisecond
-		defer func() { defaultResponseWriteDuration = originalTimeout }()
-
-		message := []byte("test message")
-		conn.WriteRawResponse(message)
-
-		select {
-		case <-closeChan:
-			// Success - connection close was triggered
-		case <-time.After(100 * time.Millisecond):
-			t.Fatal("connection close not triggered")
-		}
-	})
+	cfg.UserID = "user1"
+	cfg.ProcessBufferSize = 20
+	conn, err = rpc.NewWebsocketConnection(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+	require.Equal(t, cfg.ConnectionID, conn.ConnectionID())
+	require.Equal(t, cfg.UserID, conn.UserID())
+	require.Equal(t, cfg.ProcessBufferSize, cap(conn.RawRequests()))
 }
 
-func TestConnectionHub(t *testing.T) {
-	logger := log.NewNoopLogger()
-	hub := NewConnectionHub()
-	var err error
+func TestWebsocketConnection_Serve(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	wsConnMock := newGorillaWsConnMock(ctx)
 
-	userID1 := "user1"
-	userID2 := "user2"
-
-	// Add connections
-	connID1 := "conn1"
-	writeChan1 := make(chan []byte, 10)
-	processSink1 := make(chan []byte, 10)
-	closeChan1 := make(chan struct{}, 1)
-	conn1 := &WebsocketConnection{
-		connectionID: connID1,
-		userID:       userID1,
-		logger:       logger,
-		writeSink:    writeChan1,
-		processSink:  processSink1,
-		closeConnCh:  closeChan1,
+	cfg := rpc.WebsocketConnectionConfig{
+		ConnectionID:  "conn1",
+		WebsocketConn: wsConnMock,
 	}
-	err = hub.Add(conn1)
+	conn, err := rpc.NewWebsocketConnection(cfg)
 	require.NoError(t, err)
+	require.NotNil(t, conn)
 
-	connID2 := "conn2"
-	writeChan2 := make(chan []byte, 10)
-	processSink2 := make(chan []byte, 10)
-	closeChan2 := make(chan struct{}, 1)
-	conn2 := &WebsocketConnection{
-		connectionID: connID2,
-		userID:       userID1, // Same user as conn1
-		logger:       logger,
-		writeSink:    writeChan2,
-		processSink:  processSink2,
-		closeConnCh:  closeChan2,
+	var closureErr error
+	var closureErrMu sync.Mutex
+	handleClosure := func(err error) {
+		closureErrMu.Lock()
+		defer closureErrMu.Unlock()
+
+		closureErr = err
 	}
-	err = hub.Add(conn2)
-	require.NoError(t, err)
+	conn.Serve(ctx, handleClosure)
+	conn.Serve(ctx, handleClosure) // Second call should be no-op
 
-	connID3 := "conn3"
-	writeChan3 := make(chan []byte, 10)
-	processSink3 := make(chan []byte, 10)
-	closeChan3 := make(chan struct{}, 1)
-	conn3 := &WebsocketConnection{
-		connectionID: connID3,
-		userID:       userID2, // Same user as conn1
-		logger:       logger,
-		writeSink:    writeChan3,
-		processSink:  processSink3,
-		closeConnCh:  closeChan3,
+	msg := "message1"
+	wsConnMock.addMessageToRead(msg)
+
+	select {
+	case processedMsg := <-conn.RawRequests():
+		require.Equal(t, msg, string(processedMsg))
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("message was not processed in time")
 	}
-	err = hub.Add(conn3)
+
+	ok := conn.WriteRawResponse([]byte(msg))
+	require.True(t, ok)
+	time.Sleep(100 * time.Millisecond) // Allow some time for the write to complete
+
+	lastWritten := wsConnMock.getLastWrittenMessage()
+	require.Equal(t, msg, lastWritten)
+	require.Equal(t, 1, wsConnMock.getCalledCloseCount())
+
+	cancel() // Cancel the context to stop the connection
+	time.Sleep(100 * time.Millisecond)
+
+	closureErrMu.Lock()
+	defer closureErrMu.Unlock()
+
+	require.NoError(t, closureErr)
+	require.Equal(t, 2, wsConnMock.getCalledCloseCount())
+}
+
+func TestWebsocketConnection_ConnectionID(t *testing.T) {
+	cfg := rpc.WebsocketConnectionConfig{
+		ConnectionID:  "conn1",
+		WebsocketConn: &websocket.Conn{},
+	}
+	conn, err := rpc.NewWebsocketConnection(cfg)
 	require.NoError(t, err)
+	require.Equal(t, cfg.ConnectionID, conn.ConnectionID())
+}
 
-	// Verify connections
-	assert.Equal(t, conn1, hub.Get(connID1))
-	assert.Equal(t, conn2, hub.Get(connID2))
-	assert.Equal(t, conn3, hub.Get(connID3))
+func TestWebsocketConnection_UserID(t *testing.T) {
+	cfg := rpc.WebsocketConnectionConfig{
+		ConnectionID:  "conn1",
+		UserID:        "user1",
+		WebsocketConn: &websocket.Conn{},
+	}
+	conn, err := rpc.NewWebsocketConnection(cfg)
+	require.NoError(t, err)
+	require.Equal(t, cfg.UserID, conn.UserID())
+}
 
-	// Publish to user1
-	message1 := []byte("message for user1")
-	hub.Publish(userID1, message1)
+func TestWebsocketConnection_SetUserID(t *testing.T) {
+	cfg := rpc.WebsocketConnectionConfig{
+		ConnectionID:  "conn1",
+		WebsocketConn: &websocket.Conn{},
+	}
+	conn, err := rpc.NewWebsocketConnection(cfg)
+	require.NoError(t, err)
+	require.Equal(t, "", conn.UserID())
 
-	// Both user1 connections should receive
-	require.Equal(t, message1, <-writeChan1)
-	require.Equal(t, message1, <-writeChan2)
+	newUserID := "user1"
+	conn.SetUserID(newUserID)
+	require.Equal(t, newUserID, conn.UserID())
+}
 
-	// user2 should not receive
-	assert.Empty(t, writeChan3)
+func TestWebsocketConnection_WriteRawResponse(t *testing.T) {
+	wsConnMock := newGorillaWsConnMock(context.Background())
+	cfg := rpc.WebsocketConnectionConfig{
+		ConnectionID:    "conn1",
+		WebsocketConn:   wsConnMock,
+		WriteBufferSize: 1,
+		WriteTimeout:    100 * time.Millisecond,
+	}
+	conn, err := rpc.NewWebsocketConnection(cfg)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
 
-	// Remove one connection for user1
-	hub.Remove(connID1)
-	assert.Nil(t, hub.Get(connID1))
+	require.True(t, conn.WriteRawResponse([]byte("msg1")))
+	require.False(t, conn.WriteRawResponse([]byte("msg2"))) // This should block until the first message is sent
+}
 
-	// Publish again
-	message2 := []byte("second message")
-	hub.Publish(userID1, message2)
+type gorillaWsConnMock struct {
+	ctx                context.Context
+	messageToReadCh    chan []byte
+	lastWrittenMessage []byte
+	calledCloseCount   int
 
-	// Only conn2 should receive now
-	require.Equal(t, message2, <-writeChan2)
-	assert.Empty(t, writeChan1)
+	mu sync.Mutex
+}
 
-	// Remove all connections
-	hub.Remove(connID2)
-	hub.Remove(connID3)
+func newGorillaWsConnMock(ctx context.Context) *gorillaWsConnMock {
+	return &gorillaWsConnMock{
+		ctx:             ctx,
+		messageToReadCh: make(chan []byte, 1),
+	}
+}
 
-	assert.Empty(t, hub.connections)
-	assert.Empty(t, hub.authMapping)
+func (m *gorillaWsConnMock) ReadMessage() (messageType int, p []byte, err error) {
+	select {
+	case <-m.ctx.Done():
+		return 0, nil, &websocket.CloseError{
+			Code: websocket.CloseNormalClosure,
+			Text: "context cancelled",
+		}
+	case msg := <-m.messageToReadCh:
+		// Simulate reading a message
+		return websocket.TextMessage, msg, nil
+	}
+}
+
+func (m *gorillaWsConnMock) NextWriter(messageType int) (io.WriteCloser, error) {
+	return m, nil
+}
+
+func (m *gorillaWsConnMock) Write(p []byte) (n int, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.lastWrittenMessage = p
+	return len(p), nil
+}
+
+func (m *gorillaWsConnMock) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.calledCloseCount++
+	return nil
+}
+
+func (m *gorillaWsConnMock) addMessageToRead(msg string) {
+	m.messageToReadCh <- []byte(msg)
+}
+
+func (m *gorillaWsConnMock) getLastWrittenMessage() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return string(m.lastWrittenMessage)
+}
+
+func (m *gorillaWsConnMock) getCalledCloseCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.calledCloseCount
 }

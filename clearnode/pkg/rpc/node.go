@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/log"
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
@@ -25,14 +24,34 @@ const (
 	nodeGroupRoot = "root"
 )
 
+type Node interface {
+	Handle(method string, handler Handler)
+	Notify(userID string, method string, params Params)
+	Use(middleware Handler)
+	NewGroup(name string) HandlerGroup
+	OnConnect(handler func(send SendResponseFunc))
+	OnDisconnect(handler func(userID string))
+	OnMessageSent(handler func())
+	OnAuthenticated(handler func(userID string, send SendResponseFunc))
+}
+
+type HandlerGroup interface {
+	Handle(method string, handler Handler)
+	Use(middleware Handler)
+	NewGroup(name string) HandlerGroup
+}
+
 var (
-	defaultRPCMessageWriteDuration = 5 * time.Second // Default timeout for writing messages to WebSocket
+	_ Node         = &WebsocketNode{}
+	_ http.Handler = &WebsocketNode{}
+
+	_ HandlerGroup = &WebsocketHandlerGroup{}
 )
 
-// Node is a WebSocket-based RPC server that handles incoming connections,
+// WebsocketNode is a WebSocket-based RPC server that handles incoming connections,
 // routes messages to registered handlers and signs all responses.
 // It supports middleware chains and handler groups for organizing endpoints.
-type Node struct {
+type WebsocketNode struct {
 	// upgrader handles the HTTP to WebSocket protocol upgrade
 	upgrader websocket.Upgrader
 
@@ -57,10 +76,10 @@ type Node struct {
 	onAuthenticatedHandlers []func(userID string, send SendResponseFunc)
 }
 
-// NewNode creates a new RPC node instance with the provided signer and logger.
+// NewWebsocketNode creates a new RPC node instance with the provided signer and logger.
 // The signer is used to sign all outgoing messages, ensuring message authenticity.
-func NewNode(signer sign.Signer, logger log.Logger) *Node {
-	return &Node{
+func NewWebsocketNode(signer sign.Signer, logger log.Logger) *WebsocketNode {
+	return &WebsocketNode{
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -84,33 +103,33 @@ func NewNode(signer sign.Signer, logger log.Logger) *Node {
 	}
 }
 
-// HandleConnection is the main entry point for WebSocket connections.
+// ServeHTTP is the main entry point for WebSocket connections.
 // It upgrades the HTTP connection to WebSocket, manages concurrent read/write operations,
 // processes incoming RPC messages, and handles connection lifecycle events.
 // This method blocks until the connection is closed.
-func (n *Node) HandleConnection(w http.ResponseWriter, r *http.Request) {
-	conn, err := n.upgrader.Upgrade(w, r, nil)
+func (n *WebsocketNode) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	wsConnection, err := n.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		n.logger.Error("failed to upgrade connection to WebSocket", "error", err)
 		return
 	}
-	defer conn.Close()
+	defer wsConnection.Close()
 
 	connectionID := uuid.NewString()
-	rpcConnection := NewConnection(connectionID, "", conn, n.logger, n.onMessageSentHandlers...)
-	if err := n.connHub.Add(rpcConnection); err != nil {
+	connection := NewWebsocketConnection(connectionID, "", wsConnection, n.logger, n.onMessageSentHandlers...)
+	if err := n.connHub.Add(connection); err != nil {
 		n.logger.Error("failed to add connection to hub", "error", err, "connectionID", connectionID)
 		return
 	}
 
 	// Notify all onConnect handlers about the new connection
 	for _, handler := range n.onConnectHandlers {
-		handler(n.getSendMessageFunc(rpcConnection))
+		handler(n.getSendResponseFunc(connection))
 	}
 
 	// Cleanup function executed when connection closes
 	defer func() {
-		userID := rpcConnection.UserID()
+		userID := connection.UserID()
 		n.connHub.Remove(connectionID)
 
 		// Notify all onDisconnect handlers about the closed connection
@@ -124,21 +143,21 @@ func (n *Node) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	parentCtx, cancel := context.WithCancel(r.Context())
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
-	abortOthers := func() {
+	childHandleClosure := func(_ error) {
 		cancel()  // Trigger exit on other goroutines
 		wg.Done() // Decrement the wait group counter
 	}
 
-	go rpcConnection.Serve(parentCtx, abortOthers)
-	go n.processMessages(rpcConnection, parentCtx, abortOthers)
+	go connection.Serve(parentCtx, childHandleClosure)
+	go n.processRequests(connection, parentCtx, childHandleClosure)
 
 	wg.Wait()
 }
 
-// processMesages handles incoming messages from the RPCConnection.
+// processRequests handles incoming requests from the WebsocketConnection.
 // It validates messages, routes them to appropriate handlers, and manages authentication.
-func (n *Node) processMessages(conn *Connection, ctx context.Context, abortOthers context.CancelFunc) {
-	defer abortOthers() // Stop other goroutines when done
+func (n *WebsocketNode) processRequests(conn Connection, ctx context.Context, handleClosure func(error)) {
+	defer handleClosure(nil) // Stop other goroutines when done
 	safeStorage := NewSafeStorage()
 
 read_loop:
@@ -148,7 +167,7 @@ read_loop:
 		case <-ctx.Done():
 			n.logger.Debug("context done, stopping message processing")
 			return
-		case messageBytes = <-conn.ProcessSink():
+		case messageBytes = <-conn.RawRequests():
 			if len(messageBytes) == 0 {
 				return // Exit if the message is empty (connection closed)
 			}
@@ -200,7 +219,7 @@ read_loop:
 			n.logger.Error("failed to prepare response", "error", err, "method", req.Req.Method)
 			continue
 		}
-		conn.Write(responseBytes)
+		conn.WriteRawResponse(responseBytes)
 
 		// Handle re-authentication
 		if conn.UserID() != ctx.UserID {
@@ -209,135 +228,134 @@ read_loop:
 
 			// Notify authenticated handlers about the new user ID
 			for _, handler := range n.onAuthenticatedHandlers {
-				handler(ctx.UserID, n.getSendMessageFunc(conn))
+				handler(ctx.UserID, n.getSendResponseFunc(conn))
 			}
 		}
 	}
 }
 
-// Handler is a function that processes an RPC request.
-// Handlers can call c.Next() to pass control to the next handler in the chain.
-type Handler func(c *Context)
-
-// SendRResponseFunc is a function type for sending RPC notifications to a connection.
-// It's provided to event handlers to allow server-initiated messages.
-type SendResponseFunc func(method string, params Params)
-
-// Context contains all the information about an RPC request and provides
-// methods for handlers to process and respond to the request.
-type Context struct {
-	// Context is the standard Go context for the request
-	Context context.Context
-	// UserID is the authenticated user's identifier (empty if not authenticated)
-	UserID string
-	// Signer is used to sign the response message
-	Signer sign.Signer
-	// Request is the original RPC request message
-	Request Request
-	// Response is the response message to be sent back to the client
-	Response Response
-	// Storage provides per-connection storage for session data
-	Storage *SafeStorage
-
-	// handlers is the remaining handler chain to execute
-	handlers []Handler
+// NewGroup creates a new handler group with the given name.
+// Groups allow organizing handlers with shared middleware.
+// Example: privGroup := node.NewGroup("private"); privGroup.Use(authMiddleware)
+func (wn *WebsocketNode) NewGroup(name string) HandlerGroup {
+	return &WebsocketHandlerGroup{
+		groupId:     nodeGroupHandlerPrefix + name,
+		routePrefix: []string{wn.groupId},
+		root:        wn,
+	}
 }
 
-// Next executes the next handler in the middleware chain.
-// If there are no more handlers, it returns without doing anything.
-func (c *Context) Next() {
-	if len(c.handlers) == 0 {
+// Handle registers a handler for the specified RPC method.
+// The handler will be called when a message with the matching method is received.
+func (wn *WebsocketNode) Handle(method string, handler Handler) {
+	wn.handle(method, handler)
+	wn.routes[method] = []string{wn.groupId, method}
+}
+
+// handle is the internal method for registering handlers.
+// It validates inputs and stores the handler in the handler chain.
+func (wn *WebsocketNode) handle(method string, handler Handler) {
+	if method == "" {
+		panic("Websocket method cannot be empty")
+	}
+	if handler == nil {
+		panic(fmt.Sprintf("Websocket handler cannot be nil for method %s", method))
+	}
+
+	wn.handlerChain[method] = []Handler{handler}
+}
+
+// Use adds middleware to the root handler group.
+// Middleware will be executed for all requests before reaching the final handler.
+func (wn *WebsocketNode) Use(middleware Handler) {
+	wn.use(wn.groupId, middleware)
+}
+
+// use is the internal method for adding middleware to a specific group.
+// Middleware is appended to the group's handler chain.
+func (wn *WebsocketNode) use(groupId string, middleware Handler) {
+	if middleware == nil {
+		panic("Websocket middleware handler cannot be nil for group")
+	}
+
+	if _, exists := wn.handlerChain[groupId]; !exists {
+		wn.handlerChain[groupId] = []Handler{}
+	}
+
+	wn.handlerChain[groupId] = append(wn.handlerChain[groupId], middleware)
+}
+
+// OnConnect registers a handler to be called when a new WebSocket connection is established.
+// The handler receives a send function for sending messages to the new connection.
+func (wn *WebsocketNode) OnConnect(handler func(send SendResponseFunc)) {
+	wn.onConnectHandlers = append(wn.onConnectHandlers, handler)
+}
+
+// OnDisconnect registers a handler to be called when a WebSocket connection is closed.
+// The handler receives the user ID if the connection was authenticated.
+func (wn *WebsocketNode) OnDisconnect(handler func(userID string)) {
+	wn.onDisconnectHandlers = append(wn.onDisconnectHandlers, handler)
+}
+
+// OnMessageSent registers a handler to be called after a message is sent to a client.
+// This can be used for metrics, logging, or other post-send operations.
+func (wn *WebsocketNode) OnMessageSent(handler func()) {
+	wn.onMessageSentHandlers = append(wn.onMessageSentHandlers, handler)
+}
+
+// OnAuthenticated registers a handler to be called when a connection successfully authenticates.
+// The handler receives the user ID and a send function for the authenticated connection.
+func (wn *WebsocketNode) OnAuthenticated(handler func(userID string, send SendResponseFunc)) {
+	wn.onAuthenticatedHandlers = append(wn.onAuthenticatedHandlers, handler)
+}
+
+// Notify sends a server-initiated notification to a specific authenticated user.
+// If the user is not connected, the notification is silently dropped.
+func (wn *WebsocketNode) Notify(userID, method string, params Params) {
+	message, err := prepareRawNotification(wn.signer, method, params)
+	if err != nil {
+		wn.logger.Error("failed to prepare notification message", "error", err, "userID", userID, "method", method)
 		return
 	}
 
-	handler := c.handlers[0]
-	c.handlers = c.handlers[1:]
-	handler(c)
+	wn.connHub.Publish(userID, message)
 }
 
-// Succeed sets a successful response with the given method and parameters.
-// This should be called by handlers to indicate successful processing.
-func (c *Context) Succeed(method string, params Params) {
-	c.Response.Res = NewPayload(
-		c.Request.Req.RequestID,
-		method,
-		params,
-	)
-}
+// getSendResponseFunc creates a SendResponseFunc for a specific connection.
+// The returned function can be used to send notifications to that connection.
+func (wn *WebsocketNode) getSendResponseFunc(conn Connection) SendResponseFunc {
+	return func(method string, params Params) {
+		responseBytes, err := prepareRawNotification(wn.signer, method, params)
+		if err != nil {
+			wn.logger.Error("failed to prepare notification message", "error", err, "method", method)
+			return
+		}
 
-// Fail sets an error response for the RPC request. This method should be called by handlers
-// when an error occurs during request processing.
-//
-// Error handling behavior:
-//   - If err is an RPCError: The exact error message is sent to the client
-//   - If err is any other error type: The fallbackMessage is sent to the client
-//   - If both err is nil/non-RPCError AND fallbackMessage is empty: A generic error message is sent
-//
-// This design allows handlers to control what error information is exposed to clients:
-//   - Use RPCError for client-safe, descriptive error messages
-//   - Use regular errors with a fallbackMessage to hide internal error details
-//
-// Usage examples:
-//
-//	// Hide internal error details from client
-//	balance, err := ledger.GetBalance(account)
-//	if err != nil {
-//		c.Fail(err, "failed to retrieve balance")
-//		return
-//	}
-//
-//	// Validation error with no internal error
-//	if len(params) < 3 {
-//		c.Fail(nil, "invalid parameters: expected at least 3")
-//		return
-//	}
-//
-// The response will have Method="error" and Params containing the error message.
-func (c *Context) Fail(err error, fallbackMessage string) {
-	message := fallbackMessage
-	if _, ok := err.(Error); ok {
-		message = err.Error()
-		fmt.Println(err)
+		if conn == nil {
+			wn.logger.Error("RPCConnection is nil, cannot send message", "method", method)
+			return
+		}
+
+		conn.WriteRawResponse(responseBytes)
 	}
-	if message == "" {
-		message = nodeDefaultErrorMessage
+}
+
+// sendErrorResponse sends an error response to a connection.
+// It's used for protocol-level errors before request processing.
+func (wn *WebsocketNode) sendErrorResponse(conn Connection, requestID uint64, message string) {
+	if conn == nil {
+		wn.logger.Error("connection is nil, cannot send error response", "requestID", requestID)
+		return
 	}
 
-	c.Response = NewErrorResponse(
-		c.Request.Req.RequestID,
-		message,
-	)
-}
-
-// GetRawResponse returns the signed response message as raw bytes.
-// This is called internally after handler processing to prepare the response.
-func (c *Context) GetRawResponse() ([]byte, error) {
-	return prepareRawResponse(c.Signer, c.Response.Res)
-}
-
-// prepareRawResponse creates a signed RPC response message from the given data.
-// It marshals the data, signs it, and returns the complete message as bytes.
-func prepareRawResponse(signer sign.Signer, payload Payload) ([]byte, error) {
-	payloadHash, err := payload.Hash()
+	res := NewErrorResponse(requestID, message)
+	responseBytes, err := prepareRawResponse(wn.signer, res.Res)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash response payload: %w", err)
+		wn.logger.Error("failed to prepare error response", "error", err)
+		return
 	}
 
-	signature, err := signer.Sign(payloadHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign response data: %w", err)
-	}
-
-	responseMessage := &Response{
-		Res: payload,
-		Sig: []sign.Signature{signature},
-	}
-	resMessageBytes, err := json.Marshal(responseMessage)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal response message: %w", err)
-	}
-
-	return resMessageBytes, nil
+	conn.WriteRawResponse(responseBytes)
 }
 
 // prepareRawNotification creates a signed server-initiated notification message.
@@ -353,145 +371,21 @@ func prepareRawNotification(signer sign.Signer, method string, params Params) ([
 	return responseBytes, nil
 }
 
-// NewGroup creates a new handler group with the given name.
-// Groups allow organizing handlers with shared middleware.
-// Example: privGroup := node.NewGroup("private"); privGroup.Use(authMiddleware)
-func (wn *Node) NewGroup(name string) *HandlerGroup {
-	return &HandlerGroup{
-		groupId:     nodeGroupHandlerPrefix + name,
-		routePrefix: []string{wn.groupId},
-		root:        wn,
-	}
-}
-
-// Handle registers a handler for the specified RPC method.
-// The handler will be called when a message with the matching method is received.
-func (wn *Node) Handle(method string, handler Handler) {
-	wn.handle(method, handler)
-	wn.routes[method] = []string{wn.groupId, method}
-}
-
-// handle is the internal method for registering handlers.
-// It validates inputs and stores the handler in the handler chain.
-func (wn *Node) handle(method string, handler Handler) {
-	if method == "" {
-		panic("Websocket method cannot be empty")
-	}
-	if handler == nil {
-		panic(fmt.Sprintf("Websocket handler cannot be nil for method %s", method))
-	}
-
-	wn.handlerChain[method] = []Handler{handler}
-}
-
-// Use adds middleware to the root handler group.
-// Middleware will be executed for all requests before reaching the final handler.
-func (wn *Node) Use(middleware Handler) {
-	wn.use(wn.groupId, middleware)
-}
-
-// use is the internal method for adding middleware to a specific group.
-// Middleware is appended to the group's handler chain.
-func (wn *Node) use(groupId string, middleware Handler) {
-	if middleware == nil {
-		panic("Websocket middleware handler cannot be nil for group")
-	}
-
-	if _, exists := wn.handlerChain[groupId]; !exists {
-		wn.handlerChain[groupId] = []Handler{}
-	}
-
-	wn.handlerChain[groupId] = append(wn.handlerChain[groupId], middleware)
-}
-
-// OnConnect registers a handler to be called when a new WebSocket connection is established.
-// The handler receives a send function for sending messages to the new connection.
-func (wn *Node) OnConnect(handler func(send SendResponseFunc)) {
-	wn.onConnectHandlers = append(wn.onConnectHandlers, handler)
-}
-
-// OnDisconnect registers a handler to be called when a WebSocket connection is closed.
-// The handler receives the user ID if the connection was authenticated.
-func (wn *Node) OnDisconnect(handler func(userID string)) {
-	wn.onDisconnectHandlers = append(wn.onDisconnectHandlers, handler)
-}
-
-// OnMessageSent registers a handler to be called after a message is sent to a client.
-// This can be used for metrics, logging, or other post-send operations.
-func (wn *Node) OnMessageSent(handler func()) {
-	wn.onMessageSentHandlers = append(wn.onMessageSentHandlers, handler)
-}
-
-// OnAuthenticated registers a handler to be called when a connection successfully authenticates.
-// The handler receives the user ID and a send function for the authenticated connection.
-func (wn *Node) OnAuthenticated(handler func(userID string, send SendResponseFunc)) {
-	wn.onAuthenticatedHandlers = append(wn.onAuthenticatedHandlers, handler)
-}
-
-// Notify sends a server-initiated notification to a specific authenticated user.
-// If the user is not connected, the notification is silently dropped.
-func (wn *Node) Notify(userID, method string, params Params) {
-	message, err := prepareRawNotification(wn.signer, method, params)
-	if err != nil {
-		wn.logger.Error("failed to prepare notification message", "error", err, "userID", userID, "method", method)
-		return
-	}
-
-	wn.connHub.Publish(userID, message)
-}
-
-// getSendMessageFunc creates a SendResponseFunc for a specific connection.
-// The returned function can be used to send notifications to that connection.
-func (wn *Node) getSendMessageFunc(conn *Connection) SendResponseFunc {
-	return func(method string, params Params) {
-		message, err := prepareRawNotification(wn.signer, method, params)
-		if err != nil {
-			wn.logger.Error("failed to prepare notification message", "error", err, "method", method)
-			return
-		}
-
-		if conn == nil {
-			wn.logger.Error("RPCConnection is nil, cannot send message", "method", method)
-			return
-		}
-
-		conn.Write(message)
-	}
-}
-
-// sendErrorResponse sends an error response to a connection.
-// It's used for protocol-level errors before request processing.
-func (wn *Node) sendErrorResponse(conn *Connection, requestID uint64, message string) {
-	if conn == nil {
-		wn.logger.Error("connection is nil, cannot send error response", "requestID", requestID)
-		return
-	}
-
-	res := NewErrorResponse(requestID, message)
-	responseBytes, err := prepareRawResponse(wn.signer, res.Res)
-	if err != nil {
-		wn.logger.Error("failed to prepare error response", "error", err)
-		return
-	}
-
-	conn.Write(responseBytes)
-}
-
-// HandlerGroup represents a collection of handlers with shared middleware.
+// WebsocketHandlerGroup represents a collection of handlers with shared middleware.
 // Groups can be nested to create hierarchical middleware chains.
-type HandlerGroup struct {
+type WebsocketHandlerGroup struct {
 	// groupId is the unique identifier for this group
 	groupId string
 	// routePrefix contains the chain of group IDs leading to this group
 	routePrefix []string
 	// root is a reference to the Node this group belongs to
-	root *Node
+	root *WebsocketNode
 }
 
 // NewGroup creates a nested handler group within this group.
 // The new group inherits all middleware from parent groups.
-func (hg *HandlerGroup) NewGroup(name string) *HandlerGroup {
-	return &HandlerGroup{
+func (hg *WebsocketHandlerGroup) NewGroup(name string) HandlerGroup {
+	return &WebsocketHandlerGroup{
 		groupId:     name,
 		routePrefix: append(hg.routePrefix, hg.groupId),
 		root:        hg.root,
@@ -500,47 +394,13 @@ func (hg *HandlerGroup) NewGroup(name string) *HandlerGroup {
 
 // Handle registers a handler for the specified RPC method within this group.
 // The handler will execute after all group middleware in the chain.
-func (hg *HandlerGroup) Handle(method string, handler Handler) {
+func (hg *WebsocketHandlerGroup) Handle(method string, handler Handler) {
 	hg.root.routes[method] = append(hg.routePrefix, hg.groupId, method)
 	hg.root.handle(method, handler)
 }
 
 // Use adds middleware to this handler group.
 // The middleware will execute for all handlers registered in this group.
-func (hg *HandlerGroup) Use(middleware Handler) {
+func (hg *WebsocketHandlerGroup) Use(middleware Handler) {
 	hg.root.use(hg.groupId, middleware)
-}
-
-// SafeStorage provides thread-safe key-value storage for connection-specific data.
-// It's used to store session information, authentication policies, and other per-connection state.
-type SafeStorage struct {
-	// mu protects concurrent access to the storage map
-	mu sync.RWMutex
-	// storage holds the key-value pairs
-	storage map[string]any
-}
-
-// NewSafeStorage creates a new thread-safe storage instance.
-func NewSafeStorage() *SafeStorage {
-	return &SafeStorage{
-		storage: make(map[string]any),
-	}
-}
-
-// Set stores a value with the given key.
-// If the key already exists, its value is overwritten.
-func (s *SafeStorage) Set(key string, value any) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.storage[key] = value
-}
-
-// Get retrieves a value by key.
-// Returns the value and true if found, or nil and false if not found.
-func (s *SafeStorage) Get(key string) (any, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	return s.storage[key], s.storage[key] != nil
 }

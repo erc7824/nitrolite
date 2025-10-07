@@ -28,7 +28,7 @@ func TestNode(t *testing.T) {
 	}).WithKV("module", "rpc_test")
 
 	// 1) Create an instance of RPCNode
-	node := NewNode(signer, logger)
+	node := NewWebsocketNode(signer, logger)
 	require.NotNil(t, node)
 
 	mu := sync.Mutex{}
@@ -205,7 +205,7 @@ func TestNode(t *testing.T) {
 	testGroupB.Handle(groupMethodB, createDummyHandler(groupMethodB))
 
 	// 4) Start server
-	server := httptest.NewServer(http.HandlerFunc(node.HandleConnection))
+	server := httptest.NewServer(http.HandlerFunc(node.ServeHTTP))
 	defer server.Close()
 
 	// Convert http:// to ws://

@@ -103,7 +103,7 @@ func NewWebsocketDialer(cfg WebsocketDialerConfig) *WebsocketDialer {
 //	        log.Error("Connection closed", "error", err)
 //	    }
 //	})
-func (d *WebsocketDialer) Dial(ctx context.Context, url string, handleClosure func(err error)) error {
+func (d *WebsocketDialer) Dial(parentCtx context.Context, url string, handleClosure func(err error)) error {
 	if d.IsConnected() {
 		return ErrAlreadyConnected
 	}
@@ -114,13 +114,13 @@ func (d *WebsocketDialer) Dial(ctx context.Context, url string, handleClosure fu
 	}
 
 	// Establish WebSocket connection
-	conn, _, err := dialer.DialContext(ctx, url, nil)
+	conn, _, err := dialer.DialContext(parentCtx, url, nil)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrDialingWebsocket, err)
 	}
 
 	// Create a cancelable context for managing goroutines
-	parentCtx, cancel := context.WithCancel(ctx)
+	childCtx, cancel := context.WithCancel(parentCtx)
 	wg := sync.WaitGroup{}
 	wg.Add(3) // We'll start 3 goroutines
 
@@ -138,17 +138,17 @@ func (d *WebsocketDialer) Dial(ctx context.Context, url string, handleClosure fu
 	// Store connection context
 	d.mu.Lock()
 	d.dialCtx = &dialCtx{
-		ctx:  parentCtx,
+		ctx:  childCtx,
 		conn: conn,
-		lg:   log.FromContext(ctx).WithName("ws-dialer"),
+		lg:   log.FromContext(parentCtx).WithName("ws-dialer"),
 	}
 	d.eventCh = make(chan *Response, d.cfg.EventChanSize)
 	d.mu.Unlock()
 
 	// Start background goroutines
-	go d.closeOnContextDone(parentCtx, childHandleClosure)
-	go d.readMessages(parentCtx, childHandleClosure)
-	go d.pingPeriodically(parentCtx, childHandleClosure)
+	go d.closeOnContextDone(childCtx, childHandleClosure)
+	go d.readMessages(childCtx, childHandleClosure)
+	go d.pingPeriodically(childCtx, childHandleClosure)
 
 	// Wait for all goroutines to finish before calling the closure handler
 	go func() {

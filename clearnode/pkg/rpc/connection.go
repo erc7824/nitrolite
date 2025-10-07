@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -10,9 +9,30 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Connection represents an active WebSocket connection.
+var (
+	defaultResponseWriteDuration = 5 * time.Second // Default timeout for writing responses to WebSocket
+)
+
+type Connection interface {
+	// ConnectionID returns the unique identifier for this connection
+	ConnectionID() string
+	// UserID returns the authenticated user's identifier for this connection
+	UserID() string
+	// SetUserID sets the UserID for this connection
+	SetUserID(userID string)
+	// RawRequests returns the channel for processing incoming requests
+	RawRequests() <-chan []byte
+	// Write sends a message to the connection's write sink
+	WriteRawResponse(message []byte)
+	// Serve starts the connection's lifecycle, handling reads and writes
+	Serve(parentCtx context.Context, handleClosure func(error))
+}
+
+// WebsocketConnection represents an active WebSocket connection.
 // It tracks the authentication, stores session data, and provides communication channels.
-type Connection struct {
+type WebsocketConnection struct {
+	// ctx is the parent context for managing goroutines
+	ctx context.Context
 	// connectionID is a unique identifier for this connection
 	connectionID string
 	// UserID is the authenticated user's identifier (empty if not authenticated)
@@ -31,17 +51,17 @@ type Connection struct {
 	// closeConnCh is a channel that can be used to signal connection closure
 	closeConnCh chan struct{}
 
-	// userMu is a mutex to protect access to user-related data
-	userMu sync.RWMutex
+	// mu is a mutex to protect access to user-related data
+	mu sync.RWMutex
 }
 
-// NewConnection creates a new Connection instance.
-func NewConnection(connID, userID string, websocketConn *websocket.Conn, logger log.Logger, onMessageSentHandlers ...func()) *Connection {
+// NewWebsocketConnection creates a new Connection instance.
+func NewWebsocketConnection(connID, userID string, websocketConn *websocket.Conn, logger log.Logger, onMessageSentHandlers ...func()) *WebsocketConnection {
 	if onMessageSentHandlers == nil {
 		onMessageSentHandlers = []func(){}
 	}
 
-	return &Connection{
+	return &WebsocketConnection{
 		connectionID:          connID,
 		userID:                userID,
 		websocketConn:         websocketConn,
@@ -56,62 +76,92 @@ func NewConnection(connID, userID string, websocketConn *websocket.Conn, logger 
 
 // Serve starts the connection's lifecycle.
 // It handles reading and writing messages, and waits for the connection to close.
-func (conn *Connection) Serve(parentCtx context.Context, abortParents func()) {
-	defer abortParents() // Stop parent goroutines when done
+func (conn *WebsocketConnection) Serve(parentCtx context.Context, handleClosure func(error)) {
+	conn.mu.Lock()
+	if conn.ctx != nil {
+		conn.mu.Unlock()
+		handleClosure(nil) // Connection is already running
+		return
+	}
+	conn.ctx = parentCtx
+	conn.mu.Unlock()
 
-	ctx, cancel := context.WithCancel(parentCtx)
+	// Create a child context that can be cancelled to stop all goroutines
+	childCtx, cancel := context.WithCancel(parentCtx)
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
-	abortOthers := func() {
+
+	var closureErr error
+	childHandleClosure := func(err error) {
+		if err != nil && closureErr == nil {
+			closureErr = err
+		}
+
 		cancel()  // Trigger exit on other goroutines
 		wg.Done() // Decrement the wait group counter
 	}
 
 	// Start reading messages from the WebSocket connection
-	go conn.readMessages(cancel)
+	go conn.readMessages(childHandleClosure)
 
 	// Start writing messages to the WebSocket connection
-	go conn.writeMessages(ctx, abortOthers)
+	go conn.writeMessages(childCtx, childHandleClosure)
 
 	// Wait for the WebSocket connection to close
-	go conn.waitForConnClose(ctx, abortOthers)
+	go conn.waitForConnClose(childCtx, childHandleClosure)
 
-	// Wait for all goroutines to finish
-	wg.Wait()
-	// Close the WebSocket connection
-	if err := conn.websocketConn.Close(); err != nil {
-		conn.logger.Error("error closing WebSocket connection", "error", err)
-	}
+	go func() {
+		// Wait for all goroutines to finish
+		wg.Wait()
+		handleClosure(closureErr)
+
+		// Close the WebSocket connection
+		if err := conn.websocketConn.Close(); err != nil {
+			conn.logger.Error("error closing WebSocket connection", "error", err)
+		}
+	}()
 }
 
 // ConnectionID returns the unique identifier for this connection.
-func (conn *Connection) ConnectionID() string {
+func (conn *WebsocketConnection) ConnectionID() string {
 	return conn.connectionID
 }
 
 // UserID returns the authenticated user's identifier for this connection.
-func (conn *Connection) UserID() string {
-	conn.userMu.RLock()
-	defer conn.userMu.RUnlock()
+func (conn *WebsocketConnection) UserID() string {
+	conn.mu.RLock()
+	defer conn.mu.RUnlock()
 	return conn.userID
 }
 
 // SetUserID sets the UserID for this connection.
-func (conn *Connection) SetUserID(userID string) {
-	conn.userMu.Lock()
-	defer conn.userMu.Unlock()
+func (conn *WebsocketConnection) SetUserID(userID string) {
+	conn.mu.Lock()
+	defer conn.mu.Unlock()
 	conn.userID = userID
 }
 
-// ProcessSink returns the channel for processing incoming messages.
-func (conn *Connection) ProcessSink() <-chan []byte {
+// RawRequests returns the channel for processing incoming requests.
+func (conn *WebsocketConnection) RawRequests() <-chan []byte {
 	return conn.processSink
+}
+
+// WriteRawResponse sends a message to the connection's write sink.
+// If the write operation takes too long, it signals the connection to close.
+// This is useful for preventing hangs if the client is unresponsive.
+func (conn *WebsocketConnection) WriteRawResponse(message []byte) {
+	select {
+	case <-time.After(defaultResponseWriteDuration):
+		conn.closeConnCh <- struct{}{} // Signal connection closure if write times out
+		return
+	case conn.writeSink <- message:
+		return
+	}
 }
 
 // readMessages listens for incoming messages on the WebSocket connection.
 // It reads messages and sends them to the processSink channel for further processing.
-func (conn *Connection) readMessages(abortOthers func()) {
-	defer abortOthers()           // Stop other goroutines when done
+func (conn *WebsocketConnection) readMessages(handleClosure func(error)) {
 	defer close(conn.processSink) // Close the processing channel when done
 
 	for {
@@ -119,6 +169,9 @@ func (conn *Connection) readMessages(abortOthers func()) {
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNormalClosure) {
 				conn.logger.Error("WebSocket connection closed with unexpected reason", "error", err)
+				handleClosure(err)
+			} else {
+				handleClosure(nil) // Normal closure
 			}
 			return
 		}
@@ -133,8 +186,8 @@ func (conn *Connection) readMessages(abortOthers func()) {
 
 // writeMessages handles outgoing messages to the WebSocket connection.
 // It reads from the message sink channel and writes to the WebSocket.
-func (conn *Connection) writeMessages(ctx context.Context, abortOthers context.CancelFunc) {
-	defer abortOthers() // Stop other goroutines
+func (conn *WebsocketConnection) writeMessages(ctx context.Context, handleClosure func(error)) {
+	defer handleClosure(nil) // Stop other goroutines
 
 	for {
 		select {
@@ -173,170 +226,13 @@ func (conn *Connection) writeMessages(ctx context.Context, abortOthers context.C
 
 // waitForConnClose waits for the WebSocket connection to close.
 // It listens for the close signal and logs the closure event.
-func (conn *Connection) waitForConnClose(ctx context.Context, abortOthers context.CancelFunc) {
-	defer abortOthers() // Stop other goroutines when done
+func (conn *WebsocketConnection) waitForConnClose(ctx context.Context, handleClosure func(error)) {
+	defer handleClosure(nil) // Stop other goroutines when done
 
 	select {
 	case <-ctx.Done():
 		conn.logger.Debug("context done, stopping connection close wait")
 	case <-conn.closeConnCh:
 		conn.logger.Info("WebSocket connection closed by server", "connectionID", conn.ConnectionID)
-	}
-}
-
-// Write sends a message to the connection's write sink.
-// If the write operation takes too long, it signals the connection to close.
-// This is useful for preventing hangs if the client is unresponsive.
-func (conn *Connection) Write(message []byte) {
-	select {
-	case <-time.After(defaultRPCMessageWriteDuration):
-		conn.closeConnCh <- struct{}{} // Signal connection closure if write times out
-		return
-	case conn.writeSink <- message:
-		return
-	}
-}
-
-// ConnectionHub manages all active WebSocket connections.
-// It provides thread-safe operations for connection tracking and user mapping.
-type ConnectionHub struct {
-	// connections maps connection IDs to RPCConnection instances
-	connections map[string]*Connection
-	// authMapping maps UserIDs to their active connections.
-	authMapping map[string]map[string]bool
-	// mu protects concurrent access to the maps
-	mu sync.RWMutex
-}
-
-// NewConnectionHub creates a new instance of ConnectionHub.
-// The hub is used internally by Node to manage connections.
-func NewConnectionHub() *ConnectionHub {
-	return &ConnectionHub{
-		connections: make(map[string]*Connection),
-		authMapping: make(map[string]map[string]bool),
-	}
-}
-
-// Set adds or updates a connection in the hub.
-// If the connection has a UserID, it also updates the user mapping.
-func (hub *ConnectionHub) Add(conn *Connection) error {
-	connID := conn.ConnectionID()
-	userID := conn.UserID()
-
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
-
-	// If the connection already exists, remove it first
-	if _, exists := hub.connections[connID]; exists {
-		return fmt.Errorf("connection with ID %s already exists", connID)
-	}
-
-	hub.connections[connID] = conn
-
-	if userID == "" {
-		return nil
-	}
-
-	// If the connection has a userID, update the auth mapping
-	if _, exists := hub.authMapping[userID]; !exists {
-		hub.authMapping[userID] = make(map[string]bool)
-	}
-
-	// Update the mapping for this user
-	hub.authMapping[userID][connID] = true
-	return nil
-}
-
-// Reauthenticate updates the UserID for an existing connection.
-func (hub *ConnectionHub) Reauthenticate(connID, userID string) error {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
-
-	conn, exists := hub.connections[connID]
-	if !exists {
-		return fmt.Errorf("connection with ID %s does not exist", connID)
-	}
-
-	// Remove the old user mapping if it exists
-	oldUserID := conn.UserID()
-	if oldUserID != "" {
-		if userConns, ok := hub.authMapping[oldUserID]; ok {
-			delete(userConns, connID)
-			if len(userConns) == 0 {
-				delete(hub.authMapping, oldUserID) // Remove user mapping if no connections left
-			}
-		}
-	}
-
-	// Set the new UserID
-	conn.SetUserID(userID)
-
-	// Update the auth mapping for the new UserID
-	if _, ok := hub.authMapping[userID]; !ok {
-		hub.authMapping[userID] = make(map[string]bool)
-	}
-	hub.authMapping[userID][connID] = true
-
-	return nil
-}
-
-// Get retrieves a connection by its connection ID.
-// Returns nil if the connection doesn't exist.
-func (hub *ConnectionHub) Get(connID string) *Connection {
-	hub.mu.RLock()
-	defer hub.mu.RUnlock()
-
-	conn, ok := hub.connections[connID]
-	if !ok {
-		return nil
-	}
-
-	return conn
-}
-
-// Remove deletes a connection from the hub.
-// It also removes any associated user mapping.
-func (hub *ConnectionHub) Remove(connID string) {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
-	conn, ok := hub.connections[connID]
-	if !ok {
-		return
-	}
-
-	delete(hub.connections, connID)
-	userID := conn.UserID()
-	if userID == "" {
-		return
-	}
-
-	// If the connection has a UserID, remove it from the auth mapping
-	if userConns, exists := hub.authMapping[userID]; exists {
-		delete(userConns, connID)
-		if len(userConns) == 0 {
-			delete(hub.authMapping, userID) // Remove user mapping if no connections left
-		}
-	}
-}
-
-// Publish sends a message to a specific authenticated user.
-// If the user is not connected, the message is silently dropped.
-func (hub *ConnectionHub) Publish(userID string, message []byte) {
-	hub.mu.RLock()
-	defer hub.mu.RUnlock()
-	connIDs, ok := hub.authMapping[userID]
-	if !ok {
-		return
-	}
-
-	// Iterate over all connections for this user and send the message
-	for connID := range connIDs {
-		conn := hub.connections[connID]
-		if conn == nil || conn.writeSink == nil {
-			continue // Skip if connection is nil or write sink is not set
-		}
-
-		// Write the message to the connection's write sink
-		conn.Write(message)
 	}
 }

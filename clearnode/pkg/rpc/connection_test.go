@@ -19,7 +19,7 @@ func TestConnectionWrite(t *testing.T) {
 		writeChan := make(chan []byte, 1)
 		processSink := make(chan []byte, 1)
 		closeChan := make(chan struct{}, 1)
-		conn := &Connection{
+		conn := &WebsocketConnection{
 			connectionID: connID,
 			userID:       userID,
 			logger:       logger.WithKV("connectionID", connID),
@@ -29,7 +29,7 @@ func TestConnectionWrite(t *testing.T) {
 		}
 
 		message := []byte("test message")
-		conn.Write(message)
+		conn.WriteRawResponse(message)
 
 		select {
 		case received := <-writeChan:
@@ -47,7 +47,7 @@ func TestConnectionWrite(t *testing.T) {
 		writeChan := make(chan []byte)
 		processSink := make(chan []byte, 1)
 		closeChan := make(chan struct{}, 1)
-		conn := &Connection{
+		conn := &WebsocketConnection{
 			connectionID: connID,
 			userID:       userID,
 			logger:       logger.WithKV("connectionID", connID),
@@ -56,12 +56,12 @@ func TestConnectionWrite(t *testing.T) {
 			closeConnCh:  closeChan,
 		}
 
-		originalTimeout := defaultRPCMessageWriteDuration
-		defaultRPCMessageWriteDuration = 50 * time.Millisecond
-		defer func() { defaultRPCMessageWriteDuration = originalTimeout }()
+		originalTimeout := defaultResponseWriteDuration
+		defaultResponseWriteDuration = 50 * time.Millisecond
+		defer func() { defaultResponseWriteDuration = originalTimeout }()
 
 		message := []byte("test message")
-		conn.Write(message)
+		conn.WriteRawResponse(message)
 
 		select {
 		case <-closeChan:
@@ -85,7 +85,7 @@ func TestConnectionHub(t *testing.T) {
 	writeChan1 := make(chan []byte, 10)
 	processSink1 := make(chan []byte, 10)
 	closeChan1 := make(chan struct{}, 1)
-	conn1 := &Connection{
+	conn1 := &WebsocketConnection{
 		connectionID: connID1,
 		userID:       userID1,
 		logger:       logger,
@@ -100,7 +100,7 @@ func TestConnectionHub(t *testing.T) {
 	writeChan2 := make(chan []byte, 10)
 	processSink2 := make(chan []byte, 10)
 	closeChan2 := make(chan struct{}, 1)
-	conn2 := &Connection{
+	conn2 := &WebsocketConnection{
 		connectionID: connID2,
 		userID:       userID1, // Same user as conn1
 		logger:       logger,
@@ -115,7 +115,7 @@ func TestConnectionHub(t *testing.T) {
 	writeChan3 := make(chan []byte, 10)
 	processSink3 := make(chan []byte, 10)
 	closeChan3 := make(chan struct{}, 1)
-	conn3 := &Connection{
+	conn3 := &WebsocketConnection{
 		connectionID: connID3,
 		userID:       userID2, // Same user as conn1
 		logger:       logger,

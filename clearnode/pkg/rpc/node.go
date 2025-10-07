@@ -107,37 +107,37 @@ func NewWebsocketNode(signer sign.Signer, logger log.Logger) *WebsocketNode {
 // It upgrades the HTTP connection to WebSocket, manages concurrent read/write operations,
 // processes incoming RPC messages, and handles connection lifecycle events.
 // This method blocks until the connection is closed.
-func (n *WebsocketNode) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	wsConnection, err := n.upgrader.Upgrade(w, r, nil)
+func (wn *WebsocketNode) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	wsConnection, err := wn.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		n.logger.Error("failed to upgrade connection to WebSocket", "error", err)
+		wn.logger.Error("failed to upgrade connection to WebSocket", "error", err)
 		return
 	}
 	defer wsConnection.Close()
 
 	connectionID := uuid.NewString()
-	connection := NewWebsocketConnection(connectionID, "", wsConnection, n.logger, n.onMessageSentHandlers...)
-	if err := n.connHub.Add(connection); err != nil {
-		n.logger.Error("failed to add connection to hub", "error", err, "connectionID", connectionID)
+	connection := NewWebsocketConnection(connectionID, "", wsConnection, wn.logger, wn.onMessageSentHandlers...)
+	if err := wn.connHub.Add(connection); err != nil {
+		wn.logger.Error("failed to add connection to hub", "error", err, "connectionID", connectionID)
 		return
 	}
 
 	// Notify all onConnect handlers about the new connection
-	for _, handler := range n.onConnectHandlers {
-		handler(n.getSendResponseFunc(connection))
+	for _, handler := range wn.onConnectHandlers {
+		handler(wn.getSendResponseFunc(connection))
 	}
 
 	// Cleanup function executed when connection closes
 	defer func() {
 		userID := connection.UserID()
-		n.connHub.Remove(connectionID)
+		wn.connHub.Remove(connectionID)
 
 		// Notify all onDisconnect handlers about the closed connection
-		for _, handler := range n.onDisconnectHandlers {
+		for _, handler := range wn.onDisconnectHandlers {
 			handler(userID)
 		}
 
-		n.logger.Info("connection closed", "connectionID", connectionID, "userID", userID)
+		wn.logger.Info("connection closed", "connectionID", connectionID, "userID", userID)
 	}()
 
 	parentCtx, cancel := context.WithCancel(r.Context())
@@ -149,23 +149,22 @@ func (n *WebsocketNode) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go connection.Serve(parentCtx, childHandleClosure)
-	go n.processRequests(connection, parentCtx, childHandleClosure)
+	go wn.processRequests(connection, parentCtx, childHandleClosure)
 
 	wg.Wait()
 }
 
 // processRequests handles incoming requests from the WebsocketConnection.
 // It validates messages, routes them to appropriate handlers, and manages authentication.
-func (n *WebsocketNode) processRequests(conn Connection, ctx context.Context, handleClosure func(error)) {
+func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Context, handleClosure func(error)) {
 	defer handleClosure(nil) // Stop other goroutines when done
 	safeStorage := NewSafeStorage()
 
-read_loop:
 	for {
 		var messageBytes []byte
 		select {
-		case <-ctx.Done():
-			n.logger.Debug("context done, stopping message processing")
+		case <-parentCtx.Done():
+			wn.logger.Debug("context done, stopping message processing")
 			return
 		case messageBytes = <-conn.RawRequests():
 			if len(messageBytes) == 0 {
@@ -175,39 +174,44 @@ read_loop:
 
 		req := Request{}
 		if err := json.Unmarshal(messageBytes, &req); err != nil {
-			n.logger.Debug("invalid message format", "error", err, "message", string(messageBytes))
-			n.sendErrorResponse(conn, req.Req.RequestID, "invalid message format")
+			wn.logger.Debug("invalid message format", "error", err, "message", string(messageBytes))
+			wn.sendErrorResponse(conn, req.Req.RequestID, "invalid message format")
 			continue
 		}
 
-		methodRoute, ok := n.routes[req.Req.Method]
+		methodRoute, ok := wn.routes[req.Req.Method]
 		if !ok || len(methodRoute) == 0 {
-			n.logger.Debug("no handler found for method", "method", req.Req.Method)
-			n.sendErrorResponse(conn, req.Req.RequestID, fmt.Sprintf("unknown method: %s", req.Req.Method))
+			wn.logger.Debug("no handlers' route found for method", "method", req.Req.Method)
+			wn.sendErrorResponse(conn, req.Req.RequestID, fmt.Sprintf("unknown method: %s", req.Req.Method))
 			continue
 		}
 
 		var routeHandlers []Handler
 		for _, handlersId := range methodRoute {
-			handlers, exists := n.handlerChain[handlersId]
+			handlers, exists := wn.handlerChain[handlersId]
 			if !exists || len(handlers) == 0 {
-				n.logger.Error("no handlers found for id", "id", handlersId)
-				n.sendErrorResponse(conn, req.Req.RequestID, fmt.Sprintf("unknown method: %s", req.Req.Method))
-				continue read_loop
+				routeHandlers = nil
+				wn.logger.Error("no handlers found for id", "id", handlersId)
+				break
 			}
 
 			routeHandlers = append(routeHandlers, handlers...)
 		}
-		n.logger.Info("processing message",
+		if len(routeHandlers) == 0 {
+			wn.sendErrorResponse(conn, req.Req.RequestID, fmt.Sprintf("unknown method: %s", req.Req.Method))
+			continue
+		}
+
+		wn.logger.Info("processing message",
 			"requestID", req.Req.RequestID,
 			"userID", conn.UserID(),
 			"method", req.Req.Method,
 			"route", methodRoute)
 
 		ctx := &Context{
-			Context:  context.Background(),
+			Context:  parentCtx,
 			UserID:   conn.UserID(),
-			Signer:   n.signer,
+			Signer:   wn.signer,
 			Request:  req,
 			handlers: routeHandlers,
 			Storage:  safeStorage,
@@ -216,7 +220,7 @@ read_loop:
 
 		responseBytes, err := ctx.GetRawResponse()
 		if err != nil {
-			n.logger.Error("failed to prepare response", "error", err, "method", req.Req.Method)
+			wn.logger.Error("failed to prepare response", "error", err, "method", req.Req.Method)
 			continue
 		}
 		conn.WriteRawResponse(responseBytes)
@@ -224,11 +228,11 @@ read_loop:
 		// Handle re-authentication
 		if conn.UserID() != ctx.UserID {
 			// If the user ID changed during processing, do the re-authentication
-			n.connHub.Reauthenticate(conn.ConnectionID(), ctx.UserID)
+			wn.connHub.Reauthenticate(conn.ConnectionID(), ctx.UserID)
 
 			// Notify authenticated handlers about the new user ID
-			for _, handler := range n.onAuthenticatedHandlers {
-				handler(ctx.UserID, n.getSendResponseFunc(conn))
+			for _, handler := range wn.onAuthenticatedHandlers {
+				handler(ctx.UserID, wn.getSendResponseFunc(conn))
 			}
 		}
 	}
@@ -386,7 +390,7 @@ type WebsocketHandlerGroup struct {
 // The new group inherits all middleware from parent groups.
 func (hg *WebsocketHandlerGroup) NewGroup(name string) HandlerGroup {
 	return &WebsocketHandlerGroup{
-		groupId:     name,
+		groupId:     fmt.Sprintf("%s.%s", hg.groupId, name),
 		routePrefix: append(hg.routePrefix, hg.groupId),
 		root:        hg.root,
 	}

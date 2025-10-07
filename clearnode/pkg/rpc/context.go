@@ -105,6 +105,10 @@ func (c *Context) Fail(err error, fallbackMessage string) {
 // GetRawResponse returns the signed response message as raw bytes.
 // This is called internally after handler processing to prepare the response.
 func (c *Context) GetRawResponse() ([]byte, error) {
+	if c.Response.Res.Method == "" {
+		c.Fail(nil, "internal server error: no response from handler")
+	}
+
 	return prepareRawResponse(c.Signer, c.Response.Res)
 }
 
@@ -164,5 +168,6 @@ func (s *SafeStorage) Get(key string) (any, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.storage[key], s.storage[key] != nil
+	value, exists := s.storage[key]
+	return value, exists
 }

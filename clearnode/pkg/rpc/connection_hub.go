@@ -6,7 +6,7 @@ import (
 )
 
 // ConnectionHub manages all active WebSocket connections.
-// It provides thread-safe operations for connection tracking and user mapping.
+// It provides thread-safe operations for connection tracking and auth mapping.
 type ConnectionHub struct {
 	// connections maps connection IDs to RPCConnection instances
 	connections map[string]Connection
@@ -25,8 +25,8 @@ func NewConnectionHub() *ConnectionHub {
 	}
 }
 
-// Set adds or updates a connection in the hub.
-// If the connection has a UserID, it also updates the user mapping.
+// Add adds a connection to the hub.
+// If the connection has a UserID, it also updates the auth mapping.
 func (hub *ConnectionHub) Add(conn Connection) error {
 	connID := conn.ConnectionID()
 	userID := conn.UserID()
@@ -34,7 +34,7 @@ func (hub *ConnectionHub) Add(conn Connection) error {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
-	// If the connection already exists, remove it first
+	// If the connection already exists, return an error
 	if _, exists := hub.connections[connID]; exists {
 		return fmt.Errorf("connection with ID %s already exists", connID)
 	}
@@ -71,7 +71,7 @@ func (hub *ConnectionHub) Reauthenticate(connID, userID string) error {
 		if userConns, ok := hub.authMapping[oldUserID]; ok {
 			delete(userConns, connID)
 			if len(userConns) == 0 {
-				delete(hub.authMapping, oldUserID) // Remove user mapping if no connections left
+				delete(hub.authMapping, oldUserID) // Remove auth mapping if no connections left
 			}
 		}
 	}
@@ -122,7 +122,7 @@ func (hub *ConnectionHub) Remove(connID string) {
 	if userConns, exists := hub.authMapping[userID]; exists {
 		delete(userConns, connID)
 		if len(userConns) == 0 {
-			delete(hub.authMapping, userID) // Remove user mapping if no connections left
+			delete(hub.authMapping, userID) // Remove auth mapping if no connections left
 		}
 	}
 }

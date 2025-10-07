@@ -70,7 +70,7 @@ func NewWebsocketConnection(connID, userID string, websocketConn *websocket.Conn
 
 		writeSink:   make(chan []byte, 10),
 		processSink: make(chan []byte, 10),
-		closeConnCh: make(chan struct{}),
+		closeConnCh: make(chan struct{}, 1),
 	}
 }
 
@@ -150,9 +150,15 @@ func (conn *WebsocketConnection) RawRequests() <-chan []byte {
 // If the write operation takes too long, it signals the connection to close.
 // This is useful for preventing hangs if the client is unresponsive.
 func (conn *WebsocketConnection) WriteRawResponse(message []byte) {
+	timer := time.NewTimer(defaultResponseWriteDuration)
+	defer timer.Stop()
+
 	select {
-	case <-time.After(defaultResponseWriteDuration):
-		conn.closeConnCh <- struct{}{} // Signal connection closure if write times out
+	case <-timer.C:
+		select {
+		case conn.closeConnCh <- struct{}{}:
+		default:
+		}
 		return
 	case conn.writeSink <- message:
 		return
@@ -233,6 +239,6 @@ func (conn *WebsocketConnection) waitForConnClose(ctx context.Context, handleClo
 	case <-ctx.Done():
 		conn.logger.Debug("context done, stopping connection close wait")
 	case <-conn.closeConnCh:
-		conn.logger.Info("WebSocket connection closed by server", "connectionID", conn.ConnectionID)
+		conn.logger.Info("WebSocket connection closed by server", "connectionID", conn.ConnectionID())
 	}
 }

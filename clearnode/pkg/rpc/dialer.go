@@ -341,7 +341,7 @@ func (d *WebsocketDialer) pingPeriodically(ctx context.Context, handleClosure fu
 		case <-ticker.C:
 			// Send ping request
 			var params Params
-			payload := NewPayload(d.cfg.PingRequestID, "ping", params)
+			payload := NewPayload(d.cfg.PingRequestID, PingMethod.String(), params)
 			req := NewRequest(payload)
 
 			// Use the connection context for ping requests
@@ -353,7 +353,7 @@ func (d *WebsocketDialer) pingPeriodically(ctx context.Context, handleClosure fu
 			}
 
 			// Verify we got a pong response
-			if res.Res.Method != "pong" {
+			if res.Res.Method != PongMethod.String() {
 				lg.Warn("Unexpected response to ping", "method", res.Res.Method)
 			}
 		}

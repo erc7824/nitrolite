@@ -128,7 +128,7 @@ func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 		}
 	}
 
-	return &WebsocketNode{
+	node := &WebsocketNode{
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  config.WsUpgraderReadBufferSize,
 			WriteBufferSize: config.WsUpgraderWriteBufferSize,
@@ -139,7 +139,11 @@ func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 		handlerChain: make(map[string][]Handler),
 		routes:       make(map[string][]string),
 		connHub:      NewConnectionHub(),
-	}, nil
+	}
+
+	node.Handle(PingMethod.String(), node.handlePing) // Built-in ping handler
+
+	return node, nil
 }
 
 // ServeHTTP is the main entry point for WebSocket connections.
@@ -376,6 +380,13 @@ func (wn *WebsocketNode) sendErrorResponse(conn Connection, requestID uint64, me
 	}
 
 	conn.WriteRawResponse(responseBytes)
+}
+
+// handlePing is a built-in handler for the "ping" method.
+// It responds with a "pong" message and can be used for keep-alive checks.
+func (wn *WebsocketNode) handlePing(ctx *Context) {
+	ctx.Next() // Call any middleware first
+	ctx.Succeed(PongMethod.String(), nil)
 }
 
 // prepareRawNotification creates a signed server-initiated notification message.

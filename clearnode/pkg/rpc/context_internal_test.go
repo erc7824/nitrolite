@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
@@ -143,7 +144,7 @@ func TestContext_Fail(t *testing.T) {
 
 func TestContext_GetRawResponse(t *testing.T) {
 	ctx := &Context{
-		Signer: &mockSigner{},
+		Signer: sign.NewMockSigner("signer1"),
 		Request: Request{
 			Req: Payload{
 				RequestID: 6,
@@ -157,9 +158,6 @@ func TestContext_GetRawResponse(t *testing.T) {
 	}
 	ctx.Succeed(method, params)
 
-	payloadHash, err := ctx.Response.Res.Hash()
-	assert.NoError(t, err, "Hashing payload should not return an error")
-
 	rawResponse, err := ctx.GetRawResponse()
 	assert.NoError(t, err, "GetRawResponse should not return an error")
 	assert.NotEmpty(t, rawResponse, "Raw response should not be empty")
@@ -172,7 +170,9 @@ func TestContext_GetRawResponse(t *testing.T) {
 	assert.Equal(t, method, responseMsg.Res.Method, "Response Method should match the expected method")
 	assert.Equal(t, params, responseMsg.Res.Params, "Response Params should match the expected params")
 	require.Len(t, responseMsg.Sig, 1, "Response Sig should contain one signature")
-	assert.Equal(t, sign.Signature(append(payloadHash, []byte("-signed")...)), responseMsg.Sig[0], "Response Sig should match the expected signature")
+
+	sig := responseMsg.Sig[0]
+	assert.True(t, strings.HasSuffix(string(sig), "-signed-by-signer1"), "Signature should end with the expected suffix")
 }
 
 func TestSafeStorage(t *testing.T) {

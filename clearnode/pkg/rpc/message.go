@@ -160,7 +160,7 @@ func (r Response) GetSigners() ([]sign.Address, error) {
 // The resulting response will have params in the format: {"error": "<errMsg>"}
 func NewErrorResponse(requestID uint64, errMsg string, sig ...sign.Signature) Response {
 	errParams := NewErrorParams(errMsg)
-	errPayload := NewPayload(requestID, errorMethod, errParams)
+	errPayload := NewPayload(requestID, ErrorMethod.String(), errParams)
 	return NewResponse(errPayload, sig...)
 }
 
@@ -192,6 +192,10 @@ func NewErrorResponse(requestID uint64, errMsg string, sig ...sign.Signature) Re
 // This method is designed to work with error responses created by NewErrorResponse
 // or any response where errors are stored using NewErrorParams.
 func (r Response) Error() error {
+	if r.Res.Method != ErrorMethod.String() {
+		return nil
+	}
+
 	return r.Res.Params.Error()
 }
 

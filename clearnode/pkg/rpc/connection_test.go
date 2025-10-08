@@ -14,6 +14,8 @@ import (
 )
 
 func TestNewWebsocketConnection(t *testing.T) {
+	t.Parallel()
+
 	cfg := rpc.WebsocketConnectionConfig{}
 	_, err := rpc.NewWebsocketConnection(cfg)
 	require.Equal(t, "connection ID cannot be empty", err.Error())
@@ -41,6 +43,8 @@ func TestNewWebsocketConnection(t *testing.T) {
 }
 
 func TestWebsocketConnection_Serve(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	wsConnMock := newGorillaWsConnMock(ctx)
 
@@ -92,6 +96,8 @@ func TestWebsocketConnection_Serve(t *testing.T) {
 }
 
 func TestWebsocketConnection_ConnectionID(t *testing.T) {
+	t.Parallel()
+
 	cfg := rpc.WebsocketConnectionConfig{
 		ConnectionID:  "conn1",
 		WebsocketConn: &websocket.Conn{},
@@ -102,6 +108,8 @@ func TestWebsocketConnection_ConnectionID(t *testing.T) {
 }
 
 func TestWebsocketConnection_UserID(t *testing.T) {
+	t.Parallel()
+
 	cfg := rpc.WebsocketConnectionConfig{
 		ConnectionID:  "conn1",
 		UserID:        "user1",
@@ -113,6 +121,8 @@ func TestWebsocketConnection_UserID(t *testing.T) {
 }
 
 func TestWebsocketConnection_SetUserID(t *testing.T) {
+	t.Parallel()
+
 	cfg := rpc.WebsocketConnectionConfig{
 		ConnectionID:  "conn1",
 		WebsocketConn: &websocket.Conn{},
@@ -127,6 +137,8 @@ func TestWebsocketConnection_SetUserID(t *testing.T) {
 }
 
 func TestWebsocketConnection_WriteRawResponse(t *testing.T) {
+	t.Parallel()
+
 	wsConnMock := newGorillaWsConnMock(context.Background())
 	cfg := rpc.WebsocketConnectionConfig{
 		ConnectionID:    "conn1",

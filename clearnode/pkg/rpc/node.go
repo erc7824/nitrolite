@@ -268,6 +268,7 @@ func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Cont
 
 		responseBytes, err := ctx.GetRawResponse()
 		if err != nil {
+			wn.sendErrorResponse(conn, req.Req.RequestID, defaultNodeErrorMessage)
 			wn.cfg.Logger.Error("failed to prepare response", "error", err, "method", req.Req.Method)
 			continue
 		}

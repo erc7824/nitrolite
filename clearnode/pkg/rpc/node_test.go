@@ -16,6 +16,8 @@ import (
 )
 
 func TestNewWebsocketNode(t *testing.T) {
+	t.Parallel()
+
 	cfg := rpc.WebsocketNodeConfig{}
 	_, err := rpc.NewWebsocketNode(cfg)
 	require.Equal(t, "signer cannot be nil", err.Error())
@@ -31,6 +33,8 @@ func TestNewWebsocketNode(t *testing.T) {
 }
 
 func TestWebsocketNode_FullFlow(t *testing.T) {
+	t.Parallel()
+
 	signer := sign.NewMockSigner("signer1")
 	logger := log.NewNoopLogger()
 

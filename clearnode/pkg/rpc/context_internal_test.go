@@ -3,6 +3,7 @@ package rpc
 import (
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
@@ -11,6 +12,8 @@ import (
 )
 
 func TestContext_Next(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Missed", func(t *testing.T) {
 		valueMap := make(map[string]bool)
 		ctx := &Context{
@@ -52,6 +55,8 @@ func TestContext_Next(t *testing.T) {
 }
 
 func TestContext_Succeed(t *testing.T) {
+	t.Parallel()
+
 	ctx := &Context{
 		Request: Request{
 			Req: Payload{
@@ -73,6 +78,8 @@ func TestContext_Succeed(t *testing.T) {
 }
 
 func TestContext_Fail(t *testing.T) {
+	t.Parallel()
+
 	t.Run("With rpc.Error", func(t *testing.T) {
 		ctx := &Context{
 			Request: Request{
@@ -143,6 +150,8 @@ func TestContext_Fail(t *testing.T) {
 }
 
 func TestContext_GetRawResponse(t *testing.T) {
+	t.Parallel()
+
 	ctx := &Context{
 		Signer: sign.NewMockSigner("signer1"),
 		Request: Request{
@@ -176,6 +185,8 @@ func TestContext_GetRawResponse(t *testing.T) {
 }
 
 func TestSafeStorage(t *testing.T) {
+	t.Parallel()
+
 	storage := NewSafeStorage()
 
 	key := "testKey"
@@ -187,13 +198,21 @@ func TestSafeStorage(t *testing.T) {
 	require.Equal(t, value, retrievedValue, "Retrieved value should match the set value")
 
 	// Test concurrent access
+	var wg sync.WaitGroup
+	wg.Add(2)
+	defer wg.Wait()
+
 	go func() {
+		defer wg.Done()
+
 		for range 100 {
 			storage.Set(key, value)
 		}
 	}()
 
 	go func() {
+		defer wg.Done()
+
 		for range 100 {
 			value, ok := storage.Get(key)
 			assert.True(t, ok, "Key should exist in storage")

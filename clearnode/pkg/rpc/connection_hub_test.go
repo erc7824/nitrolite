@@ -12,6 +12,8 @@ import (
 )
 
 func TestConnectionHub(t *testing.T) {
+	t.Parallel()
+
 	hub := rpc.NewConnectionHub()
 	var err error
 

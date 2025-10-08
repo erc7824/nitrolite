@@ -59,6 +59,8 @@ func registerErrorHandler(dialer *MockDialer, method rpc.Method, errMsg string) 
 }
 
 func TestClient_Ping(t *testing.T) {
+	t.Parallel()
+
 	client, dialer := setupClient()
 
 	// Ping returns pong
@@ -74,6 +76,8 @@ func TestClient_Ping(t *testing.T) {
 }
 
 func TestClient_GetConfig(t *testing.T) {
+	t.Parallel()
+
 	client, dialer := setupClient()
 
 	config := rpc.BrokerConfig{
@@ -94,6 +98,8 @@ func TestClient_GetConfig(t *testing.T) {
 }
 
 func TestClient_GetAssets(t *testing.T) {
+	t.Parallel()
+
 	client, dialer := setupClient()
 
 	// Test data
@@ -136,6 +142,8 @@ func TestClient_GetAssets(t *testing.T) {
 }
 
 func TestClient_Authentication(t *testing.T) {
+	t.Parallel()
+
 	client, dialer := setupClient()
 
 	jwtToken := "test.jwt.token"
@@ -156,6 +164,8 @@ func TestClient_Authentication(t *testing.T) {
 }
 
 func TestClient_Channels(t *testing.T) {
+	t.Parallel()
+
 	client, dialer := setupClient()
 	amount := decimal.NewFromInt(1000)
 
@@ -198,6 +208,8 @@ func TestClient_Channels(t *testing.T) {
 }
 
 func TestClient_Ledger(t *testing.T) {
+	t.Parallel()
+
 	client, dialer := setupClient()
 
 	t.Run("balances", func(t *testing.T) {
@@ -261,6 +273,8 @@ func TestClient_Ledger(t *testing.T) {
 }
 
 func TestClient_Transfer(t *testing.T) {
+	t.Parallel()
+
 	client, dialer := setupClient()
 
 	dialer.RegisterHandler(rpc.TransferMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
@@ -294,6 +308,8 @@ func TestClient_Transfer(t *testing.T) {
 }
 
 func TestClient_AppSessions(t *testing.T) {
+	t.Parallel()
+
 	client, dialer := setupClient()
 
 	appDef := rpc.AppDefinition{
@@ -353,6 +369,8 @@ func TestClient_AppSessions(t *testing.T) {
 }
 
 func TestClient_ErrorHandling(t *testing.T) {
+	t.Parallel()
+
 	client, dialer := setupClient()
 
 	// No handler registered
@@ -366,6 +384,8 @@ func TestClient_ErrorHandling(t *testing.T) {
 }
 
 func TestClient_ConcurrentOperations(t *testing.T) {
+	t.Parallel()
+
 	client, dialer := setupClient()
 
 	// Handler with delay
@@ -394,6 +414,8 @@ func TestClient_ConcurrentOperations(t *testing.T) {
 
 // Additional test coverage for remaining methods
 func TestClient_AdditionalMethods(t *testing.T) {
+	t.Parallel()
+
 	client, dialer := setupClient()
 
 	t.Run("GetAppDefinition", func(t *testing.T) {

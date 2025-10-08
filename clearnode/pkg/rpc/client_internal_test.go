@@ -16,6 +16,8 @@ import (
 
 // Test internal authRequest method
 func TestClient_authRequest(t *testing.T) {
+	t.Parallel()
+
 	mockDialer := newMockInternalDialer()
 	client := NewClient(mockDialer)
 
@@ -55,6 +57,8 @@ func TestClient_authRequest(t *testing.T) {
 
 // Test authRequest with unexpected response method
 func TestClient_authRequest_WrongResponseMethod(t *testing.T) {
+	t.Parallel()
+
 	mockDialer := newMockInternalDialer()
 	client := NewClient(mockDialer)
 
@@ -77,6 +81,8 @@ func TestClient_authRequest_WrongResponseMethod(t *testing.T) {
 
 // Test internal authSigVerify method
 func TestClient_authSigVerify(t *testing.T) {
+	t.Parallel()
+
 	mockDialer := newMockInternalDialer()
 	client := NewClient(mockDialer)
 
@@ -121,6 +127,8 @@ func TestClient_authSigVerify(t *testing.T) {
 
 // Test signChallenge helper function
 func TestSignChallenge(t *testing.T) {
+	t.Parallel()
+
 	mockSigner := sign.NewMockSigner("signer1")
 
 	authReq := AuthRequestRequest{
@@ -143,6 +151,8 @@ func TestSignChallenge(t *testing.T) {
 }
 
 func TestClient_EventHandling(t *testing.T) {
+	t.Parallel()
+
 	mockDialer := newMockInternalDialer()
 	client := NewClient(mockDialer)
 

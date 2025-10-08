@@ -9,16 +9,31 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
-// Handler is a function that processes an RPC request.
-// Handlers can call c.Next() to pass control to the next handler in the chain.
+// Handler defines the function signature for RPC request processors.
+// Handlers receive a Context containing the request and all necessary
+// information to process it. They can call c.Next() to delegate to
+// the next handler in the middleware chain, enabling composable
+// request processing pipelines.
 type Handler func(c *Context)
 
-// SendRResponseFunc is a function type for sending RPC notifications to a connection.
-// It's provided to event handlers to allow server-initiated messages.
+// SendResponseFunc is a function type for sending server-initiated RPC notifications.
+// Unlike regular responses that reply to client requests, these functions enable
+// the server to push unsolicited messages to clients (e.g., balance updates,
+// connection events). The method parameter specifies the notification type,
+// and params contains the notification data.
 type SendResponseFunc func(method string, params Params)
 
-// Context contains all the information about an RPC request and provides
-// methods for handlers to process and respond to the request.
+// Context encapsulates all information related to an RPC request and provides
+// methods for handlers to process and respond. It implements a middleware
+// pattern where handlers can be chained together, each having the ability
+// to process the request, modify the context, or delegate to the next handler.
+//
+// The Context serves multiple purposes:
+//   - Request/response container: Holds the incoming request and outgoing response
+//   - Middleware chain management: Tracks and executes the handler chain
+//   - Session state: Provides per-connection storage for maintaining state
+//   - Authentication context: Carries the authenticated user ID
+//   - Response helpers: Convenient methods for success and error responses
 type Context struct {
 	// Context is the standard Go context for the request
 	Context context.Context
@@ -37,8 +52,24 @@ type Context struct {
 	handlers []Handler
 }
 
-// Next executes the next handler in the middleware chain.
-// If there are no more handlers, it returns without doing anything.
+// Next advances the middleware chain by executing the next handler.
+// This enables handlers to perform pre-processing, call Next() to
+// delegate to subsequent handlers, then perform post-processing.
+// If there are no more handlers in the chain, Next() returns
+// immediately without error.
+//
+// Example middleware pattern:
+//
+//	func authMiddleware(c *Context) {
+//	    // Pre-processing: check authentication
+//	    if c.UserID == "" {
+//	        c.Fail(nil, "authentication required")
+//	        return
+//	    }
+//	    c.Next() // Continue to next handler
+//	    // Post-processing: log the response
+//	    log.Info("Request processed", "user", c.UserID)
+//	}
 func (c *Context) Next() {
 	if len(c.handlers) == 0 {
 		return
@@ -49,8 +80,17 @@ func (c *Context) Next() {
 	handler(c)
 }
 
-// Succeed sets a successful response with the given method and parameters.
-// This should be called by handlers to indicate successful processing.
+// Succeed sets a successful response for the RPC request.
+// This method should be called by handlers when the request has been
+// processed successfully. The method parameter typically matches the
+// request method, and params contains the result data.
+//
+// Example:
+//
+//	func handleGetBalance(c *Context) {
+//	    balance := getBalanceForUser(c.UserID)
+//	    c.Succeed("get_balance", Params{"balance": balance})
+//	}
 func (c *Context) Succeed(method string, params Params) {
 	c.Response.Res = NewPayload(
 		c.Request.Req.RequestID,
@@ -112,8 +152,14 @@ func (c *Context) GetRawResponse() ([]byte, error) {
 	return prepareRawResponse(c.Signer, c.Response.Res)
 }
 
-// prepareRawResponse creates a signed RPC response message from the given data.
-// It marshals the data, signs it, and returns the complete message as bytes.
+// prepareRawResponse creates a complete, signed RPC response message.
+// This internal helper:
+//  1. Computes the hash of the response payload
+//  2. Signs the hash with the provided signer
+//  3. Constructs a Response with the payload and signature
+//  4. Marshals the complete response to JSON bytes
+//
+// Returns an error if hashing, signing, or marshaling fails.
 func prepareRawResponse(signer sign.Signer, payload Payload) ([]byte, error) {
 	payloadHash, err := payload.Hash()
 	if err != nil {
@@ -138,7 +184,16 @@ func prepareRawResponse(signer sign.Signer, payload Payload) ([]byte, error) {
 }
 
 // SafeStorage provides thread-safe key-value storage for connection-specific data.
-// It's used to store session information, authentication policies, and other per-connection state.
+// Each connection gets its own SafeStorage instance that persists for the
+// connection's lifetime. This enables handlers to store and retrieve session
+// state, authentication tokens, rate limiting counters, or any other
+// per-connection data across multiple requests.
+//
+// Common use cases:
+//   - Storing authentication state and policies
+//   - Caching frequently accessed data
+//   - Maintaining request counters for rate limiting
+//   - Storing connection-specific configuration
 type SafeStorage struct {
 	// mu protects concurrent access to the storage map
 	mu sync.RWMutex
@@ -147,14 +202,24 @@ type SafeStorage struct {
 }
 
 // NewSafeStorage creates a new thread-safe storage instance.
+// The storage starts empty and can be used immediately for
+// storing connection-specific data.
 func NewSafeStorage() *SafeStorage {
 	return &SafeStorage{
 		storage: make(map[string]any),
 	}
 }
 
-// Set stores a value with the given key.
+// Set stores a value with the given key in the storage.
 // If the key already exists, its value is overwritten.
+// The value can be of any type. This method is thread-safe
+// and can be called concurrently from multiple goroutines.
+//
+// Example:
+//
+//	storage.Set("auth_token", "bearer-xyz123")
+//	storage.Set("rate_limit_count", 42)
+//	storage.Set("user_preferences", userPrefs)
 func (s *SafeStorage) Set(key string, value any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -162,8 +227,17 @@ func (s *SafeStorage) Set(key string, value any) {
 	s.storage[key] = value
 }
 
-// Get retrieves a value by key.
-// Returns the value and true if found, or nil and false if not found.
+// Get retrieves a value by key from the storage.
+// Returns the value and true if the key exists, or nil and false
+// if the key is not found. The caller must type-assert the returned
+// value to the expected type.
+//
+// Example:
+//
+//	if val, ok := storage.Get("auth_token"); ok {
+//	    token := val.(string)
+//	    // Use token...
+//	}
 func (s *SafeStorage) Get(key string) (any, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

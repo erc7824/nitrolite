@@ -5,8 +5,17 @@ import (
 	"sync"
 )
 
-// ConnectionHub manages all active WebSocket connections.
-// It provides thread-safe operations for connection tracking and auth mapping.
+// ConnectionHub provides centralized management of all active RPC connections.
+// It maintains thread-safe mappings between connection IDs and Connection instances,
+// as well as user IDs and their associated connections. This enables efficient
+// message routing and connection lifecycle management.
+//
+// Key features:
+//   - Thread-safe connection storage and retrieval
+//   - User-to-connection mapping for authenticated sessions
+//   - Automatic cleanup of auth mappings when connections close
+//   - Support for re-authentication (updating user associations)
+//   - Broadcast capabilities to all connections for a specific user
 type ConnectionHub struct {
 	// connections maps connection IDs to RPCConnection instances
 	connections map[string]Connection
@@ -16,8 +25,9 @@ type ConnectionHub struct {
 	mu sync.RWMutex
 }
 
-// NewConnectionHub creates a new instance of ConnectionHub.
-// The hub is used internally by Node to manage connections.
+// NewConnectionHub creates a new ConnectionHub instance with initialized maps.
+// The hub is typically used internally by Node implementations to manage
+// the lifecycle of all active connections.
 func NewConnectionHub() *ConnectionHub {
 	return &ConnectionHub{
 		connections: make(map[string]Connection),
@@ -25,8 +35,14 @@ func NewConnectionHub() *ConnectionHub {
 	}
 }
 
-// Add adds a connection to the hub.
-// If the connection has a UserID, it also updates the auth mapping.
+// Add registers a new connection with the hub.
+// The connection is indexed by its ConnectionID for fast retrieval.
+// If the connection has an associated UserID (is authenticated),
+// it also updates the user-to-connection mapping.
+//
+// Returns an error if:
+//   - The connection is nil
+//   - A connection with the same ID already exists
 func (hub *ConnectionHub) Add(conn Connection) error {
 	if conn == nil {
 		return fmt.Errorf("connection cannot be nil")
@@ -59,7 +75,16 @@ func (hub *ConnectionHub) Add(conn Connection) error {
 	return nil
 }
 
-// Reauthenticate updates the UserID for an existing connection.
+// Reauthenticate updates the UserID association for an existing connection.
+// This method handles the complete re-authentication process:
+//   - Removes the connection from the old user's mapping (if any)
+//   - Updates the connection's UserID
+//   - Adds the connection to the new user's mapping
+//
+// This is typically called when a user logs in or switches accounts
+// on an existing connection.
+//
+// Returns an error if the specified connection doesn't exist.
 func (hub *ConnectionHub) Reauthenticate(connID, userID string) error {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
@@ -92,8 +117,11 @@ func (hub *ConnectionHub) Reauthenticate(connID, userID string) error {
 	return nil
 }
 
-// Get retrieves a connection by its connection ID.
-// Returns nil if the connection doesn't exist.
+// Get retrieves a connection by its unique connection ID.
+// Returns the Connection instance if found, or nil if no connection
+// with the specified ID exists in the hub.
+//
+// This method is safe for concurrent access.
 func (hub *ConnectionHub) Get(connID string) Connection {
 	hub.mu.RLock()
 	defer hub.mu.RUnlock()
@@ -106,8 +134,14 @@ func (hub *ConnectionHub) Get(connID string) Connection {
 	return conn
 }
 
-// Remove deletes a connection from the hub.
-// It also removes any associated user mapping.
+// Remove unregisters a connection from the hub.
+// This method:
+//   - Removes the connection from the main connection map
+//   - Cleans up any user-to-connection mappings
+//   - Removes empty user entries to prevent memory leaks
+//
+// If the connection doesn't exist, this method does nothing (no-op).
+// This method is safe for concurrent access.
 func (hub *ConnectionHub) Remove(connID string) {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
@@ -131,8 +165,17 @@ func (hub *ConnectionHub) Remove(connID string) {
 	}
 }
 
-// Publish sends a response to a specific authenticated user.
-// If the user is not connected, the response is silently dropped.
+// Publish broadcasts a message to all active connections for a specific user.
+// This enables server-initiated notifications to be sent to all of a user's
+// connected clients (e.g., multiple browser tabs or devices).
+//
+// The method:
+//   - Looks up all connections associated with the user
+//   - Attempts to send the message to each connection
+//   - Silently skips any connections that fail to accept the message
+//
+// If the user has no active connections, the message is silently dropped.
+// This method is safe for concurrent access.
 func (hub *ConnectionHub) Publish(userID string, response []byte) {
 	hub.mu.RLock()
 	defer hub.mu.RUnlock()

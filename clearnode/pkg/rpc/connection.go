@@ -20,19 +20,42 @@ var (
 	defaultWsConnWriteBufferSize = 10
 )
 
+// Connection represents an active RPC connection that handles bidirectional communication.
+// Implementations of this interface manage the connection lifecycle, message routing,
+// and authentication state. The interface is designed to be transport-agnostic,
+// though the primary implementation uses WebSocket.
 type Connection interface {
-	// ConnectionID returns the unique identifier for this connection
+	// ConnectionID returns the unique identifier for this connection.
+	// This ID is generated when the connection is established and remains
+	// constant throughout the connection's lifetime.
 	ConnectionID() string
-	// UserID returns the authenticated user's identifier for this connection
+	
+	// UserID returns the authenticated user's identifier for this connection.
+	// Returns an empty string if the connection has not been authenticated.
 	UserID() string
-	// SetUserID sets the UserID for this connection
+	
+	// SetUserID sets the UserID for this connection.
+	// This is typically called during authentication when the connection
+	// becomes associated with a specific user account.
 	SetUserID(userID string)
-	// RawRequests returns the channel for processing incoming requests
+	
+	// RawRequests returns a read-only channel for receiving incoming raw request messages.
+	// Messages received on this channel are raw bytes that need to be unmarshaled
+	// into Request objects for processing. The channel is closed when the
+	// connection is terminated.
 	RawRequests() <-chan []byte
-	// WriteRawResponse sends a raw response message to the connection's write sink
-	// Returns true if the message was successfully queued, false if it timed out
+	
+	// WriteRawResponse attempts to send a raw response message to the client.
+	// The method returns true if the message was successfully queued for sending,
+	// or false if the operation timed out (indicating a potentially unresponsive client).
+	// Messages that fail to send may trigger connection closure.
 	WriteRawResponse(message []byte) bool
-	// Serve starts the connection's lifecycle, handling reads and writes
+	
+	// Serve starts the connection's lifecycle by spawning goroutines for reading and writing.
+	// This method returns immediately after starting the goroutines. The handleClosure
+	// callback will be invoked asynchronously when the connection terminates (with an
+	// error if abnormal termination occurred). The parentCtx parameter enables
+	// graceful shutdown of the connection.
 	Serve(parentCtx context.Context, handleClosure func(error))
 }
 
@@ -46,8 +69,17 @@ type GorillaWsConnectionAdapter interface {
 	Close() error
 }
 
-// WebsocketConnection represents an active WebSocket connection.
-// It tracks the authentication, stores session data, and provides communication channels.
+// WebsocketConnection implements the Connection interface using WebSocket transport.
+// It manages bidirectional communication, handles authentication state, and provides
+// thread-safe operations for concurrent message processing. The connection supports
+// graceful shutdown and automatic cleanup of resources.
+//
+// Key features:
+//   - Concurrent read/write operations with separate goroutines
+//   - Configurable timeouts for write operations
+//   - Buffered channels for message processing
+//   - Thread-safe user authentication state management
+//   - Graceful connection closure with proper resource cleanup
 type WebsocketConnection struct {
 	// ctx is the parent context for managing goroutines
 	ctx context.Context
@@ -75,19 +107,31 @@ type WebsocketConnection struct {
 	mu sync.RWMutex
 }
 
+// WebsocketConnectionConfig contains configuration options for creating a new WebsocketConnection.
+// All fields except ConnectionID and WebsocketConn have sensible defaults.
 type WebsocketConnectionConfig struct {
+	// ConnectionID is the unique identifier for this connection (required)
 	ConnectionID  string
+	// UserID is the initial authenticated user ID (optional, can be set later)
 	UserID        string
+	// WebsocketConn is the underlying WebSocket connection (required)
 	WebsocketConn GorillaWsConnectionAdapter
 
+	// WriteTimeout is the maximum duration to wait for a write operation (default: 5s)
 	WriteTimeout         time.Duration
+	// WriteBufferSize is the capacity of the outgoing message buffer (default: 10)
 	WriteBufferSize      int
+	// ProcessBufferSize is the capacity of the incoming message buffer (default: 10)
 	ProcessBufferSize    int
+	// Logger for connection events (default: no-op logger)
 	Logger               log.Logger
+	// OnMessageSentHandler is called after a message is successfully sent (optional)
 	OnMessageSentHandler func([]byte)
 }
 
-// NewWebsocketConnection creates a new Connection instance.
+// NewWebsocketConnection creates a new WebsocketConnection instance with the provided configuration.
+// Returns an error if required fields (ConnectionID, WebsocketConn) are missing.
+// Optional fields are set to sensible defaults if not provided.
 func NewWebsocketConnection(config WebsocketConnectionConfig) (*WebsocketConnection, error) {
 	if config.ConnectionID == "" {
 		return nil, fmt.Errorf("connection ID cannot be empty")
@@ -125,8 +169,17 @@ func NewWebsocketConnection(config WebsocketConnectionConfig) (*WebsocketConnect
 	}, nil
 }
 
-// Serve starts the connection's lifecycle.
-// It handles reading and writing messages, and waits for the connection to close.
+// Serve starts the connection's lifecycle by spawning concurrent goroutines.
+// This method:
+//   - Spawns three goroutines: one for reading messages, one for writing messages,
+//     and one for monitoring connection closure signals
+//   - Returns immediately after starting the goroutines
+//   - Spawns an additional goroutine that waits for all operations to complete
+//     and then invokes handleClosure with any error that occurred
+//
+// The handleClosure callback is guaranteed to be called exactly once when the
+// connection terminates. The method is idempotent - calling it multiple times
+// will immediately invoke handleClosure without starting duplicate goroutines.
 func (conn *WebsocketConnection) Serve(parentCtx context.Context, handleClosure func(error)) {
 	conn.mu.Lock()
 	if conn.ctx != nil {
@@ -207,9 +260,14 @@ func (conn *WebsocketConnection) RawRequests() <-chan []byte {
 	return conn.processSink
 }
 
-// WriteRawResponse sends a message to the connection's write sink.
-// If the write operation takes too long, it signals the connection to close.
-// This is useful for preventing hangs if the client is unresponsive.
+// WriteRawResponse attempts to queue a message for sending to the client.
+// The method uses a timeout to prevent blocking on unresponsive clients.
+// If the message cannot be queued within the timeout duration:
+//   - The method returns false
+//   - A close signal is sent to trigger connection shutdown
+//   - This prevents resource exhaustion from slow or disconnected clients
+//
+// Returns true if the message was successfully queued for sending.
 func (conn *WebsocketConnection) WriteRawResponse(message []byte) bool {
 	timer := time.NewTimer(conn.writeTimeout)
 	defer timer.Stop()

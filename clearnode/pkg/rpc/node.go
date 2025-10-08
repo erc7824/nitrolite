@@ -25,10 +25,30 @@ const (
 	nodeGroupRoot = "root"
 )
 
+// Node represents an RPC server that manages client connections and routes
+// messages to appropriate handlers. It provides a foundation for building
+// RPC-based services with support for middleware, authentication, and
+// server-initiated notifications. The interface is transport-agnostic,
+// allowing for different implementations (WebSocket, HTTP/2, etc.).
 type Node interface {
+	// Handle registers a handler function for a specific RPC method.
+	// When a request with the matching method name is received,
+	// the handler will be invoked with the request context.
 	Handle(method string, handler Handler)
+	
+	// Notify sends a server-initiated notification to a specific user.
+	// All active connections for the user will receive the notification.
+	// If the user has no active connections, the notification is dropped.
 	Notify(userID string, method string, params Params)
+	
+	// Use adds global middleware that will be executed for all requests.
+	// Middleware is executed in the order it was added, before any
+	// method-specific handlers.
 	Use(middleware Handler)
+	
+	// NewGroup creates a new handler group for organizing related endpoints.
+	// Groups can have their own middleware and can be nested to create
+	// hierarchical handler structures.
 	NewGroup(name string) HandlerGroup
 }
 
@@ -45,9 +65,23 @@ var (
 	_ HandlerGroup = &WebsocketHandlerGroup{}
 )
 
-// WebsocketNode is a WebSocket-based RPC server that handles incoming connections,
-// routes messages to registered handlers and signs all responses.
-// It supports middleware chains and handler groups for organizing endpoints.
+// WebsocketNode implements the Node interface using WebSocket as the transport layer.
+// It provides a complete RPC server implementation with the following features:
+//
+//   - WebSocket connection management with automatic cleanup
+//   - Request routing based on method names
+//   - Middleware support at global and group levels
+//   - Cryptographic signing of all responses
+//   - Connection authentication and re-authentication
+//   - Server-initiated notifications to specific users
+//   - Configurable timeouts and buffer sizes
+//   - Structured logging for debugging and monitoring
+//
+// The node automatically handles connection lifecycle, including:
+//   - WebSocket protocol upgrade
+//   - Concurrent message processing
+//   - Graceful connection shutdown
+//   - Resource cleanup on disconnection
 type WebsocketNode struct {
 	// upgrader handles the HTTP to WebSocket protocol upgrade
 	upgrader websocket.Upgrader
@@ -63,38 +97,61 @@ type WebsocketNode struct {
 	connHub *ConnectionHub
 }
 
+// WebsocketNodeConfig contains all configuration options for creating a WebsocketNode.
+// Required fields are Signer and Logger; all others have sensible defaults.
 type WebsocketNodeConfig struct {
-	// Signer is used to sign all outgoing messages
+	// Signer is used to sign all outgoing messages (required).
+	// This ensures message authenticity and integrity.
 	Signer sign.Signer
-	// Logger is used for structured logging
+	// Logger is used for structured logging throughout the node (required).
 	Logger log.Logger
 
-	// OnConnectHandler is called when a new WebSocket connection is established
+	// Connection lifecycle callbacks:
+	
+	// OnConnectHandler is called when a new WebSocket connection is established.
+	// It receives a send function for pushing notifications to the new connection.
 	OnConnectHandler func(send SendResponseFunc)
-	// OnDisconnectHandler is called when a WebSocket connection is closed
+	// OnDisconnectHandler is called when a WebSocket connection is closed.
+	// It receives the UserID if the connection was authenticated.
 	OnDisconnectHandler func(userID string)
-	// OnMessageSentHandler is called after a message is sent to a client
+	// OnMessageSentHandler is called after a message is successfully sent to a client.
+	// Useful for metrics and debugging.
 	OnMessageSentHandler func([]byte)
 	// OnAuthenticatedHandler is called when a connection successfully authenticates
+	// or re-authenticates with a different user.
 	OnAuthenticatedHandler func(userID string, send SendResponseFunc)
 
-	// WsUpgraderReadBufferSize is the size of the read buffer for WebSocket connections
+	// WebSocket upgrader configuration:
+	
+	// WsUpgraderReadBufferSize sets the read buffer size for the WebSocket upgrader (default: 1024).
 	WsUpgraderReadBufferSize int
-	// WsUpgraderWriteBufferSize is the size of the write buffer for WebSocket connections
+	// WsUpgraderWriteBufferSize sets the write buffer size for the WebSocket upgrader (default: 1024).
 	WsUpgraderWriteBufferSize int
-	// WsUpgraderCheckOrigin is a function to check the origin of incoming WebSocket requests
+	// WsUpgraderCheckOrigin validates the origin of incoming WebSocket requests.
+	// Default allows all origins; implement this for CORS protection.
 	WsUpgraderCheckOrigin func(r *http.Request) bool
 
-	// WsConnWriteTimeout is the timeout for writing messages to the WebSocket connection
+	// Connection-level configuration:
+	
+	// WsConnWriteTimeout is the maximum time to wait for a write operation (default: 5s).
+	// Connections that exceed this timeout are considered unresponsive and closed.
 	WsConnWriteTimeout time.Duration
-	// WsConnWriteBufferSize is the size of the write buffer for WebSocket connections
+	// WsConnWriteBufferSize is the capacity of each connection's outgoing message queue (default: 10).
 	WsConnWriteBufferSize int
-	// WsConnProcessBufferSize is the size of the process buffer for WebSocket connections
+	// WsConnProcessBufferSize is the capacity of each connection's incoming message queue (default: 10).
 	WsConnProcessBufferSize int
 }
 
-// NewWebsocketNode creates a new RPC node instance with the provided configuration.
-// The signer is used to sign all outgoing messages, ensuring message authenticity.
+// NewWebsocketNode creates a new WebsocketNode instance with the provided configuration.
+// The node is ready to accept WebSocket connections after creation.
+//
+// Required configuration:
+//   - Signer: Used to sign all outgoing messages
+//   - Logger: Used for structured logging
+//
+// The node automatically registers a built-in "ping" handler that responds with "pong".
+//
+// Returns an error if required configuration is missing.
 func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 	if config.Signer == nil {
 		return nil, fmt.Errorf("signer cannot be nil")
@@ -146,10 +203,22 @@ func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 	return node, nil
 }
 
-// ServeHTTP is the main entry point for WebSocket connections.
-// It upgrades the HTTP connection to WebSocket, manages concurrent read/write operations,
-// processes incoming RPC messages, and handles connection lifecycle events.
-// This method blocks until the connection is closed.
+// ServeHTTP implements http.Handler, making the node compatible with standard HTTP servers.
+// This method:
+//   1. Upgrades incoming HTTP requests to WebSocket connections
+//   2. Creates a unique connection ID and manages connection state
+//   3. Spawns goroutines for concurrent message processing
+//   4. Invokes lifecycle callbacks (OnConnect, OnDisconnect, etc.)
+//   5. Blocks until the connection is closed
+//
+// Each connection runs independently with its own goroutines for:
+//   - Reading incoming messages
+//   - Processing requests and routing to handlers
+//   - Writing outgoing responses
+//   - Monitoring connection health
+//
+// The method ensures proper cleanup when connections close, including
+// removing the connection from the hub and invoking disconnect callbacks.
 func (wn *WebsocketNode) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	wsConnection, err := wn.upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -202,8 +271,18 @@ func (wn *WebsocketNode) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	wg.Wait()
 }
 
-// processRequests handles incoming requests from the WebsocketConnection.
-// It validates messages, routes them to appropriate handlers, and manages authentication.
+// processRequests is the main request processing loop for a connection.
+// It:
+//   1. Reads raw messages from the connection's request channel
+//   2. Unmarshals and validates incoming requests
+//   3. Looks up the appropriate handler chain for the method
+//   4. Creates a Context with the request and executes the handler chain
+//   5. Sends the signed response back to the client
+//   6. Handles re-authentication if the UserID changes
+//
+// The method runs until the connection closes or the context is cancelled.
+// Each connection has its own SafeStorage instance for maintaining state
+// across requests.
 func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Context, handleClosure func(error)) {
 	defer handleClosure(nil) // Stop other goroutines when done
 	safeStorage := NewSafeStorage()
@@ -283,9 +362,22 @@ func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Cont
 	}
 }
 
-// NewGroup creates a new handler group with the given name.
-// Groups allow organizing handlers with shared middleware.
-// Example: privGroup := node.NewGroup("private"); privGroup.Use(authMiddleware)
+// NewGroup creates a new handler group with the specified name.
+// Groups provide a way to organize related handlers and apply
+// common middleware. Groups can be nested to create hierarchical
+// structures.
+//
+// Example:
+//
+//	// Create a group for authenticated endpoints
+//	privateGroup := node.NewGroup("private")
+//	privateGroup.Use(authMiddleware)
+//	privateGroup.Handle("get_balance", handleGetBalance)
+//	
+//	// Create a nested group with additional middleware
+//	adminGroup := privateGroup.NewGroup("admin")
+//	adminGroup.Use(adminAuthMiddleware)
+//	adminGroup.Handle("manage_users", handleManageUsers)
 func (wn *WebsocketNode) NewGroup(name string) HandlerGroup {
 	return &WebsocketHandlerGroup{
 		groupId:     nodeGroupHandlerPrefix + name,
@@ -294,8 +386,15 @@ func (wn *WebsocketNode) NewGroup(name string) HandlerGroup {
 	}
 }
 
-// Handle registers a handler for the specified RPC method.
-// The handler will be called when a message with the matching method is received.
+// Handle registers a handler function for the specified RPC method.
+// When a request with a matching method name is received, the handler
+// will be invoked with a Context containing the request information.
+//
+// The handler executes after all global middleware registered with Use().
+//
+// Panics if:
+//   - method is empty
+//   - handler is nil
 func (wn *WebsocketNode) Handle(method string, handler Handler) {
 	wn.handle(method, handler)
 	wn.routes[method] = []string{wn.groupId, method}
@@ -314,8 +413,19 @@ func (wn *WebsocketNode) handle(method string, handler Handler) {
 	wn.handlerChain[method] = []Handler{handler}
 }
 
-// Use adds middleware to the root handler group.
-// Middleware will be executed for all requests before reaching the final handler.
+// Use adds global middleware that executes for all requests.
+// Middleware is executed in the order it was registered, before
+// any method-specific handlers. Common middleware includes:
+//   - Authentication checks
+//   - Request logging
+//   - Rate limiting
+//   - Request validation
+//
+// Example:
+//
+//	node.Use(loggingMiddleware)
+//	node.Use(rateLimitMiddleware)
+//	node.Use(authMiddleware)
 func (wn *WebsocketNode) Use(middleware Handler) {
 	wn.use(wn.groupId, middleware)
 }
@@ -334,8 +444,17 @@ func (wn *WebsocketNode) use(groupId string, middleware Handler) {
 	wn.handlerChain[groupId] = append(wn.handlerChain[groupId], middleware)
 }
 
-// Notify sends a server-initiated notification to a specific authenticated user.
-// If the user is not connected, the notification is silently dropped.
+// Notify sends a server-initiated notification to all connections of a specific user.
+// This enables the server to push updates to clients without a prior request.
+// Common use cases include:
+//   - Balance updates after transactions
+//   - Status changes in long-running operations
+//   - Real-time notifications for user events
+//
+// The notification is sent to all active connections for the user.
+// If the user has no active connections, the notification is silently dropped.
+//
+// Notifications have RequestID=0 to distinguish them from responses.
 func (wn *WebsocketNode) Notify(userID, method string, params Params) {
 	message, err := prepareRawNotification(wn.cfg.Signer, method, params)
 	if err != nil {
@@ -383,8 +502,12 @@ func (wn *WebsocketNode) sendErrorResponse(conn Connection, requestID uint64, me
 	conn.WriteRawResponse(responseBytes)
 }
 
-// handlePing is a built-in handler for the "ping" method.
-// It responds with a "pong" message and can be used for keep-alive checks.
+// handlePing is the built-in handler for the "ping" method.
+// It provides a standard way for clients to check if the connection
+// is alive and measure round-trip time. The handler executes any
+// registered middleware before responding with "pong".
+//
+// This handler is automatically registered when the node is created.
 func (wn *WebsocketNode) handlePing(ctx *Context) {
 	ctx.Next() // Call any middleware first
 	ctx.Succeed(PongMethod.String(), nil)
@@ -403,8 +526,17 @@ func prepareRawNotification(signer sign.Signer, method string, params Params) ([
 	return responseBytes, nil
 }
 
-// WebsocketHandlerGroup represents a collection of handlers with shared middleware.
-// Groups can be nested to create hierarchical middleware chains.
+// WebsocketHandlerGroup implements the HandlerGroup interface for organizing
+// related handlers with shared middleware. Groups support nesting, allowing
+// for hierarchical organization of endpoints with inherited middleware chains.
+//
+// When a request matches a handler in a group, the middleware chain is:
+//   1. Global middleware (from Node.Use)
+//   2. Parent group middleware (if nested)
+//   3. This group's middleware
+//   4. The method handler
+//
+// This enables fine-grained control over request processing pipelines.
 type WebsocketHandlerGroup struct {
 	// groupId is the unique identifier for this group
 	groupId string
@@ -415,7 +547,17 @@ type WebsocketHandlerGroup struct {
 }
 
 // NewGroup creates a nested handler group within this group.
-// The new group inherits all middleware from parent groups.
+// The nested group inherits the middleware chain from all parent groups,
+// allowing for progressive middleware application.
+//
+// Example:
+//
+//	api := node.NewGroup("api")
+//	api.Use(apiVersionMiddleware)
+//	
+//	v1 := api.NewGroup("v1")
+//	v1.Use(v1AuthMiddleware)
+//	// Handlers in v1 group will execute: global → api → v1 middleware
 func (hg *WebsocketHandlerGroup) NewGroup(name string) HandlerGroup {
 	return &WebsocketHandlerGroup{
 		groupId:     fmt.Sprintf("%s.%s", hg.groupId, name),
@@ -425,14 +567,23 @@ func (hg *WebsocketHandlerGroup) NewGroup(name string) HandlerGroup {
 }
 
 // Handle registers a handler for the specified RPC method within this group.
-// The handler will execute after all group middleware in the chain.
+// The handler will execute after all applicable middleware:
+//   - Global middleware
+//   - Parent group middleware (for nested groups) 
+//   - This group's middleware
+//
+// The method parameter must be unique across the entire node.
 func (hg *WebsocketHandlerGroup) Handle(method string, handler Handler) {
 	hg.root.routes[method] = append(hg.routePrefix, hg.groupId, method)
 	hg.root.handle(method, handler)
 }
 
 // Use adds middleware to this handler group.
-// The middleware will execute for all handlers registered in this group.
+// The middleware will execute for all handlers in this group
+// and any nested groups. Middleware is executed in the order
+// it was added.
+//
+// Panics if middleware is nil.
 func (hg *WebsocketHandlerGroup) Use(middleware Handler) {
 	hg.root.use(hg.groupId, middleware)
 }

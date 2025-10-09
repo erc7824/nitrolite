@@ -32,7 +32,7 @@ describe('Resize channel', () => {
 
     afterEach(async () => {
         ws.close();
-        await databaseUtils.cleanupDatabaseData();
+        await databaseUtils.resetClearnodeState();
         await blockUtils.resetSnapshot();
     });
 

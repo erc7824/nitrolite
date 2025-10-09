@@ -182,7 +182,7 @@ if err != nil {
 // Create multi-party application session
 createSessReq := rpc.CreateAppSessionRequest{
     Definition: rpc.AppDefinition{
-        Protocol:           "game/v1",
+        Protocol:           rpc.VersionNitroRPCv0_2, // Required: "NitroRPC/0.2"
         ParticipantWallets: []string{player1, player2},
         Weights:            []int64{1, 1},
         Quorum:             2,

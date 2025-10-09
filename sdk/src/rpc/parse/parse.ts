@@ -148,3 +148,7 @@ export const parseTransferResponse = (raw: string) => _parseSpecificRPCResponse(
 /** Parses `tr` response */
 export const parseTransferNotificationResponse = (raw: string) =>
     _parseSpecificRPCResponse(raw, RPCMethod.TransferNotification);
+
+/** Parses `asu` response */
+export const parseAppSessionUpdateResponse = (raw: string) =>
+    _parseSpecificRPCResponse(raw, RPCMethod.AppSessionUpdate);

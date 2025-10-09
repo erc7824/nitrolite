@@ -44,6 +44,13 @@ export class DatabaseUtils {
         }
     }
 
+    async resetClearnodeState(): Promise<void> {
+        await this.cleanupDatabaseData();
+
+        // Future-proof: if Clearnode adds in-memory caching, add cache-clear API call here
+        // await this.clearClearnodeCache(); // Uncomment when caching is added
+    }
+
     async getBlockchainActions(filters: { channel_id?: string; action_type?: string }): Promise<any[]> {
         const client = await this.pool.connect();
         try {

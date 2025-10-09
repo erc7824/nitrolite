@@ -19,6 +19,7 @@ The Clearnode protocol is a system for managing payment channels and virtual app
 - After being credited from on-chain channels, participants can create virtual applications with other participants
 - Virtual applications allow participants to allocate a portion of their balance for peer-to-peer transactions without requiring on-chain operations
 - The broker validates that:
+  - The protocol version is "NitroRPC/0.2" (the only supported version)
   - All participants have channels with the broker
   - All participants have sufficient funds in their respective accounts
   - The requested allocation amounts are available

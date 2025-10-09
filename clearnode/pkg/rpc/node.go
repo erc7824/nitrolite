@@ -35,17 +35,17 @@ type Node interface {
 	// When a request with the matching method name is received,
 	// the handler will be invoked with the request context.
 	Handle(method string, handler Handler)
-	
+
 	// Notify sends a server-initiated notification to a specific user.
 	// All active connections for the user will receive the notification.
 	// If the user has no active connections, the notification is dropped.
 	Notify(userID string, method string, params Params)
-	
+
 	// Use adds global middleware that will be executed for all requests.
 	// Middleware is executed in the order it was added, before any
 	// method-specific handlers.
 	Use(middleware Handler)
-	
+
 	// NewGroup creates a new handler group for organizing related endpoints.
 	// Groups can have their own middleware and can be nested to create
 	// hierarchical handler structures.
@@ -107,7 +107,7 @@ type WebsocketNodeConfig struct {
 	Logger log.Logger
 
 	// Connection lifecycle callbacks:
-	
+
 	// OnConnectHandler is called when a new WebSocket connection is established.
 	// It receives a send function for pushing notifications to the new connection.
 	OnConnectHandler func(send SendResponseFunc)
@@ -122,7 +122,7 @@ type WebsocketNodeConfig struct {
 	OnAuthenticatedHandler func(userID string, send SendResponseFunc)
 
 	// WebSocket upgrader configuration:
-	
+
 	// WsUpgraderReadBufferSize sets the read buffer size for the WebSocket upgrader (default: 1024).
 	WsUpgraderReadBufferSize int
 	// WsUpgraderWriteBufferSize sets the write buffer size for the WebSocket upgrader (default: 1024).
@@ -132,7 +132,7 @@ type WebsocketNodeConfig struct {
 	WsUpgraderCheckOrigin func(r *http.Request) bool
 
 	// Connection-level configuration:
-	
+
 	// WsConnWriteTimeout is the maximum time to wait for a write operation (default: 5s).
 	// Connections that exceed this timeout are considered unresponsive and closed.
 	WsConnWriteTimeout time.Duration
@@ -174,12 +174,19 @@ func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 		config.OnAuthenticatedHandler = func(userID string, send SendResponseFunc) {}
 	}
 	if config.WsUpgraderReadBufferSize <= 0 {
+		// It's the optimal default value as recommended
+		// by the library documentation for most use cases
 		config.WsUpgraderReadBufferSize = 1024
 	}
 	if config.WsUpgraderWriteBufferSize <= 0 {
+		// It's the optimal default value as recommended
+		// by the library documentation for most use cases
 		config.WsUpgraderWriteBufferSize = 1024
 	}
 	if config.WsUpgraderCheckOrigin == nil {
+		// Default allows all origins as this application is designed to be public
+		// and accept connections from multiple different applications without
+		// origin restrictions by default
 		config.WsUpgraderCheckOrigin = func(r *http.Request) bool {
 			return true // Allow all origins by default
 		}
@@ -205,11 +212,11 @@ func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 
 // ServeHTTP implements http.Handler, making the node compatible with standard HTTP servers.
 // This method:
-//   1. Upgrades incoming HTTP requests to WebSocket connections
-//   2. Creates a unique connection ID and manages connection state
-//   3. Spawns goroutines for concurrent message processing
-//   4. Invokes lifecycle callbacks (OnConnect, OnDisconnect, etc.)
-//   5. Blocks until the connection is closed
+//  1. Upgrades incoming HTTP requests to WebSocket connections
+//  2. Creates a unique connection ID and manages connection state
+//  3. Spawns goroutines for concurrent message processing
+//  4. Invokes lifecycle callbacks (OnConnect, OnDisconnect, etc.)
+//  5. Blocks until the connection is closed
 //
 // Each connection runs independently with its own goroutines for:
 //   - Reading incoming messages
@@ -273,12 +280,12 @@ func (wn *WebsocketNode) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // processRequests is the main request processing loop for a connection.
 // It:
-//   1. Reads raw messages from the connection's request channel
-//   2. Unmarshals and validates incoming requests
-//   3. Looks up the appropriate handler chain for the method
-//   4. Creates a Context with the request and executes the handler chain
-//   5. Sends the signed response back to the client
-//   6. Handles re-authentication if the UserID changes
+//  1. Reads raw messages from the connection's request channel
+//  2. Unmarshals and validates incoming requests
+//  3. Looks up the appropriate handler chain for the method
+//  4. Creates a Context with the request and executes the handler chain
+//  5. Sends the signed response back to the client
+//  6. Handles re-authentication if the UserID changes
 //
 // The method runs until the connection closes or the context is cancelled.
 // Each connection has its own SafeStorage instance for maintaining state
@@ -373,7 +380,7 @@ func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Cont
 //	privateGroup := node.NewGroup("private")
 //	privateGroup.Use(authMiddleware)
 //	privateGroup.Handle("get_balance", handleGetBalance)
-//	
+//
 //	// Create a nested group with additional middleware
 //	adminGroup := privateGroup.NewGroup("admin")
 //	adminGroup.Use(adminAuthMiddleware)
@@ -531,10 +538,10 @@ func prepareRawNotification(signer sign.Signer, method string, params Params) ([
 // for hierarchical organization of endpoints with inherited middleware chains.
 //
 // When a request matches a handler in a group, the middleware chain is:
-//   1. Global middleware (from Node.Use)
-//   2. Parent group middleware (if nested)
-//   3. This group's middleware
-//   4. The method handler
+//  1. Global middleware (from Node.Use)
+//  2. Parent group middleware (if nested)
+//  3. This group's middleware
+//  4. The method handler
 //
 // This enables fine-grained control over request processing pipelines.
 type WebsocketHandlerGroup struct {
@@ -554,7 +561,7 @@ type WebsocketHandlerGroup struct {
 //
 //	api := node.NewGroup("api")
 //	api.Use(apiVersionMiddleware)
-//	
+//
 //	v1 := api.NewGroup("v1")
 //	v1.Use(v1AuthMiddleware)
 //	// Handlers in v1 group will execute: global → api → v1 middleware
@@ -569,7 +576,7 @@ func (hg *WebsocketHandlerGroup) NewGroup(name string) HandlerGroup {
 // Handle registers a handler for the specified RPC method within this group.
 // The handler will execute after all applicable middleware:
 //   - Global middleware
-//   - Parent group middleware (for nested groups) 
+//   - Parent group middleware (for nested groups)
 //   - This group's middleware
 //
 // The method parameter must be unique across the entire node.

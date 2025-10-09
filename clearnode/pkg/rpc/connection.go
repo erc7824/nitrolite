@@ -11,6 +11,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Default values are carefully chosen to balance resource consumption and operational flexibility.
+// Higher values would increase node resource usage, while lower values would reduce the ability
+// to handle traffic spikes and incidents. These defaults provide a reasonable middle ground.
 var (
 	// defaultWsConnWriteTimeout is the default maximum duration to wait for a write to complete.
 	defaultWsConnWriteTimeout = 5 * time.Second

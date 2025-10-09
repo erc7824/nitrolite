@@ -1,91 +1,67 @@
-import { createAuthSessionWithClearnode } from '@/auth';
 import { BlockchainUtils } from '@/blockchainUtils';
 import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import {
-    getCloseAppSessionPredicate,
-    getCreateAppSessionPredicate,
-    getGetLedgerBalancesPredicate,
-    getGetAppSessionsPredicate,
-    getSubmitAppStatePredicate,
     TestWebSocket,
     getResizeChannelPredicate,
     getCloseChannelPredicate,
 } from '@/ws';
 import {
-    RPCAppDefinition,
-    RPCAppSessionAllocation,
-    createAppSessionMessage,
-    createCloseAppSessionMessage,
     createCloseChannelMessage,
-    createGetAppSessionsMessage,
-    createGetLedgerBalancesMessage,
     createResizeChannelMessage,
-    createSubmitAppStateMessage,
-    RPCChannelStatus,
-    parseCloseAppSessionResponse,
     parseCloseChannelResponse,
-    parseCreateAppSessionResponse,
-    parseGetAppSessionsResponse,
-    parseGetLedgerBalancesResponse,
     parseResizeChannelResponse,
-    parseSubmitAppStateResponse,
     RPCProtocolVersion,
     RPCAppStateIntent,
 } from '@erc7824/nitrolite';
-import { Hex, parseUnits } from 'viem';
+import { Hex } from 'viem';
+import {
+    setupTestIdentitiesAndConnections,
+    fetchAndParseAppSessions,
+} from '@/testSetup';
+import {
+    createTestChannels,
+    authenticateAppWithAllowances,
+    createTestAppSession,
+    getLedgerBalances,
+    toRaw,
+} from '@/testHelpers';
+import {
+    submitAppStateUpdate_v04,
+    closeAppSessionWithState,
+} from '@/testAppSessionHelpers';
 
-describe('Close channel', () => {
-    const depositAmount = parseUnits('100', 6); // 100 USDC (decimals = 6)
-    const decimalDepositAmount = BigInt(100);
+describe('nitrorpc_v04 lifecycle', () => {
+    const onChainDepositAmount = BigInt(1000);
+    const appSessionDepositAmount = BigInt(100);
+    const appSessionTopUpAmount = BigInt(50);
+    const appSessionPartialWithdrawalAmount = BigInt(25);
 
-    let ws: TestWebSocket;
-    let identity: Identity;
-    let client: TestNitroliteClient;
+    const finalAliceAmount = onChainDepositAmount - appSessionDepositAmount - appSessionTopUpAmount + appSessionPartialWithdrawalAmount; // 1000 - 100 - 50 + 25 = 875
+    const finalBobAmount = onChainDepositAmount + appSessionDepositAmount + appSessionTopUpAmount - appSessionPartialWithdrawalAmount; // 1000 + 100 + 50 - 25 = 1125
 
-    let appWS: TestWebSocket;
-    let appIdentity: Identity;
+    let aliceWS: TestWebSocket;
+    let alice: Identity;
+    let aliceClient: TestNitroliteClient;
 
-    let cpWS: TestWebSocket;
-    let cpIdentity: Identity;
-    let appCPIdentity: Identity;
-    let cpClient: TestNitroliteClient;
+    let aliceAppWS: TestWebSocket;
+    let aliceAppIdentity: Identity;
+
+    let bobWS: TestWebSocket;
+    let bob: Identity;
+    let bobAppIdentity: Identity;
+    let bobClient: TestNitroliteClient;
 
     let blockUtils: BlockchainUtils;
     let databaseUtils: DatabaseUtils;
 
-    let channelId: Hex;
-    let cpChannelId: Hex;
+    let aliceChannelId: Hex;
+    let bobChannelId: Hex;
     let appSessionId: string;
 
     let currentVersion = 1;
-
-    const fetchAndParseAppSessions = async () => {
-        const getAppSessionsMsg = await createGetAppSessionsMessage(
-            appIdentity.messageSigner,
-            appIdentity.walletAddress
-        );
-        const getAppSessionsResponse = await appWS.sendAndWaitForResponse(
-            getAppSessionsMsg,
-            getGetAppSessionsPredicate(),
-            1000
-        );
-
-        const getAppSessionsParsedResponse = parseGetAppSessionsResponse(getAppSessionsResponse);
-        expect(getAppSessionsParsedResponse).toBeDefined();
-        expect(getAppSessionsParsedResponse.params.appSessions).toHaveLength(1);
-
-        const appSession = getAppSessionsParsedResponse.params.appSessions[0];
-        expect(appSession.appSessionId).toBe(appSessionId);
-        expect(appSession.sessionData).toBeDefined();
-
-        return {
-            appSession,
-            sessionData: JSON.parse(appSession.sessionData!),
-        };
-    };
 
     const GAME_TYPE = 'chess';
     const TIME_CONTROL = { initial: 600, increment: 5 };
@@ -97,239 +73,91 @@ describe('Close channel', () => {
     };
 
     const SESSION_DATA_ACTIVE = {
-        gameType: GAME_TYPE,
-        timeControl: TIME_CONTROL,
+        ...SESSION_DATA_WAITING,
         gameState: 'active',
         currentMove: 'e2e4',
         moveCount: 1,
     };
 
     const SESSION_DATA_ACTIVE_2 = {
-        gameType: GAME_TYPE,
-        timeControl: TIME_CONTROL,
-        gameState: 'active',
+        ...SESSION_DATA_ACTIVE,
         currentMove: 'e4e6',
         moveCount: 2,
     };
 
     const SESSION_DATA_FINISHED = {
-        gameType: GAME_TYPE,
-        timeControl: TIME_CONTROL,
+        ...SESSION_DATA_WAITING,
         gameState: 'finished',
         winner: 'white',
         endCondition: 'checkmate',
     };
 
-    const submitAppStateUpdate = async (
-        intent: RPCAppStateIntent,
-        version: number,
-        allocations: RPCAppSessionAllocation[],
-        sessionData: object
-    ) => {
-        const submitAppStateMsg = await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_4>(appIdentity.messageSigner, {
-            app_session_id: appSessionId as Hex,
-            intent,
-            version,
-            allocations,
-            session_data: JSON.stringify(sessionData),
-        });
-
-        const submitAppStateResponse = await appWS.sendAndWaitForResponse(
-            submitAppStateMsg,
-            getSubmitAppStatePredicate(),
-            1000
-        );
-
-        const submitAppStateParsedResponse = parseSubmitAppStateResponse(submitAppStateResponse);
-        expect(submitAppStateParsedResponse).toBeDefined();
-        expect(submitAppStateParsedResponse.params.appSessionId).toBe(appSessionId);
-        expect(submitAppStateParsedResponse.params.status).toBe(RPCChannelStatus.Open);
-        expect(submitAppStateParsedResponse.params.version).toBe(version);
-
-        return submitAppStateParsedResponse;
-    };
-
-    const closeAppSessionWithState = async (
-        allocations: RPCAppSessionAllocation[],
-        sessionData: object,
-        expectedVersion: number
-    ) => {
-        const closeAppSessionMsg = await createCloseAppSessionMessage(appIdentity.messageSigner, {
-            app_session_id: appSessionId as Hex,
-            allocations,
-            session_data: JSON.stringify(sessionData),
-        });
-
-        const closeAppSessionResponse = await appWS.sendAndWaitForResponse(
-            closeAppSessionMsg,
-            getCloseAppSessionPredicate(),
-            1000
-        );
-
-        expect(closeAppSessionResponse).toBeDefined();
-
-        const closeAppSessionParsedResponse = parseCloseAppSessionResponse(closeAppSessionResponse);
-        expect(closeAppSessionParsedResponse).toBeDefined();
-        expect(closeAppSessionParsedResponse.params.appSessionId).toBe(appSessionId);
-        expect(closeAppSessionParsedResponse.params.status).toBe(RPCChannelStatus.Closed);
-        expect(closeAppSessionParsedResponse.params.version).toBe(expectedVersion);
-
-        return closeAppSessionParsedResponse;
-    };
 
     beforeAll(async () => {
         blockUtils = new BlockchainUtils();
         databaseUtils = new DatabaseUtils();
 
-        // Here we need to simulate difference between channel and app session
-        identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);
-        ws = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
-        client = new TestNitroliteClient(identity);
+        ({alice, aliceWS, aliceClient, aliceAppIdentity, aliceAppWS, bob, bobWS, bobClient, bobAppIdentity} = await setupTestIdentitiesAndConnections());
 
-        appIdentity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].APP_SESSION_PK);
-        appWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
-
-        cpWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
-        cpIdentity = new Identity(CONFIG.IDENTITIES[1].WALLET_PK, CONFIG.IDENTITIES[1].SESSION_PK);
-        appCPIdentity = new Identity(CONFIG.IDENTITIES[1].WALLET_PK, CONFIG.IDENTITIES[1].APP_SESSION_PK);
-        cpClient = new TestNitroliteClient(cpIdentity);
-
-        await ws.connect();
-        await appWS.connect();
-        await cpWS.connect();
-
-        await createAuthSessionWithClearnode(ws, identity);
-        await createAuthSessionWithClearnode(cpWS, cpIdentity);
         await blockUtils.makeSnapshot();
     });
 
     afterAll(async () => {
-        ws.close();
-        appWS.close();
-        cpWS.close();
+        aliceWS.close();
+        aliceAppWS.close();
+        bobWS.close();
 
-        await databaseUtils.cleanupDatabaseData();
         await blockUtils.resetSnapshot();
 
+        await databaseUtils.resetClearnodeState();
         await databaseUtils.close();
     });
 
     it('should create and init two channels', async () => {
-        const { params } = await client.createAndWaitForChannel(ws, {
-            tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            amount: depositAmount * BigInt(10), // 10 times the deposit amount
-        });
-
-        channelId = params.channelId;
-
-        const { params: cpParams } = await cpClient.createAndWaitForChannel(cpWS, {
-            tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            amount: depositAmount * BigInt(10), // 10 times the deposit amount
-        });
-
-        cpChannelId = cpParams.channelId;
+        [aliceChannelId, bobChannelId] = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], toRaw(onChainDepositAmount));
     });
 
     it('should create app session with allowance for participant to deposit', async () => {
-        await createAuthSessionWithClearnode(appWS, appIdentity, {
-            address: appIdentity.walletAddress,
-            session_key: appIdentity.sessionAddress,
-            app_name: 'App Domain',
-            expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
-            scope: 'console',
-            application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // random address, no use for now
-            allowances: [
-                {
-                    asset: 'usdc',
-                    amount: decimalDepositAmount.toString(),
-                },
-            ],
-        });
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, appSessionDepositAmount);
     });
 
     it('should take snapshot of ledger balances', async () => {
-        const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
-            appIdentity.messageSigner,
-            appIdentity.walletAddress
-        );
-        const getLedgerBalancesResponse = await appWS.sendAndWaitForResponse(
-            getLedgerBalancesMsg,
-            getGetLedgerBalancesPredicate(),
-            1000
-        );
-
-        const getLedgerBalancesParsedResponse = parseGetLedgerBalancesResponse(getLedgerBalancesResponse);
-        expect(getLedgerBalancesParsedResponse).toBeDefined();
-
-        const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
+        const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
-        expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(10)).toString());
+        expect(ledgerBalances[0].amount).toBe((onChainDepositAmount).toString());
         expect(ledgerBalances[0].asset).toBe('USDC');
     });
 
     it('should create app session', async () => {
-        const definition: RPCAppDefinition = {
-            protocol: RPCProtocolVersion.NitroRPC_0_4,
-            participants: [appIdentity.walletAddress, appCPIdentity.walletAddress],
-            weights: [100, 0],
-            quorum: 100,
-            challenge: 0,
-            nonce: Date.now(),
-        };
-
-        const allocations = [
-            {
-                participant: appIdentity.walletAddress,
-                asset: 'USDC',
-                amount: decimalDepositAmount.toString(),
-            },
-            {
-                participant: appCPIdentity.walletAddress,
-                asset: 'USDC',
-                amount: '0',
-            },
-        ];
-
-        const createAppSessionMsg = await createAppSessionMessage(appIdentity.messageSigner, {
-            definition,
-            allocations,
-            session_data: JSON.stringify(SESSION_DATA_WAITING),
-        });
-        const createAppSessionResponse = await appWS.sendAndWaitForResponse(
-            createAppSessionMsg,
-            getCreateAppSessionPredicate(),
-            1000
+        appSessionId = await createTestAppSession(
+            aliceAppIdentity,
+            bobAppIdentity,
+            aliceAppWS,
+            RPCProtocolVersion.NitroRPC_0_4,
+            appSessionDepositAmount,
+            SESSION_DATA_WAITING
         );
-
-        const createAppSessionParsedResponse = parseCreateAppSessionResponse(createAppSessionResponse);
-
-        expect(createAppSessionParsedResponse).toBeDefined();
-        expect(createAppSessionParsedResponse.params.appSessionId).toBeDefined();
-        expect(createAppSessionParsedResponse.params.status).toBe(RPCChannelStatus.Open);
-        expect(createAppSessionParsedResponse.params.version).toBeDefined();
-
-        appSessionId = createAppSessionParsedResponse.params.appSessionId;
     });
 
     it('should submit state with updated version and session_data', async () => {
         const allocations = [
             {
-                participant: appIdentity.walletAddress,
+                participant: aliceAppIdentity.walletAddress,
                 asset: 'USDC',
-                amount: (decimalDepositAmount / BigInt(4) * BigInt(3)).toString(), // 75 USDC
+                amount: (appSessionDepositAmount / BigInt(4) * BigInt(3)).toString(), // 75 USDC
             },
             {
-                participant: appCPIdentity.walletAddress,
+                participant: bobAppIdentity.walletAddress,
                 asset: 'USDC',
-                amount: (decimalDepositAmount / BigInt(4)).toString(), // 25 USDC
+                amount: (appSessionDepositAmount / BigInt(4)).toString(), // 25 USDC
             },
         ];
 
-        await submitAppStateUpdate(RPCAppStateIntent.Operate, ++currentVersion, allocations, SESSION_DATA_ACTIVE);
+        await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Operate, ++currentVersion, allocations, SESSION_DATA_ACTIVE);
     });
 
     it('should verify sessionData changes after updates', async () => {
-        const { sessionData } = await fetchAndParseAppSessions();
+        const { sessionData } = await fetchAndParseAppSessions(aliceAppWS, aliceAppIdentity, appSessionId);
 
         expect(sessionData).toEqual(SESSION_DATA_ACTIVE);
     });
@@ -337,132 +165,135 @@ describe('Close channel', () => {
     it('should submit state with version updated again and session data', async () => {
         const allocations = [
             {
-                participant: appIdentity.walletAddress,
+                participant: aliceAppIdentity.walletAddress,
                 asset: 'USDC',
-                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
             {
-                participant: appCPIdentity.walletAddress,
+                participant: bobAppIdentity.walletAddress,
                 asset: 'USDC',
-                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
         ];
 
-        await submitAppStateUpdate(RPCAppStateIntent.Operate, ++currentVersion, allocations, SESSION_DATA_ACTIVE_2);
+        await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Operate, ++currentVersion, allocations, SESSION_DATA_ACTIVE_2);
     });
 
     it('should verify sessionData changes after updates', async () => {
-        const { sessionData } = await fetchAndParseAppSessions();
+        const { sessionData } = await fetchAndParseAppSessions(aliceAppWS, aliceAppIdentity, appSessionId);
 
         expect(sessionData).toEqual(SESSION_DATA_ACTIVE_2);
     });
 
-    it('should return error on skipping version number', async () => {
-        const allocations = [
+    it('should allow to top-up app session', async () => {
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, appSessionDepositAmount + appSessionTopUpAmount);
+
+        const updatedAllocations = [
             {
-                participant: appIdentity.walletAddress,
+                participant: aliceAppIdentity.walletAddress,
                 asset: 'USDC',
-                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount).toString(), // 100 USDC
             },
             {
-                participant: appCPIdentity.walletAddress,
+                participant: bobAppIdentity.walletAddress,
                 asset: 'USDC',
-                amount: (decimalDepositAmount / BigInt(2)).toString(), // 50 USDC
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
+            },
+        ];
+        await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Deposit, ++currentVersion, updatedAllocations, SESSION_DATA_ACTIVE_2);
+    });
+
+    it('should verify ledger balances after top-up', async () => {
+        // updated for Alice
+        const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
+        expect(ledgerBalances).toHaveLength(1);
+        expect(ledgerBalances[0].amount).toBe((onChainDepositAmount - appSessionDepositAmount - appSessionTopUpAmount).toString());
+        expect(ledgerBalances[0].asset).toBe('USDC');
+
+        // unchanged for Bob
+        const bobLedgerBalances = await getLedgerBalances(bobAppIdentity, bobWS);
+        expect(bobLedgerBalances).toHaveLength(1);
+        expect(bobLedgerBalances[0].amount).toBe((onChainDepositAmount).toString());
+        expect(bobLedgerBalances[0].asset).toBe('USDC');
+    });
+
+    it('should allow to partially withdraw from app session', async () => {
+        const allocations = [
+            {
+                participant: aliceAppIdentity.walletAddress,
+                asset: 'USDC',
+                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 75 USDC
+            },
+            {
+                participant: bobAppIdentity.walletAddress,
+                asset: 'USDC',
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
         ];
 
-        try {
-            await submitAppStateUpdate(RPCAppStateIntent.Operate, currentVersion + 42, allocations, SESSION_DATA_ACTIVE_2);
-        } catch (e) {
-            expect((e as Error).message).toMatch(
-                `RPC Error: incorrect app state: incorrect version: expected ${
-                    currentVersion + 1
-                }, got ${currentVersion + 42}`
-            );
-            return;
-        }
-
-        throw new Error('Expected error was not thrown');
+        await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Withdraw, ++currentVersion, allocations, SESSION_DATA_ACTIVE_2);
     });
 
-    it('should verify sessionData remain unchanged after failed update', async () => {
-        const { sessionData } = await fetchAndParseAppSessions();
+    it('should verify ledger balances after partial withdrawal', async () => {
+        // updated for Alice
+        const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
+        expect(ledgerBalances).toHaveLength(1);
+        expect(ledgerBalances[0].amount).toBe((onChainDepositAmount - appSessionDepositAmount - appSessionTopUpAmount + appSessionPartialWithdrawalAmount).toString());
+        expect(ledgerBalances[0].asset).toBe('USDC');
 
-        expect(sessionData).toEqual(SESSION_DATA_ACTIVE_2);
+        // unchanged for Bob
+        const bobLedgerBalances = await getLedgerBalances(bobAppIdentity, bobWS);
+        expect(bobLedgerBalances).toHaveLength(1);
+        expect(bobLedgerBalances[0].amount).toBe((onChainDepositAmount).toString());
+        expect(bobLedgerBalances[0].asset).toBe('USDC');
     });
 
     it('should close app session', async () => {
         const allocations = [
             {
-                participant: appIdentity.walletAddress,
+                participant: aliceAppIdentity.walletAddress,
                 asset: 'USDC',
                 amount: '0',
             },
             {
-                participant: appCPIdentity.walletAddress,
+                participant: bobAppIdentity.walletAddress,
                 asset: 'USDC',
-                amount: decimalDepositAmount.toString(),
+                amount: (appSessionDepositAmount + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 125 USDC
             },
         ];
 
-        await closeAppSessionWithState(allocations, SESSION_DATA_FINISHED, ++currentVersion);
+        await closeAppSessionWithState(aliceAppWS, aliceAppIdentity, appSessionId, allocations, SESSION_DATA_FINISHED, ++currentVersion);
     });
 
     it('should verify sessionData changes after closing', async () => {
-        const { appSession, sessionData } = await fetchAndParseAppSessions();
+        const { appSession, sessionData } = await fetchAndParseAppSessions(aliceAppWS, aliceAppIdentity, appSessionId);
 
-        expect(appSession.status).toBe(RPCChannelStatus.Closed);
+        expect(appSession.status).toBe('closed');
         expect(sessionData).toEqual(SESSION_DATA_FINISHED);
     });
 
-    it('should update ledger balances for providing side', async () => {
-        const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
-            identity.messageSigner,
-            identity.walletAddress
-        );
-        const getLedgerBalancesResponse = await ws.sendAndWaitForResponse(
-            getLedgerBalancesMsg,
-            getGetLedgerBalancesPredicate(),
-            1000
-        );
-
-        const getLedgerBalancesParsedResponse = parseGetLedgerBalancesResponse(getLedgerBalancesResponse);
-        expect(getLedgerBalancesParsedResponse).toBeDefined();
-
-        const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
+    it('should update ledger balances for participant sending', async () => {
+        const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
-        expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(9)).toString()); // 1000 - 100
+        expect(ledgerBalances[0].amount).toBe((finalAliceAmount).toString()); // 1000 - 100 - 50 + 25 = 875
         expect(ledgerBalances[0].asset).toBe('USDC');
     });
 
-    it('should update ledger balances for receiving side', async () => {
-        const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
-            cpIdentity.messageSigner,
-            cpIdentity.walletAddress
-        );
-        const getLedgerBalancesResponse = await cpWS.sendAndWaitForResponse(
-            getLedgerBalancesMsg,
-            getGetLedgerBalancesPredicate(),
-            1000
-        );
-
-        const getLedgerBalancesParsedResponse = parseGetLedgerBalancesResponse(getLedgerBalancesResponse);
-        expect(getLedgerBalancesParsedResponse).toBeDefined();
-
-        const ledgerBalances = getLedgerBalancesParsedResponse.params.ledgerBalances;
+    it('should update ledger balances for participant receiving', async () => {
+        const ledgerBalances = await getLedgerBalances(bobAppIdentity, bobWS);
         expect(ledgerBalances).toHaveLength(1);
-        expect(ledgerBalances[0].amount).toBe((decimalDepositAmount * BigInt(11)).toString()); // 1000 + 100
+        expect(ledgerBalances[0].amount).toBe((finalBobAmount).toString()); // 1000 + 100 + 25 = 1125
         expect(ledgerBalances[0].asset).toBe('USDC');
     });
 
     it('should close channel and withdraw without app funds', async () => {
-        const msg = await createCloseChannelMessage(identity.messageSigner, channelId, identity.walletAddress);
+        const msg = await createCloseChannelMessage(alice.messageSigner, aliceChannelId, alice.walletAddress);
 
-        const closeResponse = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
+        const closeResponse = await aliceWS.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();
 
         const { params: closeResponseParams } = parseCloseChannelResponse(closeResponse);
-        const closeChannelTxHash = await client.closeChannel({
+        const closeChannelTxHash = await aliceClient.closeChannel({
             finalState: {
                 intent: closeResponseParams.state.intent,
                 channelId: closeResponseParams.channelId,
@@ -478,30 +309,30 @@ describe('Close channel', () => {
         const closeReceipt = await blockUtils.waitForTransaction(closeChannelTxHash);
         expect(closeReceipt).toBeDefined();
 
-        const postCloseAccountBalance = await client.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(postCloseAccountBalance).toBe(depositAmount * BigInt(9)); // 1000 - 100
+        const postCloseAccountBalance = await aliceClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(postCloseAccountBalance).toBe(toRaw(finalAliceAmount)); // 1000 - 100 - 50 + 25 = 875
     });
 
     it('should resize channel by withdrawing received funds from app to channel', async () => {
-        const msg = await createResizeChannelMessage(cpIdentity.messageSigner, {
-            channel_id: cpChannelId,
-            allocate_amount: depositAmount,
-            funds_destination: cpIdentity.walletAddress,
+        const msg = await createResizeChannelMessage(bob.messageSigner, {
+            channel_id: bobChannelId,
+            allocate_amount: toRaw(finalBobAmount - onChainDepositAmount), // 1000 + 100 + 25 - 1000 = 125
+            funds_destination: bob.walletAddress,
         });
 
-        const resizeResponse = await cpWS.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
+        const resizeResponse = await bobWS.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
         const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
 
         expect(resizeResponseParams.state.allocations).toBeDefined();
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
-        expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(cpIdentity.walletAddress);
+        expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(bob.walletAddress);
         expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
-            (depositAmount * BigInt(11)).toString() // 1000 + 100
+            (toRaw(finalBobAmount)).toString() // 1000 + 100 + 25 = 1125
         );
         expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
-        const resizeChannelTxHash = await cpClient.resizeChannel({
+        const resizeChannelTxHash = await bobClient.resizeChannel({
             resizeState: {
                 channelId: resizeResponseParams.channelId as Hex,
                 intent: resizeResponseParams.state.intent,
@@ -518,9 +349,9 @@ describe('Close channel', () => {
                     data: '0x',
                     allocations: [
                         {
-                            destination: cpIdentity.walletAddress,
+                            destination: bob.walletAddress,
                             token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-                            amount: depositAmount * BigInt(10),
+                            amount: toRaw(onChainDepositAmount),
                         },
                         {
                             destination: CONFIG.ADDRESSES.GUEST_ADDRESS,
@@ -539,13 +370,13 @@ describe('Close channel', () => {
     });
 
     it('should close channel and withdraw with app funds', async () => {
-        const msg = await createCloseChannelMessage(cpIdentity.messageSigner, cpChannelId, cpIdentity.walletAddress);
+        const msg = await createCloseChannelMessage(bob.messageSigner, bobChannelId, bob.walletAddress);
 
-        const closeResponse = await cpWS.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
+        const closeResponse = await bobWS.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();
 
         const { params: closeResponseParams } = parseCloseChannelResponse(closeResponse);
-        const closeChannelTxHash = await cpClient.closeChannel({
+        const closeChannelTxHash = await bobClient.closeChannel({
             finalState: {
                 intent: closeResponseParams.state.intent,
                 channelId: closeResponseParams.channelId,
@@ -561,19 +392,19 @@ describe('Close channel', () => {
         const closeReceipt = await blockUtils.waitForTransaction(closeChannelTxHash);
         expect(closeReceipt).toBeDefined();
 
-        const postCloseAccountBalance = await cpClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(postCloseAccountBalance).toBe(depositAmount * BigInt(11)); // 1000 + 100
+        const postCloseAccountBalance = await bobClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(postCloseAccountBalance).toBe(toRaw(finalBobAmount)); // 1000 + 100 + 25 = 1125
     });
 
-    it('should withdraw funds from channel for providing side', async () => {
+    it('should withdraw funds from channel for participant sending', async () => {
         const preWithdrawalBalance = await blockUtils.getErc20Balance(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            identity.walletAddress
+            alice.walletAddress
         );
 
-        const withdrawalTxHash = await client.withdrawal(
+        const withdrawalTxHash = await aliceClient.withdrawal(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            depositAmount * BigInt(9)
+            toRaw(finalAliceAmount) // 1000 - 100 - 50 + 25 = 875
         );
         expect(withdrawalTxHash).toBeDefined();
 
@@ -582,23 +413,23 @@ describe('Close channel', () => {
 
         const postWithdrawalBalance = await blockUtils.getErc20Balance(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            identity.walletAddress
+            alice.walletAddress
         );
-        expect(postWithdrawalBalance.rawBalance - preWithdrawalBalance.rawBalance).toBe(depositAmount * BigInt(9)); // + 900
+        expect(postWithdrawalBalance.rawBalance - preWithdrawalBalance.rawBalance).toBe(toRaw(finalAliceAmount)); // 1000 - 100 - 50 + 25 = 875
 
-        const accountBalance = await client.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        const accountBalance = await aliceClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
         expect(accountBalance).toBe(BigInt(0));
     });
 
-    it('should withdraw funds from channel for receiving side', async () => {
+    it('should withdraw funds from channel for participant receiving', async () => {
         const preWithdrawalBalance = await blockUtils.getErc20Balance(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            cpIdentity.walletAddress
+            bob.walletAddress
         );
 
-        const withdrawalTxHash = await cpClient.withdrawal(
+        const withdrawalTxHash = await bobClient.withdrawal(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            depositAmount * BigInt(11)
+            toRaw(finalBobAmount) // 1000 + 100 + 25 = 1125
         );
         expect(withdrawalTxHash).toBeDefined();
 
@@ -607,11 +438,11 @@ describe('Close channel', () => {
 
         const postWithdrawalBalance = await blockUtils.getErc20Balance(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-            cpIdentity.walletAddress
+            bob.walletAddress
         );
-        expect(postWithdrawalBalance.rawBalance - preWithdrawalBalance.rawBalance).toBe(depositAmount * BigInt(11)); // + 1100
+        expect(postWithdrawalBalance.rawBalance - preWithdrawalBalance.rawBalance).toBe(toRaw(finalBobAmount)); // + 1000 + 100 + 25 = 1125
 
-        const accountBalance = await cpClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        const accountBalance = await bobClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
         expect(accountBalance).toBe(BigInt(0));
     });
 });

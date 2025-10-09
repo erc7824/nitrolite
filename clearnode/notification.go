@@ -40,9 +40,10 @@ type Notification struct {
 type EventType string
 
 const (
-	BalanceUpdateEventType EventType = "bu"
-	ChannelUpdateEventType EventType = "cu"
-	TransferEventType      EventType = "tr"
+	BalanceUpdateEventType    EventType = "bu"
+	ChannelUpdateEventType    EventType = "cu"
+	TransferEventType         EventType = "tr"
+	AppSessionUpdateEventType EventType = "asu"
 )
 
 func (e EventType) String() string {
@@ -87,5 +88,35 @@ func NewTransferNotification(wallet string, transferredAllocations TransferRespo
 		userID:    wallet,
 		eventType: TransferEventType,
 		data:      transferredAllocations,
+	}
+}
+
+// NewAppSessionNotification creates a notification for an app session update event
+func NewAppSessionNotification(participant string, appSession AppSession, participantAllocations []AppAllocation) *Notification {
+	response := AppSessionResponse{
+		AppSessionID:       appSession.SessionID,
+		Status:             string(appSession.Status),
+		ParticipantWallets: appSession.ParticipantWallets,
+		SessionData:        appSession.SessionData,
+		Protocol:           string(appSession.Protocol),
+		Challenge:          appSession.Challenge,
+		Weights:            appSession.Weights,
+		Quorum:             appSession.Quorum,
+		Version:            appSession.Version,
+		Nonce:              appSession.Nonce,
+		CreatedAt:          appSession.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:          appSession.UpdatedAt.Format(time.RFC3339),
+	}
+
+	return &Notification{
+		userID:    participant,
+		eventType: AppSessionUpdateEventType,
+		data: struct {
+			AppSessionResponse
+			ParticipantAllocations []AppAllocation `json:"participant_allocations"`
+		}{
+			AppSessionResponse:     response,
+			ParticipantAllocations: participantAllocations,
+		},
 	}
 }

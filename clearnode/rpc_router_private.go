@@ -295,20 +295,20 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			ledger := GetWalletLedger(tx, fromAddress)
 			balance, err := ledger.Balance(fromAccountID, alloc.AssetSymbol)
 			if err != nil {
-				return RPCErrorf("failed to check participant balance: %w", err)
+				return RPCErrorf(ErrGetAccountBalance+": %w", err)
 			}
 			if alloc.Amount.GreaterThan(balance) {
 				return RPCErrorf("insufficient funds: %s for asset %s", fromWallet, alloc.AssetSymbol)
 			}
 			if err = ledger.Record(fromAccountID, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
-				return RPCErrorf("failed to debit source account: %w", err)
+				return RPCErrorf(ErrDebitSourceAccount+": %w", err)
 			}
 
 			toAddress := common.HexToAddress(destinationAddress)
 			toAccountID := NewAccountID(destinationAddress)
 			ledger = GetWalletLedger(tx, toAddress)
 			if err = ledger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
-				return RPCErrorf("failed to credit destination account: %w", err)
+				return RPCErrorf(ErrCreditDestinationAccount+": %w", err)
 			}
 			transaction, err := RecordLedgerTransaction(tx, TransactionTypeTransfer, fromAccountID, toAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
@@ -412,7 +412,7 @@ func (r *RPCRouter) HandleSubmitAppState(c *RPCContext) {
 		return
 	}
 
-	resp, err := r.AppSessionService.SubmitAppState(&params, rpcSigners)
+	resp, err := r.AppSessionService.SubmitAppState(ctx, &params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to submit app state", "error", err)
 		c.Fail(err, "failed to submit app state")

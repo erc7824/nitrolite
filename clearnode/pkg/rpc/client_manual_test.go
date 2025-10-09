@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	sandboxWsRpcUrl = "wss://clearnet-sandbox.yellow.com/ws"
+	uatWsRpcUrl = "wss://canarynet.yellow.com/ws"
 )
 
 func TestManualClient(t *testing.T) {
@@ -47,7 +47,7 @@ func TestManualClient(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())
-	err = client.Start(ctx, sandboxWsRpcUrl, handleError)
+	err = client.Start(ctx, uatWsRpcUrl, handleError)
 	require.NoError(t, err)
 
 	var jwtToken string
@@ -75,7 +75,7 @@ func TestManualClient(t *testing.T) {
 	ctx, cancel = context.WithCancel(t.Context())
 	defer cancel()
 
-	assetSymbol := "usdc"
+	assetSymbol := "ytest.usd"
 	currentBalance := decimal.NewFromInt(-1)
 	currentBalanceMu := sync.RWMutex{}
 
@@ -91,19 +91,32 @@ func TestManualClient(t *testing.T) {
 		}
 	})
 
-	err = client.Start(ctx, sandboxWsRpcUrl, handleError)
+	err = client.Start(ctx, uatWsRpcUrl, handleError)
 	require.NoError(t, err)
 
 	var appSessionID string
-	appAllocations := []rpc.AppAllocation{
+	appAllocationsV0_2 := []rpc.AppAllocation{
 		{
 			ParticipantWallet: walletSigner.PublicKey().Address().String(),
 			AssetSymbol:       assetSymbol,
 			Amount:            decimal.NewFromInt(1),
 		},
 	}
+	appAllocationsV0_4_Original := []rpc.AppAllocation{
+		{
+			ParticipantWallet: walletSigner.PublicKey().Address().String(),
+			AssetSymbol:       assetSymbol,
+			Amount:            decimal.NewFromInt(1),
+		},
+	}
+	appAllocationsV0_4_Deposited := []rpc.AppAllocation{
+		{
+			ParticipantWallet: walletSigner.PublicKey().Address().String(),
+			AssetSymbol:       assetSymbol,
+			Amount:            decimal.NewFromInt(2),
+		},
+	}
 
-	var balanceBeforeAppSession, balanceDuringAppSession, balanceAfterAppSession decimal.Decimal
 	tcs := []struct {
 		name string
 		fn   func(t *testing.T)
@@ -147,11 +160,10 @@ func TestManualClient(t *testing.T) {
 			},
 		},
 		{
-			name: "CreateAppSession",
+			name: "CreateAppSession_v0_2",
 			fn: func(t *testing.T) {
-				// Record balance before app session
 				currentBalanceMu.RLock()
-				balanceBeforeAppSession = currentBalance
+				balanceBefore := currentBalance.IntPart()
 				currentBalanceMu.RUnlock()
 
 				createAppReq := rpc.CreateAppSessionRequest{
@@ -166,7 +178,7 @@ func TestManualClient(t *testing.T) {
 						Challenge: 86400,
 						Nonce:     uint64(uuid.New().ID()),
 					},
-					Allocations: appAllocations,
+					Allocations: appAllocationsV0_2,
 				}
 				createAppPayload, err := client.PreparePayload(rpc.CreateAppSessionMethod, createAppReq)
 				require.NoError(t, err)
@@ -187,19 +199,25 @@ func TestManualClient(t *testing.T) {
 				fmt.Printf("App Session Created: %+v\n", createAppRes.AppSessionID)
 				appSessionID = createAppRes.AppSessionID
 
-				// Record balance during app session
 				currentBalanceMu.RLock()
-				balanceDuringAppSession = currentBalance
+				balanceAfter := currentBalance.IntPart()
 				currentBalanceMu.RUnlock()
+
+				balanceDiff := balanceBefore - balanceAfter
+				assert.Equal(t, int64(1), balanceDiff, "balance should decrease by 1 unit")
 			},
 		},
 		{
-			name: "SubmitAppState",
+			name: "SubmitAppState_v0_2",
 			fn: func(t *testing.T) {
+				currentBalanceMu.RLock()
+				balanceBefore := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
 				testSessionData := "{\"test\": true}"
 				updateAppReq := rpc.SubmitAppStateRequest{
 					AppSessionID: appSessionID,
-					Allocations:  appAllocations,
+					Allocations:  appAllocationsV0_2,
 					SessionData:  &testSessionData,
 				}
 				updateAppPayload, err := client.PreparePayload(rpc.SubmitAppStateMethod, updateAppReq)
@@ -219,14 +237,25 @@ func TestManualClient(t *testing.T) {
 				updateAppRes, _, err := client.SubmitAppState(ctx, &updateAppFullReq)
 				require.NoError(t, err)
 				fmt.Printf("App Session Version Updated: %+v\n", updateAppRes.Version)
+
+				currentBalanceMu.RLock()
+				balanceAfter := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
+				balanceDiff := balanceBefore - balanceAfter
+				assert.Equal(t, int64(0), balanceDiff, "balance should not change")
 			},
 		},
 		{
-			name: "CloseAppSession",
+			name: "CloseAppSession_v0_2",
 			fn: func(t *testing.T) {
+				currentBalanceMu.RLock()
+				balanceBefore := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
 				closeAppReq := rpc.CloseAppSessionRequest{
 					AppSessionID: appSessionID,
-					Allocations:  appAllocations,
+					Allocations:  appAllocationsV0_2,
 				}
 				closeAppPayload, err := client.PreparePayload(rpc.CloseAppSessionMethod, closeAppReq)
 				require.NoError(t, err)
@@ -246,10 +275,216 @@ func TestManualClient(t *testing.T) {
 				require.NoError(t, err)
 				fmt.Printf("App Session closed with Version : %+v\n", closeAppRes.Version)
 
-				// Record balance after app session
 				currentBalanceMu.RLock()
-				balanceAfterAppSession = currentBalance
+				balanceAfter := currentBalance.IntPart()
 				currentBalanceMu.RUnlock()
+
+				balanceDiff := balanceBefore - balanceAfter
+				assert.Equal(t, int64(-1), balanceDiff, "balance should increase by 1 unit")
+			},
+		},
+		{
+			name: "CreateAppSession_v0_4",
+			fn: func(t *testing.T) {
+				currentBalanceMu.RLock()
+				balanceBefore := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
+				createAppReq := rpc.CreateAppSessionRequest{
+					Definition: rpc.AppDefinition{
+						Protocol: rpc.VersionNitroRPCv0_4,
+						ParticipantWallets: []string{
+							walletSigner.PublicKey().Address().String(),
+							sign.NewEthereumAddress(common.Address{}).Hex(),
+						},
+						Weights:   []int64{100, 0},
+						Quorum:    100,
+						Challenge: 86400,
+						Nonce:     uint64(uuid.New().ID()),
+					},
+					Allocations: appAllocationsV0_4_Original,
+				}
+				createAppPayload, err := client.PreparePayload(rpc.CreateAppSessionMethod, createAppReq)
+				require.NoError(t, err)
+
+				createAppHash, err := createAppPayload.Hash()
+				require.NoError(t, err)
+
+				createAppResSig, err := sessionSigner.Sign(createAppHash)
+				require.NoError(t, err)
+
+				createAppFullReq := rpc.NewRequest(
+					createAppPayload,
+					createAppResSig,
+				)
+
+				createAppRes, _, err := client.CreateAppSession(ctx, &createAppFullReq)
+				require.NoError(t, err)
+				fmt.Printf("App Session Created: %+v\n", createAppRes.AppSessionID)
+				appSessionID = createAppRes.AppSessionID
+
+				currentBalanceMu.RLock()
+				balanceAfter := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
+				balanceDiff := balanceBefore - balanceAfter
+				assert.Equal(t, int64(1), balanceDiff, "balance should decrease by 1 unit")
+			},
+		},
+		{
+			name: "SubmitAppState_v0_4_Operate",
+			fn: func(t *testing.T) {
+				currentBalanceMu.RLock()
+				balanceBefore := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
+				testSessionData := "{\"test\": true}"
+				updateAppReq := rpc.SubmitAppStateRequest{
+					AppSessionID: appSessionID,
+					Intent:       rpc.AppSessionIntentOperate,
+					Version:      2,
+					Allocations:  appAllocationsV0_4_Original,
+					SessionData:  &testSessionData,
+				}
+				updateAppPayload, err := client.PreparePayload(rpc.SubmitAppStateMethod, updateAppReq)
+				require.NoError(t, err)
+
+				updateAppHash, err := updateAppPayload.Hash()
+				require.NoError(t, err)
+
+				updateAppResSig, err := sessionSigner.Sign(updateAppHash)
+				require.NoError(t, err)
+
+				updateAppFullReq := rpc.NewRequest(
+					updateAppPayload,
+					updateAppResSig,
+				)
+
+				updateAppRes, _, err := client.SubmitAppState(ctx, &updateAppFullReq)
+				require.NoError(t, err)
+				fmt.Printf("App Session Version Updated: %+v\n", updateAppRes.Version)
+
+				currentBalanceMu.RLock()
+				balanceAfter := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
+				balanceDiff := balanceBefore - balanceAfter
+				assert.Equal(t, int64(0), balanceDiff, "balance should not change")
+			},
+		},
+		{
+			name: "SubmitAppState_v0_4_Deposit",
+			fn: func(t *testing.T) {
+				currentBalanceMu.RLock()
+				balanceBefore := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
+				updateAppReq := rpc.SubmitAppStateRequest{
+					AppSessionID: appSessionID,
+					Intent:       rpc.AppSessionIntentDeposit,
+					Version:      3,
+					Allocations:  appAllocationsV0_4_Deposited,
+				}
+				updateAppPayload, err := client.PreparePayload(rpc.SubmitAppStateMethod, updateAppReq)
+				require.NoError(t, err)
+
+				updateAppHash, err := updateAppPayload.Hash()
+				require.NoError(t, err)
+
+				updateAppResSig, err := sessionSigner.Sign(updateAppHash)
+				require.NoError(t, err)
+
+				updateAppFullReq := rpc.NewRequest(
+					updateAppPayload,
+					updateAppResSig,
+				)
+
+				updateAppRes, _, err := client.SubmitAppState(ctx, &updateAppFullReq)
+				require.NoError(t, err)
+				fmt.Printf("App Session Version Updated: %+v\n", updateAppRes.Version)
+
+				currentBalanceMu.RLock()
+				balanceAfter := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
+				balanceDiff := balanceBefore - balanceAfter
+				assert.Equal(t, int64(1), balanceDiff, "balance should decrease by 1 unit")
+			},
+		},
+		{
+			name: "SubmitAppState_v0_4_Withdraw",
+			fn: func(t *testing.T) {
+				currentBalanceMu.RLock()
+				balanceBefore := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
+				updateAppReq := rpc.SubmitAppStateRequest{
+					AppSessionID: appSessionID,
+					Intent:       rpc.AppSessionIntentWithdraw,
+					Version:      4,
+					Allocations:  appAllocationsV0_4_Original,
+				}
+				updateAppPayload, err := client.PreparePayload(rpc.SubmitAppStateMethod, updateAppReq)
+				require.NoError(t, err)
+
+				updateAppHash, err := updateAppPayload.Hash()
+				require.NoError(t, err)
+
+				updateAppResSig, err := sessionSigner.Sign(updateAppHash)
+				require.NoError(t, err)
+
+				updateAppFullReq := rpc.NewRequest(
+					updateAppPayload,
+					updateAppResSig,
+				)
+
+				updateAppRes, _, err := client.SubmitAppState(ctx, &updateAppFullReq)
+				require.NoError(t, err)
+				fmt.Printf("App Session Version Updated: %+v\n", updateAppRes.Version)
+
+				currentBalanceMu.RLock()
+				balanceAfter := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
+				balanceDiff := balanceBefore - balanceAfter
+				assert.Equal(t, int64(-1), balanceDiff, "balance should increase by 1 unit")
+			},
+		},
+		{
+			name: "CloseAppSession_v0_4",
+			fn: func(t *testing.T) {
+				currentBalanceMu.RLock()
+				balanceBefore := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
+				closeAppReq := rpc.CloseAppSessionRequest{
+					AppSessionID: appSessionID,
+					Allocations:  appAllocationsV0_4_Original,
+				}
+				closeAppPayload, err := client.PreparePayload(rpc.CloseAppSessionMethod, closeAppReq)
+				require.NoError(t, err)
+
+				closeAppHash, err := closeAppPayload.Hash()
+				require.NoError(t, err)
+
+				closeAppResSig, err := sessionSigner.Sign(closeAppHash)
+				require.NoError(t, err)
+
+				closeAppFullReq := rpc.NewRequest(
+					closeAppPayload,
+					closeAppResSig,
+				)
+
+				closeAppRes, _, err := client.CloseAppSession(ctx, &closeAppFullReq)
+				require.NoError(t, err)
+				fmt.Printf("App Session closed with Version : %+v\n", closeAppRes.Version)
+
+				currentBalanceMu.RLock()
+				balanceAfter := currentBalance.IntPart()
+				currentBalanceMu.RUnlock()
+
+				balanceDiff := balanceBefore - balanceAfter
+				assert.Equal(t, int64(-1), balanceDiff, "balance should increase by 1 unit")
 			},
 		},
 	}
@@ -259,7 +494,4 @@ func TestManualClient(t *testing.T) {
 			tc.fn(t)
 		})
 	}
-
-	assert.Equal(t, balanceBeforeAppSession.IntPart(), balanceDuringAppSession.IntPart()+1)
-	assert.Equal(t, balanceBeforeAppSession.IntPart(), balanceAfterAppSession.IntPart())
 }

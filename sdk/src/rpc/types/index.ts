@@ -209,4 +209,5 @@ export enum RPCMethod {
     Pong = 'pong',
     Transfer = 'transfer',
     TransferNotification = 'tr',
+    AppSessionUpdate = 'asu',
 }

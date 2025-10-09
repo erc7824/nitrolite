@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RPCChannelStatus, RPCMethod } from '../types';
+import { RPCProtocolVersion, RPCChannelStatus, RPCMethod } from '../types';
 import { Address, Hex } from 'viem';
 
 // --- Shared Interfaces & Classes ---
@@ -44,6 +44,8 @@ export const decimalSchema = z
     });
 
 export const statusEnum = z.nativeEnum(RPCChannelStatus);
+
+export const protocolVersionEnum = z.nativeEnum(RPCProtocolVersion);
 
 // --- Shared Parser Functions ---
 

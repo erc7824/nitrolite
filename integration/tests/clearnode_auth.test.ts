@@ -19,7 +19,7 @@ describe('Clearnode Authentication', () => {
     afterAll(() => {
         ws.close();
         const databaseUtils = new DatabaseUtils();
-        databaseUtils.cleanupDatabaseData();
+        databaseUtils.resetClearnodeState();
         databaseUtils.close();
     });
 

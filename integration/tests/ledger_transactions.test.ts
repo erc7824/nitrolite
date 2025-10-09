@@ -36,7 +36,7 @@ describe('Ledger Transactions Integration', () => {
         }
 
         // Clean up database
-        databaseUtils.cleanupDatabaseData();
+        databaseUtils.resetClearnodeState();
         databaseUtils.close();
     });
 

@@ -280,10 +280,10 @@ import { ethers } from 'ethers';
 
 // Create and send auth_request
 const authRequestMsg = await createAuthRequestMessage({
-  wallet: '0xYourWalletAddress',
-  participant: '0xYourSignerAddress',
+  address: '0xYourWalletAddress',
+  session_key: '0xYourSignerAddress',
   app_name: 'Your Domain',
-  expire: Math.floor(Date.now() / 1000) + 3600, // 1 hour expiration
+  expire: (Math.floor(Date.now() / 1000) + 3600).toString(), // 1 hour expiration (as string)
   scope: 'console',
   application: '0xYourApplicationAddress',
   allowances: [],
@@ -370,10 +370,10 @@ import { ethers } from 'ethers';
 // After connection is established, send auth request
 ws.onopen = async () => {
   const authRequestMsg = await createAuthRequestMessage({
-    wallet: '0xYourWalletAddress',
-    participant: '0xYourSignerAddress',
+    address: '0xYourWalletAddress',
+    session_key: '0xYourSignerAddress',
     app_name: 'Your Domain',
-    expire: Math.floor(Date.now() / 1000) + 3600, // 1 hour expiration
+    expire: (Math.floor(Date.now() / 1000) + 3600).toString(), // 1 hour expiration (as string)
     scope: 'console',
     application: '0xYourApplicationAddress',
     allowances: [],

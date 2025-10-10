@@ -31,7 +31,7 @@ describe('Get User Tag Integration', () => {
         }
 
         // Clean up database
-        databaseUtils.cleanupDatabaseData();
+        databaseUtils.resetClearnodeState();
         databaseUtils.close();
     });
 

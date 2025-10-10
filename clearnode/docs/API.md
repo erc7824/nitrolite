@@ -300,7 +300,7 @@ Supports pagination and sorting.
           "0x00112233445566778899AaBbCcDdEeFf00112233"
         ],
         "session_data": "{\"gameType\":\"rps\",\"rounds\":5,\"currentRound\":3,\"scores\":{\"0x1234567890abcdef\":2,\"0x00112233445566778899AaBbCcDdEeFf00112233\":1}}",
-        "protocol": "NitroAura",
+        "protocol": "NitroRPC/0.2",
         "challenge": 86400,
         "weights": [50, 50],
         "quorum": 100,
@@ -315,7 +315,7 @@ Supports pagination and sorting.
           "0xAaBbCcDdEeFf0011223344556677889900aAbBcC"
         ],
         "session_data": "{\"gameType\":\"snake\",\"boardSize\":20,\"snakeLength\":5,\"score\":150,\"level\":3,\"gameState\":\"active\"}",
-        "protocol": "NitroSnake",
+        "protocol": "NitroRPC/0.2",
         "challenge": 86400,
         "weights": [70, 30],
         "quorum": 100,
@@ -713,6 +713,8 @@ Retrieves all RPC messages history for a participant, ordered by timestamp (newe
 Creates a virtual application between participants.
 Participants must agree on signature weights and a quorum; this quorum is required to submit an intermediate state or close an app session. The create app session request must be signed by all participants with non-zero allocations.
 
+**Important**: The `protocol` field in the definition must be set to "NitroRPC/0.2". This is the only supported protocol version for app sessions.
+
 The optional `session_data` field can be used to store application-specific data that will be preserved throughout the session lifecycle. This enables applications to maintain custom state information such as configuration settings, business logic state, or any other data needed for the application.
 
 **Request:**
@@ -770,12 +772,73 @@ This means that the sum of the weights of signers must reach the specified thres
 
 The optional `session_data` field can be used to update application-specific data associated with the session, allowing applications to track progress, update configurations, or store any custom state changes during the session lifecycle.
 
+#### NitroRPC/0.2
+
 **Request:**
 
 ```json
 {
   "req": [1, "submit_app_state", {
     "app_session_id": "0x3456789012abcdef...",
+    "allocations": [
+      {
+        "participant": "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
+        "asset": "usdc",
+        "amount": "0.0"
+      },
+      {
+        "participant": "0x00112233445566778899AaBbCcDdEeFf00112233",
+        "asset": "usdc",
+        "amount": "200.0"
+      }
+    ],
+    "session_data": "{\"gameType\":\"chess\",\"timeControl\":{\"initial\":600,\"increment\":5},\"maxPlayers\":2,\"gameState\":\"finished\",\"winner\":\"0x00112233445566778899AaBbCcDdEeFf00112233\",\"endCondition\":\"checkmate\"}" // Optional
+  }, 1619123456789],
+  "sig": ["0x9876fedcba...", "0x8765fedcba..."]
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "submit_app_state", {
+    "app_session_id": "0x3456789012abcdef...",
+    "version": "567",
+    "status": "open"
+  }, 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+#### NitroRPC/0.4
+
+NitroRPC/0.4 introduces the following changes:
+
+- The `intent` field is now required and must be set to either `operate`, `deposit` or `withdraw`. It indicates the purpose of the state update.
+  - `operate`: For normal application operations that redistribute funds within the session
+  - `deposit`: For adding funds to the session from participants' unified balances
+  - `withdraw`: For removing funds from the session to participants' unified balances
+- The `version` field is now required and must be set to the expected next version number of the app session state. This ensures that state updates are applied in the correct order and prevents replay attacks.
+
+**Allocation Requirements by Intent:**
+
+The `allocations` array format and validation rules depend on the specified `intent`:
+
+- **`operate` intent**: Allocations represent the desired distribution of funds within the session. The total sum of all allocations must equal the current session balance for each asset (zero-sum redistribution). This is used for normal game logic where funds are moved between participants without changing the total session balance.
+
+- **`deposit` intent**: Allocations represent the desired distribution after depositing funds into the session. For participants making deposits, their allocation amount should be higher than their current session balance by the deposit amount. The additional funds will be transferred from their unified balance to the session. Participants with non-zero deposit amounts must be signers of the request in addition to meeting the signature quorum.
+
+- **`withdraw` intent**: Allocations represent the desired distribution after withdrawing funds from the session. For participants making withdrawals, their allocation amount should be lower than their current session balance by the withdrawal amount. The withdrawn funds will be transferred to their unified balance. The signature quorum is required to make a withdrawal.
+
+**Request:**
+
+```json
+{
+  "req": [1, "submit_app_state", {
+    "app_session_id": "0x3456789012abcdef...",
+    "intent": "operate",
+    "version": 2,
     "allocations": [
       {
         "participant": "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",

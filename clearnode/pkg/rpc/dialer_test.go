@@ -16,6 +16,8 @@ import (
 )
 
 func TestWebsocketDialer_BasicConnection(t *testing.T) {
+	t.Parallel()
+
 	// Create mock server
 	server := createEchoServer(t, nil)
 	defer server.Close()
@@ -48,6 +50,8 @@ func TestWebsocketDialer_BasicConnection(t *testing.T) {
 }
 
 func TestWebsocketDialer_ConnectionFailure(t *testing.T) {
+	t.Parallel()
+
 	cfg := rpc.DefaultWebsocketDialerConfig
 	dialer := rpc.NewWebsocketDialer(cfg)
 
@@ -64,6 +68,8 @@ func TestWebsocketDialer_ConnectionFailure(t *testing.T) {
 }
 
 func TestWebsocketDialer_ContextCancellation(t *testing.T) {
+	t.Parallel()
+
 	// Create a server that accepts connections but doesn't respond
 	server := createEchoServer(t, nil)
 	defer server.Close()
@@ -88,6 +94,8 @@ func TestWebsocketDialer_ContextCancellation(t *testing.T) {
 }
 
 func TestWebsocketDialer_MultipleRequests(t *testing.T) {
+	t.Parallel()
+
 	server := createEchoServer(t, nil)
 	defer server.Close()
 
@@ -134,6 +142,8 @@ func TestWebsocketDialer_MultipleRequests(t *testing.T) {
 }
 
 func TestWebsocketDialer_RequestTimeout(t *testing.T) {
+	t.Parallel()
+
 	// Create server that delays responses
 	extraHandlers := map[string]func(*rpc.Request) *rpc.Response{
 		"slow_request": func(req *rpc.Request) *rpc.Response {
@@ -176,6 +186,8 @@ func TestWebsocketDialer_RequestTimeout(t *testing.T) {
 }
 
 func TestWebsocketDialer_UnsolicitedEvents(t *testing.T) {
+	t.Parallel()
+
 	// Create server that sends unsolicited events
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upgrader := websocket.Upgrader{}

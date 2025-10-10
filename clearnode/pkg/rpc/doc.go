@@ -182,6 +182,80 @@
 //
 // All monetary values use decimal.Decimal for arbitrary precision arithmetic.
 //
+// # Server Implementation
+//
+// The package provides a complete RPC server implementation through the Node interface:
+//
+//	// Create and configure the server
+//	config := rpc.WebsocketNodeConfig{
+//	    Signer: signer,
+//	    Logger: logger,
+//	    OnConnectHandler: func(send rpc.SendResponseFunc) {
+//	        // Handle new connections
+//	    },
+//	    OnAuthenticatedHandler: func(userID string, send rpc.SendResponseFunc) {
+//	        // Handle authentication
+//	    },
+//	}
+//	
+//	node, err := rpc.NewWebsocketNode(config)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	
+//	// Register handlers
+//	node.Handle("get_balance", handleGetBalance)
+//	node.Handle("transfer", handleTransfer)
+//	
+//	// Add middleware
+//	node.Use(loggingMiddleware)
+//	node.Use(authMiddleware)
+//	
+//	// Create handler groups
+//	privateGroup := node.NewGroup("private")
+//	privateGroup.Use(requireAuthMiddleware)
+//	privateGroup.Handle("create_channel", handleCreateChannel)
+//	
+//	// Start the server
+//	http.Handle("/ws", node)
+//	http.ListenAndServe(":8080", nil)
+//
+// Writing handlers:
+//
+//	func handleGetBalance(c *rpc.Context) {
+//	    // Extract parameters
+//	    var req GetBalanceRequest
+//	    if err := c.Request.Req.Params.Translate(&req); err != nil {
+//	        c.Fail(nil, "invalid parameters")
+//	        return
+//	    }
+//	    
+//	    // Process request
+//	    balance := getBalanceForUser(c.UserID, req.Asset)
+//	    
+//	    // Send response
+//	    c.Succeed("get_balance", rpc.Params{"balance": balance})
+//	}
+//
+// Writing middleware:
+//
+//	func authMiddleware(c *rpc.Context) {
+//	    // Check if connection is authenticated
+//	    if c.UserID == "" {
+//	        // Try to authenticate from request
+//	        token := extractToken(c.Request)
+//	        userID, err := validateToken(token)
+//	        if err != nil {
+//	            c.Fail(nil, "authentication required")
+//	            return
+//	        }
+//	        c.UserID = userID
+//	    }
+//	    
+//	    // Continue to next handler
+//	    c.Next()
+//	}
+//
 // # Example Usage
 //
 // Creating and sending a request:

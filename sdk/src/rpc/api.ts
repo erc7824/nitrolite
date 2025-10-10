@@ -16,13 +16,14 @@ import {
     RPCData,
     GetLedgerTransactionsFilters,
     RPCChannelStatus,
+    RPCProtocolVersion,
 } from './types';
 import { NitroliteRPC } from './nitrolite';
 import { generateRequestId, getCurrentTimestamp } from './utils';
 import {
     CloseAppSessionRequestParams,
     CreateAppSessionRequestParams,
-    SubmitAppStateRequestParams,
+    SubmitAppStateParamsPerProtocol,
     ResizeChannelRequestParams,
     GetLedgerTransactionsRequestParams,
     TransferRequestParams,
@@ -396,16 +397,34 @@ export async function createAppSessionMessage(
 
 /**
  * Creates the signed, stringified message body for a 'submit_state' request.
+ * Use the generic parameter to specify the protocol version and get type-safe parameter validation.
  *
+ * @template P - The protocol version (use RPCProtocolVersion enum) to determine the required parameters structure.
  * @param signer - The function to sign the request payload.
- * @param params - The specific parameters required by 'submit_state'. See {@link SubmitAppStateRequestParams} for details.
+ * @param params - The specific parameters required by 'submit_state' for the given protocol version.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ *
+ * @example
+ * // For NitroRPC/0.2
+ * await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_2>(signer, {
+ *   app_session_id: '0x...',
+ *   allocations: [...]
+ * });
+ *
+ * @example
+ * // For NitroRPC/0.4
+ * await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_4>(signer, {
+ *   app_session_id: '0x...',
+ *   intent: RPCAppStateIntent.Operate,
+ *   version: 1,
+ *   allocations: [...]
+ * });
  */
-export async function createSubmitAppStateMessage(
+export async function createSubmitAppStateMessage<P extends RPCProtocolVersion>(
     signer: MessageSigner,
-    params: SubmitAppStateRequestParams,
+    params: SubmitAppStateParamsPerProtocol[P],
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {

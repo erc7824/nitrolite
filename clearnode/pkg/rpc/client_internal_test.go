@@ -2,18 +2,22 @@ package rpc
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
 // Test internal authRequest method
 func TestClient_authRequest(t *testing.T) {
+	t.Parallel()
+
 	mockDialer := newMockInternalDialer()
 	client := NewClient(mockDialer)
 
@@ -53,6 +57,8 @@ func TestClient_authRequest(t *testing.T) {
 
 // Test authRequest with unexpected response method
 func TestClient_authRequest_WrongResponseMethod(t *testing.T) {
+	t.Parallel()
+
 	mockDialer := newMockInternalDialer()
 	client := NewClient(mockDialer)
 
@@ -75,6 +81,8 @@ func TestClient_authRequest_WrongResponseMethod(t *testing.T) {
 
 // Test internal authSigVerify method
 func TestClient_authSigVerify(t *testing.T) {
+	t.Parallel()
+
 	mockDialer := newMockInternalDialer()
 	client := NewClient(mockDialer)
 
@@ -119,7 +127,9 @@ func TestClient_authSigVerify(t *testing.T) {
 
 // Test signChallenge helper function
 func TestSignChallenge(t *testing.T) {
-	mockSigner := &mockSigner{}
+	t.Parallel()
+
+	mockSigner := sign.NewMockSigner("signer1")
 
 	authReq := AuthRequestRequest{
 		Address:            "0x1234567890123456789012345678901234567890",
@@ -136,24 +146,13 @@ func TestSignChallenge(t *testing.T) {
 	sig, err := signChallenge(mockSigner, authReq, challengeToken)
 	require.NoError(t, err)
 
-	// The mock signer should have created a signature
-	assert.NotNil(t, sig)
-	// Verify the signature ends with our test suffix
-	assert.Equal(t, sign.Signature("-signed"), sig[len(sig)-7:])
+	assert.NotNil(t, sig, "Signature should not be nil")
+	assert.True(t, strings.HasSuffix(string(sig), "-signed-by-signer1"), "Signature should end with the expected suffix")
 }
 
-// var (
-//
-//	testCtx     = context.Background()
-//	fixedTime   = time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
-//	testWallet  = "0x1234"
-//	testWallet2 = "0x5678"
-//	testChainID = uint32(1)
-//	testToken   = "0xUSDC"
-//	testSymbol  = "USDC"
-//
-// )
 func TestClient_EventHandling(t *testing.T) {
+	t.Parallel()
+
 	mockDialer := newMockInternalDialer()
 	client := NewClient(mockDialer)
 
@@ -253,20 +252,4 @@ func (m *mockInternalDialer) publishNotification(event Event, params Params) {
 	payload := NewPayload(0, string(event), params)
 	res := NewResponse(payload)
 	m.eventCh <- &res
-}
-
-// mockSigner implements sign.Signer for testing
-// It simply appends "-signed" to the input data as a signature
-type mockSigner struct {
-	publicKey sign.PublicKey
-}
-
-func (m *mockSigner) Sign(data []byte) (sign.Signature, error) {
-	// Create a simple signature by appending "-signed" to the data
-	sig := sign.Signature(append(data, []byte("-signed")...))
-	return sig, nil
-}
-
-func (m *mockSigner) PublicKey() sign.PublicKey {
-	return m.publicKey
 }

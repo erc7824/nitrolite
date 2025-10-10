@@ -3,13 +3,15 @@ package main
 import (
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/lib/pq"
+	"gorm.io/gorm"
 )
 
 // AppSession represents a virtual payment application session between participants
 type AppSession struct {
 	ID                 uint           `gorm:"primaryKey"`
-	Protocol           string         `gorm:"column:protocol;default:'NitroRPC/0.2';not null"`
+	Protocol           rpc.Version    `gorm:"column:protocol;default:'NitroRPC/0.2';not null"`
 	SessionID          string         `gorm:"column:session_id;not null;uniqueIndex"`
 	Challenge          uint64         `gorm:"column:challenge;"`
 	Nonce              uint64         `gorm:"column:nonce;not null"`
@@ -25,4 +27,13 @@ type AppSession struct {
 
 func (AppSession) TableName() string {
 	return "app_sessions"
+}
+
+func getAppSession(tx *gorm.DB, sessionID, status string) (*AppSession, error) {
+	var appSession AppSession
+	if err := tx.Where("session_id = ? AND status = ?", sessionID, status).
+		Order("nonce DESC").First(&appSession).Error; err != nil {
+		return nil, err
+	}
+	return &appSession, nil
 }

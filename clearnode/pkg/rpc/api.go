@@ -18,6 +18,39 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
+// ===========================================================================
+// Protocol Versioning
+// ============================================================================
+
+// Version represents the protocol version.
+// This is used to provide backward compatibility as the API evolves.
+type Version string
+
+const (
+	// VersionNitroRPCv0_2 is the initial supported version of the NitroRPC protocol.
+	VersionNitroRPCv0_2 Version = "NitroRPC/0.2"
+	// VersionNitroRPCv0_4 introduces intents for application session state updates.
+	VersionNitroRPCv0_4 Version = "NitroRPC/0.4"
+)
+
+var (
+	// supportedProtocolVersions lists all protocol versions supported by the broker.
+	supportedProtocolVersions = map[string]bool{
+		VersionNitroRPCv0_2.String(): true,
+		VersionNitroRPCv0_4.String(): true,
+	}
+)
+
+// String returns the string representation of the version.
+func (v Version) String() string {
+	return string(v)
+}
+
+// IsSupportedVersion checks if the given version is supported by the broker.
+func IsSupportedVersion(version Version) bool {
+	return supportedProtocolVersions[version.String()]
+}
+
 // ============================================================================
 // RPC Method Constants
 // ============================================================================
@@ -31,6 +64,8 @@ const (
 	PingMethod Method = "ping"
 	// PongMethod is the response to a ping request.
 	PongMethod Method = "pong"
+	// ErrorMethod is the identifier for error responses.
+	ErrorMethod Method = "error"
 	// GetConfigMethod returns the broker configuration and supported networks.
 	GetConfigMethod Method = "get_config"
 	// GetAssetsMethod returns the list of supported assets/tokens.
@@ -93,6 +128,8 @@ const (
 	ChannelUpdateEvent Event = "cu"
 	// TransferEvent notifies clients of incoming transfers.
 	TransferEvent Event = "tr"
+	// AppSessionUpdateEvent notifies clients of app session state changes.
+	AppSessionUpdateEvent Event = "asu"
 )
 
 // String returns the string representation of the event.
@@ -353,6 +390,12 @@ type CreateAppSessionResponse AppSession
 type SubmitAppStateRequest struct {
 	// AppSessionID identifies the session to update
 	AppSessionID string `json:"app_session_id"`
+	// Intent indicates the purpose of the state update (operate, deposit, withdraw)
+	// Required since protocol version: NitroRPC/0.4
+	Intent AppSessionIntent `json:"intent"`
+	// Version is the new state version number
+	// Required since protocol version: NitroRPC/0.4
+	Version uint64 `json:"version"`
 	// Allocations defines the new asset distribution
 	Allocations []AppAllocation `json:"allocations"`
 	// SessionData contains the new application state
@@ -396,6 +439,14 @@ type ChannelUpdateNotification Channel
 type TransferNotification struct {
 	// Transactions contains the ledger transactions for the transfer
 	Transactions []LedgerTransaction `json:"transactions"`
+}
+
+// AppSessionUpdateNotification is sent when an application session's state changes.
+// This includes session creation, state updates, and session closure.
+type AppSessionUpdateNotification struct {
+	AppSession AppSession `json:"app_session"`
+	// ParticipantAllocations contains each participant's asset allocations
+	ParticipantAllocations []AppAllocation `json:"participant_allocations"`
 }
 
 // ============================================================================
@@ -487,8 +538,8 @@ type TransferAllocation struct {
 
 // AppDefinition defines the protocol for a multi-party application.
 type AppDefinition struct {
-	// Protocol identifies the application type
-	Protocol string `json:"protocol"`
+	// Protocol identifies the version of the application protocol
+	Protocol Version `json:"protocol"`
 	// ParticipantWallets lists the wallet addresses of all participants
 	ParticipantWallets []string `json:"participants"`
 	// Weights defines the signature weight for each participant
@@ -511,8 +562,8 @@ type AppSession struct {
 	ParticipantWallets []string `json:"participants"`
 	// SessionData contains application-specific state
 	SessionData string `json:"session_data,omitempty"`
-	// Protocol identifies the application type
-	Protocol string `json:"protocol"`
+	// Protocol identifies the version of the application protocol
+	Protocol Version `json:"protocol"`
 	// Challenge is the dispute timeout period
 	Challenge uint64 `json:"challenge"`
 	// Weights defines participant signature weights
@@ -538,6 +589,18 @@ type AppAllocation struct {
 	// Amount allocated to the participant
 	Amount decimal.Decimal `json:"amount"`
 }
+
+// AppSessionIntent indicates the purpose of an application state update.
+type AppSessionIntent string
+
+const (
+	// AppSessionIntentOperate is for normal application operation
+	AppSessionIntentOperate AppSessionIntent = "operate"
+	// AppSessionIntentDeposit is for adding funds to the session
+	AppSessionIntentDeposit AppSessionIntent = "deposit"
+	// AppSessionIntentWithdraw is for removing funds from the session
+	AppSessionIntentWithdraw AppSessionIntent = "withdraw"
+)
 
 // ============================================================================
 // Channel Types

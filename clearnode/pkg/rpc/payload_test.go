@@ -11,6 +11,8 @@ import (
 )
 
 func TestNewPayload(t *testing.T) {
+	t.Parallel()
+
 	id := uint64(1)
 	method := "testMethod"
 	params := rpc.Params{
@@ -26,6 +28,8 @@ func TestNewPayload(t *testing.T) {
 }
 
 func TestPayloadUnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	tcs := []struct {
 		name     string
 		input    string
@@ -89,6 +93,8 @@ func TestPayloadUnmarshalJSON(t *testing.T) {
 }
 
 func TestPayloadMarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	tcs := []struct {
 		name     string
 		input    rpc.Payload
@@ -129,6 +135,8 @@ func TestPayloadMarshalJSON(t *testing.T) {
 }
 
 func TestNewParams(t *testing.T) {
+	t.Parallel()
+
 	tcs := []struct {
 		name     string
 		input    any
@@ -170,6 +178,8 @@ func TestNewParams(t *testing.T) {
 }
 
 func TestParamsTranslate(t *testing.T) {
+	t.Parallel()
+
 	type testObj struct {
 		Param1 string `json:"param1"`
 		Param2 int    `json:"param2"`
@@ -207,6 +217,8 @@ func TestParamsTranslate(t *testing.T) {
 }
 
 func TestParamsError(t *testing.T) {
+	t.Parallel()
+
 	tcs := []struct {
 		name     string
 		input    rpc.Params

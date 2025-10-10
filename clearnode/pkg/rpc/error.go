@@ -9,7 +9,6 @@ const (
 	// errorParamKey is the standard key used in Params to store error messages.
 	// When a Payload contains an error, it will be stored under this key.
 	errorParamKey = "error"
-	errorMethod   = "error"
 )
 
 // Dialer error messages

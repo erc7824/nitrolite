@@ -115,14 +115,14 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, *gorm.DB, func()) {
 		137: {
 			Name:               "polygon",
 			ChainID:            137,
-			InfuraURL:          "https://polygon-mainnet.infura.io/v3/test",
+			BlockchainRPC:      "https://polygon-mainnet.infura.io/v3/test",
 			CustodyAddress:     "0xCustodyAddress",
 			AdjudicatorAddress: "0xAdjudicatorAddress",
 		},
 		42220: {
 			Name:               "celo",
 			ChainID:            42220,
-			InfuraURL:          "https://celo-mainnet.infura.io/v3/test",
+			BlockchainRPC:      "https://celo-mainnet.infura.io/v3/test",
 			CustodyAddress:     "0xCustodyAddress2",
 			AdjudicatorAddress: "0xAdjudicatorAddress2",
 		},

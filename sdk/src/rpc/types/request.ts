@@ -8,6 +8,8 @@ import {
     RPCAppSessionAllocation,
     RPCAllowance,
     GetLedgerTransactionsFilters,
+    RPCAppStateIntent,
+    RPCProtocolVersion,
 } from '.';
 
 /**
@@ -111,14 +113,7 @@ export interface CreateAppSessionRequest extends GenericRPCMessage {
  */
 export interface SubmitAppStateRequest extends GenericRPCMessage {
     method: RPCMethod.SubmitAppState;
-    params: {
-        /** The unique identifier of the application session to update. */
-        app_session_id: Hex;
-        /** The new allocation distribution among participants. Must include all participants and maintain total balance. */
-        allocations: RPCAppSessionAllocation[];
-        /** Optional session data as a JSON string that can store application-specific state or metadata. */
-        session_data?: string;
-    };
+    params: SubmitAppStateRequestParamsV02 | SubmitAppStateRequestParamsV04;
 }
 
 /**
@@ -342,9 +337,45 @@ export type GetUserTagRequestParams = GetUserTagRequest['params'];
 export type CreateAppSessionRequestParams = CreateAppSessionRequest['params'];
 
 /**
+ * Represents the request parameters for the 'submit_app_state' RPC method (NitroRPC/0.2).
+ */
+export type SubmitAppStateRequestParamsV02 = {
+    /** The unique identifier of the application session to update. */
+    app_session_id: Hex;
+    /** The new allocation distribution among participants. Must include all participants and maintain total balance. */
+    allocations: RPCAppSessionAllocation[];
+    /** Optional session data as a JSON string that can store application-specific state or metadata. */
+    session_data?: string;
+};
+
+/**
+ * Represents the request parameters for the 'submit_app_state' RPC method (NitroRPC/0.4).
+ */
+export type SubmitAppStateRequestParamsV04 = {
+    /** The unique identifier of the application session to update. */
+    app_session_id: Hex;
+    /** The intent of the state update */
+    intent: RPCAppStateIntent;
+    /** The state version number */
+    version: number;
+    /** The new allocation distribution among participants. Must include all participants and maintain total balance. */
+    allocations: RPCAppSessionAllocation[];
+    /** Optional session data as a JSON string that can store application-specific state or metadata. */
+    session_data?: string;
+};
+
+/**
+ * Maps protocol versions to their corresponding submit_app_state parameter types.
+ */
+export type SubmitAppStateParamsPerProtocol = {
+    [RPCProtocolVersion.NitroRPC_0_2]: SubmitAppStateRequestParamsV02;
+    [RPCProtocolVersion.NitroRPC_0_4]: SubmitAppStateRequestParamsV04;
+};
+
+/**
  * Represents the request parameters for the 'submit_app_state' RPC method.
  */
-export type SubmitAppStateRequestParams = SubmitAppStateRequest['params'];
+export type SubmitAppStateRequestParams = SubmitAppStateRequestParamsV02 | SubmitAppStateRequestParamsV04;
 
 /**
  * Represents the request parameters for the 'close_app_session' RPC method.

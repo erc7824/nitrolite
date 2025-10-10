@@ -64,6 +64,8 @@ const (
 	PingMethod Method = "ping"
 	// PongMethod is the response to a ping request.
 	PongMethod Method = "pong"
+	// ErrorMethod is the identifier for error responses.
+	ErrorMethod Method = "error"
 	// GetConfigMethod returns the broker configuration and supported networks.
 	GetConfigMethod Method = "get_config"
 	// GetAssetsMethod returns the list of supported assets/tokens.

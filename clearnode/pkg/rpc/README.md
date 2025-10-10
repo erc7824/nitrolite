@@ -4,6 +4,7 @@ The `pkg/rpc` package provides the core data structures and utilities for the Cl
 
 ## Overview
 
+### Client Features
 - **High-Level Client**: Type-safe methods for all RPC operations
 - **WebSocket Transport**: Persistent connection with automatic reconnection
 - **Event Handling**: Asynchronous notifications for balance updates, transfers, and channel changes
@@ -11,6 +12,15 @@ The `pkg/rpc` package provides the core data structures and utilities for the Cl
 - **Channel Management**: Create, resize, and close payment channels
 - **Application Sessions**: Multi-party state channel applications
 - **Off-chain Transfers**: Instant, gas-free transfers within ClearNode
+
+### Server Features
+- **RPC Server**: Complete server implementation with WebSocket transport
+- **Handler Registration**: Simple method-based request routing
+- **Middleware Support**: Composable request processing pipeline
+- **Handler Groups**: Organize endpoints with shared middleware
+- **Connection Management**: Automatic connection lifecycle handling
+- **Authentication**: Built-in support for user authentication and re-authentication
+- **Server Push**: Send notifications to specific users or connections
 
 ## Core Components
 
@@ -102,6 +112,201 @@ The package includes a `Dialer` interface with a WebSocket implementation:
 
 ```go
 import "github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+```
+
+## Server Usage
+
+### Creating an RPC Server
+
+```go
+import (
+    "github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+    "github.com/erc7824/nitrolite/clearnode/pkg/sign"
+    "github.com/erc7824/nitrolite/clearnode/pkg/log"
+)
+
+// Create server configuration
+config := rpc.WebsocketNodeConfig{
+    Signer: serverSigner,  // Required: signs all responses
+    Logger: logger,        // Required: for structured logging
+    
+    // Connection lifecycle callbacks
+    OnConnectHandler: func(send rpc.SendResponseFunc) {
+        log.Info("New connection established")
+        // Optionally send welcome message
+        params, _ := rpc.NewParams(map[string]interface{}{
+            "message": "Connected to RPC server",
+        })
+        send("welcome", params)
+    },
+    OnDisconnectHandler: func(userID string) {
+        log.Info("Connection closed", "userID", userID)
+    },
+    OnAuthenticatedHandler: func(userID string, send rpc.SendResponseFunc) {
+        log.Info("User authenticated", "userID", userID)
+        // Send personalized greeting
+        params, _ := rpc.NewParams(map[string]interface{}{"userID": userID})
+        send("authenticated", params)
+    },
+}
+
+// Create the RPC node
+node, err := rpc.NewWebsocketNode(config)
+if err != nil {
+    log.Fatal("Failed to create node", "error", err)
+}
+
+// Register handlers
+node.Handle("ping", handlePing)           // Built-in, responds with "pong"
+node.Handle("get_config", handleGetConfig)
+node.Handle("auth_request", handleAuthRequest)
+
+// Add global middleware
+node.Use(loggingMiddleware)
+node.Use(rateLimitMiddleware)
+
+// Create groups for organized endpoints
+publicGroup := node.NewGroup("public")
+publicGroup.Handle("get_assets", handleGetAssets)
+publicGroup.Handle("get_channels", handleGetChannels)
+
+privateGroup := node.NewGroup("private")
+privateGroup.Use(authRequiredMiddleware)  // Only for this group
+privateGroup.Handle("get_balance", handleGetBalance)
+privateGroup.Handle("transfer", handleTransfer)
+
+// Start the server
+http.Handle("/ws", node)
+log.Fatal(http.ListenAndServe(":8080", nil))
+```
+
+### Writing Handlers
+
+Handlers process RPC requests and generate responses:
+
+```go
+func handleGetBalance(c *rpc.Context) {
+    // Check authentication (if not done by middleware)
+    if c.UserID == "" {
+        c.Fail(nil, "authentication required")
+        return
+    }
+    
+    // Extract and validate parameters
+    var req GetBalanceRequest
+    if err := c.Request.Req.Params.Translate(&req); err != nil {
+        c.Fail(nil, "invalid parameters")
+        return
+    }
+    
+    // Access connection storage
+    if lastCheck, ok := c.Storage.Get("last_balance_check"); ok {
+        log.Debug("Last balance check", "time", lastCheck)
+    }
+    c.Storage.Set("last_balance_check", time.Now())
+    
+    // Process the request
+    balance, err := ledger.GetBalance(c.UserID, req.Asset)
+    if err != nil {
+        // Internal error - generic message sent to client
+        log.Error("Failed to get balance", "error", err)
+        c.Fail(err, "failed to retrieve balance")
+        return
+    }
+    
+    // Send successful response
+    params, _ := rpc.NewParams(map[string]interface{}{
+        "asset": req.Asset,
+        "balance": balance.String(),
+    })
+    c.Succeed("get_balance", params)
+}
+```
+
+### Writing Middleware
+
+Middleware can process requests before/after handlers:
+
+```go
+func loggingMiddleware(c *rpc.Context) {
+    start := time.Now()
+    method := c.Request.Req.Method
+    
+    // Pre-processing
+    log.Info("Request started", 
+        "method", method,
+        "userID", c.UserID,
+        "requestID", c.Request.Req.RequestID)
+    
+    // Continue to next handler
+    c.Next()
+    
+    // Post-processing
+    duration := time.Since(start)
+    log.Info("Request completed",
+        "method", method,
+        "requestID", c.Request.Req.RequestID,
+        "duration", duration)
+}
+
+func authRequiredMiddleware(c *rpc.Context) {
+    // Check if already authenticated
+    if c.UserID != "" {
+        c.Next()
+        return
+    }
+    
+    // Try to authenticate from request
+    var auth AuthData
+    if err := c.Request.Req.Params.Translate(&auth); err != nil {
+        c.Fail(nil, "authentication required")
+        return
+    }
+    
+    userID, err := authenticateUser(auth.Token)
+    if err != nil {
+        c.Fail(nil, "invalid authentication")
+        return
+    }
+    
+    // Set the user ID for subsequent handlers
+    c.UserID = userID
+    c.Next()
+}
+
+func rateLimitMiddleware(c *rpc.Context) {
+    key := fmt.Sprintf("rate_limit_%s", c.UserID)
+    
+    // Get current count
+    count := 0
+    if val, ok := c.Storage.Get(key); ok {
+        count = val.(int)
+    }
+    
+    if count >= 100 {
+        c.Fail(nil, "rate limit exceeded")
+        return
+    }
+    
+    // Increment and continue
+    c.Storage.Set(key, count+1)
+    c.Next()
+}
+```
+
+### Server-Initiated Notifications
+
+Send notifications to specific users:
+
+```go
+// Send notification to a specific user
+params, _ := rpc.NewParams(map[string]interface{}{
+    "asset": "ETH",
+    "old_balance": "100",
+    "new_balance": "150",
+    "reason": "deposit",
+})
+node.Notify(userID, "balance_update", params)
 ```
 
 ## Client Usage

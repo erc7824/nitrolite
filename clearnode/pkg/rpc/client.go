@@ -1331,14 +1331,14 @@ func (c *Client) handleChannelUpdateEvent(ctx context.Context, event *Response) 
 	handler(ctx, notif, event.Sig)
 }
 
-// HandleAppSessionUpdateEvent registers a handler for channel update notifications.
-// The handler will be called whenever a channel's state changes.
+// HandleAppSessionUpdateEvent registers a handler for application session update notifications.
+// The handler will be called whenever an application session's state changes.
 // Only one handler can be registered at a time; subsequent calls override the previous handler.
 //
 // Example:
 //
 //	client.HandleAppSessionUpdateEvent(func(ctx context.Context, notif AppSessionUpdateNotification, sigs []sign.Signature) {
-//	    fmt.Printf("App Session %s updated: status=%s\n", notif.AppSession.AppSessionID, notif.Status)
+//	    fmt.Printf("App Session %s updated: status=%s\n", notif.AppSession.AppSessionID, notif.AppSession.Status)
 //	})
 func (c *Client) HandleAppSessionUpdateEvent(handler AppSessionUpdateEventHandler) {
 	c.setEventHandler(AppSessionUpdateEvent, handler)

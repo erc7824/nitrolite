@@ -181,6 +181,7 @@ func TestWebsocketNode_FullFlow(t *testing.T) {
 		require.Equal(t, methodWelcome, event.Res.Method)
 		assert.Equal(t, uint64(0), event.Res.RequestID)
 
+		time.Sleep(50 * time.Millisecond)
 		eventMu.RLock()
 		assert.Equal(t, 1, onConnectCount)
 		assert.Equal(t, 1, onMessageSentCount)
@@ -197,6 +198,7 @@ func TestWebsocketNode_FullFlow(t *testing.T) {
 	assert.Equal(t, uint64(1), res.Res.RequestID)
 	assert.Equal(t, "not authenticated", res.Error().Error())
 
+	time.Sleep(50 * time.Millisecond)
 	eventMu.RLock()
 	assert.Equal(t, 2, onMessageSentCount)
 	assert.Equal(t, 1, nodeConnCallCount)
@@ -224,6 +226,7 @@ func TestWebsocketNode_FullFlow(t *testing.T) {
 		require.Equal(t, methodWelcome, event.Res.Method)
 		assert.Equal(t, uint64(0), event.Res.RequestID)
 
+		time.Sleep(50 * time.Millisecond)
 		eventMu.RLock()
 		assert.Equal(t, 1, onAuthenticatedCount)
 		assert.Equal(t, 1, onConnectCount)
@@ -248,6 +251,7 @@ func TestWebsocketNode_FullFlow(t *testing.T) {
 	assert.Equal(t, methodUserID, res.Res.Method)
 	assert.Nil(t, res.Error())
 
+	time.Sleep(50 * time.Millisecond)
 	eventMu.RLock()
 	assert.Equal(t, 5, onMessageSentCount)
 	assert.Equal(t, 3, nodeConnCallCount)
@@ -271,6 +275,7 @@ func TestWebsocketNode_FullFlow(t *testing.T) {
 	assert.Equal(t, uint64(4), res.Res.RequestID)
 	assert.Equal(t, "user not found", res.Error().Error())
 
+	time.Sleep(50 * time.Millisecond)
 	eventMu.RLock()
 	assert.Equal(t, 6, onMessageSentCount)
 	assert.Equal(t, 4, nodeConnCallCount)
@@ -299,6 +304,7 @@ func TestWebsocketNode_FullFlow(t *testing.T) {
 		require.Equal(t, methodWelcome, event.Res.Method)
 		assert.Equal(t, uint64(0), event.Res.RequestID)
 
+		time.Sleep(50 * time.Millisecond)
 		eventMu.RLock()
 		assert.Equal(t, 2, onAuthenticatedCount)
 		assert.Equal(t, 1, onConnectCount)
@@ -323,6 +329,7 @@ func TestWebsocketNode_FullFlow(t *testing.T) {
 	assert.Equal(t, methodUserID, res.Res.Method)
 	assert.Nil(t, res.Error())
 
+	time.Sleep(50 * time.Millisecond)
 	eventMu.RLock()
 	assert.Equal(t, 9, onMessageSentCount)
 	assert.Equal(t, 6, nodeConnCallCount)
@@ -357,6 +364,7 @@ func TestWebsocketNode_FullFlow(t *testing.T) {
 		require.Equal(t, methodWelcome, event.Res.Method)
 		assert.Equal(t, uint64(0), event.Res.RequestID)
 
+		time.Sleep(50 * time.Millisecond)
 		eventMu.RLock()
 		assert.Equal(t, 3, onAuthenticatedCount)
 		assert.Equal(t, 1, onConnectCount)

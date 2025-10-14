@@ -7,7 +7,7 @@ require (
 	github.com/go-playground/validator/v10 v10.27.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/ipfs/go-log/v2 v2.8.1
+	github.com/ipfs/go-log/v2 v2.8.2
 	github.com/joho/godotenv v1.5.1
 	github.com/jsternberg/zap-logfmt v1.3.0
 	github.com/lib/pq v1.10.9

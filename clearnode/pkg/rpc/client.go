@@ -130,6 +130,10 @@ type BalanceUpdateEventHandler func(ctx context.Context, notif BalanceUpdateNoti
 // resizing, closure, or challenge events.
 type ChannelUpdateEventHandler func(ctx context.Context, notif ChannelUpdateNotification, resSig []sign.Signature)
 
+// AppSessionUpdateEventHandler processes application session update notifications from the server.
+// These notifications are sent when an application session's state changes.
+type AppSessionUpdateEventHandler func(ctx context.Context, notif AppSessionUpdateNotification, resSig []sign.Signature)
+
 // TransferEventHandler processes transfer notifications from the server.
 // These notifications are sent when transfers affect the authenticated user's account,
 // including both incoming and outgoing transfers.
@@ -164,6 +168,8 @@ func (c *Client) listenEvents(ctx context.Context) {
 				c.handleBalanceUpdateEvent(ctx, event)
 			case ChannelUpdateEvent.String():
 				c.handleChannelUpdateEvent(ctx, event)
+			case AppSessionUpdateEvent.String():
+				c.handleAppSessionUpdateEvent(ctx, event)
 			case TransferEvent.String():
 				c.handleTransferEvent(ctx, event)
 			default:
@@ -1317,6 +1323,36 @@ func (c *Client) handleChannelUpdateEvent(ctx context.Context, event *Response) 
 	}
 
 	var notif ChannelUpdateNotification
+	if err := event.Res.Params.Translate(&notif); err != nil {
+		logger.Error("failed to translate event", "error", err, "method", event.Res.Method)
+		return
+	}
+
+	handler(ctx, notif, event.Sig)
+}
+
+// HandleAppSessionUpdateEvent registers a handler for channel update notifications.
+// The handler will be called whenever a channel's state changes.
+// Only one handler can be registered at a time; subsequent calls override the previous handler.
+//
+// Example:
+//
+//	client.HandleAppSessionUpdateEvent(func(ctx context.Context, notif AppSessionUpdateNotification, sigs []sign.Signature) {
+//	    fmt.Printf("App Session %s updated: status=%s\n", notif.AppSession.AppSessionID, notif.Status)
+//	})
+func (c *Client) HandleAppSessionUpdateEvent(handler AppSessionUpdateEventHandler) {
+	c.setEventHandler(AppSessionUpdateEvent, handler)
+}
+
+func (c *Client) handleAppSessionUpdateEvent(ctx context.Context, event *Response) {
+	logger := log.FromContext(ctx)
+	handler, ok := c.getEventHandler(AppSessionUpdateEvent).(AppSessionUpdateEventHandler)
+	if !ok {
+		logger.Warn("no handler for event", "method", event.Res.Method)
+		return
+	}
+
+	var notif AppSessionUpdateNotification
 	if err := event.Res.Params.Translate(&notif); err != nil {
 		logger.Error("failed to translate event", "error", err, "method", event.Res.Method)
 		return

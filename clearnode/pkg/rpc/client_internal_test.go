@@ -159,6 +159,7 @@ func TestClient_EventHandling(t *testing.T) {
 	// Event channels
 	balanceReceived := make(chan BalanceUpdateNotification, 1)
 	channelReceived := make(chan ChannelUpdateNotification, 1)
+	appSessionReceived := make(chan AppSessionUpdateNotification, 1)
 	transferReceived := make(chan TransferNotification, 1)
 
 	// Register handlers
@@ -167,6 +168,9 @@ func TestClient_EventHandling(t *testing.T) {
 	})
 	client.HandleChannelUpdateEvent(func(ctx context.Context, n ChannelUpdateNotification, _ []sign.Signature) {
 		channelReceived <- n
+	})
+	client.HandleAppSessionUpdateEvent(func(ctx context.Context, n AppSessionUpdateNotification, _ []sign.Signature) {
+		appSessionReceived <- n
 	})
 	client.HandleTransferEvent(func(ctx context.Context, n TransferNotification, _ []sign.Signature) {
 		transferReceived <- n
@@ -184,9 +188,21 @@ func TestClient_EventHandling(t *testing.T) {
 	params, _ := NewParams(balanceUpdate)
 	mockDialer.publishNotification(BalanceUpdateEvent, params)
 
-	channelUpdate := ChannelUpdateNotification{ChannelID: "ch123"}
+	channelUpdate := ChannelUpdateNotification{
+		ChannelID: "ch123",
+		Status:    "open",
+	}
 	params, _ = NewParams(channelUpdate)
 	mockDialer.publishNotification(ChannelUpdateEvent, params)
+
+	appSessionUpdate := AppSessionUpdateNotification{
+		AppSession: AppSession{
+			AppSessionID: "as123",
+			Status:       "active",
+		},
+	}
+	params, _ = NewParams(appSessionUpdate)
+	mockDialer.publishNotification(AppSessionUpdateEvent, params)
 
 	transferNotif := TransferNotification{
 		Transactions: []LedgerTransaction{{Id: 1, TxType: "incoming"}},
@@ -205,6 +221,12 @@ func TestClient_EventHandling(t *testing.T) {
 	case <-channelReceived:
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("channel update timeout")
+	}
+
+	select {
+	case <-appSessionReceived:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("app session update timeout")
 	}
 
 	select {

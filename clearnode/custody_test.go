@@ -403,7 +403,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		ledger := GetWalletLedger(db, walletAddr)
 		initialRawAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
-		err = ledger.Record(walletAccountID, asset.Symbol, initialRawAmountDecimal)
+		err = ledger.Record(walletAccountID, asset.Symbol, initialRawAmountDecimal, nil)
 		require.NoError(t, err)
 
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, finalAmount)
@@ -510,7 +510,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
 		// Initial balance in wallet
-		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
+		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal, nil)
 		require.NoError(t, err)
 
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, finalAmount)
@@ -593,9 +593,9 @@ func TestHandleClosedEvent(t *testing.T) {
 		ledger := GetWalletLedger(db, walletAddr)
 		initialAmountDecimal := channelAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
-		err = ledger.Record(walletAccountID, asset.Symbol, walletBalance)
+		err = ledger.Record(walletAccountID, asset.Symbol, walletBalance, nil)
 		require.NoError(t, err)
-		err = ledger.Record(channelAccountID, asset.Symbol, initialAmountDecimal)
+		err = ledger.Record(channelAccountID, asset.Symbol, initialAmountDecimal, nil)
 		require.NoError(t, err)
 
 		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, channelAmount.BigInt())
@@ -746,7 +746,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		ledger := GetWalletLedger(db, walletAddr)
 		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
-		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
+		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal, nil)
 		require.NoError(t, err)
 
 		_, mockEvent := createMockResizedEvent(t, deltaAmount.BigInt())
@@ -849,7 +849,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		ledger := GetWalletLedger(db, walletAddr)
 		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
 
-		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
+		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal, nil)
 		require.NoError(t, err)
 
 		_, mockEvent := createMockResizedEvent(t, deltaAmount.BigInt())

@@ -79,6 +79,7 @@ func NewRPCRouter(
 	privGroup.Handle("get_user_tag", r.HandleGetUserTag)
 	privGroup.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
 	privGroup.Handle("get_rpc_history", r.HandleGetRPCHistory)
+	privGroup.Handle("get_session_keys", r.HandleGetSessionKeys)
 
 	historyGroup := privGroup.NewGroup("")
 	historyGroup.Use(r.HistoryMiddleware)

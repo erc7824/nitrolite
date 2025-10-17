@@ -24,6 +24,7 @@ type Entry struct {
 	Wallet      string          `gorm:"column:wallet;not null;index:idx_account_wallet"`
 	Credit      decimal.Decimal `gorm:"column:credit;type:varchar(78);not null"`
 	Debit       decimal.Decimal `gorm:"column:debit;type:varchar(78);not null"`
+	SessionKey  *string         `gorm:"column:session_key;index:idx_session_key"`
 	CreatedAt   time.Time
 }
 
@@ -56,13 +57,14 @@ func GetWalletLedger(db *gorm.DB, wallet common.Address) *WalletLedger {
 	return &WalletLedger{wallet: wallet, db: db}
 }
 
-func (l *WalletLedger) Record(accountID AccountID, assetSymbol string, amount decimal.Decimal) error {
+func (l *WalletLedger) Record(accountID AccountID, assetSymbol string, amount decimal.Decimal, sessionKey *string) error {
 	entry := &Entry{
 		AccountID:   accountID.String(),
 		Wallet:      l.wallet.Hex(),
 		AssetSymbol: assetSymbol,
 		Credit:      decimal.Zero,
 		Debit:       decimal.Zero,
+		SessionKey:  sessionKey,
 		CreatedAt:   time.Now(),
 	}
 

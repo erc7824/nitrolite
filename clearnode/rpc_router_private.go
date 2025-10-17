@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
@@ -138,6 +140,21 @@ type GetRPCHistoryResponse struct {
 	RPCEntries []RPCEntry `json:"rpc_entries"`
 }
 
+type GetSessionKeysResponse struct {
+	SessionKeys []SessionKeyResponse `json:"session_keys"`
+}
+
+type SessionKeyResponse struct {
+	ID              uint        `json:"id"`
+	SessionKey      string      `json:"session_key"`
+	ApplicationName string      `json:"application_name"`
+	SpendingCap     []Allowance `json:"spending_cap"`
+	UsedAllowance   []Allowance `json:"used_allowance"`
+	Scope           string      `json:"scope"`
+	ExpirationTime  time.Time   `json:"expiration_time"`
+	CreatedAt       time.Time   `json:"created_at"`
+}
+
 func (r *RPCRouter) BalanceUpdateMiddleware(c *RPCContext) {
 	logger := LoggerFromContext(c.Context)
 	userAddress := common.HexToAddress(c.UserID)
@@ -221,6 +238,14 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
+	var signerAddress string
+	if len(c.Message.Sig) > 0 {
+		recovered, err := RecoverAddress(c.Message.Req.rawBytes, c.Message.Sig[0])
+		if err == nil {
+			signerAddress = recovered
+		}
+	}
+
 	if err := verifySigner(&c.Message, c.UserID); err != nil {
 		r.Metrics.TransferAttemptsFail.Inc()
 		logger.Error("failed to verify signer", "error", err)
@@ -276,8 +301,14 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 
 	var respTransactions []TransactionResponse
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
-		if wallet := GetWalletBySigner(fromWallet); wallet != "" {
-			fromWallet = wallet
+		// Check if the sender is using a session key
+		var sessionKeyAddress *string
+		if signerAddress != "" && signerAddress != fromWallet {
+			// Check if this signer is a session key for this wallet
+			if wallet := GetWalletBySigner(signerAddress); wallet == fromWallet {
+				// This is a session key, validate spending caps
+				sessionKeyAddress = &signerAddress
+			}
 		}
 
 		if err := checkChallengedChannels(tx, fromWallet); err != nil {
@@ -290,6 +321,13 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 				return RPCErrorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 
+			// Validate session key spending cap if a session key is used for the transaction
+			if sessionKeyAddress != nil {
+				if err := ValidateSessionKeySpending(tx, *sessionKeyAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
+					return RPCErrorf("session key spending validation failed: %w", err)
+				}
+			}
+
 			fromAddress := common.HexToAddress(fromWallet)
 			fromAccountID := NewAccountID(fromWallet)
 			ledger := GetWalletLedger(tx, fromAddress)
@@ -300,14 +338,14 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			if alloc.Amount.GreaterThan(balance) {
 				return RPCErrorf("insufficient funds: %s for asset %s", fromWallet, alloc.AssetSymbol)
 			}
-			if err = ledger.Record(fromAccountID, alloc.AssetSymbol, alloc.Amount.Neg()); err != nil {
+			if err = ledger.Record(fromAccountID, alloc.AssetSymbol, alloc.Amount.Neg(), sessionKeyAddress); err != nil {
 				return RPCErrorf(ErrDebitSourceAccount+": %w", err)
 			}
 
 			toAddress := common.HexToAddress(destinationAddress)
 			toAccountID := NewAccountID(destinationAddress)
 			ledger = GetWalletLedger(tx, toAddress)
-			if err = ledger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount); err != nil {
+			if err = ledger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount, nil); err != nil {
 				return RPCErrorf(ErrCreditDestinationAccount+": %w", err)
 			}
 			transaction, err := RecordLedgerTransaction(tx, TransactionTypeTransfer, fromAccountID, toAccountID, alloc.AssetSymbol, alloc.Amount)
@@ -326,6 +364,15 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			return fmt.Errorf("failed to format transactions: %w", err)
 		}
 		respTransactions = formattedTransactions
+
+		// Update session key usage if this was a session key transaction
+		if sessionKeyAddress != nil {
+			if err := UpdateSessionKeyUsage(tx, *sessionKeyAddress); err != nil {
+				logger.Error("failed to update session key usage", "sessionKey", *sessionKeyAddress, "error", err)
+				return fmt.Errorf("failed to update session key usage: %w", err)
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -374,7 +421,7 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 		return
 	}
 
-	resp, err := r.AppSessionService.CreateApplication(&params, rpcSigners)
+	resp, err := r.AppSessionService.CreateAppSession(&params, rpcSigners)
 	if err != nil {
 		logger.Error("failed to create application session", "error", err)
 		c.Fail(err, "failed to create application session")
@@ -639,6 +686,74 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 
 	c.Succeed(req.Method, resp)
 	logger.Info("RPC history retrieved", "userID", c.UserID, "entryCount", len(respRPCEntries))
+}
+
+// HandleGetSessionKeys returns a list of session keys for the authenticated user
+func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
+	// TODO: add pagination?
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+
+	sessionKeys, err := GetSessionKeysByWallet(r.DB, c.UserID)
+	if err != nil {
+		logger.Error("failed to retrieve session keys", "error", err, "wallet", c.UserID)
+		c.Fail(err, "failed to retrieve session keys")
+		return
+	}
+
+	respSessionKeys := make([]SessionKeyResponse, 0, len(sessionKeys))
+	for _, sk := range sessionKeys {
+		var spendingCap []Allowance
+		var usedAllowance []Allowance
+
+		if sk.SpendingCap != nil {
+			if err := json.Unmarshal([]byte(*sk.SpendingCap), &spendingCap); err != nil {
+				logger.Error("failed to unmarshal spending cap", "error", err, "sessionKey", sk.SignerAddress)
+				c.Fail(err, "failed to parse session key spending cap")
+				return
+			}
+		}
+
+		if sk.UsedAllowance != nil {
+			if err := json.Unmarshal([]byte(*sk.UsedAllowance), &usedAllowance); err != nil {
+				logger.Error("failed to unmarshal used allowance", "error", err, "sessionKey", sk.SignerAddress)
+				c.Fail(err, "failed to parse session key used allowance")
+				return
+			}
+		}
+
+		appName := ""
+		scope := ""
+		expirationTime := time.Time{}
+
+		if sk.ApplicationName != nil {
+			appName = *sk.ApplicationName
+		}
+		if sk.Scope != nil {
+			scope = *sk.Scope
+		}
+		if sk.ExpirationTime != nil {
+			expirationTime = *sk.ExpirationTime
+		}
+
+		respSessionKeys = append(respSessionKeys, SessionKeyResponse{
+			ID:              sk.ID,
+			SessionKey:      sk.SignerAddress,
+			ApplicationName: appName,
+			SpendingCap:     spendingCap,
+			UsedAllowance:   usedAllowance,
+			Scope:           scope,
+			ExpirationTime:  expirationTime,
+			CreatedAt:       sk.CreatedAt,
+		})
+	}
+
+	resp := GetSessionKeysResponse{
+		SessionKeys: respSessionKeys,
+	}
+
+	c.Succeed(req.Method, resp)
 }
 
 func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {

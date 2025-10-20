@@ -30,7 +30,7 @@ func (SessionKey) TableName() string {
 	return "session_keys"
 }
 
-// loadSessionKeyCache populates the cache with session keys (wallet.go handles custody signers)
+// loadSessionKeyCache populates the cache with session keys
 func loadSessionKeyCache(db *gorm.DB) error {
 	var sessionKeys []SessionKey
 	if err := db.Find(&sessionKeys).Error; err != nil {
@@ -249,6 +249,11 @@ func ValidateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymb
 	// Check if session key has expired
 	if time.Now().UTC().After(sessionKey.ExpirationTime) {
 		return fmt.Errorf("session key expired")
+	}
+
+	// These are registered with app_name='clearnode' and no spending limits
+	if sessionKey.ApplicationName == "clearnode" && (sessionKey.Allowance == nil || *sessionKey.Allowance == "" || *sessionKey.Allowance == "[]") {
+		return nil // Unrestricted session key - no spending validation
 	}
 
 	// If no spending cap is set, deny the transaction

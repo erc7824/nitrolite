@@ -418,10 +418,10 @@ func (r *RPCRouter) HandleCreateApplication(c *RPCContext) {
 		return
 	}
 
-	rpcSigners, err := getWallets(&c.Message)
+	rpcSigners, err := c.Message.GetRequestSignersMap()
 	if err != nil {
-		logger.Error("failed to get wallets from RPC message", "error", err)
-		c.Fail(err, "failed to get wallets from RPC message")
+		logger.Error("failed to get signers from RPC message", "error", err)
+		c.Fail(err, "failed to get signers from RPC message")
 		return
 	}
 

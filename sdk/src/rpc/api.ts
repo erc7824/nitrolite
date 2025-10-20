@@ -209,6 +209,31 @@ export async function createGetUserTagMessage(
 }
 
 /**
+ * Creates the signed, stringified message body for a 'get_session_keys' request.
+ * Retrieves all active (non-expired) session keys for the authenticated user.
+ *
+ * @param signer - The function to sign the request payload.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ */
+export async function createGetSessionKeysMessage(
+    signer: MessageSigner,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.GetSessionKeys,
+        params: {},
+        requestId,
+        timestamp,
+    });
+    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+
+    return JSON.stringify(signedRequest);
+}
+
+/**
  * Creates the signed, stringified message body for a 'get_ledger_balances' request.
  *
  * @param signer - The function to sign the request payload.

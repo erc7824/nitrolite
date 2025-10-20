@@ -147,12 +147,12 @@ describe('nitrorpc_v04 lifecycle', () => {
             {
                 participant: aliceAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(4) * BigInt(3)).toString(), // 75
+                amount: (appSessionDepositAmount / BigInt(4) * BigInt(3)).toString(), // 75 USDC
             },
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(4)).toString(), // 25
+                amount: (appSessionDepositAmount / BigInt(4)).toString(), // 25 USDC
             },
         ];
 
@@ -170,12 +170,12 @@ describe('nitrorpc_v04 lifecycle', () => {
             {
                 participant: aliceAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
         ];
 
@@ -195,12 +195,12 @@ describe('nitrorpc_v04 lifecycle', () => {
             {
                 participant: aliceAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount).toString(), // 100
+                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount).toString(), // 100 USDC
             },
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
         ];
         await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Deposit, ++currentVersion, updatedAllocations, SESSION_DATA_ACTIVE_2);
@@ -225,12 +225,12 @@ describe('nitrorpc_v04 lifecycle', () => {
             {
                 participant: aliceAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 75
+                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 75 USDC
             },
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
         ];
 
@@ -261,7 +261,7 @@ describe('nitrorpc_v04 lifecycle', () => {
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 125
+                amount: (appSessionDepositAmount + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 125 USDC
             },
         ];
 

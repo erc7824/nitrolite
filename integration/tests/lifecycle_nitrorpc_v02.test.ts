@@ -141,13 +141,13 @@ describe('nitrorpc_v02 lifecycle', () => {
         const allocations = [
             {
                 participant: aliceAppIdentity.walletAddress,
-                asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                asset:  ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
             {
                 participant: bobAppIdentity.walletAddress,
-                asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                asset:  ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
         ];
 

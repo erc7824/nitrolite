@@ -216,7 +216,7 @@ func TestClient_Ledger(t *testing.T) {
 		balances := rpc.GetLedgerBalancesResponse{
 			LedgerBalances: []rpc.LedgerBalance{
 				{Asset: testSymbol, Amount: decimal.NewFromInt(1000)},
-				{Asset: "ETH", Amount: decimal.NewFromInt(5)},
+				{Asset: "eth", Amount: decimal.NewFromInt(5)},
 			},
 		}
 		registerSimpleHandler(dialer, rpc.GetLedgerBalancesMethod, balances)

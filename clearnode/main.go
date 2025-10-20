@@ -33,9 +33,14 @@ func main() {
 		logger.Fatal("Failed to setup database", "error", err)
 	}
 
-	err = loadWalletCache(db)
+	err = loadCustodySignersCache(db)
 	if err != nil {
-		logger.Fatal("Failed to load wallet cache", "error", err)
+		logger.Fatal("Failed to load custody signers cache", "error", err)
+	}
+
+	err = loadSessionKeyCache(db)
+	if err != nil {
+		logger.Fatal("Failed to load session key cache", "error", err)
 	}
 
 	signer, err := NewSigner(config.privateKeyHex)

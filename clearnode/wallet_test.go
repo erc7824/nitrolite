@@ -9,7 +9,8 @@ import (
 )
 
 func clearCache() {
-	walletCache = sync.Map{}
+	custodySignerCache = sync.Map{}
+	sessionKeyCache = sync.Map{}
 }
 
 func TestLoadWalletCache(t *testing.T) {
@@ -20,7 +21,7 @@ func TestLoadWalletCache(t *testing.T) {
 	require.NoError(t, db.Create(&SignerWallet{Signer: "alice", Wallet: "w1"}).Error)
 	require.NoError(t, db.Create(&SignerWallet{Signer: "bob", Wallet: "w2"}).Error)
 
-	require.NoError(t, loadWalletCache(db))
+	require.NoError(t, loadCustodySignersCache(db))
 
 	assert.Equal(t, "w1", GetWalletBySigner("alice"))
 	assert.Equal(t, "w2", GetWalletBySigner("bob"))

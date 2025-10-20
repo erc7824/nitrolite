@@ -7,6 +7,9 @@ import {
     RPCNetworkInfo,
     RPCHistoryEntry,
     GetUserTagResponseParams,
+    GetSessionKeysResponseParams,
+    RPCSessionKey,
+    RPCAllowance,
 } from '../types';
 import { hexSchema, addressSchema, ParamsParser } from './common';
 
@@ -83,6 +86,52 @@ const GetUserTagParamsSchema = z
     // Validate received type with linter
     .transform((raw): GetUserTagResponseParams => raw);
 
+const AllowanceObjectSchema = z
+    .object({
+        asset: z.string(),
+        amount: z.string(),
+    })
+    .transform(
+        (raw): RPCAllowance => ({
+            asset: raw.asset,
+            amount: raw.amount,
+        }),
+    );
+
+const SessionKeyObjectSchema = z
+    .object({
+        id: z.number(),
+        session_key: addressSchema,
+        application_name: z.string().optional(),
+        allowance: z.array(AllowanceObjectSchema),
+        used_allowance: z.array(AllowanceObjectSchema),
+        scope: z.string().optional(),
+        expires_at: z.string().optional(),
+        created_at: z.string(),
+    })
+    .transform(
+        (raw): RPCSessionKey => ({
+            id: raw.id,
+            sessionKey: raw.session_key,
+            applicationName: raw.application_name,
+            allowance: raw.allowance,
+            usedAllowance: raw.used_allowance,
+            scope: raw.scope,
+            expiresAt: raw.expires_at ? new Date(raw.expires_at) : undefined,
+            createdAt: new Date(raw.created_at),
+        }),
+    );
+
+const GetSessionKeysParamsSchema = z
+    .object({
+        session_keys: z.array(SessionKeyObjectSchema),
+    })
+    .transform(
+        (raw): GetSessionKeysResponseParams => ({
+            sessionKeys: raw.session_keys,
+        }),
+    );
+
 const parseMessageParams: ParamsParser<unknown> = (params) => {
     return params;
 };
@@ -92,5 +141,6 @@ export const miscParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.Error]: (params) => ErrorParamsSchema.parse(params),
     [RPCMethod.GetRPCHistory]: (params) => GetRPCHistoryParamsSchema.parse(params),
     [RPCMethod.GetUserTag]: (params) => GetUserTagParamsSchema.parse(params),
+    [RPCMethod.GetSessionKeys]: (params) => GetSessionKeysParamsSchema.parse(params),
     [RPCMethod.Message]: parseMessageParams,
 };

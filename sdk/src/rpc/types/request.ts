@@ -94,6 +94,14 @@ export interface GetUserTagRequest extends GenericRPCMessage {
 }
 
 /**
+ * Represents the request structure for the 'get_session_keys' RPC method.
+ */
+export interface GetSessionKeysRequest extends GenericRPCMessage {
+    method: RPCMethod.GetSessionKeys;
+    params: {};
+}
+
+/**
  * Represents the request structure for the 'create_app_session' RPC method.
  */
 export interface CreateAppSessionRequest extends GenericRPCMessage {
@@ -332,6 +340,11 @@ export type GetLedgerTransactionsRequestParams = GetLedgerTransactionsRequest['p
 export type GetUserTagRequestParams = GetUserTagRequest['params'];
 
 /**
+ * Represents the request parameters for the 'get_session_keys' RPC method.
+ */
+export type GetSessionKeysRequestParams = GetSessionKeysRequest['params'];
+
+/**
  * Represents the request parameters for the 'create_app_session' RPC method.
  */
 export type CreateAppSessionRequestParams = CreateAppSessionRequest['params'];
@@ -460,6 +473,7 @@ export type RPCRequest =
     | GetLedgerEntriesRequest
     | GetLedgerTransactionsRequest
     | GetUserTagRequest
+    | GetSessionKeysRequest
     | CreateAppSessionRequest
     | SubmitAppStateRequest
     | CloseAppSessionRequest
@@ -488,6 +502,7 @@ export type RPCRequestParamsByMethod = {
     [RPCMethod.GetLedgerEntries]: GetLedgerEntriesRequestParams;
     [RPCMethod.GetLedgerTransactions]: GetLedgerTransactionsRequestParams;
     [RPCMethod.GetUserTag]: GetUserTagRequestParams;
+    [RPCMethod.GetSessionKeys]: GetSessionKeysRequestParams;
     [RPCMethod.CreateAppSession]: CreateAppSessionRequestParams;
     [RPCMethod.SubmitAppState]: SubmitAppStateRequestParams;
     [RPCMethod.CloseAppSession]: CloseAppSessionRequestParams;

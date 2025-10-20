@@ -371,7 +371,7 @@ balances, _, err := client.GetLedgerBalances(ctx, rpc.GetLedgerBalancesRequest{}
 transferReq := rpc.TransferRequest{
     Destination: recipientAddress,
     Allocations: []rpc.TransferAllocation{
-        {AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
+        {AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
     },
 }
 

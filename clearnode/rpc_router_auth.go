@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
+	"gorm.io/gorm"
 )
 
 type AuthRequestParams struct {
@@ -214,12 +215,6 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 		return nil, nil, RPCErrorf("invalid challenge or signature")
 	}
 
-	// Store signer
-	if err := AddSigner(r.DB, challenge.Address, challenge.SessionKey); err != nil {
-		logger.Error("failed to create signer in db", "error", err)
-		return nil, nil, err
-	}
-
 	// Generate the User tag
 	if _, err = GenerateOrRetrieveUserTag(r.DB, challenge.Address); err != nil {
 		logger.Error("failed to store user tag in db", "error", err)
@@ -231,6 +226,17 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 	if err != nil {
 		logger.Error("failed to generate JWT token", "error", err)
 		return nil, nil, RPCErrorf("failed to generate JWT token")
+	}
+
+	// Validate allowances against supported assets before storing session key
+	if err := validateAllowanceAssets(r.DB, challenge.Allowances); err != nil {
+		logger.Error("unsupported asset in allowances", "error", err, "allowances", challenge.Allowances)
+		return nil, nil, RPCErrorf("unsupported token: %w", err)
+	}
+
+	if err := AddSessionKey(r.DB, challenge.Address, challenge.SessionKey, challenge.AppName, challenge.Scope, challenge.Allowances, claims.Policy.ExpiresAt); err != nil {
+		logger.Error("failed to store session key", "error", err, "sessionKey", challenge.SessionKey)
+		return nil, nil, err
 	}
 
 	return &claims.Policy, map[string]any{
@@ -249,5 +255,31 @@ func ValidateTimestamp(ts uint64, expirySeconds int) error {
 	if time.Since(t) > time.Duration(expirySeconds)*time.Second {
 		return fmt.Errorf("timestamp expired: %s older than %d s", t.Format(time.RFC3339Nano), expirySeconds)
 	}
+	return nil
+}
+
+// validateAllowanceAssets validates that all assets in allowances are supported by the system
+func validateAllowanceAssets(db *gorm.DB, allowances []Allowance) error {
+	if len(allowances) == 0 {
+		return nil
+	}
+
+	// Note: this would be more efficient once we introduce in-memory assets
+	supportedAssets, err := GetAllAssets(db, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get supported assets: %w", err)
+	}
+
+	supportedSymbols := make(map[string]bool)
+	for _, asset := range supportedAssets {
+		supportedSymbols[asset.Symbol] = true
+	}
+
+	for _, allowance := range allowances {
+		if !supportedSymbols[allowance.Asset] {
+			return fmt.Errorf("asset '%s' is not supported", allowance.Asset)
+		}
+	}
+
 	return nil
 }

@@ -115,7 +115,7 @@ services:
           echo 'Seeding database with tokens...' &&
           psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c \"
             INSERT INTO assets (token, chain_id, symbol, decimals)
-            VALUES ('$$TOKEN_ADDRESS', 31337, 'USDC', 6);
+            VALUES ('$$TOKEN_ADDRESS', 31337, 'usdc', 6);
           \" &&
           echo 'Database seeded with tokens successfully'
         else

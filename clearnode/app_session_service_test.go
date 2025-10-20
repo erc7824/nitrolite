@@ -37,10 +37,10 @@ func assertNotifications(t *testing.T, capturedNotifications map[string][]Notifi
 
 func setupWallets(t *testing.T, db *gorm.DB, funds map[common.Address]map[string]int) {
 	for addr, assets := range funds {
-		require.NoError(t, db.Create(&SignerWallet{Signer: addr.Hex(), Wallet: addr.Hex()}).Error)
+		require.NoError(t, AddSigner(db, addr.Hex(), addr.Hex()))
 		accountID := NewAccountID(addr.Hex())
 		for asset, amount := range assets {
-			require.NoError(t, GetWalletLedger(db, addr).Record(accountID, asset, decimal.NewFromInt(int64(amount))))
+			require.NoError(t, GetWalletLedger(db, addr).Record(accountID, asset, decimal.NewFromInt(int64(amount)), nil))
 		}
 	}
 }
@@ -78,7 +78,7 @@ func createTestAppSessionService(db *gorm.DB, capturedNotifications map[string][
 func setupAppSessionBalances(t *testing.T, db *gorm.DB, sessionAccountID AccountID, balances map[common.Address]map[string]int) {
 	for addr, assets := range balances {
 		for asset, amount := range assets {
-			require.NoError(t, GetWalletLedger(db, addr).Record(sessionAccountID, asset, decimal.NewFromInt(int64(amount))))
+			require.NoError(t, GetWalletLedger(db, addr).Record(sessionAccountID, asset, decimal.NewFromInt(int64(amount)), nil))
 		}
 	}
 }
@@ -119,7 +119,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			},
 		}
 
-		appSession, err := service.CreateApplication(params, rpcSigners(userAddressA, userAddressB))
+		appSession, err := service.CreateAppSession(params, rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.NotEmpty(t, appSession.AppSessionID)
 		assert.Equal(t, uint64(1), appSession.Version)
@@ -159,7 +159,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			},
 		}
 
-		_, err := service.CreateApplication(params, rpcSigners(userAddressA))
+		_, err := service.CreateAppSession(params, rpcSigners(userAddressA))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "insufficient funds")
 	})
@@ -184,7 +184,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			},
 		}
 
-		_, err := service.CreateApplication(params, rpcSigners(userAddressA))
+		_, err := service.CreateAppSession(params, rpcSigners(userAddressA))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), ErrNegativeAllocation)
 	})
@@ -210,9 +210,71 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 			},
 		}
 
-		_, err := service.CreateApplication(params, rpcSigners(userAddressA))
+		_, err := service.CreateAppSession(params, rpcSigners(userAddressA))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has challenged channels")
+	})
+
+	t.Run("ErrorQuorumExceedsTotalWeights", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		setupWallets(t, db, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 100},
+		})
+		service := createTestAppSessionService(db, nil)
+
+		params := &CreateAppSessionParams{
+			Definition: AppDefinition{
+				Protocol:           rpc.VersionNitroRPCv0_2,
+				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
+				Weights:            []int64{3, 5}, // Total weight is 8
+				Quorum:             10,            // Quorum exceeds total weight (10 > 8)
+				Challenge:          60,
+				Nonce:              uint64(time.Now().Unix()),
+			},
+			Allocations: []AppAllocation{
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+			},
+		}
+
+		_, err := service.CreateAppSession(params, rpcSigners(userAddressA, userAddressB))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "target quorum (10) cannot be greater than total sum of weights (8)")
+	})
+
+	t.Run("SuccessQuorumEqualsToTotalWeights", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		setupWallets(t, db, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+			userAddressB: {"usdc": 100},
+		})
+		service := createTestAppSessionService(db, nil)
+
+		params := &CreateAppSessionParams{
+			Definition: AppDefinition{
+				Protocol:           rpc.VersionNitroRPCv0_2,
+				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
+				Weights:            []int64{3, 5}, // Total weight is 8
+				Quorum:             8,             // Quorum equals total weight (8 == 8) - should be valid
+				Challenge:          60,
+				Nonce:              uint64(time.Now().Unix()),
+			},
+			Allocations: []AppAllocation{
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+			},
+		}
+
+		appSession, err := service.CreateAppSession(params, rpcSigners(userAddressA, userAddressB))
+		require.NoError(t, err)
+		assert.NotEmpty(t, appSession.AppSessionID)
+		assert.Equal(t, uint64(1), appSession.Version)
+		assert.Equal(t, string(ChannelStatusOpen), appSession.Status)
 	})
 }
 
@@ -240,7 +302,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -271,7 +333,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), ErrNegativeAllocation)
 	})
@@ -300,7 +362,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -334,7 +396,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.Equal(t, fmt.Sprintf("incorrect app state: incorrect version: expected %d, got %d", 2, params.Version), err.Error())
 	})
 
@@ -361,7 +423,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect operate request: non-zero allocations sum delta")
 	})
@@ -382,7 +444,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect app state: unsupported intent: unknown_intent")
 	})
@@ -458,7 +520,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB), rpcSigners(depositorAddress, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 		assert.Equal(t, string(ChannelStatusOpen), resp.Status)
@@ -556,7 +618,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB, userAddressC))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB, userAddressC), rpcSigners(depositorAddress, userAddressB, userAddressC))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -598,7 +660,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB), rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: non-positive allocations sum delta")
 	})
@@ -629,7 +691,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB), rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: insufficient unified balance")
 	})
@@ -650,7 +712,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB), rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect request: specified parameters are not supported in this protocol")
 	})
@@ -677,7 +739,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressB), rpcSigners(userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: quorum not reached")
 	})
@@ -704,12 +766,12 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress), rpcSigners(depositorAddress))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: quorum not reached")
 	})
 
-	t.Run("Error_quorumReached_noDepositorSignature", func(t *testing.T) {
+	t.Run("Error_quorumReached_noDepositorSignature_noSessionKey", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
 
@@ -742,11 +804,75 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		// Quorum is satisfied but depositor (userA) signature is missing
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressB, userAddressC))
+		// Quorum is satisfied but depositor signature is still required when no session key is used
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressB, userAddressC), rpcSigners(userAddressB, userAddressC))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: depositor signature is required")
 		assert.NotContains(t, err.Error(), "quorum not reached")
+	})
+
+	t.Run("Success_quorumReached_withSessionKey", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		// Load session key cache
+		err := loadSessionKeyCache(db)
+		require.NoError(t, err)
+
+		walletAddress := depositorAddress.Hex()
+		sessionKeyAddr := common.HexToAddress("0x1234567890123456789012345678901234567890") // Session key for depositor
+		sessionKeyAddress := sessionKeyAddr.Hex()
+
+		// Create session key with spending allowance
+		allowances := []Allowance{
+			{Asset: "usdc", Amount: "1000"},
+		}
+		err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
+		require.NoError(t, err)
+
+		// Setup depositor wallet balance (no custody signer needed - using session key)
+		depositorAccountID := NewAccountID(walletAddress)
+		require.NoError(t, GetWalletLedger(db, depositorAddress).Record(depositorAccountID, "usdc", decimal.NewFromInt(500), nil))
+
+		// Setup other participants as custody signers with balances
+		setupWallets(t, db, map[common.Address]map[string]int{
+			userAddressB: {"usdc": 300},
+			userAddressC: {"usdc": 200},
+		})
+
+		session := createTestAppSession(t, db, "test-session-sk", rpc.VersionNitroRPCv0_4,
+			[]string{depositorAddress.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 2)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			depositorAddress: {"usdc": 100},
+			userAddressB:     {"usdc": 50},
+			userAddressC:     {"usdc": 50},
+		})
+
+		service := createTestAppSessionService(db, nil)
+		// UserA wants to deposit 100 more (from 100 to 200)
+		params := &SubmitAppStateParams{
+			AppSessionID: session.SessionID,
+			Intent:       rpc.AppSessionIntentDeposit,
+			Version:      2,
+			Allocations: []AppAllocation{
+				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+			},
+		}
+
+		// Quorum is satisfied and session key provides depositor authorization
+		// rpcWallets contains the actual wallet addresses (session key maps to depositor wallet)
+		// rpcSigners contains the actual signer addresses (session key address itself)
+		_, err = service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB, userAddressC), rpcSigners(sessionKeyAddr, userAddressB, userAddressC))
+		require.NoError(t, err, "Should succeed when using session key for depositor authorization")
+
+		// Verify session key usage was updated
+		spending, err := GetSessionKeySpending(db, sessionKeyAddress, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, "100", spending.String(), "Should track spending from deposit")
 	})
 
 	t.Run("ZeroAllocationIncreaseError", func(t *testing.T) {
@@ -773,7 +899,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB), rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: non-positive allocations sum delta")
 	})
@@ -807,7 +933,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB), rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect deposit request: decreased allocation for participant")
 	})
@@ -845,7 +971,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB, userAddressC))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB, userAddressC), rpcSigners(depositorAddress, userAddressB, userAddressC))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -892,7 +1018,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(withdrawerAddress, userAddressB))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(withdrawerAddress, userAddressB), rpcSigners(withdrawerAddress, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 		assert.Equal(t, string(ChannelStatusOpen), resp.Status)
@@ -949,7 +1075,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(withdrawerAddress, userAddressB, userAddressC))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(withdrawerAddress, userAddressB, userAddressC), rpcSigners(withdrawerAddress, userAddressB, userAddressC))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -991,7 +1117,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect withdrawal request: non-negative allocations sum delta")
 	})
@@ -1013,7 +1139,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect request: specified parameters are not supported in this protocol")
 	})
@@ -1047,7 +1173,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect withdrawal request: increased allocation for participant")
 	})
@@ -1074,7 +1200,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			},
 		}
 
-		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB)) // Only 2 signers, need 3
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB)) // Only 2 signers, need 3
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect withdrawal request: quorum not reached")
 	})
@@ -1191,5 +1317,123 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		_, err := service.CloseApplication(params, rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), ErrNegativeAllocation)
+	})
+}
+
+func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	err := loadSessionKeyCache(db)
+	require.NoError(t, err)
+
+	walletAddress := userAddressA.Hex()
+	sessionKeyAddr := common.HexToAddress("0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC") // Dedicated session key address
+	sessionKeyAddress := sessionKeyAddr.Hex()
+
+	allowances := []Allowance{
+		{Asset: "usdc", Amount: "500"},
+		{Asset: "eth", Amount: "2"},
+	}
+	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
+	require.NoError(t, err)
+
+	accountID := NewAccountID(walletAddress)
+	require.NoError(t, GetWalletLedger(db, userAddressA).Record(accountID, "usdc", decimal.NewFromInt(1000), nil))
+	require.NoError(t, GetWalletLedger(db, userAddressA).Record(accountID, "eth", decimal.NewFromInt(5), nil))
+
+	require.NoError(t, AddSigner(db, userAddressB.Hex(), userAddressB.Hex()))
+	accountIDB := NewAccountID(userAddressB.Hex())
+	require.NoError(t, GetWalletLedger(db, userAddressB).Record(accountIDB, "usdc", decimal.NewFromInt(1000), nil))
+
+	capturedNotifications := make(map[string][]Notification)
+	service := createTestAppSessionService(db, capturedNotifications)
+
+	t.Run("CreateAppSession_WithinSpendingCap_Success", func(t *testing.T) {
+		params := &CreateAppSessionParams{
+			Definition: AppDefinition{
+				Protocol:           rpc.VersionNitroRPCv0_2,
+				ParticipantWallets: []string{walletAddress, userAddressB.Hex()},
+				Weights:            []int64{2, 0},
+				Quorum:             2,
+				Challenge:          60,
+				Nonce:              1,
+			},
+			Allocations: []AppAllocation{
+				{ParticipantWallet: walletAddress, AssetSymbol: "usdc", Amount: decimal.NewFromInt(300)},
+			},
+		}
+
+		_, err := service.CreateAppSession(params, rpcSigners(sessionKeyAddr)) // Sign with session key
+		assert.NoError(t, err, "Should allow app session creation within spending cap")
+
+		// Verify session key usage was updated
+		spending, err := GetSessionKeySpending(db, sessionKeyAddress, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, "300", spending.String(), "Should track spending from app session creation")
+	})
+
+	t.Run("CreateAppSession_ExceedsSpendingCap_Fails", func(t *testing.T) {
+		params := &CreateAppSessionParams{
+			Definition: AppDefinition{
+				Protocol:           rpc.VersionNitroRPCv0_2,
+				ParticipantWallets: []string{walletAddress, userAddressB.Hex()},
+				Weights:            []int64{2, 1},
+				Quorum:             2,
+				Challenge:          60,
+				Nonce:              2,
+			},
+			Allocations: []AppAllocation{
+				{ParticipantWallet: walletAddress, AssetSymbol: "usdc", Amount: decimal.NewFromInt(300)}, // This would make total 600, exceeding 500 limit
+			},
+		}
+
+		_, err := service.CreateAppSession(params, rpcSigners(sessionKeyAddr))
+		assert.Error(t, err, "Should reject app session creation that exceeds spending cap")
+		assert.Contains(t, err.Error(), "session key spending validation failed")
+	})
+
+	t.Run("CreateAppSession_UnsupportedAsset_Fails", func(t *testing.T) {
+		params := &CreateAppSessionParams{
+			Definition: AppDefinition{
+				Protocol:           rpc.VersionNitroRPCv0_2,
+				ParticipantWallets: []string{walletAddress, userAddressB.Hex()},
+				Weights:            []int64{2, 0},
+				Quorum:             2,
+				Challenge:          60,
+				Nonce:              3,
+			},
+			Allocations: []AppAllocation{
+				{ParticipantWallet: walletAddress, AssetSymbol: "btc", Amount: decimal.NewFromInt(1)}, // BTC not in allowances
+			},
+		}
+
+		_, err := service.CreateAppSession(params, rpcSigners(sessionKeyAddr))
+		assert.Error(t, err, "Should reject unsupported asset")
+		assert.Contains(t, err.Error(), "not allowed in session key spending cap")
+	})
+
+	t.Run("AppSessionDeposit_WithinSpendingCap_Success", func(t *testing.T) {
+		session := createTestAppSession(t, db, "test-session-deposit", rpc.VersionNitroRPCv0_4, []string{walletAddress}, []int64{2, 0}, 2)
+		_ = NewAccountID(session.SessionID)
+
+		// Deposit 100
+		params := &SubmitAppStateParams{
+			AppSessionID: session.SessionID,
+			Intent:       rpc.AppSessionIntentDeposit,
+			Version:      2,
+			Allocations: []AppAllocation{
+				{ParticipantWallet: walletAddress, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+			},
+		}
+
+		// rpcWallets contains wallet address, rpcSigners contains session key address
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA), rpcSigners(sessionKeyAddr))
+		assert.NoError(t, err, "Should allow deposit within spending cap")
+
+		// Verify the total spending is now 400
+		totalSpending, err := GetSessionKeySpending(db, sessionKeyAddress, "usdc")
+		require.NoError(t, err)
+		assert.Equal(t, "400", totalSpending.String(), "Should track total spending including deposits")
 	})
 }

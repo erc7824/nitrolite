@@ -428,7 +428,7 @@ func (c *Client) GetChannels(ctx context.Context, reqParams GetChannelsRequest) 
 // Example:
 //
 //	entries, _, err := client.GetLedgerEntries(ctx, GetLedgerEntriesRequest{
-//	    Asset: "USDC",
+//	    Asset: "usdc",
 //	    Wallet: userWallet,
 //	    ListOptions: ListOptions{Limit: 50},
 //	})
@@ -470,7 +470,7 @@ func (c *Client) GetLedgerEntries(ctx context.Context, reqParams GetLedgerEntrie
 //
 //	// Get recent USDC transactions
 //	txns, _, err := client.GetLedgerTransactions(ctx, GetLedgerTransactionsRequest{
-//	    Asset: "USDC",
+//	    Asset: "usdc",
 //	    ListOptions: ListOptions{
 //	        Limit: 20,
 //	        Sort: &SortTypeDescending,
@@ -529,7 +529,7 @@ func (c *Client) GetLedgerTransactions(ctx context.Context, reqParams GetLedgerT
 //	    Address:            walletSigner.PublicKey().Address().String(),   // Main wallet
 //	    SessionKey:         sessionSigner.PublicKey().Address().String(),  // Different key for session
 //	    AppName:            "MyDApp",
-//	    Allowances:         []Allowance{{Asset: "USDC", Amount: "1000"}},
+//	    Allowances:         []Allowance{{Asset: "usdc", Amount: "1000"}},
 //	    ApplicationAddress: appContractAddress,
 //	}
 //
@@ -972,8 +972,8 @@ func (c *Client) CloseChannel(ctx context.Context, req *Request) (CloseChannelRe
 //	transferReq := TransferRequest{
 //	    Destination: "0xRecipient...",
 //	    Allocations: []TransferAllocation{
-//	        {AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
-//	        {AssetSymbol: "ETH", Amount: decimal.NewFromFloat(0.1)},
+//	        {AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+//	        {AssetSymbol: "eth", Amount: decimal.NewFromFloat(0.1)},
 //	    },
 //	}
 //

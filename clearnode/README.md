@@ -8,7 +8,7 @@ Clearnode is an implementation of a message broker node providing ledger service
 
 ## Features
 
-- **Multi-Chain Support**: Connect to multiple EVM blockchains (Polygon, Celo, Base)
+- **Multi-Chain Support**: Connect to multiple EVM blockchains with YAML-based configuration
 - **Off-Chain Payments**: Efficient payment channels for high-throughput transactions
 - **Virtual Applications**: Create multi-participant applications
 - **Message Forwarding**: Bi-directional message routing between application participants
@@ -129,6 +129,39 @@ type JWTClaims struct {
 
 The ledger system manages financial transactions between accounts using double-entry accounting principles:
 
+## Blockchain Configuration
+
+Clearnode uses a YAML-based configuration system for managing blockchain connections and contract addresses. The configuration file `blockchains.yaml` should be placed in your configuration directory.
+
+See example configuration: [`config/compose/example/blockchains.yaml`](config/compose/example/blockchains.yaml)
+
+### Configuration Structure
+
+- **default_contract_addresses**: Default contract addresses applied to all blockchains unless overridden
+  - `custody`: Custody contract address
+  - `adjudicator`: Adjudicator contract address  
+  - `balance_checker`: Balance checker contract address
+
+- **blockchains**: Array of blockchain configurations. You can add as many blockchains as needed.
+  - `name`: Blockchain name (lowercase, underscores allowed)
+  - `id`: Chain ID for validation
+  - `enabled`: Whether to connect to this blockchain
+  - `block_step`: Block range for scanning (optional, default: 10000)
+  - `contract_addresses`: Override default addresses as needed
+
+### RPC Configuration
+
+Each enabled blockchain requires an RPC endpoint configured via environment variables following the pattern:
+`<BLOCKCHAIN_NAME_UPPERCASE>_BLOCKCHAIN_RPC`
+
+Example:
+```bash
+MY_NETWORK_BLOCKCHAIN_RPC=https://my-network-rpc.example.com
+ANOTHER_CHAIN_BLOCKCHAIN_RPC=https://another-chain.example.com
+```
+
+The system validates that RPC endpoints match the expected chain ID at startup.
+
 ## Environment Variables
 
 Clearnode requires the following environment variables to be properly configured:
@@ -138,30 +171,32 @@ Clearnode requires the following environment variables to be properly configured
 | `BROKER_PRIVATE_KEY` | Private key used for signing broker messages | Yes | - |
 | `DATABASE_DRIVER` | Database driver to use (postgres/sqlite) | No | sqlite |
 | `CLEARNODE_DATABASE_URL` | Database connection string | No | clearnode.db |
-| `LOG_LEVEL` | Logging level (debug, info, warn, error) | No | info |
+| `CLEARNODE_LOG_LEVEL` | Logging level (debug, info, warn, error) | No | info |
 | `HTTP_PORT` | Port for the HTTP/WebSocket server | No | 8000 |
 | `METRICS_PORT` | Port for Prometheus metrics | No | 4242 |
 | `MSG_EXPIRY_TIME` | Time in seconds for message timestamp validation | No | 60 |
-| `POLYGON_BLOCKCHAIN_RPC` | Polygon RPC endpoint URL | At least one network required | - |
-| `POLYGON_CUSTODY_CONTRACT_ADDRESS` | Polygon custody contract address | Required if using Polygon | - |
-| `POLYGON_ADJUDICATOR_ADDRESS` | Polygon adjudicator contract address | Required if using Polygon | - |
-| `POLYGON_BALANCE_CHECKER_ADDRESS` | Polygon balance checker contract address | Required if using Polygon | - |
-
-Multiple networks can be added. For each supported network you can specify the corresponding BLOCKCHAIN_RPC, CUSTODY_CONTRACT_ADDRESS, ADJUDICATOR_ADDRESS, and BALANCE_CHECKER_ADDRESS environment variables.
+| `CONFIG_DIR_PATH` | Path to directory containing blockchains.yaml | No | . |
+| `<BLOCKCHAIN_NAME>_BLOCKCHAIN_RPC` | RPC endpoint for each enabled blockchain | Yes (per enabled blockchain) | - |
 
 ## Running with Docker
 
 ### Quick Start
 
-1. Set up environment variables:
+1. Create a configuration directory with `blockchains.yaml`:
 
+```bash
+mkdir -p config/compose/local
+cp config/compose/example/blockchains.yaml config/compose/local/
+# Edit config/compose/local/blockchains.yaml for your networks
 ```
+
+2. Set up environment variables in `.env` file:
+
+```bash
+# Required
 BROKER_PRIVATE_KEY=your_private_key
-DATABASE_DRIVER=postgres
-CLEARNODE_DATABASE_URL=file:./dev.db 
-POLYGON_BLOCKCHAIN_RPC=https://polygon-mainnet.infura.io/v3/your_infura_key
-POLYGON_CUSTODY_CONTRACT_ADDRESS=0xYourContractAddress
-POLYGON_ADJUDICATOR_ADDRESS=0xYourAdjudicatorAddress
+# Add RPC endpoints for each enabled blockchain in your config
+<BLOCKCHAIN_NAME>_BLOCKCHAIN_RPC=https://your-rpc-endpoint.com
 ```
 
 ### Run locally
@@ -170,12 +205,8 @@ POLYGON_ADJUDICATOR_ADDRESS=0xYourAdjudicatorAddress
 go run .
 ```
 
-### Build and Run the Docker Image
+### Run with Docker Compose
 
 ```bash
-# Build the Docker image
-docker build -t clearnode .
-
-# Run the container
-docker run -p 8000:8000 -p 4242:4242  -v ./.env:/.env clearnode
+docker-compose up
 ```

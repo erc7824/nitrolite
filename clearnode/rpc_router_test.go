@@ -111,24 +111,28 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, *gorm.DB, func()) {
 	node := NewRPCNode(signer, logger)
 	wsNotifier := NewWSNotifier(node.Notify, logger)
 
-	networks := map[uint32]*NetworkConfig{
+	blockchains := map[uint32]BlockchainConfig{
 		137: {
-			Name:               "polygon",
-			ChainID:            137,
-			BlockchainRPC:      "https://polygon-mainnet.infura.io/v3/test",
-			CustodyAddress:     "0xCustodyAddress",
-			AdjudicatorAddress: "0xAdjudicatorAddress",
+			Name:          "polygon",
+			ID:            137,
+			BlockchainRPC: "https://polygon-mainnet.infura.io/v3/test",
+			ContractAddresses: ContractAddressesConfig{
+				Custody:     "0xCustodyAddress",
+				Adjudicator: "0xAdjudicatorAddress",
+			},
 		},
 		42220: {
-			Name:               "celo",
-			ChainID:            42220,
-			BlockchainRPC:      "https://celo-mainnet.infura.io/v3/test",
-			CustodyAddress:     "0xCustodyAddress2",
-			AdjudicatorAddress: "0xAdjudicatorAddress2",
+			Name:          "celo",
+			ID:            42220,
+			BlockchainRPC: "https://celo-mainnet.infura.io/v3/test",
+			ContractAddresses: ContractAddressesConfig{
+				Custody:     "0xCustodyAddress2",
+				Adjudicator: "0xAdjudicatorAddress2",
+			},
 		},
 	}
 
-	channelService := NewChannelService(db, networks, signer)
+	channelService := NewChannelService(db, blockchains, signer)
 
 	// Create an instance of RPCRouter
 	router := &RPCRouter{

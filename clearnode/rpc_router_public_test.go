@@ -50,10 +50,10 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 	defer cleanup()
 
 	router.Config = &Config{
-		networks: map[uint32]*NetworkConfig{
-			137:   {ChainID: 137, BlockchainRPC: "https://polygon-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress1"},
-			42220: {ChainID: 42220, BlockchainRPC: "https://celo-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress2"},
-			8453:  {ChainID: 8453, BlockchainRPC: "https://base-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress3"},
+		blockchains: map[uint32]BlockchainConfig{
+			137:   {ID: 137, BlockchainRPC: "https://polygon-mainnet.infura.io/v3/test", ContractAddresses: ContractAddressesConfig{Custody: "0xCustodyAddress1", Adjudicator: "0xAdjudicatorAddress1"}},
+			42220: {ID: 42220, BlockchainRPC: "https://celo-mainnet.infura.io/v3/test", ContractAddresses: ContractAddressesConfig{Custody: "0xCustodyAddress2", Adjudicator: "0xAdjudicatorAddress2"}},
+			8453:  {ID: 8453, BlockchainRPC: "https://base-mainnet.infura.io/v3/test", ContractAddresses: ContractAddressesConfig{Custody: "0xCustodyAddress3", Adjudicator: "0xAdjudicatorAddress3"}},
 		},
 	}
 
@@ -66,18 +66,18 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 	assert.Equal(t, router.Signer.GetAddress().Hex(), configMap.BrokerAddress)
 	require.Len(t, configMap.Networks, 3, "Should have 3 supported networks")
 
-	expectedNetworks := map[uint32]struct{}{
+	expectedBlockchains := map[uint32]struct{}{
 		137:   {},
 		42220: {},
 		8453:  {},
 	}
-	for _, network := range configMap.Networks {
-		_, exists := expectedNetworks[network.ChainID]
-		assert.True(t, exists, "Network %d should be in expected networks", network.ChainID)
-		assert.Contains(t, network.CustodyAddress, "0xCustodyAddress", "Custody address should be present")
-		delete(expectedNetworks, network.ChainID)
+	for _, blockchain := range configMap.Networks {
+		_, exists := expectedBlockchains[blockchain.ID]
+		assert.True(t, exists, "Blockchain %d should be in expected blockchains", blockchain.ID)
+		assert.Contains(t, blockchain.CustodyAddress, "0xCustodyAddress", "Custody address should be present")
+		delete(expectedBlockchains, blockchain.ID)
 	}
-	assert.Empty(t, expectedNetworks, "All expected networks should be found")
+	assert.Empty(t, expectedBlockchains, "All expected blockchains should be found")
 }
 
 func TestRPCRouterHandleGetAssets(t *testing.T) {

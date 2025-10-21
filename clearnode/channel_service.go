@@ -14,14 +14,14 @@ import (
 
 // ChannelService handles the business logic for channel operations.
 type ChannelService struct {
-	db       *gorm.DB
-	networks map[uint32]*NetworkConfig
-	signer   *Signer
+	db          *gorm.DB
+	blockchains map[uint32]BlockchainConfig
+	signer      *Signer
 }
 
 // NewChannelService creates a new ChannelService.
-func NewChannelService(db *gorm.DB, networks map[uint32]*NetworkConfig, signer *Signer) *ChannelService {
-	return &ChannelService{db: db, networks: networks, signer: signer}
+func NewChannelService(db *gorm.DB, blockchains map[uint32]BlockchainConfig, signer *Signer) *ChannelService {
+	return &ChannelService{db: db, blockchains: blockchains, signer: signer}
 }
 
 func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChannelParams, rpcSigners map[string]struct{}, logger Logger) (ChannelOperationResponse, error) {
@@ -55,7 +55,7 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		},
 	}
 
-	networkConfig, ok := s.networks[params.ChainID]
+	networkConfig, ok := s.blockchains[params.ChainID]
 	if !ok {
 		return ChannelOperationResponse{}, RPCErrorf("unsupported chain ID: %d", params.ChainID)
 	}
@@ -71,7 +71,7 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 
 	channel := nitrolite.Channel{
 		Participants: []common.Address{userParticipant, s.signer.GetAddress()},
-		Adjudicator:  common.HexToAddress(networkConfig.AdjudicatorAddress),
+		Adjudicator:  common.HexToAddress(networkConfig.ContractAddresses.Adjudicator),
 		Challenge:    3600,
 		Nonce:        uint64(time.Now().UnixMilli()),
 	}

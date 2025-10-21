@@ -18,7 +18,7 @@ func runReconcileCli(logger Logger) {
 		logger.Fatal("Usage: clearnode reconcile <network> <block_start> <block_end>")
 	}
 
-	networkID, ok := new(big.Int).SetString(os.Args[2], 10)
+	chainID, ok := new(big.Int).SetString(os.Args[2], 10)
 	if !ok {
 		logger.Fatal("Invalid network ID", "value", os.Args[2])
 	}
@@ -37,12 +37,12 @@ func runReconcileCli(logger Logger) {
 		logger.Fatal("Failed to load configuration", "error", err)
 	}
 
-	network, ok := config.networks[uint32(networkID.Uint64())]
+	blockchain, ok := config.blockchains[uint32(chainID.Uint64())]
 	if !ok {
-		logger.Fatal("Network is not configured", "network", networkID.Uint64())
+		logger.Fatal("Network is not configured", "network", chainID.Uint64())
 	}
 
-	client, err := ethclient.Dial(network.BlockchainRPC)
+	client, err := ethclient.Dial(blockchain.BlockchainRPC)
 	if err != nil {
 		logger.Fatal("Failed to connect to Ethereum node", "error", err)
 	}
@@ -61,12 +61,7 @@ func runReconcileCli(logger Logger) {
 		signer,
 		db,
 		NewWSNotifier(func(userID, method string, params RPCDataParams) {}, logger),
-		network.BlockchainRPC,
-		network.CustodyAddress,
-		network.AdjudicatorAddress,
-		network.BalanceCHeckerAddress,
-		network.ChainID,
-		network.BlockStep,
+		blockchain,
 		logger,
 	)
 	if err != nil {
@@ -77,10 +72,10 @@ func runReconcileCli(logger Logger) {
 	go func() {
 		ReconcileBlockRange(
 			client,
-			common.HexToAddress(network.CustodyAddress),
-			network.ChainID,
+			common.HexToAddress(blockchain.ContractAddresses.Custody),
+			blockchain.ID,
 			blockEnd.Uint64(),
-			network.BlockStep,
+			blockchain.BlockStep,
 			blockStart.Uint64(),
 			0,
 			eventCh,

@@ -31,6 +31,8 @@ config:
     # KEY: VALUE
   # -- Name of the secret containing environment variables
   envSecret: ""
+  # -- Blockchains configuration
+  blockchains: {}
 
 # -- Number of replicas
 replicaCount: 1

@@ -47,8 +47,8 @@ type Custody struct {
 }
 
 // NewCustody initializes the Ethereum client and custody contract wrapper.
-func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, blockchainRPC, custodyAddressStr, adjudicatorAddr, balanceCheckerAddr string, chain uint32, blockStep uint64, logger Logger) (*Custody, error) {
-	client, err := ethclient.Dial(blockchainRPC)
+func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, blockchain BlockchainConfig, logger Logger) (*Custody, error) {
+	client, err := ethclient.Dial(blockchain.BlockchainRPC)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to blockchain node: %w", err)
 	}
@@ -68,13 +68,13 @@ func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, blockchainR
 	auth.GasPrice = big.NewInt(30000000000) // 30 gwei.
 	auth.GasLimit = uint64(3000000)
 
-	custodyAddress := common.HexToAddress(custodyAddressStr)
+	custodyAddress := common.HexToAddress(blockchain.ContractAddresses.Custody)
 	custody, err := nitrolite.NewCustody(custodyAddress, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bind custody contract: %w", err)
 	}
 
-	balanceChecker, err := nitrolite.NewBalanceChecker(common.HexToAddress(balanceCheckerAddr), client)
+	balanceChecker, err := nitrolite.NewBalanceChecker(common.HexToAddress(blockchain.ContractAddresses.BalanceChecker), client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to bind balance checker contract: %w", err)
 	}
@@ -88,10 +88,10 @@ func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, blockchainR
 		transactOpts:       auth,
 		chainID:            uint32(chainID.Int64()),
 		signer:             signer,
-		adjudicatorAddress: common.HexToAddress(adjudicatorAddr),
+		adjudicatorAddress: common.HexToAddress(blockchain.ContractAddresses.Adjudicator),
 		wsNotifier:         wsNotifier,
-		blockStep:          blockStep,
-		logger:             logger.NewSystem("custody").With("chainID", chainID.Int64()).With("custodyAddress", custodyAddressStr),
+		blockStep:          blockchain.BlockStep,
+		logger:             logger.NewSystem("custody").With("chainID", chainID.Int64()).With("custodyAddress", blockchain.ContractAddresses.Custody),
 	}, nil
 }
 

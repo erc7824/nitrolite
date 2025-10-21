@@ -149,14 +149,15 @@ type GetSessionKeysResponse struct {
 }
 
 type SessionKeyResponse struct {
-	ID              uint        `json:"id"`
-	SessionKey      string      `json:"session_key"`
-	ApplicationName string      `json:"application_name,omitempty"`
-	Allowance       []Allowance `json:"allowance"`
-	UsedAllowance   []Allowance `json:"used_allowance"`
-	Scope           string      `json:"scope,omitempty"`
-	ExpiresAt       time.Time   `json:"expires_at,omitempty"`
-	CreatedAt       time.Time   `json:"created_at"`
+	ID            uint        `json:"id"`
+	SessionKey    string      `json:"session_key"`
+	AppName       string      `json:"app_name,omitempty"`
+	AppAddress    string      `json:"app_address,omitempty"`
+	Allowance     []Allowance `json:"allowance"`
+	UsedAllowance []Allowance `json:"used_allowance"`
+	Scope         string      `json:"scope,omitempty"`
+	ExpiresAt     time.Time   `json:"expires_at,omitempty"`
+	CreatedAt     time.Time   `json:"created_at"`
 }
 
 func (r *RPCRouter) BalanceUpdateMiddleware(c *RPCContext) {
@@ -736,14 +737,15 @@ func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
 		}
 
 		respSessionKeys = append(respSessionKeys, SessionKeyResponse{
-			ID:              sk.ID,
-			SessionKey:      sk.SignerAddress,
-			ApplicationName: sk.ApplicationName,
-			Allowance:       spendingCap,
-			UsedAllowance:   usedAllowance,
-			Scope:           sk.Scope,
-			ExpiresAt:       sk.ExpiresAt,
-			CreatedAt:       sk.CreatedAt,
+			ID:            sk.ID,
+			SessionKey:    sk.SignerAddress,
+			AppName:       sk.AppName,
+			AppAddress:    sk.AppAddress,
+			Allowance:     spendingCap,
+			UsedAllowance: usedAllowance,
+			Scope:         sk.Scope,
+			ExpiresAt:     sk.ExpiresAt,
+			CreatedAt:     sk.CreatedAt,
 		})
 	}
 

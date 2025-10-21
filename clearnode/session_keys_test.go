@@ -27,7 +27,7 @@ func TestSessionKey(t *testing.T) {
 	}
 	expirationTime := time.Now().Add(24 * time.Hour)
 
-	err := AddSessionKey(db, walletAddress, sessionSignerAddress, appName, scope, allowances, expirationTime)
+	err := AddSessionKey(db, walletAddress, sessionSignerAddress, appName, "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", scope, allowances, expirationTime)
 	require.NoError(t, err)
 
 	retrievedWallet := GetWalletBySigner(sessionSignerAddress)
@@ -40,7 +40,7 @@ func TestSessionKey(t *testing.T) {
 	sk := retrievedKeys[0]
 	assert.Equal(t, walletAddress, sk.WalletAddress)
 	assert.Equal(t, sessionSignerAddress, sk.SignerAddress)
-	assert.Equal(t, appName, sk.ApplicationName)
+	assert.Equal(t, appName, sk.AppName)
 	assert.Equal(t, scope, sk.Scope)
 	assert.WithinDuration(t, expirationTime, sk.ExpiresAt, time.Second)
 
@@ -100,7 +100,7 @@ func TestSessionKeyMultipleKeys(t *testing.T) {
 	}
 
 	for _, sk := range sessionKeys {
-		err := AddSessionKey(db, walletAddress, sk.signerAddress, sk.appName, sk.scope, []Allowance{}, time.Now().Add(time.Hour))
+		err := AddSessionKey(db, walletAddress, sk.signerAddress, sk.appName, "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", sk.scope, []Allowance{}, time.Now().Add(time.Hour))
 		require.NoError(t, err)
 	}
 
@@ -122,18 +122,18 @@ func TestSessionKeyActiveKeys(t *testing.T) {
 	walletAddress := "0x1234567890123456789012345678901234567890"
 
 	// Add an active session key
-	err := AddSessionKey(db, walletAddress, "0xactive123", "ActiveApp", "trade", []Allowance{}, time.Now().Add(24*time.Hour))
+	err := AddSessionKey(db, walletAddress, "0xactive123", "ActiveApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "trade", []Allowance{}, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
 	// Create an expired session key by directly inserting into DB (bypassing validation)
 	expiredKey := SessionKey{
-		SignerAddress:   "0xexpired123",
-		WalletAddress:   walletAddress,
-		ApplicationName: "ExpiredApp",
-		Allowance:       strPtr("[]"),
-		UsedAllowance:   strPtr("[]"),
-		Scope:           "view",
-		ExpiresAt:       time.Now().Add(-1 * time.Hour).UTC(),
+		SignerAddress: "0xexpired123",
+		WalletAddress: walletAddress,
+		AppName:       "ExpiredApp",
+		Allowance:     strPtr("[]"),
+		UsedAllowance: strPtr("[]"),
+		Scope:         "view",
+		ExpiresAt:     time.Now().Add(-1 * time.Hour).UTC(),
 	}
 	err = db.Create(&expiredKey).Error
 	require.NoError(t, err)
@@ -167,7 +167,7 @@ func TestSessionKeySpendingValidation(t *testing.T) {
 		{Asset: "usdc", Amount: "1000"},
 		{Asset: "eth", Amount: "5"},
 	}
-	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
+	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "trade", allowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
 	// Test 1: Valid spending within limits
@@ -254,7 +254,7 @@ func TestSessionKeySpendingEdgeCases(t *testing.T) {
 	zeroAllowances := []Allowance{
 		{Asset: "usdc", Amount: "0"},
 	}
-	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "ZeroApp", "trade", zeroAllowances, time.Now().Add(24*time.Hour))
+	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "ZeroApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "trade", zeroAllowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
 	err = ValidateSessionKeySpending(db, sessionKeyAddress, "usdc", decimal.NewFromInt(1))
@@ -287,7 +287,7 @@ func TestSessionKeyTransferIntegration(t *testing.T) {
 		{Asset: "usdc", Amount: "500"},
 		{Asset: "eth", Amount: "2"},
 	}
-	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
+	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "trade", allowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
 	err = loadSessionKeyCache(db)
@@ -412,7 +412,7 @@ func TestOneSessionKeyPerApp(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add first session key for the app
-	err = AddSessionKey(db, walletAddress, sessionKey1, appName, "trade", allowances, expiration)
+	err = AddSessionKey(db, walletAddress, sessionKey1, appName, "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "trade", allowances, expiration)
 	require.NoError(t, err)
 
 	// Verify first session key exists and is cached
@@ -423,10 +423,10 @@ func TestOneSessionKeyPerApp(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, sessionKeys, 1)
 	assert.Equal(t, sessionKey1, sessionKeys[0].SignerAddress)
-	assert.Equal(t, appName, sessionKeys[0].ApplicationName)
+	assert.Equal(t, appName, sessionKeys[0].AppName)
 
 	// Add second session key for the SAME app - should invalidate the first one
-	err = AddSessionKey(db, walletAddress, sessionKey2, appName, "trade", allowances, expiration)
+	err = AddSessionKey(db, walletAddress, sessionKey2, appName, "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "trade", allowances, expiration)
 	require.NoError(t, err)
 
 	// Verify second session key exists and is cached
@@ -440,13 +440,13 @@ func TestOneSessionKeyPerApp(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, sessionKeys, 1, "Should only have one session key per app")
 	assert.Equal(t, sessionKey2, sessionKeys[0].SignerAddress)
-	assert.Equal(t, appName, sessionKeys[0].ApplicationName)
+	assert.Equal(t, appName, sessionKeys[0].AppName)
 
 	// Test that different apps can have different session keys
 	sessionKey3 := "0x8ba1f109551bD432803012645Hac136c9SessionKey3"
 	differentApp := "DifferentApp"
 
-	err = AddSessionKey(db, walletAddress, sessionKey3, differentApp, "trade", allowances, expiration)
+	err = AddSessionKey(db, walletAddress, sessionKey3, differentApp, "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "trade", allowances, expiration)
 	require.NoError(t, err)
 
 	// Verify both session keys exist (different apps)

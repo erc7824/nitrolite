@@ -827,7 +827,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		allowances := []Allowance{
 			{Asset: "usdc", Amount: "1000"},
 		}
-		err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
+		err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "trade", allowances, time.Now().Add(24*time.Hour))
 		require.NoError(t, err)
 
 		// Setup depositor wallet balance (no custody signer needed - using session key)
@@ -1335,7 +1335,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 		{Asset: "usdc", Amount: "500"},
 		{Asset: "eth", Amount: "2"},
 	}
-	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
+	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "trade", allowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
 	accountID := NewAccountID(walletAddress)

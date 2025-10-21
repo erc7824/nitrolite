@@ -74,6 +74,11 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 			return ChannelOperationResponse{}, RPCErrorf("app session keys with spending limits cannot be used as channel participants")
 		}
 
+		signerWallet := GetWalletBySigner(sessionKeyAddress.Hex())
+		if signerWallet != "" && signerWallet != wallet.Hex() {
+			return ChannelOperationResponse{}, RPCErrorf("session key is already used by a different wallet")
+		}
+
 		userParticipant = sessionKeyAddress
 	}
 

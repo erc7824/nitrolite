@@ -6,7 +6,8 @@ CREATE TABLE session_keys (
     id SERIAL PRIMARY KEY,
     signer_address VARCHAR NOT NULL UNIQUE,
     wallet_address VARCHAR NOT NULL,
-    application_name VARCHAR NOT NULL,
+    app_name VARCHAR NOT NULL,
+    app_address VARCHAR NOT NULL DEFAULT '',
     allowance TEXT,
     used_allowance TEXT,
     scope VARCHAR NOT NULL DEFAULT 'all',
@@ -18,7 +19,7 @@ CREATE TABLE session_keys (
 -- Add indexes for performance
 CREATE INDEX idx_session_keys_wallet_address ON session_keys(wallet_address);
 CREATE UNIQUE INDEX idx_session_keys_unique_wallet_app
-  ON session_keys(wallet_address, application_name);
+  ON session_keys(wallet_address, app_name, app_address);
 
 ALTER TABLE ledger ADD COLUMN IF NOT EXISTS session_key VARCHAR;
 CREATE INDEX IF NOT EXISTS idx_ledger_session_key ON ledger(session_key);

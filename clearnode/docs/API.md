@@ -435,7 +435,8 @@ This endpoint returns only session keys, not custody signers. Each session key i
       {
         "id": 1,
         "session_key": "0xabcdef1234567890...",
-        "application_name": "Chess Game",
+        "app_name": "Chess Game",
+        "app_address": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
         "allowance": [
           {
             "asset": "usdc",
@@ -463,7 +464,8 @@ This endpoint returns only session keys, not custody signers. Each session key i
       {
         "id": 2,
         "session_key": "0xfedcba0987654321...",
-        "application_name": "Trading Bot",
+        "app_name": "Trading Bot",
+        "app_address": "0x1234567890abcdef1234567890abcdef12345678",
         "allowance": [
           {
             "asset": "usdc",
@@ -490,7 +492,8 @@ Each session key includes:
 
 - `id`: Unique identifier for the session key record
 - `session_key`: The address of the session key that can sign transactions
-- `application_name`: Name of the application this session key is authorized for (optional field, omitted if empty)
+- `app_name`: Name of the application this session key is authorized for (optional field, omitted if empty)
+- `app_address`: Address of the application this session key is authorized for (optional field, omitted if empty)
 - `allowance`: Array of asset allowances defining maximum amounts the session key can spend
 - `used_allowance`: Array showing how much of each allowance has been used by this session key
 - `scope`: Permission scope for this session key (e.g., "app.create", "ledger.readonly") (optional field, omitted if empty)

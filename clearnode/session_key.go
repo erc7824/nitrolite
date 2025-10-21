@@ -16,14 +16,15 @@ type SessionKey struct {
 	SignerAddress string `gorm:"column:signer_address;uniqueIndex;not null"`
 	WalletAddress string `gorm:"column:wallet_address;index;not null"`
 
-	ApplicationName string    `gorm:"column:application_name;not null"`
-	Allowance       *string   `gorm:"column:allowance;type:text"`      // JSON serialized allowances
-	UsedAllowance   *string   `gorm:"column:used_allowance;type:text"` // JSON serialized used amounts
-	Scope           string    `gorm:"column:scope;not null;default:'all'"`
-	ExpiresAt       time.Time `gorm:"column:expires_at;not null"`
+	AppName       string    `gorm:"column:app_name;not null"`
+	AppAddress    string    `gorm:"column:app_address;not null;default:''"`
+	Allowance     *string   `gorm:"column:allowance;type:text"`      // JSON serialized allowances
+	UsedAllowance *string   `gorm:"column:used_allowance;type:text"` // JSON serialized used amounts
+	Scope         string    `gorm:"column:scope;not null;default:'all'"`
+	ExpiresAt     time.Time `gorm:"column:expires_at;not null"`
 
-	CreatedAt time.Time `gorm:"autoCreateTime"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (SessionKey) TableName() string {
@@ -44,7 +45,7 @@ func loadSessionKeyCache(db *gorm.DB) error {
 
 // AddSessionKey stores a new session key with its metadata
 // Only one session key per wallet+app combination is allowed - adding a new one invalidates existing ones
-func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, scope string, allowances []Allowance, expirationTime time.Time) error {
+func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, applicationAddress, scope string, allowances []Allowance, expirationTime time.Time) error {
 	if applicationName == "clearnode" && len(allowances) == 0 {
 		return AddSigner(db, walletAddress, signerAddress)
 	}
@@ -62,7 +63,7 @@ func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, s
 
 		// Check for and remove existing session key for this wallet+app combination
 		var existingKeys []SessionKey
-		err := tx.Where("wallet_address = ? AND application_name = ?",
+		err := tx.Where("wallet_address = ? AND app_name = ?",
 			walletAddress, applicationName).Find(&existingKeys).Error
 		if err != nil {
 			return fmt.Errorf("failed to check existing session keys: %w", err)
@@ -90,13 +91,14 @@ func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, s
 		usedAllowanceStr := string(usedAllowanceJSON)
 
 		sessionKey := &SessionKey{
-			SignerAddress:   signerAddress,
-			WalletAddress:   walletAddress,
-			ApplicationName: applicationName,
-			Allowance:       &spendingCapStr,
-			UsedAllowance:   &usedAllowanceStr,
-			Scope:           scope,
-			ExpiresAt:       expirationTime,
+			SignerAddress: signerAddress,
+			WalletAddress: walletAddress,
+			AppName:       applicationName,
+			AppAddress:    applicationAddress,
+			Allowance:     &spendingCapStr,
+			UsedAllowance: &usedAllowanceStr,
+			Scope:         scope,
+			ExpiresAt:     expirationTime,
 		}
 
 		return tx.Create(sessionKey).Error

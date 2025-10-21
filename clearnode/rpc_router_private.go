@@ -716,8 +716,8 @@ func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
 
 	respSessionKeys := make([]SessionKeyResponse, 0, len(sessionKeys))
 	for _, sk := range sessionKeys {
-		var spendingCap []Allowance
-		var usedAllowance []Allowance
+		spendingCap := []Allowance{}
+		usedAllowance := []Allowance{}
 
 		if sk.Allowance != nil {
 			if err := json.Unmarshal([]byte(*sk.Allowance), &spendingCap); err != nil {

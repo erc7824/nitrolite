@@ -45,7 +45,7 @@ func loadSessionKeyCache(db *gorm.DB) error {
 // AddSessionKey stores a new session key with its metadata
 // Only one session key per wallet+app combination is allowed - adding a new one invalidates existing ones
 func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, scope string, allowances []Allowance, expirationTime time.Time) error {
-	if applicationName == "" && len(allowances) == 0 {
+	if applicationName == "clearnode" && len(allowances) == 0 {
 		return AddSigner(db, walletAddress, signerAddress)
 	}
 
@@ -54,6 +54,7 @@ func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, s
 		if expirationTime.IsZero() || expirationTime.Before(time.Now().UTC()) {
 			return fmt.Errorf("expiration time must be set and in the future")
 		}
+		expirationTime = expirationTime.UTC()
 
 		if scope == "" {
 			scope = "all"

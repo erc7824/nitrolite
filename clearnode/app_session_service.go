@@ -68,8 +68,12 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 
 	for _, alloc := range d.params.Allocations {
 		walletAddress := alloc.ParticipantWallet // ParticipantWallet should always be the main wallet
-
 		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
+
+		if alloc.Amount.LessThan(currentAmount) {
+			return UpdateResult{}, RPCErrorf("incorrect deposit request: decreased allocation for participant %s", walletAddress)
+		}
+
 		if alloc.Amount.GreaterThan(currentAmount) {
 			if alloc.Amount.IsNegative() {
 				return UpdateResult{}, RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
@@ -98,7 +102,7 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 			} else if _, ok := d.rpcWallets[alloc.ParticipantWallet]; ok {
 				// Check if any of the signers is a session key with spending limits for this wallet
 				for signer := range d.rpcSigners {
-					if IsSessionKey(signer) {
+					if IsSessionKey(signer) && GetWalletBySigner(signer) == alloc.ParticipantWallet {
 						sessionKeyAddress = &signer
 						break
 					}
@@ -143,8 +147,6 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 			}
 
 			participantsWithUpdatedBalance[walletAddress] = true
-		} else if alloc.Amount.LessThan(currentAmount) {
-			return UpdateResult{}, RPCErrorf("incorrect deposit request: decreased allocation for participant %s", walletAddress)
 		}
 	}
 
@@ -211,6 +213,10 @@ func (w *WithdrawUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult
 		}
 
 		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
+
+		if alloc.Amount.GreaterThan(currentAmount) {
+			return UpdateResult{}, RPCErrorf("incorrect withdrawal request: increased allocation for participant %s", walletAddress)
+		}
 		if alloc.Amount.LessThan(currentAmount) {
 			withdrawalAmount := currentAmount.Sub(alloc.Amount)
 			noWithdrawals = false
@@ -231,8 +237,6 @@ func (w *WithdrawUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult
 			}
 
 			participantsWithUpdatedBalance[walletAddress] = true
-		} else if alloc.Amount.GreaterThan(currentAmount) {
-			return UpdateResult{}, RPCErrorf("incorrect withdrawal request: increased allocation for participant %s", walletAddress)
 		}
 	}
 
@@ -390,7 +394,7 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 			} else {
 				// Check if any signer is a session key with spending limits for this participant
 				for signer := range rpcSigners {
-					if IsSessionKey(signer) {
+					if IsSessionKey(signer) && GetWalletBySigner(signer) == alloc.ParticipantWallet {
 						signatureProvided = true
 						sessionKeyAddress = &signer
 						break

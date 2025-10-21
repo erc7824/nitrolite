@@ -18,8 +18,9 @@ CREATE TABLE session_keys (
 
 -- Add indexes for performance
 CREATE INDEX idx_session_keys_wallet_address ON session_keys(wallet_address);
+-- Ensure one session key per wallet+app (identified by both name and address together)
 CREATE UNIQUE INDEX idx_session_keys_unique_wallet_app
-  ON session_keys(wallet_address, app_name, app_address);
+  ON session_keys(wallet_address, app_name);
 
 ALTER TABLE ledger ADD COLUMN IF NOT EXISTS session_key VARCHAR;
 CREATE INDEX IF NOT EXISTS idx_ledger_session_key ON ledger(session_key);

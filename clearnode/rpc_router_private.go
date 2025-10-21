@@ -243,12 +243,13 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
-	var signerAddress string
-	if len(c.Message.Sig) > 0 {
-		recovered, err := RecoverAddress(c.Message.Req.rawBytes, c.Message.Sig[0])
-		if err == nil {
-			signerAddress = recovered
-		}
+	// Build signer maps once; use them to determine wallet/session-key context deterministically.
+	rpcSignersMap, err := c.Message.GetRequestSignersMap()
+	if err != nil {
+		r.Metrics.TransferAttemptsFail.Inc()
+		logger.Error("failed to get signers from RPC message", "error", err)
+		c.Fail(err, "failed to get signers from RPC message")
+		return
 	}
 
 	if err := verifySigner(&c.Message, c.UserID); err != nil {
@@ -294,7 +295,6 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	}
 
 	fromWallet := c.UserID
-	var err error
 	// Sender tag should be included in the returned transaction in case it exists
 	fromAccountTag, err = GetUserTagByWallet(r.DB, fromWallet)
 	if err != nil && err != gorm.ErrRecordNotFound {
@@ -306,10 +306,19 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 
 	var respTransactions []TransactionResponse
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
-		// Check if the sender is using a session key with spending limits
+		// Determine if wallet signed; only apply session-key limits if wallet did NOT sign.
 		var sessionKeyAddress *string
-		if signerAddress != fromWallet && IsSessionKey(signerAddress) {
-			sessionKeyAddress = &signerAddress
+		walletSigned := false
+		if _, ok := rpcSignersMap[fromWallet]; ok {
+			walletSigned = true
+		} else {
+			for signer := range rpcSignersMap {
+				if IsSessionKey(signer) && GetWalletBySigner(signer) == fromWallet {
+					s := signer
+					sessionKeyAddress = &s
+					break
+				}
+			}
 		}
 
 		if err := checkChallengedChannels(tx, fromWallet); err != nil {
@@ -322,8 +331,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 				return RPCErrorf("invalid allocation: %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 
-			// Validate session key spending cap if a session key is used for the transaction
-			if sessionKeyAddress != nil {
+			// Validate session key spending cap only when wallet didn't sign
+			if sessionKeyAddress != nil && !walletSigned {
 				if err := ValidateSessionKeySpending(tx, *sessionKeyAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
 					return RPCErrorf("session key spending validation failed: %w", err)
 				}
@@ -366,8 +375,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		}
 		respTransactions = formattedTransactions
 
-		// Update session key usage if this was a session key transaction
-		if sessionKeyAddress != nil {
+		// Update session key usage only when wallet didn't sign
+		if sessionKeyAddress != nil && !walletSigned {
 			if err := UpdateSessionKeyUsage(tx, *sessionKeyAddress); err != nil {
 				logger.Error("failed to update session key usage", "sessionKey", *sessionKeyAddress, "error", err)
 				return fmt.Errorf("failed to update session key usage: %w", err)

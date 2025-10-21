@@ -16,11 +16,11 @@ type SessionKey struct {
 	SignerAddress string `gorm:"column:signer_address;uniqueIndex;not null"`
 	WalletAddress string `gorm:"column:wallet_address;index;not null"`
 
-	ApplicationName string    `gorm:"column:application_name;not null;default:'clearnode'"`
+	ApplicationName string    `gorm:"column:application_name;not null"`
 	Allowance       *string   `gorm:"column:allowance;type:text"`      // JSON serialized allowances
 	UsedAllowance   *string   `gorm:"column:used_allowance;type:text"` // JSON serialized used amounts
 	Scope           string    `gorm:"column:scope;not null;default:'all'"`
-	ExpirationTime  time.Time `gorm:"column:expires_at;not null"`
+	ExpiresAt       time.Time `gorm:"column:expires_at;not null"`
 
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`
@@ -33,7 +33,7 @@ func (SessionKey) TableName() string {
 // loadSessionKeyCache populates the cache with session keys
 func loadSessionKeyCache(db *gorm.DB) error {
 	var sessionKeys []SessionKey
-	if err := db.Find(&sessionKeys).Error; err != nil {
+	if err := db.Where("expires_at > ?", time.Now().UTC()).Find(&sessionKeys).Error; err != nil {
 		return err
 	}
 	for _, sk := range sessionKeys {
@@ -45,14 +45,14 @@ func loadSessionKeyCache(db *gorm.DB) error {
 // AddSessionKey stores a new session key with its metadata
 // Only one session key per wallet+app combination is allowed - adding a new one invalidates existing ones
 func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, scope string, allowances []Allowance, expirationTime time.Time) error {
+	if applicationName == "" && len(allowances) == 0 {
+		return AddSigner(db, walletAddress, signerAddress)
+	}
+
 	err := db.Transaction(func(tx *gorm.DB) error {
 		// Validate expiration time is in the future
 		if expirationTime.IsZero() || expirationTime.Before(time.Now().UTC()) {
 			return fmt.Errorf("expiration time must be set and in the future")
-		}
-
-		if applicationName == "" {
-			applicationName = "clearnode"
 		}
 
 		if scope == "" {
@@ -95,7 +95,7 @@ func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, s
 			Allowance:       &spendingCapStr,
 			UsedAllowance:   &usedAllowanceStr,
 			Scope:           scope,
-			ExpirationTime:  expirationTime,
+			ExpiresAt:       expirationTime,
 		}
 
 		return tx.Create(sessionKey).Error
@@ -241,24 +241,23 @@ func GetSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol st
 
 // ValidateSessionKeySpending checks if a session key can spend the requested amount without exceeding its allowance
 func ValidateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol string, requestedAmount decimal.Decimal) error {
+	if _, ok := custodySignerCache.Load(sessionKeyAddress); ok {
+		return nil // Custody signers don't have spending limitations
+	}
+
 	sessionKey, err := GetSessionKeyBySigner(db, sessionKeyAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get session key: %w", err)
 	}
 
 	// Check if session key has expired
-	if time.Now().UTC().After(sessionKey.ExpirationTime) {
+	if time.Now().UTC().After(sessionKey.ExpiresAt) {
 		return fmt.Errorf("session key expired")
-	}
-
-	// These are registered with app_name='clearnode' and no spending limits
-	if sessionKey.ApplicationName == "clearnode" && (sessionKey.Allowance == nil || *sessionKey.Allowance == "" || *sessionKey.Allowance == "[]") {
-		return nil // Unrestricted session key - no spending validation
 	}
 
 	// If no spending cap is set, deny the transaction
 	if sessionKey.Allowance == nil {
-		return fmt.Errorf("session key has no spending cap configured - transaction denied")
+		return fmt.Errorf("session key has no allowance")
 	}
 
 	var allowances []Allowance

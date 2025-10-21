@@ -6,7 +6,7 @@ CREATE TABLE session_keys (
     id SERIAL PRIMARY KEY,
     signer_address VARCHAR NOT NULL UNIQUE,
     wallet_address VARCHAR NOT NULL,
-    application_name VARCHAR NOT NULL DEFAULT 'clearnode',
+    application_name VARCHAR NOT NULL,
     allowance TEXT,
     used_allowance TEXT,
     scope VARCHAR NOT NULL DEFAULT 'all',

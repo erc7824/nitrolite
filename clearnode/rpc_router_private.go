@@ -305,14 +305,10 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 
 	var respTransactions []TransactionResponse
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
-		// Check if the sender is using a session key
+		// Check if the sender is using a session key with spending limits
 		var sessionKeyAddress *string
-		if signerAddress != "" && signerAddress != fromWallet {
-			// Check if this signer is a session key for this wallet
-			// Only treat as session key if it's a session signer (not custody)
-			if wallet := GetWalletBySigner(signerAddress); wallet == fromWallet && IsSessionKey(signerAddress) {
-				sessionKeyAddress = &signerAddress
-			}
+		if signerAddress != fromWallet && IsSessionKey(signerAddress) {
+			sessionKeyAddress = &signerAddress
 		}
 
 		if err := checkChallengedChannels(tx, fromWallet); err != nil {
@@ -746,7 +742,7 @@ func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
 			Allowance:       spendingCap,
 			UsedAllowance:   usedAllowance,
 			Scope:           sk.Scope,
-			ExpiresAt:       sk.ExpirationTime,
+			ExpiresAt:       sk.ExpiresAt,
 			CreatedAt:       sk.CreatedAt,
 		})
 	}

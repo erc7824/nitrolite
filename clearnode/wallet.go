@@ -37,25 +37,6 @@ func loadCustodySignersCache(db *gorm.DB) error {
 }
 
 // AddSigner adds a new custody signer to the database
-// isUnrestrictedSessionKey checks if a session key is unrestricted (clearnode app with no spending limits)
-func isUnrestrictedSessionKey(db *gorm.DB, signerAddress, walletAddress string) (bool, error) {
-	var sessionKey SessionKey
-	err := db.Where("signer_address = ? AND wallet_address = ?", signerAddress, walletAddress).First(&sessionKey).Error
-	if err == gorm.ErrRecordNotFound {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-
-	// Check if it's a clearnode app session key with unlimited allowance
-	if sessionKey.ApplicationName == "clearnode" && (sessionKey.Allowance == nil || *sessionKey.Allowance == "" || *sessionKey.Allowance == "[]") {
-		return true, nil
-	}
-
-	return false, nil
-}
-
 func AddSigner(db *gorm.DB, wallet, signer string) error {
 	// Check if the signer already exists for this wallet in custody cache
 	if w, ok := custodySignerCache.Load(signer); ok {
@@ -65,16 +46,10 @@ func AddSigner(db *gorm.DB, wallet, signer string) error {
 		return fmt.Errorf("signer %s is already in use for another wallet", signer)
 	}
 
-	// Check if it exists as a session key
+	// Check if it exists as a session key with spending limits
+	// Custody signers (clearnode with no allowances) are now stored in signers table, not session_keys
 	if _, ok := sessionKeyCache.Load(signer); ok {
-		// Allow session keys with app_name='clearnode' and no spending limit to also be registered as custody signers
-		unrestricted, err := isUnrestrictedSessionKey(db, signer, wallet)
-		if err != nil {
-			return fmt.Errorf("failed to check session key restrictions: %w", err)
-		}
-		if !unrestricted {
-			return fmt.Errorf("address is already in use as a session key: %s", signer)
-		}
+		return fmt.Errorf("address is already in use as a session key: %s", signer)
 	}
 
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -112,17 +87,10 @@ func AddSigner(db *gorm.DB, wallet, signer string) error {
 			return fmt.Errorf("signer is already in use for another wallet")
 
 		case err == gorm.ErrRecordNotFound:
-			// Check session_keys table too
+			// Check session_keys table - addresses with spending limits cannot be custody signers
 			var existingSessionKey SessionKey
 			if err := tx.Where("signer_address = ?", signer).First(&existingSessionKey).Error; err == nil {
-				// Allow unrestricted clearnode session keys to also be custody signers
-				if existingSessionKey.WalletAddress == wallet &&
-					existingSessionKey.ApplicationName == "clearnode" &&
-					(existingSessionKey.Allowance == nil || *existingSessionKey.Allowance == "" || *existingSessionKey.Allowance == "[]") {
-					// This is OK - unrestricted session key can also be a custody signer
-				} else {
-					return fmt.Errorf("signer is already in use as a session key")
-				}
+				return fmt.Errorf("signer is already in use as a session key")
 			} else if err != gorm.ErrRecordNotFound {
 				return err
 			}

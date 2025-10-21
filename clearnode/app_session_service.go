@@ -96,12 +96,10 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 			if _, ok := d.rpcSigners[alloc.ParticipantWallet]; ok {
 				isDepositorSig = true
 			} else if _, ok := d.rpcWallets[alloc.ParticipantWallet]; ok {
-				// Check if any of the signers is a session key for this wallet
+				// Check if any of the signers is a session key with spending limits for this wallet
 				for signer := range d.rpcSigners {
-					if walletForSigner := GetWalletBySigner(signer); walletForSigner == alloc.ParticipantWallet {
-						if IsSessionKey(signer) {
-							sessionKeyAddress = &signer
-						}
+					if IsSessionKey(signer) {
+						sessionKeyAddress = &signer
 						break
 					}
 				}
@@ -390,9 +388,9 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 			if _, ok := rpcSigners[alloc.ParticipantWallet]; ok {
 				signatureProvided = true
 			} else {
-				// Check if any signer is a session key for this participant
+				// Check if any signer is a session key with spending limits for this participant
 				for signer := range rpcSigners {
-					if walletForSigner := GetWalletBySigner(signer); walletForSigner == alloc.ParticipantWallet && IsSessionKey(signer) {
+					if IsSessionKey(signer) {
 						signatureProvided = true
 						sessionKeyAddress = &signer
 						break

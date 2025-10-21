@@ -67,6 +67,13 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		if sessionKeyAddress == wallet {
 			return ChannelOperationResponse{}, RPCErrorf("session key cannot be the same as the wallet address")
 		}
+
+		// Only custody or unregistered signers can be channel participants
+		_, err := GetSessionKeyBySigner(s.db, sessionKeyAddress.Hex())
+		if err == nil {
+			return ChannelOperationResponse{}, RPCErrorf("app session keys with spending limits cannot be used as channel participants")
+		}
+
 		userParticipant = sessionKeyAddress
 	}
 

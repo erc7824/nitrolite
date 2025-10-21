@@ -42,7 +42,7 @@ func TestSessionKey(t *testing.T) {
 	assert.Equal(t, sessionSignerAddress, sk.SignerAddress)
 	assert.Equal(t, appName, sk.ApplicationName)
 	assert.Equal(t, scope, sk.Scope)
-	assert.WithinDuration(t, expirationTime, sk.ExpirationTime, time.Second)
+	assert.WithinDuration(t, expirationTime, sk.ExpiresAt, time.Second)
 
 	// Test JSON serialization/deserialization of allowances
 	var retrievedSpendingCap []Allowance
@@ -133,7 +133,7 @@ func TestSessionKeyActiveKeys(t *testing.T) {
 		Allowance:       strPtr("[]"),
 		UsedAllowance:   strPtr("[]"),
 		Scope:           "view",
-		ExpirationTime:  time.Now().Add(-1 * time.Hour).UTC(),
+		ExpiresAt:       time.Now().Add(-1 * time.Hour).UTC(),
 	}
 	err = db.Create(&expiredKey).Error
 	require.NoError(t, err)

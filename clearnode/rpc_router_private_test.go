@@ -1927,3 +1927,225 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		assertErrorResponse(t, ctx, "")
 	})
 }
+
+func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
+	userKey, _ := crypto.GenerateKey()
+	userSigner := Signer{privateKey: userKey}
+	userAddr := userSigner.GetAddress().Hex()
+
+	sessionKey1, _ := crypto.GenerateKey()
+	sessionKey1Addr := crypto.PubkeyToAddress(sessionKey1.PublicKey).Hex()
+
+	sessionKey2, _ := crypto.GenerateKey()
+	sessionKey2Addr := crypto.PubkeyToAddress(sessionKey2.PublicKey).Hex()
+
+	t.Run("Successfully retrieve session keys with app_name and app_address", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Add session keys with different apps
+		allowances1 := []Allowance{
+			{Asset: "usdc", Amount: "100"},
+			{Asset: "eth", Amount: "0.5"},
+		}
+		expiresAt := time.Now().Add(24 * time.Hour)
+		err := AddSessionKey(db, userAddr, sessionKey1Addr, "Chess Game", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "app.create", allowances1, expiresAt)
+		require.NoError(t, err)
+
+		allowances2 := []Allowance{
+			{Asset: "usdc", Amount: "500"},
+		}
+		err = AddSessionKey(db, userAddr, sessionKey2Addr, "Trading Bot", "0x1234567890abcdef1234567890abcdef12345678", "app.create", allowances2, expiresAt)
+		require.NoError(t, err)
+
+		ctx := createSignedRPCContext(1, "get_session_keys", nil, userSigner)
+		router.HandleGetSessionKeys(ctx)
+
+		res := assertResponse(t, ctx, "get_session_keys")
+		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		require.True(t, ok, "Response should be a GetSessionKeysResponse")
+		require.Len(t, getKeysResponse.SessionKeys, 2)
+
+		// Find and verify session keys (order not guaranteed)
+		var sk1, sk2 *SessionKeyResponse
+		for i := range getKeysResponse.SessionKeys {
+			if getKeysResponse.SessionKeys[i].SessionKey == sessionKey1Addr {
+				sk1 = &getKeysResponse.SessionKeys[i]
+			} else if getKeysResponse.SessionKeys[i].SessionKey == sessionKey2Addr {
+				sk2 = &getKeysResponse.SessionKeys[i]
+			}
+		}
+
+		require.NotNil(t, sk1, "Chess Game session key should be present")
+		require.Equal(t, "Chess Game", sk1.AppName)
+		require.Equal(t, "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", sk1.AppAddress)
+		require.Len(t, sk1.Allowance, 2)
+		require.Equal(t, "usdc", sk1.Allowance[0].Asset)
+		require.Equal(t, "100", sk1.Allowance[0].Amount)
+		require.Equal(t, "app.create", sk1.Scope)
+
+		require.NotNil(t, sk2, "Trading Bot session key should be present")
+		require.Equal(t, "Trading Bot", sk2.AppName)
+		require.Equal(t, "0x1234567890abcdef1234567890abcdef12345678", sk2.AppAddress)
+		require.Len(t, sk2.Allowance, 1)
+		require.Equal(t, "usdc", sk2.Allowance[0].Asset)
+		require.Equal(t, "500", sk2.Allowance[0].Amount)
+	})
+
+	t.Run("Successfully retrieve session keys with used allowances", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Add session key
+		allowances := []Allowance{
+			{Asset: "usdc", Amount: "100"},
+		}
+		expiresAt := time.Now().Add(24 * time.Hour)
+		err := AddSessionKey(db, userAddr, sessionKey1Addr, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "app.create", allowances, expiresAt)
+		require.NoError(t, err)
+
+		// Simulate spending by recording ledger entries
+		ledger := GetWalletLedger(db, userSigner.GetAddress())
+		accountID := NewAccountID(userAddr)
+		err = ledger.Record(accountID, "usdc", decimal.NewFromInt(-45), &sessionKey1Addr)
+		require.NoError(t, err)
+
+		// Update used allowance based on ledger entries
+		err = UpdateSessionKeyUsage(db, sessionKey1Addr)
+		require.NoError(t, err)
+
+		ctx := createSignedRPCContext(1, "get_session_keys", nil, userSigner)
+		router.HandleGetSessionKeys(ctx)
+
+		res := assertResponse(t, ctx, "get_session_keys")
+		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		require.True(t, ok)
+		require.Len(t, getKeysResponse.SessionKeys, 1)
+
+		sk := getKeysResponse.SessionKeys[0]
+		require.Equal(t, sessionKey1Addr, sk.SessionKey)
+		require.Len(t, sk.UsedAllowance, 1)
+		require.Equal(t, "usdc", sk.UsedAllowance[0].Asset)
+		require.Equal(t, "45", sk.UsedAllowance[0].Amount)
+	})
+
+	t.Run("No session keys returns empty array", func(t *testing.T) {
+		t.Parallel()
+
+		router, _, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		ctx := createSignedRPCContext(1, "get_session_keys", nil, userSigner)
+		router.HandleGetSessionKeys(ctx)
+
+		res := assertResponse(t, ctx, "get_session_keys")
+		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		require.True(t, ok)
+		require.Len(t, getKeysResponse.SessionKeys, 0)
+	})
+
+	t.Run("Only returns active (non-expired) session keys", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		allowances := []Allowance{
+			{Asset: "usdc", Amount: "100"},
+		}
+		allowancesJSON, _ := json.Marshal(allowances)
+		allowancesStr := string(allowancesJSON)
+
+		// Add active session key
+		activeExpiresAt := time.Now().Add(24 * time.Hour)
+		err := AddSessionKey(db, userAddr, sessionKey1Addr, "ActiveApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "app.create", allowances, activeExpiresAt)
+		require.NoError(t, err)
+
+		// Directly insert expired session key into database (bypassing validation)
+		expiredExpiresAt := time.Now().UTC().Add(-1 * time.Hour)
+		expiredKey := SessionKey{
+			SignerAddress: sessionKey2Addr,
+			WalletAddress: userAddr,
+			AppName:       "ExpiredApp",
+			AppAddress:    "0x1234567890abcdef1234567890abcdef12345678",
+			Allowance:     &allowancesStr,
+			Scope:         "app.create",
+			ExpiresAt:     expiredExpiresAt,
+		}
+		err = db.Create(&expiredKey).Error
+		require.NoError(t, err)
+
+		ctx := createSignedRPCContext(1, "get_session_keys", nil, userSigner)
+		router.HandleGetSessionKeys(ctx)
+
+		res := assertResponse(t, ctx, "get_session_keys")
+		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		require.True(t, ok)
+		require.Len(t, getKeysResponse.SessionKeys, 1)
+		require.Equal(t, sessionKey1Addr, getKeysResponse.SessionKeys[0].SessionKey)
+		require.Equal(t, "ActiveApp", getKeysResponse.SessionKeys[0].AppName)
+	})
+
+	t.Run("Session key with different scopes", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Add session key with ledger.readonly scope
+		allowances := []Allowance{
+			{Asset: "usdc", Amount: "50"},
+		}
+		expiresAt := time.Now().Add(24 * time.Hour)
+		err := AddSessionKey(db, userAddr, sessionKey1Addr, "ReadOnlyApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "ledger.readonly", allowances, expiresAt)
+		require.NoError(t, err)
+
+		ctx := createSignedRPCContext(1, "get_session_keys", nil, userSigner)
+		router.HandleGetSessionKeys(ctx)
+
+		res := assertResponse(t, ctx, "get_session_keys")
+		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		require.True(t, ok)
+		require.Len(t, getKeysResponse.SessionKeys, 1)
+		require.Equal(t, "ledger.readonly", getKeysResponse.SessionKeys[0].Scope)
+	})
+
+	t.Run("Multiple session keys for same app replaces old one", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		allowances1 := []Allowance{
+			{Asset: "usdc", Amount: "100"},
+		}
+		expiresAt := time.Now().Add(24 * time.Hour)
+
+		// Add first session key for app
+		err := AddSessionKey(db, userAddr, sessionKey1Addr, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "app.create", allowances1, expiresAt)
+		require.NoError(t, err)
+
+		// Add second session key for same app (should replace first)
+		allowances2 := []Allowance{
+			{Asset: "usdc", Amount: "200"},
+		}
+		err = AddSessionKey(db, userAddr, sessionKey2Addr, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "app.create", allowances2, expiresAt)
+		require.NoError(t, err)
+
+		ctx := createSignedRPCContext(1, "get_session_keys", nil, userSigner)
+		router.HandleGetSessionKeys(ctx)
+
+		res := assertResponse(t, ctx, "get_session_keys")
+		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		require.True(t, ok)
+		require.Len(t, getKeysResponse.SessionKeys, 1)
+		// Should only have the second session key
+		require.Equal(t, sessionKey2Addr, getKeysResponse.SessionKeys[0].SessionKey)
+		require.Len(t, getKeysResponse.SessionKeys[0].Allowance, 1)
+		require.Equal(t, "200", getKeysResponse.SessionKeys[0].Allowance[0].Amount)
+	})
+}

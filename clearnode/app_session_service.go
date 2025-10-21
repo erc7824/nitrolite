@@ -64,15 +64,19 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 		return UpdateResult{}, RPCErrorf("failed to get current allocations: %w", err)
 	}
 
+	for _, alloc := range d.params.Allocations {
+		walletAddress := alloc.ParticipantWallet
+		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
+		if alloc.Amount.LessThan(currentAmount) {
+			return UpdateResult{}, RPCErrorf("incorrect deposit request: decreased allocation for participant %s", walletAddress)
+		}
+	}
+
 	noDeposits := true
 
 	for _, alloc := range d.params.Allocations {
 		walletAddress := alloc.ParticipantWallet // ParticipantWallet should always be the main wallet
 		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
-
-		if alloc.Amount.LessThan(currentAmount) {
-			return UpdateResult{}, RPCErrorf("incorrect deposit request: decreased allocation for participant %s", walletAddress)
-		}
 
 		if alloc.Amount.GreaterThan(currentAmount) {
 			if alloc.Amount.IsNegative() {
@@ -200,6 +204,14 @@ func (w *WithdrawUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult
 		return UpdateResult{}, RPCErrorf("failed to get current allocations: %w", err)
 	}
 
+	for _, alloc := range w.params.Allocations {
+		walletAddress := alloc.ParticipantWallet
+		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
+		if alloc.Amount.GreaterThan(currentAmount) {
+			return UpdateResult{}, RPCErrorf("incorrect withdrawal request: increased allocation for participant %s", walletAddress)
+		}
+	}
+
 	noWithdrawals := true
 
 	for _, alloc := range w.params.Allocations {
@@ -214,9 +226,6 @@ func (w *WithdrawUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult
 
 		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
 
-		if alloc.Amount.GreaterThan(currentAmount) {
-			return UpdateResult{}, RPCErrorf("incorrect withdrawal request: increased allocation for participant %s", walletAddress)
-		}
 		if alloc.Amount.LessThan(currentAmount) {
 			withdrawalAmount := currentAmount.Sub(alloc.Amount)
 			noWithdrawals = false

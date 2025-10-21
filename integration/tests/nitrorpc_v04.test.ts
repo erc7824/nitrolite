@@ -234,12 +234,22 @@ describe('App session state v0.4 error cases', () => {
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_2,
                 ASSET_SYMBOL,
-                appSessionDepositAmount,
+                BigInt(0), // No initial deposit to avoid spending Alice's allowance
                 START_SESSION_DATA
             );
 
-            let allocations = structuredClone(START_ALLOCATIONS);
-            allocations[0].amount = (BigInt(allocations[0].amount) + BigInt(10)).toString(); // 110 - more than deposited
+            let allocations = [
+                {
+                    participant: aliceAppIdentity.walletAddress,
+                    asset: 'usdc',
+                    amount: '10', // Try to deposit 10 USDC
+                },
+                {
+                    participant: bobAppIdentity.walletAddress,
+                    asset: 'usdc',
+                    amount: '0',
+                },
+            ];
 
             try {
                 await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, v02AppSessionId, RPCAppStateIntent.Deposit, 2, allocations, { state: 'test' });
@@ -353,12 +363,22 @@ describe('App session state v0.4 error cases', () => {
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_2,
                 ASSET_SYMBOL,
-                appSessionDepositAmount,
+                BigInt(0), // No initial deposit
                 START_SESSION_DATA
             );
 
-            let allocations = structuredClone(START_ALLOCATIONS);
-            allocations[0].amount = (BigInt(allocations[0].amount) - BigInt(10)).toString(); // 90 - less than deposited
+            let allocations = [
+                {
+                    participant: aliceAppIdentity.walletAddress,
+                    asset: 'usdc',
+                    amount: '0', // Keep at 0 (no withdrawal)
+                },
+                {
+                    participant: bobAppIdentity.walletAddress,
+                    asset: 'usdc',
+                    amount: '0',
+                },
+            ];
 
             try {
                 await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, v02AppSessionId, RPCAppStateIntent.Withdraw, 2, allocations, { state: 'test' });

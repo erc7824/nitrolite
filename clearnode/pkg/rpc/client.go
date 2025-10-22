@@ -984,15 +984,23 @@ func (c *Client) CloseChannel(ctx context.Context, req *Request) (CloseChannelRe
 //	for _, tx := range response.Transactions {
 //	    fmt.Printf("Transferred %s %s to %s\n", tx.Amount, tx.Asset, tx.ToAccount)
 //	}
-func (c *Client) Transfer(ctx context.Context, reqParams TransferRequest, sig sign.Signature) (TransferResponse, []sign.Signature, error) {
+func (c *Client) Transfer(ctx context.Context, req *Request) (TransferResponse, []sign.Signature, error) {
+	if req == nil || req.Req.Method != string(TransferMethod) {
+		return TransferResponse{}, nil, ErrInvalidRequestMethod
+	}
+
 	var resParams TransferResponse
 	var resSig []sign.Signature
 
-	res, err := c.call(ctx, TransferMethod, &reqParams, sig)
+	res, err := c.dialer.Call(ctx, req)
 	if err != nil {
-		return resParams, resSig, err
+		return resParams, res.Sig, err
 	}
 	resSig = res.Sig
+
+	if err := res.Res.Params.Error(); err != nil {
+		return resParams, res.Sig, err
+	}
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err

@@ -437,6 +437,49 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		assert.Contains(t, capturedNotifications, depositorAddress.Hex())
 		assert.Contains(t, capturedNotifications, userAddressB.Hex())
 
+		// Verify AppSession fields are not empty in the notification
+		for _, notifications := range capturedNotifications {
+			for _, notification := range notifications {
+				if notification.eventType == AppSessionUpdateEventType {
+					notificationData, ok := notification.data.(struct {
+						AppSessionResponse
+						ParticipantAllocations []AppAllocation `json:"participant_allocations"`
+					})
+					require.True(t, ok, "notification data should be AppSessionUpdateNotification")
+
+					assert.Equal(t, session.SessionID, notificationData.AppSessionID, "AppSessionID should match")
+					assert.Equal(t, string(ChannelStatusOpen), notificationData.Status, "Status should be open")
+					assert.Equal(t, string(rpc.VersionNitroRPCv0_4), notificationData.Protocol, "Protocol should match")
+					assert.Equal(t, []string{depositorAddress.Hex(), userAddressB.Hex()}, notificationData.ParticipantWallets, "ParticipantWallets should match")
+					assert.Equal(t, []int64{1, 1}, notificationData.Weights, "Weights should match")
+					assert.Equal(t, uint64(2), notificationData.Quorum, "Quorum should match")
+					assert.Equal(t, uint64(2), notificationData.Version, "Version should be 2 after update")
+					assert.NotEmpty(t, notificationData.CreatedAt, "CreatedAt should not be empty")
+					assert.NotEmpty(t, notificationData.UpdatedAt, "UpdatedAt should not be empty")
+
+					// Verify timestamps are properly formatted
+					createdAt, err := time.Parse(time.RFC3339, notificationData.CreatedAt)
+					assert.NoError(t, err, "CreatedAt should be valid RFC3339 timestamp")
+					updatedAt, err := time.Parse(time.RFC3339, notificationData.UpdatedAt)
+					assert.NoError(t, err, "UpdatedAt should be valid RFC3339 timestamp")
+					assert.False(t, createdAt.IsZero(), "CreatedAt should have a valid time")
+					assert.False(t, updatedAt.IsZero(), "UpdatedAt should have a valid time")
+					assert.True(t, updatedAt.After(createdAt) || updatedAt.Equal(createdAt), "UpdatedAt should be >= CreatedAt")
+
+					// Verify participant allocations
+					require.Len(t, notificationData.ParticipantAllocations, 2, "Should have 2 participant allocations")
+					totalAllocations := decimal.Zero
+					for _, alloc := range notificationData.ParticipantAllocations {
+						assert.NotEmpty(t, alloc.ParticipantWallet, "ParticipantWallet should not be empty")
+						assert.Equal(t, "usdc", alloc.AssetSymbol, "AssetSymbol should be usdc")
+						assert.True(t, alloc.Amount.IsPositive(), "Amount should be positive")
+						totalAllocations = totalAllocations.Add(alloc.Amount)
+					}
+					assert.Equal(t, decimal.NewFromInt(250), totalAllocations, "Total allocations should be 250")
+				}
+			}
+		}
+
 		var depositTx []LedgerTransaction
 		db.Where("tx_type = ? AND from_account = ? AND asset_symbol = ?",
 			TransactionTypeAppDeposit, depositorAddress.Hex(), "usdc").Find(&depositTx)

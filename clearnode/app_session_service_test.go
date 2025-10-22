@@ -412,10 +412,12 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		capturedNotifications := make(map[string][]Notification)
 		service := createTestAppSessionService(db, capturedNotifications)
 
+		testSessionData := `{"state":"updated","counter":42}`
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
+			SessionData:  &testSessionData,
 			Allocations: []AppAllocation{
 				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
@@ -451,6 +453,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 					assert.Equal(t, []int64{1, 1}, notificationData.AppSession.Weights, "Weights should match")
 					assert.Equal(t, uint64(2), notificationData.AppSession.Quorum, "Quorum should match")
 					assert.Equal(t, uint64(2), notificationData.AppSession.Version, "Version should be 2 after update")
+					assert.Equal(t, testSessionData, notificationData.AppSession.SessionData, "SessionData should be updated")
 					assert.NotEmpty(t, notificationData.AppSession.CreatedAt, "CreatedAt should not be empty")
 					assert.NotEmpty(t, notificationData.AppSession.UpdatedAt, "UpdatedAt should not be empty")
 

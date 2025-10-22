@@ -984,11 +984,11 @@ func (c *Client) CloseChannel(ctx context.Context, req *Request) (CloseChannelRe
 //	for _, tx := range response.Transactions {
 //	    fmt.Printf("Transferred %s %s to %s\n", tx.Amount, tx.Asset, tx.ToAccount)
 //	}
-func (c *Client) Transfer(ctx context.Context, reqParams TransferRequest) (TransferResponse, []sign.Signature, error) {
+func (c *Client) Transfer(ctx context.Context, reqParams TransferRequest, sig sign.Signature) (TransferResponse, []sign.Signature, error) {
 	var resParams TransferResponse
 	var resSig []sign.Signature
 
-	res, err := c.call(ctx, TransferMethod, &reqParams)
+	res, err := c.call(ctx, TransferMethod, &reqParams, sig)
 	if err != nil {
 		return resParams, resSig, err
 	}
@@ -1427,7 +1427,8 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 			"Allowance": {
 				{Name: "asset", Type: "string"},
 				{Name: "amount", Type: "uint256"}, // FIXME: currently allowance amount is string, so it will fail if there are some allowances
-			}},
+			},
+		},
 		PrimaryType: "Policy",
 		Domain: apitypes.TypedDataDomain{
 			Name: req.AppName,

@@ -467,24 +467,31 @@ func (s *AppSessionService) SubmitAppState(ctx context.Context, params *SubmitAp
 		return AppSessionResponse{}, err
 	}
 
+	appSession, err := getAppSession(s.db, params.AppSessionID, "")
+	if err != nil {
+		logger := LoggerFromContext(ctx)
+		logger.Error("failed to reload app session after update, using cached version", "sessionID", params.AppSessionID, "error", err)
+		appSession = &updatedAppSession
+	}
+
 	// Notify only participants whose balances were affected by deposit operations
 	for participant := range participants {
 		s.wsNotifier.Notify(NewBalanceNotification(participant, s.db))
 	}
 
-	participantAllocations, err := getParticipantAllocations(s.db, updatedAppSession, NewAccountID(params.AppSessionID))
+	participantAllocations, err := getParticipantAllocations(s.db, *appSession, NewAccountID(params.AppSessionID))
 	if err != nil {
 		logger := LoggerFromContext(ctx)
-		logger.Error("failed to get participant allocations for app session, notifications will not be sent", "sessionID", updatedAppSession.SessionID, "error", err)
+		logger.Error("failed to get participant allocations for app session, notifications will not be sent", "sessionID", appSession.SessionID, "error", err)
 	} else {
-		for _, participant := range updatedAppSession.ParticipantWallets {
-			s.wsNotifier.Notify(NewAppSessionNotification(participant, updatedAppSession, prepareAppAllocations(participantAllocations)))
+		for _, participant := range appSession.ParticipantWallets {
+			s.wsNotifier.Notify(NewAppSessionNotification(participant, *appSession, prepareAppAllocations(participantAllocations)))
 		}
 	}
 
 	return AppSessionResponse{
 		AppSessionID: params.AppSessionID,
-		Version:      updatedAppSession.Version,
+		Version:      appSession.Version,
 		Status:       string(ChannelStatusOpen),
 	}, nil
 }

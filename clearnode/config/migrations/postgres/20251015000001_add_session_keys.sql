@@ -1,6 +1,8 @@
 -- +goose Up
 -- +goose StatementBegin
 
+DROP TABLE IF EXISTS signers;
+
 -- Create session_keys table for session keys with spending caps
 CREATE TABLE session_keys (
     id SERIAL PRIMARY KEY,
@@ -34,5 +36,10 @@ DROP INDEX IF EXISTS idx_ledger_session_key;
 ALTER TABLE ledger DROP COLUMN IF EXISTS session_key;
 
 DROP TABLE IF EXISTS session_keys;
+
+CREATE TABLE signers (
+    signer VARCHAR PRIMARY KEY,
+    wallet VARCHAR NOT NULL
+);
 
 -- +goose StatementEnd

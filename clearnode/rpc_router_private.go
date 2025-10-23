@@ -81,10 +81,9 @@ type AppSessionResponse struct {
 }
 
 type CreateChannelParams struct {
-	ChainID    uint32           `json:"chain_id" validate:"required"`
-	Token      string           `json:"token" validate:"required"`
-	Amount     *decimal.Decimal `json:"amount" validate:"required,bigint"`
-	SessionKey *string          `json:"session_key,omitempty" validate:"omitempty"`
+	ChainID uint32           `json:"chain_id" validate:"required"`
+	Token   string           `json:"token" validate:"required"`
+	Amount  *decimal.Decimal `json:"amount" validate:"required,bigint"`
 }
 
 type ResizeChannelParams struct {
@@ -308,12 +307,9 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
 		// Determine if wallet signed; only apply session-key limits if wallet did NOT sign.
 		var sessionKeyAddress *string
-		walletSigned := false
-		if _, ok := rpcSignersMap[fromWallet]; ok {
-			walletSigned = true
-		} else {
+		if _, ok := rpcSignersMap[fromWallet]; !ok {
 			for signer := range rpcSignersMap {
-				if IsSessionKey(signer) && GetWalletBySigner(signer) == fromWallet {
+				if GetWalletBySigner(signer) == fromWallet {
 					s := signer
 					sessionKeyAddress = &s
 					break
@@ -332,7 +328,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			}
 
 			// Validate session key spending cap only when wallet didn't sign
-			if sessionKeyAddress != nil && !walletSigned {
+			if sessionKeyAddress != nil {
 				if err := ValidateSessionKeySpending(tx, *sessionKeyAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
 					return RPCErrorf("session key spending validation failed: %w", err)
 				}
@@ -376,7 +372,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		respTransactions = formattedTransactions
 
 		// Update session key usage only when wallet didn't sign
-		if sessionKeyAddress != nil && !walletSigned {
+		if sessionKeyAddress != nil {
 			if err := UpdateSessionKeyUsage(tx, *sessionKeyAddress); err != nil {
 				logger.Error("failed to update session key usage", "sessionKey", *sessionKeyAddress, "error", err)
 				return fmt.Errorf("failed to update session key usage: %w", err)

@@ -231,11 +231,6 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		return
 	}
 
-	if err := AddSigner(c.db, wallet, participantSigner); err != nil {
-		logger.Error("failed to add signer", "error", err)
-		return
-	}
-
 	var ch Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB

@@ -213,7 +213,6 @@ func TestRPCRouterHandleGetUserTag(t *testing.T) {
 		t.Parallel()
 
 		router, db, cleanup := setupTestRPCRouter(t)
-		require.NoError(t, AddSigner(db, userAddr, userAddr))
 		t.Cleanup(cleanup)
 
 		userTag, err := GenerateOrRetrieveUserTag(db, userAddr)
@@ -230,8 +229,7 @@ func TestRPCRouterHandleGetUserTag(t *testing.T) {
 	t.Run("Error when there is no tag", func(t *testing.T) {
 		t.Parallel()
 
-		router, db, cleanup := setupTestRPCRouter(t)
-		require.NoError(t, AddSigner(db, userAddr, userAddr))
+		router, _, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
 		ctx := createSignedRPCContext(1, "get_user_tag", nil, userSigner)
@@ -255,8 +253,6 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
-
-		require.NoError(t, AddSigner(db, senderAddr.Hex(), senderAddr.Hex()))
 
 		// Fund sender's account
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000), nil))
@@ -359,8 +355,6 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		require.NoError(t, AddSigner(db, senderAddr.Hex(), senderAddr.Hex()))
-
 		// Fund sender's account
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000), nil))
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "eth", decimal.NewFromInt(5), nil))
@@ -428,7 +422,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		require.NoError(t, AddSigner(db, senderAddr.Hex(), senderAddr.Hex()))
+		// require.NoError(t, AddSigner(db, senderAddr.Hex(), senderAddr.Hex()))
 
 		// Fund sender's account
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000), nil))
@@ -453,8 +447,6 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		require.NoError(t, AddSigner(db, senderAddr.Hex(), senderAddr.Hex()))
-
 		// Fund sender's account
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000), nil))
 
@@ -478,8 +470,6 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		require.NoError(t, AddSigner(db, senderAddr.Hex(), senderAddr.Hex()))
-
 		// Fund sender's account with a small amount
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(100), nil))
 
@@ -500,10 +490,8 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 	t.Run("ErrorEmptyAllocations", func(t *testing.T) {
 		t.Parallel()
 
-		router, db, cleanup := setupTestRPCRouter(t)
+		router, _, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
-
-		require.NoError(t, AddSigner(db, senderAddr.Hex(), senderAddr.Hex()))
 
 		// Create transfer with empty allocations
 		transferParams := TransferParams{
@@ -522,8 +510,6 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
-
-		require.NoError(t, AddSigner(db, senderAddr.Hex(), senderAddr.Hex()))
 
 		// Fund sender's account
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000), nil))
@@ -548,8 +534,6 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		require.NoError(t, AddSigner(db, senderAddr.Hex(), senderAddr.Hex()))
-
 		// Fund sender's account
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000), nil))
 
@@ -572,8 +556,6 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
-
-		require.NoError(t, AddSigner(db, senderAddr.Hex(), senderAddr.Hex()))
 
 		// Fund sender's account
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000), nil))
@@ -623,7 +605,6 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 				Nonce:       1,
 			}
 			require.NoError(t, db.Create(ch).Error)
-			require.NoError(t, AddSigner(db, p, p))
 		}
 
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(accountIDA, "usdc", decimal.NewFromInt(100), nil))
@@ -693,7 +674,6 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 				Nonce:       1,
 			}
 			require.NoError(t, db.Create(ch).Error)
-			require.NoError(t, AddSigner(db, p, p))
 		}
 
 		require.NoError(t, GetWalletLedger(db, userAddressA).Record(accountIDA, "usdc", decimal.NewFromInt(100), nil))

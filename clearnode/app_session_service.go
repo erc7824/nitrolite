@@ -100,16 +100,14 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 			// Only apply session key limits if wallet didn't sign directly
 			var sessionKeyAddress *string
 			isDepositorSig := false
-			walletSigned := false
 
 			// Check if participant wallet signed directly
 			if _, ok := d.rpcSigners[alloc.ParticipantWallet]; ok {
 				isDepositorSig = true
-				walletSigned = true
 			} else if _, ok := d.rpcWallets[alloc.ParticipantWallet]; ok {
 				// Check if any of the signers is a session key with spending limits for this wallet
 				for signer := range d.rpcSigners {
-					if IsSessionKey(signer) && GetWalletBySigner(signer) == alloc.ParticipantWallet {
+					if GetWalletBySigner(signer) == alloc.ParticipantWallet {
 						sessionKeyAddress = &signer
 						break
 					}
@@ -134,7 +132,7 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 			}
 
 			// Validate session key spending only when wallet didn't sign
-			if sessionKeyAddress != nil && !walletSigned {
+			if sessionKeyAddress != nil {
 				if err := ValidateSessionKeySpending(tx, *sessionKeyAddress, alloc.AssetSymbol, depositAmount); err != nil {
 					return UpdateResult{}, RPCErrorf("session key spending validation failed: %w", err)
 				}
@@ -400,16 +398,14 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 			// Only apply session key limits if wallet didn't sign directly
 			var sessionKeyAddress *string
 			signatureProvided := false
-			walletSigned := false
 
 			// Check direct signature from participant
 			if _, ok := rpcSigners[alloc.ParticipantWallet]; ok {
 				signatureProvided = true
-				walletSigned = true
 			} else {
 				// Check if any signer is a session key with spending limits for this participant
 				for signer := range rpcSigners {
-					if IsSessionKey(signer) && GetWalletBySigner(signer) == alloc.ParticipantWallet {
+					if GetWalletBySigner(signer) == alloc.ParticipantWallet {
 						signatureProvided = true
 						sessionKeyAddress = &signer
 						break
@@ -422,7 +418,7 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 			}
 
 			// Validate session key spending only when wallet didn't sign
-			if sessionKeyAddress != nil && !walletSigned {
+			if sessionKeyAddress != nil {
 				if err := ValidateSessionKeySpending(tx, *sessionKeyAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
 					return RPCErrorf("session key spending validation failed: %w", err)
 				}

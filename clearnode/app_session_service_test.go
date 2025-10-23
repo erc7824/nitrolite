@@ -37,7 +37,6 @@ func assertNotifications(t *testing.T, capturedNotifications map[string][]Notifi
 
 func setupWallets(t *testing.T, db *gorm.DB, funds map[common.Address]map[string]int) {
 	for addr, assets := range funds {
-		require.NoError(t, AddSigner(db, addr.Hex(), addr.Hex()))
 		accountID := NewAccountID(addr.Hex())
 		for asset, amount := range assets {
 			require.NoError(t, GetWalletLedger(db, addr).Record(accountID, asset, decimal.NewFromInt(int64(amount)), nil))
@@ -1342,7 +1341,6 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 	require.NoError(t, GetWalletLedger(db, userAddressA).Record(accountID, "usdc", decimal.NewFromInt(1000), nil))
 	require.NoError(t, GetWalletLedger(db, userAddressA).Record(accountID, "eth", decimal.NewFromInt(5), nil))
 
-	require.NoError(t, AddSigner(db, userAddressB.Hex(), userAddressB.Hex()))
 	accountIDB := NewAccountID(userAddressB.Hex())
 	require.NoError(t, GetWalletLedger(db, userAddressB).Record(accountIDB, "usdc", decimal.NewFromInt(1000), nil))
 

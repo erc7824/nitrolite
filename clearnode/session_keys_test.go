@@ -18,7 +18,6 @@ func TestSessionKey(t *testing.T) {
 
 	walletAddress := "0x1234567890123456789012345678901234567890"
 	sessionSignerAddress := "0xabcdef1234567890abcdef1234567890abcdef12"
-	custodySignerAddress := "0xfedcba0987654321fedcba0987654321fedcba09"
 	appName := "TestApp"
 	scope := "trade"
 	allowances := []Allowance{
@@ -68,11 +67,7 @@ func TestSessionKey(t *testing.T) {
 		assert.Equal(t, "0", allowance.Amount)
 	}
 
-	err = AddSigner(db, walletAddress, custodySignerAddress)
-	require.NoError(t, err)
-
 	assert.Equal(t, walletAddress, GetWalletBySigner(sessionSignerAddress))
-	assert.Equal(t, walletAddress, GetWalletBySigner(custodySignerAddress))
 
 	// Session keys are queried separately
 	sessionKeys, err := GetSessionKeysByWallet(db, walletAddress)
@@ -232,14 +227,6 @@ func TestSessionKeySpendingValidation(t *testing.T) {
 		}
 	}
 	assert.Equal(t, "200", usdcUsage, "Used allowance should reflect actual spending")
-
-	// Test 9: Session key without spending cap should allow everything
-	unlimitedSessionKey := "0xunlimited1234567890abcdef1234567890abcdef"
-	err = AddSigner(db, walletAddress, unlimitedSessionKey) // custody signer has no spending cap
-	require.NoError(t, err)
-
-	walletFromSigner := GetWalletBySigner(unlimitedSessionKey)
-	assert.Equal(t, walletAddress, walletFromSigner, "Should resolve to correct wallet")
 }
 
 func TestSessionKeySpendingEdgeCases(t *testing.T) {

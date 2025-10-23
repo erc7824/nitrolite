@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -31,6 +32,9 @@ func (SessionKey) TableName() string {
 	return "session_keys"
 }
 
+// sessionKeyCache maps session key addresses to wallet addresses
+var sessionKeyCache sync.Map
+
 // loadSessionKeyCache populates the cache with session keys
 func loadSessionKeyCache(db *gorm.DB) error {
 	var sessionKeys []SessionKey
@@ -46,10 +50,6 @@ func loadSessionKeyCache(db *gorm.DB) error {
 // AddSessionKey stores a new session key with its metadata
 // Only one session key per wallet+app combination is allowed - adding a new one invalidates existing ones
 func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, applicationAddress, scope string, allowances []Allowance, expirationTime time.Time) error {
-	if applicationName == "clearnode" && len(allowances) == 0 {
-		return AddSigner(db, walletAddress, signerAddress)
-	}
-
 	err := db.Transaction(func(tx *gorm.DB) error {
 		// Validate expiration time is in the future
 		if expirationTime.IsZero() || expirationTime.Before(time.Now().UTC()) {
@@ -118,17 +118,7 @@ func GetWalletBySigner(signer string) string {
 	if w, ok := sessionKeyCache.Load(signer); ok {
 		return w.(string)
 	}
-	// Check custody signer cache
-	if w, ok := custodySignerCache.Load(signer); ok {
-		return w.(string)
-	}
 	return ""
-}
-
-// IsSessionKey checks if the given address is a session key (not a custody signer)
-func IsSessionKey(signerAddress string) bool {
-	_, ok := sessionKeyCache.Load(signerAddress)
-	return ok
 }
 
 // GetSessionKeysByWallet retrieves all session keys for a given wallet address
@@ -244,13 +234,12 @@ func GetSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol st
 
 // ValidateSessionKeySpending checks if a session key can spend the requested amount without exceeding its allowance
 func ValidateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol string, requestedAmount decimal.Decimal) error {
-	if _, ok := custodySignerCache.Load(sessionKeyAddress); ok {
-		return nil // Custody signers don't have spending limitations
-	}
-
 	sessionKey, err := GetSessionKeyBySigner(db, sessionKeyAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get session key: %w", err)
+	}
+	if sessionKey.AppName == "clearnode" {
+		return nil // Do not enforce limitations on clearnode session keys
 	}
 
 	// Check if session key has expired

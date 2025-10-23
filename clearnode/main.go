@@ -33,11 +33,6 @@ func main() {
 		logger.Fatal("Failed to setup database", "error", err)
 	}
 
-	err = loadCustodySignersCache(db)
-	if err != nil {
-		logger.Fatal("Failed to load custody signers cache", "error", err)
-	}
-
 	err = loadSessionKeyCache(db)
 	if err != nil {
 		logger.Fatal("Failed to load session key cache", "error", err)

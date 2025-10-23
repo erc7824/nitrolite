@@ -1036,7 +1036,6 @@ Requests opening a channel with a Clearnode broker on a specific network.
     "chain_id": 137,
     "token": "0xeeee567890abcdef...",
     "amount": "100000000",
-    "session_key": "0x1234567890abcdef..." // Optional
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
@@ -1046,7 +1045,6 @@ The request parameters are:
 - `chain_id`: The blockchain network ID where the channel should be created
 - `token`: The token contract address for the channel
 - `amount`: The initial amount to deposit in the channel (in raw token units)
-- `session_key`: An optional session key for channel operations
 
 **Response:**
 

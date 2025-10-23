@@ -51,7 +51,6 @@ export class TestNitroliteClient extends NitroliteClient {
             chain_id: chain.id,
             token: tokenAddress,
             amount,
-            session_key: this.identity.sessionAddress,
         });
         const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
         expect(createResponse).toBeDefined();

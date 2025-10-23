@@ -285,6 +285,44 @@ type AuthJWTVerifyResponse struct {
 	Success bool `json:"success"`
 }
 
+// GetSessionKeysRequest queries for session keys associated with the authenticated wallet.
+type GetSessionKeysRequest struct {
+	// No parameters - returns all session keys for the authenticated user
+}
+
+// GetSessionKeysResponse contains the list of active session keys.
+type GetSessionKeysResponse struct {
+	SessionKeys []SessionKeyResponse `json:"session_keys"`
+}
+
+// SessionKeyResponse represents a single session key with its allowances and usage.
+type SessionKeyResponse struct {
+	// ID is the internal database identifier
+	ID uint `json:"id"`
+	// SessionKey is the public key/address of the session key
+	SessionKey string `json:"session_key"`
+	// Application is the name or identifier of the application this key is for
+	Application string `json:"application,omitempty"`
+	// Allowances contains spending limits per asset with usage tracking
+	Allowances []AllowanceUsage `json:"allowances"`
+	// Scope defines the permission scope for the session (e.g., "app.create", "ledger.readonly")
+	Scope string `json:"scope,omitempty"`
+	// ExpiresAt is when the session key expires
+	ExpiresAt time.Time `json:"expires_at,omitempty"`
+	// CreatedAt is when the session key was created
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// AllowanceUsage represents an asset allowance with usage tracking.
+type AllowanceUsage struct {
+	// Asset is the token/asset symbol
+	Asset string `json:"asset"`
+	// Allowance is the total spending limit for this asset
+	Allowance decimal.Decimal `json:"allowance"`
+	// Used is how much of the allowance has been spent
+	Used decimal.Decimal `json:"used"`
+}
+
 // ============================================================================
 // Private API Types - Authentication Required
 // ============================================================================
@@ -538,7 +576,7 @@ type TransferAllocation struct {
 
 // AppDefinition defines the protocol for a multi-party application.
 type AppDefinition struct {
-	// Application is the name or identifier of the application
+	// Application is the identifier of the application
 	Application string `json:"application"`
 	// Protocol identifies the version of the application protocol
 	Protocol Version `json:"protocol"`
@@ -586,8 +624,8 @@ type AppSession struct {
 
 // AppAllocation defines asset distribution for a participant in an app session.
 type AppAllocation struct {
-	// ParticipantWallet is the recipient's address
-	ParticipantWallet string `json:"participant"`
+	// Participant is the recipient's address
+	Participant string `json:"participant"`
 	// AssetSymbol identifies the asset
 	AssetSymbol string `json:"asset"`
 	// Amount allocated to the participant

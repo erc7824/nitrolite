@@ -10,6 +10,10 @@ import (
 	"gorm.io/gorm"
 )
 
+var (
+	AppNameClearnode = "clearnode"
+)
+
 // SessionKey represents a ledger layer session key
 type SessionKey struct {
 	ID      uint   `gorm:"primaryKey;autoIncrement"`
@@ -17,7 +21,7 @@ type SessionKey struct {
 
 	WalletAddress string    `gorm:"column:wallet_address;index;not null"`
 	Application   string    `gorm:"column:application;not null"`
-	Allowance     *string   `gorm:"column:allowance;type:text"` // JSON serialized allowances
+	Allowance     *string   `gorm:"column:allowance;type:jsonb"` // JSON serialized allowances
 	Scope         string    `gorm:"column:scope;not null;"`
 	ExpiresAt     time.Time `gorm:"column:expires_at;not null"`
 
@@ -161,8 +165,8 @@ func GetSessionKey(db *gorm.DB, sessionKeyAddress string) (*SessionKey, error) {
 	return &sk, nil
 }
 
-// GetSessionKeySpending calculates total amount spent by a session key for a specific asset
-func GetSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol string) (decimal.Decimal, error) {
+// CalculateSessionKeySpending calculates total amount spent by a session key for a specific asset
+func CalculateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol string) (decimal.Decimal, error) {
 	type result struct {
 		TotalSpent decimal.Decimal
 	}
@@ -184,20 +188,20 @@ func GetSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol st
 func ValidateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol string, requestedAmount decimal.Decimal) error {
 	sessionKey, err := GetSessionKey(db, sessionKeyAddress)
 	if err != nil {
-		return fmt.Errorf("failed to get session key: %w", err)
+		return fmt.Errorf("operation denied: failed to get session key: %w", err)
 	}
-	if sessionKey.Application == "clearnode" {
+	if sessionKey.Application == AppNameClearnode {
 		return nil // Do not enforce limitations on clearnode session keys
 	}
 
 	// Check if session key has expired
 	if time.Now().UTC().After(sessionKey.ExpiresAt) {
-		return fmt.Errorf("session key expired")
+		return fmt.Errorf("operation denied: session key expired")
 	}
 
 	// If no spending cap is set, deny the transaction
 	if sessionKey.Allowance == nil {
-		return fmt.Errorf("session key has no allowance")
+		return fmt.Errorf("operation denied: session key has no allowance configured")
 	}
 
 	var allowances []Allowance
@@ -213,7 +217,7 @@ func ValidateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymb
 			var err error
 			allowedAmount, err = decimal.NewFromString(allowance.Amount)
 			if err != nil {
-				return fmt.Errorf("failed to parse allowed amount: %w", err)
+				return fmt.Errorf("operation denied: failed to parse allowed amount: %w", err)
 			}
 			found = true
 			break
@@ -221,10 +225,10 @@ func ValidateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymb
 	}
 
 	if !found {
-		return fmt.Errorf("asset %s not allowed in session key spending cap", assetSymbol)
+		return fmt.Errorf("operation denied: asset %s not allowed in session key spending cap", assetSymbol)
 	}
 
-	currentSpending, err := GetSessionKeySpending(db, sessionKeyAddress, assetSymbol)
+	currentSpending, err := CalculateSessionKeySpending(db, sessionKeyAddress, assetSymbol)
 	if err != nil {
 		return err
 	}
@@ -245,7 +249,7 @@ func ValidateSessionKeyApplication(db *gorm.DB, sessionKeyAddress string, appApp
 		return fmt.Errorf("failed to get session key: %w", err)
 	}
 
-	if sessionKey.Application == "clearnode" {
+	if sessionKey.Application == AppNameClearnode {
 		return nil
 	}
 

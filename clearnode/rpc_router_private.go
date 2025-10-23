@@ -309,7 +309,6 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 
 	var respTransactions []TransactionResponse
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
-		// Determine if wallet signed; only apply session-key limits if wallet did NOT sign.
 		var sessionKeyAddress *string
 		if _, ok := rpcSignersMap[fromWallet]; !ok {
 			for signer := range rpcSignersMap {
@@ -738,7 +737,7 @@ func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
 				return
 			}
 
-			usedAmount, err := GetSessionKeySpending(r.DB, sk.Address, allowance.Asset)
+			usedAmount, err := CalculateSessionKeySpending(r.DB, sk.Address, allowance.Asset)
 			if err != nil {
 				logger.Error("failed to calculate session key spending", "error", err, "sessionKey", sk.Address, "asset", allowance.Asset)
 				c.Fail(err, "failed to calculate session key usage")

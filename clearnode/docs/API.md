@@ -492,9 +492,9 @@ Each session key includes:
 **Notes:**
 
 - Only active (non-expired) session keys are returned
-- If a session key has an empty spending cap array, all operations using that key will be denied (zero spending allowed)
+- If a session key has an empty spending cap array, all operations using that key will be denied (no spending allowed)
 - The `used_allowance` is calculated by summing all debit entries in the ledger that were made using this session key
-- Available allowance for an asset = allowance amount - used_allowance amount
+- Available allowance for an asset = `allowance - used_allowance`
 
 ### Transfer Funds
 

@@ -179,7 +179,7 @@ func TestSessionKeySpendingValidation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test 6: Check spending calculation
-	currentSpending, err := GetSessionKeySpending(db, sessionKeyAddress, "usdc")
+	currentSpending, err := CalculateSessionKeySpending(db, sessionKeyAddress, "usdc")
 	require.NoError(t, err)
 	assert.Equal(t, "200", currentSpending.String(), "Should correctly calculate current spending")
 
@@ -192,7 +192,7 @@ func TestSessionKeySpendingValidation(t *testing.T) {
 	assert.Contains(t, err.Error(), "operation denied: insufficient session key allowance")
 
 	// Test 8: Verify usage is calculated correctly on the fly
-	usdcUsage, err := GetSessionKeySpending(db, sessionKeyAddress, "usdc")
+	usdcUsage, err := CalculateSessionKeySpending(db, sessionKeyAddress, "usdc")
 	require.NoError(t, err)
 	assert.Equal(t, "200", usdcUsage.String(), "Used allowance should reflect actual spending")
 }
@@ -276,7 +276,7 @@ func TestSessionKeyTransferIntegration(t *testing.T) {
 	require.Len(t, transferResp.Transactions, 1)
 
 	// Test 2: Verify spending was recorded
-	spending, err := GetSessionKeySpending(db, sessionKeyAddress, "usdc")
+	spending, err := CalculateSessionKeySpending(db, sessionKeyAddress, "usdc")
 	require.NoError(t, err)
 	assert.Equal(t, "300", spending.String())
 
@@ -347,6 +347,29 @@ func TestUnsupportedAssetValidation(t *testing.T) {
 	err = validateAllowances(db, unsupportedAllowances)
 	assert.Error(t, err, "Should reject unsupported assets")
 	assert.Contains(t, err.Error(), "asset 'btc' is not supported")
+
+	// Test 4: Zero amount should pass validation (0 is allowed)
+	zeroAllowances := []Allowance{
+		{Asset: "usdc", Amount: "0"},
+	}
+	err = validateAllowances(db, zeroAllowances)
+	assert.NoError(t, err, "Should accept zero amounts")
+
+	// Test 5: Negative amount should fail validation
+	negativeAllowances := []Allowance{
+		{Asset: "usdc", Amount: "-100"},
+	}
+	err = validateAllowances(db, negativeAllowances)
+	assert.Error(t, err, "Should reject negative amounts")
+	assert.Contains(t, err.Error(), "allowance amount cannot be negative")
+
+	// Test 6: Invalid decimal format should fail validation
+	invalidAllowances := []Allowance{
+		{Asset: "usdc", Amount: "not-a-number"},
+	}
+	err = validateAllowances(db, invalidAllowances)
+	assert.Error(t, err, "Should reject invalid decimal format")
+	assert.Contains(t, err.Error(), "invalid amount")
 }
 
 func TestOneSessionKeyPerApp(t *testing.T) {

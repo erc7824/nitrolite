@@ -58,7 +58,6 @@ export async function authenticateAppWithAllowances(
         application: 'App Domain',
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
-        application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // random address, no use for now
         allowances: [
             {
                 asset,
@@ -81,6 +80,7 @@ export async function createTestAppSession(
     sessionData: object
 ): Promise<string> {
     const definition: RPCAppDefinition = {
+        application: 'clearnode',
         protocol,
         participants: [aliceAppIdentity.walletAddress, bobAppIdentity.walletAddress],
         weights: [100, 0],

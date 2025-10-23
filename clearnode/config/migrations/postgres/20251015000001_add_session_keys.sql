@@ -9,7 +9,7 @@ CREATE TABLE session_keys (
     address VARCHAR NOT NULL UNIQUE,
     wallet_address VARCHAR NOT NULL,
     application VARCHAR NOT NULL,
-    allowance TEXT,
+    allowance JSONB,
     scope VARCHAR NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,

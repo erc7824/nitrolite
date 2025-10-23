@@ -38,8 +38,7 @@ describe('Clearnode Authentication', () => {
         identity.walletClient,
         {
             scope: authRequestParams.scope,
-            application: authRequestParams.application,
-            participant: authRequestParams.session_key,
+            session_key: authRequestParams.session_key,
             expire: authRequestParams.expire,
             allowances: authRequestParams.allowances,
         },

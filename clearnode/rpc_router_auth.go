@@ -277,8 +277,13 @@ func validateAllowances(db *gorm.DB, allowances []Allowance) error {
 			return fmt.Errorf("asset '%s' is not supported", allowance.Asset)
 		}
 
-		if _, err := decimal.NewFromString(allowance.Amount); err != nil {
+		amount, err := decimal.NewFromString(allowance.Amount)
+		if err != nil {
 			return fmt.Errorf("invalid amount '%s' for asset '%s': %w", allowance.Amount, allowance.Asset, err)
+		}
+
+		if amount.LessThan(decimal.Zero) {
+			return fmt.Errorf("allowance amount cannot be negative for asset '%s', got '%s'", allowance.Asset, allowance.Amount)
 		}
 	}
 

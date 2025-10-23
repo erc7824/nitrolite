@@ -96,23 +96,23 @@ func TestManualClient(t *testing.T) {
 	var appSessionID string
 	appAllocationsV0_2 := []rpc.AppAllocation{
 		{
-			ParticipantWallet: walletSigner.PublicKey().Address().String(),
-			AssetSymbol:       assetSymbol,
-			Amount:            decimal.NewFromInt(1),
+			Participant: walletSigner.PublicKey().Address().String(),
+			AssetSymbol: assetSymbol,
+			Amount:      decimal.NewFromInt(1),
 		},
 	}
 	appAllocationsV0_4_Original := []rpc.AppAllocation{
 		{
-			ParticipantWallet: walletSigner.PublicKey().Address().String(),
-			AssetSymbol:       assetSymbol,
-			Amount:            decimal.NewFromInt(1),
+			Participant: walletSigner.PublicKey().Address().String(),
+			AssetSymbol: assetSymbol,
+			Amount:      decimal.NewFromInt(1),
 		},
 	}
 	appAllocationsV0_4_Deposited := []rpc.AppAllocation{
 		{
-			ParticipantWallet: walletSigner.PublicKey().Address().String(),
-			AssetSymbol:       assetSymbol,
-			Amount:            decimal.NewFromInt(2),
+			Participant: walletSigner.PublicKey().Address().String(),
+			AssetSymbol: assetSymbol,
+			Amount:      decimal.NewFromInt(2),
 		},
 	}
 

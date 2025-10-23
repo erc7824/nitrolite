@@ -874,7 +874,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		require.NoError(t, err, "Should succeed when using session key for depositor authorization")
 
 		// Verify session key usage was updated
-		spending, err := GetSessionKeySpending(db, sessionKeyAddress, "usdc")
+		spending, err := CalculateSessionKeySpending(db, sessionKeyAddress, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, "100", spending.String(), "Should track spending from deposit")
 	})
@@ -1372,7 +1372,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 		assert.NoError(t, err, "Should allow app session creation within spending cap")
 
 		// Verify session key usage was updated
-		spending, err := GetSessionKeySpending(db, sessionKeyAddress, "usdc")
+		spending, err := CalculateSessionKeySpending(db, sessionKeyAddress, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, "300", spending.String(), "Should track spending from app session creation")
 	})
@@ -1438,7 +1438,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 		assert.NoError(t, err, "Should allow deposit within spending cap")
 
 		// Verify the total spending is now 400
-		totalSpending, err := GetSessionKeySpending(db, sessionKeyAddress, "usdc")
+		totalSpending, err := CalculateSessionKeySpending(db, sessionKeyAddress, "usdc")
 		require.NoError(t, err)
 		assert.Equal(t, "400", totalSpending.String(), "Should track total spending including deposits")
 	})

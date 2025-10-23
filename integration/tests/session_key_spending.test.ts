@@ -3,9 +3,10 @@ import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { TestWebSocket } from '@/ws';
+import { createAuthSessionWithClearnode } from '@/auth';
+import { CONFIG } from '@/setup';
 import { RPCAppStateIntent, RPCProtocolVersion } from '@erc7824/nitrolite';
-import { Hex } from 'viem';
-import { setupTestIdentitiesAndConnections } from '@/testSetup';
+
 import {
     createTestChannels,
     authenticateAppWithAllowances,
@@ -45,26 +46,20 @@ describe('Session Key Spending Caps', () => {
         blockUtils = new BlockchainUtils();
         databaseUtils = new DatabaseUtils();
 
-        const { Identity: IdentityClass } = await import('@/identity');
-        const { TestWebSocket: TestWebSocketClass } = await import('@/ws');
-        const { TestNitroliteClient: TestNitroliteClientClass } = await import('@/nitroliteClient');
-        const { createAuthSessionWithClearnode } = await import('@/auth');
-        const { CONFIG } = await import('@/setup');
-
-        alice = new IdentityClass(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);
-        aliceWS = new TestWebSocketClass(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
-        aliceClient = new TestNitroliteClientClass(alice);
+        alice = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);
+        aliceWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
+        aliceClient = new TestNitroliteClient(alice);
         await aliceWS.connect();
         await createAuthSessionWithClearnode(aliceWS, alice);
 
-        aliceAppIdentity = new IdentityClass(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].APP_SESSION_PK);
-        aliceAppWS = new TestWebSocketClass(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
+        aliceAppIdentity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].APP_SESSION_PK);
+        aliceAppWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
         await aliceAppWS.connect();
 
-        bob = new IdentityClass(CONFIG.IDENTITIES[1].WALLET_PK, CONFIG.IDENTITIES[1].SESSION_PK);
-        bobAppIdentity = new IdentityClass(CONFIG.IDENTITIES[1].WALLET_PK, CONFIG.IDENTITIES[1].APP_SESSION_PK);
-        bobWS = new TestWebSocketClass(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
-        bobClient = new TestNitroliteClientClass(bob);
+        bob = new Identity(CONFIG.IDENTITIES[1].WALLET_PK, CONFIG.IDENTITIES[1].SESSION_PK);
+        bobAppIdentity = new Identity(CONFIG.IDENTITIES[1].WALLET_PK, CONFIG.IDENTITIES[1].APP_SESSION_PK);
+        bobWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
+        bobClient = new TestNitroliteClient(bob);
         await bobWS.connect();
         await createAuthSessionWithClearnode(bobWS, bob);
     });

@@ -338,8 +338,8 @@ func TestClient_AppSessions(t *testing.T) {
 		req := rpc.CreateAppSessionRequest{
 			Definition: appDef,
 			Allocations: []rpc.AppAllocation{
-				{ParticipantWallet: testWallet, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: testWallet2, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
+				{Participant: testWallet, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
+				{Participant: testWallet2, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
 			},
 		}
 		payload, err := client.PreparePayload(rpc.CreateAppSessionMethod, req)

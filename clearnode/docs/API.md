@@ -821,6 +821,7 @@ The optional `session_data` field can be used to store application-specific data
 {
   "req": [1, "create_app_session", {
     "definition": {
+      "application": "clearnode",
       "protocol": "NitroRPC/0.2",
       "participants": [
         "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",

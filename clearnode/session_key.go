@@ -238,3 +238,21 @@ func ValidateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymb
 
 	return nil
 }
+
+func ValidateSessionKeyApplication(db *gorm.DB, sessionKeyAddress string, appApplication string) error {
+	sessionKey, err := GetSessionKey(db, sessionKeyAddress)
+	if err != nil {
+		return fmt.Errorf("failed to get session key: %w", err)
+	}
+
+	if sessionKey.Application == "clearnode" {
+		return nil
+	}
+
+	if sessionKey.Application != appApplication {
+		return fmt.Errorf("session key application mismatch: session key is for '%s', but app session is for '%s'",
+			sessionKey.Application, appApplication)
+	}
+
+	return nil
+}

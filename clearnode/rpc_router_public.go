@@ -34,6 +34,7 @@ type GetAppDefinitionParams struct {
 }
 
 type AppDefinition struct {
+	Application        string      `json:"application"`
 	Protocol           rpc.Version `json:"protocol"`
 	ParticipantWallets []string    `json:"participants"`
 	Weights            []int64     `json:"weights"` // Signature weight for each participant.

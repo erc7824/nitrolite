@@ -332,21 +332,21 @@ func TestUnsupportedAssetValidation(t *testing.T) {
 		{Asset: "usdc", Amount: "1000"},
 		{Asset: "eth", Amount: "5"},
 	}
-	err = validateAllowanceAssets(db, supportedAllowances)
+	err = validateAllowances(db, supportedAllowances)
 	assert.NoError(t, err, "Should accept supported assets")
 
 	// Test 2: Empty allowances should pass validation
-	err = validateAllowanceAssets(db, []Allowance{})
+	err = validateAllowances(db, []Allowance{})
 	assert.NoError(t, err, "Should accept empty allowances")
 
 	// Test 3: Unsupported asset should fail validation
 	unsupportedAllowances := []Allowance{
 		{Asset: "usdc", Amount: "1000"}, // supported
-		{Asset: "BTC", Amount: "1"},     // unsupported
+		{Asset: "btc", Amount: "1"},     // unsupported
 	}
-	err = validateAllowanceAssets(db, unsupportedAllowances)
+	err = validateAllowances(db, unsupportedAllowances)
 	assert.Error(t, err, "Should reject unsupported assets")
-	assert.Contains(t, err.Error(), "asset 'BTC' is not supported")
+	assert.Contains(t, err.Error(), "asset 'btc' is not supported")
 }
 
 func TestOneSessionKeyPerApp(t *testing.T) {

@@ -25,10 +25,14 @@ CREATE UNIQUE INDEX idx_session_keys_unique_wallet_app
 ALTER TABLE ledger ADD COLUMN IF NOT EXISTS session_key VARCHAR;
 CREATE INDEX IF NOT EXISTS idx_ledger_session_key ON ledger(session_key);
 
+ALTER TABLE app_sessions ADD COLUMN IF NOT EXISTS application VARCHAR NOT NULL;
+
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
+
+ALTER TABLE app_sessions DROP COLUMN IF EXISTS application;
 
 DROP INDEX IF EXISTS idx_ledger_session_key;
 ALTER TABLE ledger DROP COLUMN IF EXISTS session_key;

@@ -45,8 +45,13 @@ func setupWallets(t *testing.T, db *gorm.DB, funds map[common.Address]map[string
 }
 
 func createTestAppSession(t *testing.T, db *gorm.DB, sessionID string, protocol rpc.Version, participants []string, weights []int64, quorum uint64) *AppSession {
+	return createTestAppSessionWithApplication(t, db, sessionID, "", protocol, participants, weights, quorum)
+}
+
+func createTestAppSessionWithApplication(t *testing.T, db *gorm.DB, sessionID string, application string, protocol rpc.Version, participants []string, weights []int64, quorum uint64) *AppSession {
 	session := &AppSession{
 		SessionID:          sessionID,
+		Application:        application,
 		Protocol:           protocol,
 		ParticipantWallets: participants,
 		Weights:            weights,
@@ -839,7 +844,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			userAddressC: {"usdc": 200},
 		})
 
-		session := createTestAppSession(t, db, "test-session-sk", rpc.VersionNitroRPCv0_4,
+		session := createTestAppSessionWithApplication(t, db, "test-session-sk", "TestApp", rpc.VersionNitroRPCv0_4,
 			[]string{depositorAddress.Hex(), userAddressB.Hex(), userAddressC.Hex()}, []int64{1, 1, 1}, 2)
 		sessionAccountID := NewAccountID(session.SessionID)
 
@@ -1350,6 +1355,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 	t.Run("CreateAppSession_WithinSpendingCap_Success", func(t *testing.T) {
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
+				Application:        "TestApp",
 				Protocol:           rpc.VersionNitroRPCv0_2,
 				ParticipantWallets: []string{walletAddress, userAddressB.Hex()},
 				Weights:            []int64{2, 0},
@@ -1374,6 +1380,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 	t.Run("CreateAppSession_ExceedsSpendingCap_Fails", func(t *testing.T) {
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
+				Application:        "TestApp",
 				Protocol:           rpc.VersionNitroRPCv0_2,
 				ParticipantWallets: []string{walletAddress, userAddressB.Hex()},
 				Weights:            []int64{2, 1},
@@ -1394,6 +1401,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 	t.Run("CreateAppSession_UnsupportedAsset_Fails", func(t *testing.T) {
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
+				Application:        "TestApp",
 				Protocol:           rpc.VersionNitroRPCv0_2,
 				ParticipantWallets: []string{walletAddress, userAddressB.Hex()},
 				Weights:            []int64{2, 0},
@@ -1412,7 +1420,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 	})
 
 	t.Run("AppSessionDeposit_WithinSpendingCap_Success", func(t *testing.T) {
-		session := createTestAppSession(t, db, "test-session-deposit", rpc.VersionNitroRPCv0_4, []string{walletAddress}, []int64{2, 0}, 2)
+		session := createTestAppSessionWithApplication(t, db, "test-session-deposit", "TestApp", rpc.VersionNitroRPCv0_4, []string{walletAddress}, []int64{2, 0}, 2)
 		_ = NewAccountID(session.SessionID)
 
 		// Deposit 100

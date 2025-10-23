@@ -538,6 +538,8 @@ type TransferAllocation struct {
 
 // AppDefinition defines the protocol for a multi-party application.
 type AppDefinition struct {
+	// Application is the name or identifier of the application
+	Application string `json:"application"`
 	// Protocol identifies the version of the application protocol
 	Protocol Version `json:"protocol"`
 	// ParticipantWallets lists the wallet addresses of all participants
@@ -556,6 +558,8 @@ type AppDefinition struct {
 type AppSession struct {
 	// AppSessionID is the unique session identifier
 	AppSessionID string `json:"app_session_id"`
+	// Application is the name of the application
+	Application string `json:"application"`
 	// Status indicates the session state (open/closed)
 	Status string `json:"status"`
 	// ParticipantWallets lists all participants

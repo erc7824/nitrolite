@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -225,7 +226,7 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 	}
 
 	// Validate allowances against supported assets before storing session key
-	if err := validateAllowanceAssets(r.DB, challenge.Allowances); err != nil {
+	if err := validateAllowances(r.DB, challenge.Allowances); err != nil {
 		logger.Error("unsupported asset in allowances", "error", err, "allowances", challenge.Allowances)
 		return nil, nil, RPCErrorf("unsupported token: %w", err)
 	}
@@ -254,8 +255,8 @@ func ValidateTimestamp(ts uint64, expirySeconds int) error {
 	return nil
 }
 
-// validateAllowanceAssets validates that all assets in allowances are supported by the system
-func validateAllowanceAssets(db *gorm.DB, allowances []Allowance) error {
+// validateAllowances validates that all assets in allowances are supported by the system
+func validateAllowances(db *gorm.DB, allowances []Allowance) error {
 	if len(allowances) == 0 {
 		return nil
 	}
@@ -274,6 +275,10 @@ func validateAllowanceAssets(db *gorm.DB, allowances []Allowance) error {
 	for _, allowance := range allowances {
 		if !supportedSymbols[allowance.Asset] {
 			return fmt.Errorf("asset '%s' is not supported", allowance.Asset)
+		}
+
+		if _, err := decimal.NewFromString(allowance.Amount); err != nil {
+			return fmt.Errorf("invalid amount '%s' for asset '%s': %w", allowance.Amount, allowance.Asset, err)
 		}
 	}
 

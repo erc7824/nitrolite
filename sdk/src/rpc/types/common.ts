@@ -32,6 +32,8 @@ export enum RPCProtocolVersion {
  * Defines the structure of an application definition used when creating an application.
  */
 export interface RPCAppDefinition {
+    /** Application identifier */
+    application: string;
     /** Protocol identifies the version of the application protocol */
     protocol: RPCProtocolVersion;
     /** An array of participant addresses (Ethereum addresses) involved in the application. Must have at least 2 participants. */
@@ -140,6 +142,8 @@ export enum RPCAppStateIntent {
 export interface RPCAppSession {
     /** The unique identifier for the application session. */
     appSessionId: Hex;
+    /** Application identifier */
+    application: string;
     /** The current status of the channel (e.g., "open", "closed"). */
     status: RPCChannelStatus;
     /** List of participant Ethereum addresses. */

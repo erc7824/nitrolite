@@ -133,6 +133,10 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 
 			// Validate session key spending only when wallet didn't sign
 			if sessionKeyAddress != nil {
+				if err := ValidateSessionKeyApplication(tx, *sessionKeyAddress, d.appSession.Application); err != nil {
+					return UpdateResult{}, RPCErrorf("session key application validation failed: %w", err)
+				}
+
 				if err := ValidateSessionKeySpending(tx, *sessionKeyAddress, alloc.AssetSymbol, depositAmount); err != nil {
 					return UpdateResult{}, RPCErrorf("session key spending validation failed: %w", err)
 				}
@@ -402,6 +406,11 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 
 			// Validate session key spending only when wallet didn't sign
 			if sessionKeyAddress != nil {
+				// Validate that session key application matches app session application
+				if err := ValidateSessionKeyApplication(tx, *sessionKeyAddress, params.Definition.Application); err != nil {
+					return RPCErrorf("session key application validation failed: %w", err)
+				}
+
 				if err := ValidateSessionKeySpending(tx, *sessionKeyAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
 					return RPCErrorf("session key spending validation failed: %w", err)
 				}
@@ -443,6 +452,7 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 		session := &AppSession{
 			Protocol:           params.Definition.Protocol,
 			SessionID:          appSessionID,
+			Application:        params.Definition.Application,
 			ParticipantWallets: params.Definition.ParticipantWallets,
 			Status:             ChannelStatusOpen,
 			Challenge:          params.Definition.Challenge,

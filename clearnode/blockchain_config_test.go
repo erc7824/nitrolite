@@ -168,7 +168,7 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 					},
 				},
 			},
-			expectedErrorStr: "missing custody contract address for blockchain 'ethereum'",
+			expectedErrorStr: "missing default and blockchain-specific custody contract address for blockchain 'ethereum'",
 		},
 		{
 			name: "missing adjudicator address",
@@ -183,7 +183,7 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 					},
 				},
 			},
-			expectedErrorStr: "missing adjudicator contract address for blockchain 'ethereum'",
+			expectedErrorStr: "missing default and blockchain-specific adjudicator contract address for blockchain 'ethereum'",
 		},
 		{
 			name: "missing balance checker address",
@@ -200,7 +200,7 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 					},
 				},
 			},
-			expectedErrorStr: "missing balance checker contract address for blockchain 'ethereum'",
+			expectedErrorStr: "missing default and blockchain-specific balance checker contract address for blockchain 'ethereum'",
 		},
 		{
 			name: "invalid custody address",

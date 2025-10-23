@@ -76,7 +76,7 @@ func main() {
 	for chainID, blockchain := range config.blockchains {
 		client, err := NewCustody(signer, db, wsNotifier, blockchain, logger)
 		if err != nil {
-			logger.Warn("failed to initialize blockchain client", "chainID", chainID, "error", err)
+			logger.Fatal("failed to initialize blockchain client", "chainID", chainID, "error", err)
 			continue
 		}
 		custodyClients[chainID] = client

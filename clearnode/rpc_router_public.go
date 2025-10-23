@@ -72,18 +72,6 @@ type GetLedgerTransactionsParams struct {
 	TxType    string `json:"tx_type,omitempty"`    // Optional transaction type to filter transactions
 }
 
-type BlockchainInfo struct {
-	ID                 uint32 `json:"chain_id"`
-	Name               string `json:"name"`
-	CustodyAddress     string `json:"custody_address"`
-	AdjudicatorAddress string `json:"adjudicator_address"`
-}
-
-type BrokerConfig struct {
-	BrokerAddress string           `json:"broker_address"`
-	Networks      []BlockchainInfo `json:"networks"` // TODO: rename to "blockchains"
-}
-
 type TransactionResponse struct {
 	Id             uint            `json:"id"`
 	TxType         string          `json:"tx_type"`
@@ -122,10 +110,10 @@ func (r *RPCRouter) HandlePing(c *RPCContext) {
 
 // HandleGetConfig returns the broker configuration
 func (r *RPCRouter) HandleGetConfig(c *RPCContext) {
-	supportedBlockchains := make([]BlockchainInfo, 0, len(r.Config.blockchains))
+	supportedBlockchains := make([]rpc.BlockchainInfo, 0, len(r.Config.blockchains))
 
 	for _, blockchain := range r.Config.blockchains {
-		supportedBlockchains = append(supportedBlockchains, BlockchainInfo{
+		supportedBlockchains = append(supportedBlockchains, rpc.BlockchainInfo{
 			ID:                 blockchain.ID,
 			Name:               blockchain.Name,
 			CustodyAddress:     blockchain.ContractAddresses.Custody,
@@ -133,9 +121,9 @@ func (r *RPCRouter) HandleGetConfig(c *RPCContext) {
 		})
 	}
 
-	brokerConfig := BrokerConfig{
+	brokerConfig := rpc.BrokerConfig{
 		BrokerAddress: r.Signer.GetAddress().Hex(),
-		Networks:      supportedBlockchains,
+		Blockchains:   supportedBlockchains,
 	}
 
 	c.Succeed(c.Message.Req.Method, brokerConfig)

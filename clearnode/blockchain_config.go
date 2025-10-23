@@ -113,12 +113,12 @@ func (cfg *BlockchainsConfig) verifyVariables() error {
 		}
 
 		if !blockchainNameRegex.MatchString(bc.Name) {
-			return fmt.Errorf("invalid blockchain name '%s'", bc.Name)
+			return fmt.Errorf("invalid blockchain name '%s', should match snake_case format", bc.Name)
 		}
 
 		if bc.ContractAddresses.Custody == "" {
 			if defaults.Custody == "" {
-				return fmt.Errorf("missing custody contract address for blockchain '%s'", bc.Name)
+				return fmt.Errorf("missing default and blockchain-specific custody contract address for blockchain '%s'", bc.Name)
 			} else {
 				cfg.Blockchains[i].ContractAddresses.Custody = defaults.Custody
 			}
@@ -128,7 +128,7 @@ func (cfg *BlockchainsConfig) verifyVariables() error {
 
 		if bc.ContractAddresses.Adjudicator == "" {
 			if defaults.Adjudicator == "" {
-				return fmt.Errorf("missing adjudicator contract address for blockchain '%s'", bc.Name)
+				return fmt.Errorf("missing default and blockchain-specific adjudicator contract address for blockchain '%s'", bc.Name)
 			} else {
 				cfg.Blockchains[i].ContractAddresses.Adjudicator = defaults.Adjudicator
 			}
@@ -138,7 +138,7 @@ func (cfg *BlockchainsConfig) verifyVariables() error {
 
 		if bc.ContractAddresses.BalanceChecker == "" {
 			if defaults.BalanceChecker == "" {
-				return fmt.Errorf("missing balance checker contract address for blockchain '%s'", bc.Name)
+				return fmt.Errorf("missing default and blockchain-specific balance checker contract address for blockchain '%s'", bc.Name)
 			} else {
 				cfg.Blockchains[i].ContractAddresses.BalanceChecker = defaults.BalanceChecker
 			}
@@ -170,7 +170,7 @@ func (cfg *BlockchainsConfig) verifyRPCs() error {
 		}
 
 		if err := checkChainId(blockchainRPC, bc.ID); err != nil {
-			return fmt.Errorf("blockchain '%s' RPC check failed: %w", bc.Name, err)
+			return fmt.Errorf("blockchain '%s' ChainID check failed: %w", bc.Name, err)
 		}
 
 		cfg.Blockchains[i].BlockchainRPC = blockchainRPC
@@ -202,6 +202,7 @@ func checkChainId(blockchainRPC string, expectedChainID uint32) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to blockchain RPC: %w", err)
 	}
+	defer client.Close()
 
 	chainID, err := client.ChainID(ctx)
 	if err != nil {

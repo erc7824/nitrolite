@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -61,17 +62,17 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 	router.HandleGetConfig(ctx)
 
 	res := assertResponse(t, ctx, "get_config")
-	configMap, ok := res.Params.(BrokerConfig)
+	configMap, ok := res.Params.(rpc.BrokerConfig)
 	require.True(t, ok, "Response should contain a BrokerConfig")
 	assert.Equal(t, router.Signer.GetAddress().Hex(), configMap.BrokerAddress)
-	require.Len(t, configMap.Networks, 3, "Should have 3 supported networks")
+	require.Len(t, configMap.Blockchains, 3, "Should have 3 supported blockchains")
 
 	expectedBlockchains := map[uint32]struct{}{
 		137:   {},
 		42220: {},
 		8453:  {},
 	}
-	for _, blockchain := range configMap.Networks {
+	for _, blockchain := range configMap.Blockchains {
 		_, exists := expectedBlockchains[blockchain.ID]
 		assert.True(t, exists, "Blockchain %d should be in expected blockchains", blockchain.ID)
 		assert.Contains(t, blockchain.CustodyAddress, "0xCustodyAddress", "Custody address should be present")

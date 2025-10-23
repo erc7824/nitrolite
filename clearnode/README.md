@@ -175,7 +175,7 @@ Clearnode requires the following environment variables to be properly configured
 | `HTTP_PORT` | Port for the HTTP/WebSocket server | No | 8000 |
 | `METRICS_PORT` | Port for Prometheus metrics | No | 4242 |
 | `MSG_EXPIRY_TIME` | Time in seconds for message timestamp validation | No | 60 |
-| `CONFIG_DIR_PATH` | Path to directory containing blockchains.yaml | No | . |
+| `CONFIG_DIR_PATH` | Path to directory containing configuration files | No | . |
 | `<BLOCKCHAIN_NAME>_BLOCKCHAIN_RPC` | RPC endpoint for each enabled blockchain | Yes (per enabled blockchain) | - |
 
 ## Running with Docker

@@ -15,12 +15,12 @@ import (
 func runReconcileCli(logger Logger) {
 	logger = logger.NewSystem("reconcile")
 	if len(os.Args) < 5 {
-		logger.Fatal("Usage: clearnode reconcile <network> <block_start> <block_end>")
+		logger.Fatal("Usage: clearnode reconcile <blockchain_id> <block_start> <block_end>")
 	}
 
 	chainID, ok := new(big.Int).SetString(os.Args[2], 10)
 	if !ok {
-		logger.Fatal("Invalid network ID", "value", os.Args[2])
+		logger.Fatal("Invalid blockchain ID", "value", os.Args[2])
 	}
 	blockStart, ok := new(big.Int).SetString(os.Args[3], 10)
 	if !ok {
@@ -39,7 +39,7 @@ func runReconcileCli(logger Logger) {
 
 	blockchain, ok := config.blockchains[uint32(chainID.Uint64())]
 	if !ok {
-		logger.Fatal("Network is not configured", "network", chainID.Uint64())
+		logger.Fatal("Blockchain is either not configured or disabled", "id", chainID.Uint64())
 	}
 
 	client, err := ethclient.Dial(blockchain.BlockchainRPC)

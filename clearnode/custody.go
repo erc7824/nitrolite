@@ -53,13 +53,8 @@ func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, blockchain 
 		return nil, fmt.Errorf("failed to connect to blockchain node: %w", err)
 	}
 
-	chainID, err := client.ChainID(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get chain ID: %w", err)
-	}
-
 	// Create auth options for transactions.
-	auth, err := bind.NewKeyedTransactorWithChainID(signer.GetPrivateKey(), chainID)
+	auth, err := bind.NewKeyedTransactorWithChainID(signer.GetPrivateKey(), big.NewInt(int64(blockchain.ID)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transaction signer: %w", err)
 	}
@@ -86,12 +81,12 @@ func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, blockchain 
 		db:                 db,
 		custodyAddr:        custodyAddress,
 		transactOpts:       auth,
-		chainID:            uint32(chainID.Int64()),
+		chainID:            blockchain.ID,
 		signer:             signer,
 		adjudicatorAddress: common.HexToAddress(blockchain.ContractAddresses.Adjudicator),
 		wsNotifier:         wsNotifier,
 		blockStep:          blockchain.BlockStep,
-		logger:             logger.NewSystem("custody").With("chainID", chainID.Int64()).With("custodyAddress", blockchain.ContractAddresses.Custody),
+		logger:             logger.NewSystem("custody").With("chainID", blockchain.ID).With("custodyAddress", blockchain.ContractAddresses.Custody),
 	}, nil
 }
 

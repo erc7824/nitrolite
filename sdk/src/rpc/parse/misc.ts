@@ -98,14 +98,27 @@ const AllowanceObjectSchema = z
         }),
     );
 
+const AllowanceUsageObjectSchema = z
+    .object({
+        asset: z.string(),
+        allowance: z.string(),
+        used: z.string(),
+    })
+    .transform(
+        (raw): import('../types').RPCAllowanceUsage => ({
+            asset: raw.asset,
+            allowance: raw.allowance,
+            used: raw.used,
+        }),
+    );
+
 const SessionKeyObjectSchema = z
     .object({
         id: z.number(),
         session_key: addressSchema,
         application: z.string().optional(),
         app_address: z.string().optional(),
-        allowance: z.array(AllowanceObjectSchema),
-        used_allowance: z.array(AllowanceObjectSchema),
+        allowances: z.array(AllowanceUsageObjectSchema),
         scope: z.string().optional(),
         expires_at: z.string().optional(),
         created_at: z.string(),
@@ -115,8 +128,7 @@ const SessionKeyObjectSchema = z
             id: raw.id,
             sessionKey: raw.session_key,
             application: raw.application,
-            allowance: raw.allowance,
-            usedAllowance: raw.used_allowance,
+            allowances: raw.allowances,
             scope: raw.scope,
             expiresAt: raw.expires_at ? new Date(raw.expires_at) : undefined,
             createdAt: new Date(raw.created_at),

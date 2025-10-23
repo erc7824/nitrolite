@@ -17,9 +17,8 @@ type SessionKey struct {
 
 	WalletAddress string    `gorm:"column:wallet_address;index;not null"`
 	Application   string    `gorm:"column:application;not null"`
-	Allowance     *string   `gorm:"column:allowance;type:text"`      // JSON serialized allowances
-	UsedAllowance *string   `gorm:"column:used_allowance;type:text"` // JSON serialized used amounts
-	Scope         string    `gorm:"column:scope;not null;default:'all'"`
+	Allowance     *string   `gorm:"column:allowance;type:text"` // JSON serialized allowances
+	Scope         string    `gorm:"column:scope;not null;"`
 	ExpiresAt     time.Time `gorm:"column:expires_at;not null"`
 
 	CreatedAt time.Time
@@ -80,20 +79,13 @@ func AddSessionKey(db *gorm.DB, walletAddress, address, applicationName, scope s
 			return fmt.Errorf("failed to serialize spending cap: %w", err)
 		}
 
-		usedAllowanceJSON, err := json.Marshal([]Allowance{})
-		if err != nil {
-			return fmt.Errorf("failed to serialize used allowance: %w", err)
-		}
-
 		spendingCapStr := string(spendingCapJSON)
-		usedAllowanceStr := string(usedAllowanceJSON)
 
 		sessionKey := &SessionKey{
 			Address:       address,
 			WalletAddress: walletAddress,
 			Application:   applicationName,
 			Allowance:     &spendingCapStr,
-			UsedAllowance: &usedAllowanceStr,
 			Scope:         scope,
 			ExpiresAt:     expirationTime,
 		}
@@ -157,47 +149,6 @@ func GetActiveSessionKeysByWallet(db *gorm.DB, walletAddress string, listOpts *L
 	}
 
 	return sessionKeys, nil
-}
-
-// UpdateSessionKeyUsage recalculates and updates the used allowance for a session key based on ledger entries
-func UpdateSessionKeyUsage(db *gorm.DB, sessionKeyAddress string) error {
-	sessionKey, err := GetSessionKey(db, sessionKeyAddress)
-	if err != nil {
-		return fmt.Errorf("failed to get session key: %w", err)
-	}
-
-	if sessionKey.Allowance == nil {
-		return fmt.Errorf("session key %s has no spending cap configured", sessionKeyAddress)
-	}
-
-	var allowances []Allowance
-	if err := json.Unmarshal([]byte(*sessionKey.Allowance), &allowances); err != nil {
-		return fmt.Errorf("failed to parse spending cap: %w", err)
-	}
-
-	// Calculate used amounts for each asset
-	var usedAllowances []Allowance
-	for _, allowance := range allowances {
-		usedAmount, err := GetSessionKeySpending(db, sessionKeyAddress, allowance.Asset)
-		if err != nil {
-			return fmt.Errorf("failed to get spending for asset %s: %w", allowance.Asset, err)
-		}
-
-		usedAllowances = append(usedAllowances, Allowance{
-			Asset:  allowance.Asset,
-			Amount: usedAmount.String(),
-		})
-	}
-
-	usedAllowanceJSON, err := json.Marshal(usedAllowances)
-	if err != nil {
-		return fmt.Errorf("failed to serialize used allowance: %w", err)
-	}
-
-	usedAllowanceStr := string(usedAllowanceJSON)
-	return db.Model(&SessionKey{}).
-		Where("address = ?", sessionKeyAddress).
-		Update("used_allowance", usedAllowanceStr).Error
 }
 
 // GetSessionKey retrieves a specific session key

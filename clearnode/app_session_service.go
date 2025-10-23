@@ -161,13 +161,6 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 
 	d.appSession.Version++
 
-	// Update session key usage for any session keys that were actually used
-	for sessionKey := range sessionKeysUsed {
-		if err := UpdateSessionKeyUsage(tx, sessionKey); err != nil {
-			return UpdateResult{}, fmt.Errorf("failed to update session key usage for %s: %w", sessionKey, err)
-		}
-	}
-
 	return UpdateResult{
 		ParticipantsAffected: participantsWithUpdatedBalance,
 		UpdatedAppSession:    d.appSession,
@@ -460,13 +453,6 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 		}
 		if params.SessionData != nil {
 			session.SessionData = *params.SessionData
-		}
-
-		// Update session key usage for any session keys that were actually used
-		for sessionKey := range sessionKeysUsed {
-			if err := UpdateSessionKeyUsage(tx, sessionKey); err != nil {
-				return fmt.Errorf("failed to update session key usage for %s: %w", sessionKey, err)
-			}
 		}
 
 		return tx.Create(session).Error

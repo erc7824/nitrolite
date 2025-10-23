@@ -437,24 +437,16 @@ This endpoint returns only session keys, not custody signers. Each session key i
         "session_key": "0xabcdef1234567890...",
         "application": "Chess Game",
         "app_address": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
-        "allowance": [
+        "allowances": [
           {
             "asset": "usdc",
-            "amount": "100.0"
+            "allowance": "100.0",
+            "used": "45.0"
           },
           {
             "asset": "eth",
-            "amount": "0.5"
-          }
-        ],
-        "used_allowance": [
-          {
-            "asset": "usdc",
-            "amount": "45.0"
-          },
-          {
-            "asset": "eth",
-            "amount": "0.0"
+            "allowance": "0.5",
+            "used": "0.0"
           }
         ],
         "scope": "app.create",
@@ -466,16 +458,11 @@ This endpoint returns only session keys, not custody signers. Each session key i
         "session_key": "0xfedcba0987654321...",
         "application": "Trading Bot",
         "app_address": "0x1234567890abcdef1234567890abcdef12345678",
-        "allowance": [
+        "allowances": [
           {
             "asset": "usdc",
-            "amount": "500.0"
-          }
-        ],
-        "used_allowance": [
-          {
-            "asset": "usdc",
-            "amount": "250.0"
+            "allowance": "500.0",
+            "used": "250.0"
           }
         ],
         "scope": "app.create",
@@ -494,8 +481,10 @@ Each session key includes:
 - `session_key`: The address of the session key that can sign transactions
 - `application`: Name of the application this session key is authorized for (optional field, omitted if empty)
 - `app_address`: Address of the application this session key is authorized for (optional field, omitted if empty)
-- `allowance`: Array of asset allowances defining maximum amounts the session key can spend
-- `used_allowance`: Array showing how much of each allowance has been used by this session key
+- `allowances`: Array of asset allowances with usage tracking. Each entry contains:
+  - `asset`: Symbol of the asset (e.g., "usdc", "eth")
+  - `allowance`: Maximum amount the session key can spend for this asset
+  - `used`: Amount already spent by this session key (calculated on the fly from ledger entries)
 - `scope`: Permission scope for this session key (e.g., "app.create", "ledger.readonly") (optional field, omitted if empty)
 - `expires_at`: When this session key expires (ISO 8601 format) (optional field, omitted if no expiration)
 - `created_at`: When the session key was created (ISO 8601 format)

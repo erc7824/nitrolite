@@ -147,15 +147,20 @@ type GetSessionKeysResponse struct {
 	SessionKeys []SessionKeyResponse `json:"session_keys"`
 }
 
+type AllowanceUsage struct {
+	Asset     string          `json:"asset"`
+	Allowance decimal.Decimal `json:"allowance"`
+	Used      decimal.Decimal `json:"used"`
+}
+
 type SessionKeyResponse struct {
-	ID            uint        `json:"id"`
-	SessionKey    string      `json:"session_key"`
-	Application   string      `json:"application,omitempty"`
-	Allowance     []Allowance `json:"allowance"`
-	UsedAllowance []Allowance `json:"used_allowance"`
-	Scope         string      `json:"scope,omitempty"`
-	ExpiresAt     time.Time   `json:"expires_at,omitempty"`
-	CreatedAt     time.Time   `json:"created_at"`
+	ID          uint             `json:"id"`
+	SessionKey  string           `json:"session_key"`
+	Application string           `json:"application,omitempty"`
+	Allowances  []AllowanceUsage `json:"allowances"`
+	Scope       string           `json:"scope,omitempty"`
+	ExpiresAt   time.Time        `json:"expires_at,omitempty"`
+	CreatedAt   time.Time        `json:"created_at"`
 }
 
 func (r *RPCRouter) BalanceUpdateMiddleware(c *RPCContext) {
@@ -369,14 +374,6 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			return fmt.Errorf("failed to format transactions: %w", err)
 		}
 		respTransactions = formattedTransactions
-
-		// Update session key usage only when wallet didn't sign
-		if sessionKeyAddress != nil {
-			if err := UpdateSessionKeyUsage(tx, *sessionKeyAddress); err != nil {
-				logger.Error("failed to update session key usage", "sessionKey", *sessionKeyAddress, "error", err)
-				return fmt.Errorf("failed to update session key usage: %w", err)
-			}
-		}
 
 		return nil
 	})
@@ -721,34 +718,48 @@ func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
 
 	respSessionKeys := make([]SessionKeyResponse, 0, len(sessionKeys))
 	for _, sk := range sessionKeys {
-		spendingCap := []Allowance{}
-		usedAllowance := []Allowance{}
+		var allowances []Allowance
 
+		// Parse the allowances from the session key
 		if sk.Allowance != nil {
-			if err := json.Unmarshal([]byte(*sk.Allowance), &spendingCap); err != nil {
+			if err := json.Unmarshal([]byte(*sk.Allowance), &allowances); err != nil {
 				logger.Error("failed to unmarshal spending cap", "error", err, "sessionKey", sk.Address)
 				c.Fail(err, "failed to parse session key spending cap")
 				return
 			}
 		}
 
-		if sk.UsedAllowance != nil {
-			if err := json.Unmarshal([]byte(*sk.UsedAllowance), &usedAllowance); err != nil {
-				logger.Error("failed to unmarshal used allowance", "error", err, "sessionKey", sk.Address)
-				c.Fail(err, "failed to parse session key used allowance")
+		allowanceUsages := make([]AllowanceUsage, 0, len(allowances))
+		for _, allowance := range allowances {
+			allowanceAmount, err := decimal.NewFromString(allowance.Amount)
+			if err != nil {
+				logger.Error("failed to parse allowance amount", "error", err, "sessionKey", sk.Address, "asset", allowance.Asset)
+				c.Fail(err, "failed to parse allowance amount")
 				return
 			}
+
+			usedAmount, err := GetSessionKeySpending(r.DB, sk.Address, allowance.Asset)
+			if err != nil {
+				logger.Error("failed to calculate session key spending", "error", err, "sessionKey", sk.Address, "asset", allowance.Asset)
+				c.Fail(err, "failed to calculate session key usage")
+				return
+			}
+
+			allowanceUsages = append(allowanceUsages, AllowanceUsage{
+				Asset:     allowance.Asset,
+				Allowance: allowanceAmount,
+				Used:      usedAmount,
+			})
 		}
 
 		respSessionKeys = append(respSessionKeys, SessionKeyResponse{
-			ID:            sk.ID,
-			SessionKey:    sk.Address,
-			Application:   sk.Application,
-			Allowance:     spendingCap,
-			UsedAllowance: usedAllowance,
-			Scope:         sk.Scope,
-			ExpiresAt:     sk.ExpiresAt,
-			CreatedAt:     sk.CreatedAt,
+			ID:          sk.ID,
+			SessionKey:  sk.Address,
+			Application: sk.Application,
+			Allowances:  allowanceUsages,
+			Scope:       sk.Scope,
+			ExpiresAt:   sk.ExpiresAt,
+			CreatedAt:   sk.CreatedAt,
 		})
 	}
 

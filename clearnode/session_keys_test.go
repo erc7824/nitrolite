@@ -49,23 +49,7 @@ func TestSessionKey(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, allowances, retrievedSpendingCap)
 
-	var retrievedUsedAllowance []Allowance
-	err = json.Unmarshal([]byte(*sk.UsedAllowance), &retrievedUsedAllowance)
-	require.NoError(t, err)
-	assert.Empty(t, retrievedUsedAllowance)
-
-	err = UpdateSessionKeyUsage(db, sessionSignerAddress)
-	require.NoError(t, err)
-
-	retrievedKeys, err = GetSessionKeysByWallet(db, walletAddress)
-	require.NoError(t, err)
-	require.Len(t, retrievedKeys, 1)
-
-	err = json.Unmarshal([]byte(*retrievedKeys[0].UsedAllowance), &retrievedUsedAllowance)
-	require.NoError(t, err)
-	for _, allowance := range retrievedUsedAllowance {
-		assert.Equal(t, "0", allowance.Amount)
-	}
+	// UsedAllowance is now calculated on the fly, not stored in the database
 
 	assert.Equal(t, walletAddress, GetWalletBySessionKey(sessionSignerAddress))
 
@@ -126,7 +110,6 @@ func TestSessionKeyActiveKeys(t *testing.T) {
 		WalletAddress: walletAddress,
 		Application:   "ExpiredApp",
 		Allowance:     strPtr("[]"),
-		UsedAllowance: strPtr("[]"),
 		Scope:         "view",
 		ExpiresAt:     time.Now().Add(-1 * time.Hour).UTC(),
 	}
@@ -208,25 +191,10 @@ func TestSessionKeySpendingValidation(t *testing.T) {
 	assert.Error(t, err, "Should reject spending beyond remaining allowance")
 	assert.Contains(t, err.Error(), "operation denied: insufficient session key allowance")
 
-	// Test 8: Update session key usage and verify
-	err = UpdateSessionKeyUsage(db, sessionKeyAddress)
+	// Test 8: Verify usage is calculated correctly on the fly
+	usdcUsage, err := GetSessionKeySpending(db, sessionKeyAddress, "usdc")
 	require.NoError(t, err)
-
-	retrievedKey, err := GetSessionKey(db, sessionKeyAddress)
-	require.NoError(t, err)
-
-	var usedAllowances []Allowance
-	err = json.Unmarshal([]byte(*retrievedKey.UsedAllowance), &usedAllowances)
-	require.NoError(t, err)
-
-	var usdcUsage string
-	for _, allowance := range usedAllowances {
-		if allowance.Asset == "usdc" {
-			usdcUsage = allowance.Amount
-			break
-		}
-	}
-	assert.Equal(t, "200", usdcUsage, "Used allowance should reflect actual spending")
+	assert.Equal(t, "200", usdcUsage.String(), "Used allowance should reflect actual spending")
 }
 
 func TestSessionKeySpendingEdgeCases(t *testing.T) {

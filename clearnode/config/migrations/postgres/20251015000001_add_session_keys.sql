@@ -10,8 +10,7 @@ CREATE TABLE session_keys (
     wallet_address VARCHAR NOT NULL,
     application VARCHAR NOT NULL,
     allowance TEXT,
-    used_allowance TEXT,
-    scope VARCHAR NOT NULL DEFAULT 'all',
+    scope VARCHAR NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP

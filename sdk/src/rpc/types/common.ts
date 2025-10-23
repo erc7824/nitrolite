@@ -238,6 +238,18 @@ export interface RPCAllowance {
 }
 
 /**
+ * Represents an allowance with usage tracking, combining both limit and used amount.
+ */
+export interface RPCAllowanceUsage {
+    /** The symbol of the asset (e.g., "eth", "usdc"). */
+    asset: string;
+    /** The maximum amount of the asset that is allowed to be spent. */
+    allowance: string;
+    /** The amount of the asset that has been used. */
+    used: string;
+}
+
+/**
  * Represents a session key with its allowances and usage tracking.
  */
 export interface RPCSessionKey {
@@ -247,10 +259,8 @@ export interface RPCSessionKey {
     sessionKey: Address;
     /** Name of the application this session key is authorized for. */
     application?: string;
-    /** Array of asset allowances defining maximum amounts the session key can spend. */
-    allowance: RPCAllowance[];
-    /** Array showing how much of each allowance has been used by this session key. */
-    usedAllowance: RPCAllowance[];
+    /** Array of asset allowances with usage tracking. */
+    allowances: RPCAllowanceUsage[];
     /** Permission scope for this session key (e.g., "app.create", "ledger.readonly"). */
     scope?: string;
     /** When this session key expires. */

@@ -1960,16 +1960,18 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 
 		require.NotNil(t, sk1, "Chess Game session key should be present")
 		require.Equal(t, "Chess Game", sk1.Application)
-		require.Len(t, sk1.Allowance, 2)
-		require.Equal(t, "usdc", sk1.Allowance[0].Asset)
-		require.Equal(t, "100", sk1.Allowance[0].Amount)
+		require.Len(t, sk1.Allowances, 2)
+		require.Equal(t, "usdc", sk1.Allowances[0].Asset)
+		require.True(t, decimal.NewFromInt(100).Equal(sk1.Allowances[0].Allowance), "Allowance should be 100")
+		require.True(t, decimal.Zero.Equal(sk1.Allowances[0].Used), "Used should be 0")
 		require.Equal(t, "app.create", sk1.Scope)
 
 		require.NotNil(t, sk2, "Trading Bot session key should be present")
 		require.Equal(t, "Trading Bot", sk2.Application)
-		require.Len(t, sk2.Allowance, 1)
-		require.Equal(t, "usdc", sk2.Allowance[0].Asset)
-		require.Equal(t, "500", sk2.Allowance[0].Amount)
+		require.Len(t, sk2.Allowances, 1)
+		require.Equal(t, "usdc", sk2.Allowances[0].Asset)
+		require.True(t, decimal.NewFromInt(500).Equal(sk2.Allowances[0].Allowance), "Allowance should be 500")
+		require.True(t, decimal.Zero.Equal(sk2.Allowances[0].Used), "Used should be 0")
 	})
 
 	t.Run("Successfully retrieve session keys with used allowances", func(t *testing.T) {
@@ -1992,9 +1994,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		err = ledger.Record(accountID, "usdc", decimal.NewFromInt(-45), &sessionKey1Addr)
 		require.NoError(t, err)
 
-		// Update used allowance based on ledger entries
-		err = UpdateSessionKeyUsage(db, sessionKey1Addr)
-		require.NoError(t, err)
+		// Usage is now calculated on the fly, no need to update
 
 		ctx := createSignedRPCContext(1, "get_session_keys", nil, userSigner)
 		router.HandleGetSessionKeys(ctx)
@@ -2006,9 +2006,10 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 
 		sk := getKeysResponse.SessionKeys[0]
 		require.Equal(t, sessionKey1Addr, sk.SessionKey)
-		require.Len(t, sk.UsedAllowance, 1)
-		require.Equal(t, "usdc", sk.UsedAllowance[0].Asset)
-		require.Equal(t, "45", sk.UsedAllowance[0].Amount)
+		require.Len(t, sk.Allowances, 1)
+		require.Equal(t, "usdc", sk.Allowances[0].Asset)
+		require.True(t, decimal.NewFromInt(100).Equal(sk.Allowances[0].Allowance), "Allowance should be 100")
+		require.True(t, decimal.NewFromInt(45).Equal(sk.Allowances[0].Used), "Used should be 45")
 	})
 
 	t.Run("No session keys returns empty array", func(t *testing.T) {
@@ -2122,7 +2123,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		require.Len(t, getKeysResponse.SessionKeys, 1)
 		// Should only have the second session key
 		require.Equal(t, sessionKey2Addr, getKeysResponse.SessionKeys[0].SessionKey)
-		require.Len(t, getKeysResponse.SessionKeys[0].Allowance, 1)
-		require.Equal(t, "200", getKeysResponse.SessionKeys[0].Allowance[0].Amount)
+		require.Len(t, getKeysResponse.SessionKeys[0].Allowances, 1)
+		require.True(t, decimal.NewFromInt(200).Equal(getKeysResponse.SessionKeys[0].Allowances[0].Allowance), "Allowance should be 200")
 	})
 }

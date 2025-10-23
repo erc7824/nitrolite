@@ -41,13 +41,14 @@ type Custody struct {
 	chainID            uint32
 	signer             *Signer
 	adjudicatorAddress common.Address
+	assetsCfg          *AssetsConfig
 	blockStep          uint64
 	wsNotifier         *WSNotifier
 	logger             Logger
 }
 
 // NewCustody initializes the Ethereum client and custody contract wrapper.
-func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, blockchain BlockchainConfig, logger Logger) (*Custody, error) {
+func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, blockchain BlockchainConfig, assetsCfg *AssetsConfig, logger Logger) (*Custody, error) {
 	client, err := ethclient.Dial(blockchain.BlockchainRPC)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to blockchain node: %w", err)
@@ -74,6 +75,10 @@ func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, blockchain 
 		return nil, fmt.Errorf("failed to bind balance checker contract: %w", err)
 	}
 
+	if assetsCfg == nil {
+		return nil, fmt.Errorf("assets configuration is required")
+	}
+
 	return &Custody{
 		client:             client,
 		custody:            custody,
@@ -84,6 +89,7 @@ func NewCustody(signer *Signer, db *gorm.DB, wsNotifier *WSNotifier, blockchain 
 		chainID:            blockchain.ID,
 		signer:             signer,
 		adjudicatorAddress: common.HexToAddress(blockchain.ContractAddresses.Adjudicator),
+		assetsCfg:          assetsCfg,
 		wsNotifier:         wsNotifier,
 		blockStep:          blockchain.BlockStep,
 		logger:             logger.NewSystem("custody").With("chainID", blockchain.ID).With("custodyAddress", blockchain.ContractAddresses.Custody),
@@ -279,11 +285,11 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 			return err
 		}
 
-		asset, err := GetAssetByToken(tx, tokenAddress, c.chainID)
-		if err != nil {
-			return fmt.Errorf("failed to get asset: %w", err)
+		asset, ok := c.assetsCfg.GetAssetTokenByAddressAndChainID(tokenAddress, c.chainID)
+		if !ok {
+			return fmt.Errorf("asset with address %s on chain ID %d not found", tokenAddress, c.chainID)
 		}
-		amount := rawToDecimal(rawAmount, asset.Decimals)
+		amount := rawToDecimal(rawAmount, asset.Token.Decimals)
 
 		walletAddress := ev.Wallet
 		channelAccountID := NewAccountID(channelID)
@@ -430,12 +436,12 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 		walletAccountID := NewAccountID(channel.Wallet)
 		resizeAmount := ev.DeltaAllocations[0] // Participant deposits or withdraws.
 		if resizeAmount.Cmp(big.NewInt(0)) != 0 {
-			asset, err := GetAssetByToken(tx, channel.Token, c.chainID)
-			if err != nil {
-				return fmt.Errorf("failed to get asset: %w", err)
+			asset, ok := c.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, c.chainID)
+			if !ok {
+				return fmt.Errorf("asset with address %s on chain ID %d not found", channel.Token, c.chainID)
 			}
 
-			amount := rawToDecimal(resizeAmount, asset.Decimals)
+			amount := rawToDecimal(resizeAmount, asset.Token.Decimals)
 			// Keep correct order of operation for deposits and withdrawals into the channel.
 			if amount.IsPositive() || amount.IsZero() {
 				// 1. Deposit into a channel account.
@@ -451,7 +457,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 				if err := ledger.Record(walletAccountID, asset.Symbol, amount); err != nil {
 					return fmt.Errorf("error recording balance update for participant: %w", err)
 				}
-				_, err = RecordLedgerTransaction(tx, TransactionTypeDeposit, channelAccountID, walletAccountID, asset.Symbol, amount)
+				_, err := RecordLedgerTransaction(tx, TransactionTypeDeposit, channelAccountID, walletAccountID, asset.Symbol, amount)
 				if err != nil {
 					return fmt.Errorf("failed to record transaction: %w", err)
 				}
@@ -464,7 +470,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 				if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
 					return fmt.Errorf("error recording balance update for wallet: %w", err)
 				}
-				_, err = RecordLedgerTransaction(tx, TransactionTypeWithdrawal, walletAccountID, channelAccountID, asset.Symbol, amount)
+				_, err := RecordLedgerTransaction(tx, TransactionTypeWithdrawal, walletAccountID, channelAccountID, asset.Symbol, amount)
 				if err != nil {
 					return fmt.Errorf("failed to record transaction: %w", err)
 				}
@@ -512,13 +518,13 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 			return fmt.Errorf("error finding channel: %w", result.Error)
 		}
 
-		asset, err := GetAssetByToken(tx, channel.Token, c.chainID)
-		if err != nil {
-			return fmt.Errorf("failed to get asset: %w", err)
+		asset, ok := c.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, c.chainID)
+		if !ok {
+			return fmt.Errorf("asset with address %s on chain ID %d not found", channel.Token, c.chainID)
 		}
 
 		rawAmount := ev.FinalState.Allocations[0].Amount
-		amount := rawToDecimal(rawAmount, asset.Decimals)
+		amount := rawToDecimal(rawAmount, asset.Token.Decimals)
 
 		walletAddress := common.HexToAddress(channel.Wallet)
 		channelAccountID := NewAccountID(channelID)
@@ -596,7 +602,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 }
 
 // UpdateBalanceMetrics fetches the broker's account information from the smart contract and updates metrics
-func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metrics *Metrics) {
+func (c *Custody) UpdateBalanceMetrics(ctx context.Context, metrics *Metrics) {
 	logger := LoggerFromContext(ctx)
 
 	if metrics == nil {
@@ -607,9 +613,16 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 	callOpts := &bind.CallOpts{Context: ctx}
 	brokerAddr := c.signer.GetAddress()
 
+	assets := c.assetsCfg.GetAssetTokensByChainID(c.chainID)
+	assetsCount := len(assets)
+	if assetsCount == 0 {
+		logger.Warn("no assets configured for custody client", "network", c.chainID)
+		return
+	}
+
 	var tokenAddrs []common.Address
 	for _, asset := range assets {
-		tokenAddrs = append(tokenAddrs, common.HexToAddress(asset.Token))
+		tokenAddrs = append(tokenAddrs, common.HexToAddress(asset.Token.Address))
 	}
 	availInfo, err := c.custody.GetAccountsBalances(callOpts, []common.Address{brokerAddr}, tokenAddrs)
 	if err != nil {
@@ -618,9 +631,9 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 	}
 	if len(availInfo) == 0 {
 		logger.Warn("batch account info is empty", "network", c.chainID)
-	} else if len(availInfo[0]) != len(assets) {
+	} else if len(availInfo[0]) != assetsCount {
 		logger.Warn("unexpected batch account info length", "network", c.chainID,
-			"expected", len(assets), "got", len(availInfo[0]))
+			"expected", assetsCount, "got", len(availInfo[0]))
 	}
 
 	rawWalletBalances, err := c.balanceChecker.Balances(callOpts, []common.Address{brokerAddr}, tokenAddrs)
@@ -628,9 +641,9 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 		logger.Error("failed to get wallet balances", "network", c.chainID, "error", err)
 		return
 	}
-	if len(rawWalletBalances) != len(assets) {
+	if len(rawWalletBalances) != assetsCount {
 		logger.Warn("unexpected wallet balances length", "network", c.chainID,
-			"expected", len(assets), "got", len(rawWalletBalances))
+			"expected", assetsCount, "got", len(rawWalletBalances))
 	}
 
 	// Get the native token balance
@@ -644,37 +657,41 @@ func (c *Custody) UpdateBalanceMetrics(ctx context.Context, assets []Asset, metr
 	for i, asset := range assets {
 		var available decimal.Decimal
 		if len(availInfo) > 0 && i < len(availInfo[0]) {
-			available = rawToDecimal(availInfo[0][i], asset.Decimals)
+			available = rawToDecimal(availInfo[0][i], asset.Token.Decimals)
 
 			metrics.BrokerBalanceAvailable.With(prometheus.Labels{
-				"network": fmt.Sprintf("%d", c.chainID),
-				"token":   asset.Token,
-				"asset":   asset.Symbol,
+				"blockchainID": fmt.Sprintf("%d", c.chainID),
+				"token":        asset.Token.Address,
+				"asset":        asset.Token.Symbol,
 			}).Set(available.InexactFloat64())
 		}
 
-		walletBalance := rawToDecimal(rawWalletBalances[i], asset.Decimals)
+		walletBalance := rawToDecimal(rawWalletBalances[i], asset.Token.Decimals)
 		metrics.BrokerWalletBalance.With(prometheus.Labels{
-			"network": fmt.Sprintf("%d", c.chainID),
-			"token":   asset.Token,
-			"asset":   asset.Symbol,
+			"blockchainID": fmt.Sprintf("%d", c.chainID),
+			"token":        asset.Token.Address,
+			"asset":        asset.Token.Symbol,
 		}).Set(walletBalance.InexactFloat64())
 
-		logger.Debug("metrics updated", "network", c.chainID, "token", asset.Token, "contract_balance", available.String(), "wallet_balance", walletBalance.String())
+		logger.Debug("metrics updated",
+			"blockchainID", c.chainID,
+			"token", asset.Token.Address,
+			"contract_balance", available.String(),
+			"wallet_balance", walletBalance.String())
 	}
 
 	openChannels, err := c.custody.GetOpenChannels(callOpts, []common.Address{brokerAddr})
 	if err != nil {
-		logger.Error("failed to get open channels", "network", c.chainID, "broker", brokerAddr, "error", err)
+		logger.Error("failed to get open channels", "blockchainID", c.chainID, "broker", brokerAddr, "error", err)
 		return
 	}
 	if len(openChannels) == 0 {
-		logger.Warn("no open channels found", "network", c.chainID, "broker", brokerAddr)
+		logger.Warn("no open channels found", "blockchainID", c.chainID, "broker", brokerAddr)
 		return
 	}
 	count := len(openChannels[0])
-	metrics.BrokerChannelCount.With(prometheus.Labels{"network": fmt.Sprintf("%d", c.chainID)}).Set(float64(count))
-	logger.Debug("open channels metric updated", "network", c.chainID, "channels", count)
+	metrics.BrokerChannelCount.With(prometheus.Labels{"blockchainID": fmt.Sprintf("%d", c.chainID)}).Set(float64(count))
+	logger.Debug("open channels metric updated", "blockchainID", c.chainID, "channels", count)
 }
 
 // saveContractEvent saves a contract event to the database if it has not been processed before.

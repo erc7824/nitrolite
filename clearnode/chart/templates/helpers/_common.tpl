@@ -74,6 +74,8 @@ Returns common environment variables
 {{- range $key, $value := .Values.config.extraEnvs }}
 - name: {{ $key | upper }}
   value: {{ $value | print | quote }}
+- name: CLEARNODE_CONFIG_DIR_PATH
+  value: /app/config
 {{- end }}
 {{- end }}
 

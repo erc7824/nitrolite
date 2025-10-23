@@ -68,11 +68,22 @@ func setupMockCustody(t *testing.T) (*Custody, *gorm.DB, func()) {
 	auth.GasPrice = big.NewInt(30000000000)
 	auth.GasLimit = uint64(3000000)
 
-	assets := []Asset{
-		{Token: tokenAddress, ChainID: uint32(chainID.Int64()), Symbol: "usdc", Decimals: 6},
-	}
-	for _, asset := range assets {
-		require.NoError(t, db.Create(&asset).Error)
+	assetsCfg := &AssetsConfig{
+		Assets: []AssetConfig{
+			{
+				Symbol:  "usdc",
+				Enabled: true,
+				Tokens: []TokenConfig{
+					{
+						Enabled:      true,
+						BlockchainID: uint32(chainID.Int64()),
+						Address:      tokenAddress,
+						Symbol:       "usdc",
+						Decimals:     6,
+					},
+				},
+			},
+		},
 	}
 
 	contract, err := nitrolite.NewCustody(common.Address{}, client)
@@ -86,6 +97,7 @@ func setupMockCustody(t *testing.T) (*Custody, *gorm.DB, func()) {
 		custody:            contract,
 		chainID:            uint32(chainID.Int64()),
 		adjudicatorAddress: newTestCommonAddress("0xAdjudicatorAddress"),
+		assetsCfg:          assetsCfg,
 		wsNotifier:         NewWSNotifier(func(userID string, method string, params RPCDataParams) {}, logger),
 		logger:             logger,
 	}
@@ -397,11 +409,11 @@ func TestHandleClosedEvent(t *testing.T) {
 		err := db.Create(&initialChannel).Error
 		require.NoError(t, err)
 
-		asset, err := GetAssetByToken(db, tokenAddress, custody.chainID)
-		require.NoError(t, err)
+		asset, ok := custody.assetsCfg.GetAssetTokenByAddressAndChainID(tokenAddress, custody.chainID)
+		require.True(t, ok)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialRawAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialRawAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
 
 		err = ledger.Record(walletAccountID, asset.Symbol, initialRawAmountDecimal)
 		require.NoError(t, err)
@@ -464,7 +476,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 
-		finalAmountDecimal := decimal.NewFromBigInt(finalAmount, 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		finalAmountDecimal := decimal.NewFromBigInt(finalAmount, 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
 		assert.True(t, finalAmountDecimal.Equal(tx.Amount), "Transaction amount should match final amount")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
@@ -503,11 +515,11 @@ func TestHandleClosedEvent(t *testing.T) {
 		require.NoError(t, err)
 
 		// Set up initial wallet balance
-		asset, err := GetAssetByToken(db, tokenAddress, custody.chainID)
-		require.NoError(t, err)
+		asset, ok := custody.assetsCfg.GetAssetTokenByAddressAndChainID(tokenAddress, custody.chainID)
+		require.True(t, ok)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
 
 		// Initial balance in wallet
 		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
@@ -549,7 +561,7 @@ func TestHandleClosedEvent(t *testing.T) {
 		assert.Equal(t, channelID, tx.ToAccount, "To account should be channel ID")
 		assert.Equal(t, asset.Symbol, tx.AssetSymbol, "Asset symbol should match")
 
-		finalAmountDecimal := decimal.NewFromBigInt(finalAmount, 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		finalAmountDecimal := decimal.NewFromBigInt(finalAmount, 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
 		assert.True(t, finalAmountDecimal.Equal(tx.Amount), "Transaction amount should match final amount")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
@@ -587,11 +599,11 @@ func TestHandleClosedEvent(t *testing.T) {
 		err := db.Create(&initialChannel).Error
 		require.NoError(t, err)
 
-		asset, err := GetAssetByToken(db, tokenAddress, custody.chainID)
-		require.NoError(t, err)
+		asset, ok := custody.assetsCfg.GetAssetTokenByAddressAndChainID(tokenAddress, custody.chainID)
+		require.True(t, ok)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := channelAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialAmountDecimal := channelAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
 
 		err = ledger.Record(walletAccountID, asset.Symbol, walletBalance)
 		require.NoError(t, err)
@@ -740,11 +752,11 @@ func TestHandleResizedEvent(t *testing.T) {
 		err := db.Create(&initialChannel).Error
 		require.NoError(t, err)
 
-		asset, err := GetAssetByToken(db, tokenAddress, custody.chainID)
-		require.NoError(t, err)
+		asset, ok := custody.assetsCfg.GetAssetTokenByAddressAndChainID(tokenAddress, custody.chainID)
+		require.True(t, ok)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
 
 		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
 		require.NoError(t, err)
@@ -784,7 +796,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		walletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)
 		require.NoError(t, err)
 
-		deltaAmountDecimal := deltaAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		deltaAmountDecimal := deltaAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
 		expectedWalletBalance := initialAmountDecimal.Add(deltaAmountDecimal)
 
 		assert.True(t, expectedWalletBalance.Equal(walletBalance),
@@ -843,11 +855,11 @@ func TestHandleResizedEvent(t *testing.T) {
 		err := db.Create(&initialChannel).Error
 		require.NoError(t, err)
 
-		asset, err := GetAssetByToken(db, tokenAddress, custody.chainID)
-		require.NoError(t, err)
+		asset, ok := custody.assetsCfg.GetAssetTokenByAddressAndChainID(tokenAddress, custody.chainID)
+		require.True(t, ok)
 
 		ledger := GetWalletLedger(db, walletAddr)
-		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		initialAmountDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
 
 		err = ledger.Record(walletAccountID, asset.Symbol, initialAmountDecimal)
 		require.NoError(t, err)
@@ -868,7 +880,7 @@ func TestHandleResizedEvent(t *testing.T) {
 		walletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)
 		require.NoError(t, err)
 
-		deltaAmountDecimal := deltaAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Decimals))))
+		deltaAmountDecimal := deltaAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
 		expectedWalletBalance := initialAmountDecimal.Add(deltaAmountDecimal)
 
 		assert.True(t, expectedWalletBalance.Equal(walletBalance),

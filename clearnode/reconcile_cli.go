@@ -62,6 +62,7 @@ func runReconcileCli(logger Logger) {
 		db,
 		NewWSNotifier(func(userID, method string, params RPCDataParams) {}, logger),
 		blockchain,
+		&config.assets,
 		logger,
 	)
 	if err != nil {

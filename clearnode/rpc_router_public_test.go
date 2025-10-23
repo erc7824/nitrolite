@@ -84,18 +84,42 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 func TestRPCRouterHandleGetAssets(t *testing.T) {
 	t.Parallel()
 
-	router, db, cleanup := setupTestRPCRouter(t)
+	router, _, cleanup := setupTestRPCRouter(t)
 	defer cleanup()
 
-	testAssets := []Asset{
-		{Token: "0xToken1", ChainID: 137, Symbol: "usdc", Decimals: 6},
-		{Token: "0xToken2", ChainID: 137, Symbol: "weth", Decimals: 18},
-		{Token: "0xToken3", ChainID: 42220, Symbol: "celo", Decimals: 18},
-		{Token: "0xToken4", ChainID: 8453, Symbol: "usdbc", Decimals: 6},
+	testTokens := []TokenConfig{
+		{
+			Address:      "0xToken1",
+			BlockchainID: 137,
+			Decimals:     6,
+			Symbol:       "usdc",
+		},
+		{
+			Address:      "0xToken2",
+			BlockchainID: 137,
+			Decimals:     18,
+			Symbol:       "weth",
+		},
+		{
+			Address:      "0xToken3",
+			BlockchainID: 42220,
+			Decimals:     18,
+			Symbol:       "celo",
+		},
+		{
+			Address:      "0xToken4",
+			BlockchainID: 8453,
+			Decimals:     6,
+			Symbol:       "usdbc",
+		},
 	}
 
-	for _, asset := range testAssets {
-		require.NoError(t, db.Create(&asset).Error)
+	for _, token := range testTokens {
+		seedAsset(t, &router.Config.assets,
+			token.Address,
+			token.BlockchainID,
+			token.Symbol,
+			token.Decimals)
 	}
 
 	tcs := []struct {
@@ -103,7 +127,7 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 		params             map[string]interface{}
 		expectedTokenNames []string
 	}{
-		{"Get all with no sort (default asc, by chain_id and symbol)", map[string]interface{}{}, []string{"0xToken3", "0xToken4", "0xToken1", "0xToken2"}},
+		{"Get all", map[string]interface{}{}, []string{"0xToken1", "0xToken2", "0xToken3", "0xToken4"}},
 		{"Filter by chain_id=137", map[string]interface{}{"chain_id": float64(137)}, []string{"0xToken1", "0xToken2"}},
 		{"Filter by chain_id=42220", map[string]interface{}{"chain_id": float64(42220)}, []string{"0xToken3"}},
 		{"Filter by non-existent chain_id=1", map[string]interface{}{"chain_id": float64(1)}, []string{}},

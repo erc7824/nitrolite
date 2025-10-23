@@ -171,26 +171,8 @@ func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[uint
 			ctx = SetContextLogger(ctx, logger)
 
 			// Update metrics for each custody client
-			for _, client := range custodyClients {
-				assets, err := GetAllAssets(db, &client.chainID)
-				if err != nil {
-					logger.Error("failed to retrieve assets", "err", err)
-					continue
-				}
-
-				// Append base asset
-				baseAsset := Asset{
-					Token:    "0x0000000000000000000000000000000000000000",
-					ChainID:  client.chainID,
-					Symbol:   "eth",
-					Decimals: 18,
-				}
-				if client.chainID == 137 {
-					baseAsset.Symbol = "pol"
-				}
-				assets = append(assets, baseAsset)
-
-				client.UpdateBalanceMetrics(ctx, assets, m)
+			for _, custodyClient := range custodyClients {
+				custodyClient.UpdateBalanceMetrics(ctx, m)
 			}
 		}
 	}

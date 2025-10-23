@@ -141,17 +141,20 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 		return
 	}
 
-	query := applySort(r.DB, "symbol", SortTypeAscending, nil)
-	assets, err := GetAllAssets(query, params.ChainID)
-	if err != nil {
-		logger.Error("failed to get assets", "error", err)
-		c.Fail(err, "failed to get assets")
-		return
-	}
+	respAssets := []AssetResponse{}
+	for _, asset := range r.Config.assets.Assets {
+		for _, token := range asset.Tokens {
+			if params.ChainID != nil && token.BlockchainID != *params.ChainID {
+				continue
+			}
 
-	respAssets := make([]AssetResponse, 0, len(assets))
-	for _, asset := range assets {
-		respAssets = append(respAssets, AssetResponse(asset))
+			respAssets = append(respAssets, AssetResponse{
+				Symbol:   asset.Symbol,
+				ChainID:  token.BlockchainID,
+				Token:    token.Address,
+				Decimals: token.Decimals,
+			})
+		}
 	}
 
 	resp := GetAssetsResponse{

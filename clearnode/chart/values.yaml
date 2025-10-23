@@ -33,6 +33,8 @@ config:
   envSecret: ""
   # -- Blockchains configuration
   blockchains: {}
+  # -- Assets configuration
+  assets: {}
 
 # -- Number of replicas
 replicaCount: 1

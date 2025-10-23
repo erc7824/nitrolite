@@ -11,3 +11,5 @@ metadata:
 data:
   blockchains.yaml: |-
 {{ .Values.config.blockchains | indent 4 }}
+  assets.yaml: |-
+{{ .Values.config.assets | indent 4 }}

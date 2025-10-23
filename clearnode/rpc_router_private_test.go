@@ -919,8 +919,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		t.Cleanup(cleanup)
 
 		// Seed asset
-		asset := Asset{Token: "0xTokenResize", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenResize"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		// Create channel with initial amount 1000
 		initialRawAmount := decimal.NewFromInt(1000)
@@ -929,7 +929,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
 			State: UnsignedState{
@@ -988,8 +988,9 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		asset := Asset{Token: "0xTokenResize2", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		// Seed asset
+		tokenAddress := "0xTokenResize2"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		initialRawAmount := decimal.NewFromInt(1000)
 		ch := Channel{
@@ -997,7 +998,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
 			State: UnsignedState{
@@ -1064,15 +1065,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		asset := Asset{Token: "0xTokenClosed", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenClosed"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		ch := Channel{
 			ChannelID:   "0xChanClosed",
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusClosed,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
 			State: UnsignedState{
@@ -1105,15 +1106,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		signer := Signer{privateKey: rawKey}
 		userAddress := signer.GetAddress()
 
-		asset := Asset{Token: "0xToken", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xToken"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		require.NoError(t, db.Create(&Channel{
 			ChannelID:   "0xChanChallenged",
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusChallenged,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
 			State: UnsignedState{
@@ -1126,7 +1127,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
 			State: UnsignedState{
@@ -1154,15 +1155,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		asset := Asset{Token: "0xTokenInsufficient", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenInsufficient"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		ch := Channel{
 			ChannelID:   "0xChanInsufficient",
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
 			State: UnsignedState{
@@ -1194,15 +1195,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		asset := Asset{Token: "0xTokenZero", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenZero"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		ch := Channel{
 			ChannelID:   "0xChanZero",
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
 			State: UnsignedState{
@@ -1237,8 +1238,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		asset := Asset{Token: "0xTokenResizeOnly", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenResizeOnly"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		initialRawAmount := decimal.NewFromInt(1000)
 		ch := Channel{
@@ -1246,7 +1247,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
 			State: UnsignedState{
@@ -1285,8 +1286,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		asset := Asset{Token: "0xTokenResizeOnly", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenResizeOnly"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		initialRawAmount := decimal.NewFromInt(1000)
 		ch := Channel{
@@ -1294,7 +1295,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
 			State: UnsignedState{
@@ -1334,15 +1335,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		asset := Asset{Token: "0xTokenExcessive", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenExcessive"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		ch := Channel{
 			ChannelID:   "0xChanExcessive",
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
 			State: UnsignedState{
@@ -1376,15 +1377,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NoError(t, err)
 		wrongSigner := Signer{privateKey: wrongKey}
 
-		asset := Asset{Token: "0xTokenSig", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenSig"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		ch := Channel{
 			ChannelID:   "0xChanSig",
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
 			State: UnsignedState{
@@ -1412,15 +1413,15 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		asset := Asset{Token: "0xTokenLarge", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenLarge"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		ch := Channel{
 			ChannelID:   "0xChanLarge",
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(1000),
 			State: UnsignedState{
@@ -1460,8 +1461,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		t.Cleanup(cleanup)
 
 		// Seed asset
-		asset := Asset{Token: "0xTokenMixed", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenMixed"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		// Create channel with initial amount 1000
 		initialRawAmount := decimal.NewFromInt(1000)
@@ -1470,7 +1471,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
 			State: UnsignedState{
@@ -1532,8 +1533,8 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		t.Cleanup(cleanup)
 
 		// Seed asset
-		asset := Asset{Token: "0xTokenMixed", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenMixed"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		// Create channel with initial amount 0
 		initialRawAmount := decimal.NewFromInt(0)
@@ -1542,7 +1543,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
 			State: UnsignedState{
@@ -1611,8 +1612,8 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		t.Cleanup(cleanup)
 
 		// Seed asset
-		asset := Asset{Token: "0xTokenClose", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenClose"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		// Create channel with amount 500
 		initialRawAmount := decimal.NewFromInt(500)
@@ -1621,7 +1622,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   initialRawAmount,
 			State: UnsignedState{
@@ -1634,7 +1635,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddress).Record(
 			userAccountID,
 			"usdc",
-			rawToDecimal(initialRawAmount.BigInt(), asset.Decimals),
+			rawToDecimal(initialRawAmount.BigInt(), 6),
 		))
 
 		closeParams := CloseChannelParams{
@@ -1662,8 +1663,8 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		t.Cleanup(cleanup)
 
 		// Seed asset
-		asset := Asset{Token: "0xTokenClose", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenClose"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		initialRawAmount := decimal.NewFromInt(500)
 
@@ -1673,7 +1674,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 				Participant: userAddress.Hex(),
 				Wallet:      userAddress.Hex(),
 				Status:      ChannelStatusChallenged,
-				Token:       asset.Token,
+				Token:       tokenAddress,
 				ChainID:     137,
 				RawAmount:   initialRawAmount,
 				State: UnsignedState{
@@ -1685,7 +1686,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 				Participant: userAddress.Hex(),
 				Wallet:      userAddress.Hex(),
 				Status:      ChannelStatusOpen,
-				Token:       asset.Token,
+				Token:       tokenAddress,
 				ChainID:     137,
 				RawAmount:   initialRawAmount,
 				State: UnsignedState{
@@ -1700,7 +1701,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		require.NoError(t, GetWalletLedger(db, userAddress).Record(
 			userAccountID,
 			"usdc",
-			rawToDecimal(initialRawAmount.BigInt(), asset.Decimals),
+			rawToDecimal(initialRawAmount.BigInt(), 6),
 		))
 
 		closeParams := CloseChannelParams{
@@ -1724,18 +1725,18 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 	t.Run("SuccessfulCreateChannel", func(t *testing.T) {
 		t.Parallel()
 
-		router, db, cleanup := setupTestRPCRouter(t)
+		router, _, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
 		// Seed asset with proper address format
-		asset := Asset{Token: "0x1234567890123456789012345678901234567890", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0x1234567890123456789012345678901234567890"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		// Create channel params
 		amount := decimal.NewFromInt(1000000) // 1 USDC in raw units (6 decimals)
 		createParams := CreateChannelParams{
 			ChainID: 137,
-			Token:   asset.Token,
+			Token:   tokenAddress,
 			Amount:  &amount,
 		}
 
@@ -1758,28 +1759,28 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 
 		// Verify allocations
 		require.Equal(t, userAddress.Hex(), resObj.State.Allocations[0].Participant, "First allocation should be for user")
-		require.Equal(t, asset.Token, resObj.State.Allocations[0].TokenAddress, "Token address should match")
+		require.Equal(t, tokenAddress, resObj.State.Allocations[0].TokenAddress, "Token address should match")
 		require.Equal(t, amount, resObj.State.Allocations[0].RawAmount, "Amount should match")
 
 		require.Equal(t, router.Signer.GetAddress().Hex(), resObj.State.Allocations[1].Participant, "Second allocation should be for broker")
-		require.Equal(t, asset.Token, resObj.State.Allocations[1].TokenAddress, "Token address should match")
+		require.Equal(t, tokenAddress, resObj.State.Allocations[1].TokenAddress, "Token address should match")
 		require.True(t, resObj.State.Allocations[1].RawAmount.IsZero(), "Broker allocation should be zero")
 	})
 
 	t.Run("ErrorInvalidChainID", func(t *testing.T) {
 		t.Parallel()
 
-		router, db, cleanup := setupTestRPCRouter(t)
+		router, _, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
 		// Seed asset for unsupported chain ID to pass asset check first
-		asset := Asset{Token: "0xTokenCreate", ChainID: 999, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenCreate"
+		seedAsset(t, &router.Config.assets, tokenAddress, 999, "usdc", 6)
 
 		amount := decimal.NewFromInt(1000000)
 		createParams := CreateChannelParams{
 			ChainID: 999, // Unsupported chain ID
-			Token:   "0xTokenCreate",
+			Token:   tokenAddress,
 			Amount:  &amount,
 		}
 
@@ -1816,8 +1817,8 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		t.Cleanup(cleanup)
 
 		// Seed asset
-		asset := Asset{Token: "0xTokenCreate", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenCreate"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		// Create existing open channel
 		existingChannel := Channel{
@@ -1825,7 +1826,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 			Participant: userAddress.Hex(),
 			Wallet:      userAddress.Hex(),
 			Status:      ChannelStatusOpen,
-			Token:       asset.Token,
+			Token:       tokenAddress,
 			ChainID:     137,
 			RawAmount:   decimal.NewFromInt(500),
 			State: UnsignedState{
@@ -1838,7 +1839,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		amount := decimal.NewFromInt(1000000)
 		createParams := CreateChannelParams{
 			ChainID: 137,
-			Token:   asset.Token,
+			Token:   tokenAddress,
 			Amount:  &amount,
 		}
 
@@ -1851,18 +1852,18 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 	t.Run("ErrorInvalidSignature", func(t *testing.T) {
 		t.Parallel()
 
-		router, db, cleanup := setupTestRPCRouter(t)
+		router, _, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
 		// Seed asset
-		asset := Asset{Token: "0xTokenCreate", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenCreate"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		// Create channel params
 		amount := decimal.NewFromInt(1000000)
 		createParams := CreateChannelParams{
 			ChainID: 137,
-			Token:   asset.Token,
+			Token:   tokenAddress,
 			Amount:  &amount,
 		}
 
@@ -1878,18 +1879,18 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 	t.Run("SuccessfulZeroAmount", func(t *testing.T) {
 		t.Parallel()
 
-		router, db, cleanup := setupTestRPCRouter(t)
+		router, _, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
 		// Seed asset
-		asset := Asset{Token: "0xTokenCreate", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenCreate"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		// Try to create channel with zero amount
 		amount := decimal.Zero
 		createParams := CreateChannelParams{
 			ChainID: 137,
-			Token:   asset.Token,
+			Token:   tokenAddress,
 			Amount:  &amount,
 		}
 
@@ -1906,18 +1907,18 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 	t.Run("ErrorNegativeAmount", func(t *testing.T) {
 		t.Parallel()
 
-		router, db, cleanup := setupTestRPCRouter(t)
+		router, _, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
 		// Seed asset
-		asset := Asset{Token: "0xTokenCreate", ChainID: 137, Symbol: "usdc", Decimals: 6}
-		require.NoError(t, db.Create(&asset).Error)
+		tokenAddress := "0xTokenCreate"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		// Try to create channel with negative amount
 		amount := decimal.NewFromInt(-1000)
 		createParams := CreateChannelParams{
 			ChainID: 137,
-			Token:   asset.Token,
+			Token:   tokenAddress,
 			Amount:  &amount,
 		}
 

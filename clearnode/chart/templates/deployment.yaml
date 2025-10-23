@@ -32,8 +32,6 @@ spec:
           image: {{ include "clearnode.component.image" .Values.image }}
           imagePullPolicy: IfNotPresent
           env:
-            - name: BLOCKCHAINS_CONFIG_PATH
-              value: /app/config/blockchains.yaml
             {{- include "clearnode.common.env" . | nindent 12 }}
           {{- if or .Values.config.secretEnvs .Values.config.envSecret }}
           envFrom:

@@ -17,6 +17,7 @@ const (
 // Config represents the overall application configuration
 type Config struct {
 	blockchains   map[uint32]BlockchainConfig
+	assets        AssetsConfig
 	privateKeyHex string
 	dbConf        DatabaseConfig
 	msgExpiryTime int // Time in seconds for message timestamp validation
@@ -80,8 +81,14 @@ func LoadConfig(logger Logger) (*Config, error) {
 		logger.Fatal("failed to load blockchains", "error", err)
 	}
 
+	assets, err := LoadAssets(configDirPath)
+	if err != nil {
+		logger.Fatal("failed to load assets", "error", err)
+	}
+
 	config := Config{
 		blockchains:   blockchains,
+		assets:        assets,
 		privateKeyHex: privateKeyHex,
 		dbConf:        dbConf,
 		msgExpiryTime: messageTimestampExpiry,

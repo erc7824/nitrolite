@@ -74,7 +74,7 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 					},
 				},
 			},
-			expectedErrorStr: "invalid blockchain name 'Invalid Name!'",
+			expectedErrorStr: "invalid blockchain name 'Invalid Name!', should match snake_case format",
 		},
 		{
 			name: "invalid name 2",
@@ -87,7 +87,7 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 					},
 				},
 			},
-			expectedErrorStr: "invalid blockchain name '_foo_'",
+			expectedErrorStr: "invalid blockchain name '_foo_', should match snake_case format",
 		},
 		{
 			name: "disabled blockchain",

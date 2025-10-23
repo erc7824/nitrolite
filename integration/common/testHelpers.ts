@@ -55,7 +55,7 @@ export async function authenticateAppWithAllowances(
     await createAuthSessionWithClearnode(participantAppWS, participantAppIdentity, {
         address: participantAppIdentity.walletAddress,
         session_key: participantAppIdentity.sessionAddress,
-        app_name: 'App Domain',
+        application: 'App Domain',
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
         application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // random address, no use for now

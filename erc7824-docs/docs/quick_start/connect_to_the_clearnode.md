@@ -282,10 +282,9 @@ import { ethers } from 'ethers';
 const authRequestMsg = await createAuthRequestMessage({
   address: '0xYourWalletAddress',
   session_key: '0xYourSignerAddress',
-  app_name: 'Your Domain',
+  application: 'YourAppDomain',
   expire: (Math.floor(Date.now() / 1000) + 3600).toString(), // 1 hour expiration (as string)
   scope: 'console',
-  application: '0xYourApplicationAddress',
   allowances: [],
 });
 
@@ -372,10 +371,9 @@ ws.onopen = async () => {
   const authRequestMsg = await createAuthRequestMessage({
     address: '0xYourWalletAddress',
     session_key: '0xYourSignerAddress',
-    app_name: 'Your Domain',
+    application: 'YourAppDomain',
     expire: (Math.floor(Date.now() / 1000) + 3600).toString(), // 1 hour expiration (as string)
     scope: 'console',
-    application: '0xYourApplicationAddress',
     allowances: [],
   });
   ws.send(authRequestMsg);
@@ -510,7 +508,6 @@ The format of the EIP-712 message is as follows:
     challenge: 'RandomChallengeString',
     scope: 'console',
     wallet: '0xYourWalletAddress',
-    application: '0xYourApplicationAddress',
     participant: '0xYourSignerAddress',
     expire: 100500,
     allowances: []

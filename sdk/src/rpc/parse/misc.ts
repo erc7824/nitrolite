@@ -102,7 +102,7 @@ const SessionKeyObjectSchema = z
     .object({
         id: z.number(),
         session_key: addressSchema,
-        app_name: z.string().optional(),
+        application: z.string().optional(),
         app_address: z.string().optional(),
         allowance: z.array(AllowanceObjectSchema),
         used_allowance: z.array(AllowanceObjectSchema),
@@ -114,8 +114,7 @@ const SessionKeyObjectSchema = z
         (raw): RPCSessionKey => ({
             id: raw.id,
             sessionKey: raw.session_key,
-            appName: raw.app_name,
-            appAddress: raw.app_address,
+            application: raw.application,
             allowance: raw.allowance,
             usedAllowance: raw.used_allowance,
             scope: raw.scope,

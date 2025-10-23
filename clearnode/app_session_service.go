@@ -65,7 +65,7 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 	}
 
 	for _, alloc := range d.params.Allocations {
-		walletAddress := alloc.ParticipantWallet
+		walletAddress := alloc.Participant
 		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
 		if alloc.Amount.LessThan(currentAmount) {
 			return UpdateResult{}, RPCErrorf("incorrect deposit request: decreased allocation for participant %s", walletAddress)
@@ -75,7 +75,7 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 	noDeposits := true
 
 	for _, alloc := range d.params.Allocations {
-		walletAddress := alloc.ParticipantWallet // ParticipantWallet should always be the main wallet
+		walletAddress := alloc.Participant // ParticipantWallet should always be the main wallet
 		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
 
 		if alloc.Amount.GreaterThan(currentAmount) {
@@ -102,12 +102,12 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 			isDepositorSig := false
 
 			// Check if participant wallet signed directly
-			if _, ok := d.rpcSigners[alloc.ParticipantWallet]; ok {
+			if _, ok := d.rpcSigners[alloc.Participant]; ok {
 				isDepositorSig = true
-			} else if _, ok := d.rpcWallets[alloc.ParticipantWallet]; ok {
+			} else if _, ok := d.rpcWallets[alloc.Participant]; ok {
 				// Check if any of the signers is a session key with spending limits for this wallet
 				for signer := range d.rpcSigners {
-					if GetWalletBySigner(signer) == alloc.ParticipantWallet {
+					if GetWalletBySessionKey(signer) == alloc.Participant {
 						sessionKeyAddress = &signer
 						break
 					}
@@ -206,7 +206,7 @@ func (w *WithdrawUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult
 	}
 
 	for _, alloc := range w.params.Allocations {
-		walletAddress := alloc.ParticipantWallet
+		walletAddress := alloc.Participant
 		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
 		if alloc.Amount.GreaterThan(currentAmount) {
 			return UpdateResult{}, RPCErrorf("incorrect withdrawal request: increased allocation for participant %s", walletAddress)
@@ -220,19 +220,14 @@ func (w *WithdrawUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult
 			return UpdateResult{}, RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 		}
 
-		walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
-		if walletAddress == "" {
-			walletAddress = alloc.ParticipantWallet
-		}
-
-		currentAmount := currentAllocations[walletAddress][alloc.AssetSymbol]
+		currentAmount := currentAllocations[alloc.Participant][alloc.AssetSymbol]
 
 		if alloc.Amount.LessThan(currentAmount) {
 			withdrawalAmount := currentAmount.Sub(alloc.Amount)
 			noWithdrawals = false
 
-			userAddress := common.HexToAddress(walletAddress)
-			userAccountID := NewAccountID(walletAddress)
+			userAddress := common.HexToAddress(alloc.Participant)
+			userAccountID := NewAccountID(alloc.Participant)
 			ledger := GetWalletLedger(tx, userAddress)
 
 			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, withdrawalAmount.Neg(), nil); err != nil {
@@ -246,7 +241,7 @@ func (w *WithdrawUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult
 				return UpdateResult{}, RPCErrorf(ErrRecordTransaction+": %w", err)
 			}
 
-			participantsWithUpdatedBalance[walletAddress] = true
+			participantsWithUpdatedBalance[alloc.Participant] = true
 		}
 	}
 
@@ -297,16 +292,11 @@ func (o *OperateUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 			return UpdateResult{}, RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 		}
 
-		walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
-		if walletAddress == "" {
-			walletAddress = alloc.ParticipantWallet
-		}
-
-		if err := validateAppParticipant(walletAddress, participantWeights); err != nil {
+		if err := validateAppParticipant(alloc.Participant, participantWeights); err != nil {
 			return UpdateResult{}, err
 		}
 
-		userAddress := common.HexToAddress(walletAddress)
+		userAddress := common.HexToAddress(alloc.Participant)
 		ledger := GetWalletLedger(tx, userAddress)
 		balance, err := ledger.Balance(sessionAccountID, alloc.AssetSymbol)
 		if err != nil {
@@ -400,12 +390,12 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 			signatureProvided := false
 
 			// Check direct signature from participant
-			if _, ok := rpcSigners[alloc.ParticipantWallet]; ok {
+			if _, ok := rpcSigners[alloc.Participant]; ok {
 				signatureProvided = true
 			} else {
 				// Check if any signer is a session key with spending limits for this participant
 				for signer := range rpcSigners {
-					if GetWalletBySigner(signer) == alloc.ParticipantWallet {
+					if GetWalletBySessionKey(signer) == alloc.Participant {
 						signatureProvided = true
 						sessionKeyAddress = &signer
 						break
@@ -414,7 +404,7 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 			}
 
 			if alloc.Amount.IsPositive() && !signatureProvided {
-				return RPCErrorf("missing signature for participant %s", alloc.ParticipantWallet)
+				return RPCErrorf("missing signature for participant %s", alloc.Participant)
 			}
 
 			// Validate session key spending only when wallet didn't sign
@@ -426,7 +416,7 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 				sessionKeysUsed[*sessionKeyAddress] = true
 			}
 
-			walletAddress := alloc.ParticipantWallet
+			walletAddress := alloc.Participant
 
 			if err := checkChallengedChannels(tx, walletAddress); err != nil {
 				return err
@@ -623,10 +613,7 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcW
 				return RPCErrorf(ErrNegativeAllocation+": %s for asset %s", alloc.Amount, alloc.AssetSymbol)
 			}
 
-			walletAddress := GetWalletBySigner(alloc.ParticipantWallet)
-			if walletAddress == "" {
-				walletAddress = alloc.ParticipantWallet
-			}
+			walletAddress := alloc.Participant
 
 			if err := validateAppParticipant(walletAddress, participantWeights); err != nil {
 				return err
@@ -797,9 +784,9 @@ func prepareAppAllocations(participantAllocations map[string]map[string]decimal.
 		for asset, amount := range assetMap {
 			if !amount.IsZero() {
 				allocations = append(allocations, AppAllocation{
-					ParticipantWallet: participant,
-					AssetSymbol:       asset,
-					Amount:            amount,
+					Participant: participant,
+					AssetSymbol: asset,
+					Amount:      amount,
 				})
 			}
 		}

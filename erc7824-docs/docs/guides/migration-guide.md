@@ -284,7 +284,7 @@ Update all your ClearNode API requests to use object-based parameters instead of
     "req": [1, "auth_request", [{
       "address": "0x1234567890abcdef...",
       "session_key": "0x9876543210fedcba...",
-      "app_name": "Example App",
+      "application": "Example App",
       "allowances": [ "usdc", "100.0" ],
       "scope": "app.create",
       "expire": "3600",
@@ -302,7 +302,7 @@ Update all your ClearNode API requests to use object-based parameters instead of
     "req": [1, "auth_request", {
       "address": "0x1234567890abcdef...",
       "session_key": "0x9876543210fedcba...",
-      "app_name": "Example App",
+      "application": "Example App",
       "allowances": [
         {
           "asset": "usdc",

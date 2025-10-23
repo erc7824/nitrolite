@@ -251,15 +251,13 @@ export interface AuthRequest extends GenericRPCMessage {
         /** The session key address associated with the authentication attempt. */
         session_key: Address;
         /** The name of the application being authorized. */
-        app_name: string;
+        application: string;
         /** The allowances for the connection. */
         allowances: RPCAllowance[];
         /** The expiration timestamp for the authorization. */
         expire: string;
         /** The scope of the authorization. */
         scope: string;
-        /** The application address being authorized. */
-        application: Address;
     };
 }
 

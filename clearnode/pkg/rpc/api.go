@@ -235,16 +235,14 @@ type AuthRequestRequest struct {
 	Address string `json:"address"`
 	// SessionKey is a unique key for this authentication session
 	SessionKey string `json:"session_key"`
-	// AppName identifies the application requesting authentication
-	AppName string `json:"app_name"`
+	// Application identifies the application requesting authentication
+	Application string `json:"application"`
 	// Allowances define spending limits for the authenticated session
 	Allowances []Allowance `json:"allowances"`
 	// Expire defines when the authentication expires (RFC3339 format)
 	Expire string `json:"expire"`
 	// Scope defines the permission scope for the session
 	Scope string `json:"scope"`
-	// ApplicationAddress is the contract address of the requesting application
-	ApplicationAddress string `json:"application"`
 }
 
 // AuthRequestResponse contains the challenge for wallet signature.

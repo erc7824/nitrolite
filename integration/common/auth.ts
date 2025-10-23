@@ -16,7 +16,7 @@ export const createAuthSessionWithClearnode = async (
     authRequestParams = authRequestParams || {
         address: identity.walletAddress,
         session_key: identity.sessionAddress,
-        app_name: 'clearnode', // Use 'clearnode' app name to allow session key to be used as a custody signer
+        application: 'clearnode', // Use 'clearnode' app name to allow session key to be used as a custody signer
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
         application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // random address, no use for now
@@ -33,7 +33,7 @@ export const createAuthSessionWithClearnode = async (
             allowances: authRequestParams.allowances,
         },
         {
-            name: authRequestParams.app_name,
+            name: authRequestParams.application,
         }
     );
 

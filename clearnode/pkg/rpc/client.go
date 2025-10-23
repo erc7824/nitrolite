@@ -508,11 +508,10 @@ func (c *Client) GetLedgerTransactions(ctx context.Context, reqParams GetLedgerT
 //   - reqParams: Authentication request containing:
 //   - Address: Main wallet address requesting authentication (cold wallet)
 //   - SessionKey: Address of a different key that will be used for signing during this session (hot wallet)
-//   - AppName: Name of the application
+//   - Application: Name of the application
 //   - Allowances: Spending limits for the session
 //   - Expire: When the authentication expires (RFC3339 or empty)
 //   - Scope: Permission scope (e.g., "trade", "view", or empty)
-//   - ApplicationAddress: Contract address of the requesting application
 //   - signer: Signer interface to sign the challenge (should correspond to Address, not SessionKey)
 //
 // Returns:
@@ -528,9 +527,8 @@ func (c *Client) GetLedgerTransactions(ctx context.Context, reqParams GetLedgerT
 //	authReq := AuthRequestRequest{
 //	    Address:            walletSigner.PublicKey().Address().String(),   // Main wallet
 //	    SessionKey:         sessionSigner.PublicKey().Address().String(),  // Different key for session
-//	    AppName:            "MyDApp",
+//	    Application:            "MyDApp",
 //	    Allowances:         []Allowance{{Asset: "usdc", Amount: "1000"}},
-//	    ApplicationAddress: appContractAddress,
 //	}
 //
 //	// Sign with main wallet, but SessionKey will be used for subsequent operations
@@ -1419,8 +1417,7 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 				{Name: "challenge", Type: "string"},
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
-				{Name: "application", Type: "address"},
-				{Name: "participant", Type: "address"},
+				{Name: "session_key", Type: "address"},
 				{Name: "expire", Type: "uint256"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
@@ -1430,14 +1427,13 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 			}},
 		PrimaryType: "Policy",
 		Domain: apitypes.TypedDataDomain{
-			Name: req.AppName,
+			Name: req.Application,
 		},
 		Message: map[string]any{
 			"challenge":   token,
 			"scope":       req.Scope,
 			"wallet":      req.Address,
-			"application": req.ApplicationAddress,
-			"participant": req.SessionKey,
+			"session_key": req.SessionKey,
 			"expire":      req.Expire,
 			"allowances":  req.Allowances,
 		},

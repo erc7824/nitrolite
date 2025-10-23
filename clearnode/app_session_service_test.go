@@ -113,8 +113,8 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 				Nonce:              uint64(time.Now().Unix()),
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 			},
 		}
 
@@ -154,7 +154,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 				Nonce:              uint64(time.Now().Unix()),
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 
@@ -179,7 +179,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 				Nonce:              uint64(time.Now().Unix()),
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
 			},
 		}
 
@@ -205,7 +205,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 				Nonce:              uint64(time.Now().Unix()),
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 
@@ -234,8 +234,8 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 				Nonce:              uint64(time.Now().Unix()),
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
@@ -264,8 +264,8 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 				Nonce:              uint64(time.Now().Unix()),
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
@@ -296,8 +296,8 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			AppSessionID: session.SessionID,
 			Version:      0,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
@@ -327,8 +327,8 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 			},
 		}
 
@@ -356,8 +356,8 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			Intent:       rpc.AppSessionIntentOperate,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
@@ -390,8 +390,8 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			Intent:       rpc.AppSessionIntentOperate,
 			Version:      3,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
@@ -417,8 +417,8 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			Intent:       rpc.AppSessionIntentOperate,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(80)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(80)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
@@ -439,7 +439,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			Intent:       "unknown_intent",
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 
@@ -514,8 +514,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Version:      2,
 			SessionData:  &testSessionData,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 
@@ -610,10 +610,10 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(3)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(250)},
-				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(5)},
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+				{Participant: depositorAddress.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(3)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(250)},
+				{Participant: userAddressC.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(5)},
 			},
 		}
 
@@ -654,8 +654,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
 			},
 		}
 
@@ -686,7 +686,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 
@@ -707,7 +707,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentDeposit,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 
@@ -734,7 +734,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 			},
 		}
 
@@ -761,7 +761,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 			},
 		}
 
@@ -797,9 +797,9 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
-				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressC.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
@@ -826,7 +826,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		allowances := []Allowance{
 			{Asset: "usdc", Amount: "1000"},
 		}
-		err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "trade", allowances, time.Now().Add(24*time.Hour))
+		err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
 		require.NoError(t, err)
 
 		// Setup depositor wallet balance (no custody signer needed - using session key)
@@ -856,9 +856,9 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
-				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressC.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
@@ -893,8 +893,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)}, // no change
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},     // no change
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)}, // no change
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},     // no change
 			},
 		}
 
@@ -927,8 +927,8 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(80)}, // decrease from 100 to 80
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},     // no change
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(80)}, // decrease from 100 to 80
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},     // no change
 			},
 		}
 
@@ -964,9 +964,9 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)}, // +50
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(75)},      // +25
-				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},      // no change
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)}, // +50
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(75)},      // +25
+				{Participant: userAddressC.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},      // no change
 			},
 		}
 
@@ -1012,8 +1012,8 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			Intent:       rpc.AppSessionIntentWithdraw,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: withdrawerAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: withdrawerAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 
@@ -1067,10 +1067,10 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			Intent:       rpc.AppSessionIntentWithdraw,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: withdrawerAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)}, // withdraw 50
-				{ParticipantWallet: withdrawerAddress.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(3)},    // withdraw 2
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},      // withdraw 50
-				{ParticipantWallet: userAddressC.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(5)},         // withdraw 3
+				{Participant: withdrawerAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)}, // withdraw 50
+				{Participant: withdrawerAddress.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(3)},    // withdraw 2
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},      // withdraw 50
+				{Participant: userAddressC.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(5)},         // withdraw 3
 			},
 		}
 
@@ -1111,8 +1111,8 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			Intent:       rpc.AppSessionIntentWithdraw,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
 			},
 		}
 
@@ -1134,7 +1134,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			Intent:       rpc.AppSessionIntentWithdraw,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
@@ -1167,8 +1167,8 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			Intent:       rpc.AppSessionIntentWithdraw,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(120)}, // increase from 100 to 120
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},  // no change
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(120)}, // increase from 100 to 120
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},  // no change
 			},
 		}
 
@@ -1195,7 +1195,7 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 			Intent:       rpc.AppSessionIntentWithdraw,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
 			},
 		}
 
@@ -1225,8 +1225,8 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		params := &CloseAppSessionParams{
 			AppSessionID: session.SessionID,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 			},
 		}
 
@@ -1270,8 +1270,8 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		params := &CloseAppSessionParams{
 			AppSessionID: session.SessionID,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
 			},
 		}
 
@@ -1308,8 +1308,8 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 		params := &CloseAppSessionParams{
 			AppSessionID: session.SessionID,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-100)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(400)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(-100)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(400)},
 			},
 		}
 
@@ -1334,7 +1334,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 		{Asset: "usdc", Amount: "500"},
 		{Asset: "eth", Amount: "2"},
 	}
-	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "trade", allowances, time.Now().Add(24*time.Hour))
+	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
 	accountID := NewAccountID(walletAddress)
@@ -1358,7 +1358,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 				Nonce:              1,
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: walletAddress, AssetSymbol: "usdc", Amount: decimal.NewFromInt(300)},
+				{Participant: walletAddress, AssetSymbol: "usdc", Amount: decimal.NewFromInt(300)},
 			},
 		}
 
@@ -1382,7 +1382,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 				Nonce:              2,
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: walletAddress, AssetSymbol: "usdc", Amount: decimal.NewFromInt(300)}, // This would make total 600, exceeding 500 limit
+				{Participant: walletAddress, AssetSymbol: "usdc", Amount: decimal.NewFromInt(300)}, // This would make total 600, exceeding 500 limit
 			},
 		}
 
@@ -1402,7 +1402,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 				Nonce:              3,
 			},
 			Allocations: []AppAllocation{
-				{ParticipantWallet: walletAddress, AssetSymbol: "btc", Amount: decimal.NewFromInt(1)}, // BTC not in allowances
+				{Participant: walletAddress, AssetSymbol: "btc", Amount: decimal.NewFromInt(1)}, // BTC not in allowances
 			},
 		}
 
@@ -1421,7 +1421,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: walletAddress, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: walletAddress, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
 			},
 		}
 

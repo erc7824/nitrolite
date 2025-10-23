@@ -6,10 +6,9 @@ DROP TABLE IF EXISTS signers;
 -- Create session_keys table for session keys with spending caps
 CREATE TABLE session_keys (
     id SERIAL PRIMARY KEY,
-    signer_address VARCHAR NOT NULL UNIQUE,
+    address VARCHAR NOT NULL UNIQUE,
     wallet_address VARCHAR NOT NULL,
-    app_name VARCHAR NOT NULL,
-    app_address VARCHAR NOT NULL DEFAULT '',
+    application VARCHAR NOT NULL,
     allowance TEXT,
     used_allowance TEXT,
     scope VARCHAR NOT NULL DEFAULT 'all',
@@ -22,7 +21,7 @@ CREATE TABLE session_keys (
 CREATE INDEX idx_session_keys_wallet_address ON session_keys(wallet_address);
 -- Ensure one session key per wallet+app (identified by both name and address together)
 CREATE UNIQUE INDEX idx_session_keys_unique_wallet_app
-  ON session_keys(wallet_address, app_name);
+  ON session_keys(wallet_address, application);
 
 ALTER TABLE ledger ADD COLUMN IF NOT EXISTS session_key VARCHAR;
 CREATE INDEX IF NOT EXISTS idx_ledger_session_key ON ledger(session_key);

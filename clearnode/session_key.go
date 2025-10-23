@@ -12,13 +12,11 @@ import (
 
 // SessionKey represents a ledger layer session key
 type SessionKey struct {
-	ID uint `gorm:"primaryKey;autoIncrement"`
+	ID      uint   `gorm:"primaryKey;autoIncrement"`
+	Address string `gorm:"column:address;uniqueIndex;not null"`
 
-	SignerAddress string `gorm:"column:signer_address;uniqueIndex;not null"`
-	WalletAddress string `gorm:"column:wallet_address;index;not null"`
-
-	AppName       string    `gorm:"column:app_name;not null"`
-	AppAddress    string    `gorm:"column:app_address;not null;default:''"`
+	WalletAddress string    `gorm:"column:wallet_address;index;not null"`
+	Application   string    `gorm:"column:application;not null"`
 	Allowance     *string   `gorm:"column:allowance;type:text"`      // JSON serialized allowances
 	UsedAllowance *string   `gorm:"column:used_allowance;type:text"` // JSON serialized used amounts
 	Scope         string    `gorm:"column:scope;not null;default:'all'"`
@@ -42,14 +40,14 @@ func loadSessionKeyCache(db *gorm.DB) error {
 		return err
 	}
 	for _, sk := range sessionKeys {
-		sessionKeyCache.Store(sk.SignerAddress, sk.WalletAddress)
+		sessionKeyCache.Store(sk.Address, sk.WalletAddress)
 	}
 	return nil
 }
 
 // AddSessionKey stores a new session key with its metadata
-// Only one session key per wallet+app combination is allowed - adding a new one invalidates existing ones
-func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, applicationAddress, scope string, allowances []Allowance, expirationTime time.Time) error {
+// Only one session key per wallet+app combination is allowed - registering a new one invalidates existing ones
+func AddSessionKey(db *gorm.DB, walletAddress, address, applicationName, scope string, allowances []Allowance, expirationTime time.Time) error {
 	err := db.Transaction(func(tx *gorm.DB) error {
 		// Validate expiration time is in the future
 		if expirationTime.IsZero() || expirationTime.Before(time.Now().UTC()) {
@@ -63,7 +61,7 @@ func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, a
 
 		// Check for and remove existing session key for this wallet+app combination
 		var existingKeys []SessionKey
-		err := tx.Where("wallet_address = ? AND app_name = ?",
+		err := tx.Where("wallet_address = ? AND application = ?",
 			walletAddress, applicationName).Find(&existingKeys).Error
 		if err != nil {
 			return fmt.Errorf("failed to check existing session keys: %w", err)
@@ -74,7 +72,7 @@ func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, a
 			if err := tx.Delete(&existingKey).Error; err != nil {
 				return fmt.Errorf("failed to remove existing session key: %w", err)
 			}
-			sessionKeyCache.Delete(existingKey.SignerAddress)
+			sessionKeyCache.Delete(existingKey.Address)
 		}
 
 		spendingCapJSON, err := json.Marshal(allowances)
@@ -91,10 +89,9 @@ func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, a
 		usedAllowanceStr := string(usedAllowanceJSON)
 
 		sessionKey := &SessionKey{
-			SignerAddress: signerAddress,
+			Address:       address,
 			WalletAddress: walletAddress,
-			AppName:       applicationName,
-			AppAddress:    applicationAddress,
+			Application:   applicationName,
 			Allowance:     &spendingCapStr,
 			UsedAllowance: &usedAllowanceStr,
 			Scope:         scope,
@@ -106,16 +103,16 @@ func AddSessionKey(db *gorm.DB, walletAddress, signerAddress, applicationName, a
 
 	// Update cache only after transaction commits successfully
 	if err == nil {
-		sessionKeyCache.Store(signerAddress, walletAddress)
+		sessionKeyCache.Store(address, walletAddress)
 	}
 
 	return err
 }
 
-// GetWalletBySigner retrieves the wallet address associated with a given signer
-func GetWalletBySigner(signer string) string {
+// GetWalletBySessionKey retrieves the wallet address associated with a given signer
+func GetWalletBySessionKey(sessionKeyAddress string) string {
 	// Check session key cache first
-	if w, ok := sessionKeyCache.Load(signer); ok {
+	if w, ok := sessionKeyCache.Load(sessionKeyAddress); ok {
 		return w.(string)
 	}
 	return ""
@@ -163,14 +160,14 @@ func GetActiveSessionKeysByWallet(db *gorm.DB, walletAddress string, listOpts *L
 }
 
 // UpdateSessionKeyUsage recalculates and updates the used allowance for a session key based on ledger entries
-func UpdateSessionKeyUsage(db *gorm.DB, signerAddress string) error {
-	sessionKey, err := GetSessionKeyBySigner(db, signerAddress)
+func UpdateSessionKeyUsage(db *gorm.DB, sessionKeyAddress string) error {
+	sessionKey, err := GetSessionKey(db, sessionKeyAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get session key: %w", err)
 	}
 
 	if sessionKey.Allowance == nil {
-		return fmt.Errorf("session key %s has no spending cap configured", signerAddress)
+		return fmt.Errorf("session key %s has no spending cap configured", sessionKeyAddress)
 	}
 
 	var allowances []Allowance
@@ -181,7 +178,7 @@ func UpdateSessionKeyUsage(db *gorm.DB, signerAddress string) error {
 	// Calculate used amounts for each asset
 	var usedAllowances []Allowance
 	for _, allowance := range allowances {
-		usedAmount, err := GetSessionKeySpending(db, signerAddress, allowance.Asset)
+		usedAmount, err := GetSessionKeySpending(db, sessionKeyAddress, allowance.Asset)
 		if err != nil {
 			return fmt.Errorf("failed to get spending for asset %s: %w", allowance.Asset, err)
 		}
@@ -199,16 +196,16 @@ func UpdateSessionKeyUsage(db *gorm.DB, signerAddress string) error {
 
 	usedAllowanceStr := string(usedAllowanceJSON)
 	return db.Model(&SessionKey{}).
-		Where("signer_address = ?", signerAddress).
+		Where("address = ?", sessionKeyAddress).
 		Update("used_allowance", usedAllowanceStr).Error
 }
 
-// GetSessionKeyBySigner retrieves a specific session key by its signer address
-func GetSessionKeyBySigner(db *gorm.DB, signerAddress string) (*SessionKey, error) {
+// GetSessionKey retrieves a specific session key
+func GetSessionKey(db *gorm.DB, sessionKeyAddress string) (*SessionKey, error) {
 	var sk SessionKey
-	err := db.Where("signer_address = ?", signerAddress).First(&sk).Error
+	err := db.Where("address = ?", sessionKeyAddress).First(&sk).Error
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve session key %s: %w", signerAddress, err)
+		return nil, fmt.Errorf("failed to retrieve session key %s: %w", sessionKeyAddress, err)
 	}
 	return &sk, nil
 }
@@ -234,11 +231,11 @@ func GetSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol st
 
 // ValidateSessionKeySpending checks if a session key can spend the requested amount without exceeding its allowance
 func ValidateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol string, requestedAmount decimal.Decimal) error {
-	sessionKey, err := GetSessionKeyBySigner(db, sessionKeyAddress)
+	sessionKey, err := GetSessionKey(db, sessionKeyAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get session key: %w", err)
 	}
-	if sessionKey.AppName == "clearnode" {
+	if sessionKey.Application == "clearnode" {
 		return nil // Do not enforce limitations on clearnode session keys
 	}
 

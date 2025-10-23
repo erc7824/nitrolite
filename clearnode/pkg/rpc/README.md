@@ -350,8 +350,7 @@ sessionSigner, _ := sign.NewEthereumSigner(sessionPrivateKey)
 authReq := rpc.AuthRequestRequest{
     Address:            walletSigner.PublicKey().Address().String(),
     SessionKey:         sessionSigner.PublicKey().Address().String(), // Different from Address
-    AppName:            "MyApp",
-    ApplicationAddress: appContractAddress,
+    Application:            "MyApp",
 }
 
 authResp, _, err := client.AuthWithSig(ctx, authReq, walletSigner)

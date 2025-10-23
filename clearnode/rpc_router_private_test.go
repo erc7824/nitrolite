@@ -623,8 +623,8 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		createParams := CreateAppSessionParams{
 			Definition: def,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 			},
 			SessionData: &data,
 		}
@@ -691,8 +691,8 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		createParams := CreateAppSessionParams{
 			Definition: def,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
 			},
 		}
 
@@ -757,8 +757,8 @@ func TestRPCRouterHandleSubmitAppState(t *testing.T) {
 		submitAppStateParams := SubmitAppStateParams{
 			AppSessionID: vAppID.Hex(),
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+				{Participant: userAddressA.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+				{Participant: userAddressB.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
 			},
 			SessionData: &data,
 		}
@@ -844,8 +844,8 @@ func TestRPCRouterHandleCloseAppSession(t *testing.T) {
 		closeParams := CloseAppSessionParams{
 			AppSessionID: vAppID.Hex(),
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+				{Participant: userAddressA.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
+				{Participant: userAddressB.Hex(), AssetSymbol: assetSymbol, Amount: decimal.NewFromInt(250)},
 			},
 			SessionData: &data,
 		}
@@ -1919,7 +1919,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 	sessionKey2, _ := crypto.GenerateKey()
 	sessionKey2Addr := crypto.PubkeyToAddress(sessionKey2.PublicKey).Hex()
 
-	t.Run("Successfully retrieve session keys with app_name and app_address", func(t *testing.T) {
+	t.Run("Successfully retrieve session keys with application and app_address", func(t *testing.T) {
 		t.Parallel()
 
 		router, db, cleanup := setupTestRPCRouter(t)
@@ -1931,13 +1931,13 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 			{Asset: "eth", Amount: "0.5"},
 		}
 		expiresAt := time.Now().Add(24 * time.Hour)
-		err := AddSessionKey(db, userAddr, sessionKey1Addr, "Chess Game", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "app.create", allowances1, expiresAt)
+		err := AddSessionKey(db, userAddr, sessionKey1Addr, "Chess Game", "app.create", allowances1, expiresAt)
 		require.NoError(t, err)
 
 		allowances2 := []Allowance{
 			{Asset: "usdc", Amount: "500"},
 		}
-		err = AddSessionKey(db, userAddr, sessionKey2Addr, "Trading Bot", "0x1234567890abcdef1234567890abcdef12345678", "app.create", allowances2, expiresAt)
+		err = AddSessionKey(db, userAddr, sessionKey2Addr, "Trading Bot", "app.create", allowances2, expiresAt)
 		require.NoError(t, err)
 
 		ctx := createSignedRPCContext(1, "get_session_keys", nil, userSigner)
@@ -1959,16 +1959,14 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		}
 
 		require.NotNil(t, sk1, "Chess Game session key should be present")
-		require.Equal(t, "Chess Game", sk1.AppName)
-		require.Equal(t, "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", sk1.AppAddress)
+		require.Equal(t, "Chess Game", sk1.Application)
 		require.Len(t, sk1.Allowance, 2)
 		require.Equal(t, "usdc", sk1.Allowance[0].Asset)
 		require.Equal(t, "100", sk1.Allowance[0].Amount)
 		require.Equal(t, "app.create", sk1.Scope)
 
 		require.NotNil(t, sk2, "Trading Bot session key should be present")
-		require.Equal(t, "Trading Bot", sk2.AppName)
-		require.Equal(t, "0x1234567890abcdef1234567890abcdef12345678", sk2.AppAddress)
+		require.Equal(t, "Trading Bot", sk2.Application)
 		require.Len(t, sk2.Allowance, 1)
 		require.Equal(t, "usdc", sk2.Allowance[0].Asset)
 		require.Equal(t, "500", sk2.Allowance[0].Amount)
@@ -1985,7 +1983,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 			{Asset: "usdc", Amount: "100"},
 		}
 		expiresAt := time.Now().Add(24 * time.Hour)
-		err := AddSessionKey(db, userAddr, sessionKey1Addr, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "app.create", allowances, expiresAt)
+		err := AddSessionKey(db, userAddr, sessionKey1Addr, "TestApp", "app.create", allowances, expiresAt)
 		require.NoError(t, err)
 
 		// Simulate spending by recording ledger entries
@@ -2042,16 +2040,15 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 
 		// Add active session key
 		activeExpiresAt := time.Now().Add(24 * time.Hour)
-		err := AddSessionKey(db, userAddr, sessionKey1Addr, "ActiveApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "app.create", allowances, activeExpiresAt)
+		err := AddSessionKey(db, userAddr, sessionKey1Addr, "ActiveApp", "app.create", allowances, activeExpiresAt)
 		require.NoError(t, err)
 
 		// Directly insert expired session key into database (bypassing validation)
 		expiredExpiresAt := time.Now().UTC().Add(-1 * time.Hour)
 		expiredKey := SessionKey{
-			SignerAddress: sessionKey2Addr,
+			Address:       sessionKey2Addr,
 			WalletAddress: userAddr,
-			AppName:       "ExpiredApp",
-			AppAddress:    "0x1234567890abcdef1234567890abcdef12345678",
+			Application:   "ExpiredApp",
 			Allowance:     &allowancesStr,
 			Scope:         "app.create",
 			ExpiresAt:     expiredExpiresAt,
@@ -2067,7 +2064,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		require.True(t, ok)
 		require.Len(t, getKeysResponse.SessionKeys, 1)
 		require.Equal(t, sessionKey1Addr, getKeysResponse.SessionKeys[0].SessionKey)
-		require.Equal(t, "ActiveApp", getKeysResponse.SessionKeys[0].AppName)
+		require.Equal(t, "ActiveApp", getKeysResponse.SessionKeys[0].Application)
 	})
 
 	t.Run("Session key with different scopes", func(t *testing.T) {
@@ -2081,7 +2078,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 			{Asset: "usdc", Amount: "50"},
 		}
 		expiresAt := time.Now().Add(24 * time.Hour)
-		err := AddSessionKey(db, userAddr, sessionKey1Addr, "ReadOnlyApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "ledger.readonly", allowances, expiresAt)
+		err := AddSessionKey(db, userAddr, sessionKey1Addr, "ReadOnlyApp", "ledger.readonly", allowances, expiresAt)
 		require.NoError(t, err)
 
 		ctx := createSignedRPCContext(1, "get_session_keys", nil, userSigner)
@@ -2106,14 +2103,14 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		expiresAt := time.Now().Add(24 * time.Hour)
 
 		// Add first session key for app
-		err := AddSessionKey(db, userAddr, sessionKey1Addr, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "app.create", allowances1, expiresAt)
+		err := AddSessionKey(db, userAddr, sessionKey1Addr, "TestApp", "app.create", allowances1, expiresAt)
 		require.NoError(t, err)
 
 		// Add second session key for same app (should replace first)
 		allowances2 := []Allowance{
 			{Asset: "usdc", Amount: "200"},
 		}
-		err = AddSessionKey(db, userAddr, sessionKey2Addr, "TestApp", "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc", "app.create", allowances2, expiresAt)
+		err = AddSessionKey(db, userAddr, sessionKey2Addr, "TestApp", "app.create", allowances2, expiresAt)
 		require.NoError(t, err)
 
 		ctx := createSignedRPCContext(1, "get_session_keys", nil, userSigner)

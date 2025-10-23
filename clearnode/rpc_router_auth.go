@@ -11,13 +11,12 @@ import (
 )
 
 type AuthRequestParams struct {
-	Address            string      `json:"address"`     // The wallet address requesting authentication
-	SessionKey         string      `json:"session_key"` // The session key for the authentication
-	AppName            string      `json:"app_name"`    // The name of the application requesting authentication
-	Allowances         []Allowance `json:"allowances"`  // Allowances for the application
-	Expire             string      `json:"expire"`      // Expiration time for the authentication
-	Scope              string      `json:"scope"`       // Scope of the authentication
-	ApplicationAddress string      `json:"application"` // The address of the application requesting authentication
+	Address     string      `json:"address"`     // The wallet address requesting authentication
+	SessionKey  string      `json:"session_key"` // The session key for the authentication
+	Application string      `json:"application"` // The name of the application requesting authentication
+	Allowances  []Allowance `json:"allowances"`  // Allowances for the application
+	Expire      string      `json:"expire"`      // Expiration time for the authentication
+	Scope       string      `json:"scope"`       // Scope of the authentication
 }
 
 // AuthResponse represents the server's challenge response
@@ -49,21 +48,19 @@ func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 	logger.Debug("incoming auth request",
 		"addr", authParams.Address,
 		"sessionKey", authParams.SessionKey,
-		"appName", authParams.AppName,
+		"application", authParams.Application,
 		"rawAllowances", authParams.Allowances,
 		"scope", authParams.Scope,
-		"expire", authParams.Expire,
-		"applicationAddress", authParams.ApplicationAddress)
+		"expire", authParams.Expire)
 
 	// Generate a challenge for this address
 	token, err := r.AuthManager.GenerateChallenge(
 		authParams.Address,
 		authParams.SessionKey,
-		authParams.AppName,
+		authParams.Application,
 		authParams.Allowances,
 		authParams.Scope,
 		authParams.Expire,
-		authParams.ApplicationAddress,
 	)
 	if err != nil {
 		logger.Error("failed to generate challenge", "error", err)
@@ -180,7 +177,7 @@ func (r *RPCRouter) handleAuthJWTVerify(ctx context.Context, authParams AuthVeri
 
 	return &claims.Policy, map[string]any{
 		"address":     claims.Policy.Wallet,
-		"session_key": claims.Policy.Participant,
+		"session_key": claims.Policy.SessionKey,
 		// "jwt_token":   newJwtToken, TODO: add refresh token
 		"success": true,
 	}, nil
@@ -199,10 +196,9 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 		challenge.Address,
 		challenge.Token.String(),
 		challenge.SessionKey,
-		challenge.AppName,
+		challenge.Application,
 		challenge.Allowances,
 		challenge.Scope,
-		challenge.ApplicationAddress,
 		challenge.Expire,
 		sig)
 	if err != nil {
@@ -222,7 +218,7 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 	}
 
 	// TODO: to use expiration specified in the Policy, instead of just setting 1 hour
-	claims, jwtToken, err := r.AuthManager.GenerateJWT(challenge.Address, challenge.SessionKey, challenge.Scope, challenge.AppName, challenge.Allowances)
+	claims, jwtToken, err := r.AuthManager.GenerateJWT(challenge.Address, challenge.SessionKey, challenge.Scope, challenge.Application, challenge.Allowances)
 	if err != nil {
 		logger.Error("failed to generate JWT token", "error", err)
 		return nil, nil, RPCErrorf("failed to generate JWT token")
@@ -234,7 +230,7 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 		return nil, nil, RPCErrorf("unsupported token: %w", err)
 	}
 
-	if err := AddSessionKey(r.DB, challenge.Address, challenge.SessionKey, challenge.AppName, challenge.ApplicationAddress, challenge.Scope, challenge.Allowances, claims.Policy.ExpiresAt); err != nil {
+	if err := AddSessionKey(r.DB, challenge.Address, challenge.SessionKey, challenge.Application, challenge.Scope, challenge.Allowances, claims.Policy.ExpiresAt); err != nil {
 		logger.Error("failed to store session key", "error", err, "sessionKey", challenge.SessionKey)
 		return nil, nil, err
 	}

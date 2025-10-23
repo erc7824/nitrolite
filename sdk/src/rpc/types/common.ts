@@ -246,9 +246,7 @@ export interface RPCSessionKey {
     /** The address of the session key that can sign transactions. */
     sessionKey: Address;
     /** Name of the application this session key is authorized for. */
-    appName?: string;
-    /** Address of the application this session key is authorized for. */
-    appAddress?: string;
+    application?: string;
     /** Array of asset allowances defining maximum amounts the session key can spend. */
     allowance: RPCAllowance[];
     /** Array showing how much of each allowance has been used by this session key. */

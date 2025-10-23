@@ -16,7 +16,7 @@ export class DatabaseUtils {
 
     async cleanupDatabaseData(): Promise<void> {
         try {
-            const tables = ['app_sessions', 'channels', 'contract_events', 'ledger', 'rpc_store', 'signers', 'session_keys', 'ledger_transactions', 'blockchain_actions'];
+            const tables = ['app_sessions', 'channels', 'contract_events', 'ledger', 'rpc_store', 'session_keys', 'ledger_transactions', 'blockchain_actions'];
 
             const client = await this.pool.connect();
             try {

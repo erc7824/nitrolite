@@ -53,13 +53,12 @@ func TestManualClient(t *testing.T) {
 	var jwtToken string
 	t.Run("Authenticate With Signature", func(t *testing.T) {
 		authReq := rpc.AuthRequestRequest{
-			Address:            walletSigner.PublicKey().Address().String(),
-			SessionKey:         sessionSigner.PublicKey().Address().String(),
-			AppName:            "TestClient",
-			Allowances:         []rpc.Allowance{},
-			Expire:             "",
-			Scope:              "",
-			ApplicationAddress: walletSigner.PublicKey().Address().String(),
+			Address:     walletSigner.PublicKey().Address().String(),
+			SessionKey:  sessionSigner.PublicKey().Address().String(),
+			Application: "TestClient",
+			Allowances:  []rpc.Allowance{},
+			Expire:      "",
+			Scope:       "",
 		}
 		authRes, _, err := client.AuthWithSig(ctx, authReq, walletSigner)
 		require.NoError(t, err)

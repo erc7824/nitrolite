@@ -47,7 +47,7 @@ Initiates authentication with the server.
   "req": [1, "auth_request", {
     "address": "0x1234567890abcdef...",
     "session_key": "0x9876543210fedcba...", // If specified, enables delegation to this key
-    "app_name": "Example App", // Application name for analytics (defaults to "clearnode" if not provided)
+    "application": "Example App", // Application name for analytics (defaults to "clearnode" if not provided)
     "allowances": [ // Asset allowances for the session
       {
         "asset": "usdc", 
@@ -435,7 +435,7 @@ This endpoint returns only session keys, not custody signers. Each session key i
       {
         "id": 1,
         "session_key": "0xabcdef1234567890...",
-        "app_name": "Chess Game",
+        "application": "Chess Game",
         "app_address": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
         "allowance": [
           {
@@ -464,7 +464,7 @@ This endpoint returns only session keys, not custody signers. Each session key i
       {
         "id": 2,
         "session_key": "0xfedcba0987654321...",
-        "app_name": "Trading Bot",
+        "application": "Trading Bot",
         "app_address": "0x1234567890abcdef1234567890abcdef12345678",
         "allowance": [
           {
@@ -492,7 +492,7 @@ Each session key includes:
 
 - `id`: Unique identifier for the session key record
 - `session_key`: The address of the session key that can sign transactions
-- `app_name`: Name of the application this session key is authorized for (optional field, omitted if empty)
+- `application`: Name of the application this session key is authorized for (optional field, omitted if empty)
 - `app_address`: Address of the application this session key is authorized for (optional field, omitted if empty)
 - `allowance`: Array of asset allowances defining maximum amounts the session key can spend
 - `used_allowance`: Array showing how much of each allowance has been used by this session key

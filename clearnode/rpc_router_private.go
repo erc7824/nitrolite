@@ -60,9 +60,9 @@ type CloseAppSessionParams struct {
 }
 
 type AppAllocation struct {
-	ParticipantWallet string          `json:"participant"`
-	AssetSymbol       string          `json:"asset"`
-	Amount            decimal.Decimal `json:"amount"`
+	Participant string          `json:"participant"`
+	AssetSymbol string          `json:"asset"`
+	Amount      decimal.Decimal `json:"amount"`
 }
 
 type AppSessionResponse struct {
@@ -150,8 +150,7 @@ type GetSessionKeysResponse struct {
 type SessionKeyResponse struct {
 	ID            uint        `json:"id"`
 	SessionKey    string      `json:"session_key"`
-	AppName       string      `json:"app_name,omitempty"`
-	AppAddress    string      `json:"app_address,omitempty"`
+	Application   string      `json:"application,omitempty"`
 	Allowance     []Allowance `json:"allowance"`
 	UsedAllowance []Allowance `json:"used_allowance"`
 	Scope         string      `json:"scope,omitempty"`
@@ -309,7 +308,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		var sessionKeyAddress *string
 		if _, ok := rpcSignersMap[fromWallet]; !ok {
 			for signer := range rpcSignersMap {
-				if GetWalletBySigner(signer) == fromWallet {
+				if GetWalletBySessionKey(signer) == fromWallet {
 					s := signer
 					sessionKeyAddress = &s
 					break
@@ -727,7 +726,7 @@ func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
 
 		if sk.Allowance != nil {
 			if err := json.Unmarshal([]byte(*sk.Allowance), &spendingCap); err != nil {
-				logger.Error("failed to unmarshal spending cap", "error", err, "sessionKey", sk.SignerAddress)
+				logger.Error("failed to unmarshal spending cap", "error", err, "sessionKey", sk.Address)
 				c.Fail(err, "failed to parse session key spending cap")
 				return
 			}
@@ -735,7 +734,7 @@ func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
 
 		if sk.UsedAllowance != nil {
 			if err := json.Unmarshal([]byte(*sk.UsedAllowance), &usedAllowance); err != nil {
-				logger.Error("failed to unmarshal used allowance", "error", err, "sessionKey", sk.SignerAddress)
+				logger.Error("failed to unmarshal used allowance", "error", err, "sessionKey", sk.Address)
 				c.Fail(err, "failed to parse session key used allowance")
 				return
 			}
@@ -743,9 +742,8 @@ func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
 
 		respSessionKeys = append(respSessionKeys, SessionKeyResponse{
 			ID:            sk.ID,
-			SessionKey:    sk.SignerAddress,
-			AppName:       sk.AppName,
-			AppAddress:    sk.AppAddress,
+			SessionKey:    sk.Address,
+			Application:   sk.Application,
 			Allowance:     spendingCap,
 			UsedAllowance: usedAllowance,
 			Scope:         sk.Scope,
@@ -786,7 +784,7 @@ func getWallets(rpc *RPCMessage) (map[string]struct{}, error) {
 
 	result := make(map[string]struct{})
 	for addr := range rpcSigners {
-		walletAddress := GetWalletBySigner(addr)
+		walletAddress := GetWalletBySessionKey(addr)
 		if walletAddress != "" {
 			result[walletAddress] = struct{}{}
 		} else {
@@ -805,7 +803,7 @@ func verifySigner(rpc *RPCMessage, channelWallet string) error {
 	if err != nil {
 		return err
 	}
-	if mapped := GetWalletBySigner(recovered); mapped != "" {
+	if mapped := GetWalletBySessionKey(recovered); mapped != "" {
 		recovered = mapped
 	}
 	if recovered != channelWallet {

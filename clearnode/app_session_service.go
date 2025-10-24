@@ -266,9 +266,7 @@ func (o *OperateUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 			}
 		}
 
-		if !alloc.Amount.IsZero() {
-			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
-		}
+		allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
 	}
 
 	if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {

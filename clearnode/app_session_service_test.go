@@ -386,6 +386,40 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect app state: unsupported intent: unknown_intent")
 	})
+
+	t.Run("NitroRPCv0.4_Operate_ZeroAllocations_Success", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		service := createTestAppSessionService(db, nil)
+		session := createTestAppSession(t, db, "test-session-v04-operate-zero", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 0},
+			userAddressB: {"usdc": 0},
+		})
+
+		params := &SubmitAppStateParams{
+			AppSessionID: session.SessionID,
+			Intent:       rpc.AppSessionIntentOperate,
+			Version:      2,
+			Allocations: []AppAllocation{
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+			},
+		}
+
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		require.NoError(t, err)
+		assert.Equal(t, uint64(2), resp.Version)
+
+		appBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
+		appBalB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
+		assert.True(t, appBalA.IsZero())
+		assert.True(t, appBalB.IsZero())
+	})
 }
 
 func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {

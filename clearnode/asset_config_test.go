@@ -96,7 +96,7 @@ func TestAssetsConfig_verifyVariables(t *testing.T) {
 		}
 		err := cfg.verifyVariables()
 		require.NoError(t, err)
-		// Note: The token symbol is set during verification but not persisted in the original slice
+		assert.Equal(t, "USDC", cfg.Assets[0].Tokens[0].Symbol)
 	})
 }
 
@@ -171,12 +171,12 @@ func TestAssetsConfig_GetAssetTokenByAddressAndChainID(t *testing.T) {
 	t.Run("all good", func(t *testing.T) {
 		result, found := cfg.GetAssetTokenByAddressAndChainID("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", 1)
 		assert.True(t, found)
-		
+
 		// Verify asset-level data
 		assert.Equal(t, "USD Coin", result.Name)
 		assert.Equal(t, "USDC", result.Symbol)
 		assert.True(t, result.Enabled)
-		
+
 		// Verify token-level data
 		assert.Equal(t, "USD Coin", result.Token.Name)
 		assert.Equal(t, "USDC", result.Token.Symbol)
@@ -257,16 +257,16 @@ func TestAssetsConfig_GetAssetTokensByChainID(t *testing.T) {
 	// Test with disabled tokens and assets filtered out
 	t.Run("filters disabled", func(t *testing.T) {
 		tokens := cfg.GetAssetTokensByChainID(1)
-		
+
 		// Should only get 2 tokens: USDC and WETH (not disabled USDC variant or USDT from disabled asset)
 		assert.Len(t, tokens, 2)
-		
+
 		// Verify first token (USDC)
 		assert.Equal(t, "USD Coin", tokens[0].Name)
 		assert.Equal(t, "USDC", tokens[0].Symbol)
 		assert.True(t, tokens[0].Enabled)
 		assert.Equal(t, "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", tokens[0].Token.Address)
-		
+
 		// Verify second token (WETH)
 		assert.Equal(t, "WETH", tokens[1].Name)
 		assert.Equal(t, "WETH", tokens[1].Symbol)

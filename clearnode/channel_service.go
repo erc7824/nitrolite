@@ -137,7 +137,7 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 
 	asset, ok := s.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, channel.ChainID)
 	if !ok {
-		logger.Error("failed to find asset", "error", err)
+		logger.Error("failed to find asset for an existing channel", "token", channel.Token, "chainID", channel.ChainID)
 		return ChannelOperationResponse{}, RPCErrorf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID)
 	}
 
@@ -246,7 +246,7 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 
 	asset, ok := s.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, channel.ChainID)
 	if !ok {
-		logger.Error("failed to find asset", "error", err)
+		logger.Error("failed to find asset for an existing channel", "token", channel.Token, "chainID", channel.ChainID)
 		return ChannelOperationResponse{}, RPCErrorf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID)
 	}
 

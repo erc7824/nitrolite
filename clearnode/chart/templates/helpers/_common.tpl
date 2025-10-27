@@ -67,15 +67,15 @@ imagePullSecrets:
 Returns common environment variables
 */}}
 {{- define "clearnode.common.env" -}}
-- name: LOG_LEVEL
+- name: CLEARNODE_LOG_LEVEL
   value: {{ .Values.config.logLevel }}
+- name: CLEARNODE_CONFIG_DIR_PATH
+  value: /app/config
 - name: DATABASE_DRIVER
   value: {{ .Values.config.database.driver }}
 {{- range $key, $value := .Values.config.extraEnvs }}
 - name: {{ $key | upper }}
   value: {{ $value | print | quote }}
-- name: CLEARNODE_CONFIG_DIR_PATH
-  value: /app/config
 {{- end }}
 {{- end }}
 

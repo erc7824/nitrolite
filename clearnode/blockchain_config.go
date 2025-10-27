@@ -69,7 +69,7 @@ type ContractAddressesConfig struct {
 // - Required contract addresses (using defaults when not specified)
 func LoadBlockchains(configDirPath string) (map[uint32]BlockchainConfig, error) {
 	blockchainsPath := filepath.Join(configDirPath, blockchainsFileName)
-	f, err := os.OpenFile(blockchainsPath, os.O_RDONLY|os.O_SYNC, 0)
+	f, err := os.Open(blockchainsPath)
 	if err != nil {
 		return nil, err
 	}

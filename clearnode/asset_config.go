@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,14 +34,14 @@ type AssetsConfig struct {
 type AssetConfig struct {
 	// Name is the human-readable name of the asset (e.g., "USD Coin")
 	// If empty, it will inherit the Symbol value during validation
-	Name    string        `yaml:"name"`
+	Name string `yaml:"name"`
 	// Symbol is the ticker symbol for the asset (e.g., "USDC")
 	// This field is required for enabled assets
-	Symbol  string        `yaml:"symbol"`
+	Symbol string `yaml:"symbol"`
 	// Enabled determines if this asset should be processed
-	Enabled bool          `yaml:"enabled"`
+	Enabled bool `yaml:"enabled"`
 	// Tokens contains the blockchain-specific token implementations
-	Tokens  []TokenConfig `yaml:"tokens"`
+	Tokens []TokenConfig `yaml:"tokens"`
 }
 
 // TokenConfig represents a specific token implementation on a blockchain.
@@ -48,19 +49,19 @@ type AssetConfig struct {
 type TokenConfig struct {
 	// Name is the token name on this blockchain (e.g., "Bridged USDC")
 	// If empty, it will inherit from the parent asset's Name
-	Name         string `yaml:"name"`
+	Name string `yaml:"name"`
 	// Symbol is the token symbol on this blockchain
 	// If empty, it will inherit from the parent asset's Symbol
-	Symbol       string `yaml:"symbol"`
+	Symbol string `yaml:"symbol"`
 	// BlockchainID is the chain ID where this token is deployed
 	BlockchainID uint32 `yaml:"blockchain_id"`
 	// Enabled determines if this token should be processed
-	Enabled      bool   `yaml:"enabled"`
+	Enabled bool `yaml:"enabled"`
 	// Address is the token's contract address on the blockchain
 	// Must be a valid Ethereum address (0x followed by 40 hex characters)
-	Address      string `yaml:"address"`
+	Address string `yaml:"address"`
 	// Decimals is the number of decimal places for the token
-	Decimals     uint8  `yaml:"decimals"`
+	Decimals uint8 `yaml:"decimals"`
 }
 
 // LoadAssets loads and validates asset configurations from a YAML file.
@@ -73,7 +74,7 @@ type TokenConfig struct {
 // - Inheritance of names and symbols from asset to token level
 func LoadAssets(configDirPath string) (AssetsConfig, error) {
 	assetsPath := filepath.Join(configDirPath, assetsFileName)
-	f, err := os.OpenFile(assetsPath, os.O_RDONLY|os.O_SYNC, 0)
+	f, err := os.Open(assetsPath)
 	if err != nil {
 		return AssetsConfig{}, err
 	}
@@ -109,21 +110,23 @@ func (cfg *AssetsConfig) verifyVariables() error {
 			return fmt.Errorf("missing asset symbol for asset[%d]", i)
 		}
 		if asset.Name == "" {
-			asset.Name = asset.Symbol
+			cfg.Assets[i].Name = asset.Symbol
 		}
 
-		for _, token := range asset.Tokens {
+		asset = cfg.Assets[i]
+		for j, token := range asset.Tokens {
 			if !token.Enabled {
 				continue
 			}
 
 			if token.Symbol == "" {
-				token.Symbol = asset.Symbol
+				cfg.Assets[i].Tokens[j].Symbol = asset.Symbol
 			}
 			if token.Name == "" {
-				token.Name = asset.Name
+				cfg.Assets[i].Tokens[j].Name = asset.Name
 			}
 
+			token = cfg.Assets[i].Tokens[j]
 			if token.Address == "" {
 				return fmt.Errorf("missing %s token address for blockchain with id %d", token.Name, token.BlockchainID)
 			} else if !contractAddressRegex.MatchString(token.Address) {
@@ -150,7 +153,7 @@ func (cfg AssetsConfig) GetAssetTokenByAddressAndChainID(tokenAddress string, ch
 				continue
 			}
 
-			if token.BlockchainID == chainID && token.Address == tokenAddress {
+			if token.BlockchainID == chainID && strings.EqualFold(token.Address, tokenAddress) {
 				return AssetTokenConfig{
 					Name:    asset.Name,
 					Symbol:  asset.Symbol,

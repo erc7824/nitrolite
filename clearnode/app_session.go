@@ -31,8 +31,11 @@ func (AppSession) TableName() string {
 
 func getAppSession(tx *gorm.DB, sessionID, status string) (*AppSession, error) {
 	var appSession AppSession
-	if err := tx.Where("session_id = ? AND status = ?", sessionID, status).
-		Order("nonce DESC").First(&appSession).Error; err != nil {
+	query := tx.Where("session_id = ?", sessionID)
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if err := query.Order("nonce DESC").First(&appSession).Error; err != nil {
 		return nil, err
 	}
 	return &appSession, nil

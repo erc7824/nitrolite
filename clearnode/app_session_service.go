@@ -266,9 +266,7 @@ func (o *OperateUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 			}
 		}
 
-		if !alloc.Amount.IsZero() {
-			allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
-		}
+		allocationSum[alloc.AssetSymbol] = allocationSum[alloc.AssetSymbol].Add(alloc.Amount)
 	}
 
 	if err := verifyAllocations(appSessionBalance, allocationSum); err != nil {
@@ -459,6 +457,12 @@ func (s *AppSessionService) SubmitAppState(ctx context.Context, params *SubmitAp
 		if err != nil {
 			return err
 		}
+
+		reloadedSession, err := getAppSession(tx, params.AppSessionID, "")
+		if err != nil {
+			return RPCErrorf("failed to reload app session after update: %w", err)
+		}
+		updatedAppSession = *reloadedSession
 
 		return nil
 	})

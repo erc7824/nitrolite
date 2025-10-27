@@ -386,6 +386,40 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "incorrect app state: unsupported intent: unknown_intent")
 	})
+
+	t.Run("NitroRPCv0.4_Operate_ZeroAllocations_Success", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		service := createTestAppSessionService(db, nil)
+		session := createTestAppSession(t, db, "test-session-v04-operate-zero", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 0},
+			userAddressB: {"usdc": 0},
+		})
+
+		params := &SubmitAppStateParams{
+			AppSessionID: session.SessionID,
+			Intent:       rpc.AppSessionIntentOperate,
+			Version:      2,
+			Allocations: []AppAllocation{
+				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+			},
+		}
+
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		require.NoError(t, err)
+		assert.Equal(t, uint64(2), resp.Version)
+
+		appBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
+		appBalB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
+		assert.True(t, appBalA.IsZero())
+		assert.True(t, appBalB.IsZero())
+	})
 }
 
 func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
@@ -412,10 +446,12 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		capturedNotifications := make(map[string][]Notification)
 		service := createTestAppSessionService(db, capturedNotifications)
 
+		testSessionData := `{"state":"updated","counter":42}`
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
 			Intent:       rpc.AppSessionIntentDeposit,
 			Version:      2,
+			SessionData:  &testSessionData,
 			Allocations: []AppAllocation{
 				{ParticipantWallet: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
 				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
@@ -436,6 +472,47 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 
 		assert.Contains(t, capturedNotifications, depositorAddress.Hex())
 		assert.Contains(t, capturedNotifications, userAddressB.Hex())
+
+		// Verify AppSession fields are not empty in the notification
+		for _, notifications := range capturedNotifications {
+			for _, notification := range notifications {
+				if notification.eventType == AppSessionUpdateEventType {
+					notificationData, ok := notification.data.(rpc.AppSessionUpdateNotification)
+					require.True(t, ok, "notification data should be AppSessionUpdateNotification")
+
+					assert.Equal(t, session.SessionID, notificationData.AppSession.AppSessionID, "AppSessionID should match")
+					assert.Equal(t, string(ChannelStatusOpen), notificationData.AppSession.Status, "Status should be open")
+					assert.Equal(t, rpc.VersionNitroRPCv0_4, notificationData.AppSession.Protocol, "Protocol should match")
+					assert.Equal(t, []string{depositorAddress.Hex(), userAddressB.Hex()}, notificationData.AppSession.ParticipantWallets, "ParticipantWallets should match")
+					assert.Equal(t, []int64{1, 1}, notificationData.AppSession.Weights, "Weights should match")
+					assert.Equal(t, uint64(2), notificationData.AppSession.Quorum, "Quorum should match")
+					assert.Equal(t, uint64(2), notificationData.AppSession.Version, "Version should be 2 after update")
+					assert.Equal(t, testSessionData, notificationData.AppSession.SessionData, "SessionData should be updated")
+					assert.NotEmpty(t, notificationData.AppSession.CreatedAt, "CreatedAt should not be empty")
+					assert.NotEmpty(t, notificationData.AppSession.UpdatedAt, "UpdatedAt should not be empty")
+
+					// Verify timestamps are properly formatted
+					createdAt, err := time.Parse(time.RFC3339, notificationData.AppSession.CreatedAt)
+					assert.NoError(t, err, "CreatedAt should be valid RFC3339 timestamp")
+					updatedAt, err := time.Parse(time.RFC3339, notificationData.AppSession.UpdatedAt)
+					assert.NoError(t, err, "UpdatedAt should be valid RFC3339 timestamp")
+					assert.False(t, createdAt.IsZero(), "CreatedAt should have a valid time")
+					assert.False(t, updatedAt.IsZero(), "UpdatedAt should have a valid time")
+					assert.True(t, updatedAt.After(createdAt) || updatedAt.Equal(createdAt), "UpdatedAt should be >= CreatedAt")
+
+					// Verify participant allocations
+					require.Len(t, notificationData.ParticipantAllocations, 2, "Should have 2 participant allocations")
+					totalAllocations := decimal.Zero
+					for _, alloc := range notificationData.ParticipantAllocations {
+						assert.NotEmpty(t, alloc.ParticipantWallet, "ParticipantWallet should not be empty")
+						assert.Equal(t, "usdc", alloc.AssetSymbol, "AssetSymbol should be usdc")
+						assert.True(t, alloc.Amount.IsPositive(), "Amount should be positive")
+						totalAllocations = totalAllocations.Add(alloc.Amount)
+					}
+					assert.Equal(t, decimal.NewFromInt(250), totalAllocations, "Total allocations should be 250")
+				}
+			}
+		}
 
 		var depositTx []LedgerTransaction
 		db.Where("tx_type = ? AND from_account = ? AND asset_symbol = ?",

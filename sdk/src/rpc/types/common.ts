@@ -262,7 +262,7 @@ export interface RPCSessionKey {
     /** The address of the session key that can sign transactions. */
     sessionKey: Address;
     /** Name of the application this session key is authorized for. */
-    application?: string;
+    application: string;
     /** Array of asset allowances with usage tracking. */
     allowances: RPCAllowanceUsage[];
     /** Permission scope for this session key (e.g., "app.create", "ledger.readonly"). */

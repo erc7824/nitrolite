@@ -472,12 +472,12 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			Intent:       rpc.AppSessionIntentOperate,
 			Version:      2,
 			Allocations: []AppAllocation{
-				{ParticipantWallet: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
-				{ParticipantWallet: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(0)},
 			},
 		}
 
-		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB))
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -570,7 +570,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 					require.Len(t, notificationData.ParticipantAllocations, 2, "Should have 2 participant allocations")
 					totalAllocations := decimal.Zero
 					for _, alloc := range notificationData.ParticipantAllocations {
-						assert.NotEmpty(t, alloc.ParticipantWallet, "ParticipantWallet should not be empty")
+						assert.NotEmpty(t, alloc.Participant, "ParticipantWallet should not be empty")
 						assert.Equal(t, "usdc", alloc.AssetSymbol, "AssetSymbol should be usdc")
 						assert.True(t, alloc.Amount.IsPositive(), "Amount should be positive")
 						totalAllocations = totalAllocations.Add(alloc.Amount)

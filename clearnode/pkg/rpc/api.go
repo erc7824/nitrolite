@@ -302,7 +302,7 @@ type SessionKeyResponse struct {
 	// SessionKey is the public key/address of the session key
 	SessionKey string `json:"session_key"`
 	// Application is the name or identifier of the application this key is for
-	Application string `json:"application,omitempty"`
+	Application string `json:"application"`
 	// Allowances contains spending limits per asset with usage tracking
 	Allowances []AllowanceUsage `json:"allowances"`
 	// Scope defines the permission scope for the session (e.g., "app.create", "ledger.readonly")

@@ -436,7 +436,6 @@ This endpoint returns only session keys, not custody signers. Each session key i
         "id": 1,
         "session_key": "0xabcdef1234567890...",
         "application": "Chess Game",
-        "app_address": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
         "allowances": [
           {
             "asset": "usdc",
@@ -457,7 +456,6 @@ This endpoint returns only session keys, not custody signers. Each session key i
         "id": 2,
         "session_key": "0xfedcba0987654321...",
         "application": "Trading Bot",
-        "app_address": "0x1234567890abcdef1234567890abcdef12345678",
         "allowances": [
           {
             "asset": "usdc",
@@ -479,8 +477,7 @@ Each session key includes:
 
 - `id`: Unique identifier for the session key record
 - `session_key`: The address of the session key that can sign transactions
-- `application`: Name of the application this session key is authorized for (optional field, omitted if empty)
-- `app_address`: Address of the application this session key is authorized for (optional field, omitted if empty)
+- `application`: Name of the application this session key is authorized for. If set to `"clearnode"`, the session key has root access and bypasses spending allowance and application validation checks.
 - `allowances`: Array of asset allowances with usage tracking. Each entry contains:
   - `asset`: Symbol of the asset (e.g., "usdc", "eth")
   - `allowance`: Maximum amount the session key can spend for this asset
@@ -495,6 +492,7 @@ Each session key includes:
 - If a session key has an empty spending cap array, all operations using that key will be denied (no spending allowed)
 - The `used_allowance` is calculated by summing all debit entries in the ledger that were made using this session key
 - Available allowance for an asset = `allowance - used_allowance`
+- **Special case**: Session keys with `application` set to `"clearnode"` have root access and are exempt from spending allowance limits and application validation. This facilitates backwards compatibility, and will be deprecated after a migration period for developers elapses.
 
 ### Transfer Funds
 

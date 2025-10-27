@@ -116,8 +116,7 @@ const SessionKeyObjectSchema = z
     .object({
         id: z.number(),
         session_key: addressSchema,
-        application: z.string().optional(),
-        app_address: z.string().optional(),
+        application: z.string(),
         allowances: z.array(AllowanceUsageObjectSchema),
         scope: z.string().optional(),
         expires_at: z.string().optional(),

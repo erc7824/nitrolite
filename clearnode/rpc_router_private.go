@@ -156,7 +156,7 @@ type AllowanceUsage struct {
 type SessionKeyResponse struct {
 	ID          uint             `json:"id"`
 	SessionKey  string           `json:"session_key"`
-	Application string           `json:"application,omitempty"`
+	Application string           `json:"application"`
 	Allowances  []AllowanceUsage `json:"allowances"`
 	Scope       string           `json:"scope,omitempty"`
 	ExpiresAt   time.Time        `json:"expires_at,omitempty"`

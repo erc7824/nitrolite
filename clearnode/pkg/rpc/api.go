@@ -487,13 +487,15 @@ type BrokerConfig struct {
 	// BrokerAddress is the wallet address of the broker
 	BrokerAddress string `json:"broker_address"`
 	// Networks lists all supported blockchain networks
-	Networks []NetworkInfo `json:"networks"`
+	Blockchains []BlockchainInfo `json:"networks"` // TODO: rename to "blockchains"
 }
 
-// NetworkInfo describes a supported blockchain network.
-type NetworkInfo struct {
-	// ChainID is the network's chain identifier
-	ChainID uint32 `json:"chain_id"`
+// BlockchainInfo describes a supported blockchain network.
+type BlockchainInfo struct {
+	// ID is the network's chain identifier
+	ID uint32 `json:"chain_id"`
+	// Name is the human-readable name of the blockchain
+	Name string `json:"name"` // TODO: add to SDK
 	// CustodyAddress is the custody contract address
 	CustodyAddress string `json:"custody_address"`
 	// AdjudicatorAddress is the adjudicator contract address

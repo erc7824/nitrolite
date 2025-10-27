@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -50,10 +51,10 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 	defer cleanup()
 
 	router.Config = &Config{
-		networks: map[uint32]*NetworkConfig{
-			137:   {ChainID: 137, BlockchainRPC: "https://polygon-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress1"},
-			42220: {ChainID: 42220, BlockchainRPC: "https://celo-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress2"},
-			8453:  {ChainID: 8453, BlockchainRPC: "https://base-mainnet.infura.io/v3/test", CustodyAddress: "0xCustodyAddress3"},
+		blockchains: map[uint32]BlockchainConfig{
+			137:   {ID: 137, BlockchainRPC: "https://polygon-mainnet.infura.io/v3/test", ContractAddresses: ContractAddressesConfig{Custody: "0xCustodyAddress1", Adjudicator: "0xAdjudicatorAddress1"}},
+			42220: {ID: 42220, BlockchainRPC: "https://celo-mainnet.infura.io/v3/test", ContractAddresses: ContractAddressesConfig{Custody: "0xCustodyAddress2", Adjudicator: "0xAdjudicatorAddress2"}},
+			8453:  {ID: 8453, BlockchainRPC: "https://base-mainnet.infura.io/v3/test", ContractAddresses: ContractAddressesConfig{Custody: "0xCustodyAddress3", Adjudicator: "0xAdjudicatorAddress3"}},
 		},
 	}
 
@@ -61,40 +62,64 @@ func TestRPCRouterHandleGetConfig(t *testing.T) {
 	router.HandleGetConfig(ctx)
 
 	res := assertResponse(t, ctx, "get_config")
-	configMap, ok := res.Params.(BrokerConfig)
+	configMap, ok := res.Params.(rpc.BrokerConfig)
 	require.True(t, ok, "Response should contain a BrokerConfig")
 	assert.Equal(t, router.Signer.GetAddress().Hex(), configMap.BrokerAddress)
-	require.Len(t, configMap.Networks, 3, "Should have 3 supported networks")
+	require.Len(t, configMap.Blockchains, 3, "Should have 3 supported blockchains")
 
-	expectedNetworks := map[uint32]struct{}{
+	expectedBlockchains := map[uint32]struct{}{
 		137:   {},
 		42220: {},
 		8453:  {},
 	}
-	for _, network := range configMap.Networks {
-		_, exists := expectedNetworks[network.ChainID]
-		assert.True(t, exists, "Network %d should be in expected networks", network.ChainID)
-		assert.Contains(t, network.CustodyAddress, "0xCustodyAddress", "Custody address should be present")
-		delete(expectedNetworks, network.ChainID)
+	for _, blockchain := range configMap.Blockchains {
+		_, exists := expectedBlockchains[blockchain.ID]
+		assert.True(t, exists, "Blockchain %d should be in expected blockchains", blockchain.ID)
+		assert.Contains(t, blockchain.CustodyAddress, "0xCustodyAddress", "Custody address should be present")
+		delete(expectedBlockchains, blockchain.ID)
 	}
-	assert.Empty(t, expectedNetworks, "All expected networks should be found")
+	assert.Empty(t, expectedBlockchains, "All expected blockchains should be found")
 }
 
 func TestRPCRouterHandleGetAssets(t *testing.T) {
 	t.Parallel()
 
-	router, db, cleanup := setupTestRPCRouter(t)
+	router, _, cleanup := setupTestRPCRouter(t)
 	defer cleanup()
 
-	testAssets := []Asset{
-		{Token: "0xToken1", ChainID: 137, Symbol: "usdc", Decimals: 6},
-		{Token: "0xToken2", ChainID: 137, Symbol: "weth", Decimals: 18},
-		{Token: "0xToken3", ChainID: 42220, Symbol: "celo", Decimals: 18},
-		{Token: "0xToken4", ChainID: 8453, Symbol: "usdbc", Decimals: 6},
+	testTokens := []TokenConfig{
+		{
+			Address:      "0xToken1",
+			BlockchainID: 137,
+			Decimals:     6,
+			Symbol:       "usdc",
+		},
+		{
+			Address:      "0xToken2",
+			BlockchainID: 137,
+			Decimals:     18,
+			Symbol:       "weth",
+		},
+		{
+			Address:      "0xToken3",
+			BlockchainID: 42220,
+			Decimals:     18,
+			Symbol:       "celo",
+		},
+		{
+			Address:      "0xToken4",
+			BlockchainID: 8453,
+			Decimals:     6,
+			Symbol:       "usdbc",
+		},
 	}
 
-	for _, asset := range testAssets {
-		require.NoError(t, db.Create(&asset).Error)
+	for _, token := range testTokens {
+		seedAsset(t, &router.Config.assets,
+			token.Address,
+			token.BlockchainID,
+			token.Symbol,
+			token.Decimals)
 	}
 
 	tcs := []struct {
@@ -102,7 +127,7 @@ func TestRPCRouterHandleGetAssets(t *testing.T) {
 		params             map[string]interface{}
 		expectedTokenNames []string
 	}{
-		{"Get all with no sort (default asc, by chain_id and symbol)", map[string]interface{}{}, []string{"0xToken3", "0xToken4", "0xToken1", "0xToken2"}},
+		{"Get all", map[string]interface{}{}, []string{"0xToken1", "0xToken2", "0xToken3", "0xToken4"}},
 		{"Filter by chain_id=137", map[string]interface{}{"chain_id": float64(137)}, []string{"0xToken1", "0xToken2"}},
 		{"Filter by chain_id=42220", map[string]interface{}{"chain_id": float64(42220)}, []string{"0xToken3"}},
 		{"Filter by non-existent chain_id=1", map[string]interface{}{"chain_id": float64(1)}, []string{}},

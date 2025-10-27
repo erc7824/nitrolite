@@ -49,6 +49,7 @@ export async function createTestChannels(
 export async function authenticateAppWithAllowances(
     participantAppWS: TestWebSocket,
     participantAppIdentity: Identity,
+    asset: string,
     decimalDepositAmount: bigint
 ): Promise<void> {
     await createAuthSessionWithClearnode(participantAppWS, participantAppIdentity, {
@@ -60,7 +61,7 @@ export async function authenticateAppWithAllowances(
         application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // random address, no use for now
         allowances: [
             {
-                asset: 'usdc',
+                asset,
                 amount: decimalDepositAmount.toString(),
             },
         ],
@@ -75,6 +76,7 @@ export async function createTestAppSession(
     bobAppIdentity: Identity,
     aliceAppWS: TestWebSocket,
     protocol: RPCProtocolVersion,
+    asset: string,
     decimalDepositAmount: bigint,
     sessionData: object
 ): Promise<string> {
@@ -90,12 +92,12 @@ export async function createTestAppSession(
     const allocations = [
         {
             participant: aliceAppIdentity.walletAddress,
-            asset: 'USDC',
+            asset,
             amount: decimalDepositAmount.toString(),
         },
         {
             participant: bobAppIdentity.walletAddress,
-            asset: 'USDC',
+            asset,
             amount: '0',
         },
     ];

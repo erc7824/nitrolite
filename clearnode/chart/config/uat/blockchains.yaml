@@ -1,0 +1,13 @@
+default_contract_addresses:
+  custody: "0x490fb189DdE3a01B00be9BA5F41e3447FbC838b6"
+  adjudicator: "0x7de4A0736Cf5740fD3Ca2F2e9cc85c9AC223eF0C"
+
+blockchains:
+- name: polygon
+  id: 137
+  contract_addresses:
+    balance_checker: "0x2352c63A83f9Fd126af8676146721Fa00924d7e4"
+- name: ethereum_sepolia
+  id: 11155111
+  contract_addresses:
+    balance_checker: "0xBfbCed302deD369855fc5f7668356e123ca4B329"

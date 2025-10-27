@@ -34,6 +34,8 @@ import {
 } from '@/testAppSessionHelpers';
 
 describe('nitrorpc_v04 lifecycle', () => {
+    const ASSET_SYMBOL = CONFIG.TOKEN_SYMBOL;
+
     const onChainDepositAmount = BigInt(1000);
     const appSessionDepositAmount = BigInt(100);
     const appSessionTopUpAmount = BigInt(50);
@@ -118,14 +120,14 @@ describe('nitrorpc_v04 lifecycle', () => {
     });
 
     it('should create app session with allowance for participant to deposit', async () => {
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, appSessionDepositAmount);
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount);
     });
 
     it('should take snapshot of ledger balances', async () => {
         const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((onChainDepositAmount).toString());
-        expect(ledgerBalances[0].asset).toBe('USDC');
+        expect(ledgerBalances[0].asset).toBe(ASSET_SYMBOL);
     });
 
     it('should create app session', async () => {
@@ -134,6 +136,7 @@ describe('nitrorpc_v04 lifecycle', () => {
             bobAppIdentity,
             aliceAppWS,
             RPCProtocolVersion.NitroRPC_0_4,
+            ASSET_SYMBOL,
             appSessionDepositAmount,
             SESSION_DATA_WAITING
         );
@@ -143,13 +146,13 @@ describe('nitrorpc_v04 lifecycle', () => {
         const allocations = [
             {
                 participant: aliceAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(4) * BigInt(3)).toString(), // 75 USDC
+                asset: ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(4) * BigInt(3)).toString(), // 75
             },
             {
                 participant: bobAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(4)).toString(), // 25 USDC
+                asset: ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(4)).toString(), // 25
             },
         ];
 
@@ -166,13 +169,13 @@ describe('nitrorpc_v04 lifecycle', () => {
         const allocations = [
             {
                 participant: aliceAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
+                asset: ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
             },
             {
                 participant: bobAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
+                asset: ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
             },
         ];
 
@@ -186,18 +189,18 @@ describe('nitrorpc_v04 lifecycle', () => {
     });
 
     it('should allow to top-up app session', async () => {
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, appSessionDepositAmount + appSessionTopUpAmount);
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount + appSessionTopUpAmount);
 
         const updatedAllocations = [
             {
                 participant: aliceAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount).toString(), // 100 USDC
+                asset: ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount).toString(), // 100
             },
             {
                 participant: bobAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
+                asset: ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
             },
         ];
         await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Deposit, ++currentVersion, updatedAllocations, SESSION_DATA_ACTIVE_2);
@@ -208,26 +211,26 @@ describe('nitrorpc_v04 lifecycle', () => {
         const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((onChainDepositAmount - appSessionDepositAmount - appSessionTopUpAmount).toString());
-        expect(ledgerBalances[0].asset).toBe('USDC');
+        expect(ledgerBalances[0].asset).toBe(ASSET_SYMBOL);
 
         // unchanged for Bob
         const bobLedgerBalances = await getLedgerBalances(bobAppIdentity, bobWS);
         expect(bobLedgerBalances).toHaveLength(1);
         expect(bobLedgerBalances[0].amount).toBe((onChainDepositAmount).toString());
-        expect(bobLedgerBalances[0].asset).toBe('USDC');
+        expect(bobLedgerBalances[0].asset).toBe(ASSET_SYMBOL);
     });
 
     it('should allow to partially withdraw from app session', async () => {
         const allocations = [
             {
                 participant: aliceAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 75 USDC
+                asset: ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 75
             },
             {
                 participant: bobAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
+                asset: ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
             },
         ];
 
@@ -239,26 +242,26 @@ describe('nitrorpc_v04 lifecycle', () => {
         const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((onChainDepositAmount - appSessionDepositAmount - appSessionTopUpAmount + appSessionPartialWithdrawalAmount).toString());
-        expect(ledgerBalances[0].asset).toBe('USDC');
+        expect(ledgerBalances[0].asset).toBe(ASSET_SYMBOL);
 
         // unchanged for Bob
         const bobLedgerBalances = await getLedgerBalances(bobAppIdentity, bobWS);
         expect(bobLedgerBalances).toHaveLength(1);
         expect(bobLedgerBalances[0].amount).toBe((onChainDepositAmount).toString());
-        expect(bobLedgerBalances[0].asset).toBe('USDC');
+        expect(bobLedgerBalances[0].asset).toBe(ASSET_SYMBOL);
     });
 
     it('should close app session', async () => {
         const allocations = [
             {
                 participant: aliceAppIdentity.walletAddress,
-                asset: 'USDC',
+                asset: ASSET_SYMBOL,
                 amount: '0',
             },
             {
                 participant: bobAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 125 USDC
+                asset: ASSET_SYMBOL,
+                amount: (appSessionDepositAmount + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 125
             },
         ];
 
@@ -276,14 +279,14 @@ describe('nitrorpc_v04 lifecycle', () => {
         const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((finalAliceAmount).toString()); // 1000 - 100 - 50 + 25 = 875
-        expect(ledgerBalances[0].asset).toBe('USDC');
+        expect(ledgerBalances[0].asset).toBe(ASSET_SYMBOL);
     });
 
     it('should update ledger balances for participant receiving', async () => {
         const ledgerBalances = await getLedgerBalances(bobAppIdentity, bobWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((finalBobAmount).toString()); // 1000 + 100 + 25 = 1125
-        expect(ledgerBalances[0].asset).toBe('USDC');
+        expect(ledgerBalances[0].asset).toBe(ASSET_SYMBOL);
     });
 
     it('should close channel and withdraw without app funds', async () => {

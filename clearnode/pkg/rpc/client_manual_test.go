@@ -126,7 +126,7 @@ func TestManualClient(t *testing.T) {
 			fn: func(t *testing.T) {
 				configRes, _, err := client.GetConfig(ctx)
 				require.NoError(t, err)
-				fmt.Printf("Networks: %+v\n", configRes.Networks)
+				fmt.Printf("Blockchains: %+v\n", configRes.Blockchains)
 			},
 		},
 		{

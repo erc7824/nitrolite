@@ -82,8 +82,8 @@ func TestClient_GetConfig(t *testing.T) {
 
 	config := rpc.BrokerConfig{
 		BrokerAddress: testWallet,
-		Networks: []rpc.NetworkInfo{{
-			ChainID:            testChainID,
+		Blockchains: []rpc.BlockchainInfo{{
+			ID:                 testChainID,
 			CustodyAddress:     "0xabc",
 			AdjudicatorAddress: "0xdef",
 		}},

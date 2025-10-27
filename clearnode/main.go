@@ -59,7 +59,7 @@ func main() {
 	rpcNode := NewRPCNode(signer, logger)
 	wsNotifier := NewWSNotifier(rpcNode.Notify, logger)
 	appSessionService := NewAppSessionService(db, wsNotifier)
-	channelService := NewChannelService(db, config.networks, signer)
+	channelService := NewChannelService(db, config.blockchains, &config.assets, signer)
 
 	NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, wsNotifier, logger)
 
@@ -73,10 +73,10 @@ func main() {
 		Handler: rpcMux,
 	}
 
-	for chainID, network := range config.networks {
-		client, err := NewCustody(signer, db, wsNotifier, network.BlockchainRPC, network.CustodyAddress, network.AdjudicatorAddress, network.BalanceCHeckerAddress, network.ChainID, network.BlockStep, logger)
+	for chainID, blockchain := range config.blockchains {
+		client, err := NewCustody(signer, db, wsNotifier, blockchain, &config.assets, logger)
 		if err != nil {
-			logger.Warn("failed to initialize blockchain client", "chainID", chainID, "error", err)
+			logger.Fatal("failed to initialize blockchain client", "chainID", chainID, "error", err)
 			continue
 		}
 		custodyClients[chainID] = client

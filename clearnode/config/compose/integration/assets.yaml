@@ -1,0 +1,7 @@
+assets:
+  - name: "yintegration.USD"
+    symbol: "yintegration.usd"
+    tokens:
+      - blockchain_id: 31337
+        address: "0xbD24c53072b9693A35642412227043Ffa5fac382"
+        decimals: 6

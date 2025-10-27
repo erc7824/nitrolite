@@ -14,8 +14,11 @@ import {
 } from '@/testHelpers';
 import { submitAppStateUpdate_v04 } from '@/testAppSessionHelpers';
 import { createAuthSessionWithClearnode } from '@/auth';
+import { CONFIG } from '@/setup';
 
 describe('App session state v0.4 error cases', () => {
+    const ASSET_SYMBOL = CONFIG.TOKEN_SYMBOL;
+
     const onChainDepositAmount = BigInt(1000);
     const appSessionDepositAmount = BigInt(100);
 
@@ -53,12 +56,12 @@ describe('App session state v0.4 error cases', () => {
         START_ALLOCATIONS = [
             {
                 participant: aliceAppIdentity.walletAddress,
-                asset: 'USDC',
+                asset: ASSET_SYMBOL,
                 amount: (appSessionDepositAmount).toString(),
             },
             {
                 participant: bobAppIdentity.walletAddress,
-                asset: 'USDC',
+                asset: ASSET_SYMBOL,
                 amount: '0',
             },
         ];
@@ -69,13 +72,14 @@ describe('App session state v0.4 error cases', () => {
 
         [aliceChannelId, bobChannelId] = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], toRaw(onChainDepositAmount));
 
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, appSessionDepositAmount);
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount);
 
         appSessionId = await createTestAppSession(
             aliceAppIdentity,
             bobAppIdentity,
             aliceAppWS,
             RPCProtocolVersion.NitroRPC_0_4,
+            ASSET_SYMBOL,
             appSessionDepositAmount,
             START_SESSION_DATA
         );
@@ -119,7 +123,7 @@ describe('App session state v0.4 error cases', () => {
     it('should fail on operate intent and positive delta', async () => {
         let allocations = structuredClone(START_ALLOCATIONS);
 
-        allocations[0].amount = (BigInt(allocations[0].amount) + BigInt(10)).toString(); // 110 USDC - more than deposited
+        allocations[0].amount = (BigInt(allocations[0].amount) + BigInt(10)).toString(); // 110 - more than deposited
 
         try {
             await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Operate, currentVersion + 1, allocations, { state: 'test' });
@@ -136,7 +140,7 @@ describe('App session state v0.4 error cases', () => {
 
     it('should fail on operate intent and negative delta', async () => {
         let allocations = structuredClone(START_ALLOCATIONS);
-        allocations[0].amount = (BigInt(allocations[0].amount) - BigInt(10)).toString(); // 90 USDC - less than deposited
+        allocations[0].amount = (BigInt(allocations[0].amount) - BigInt(10)).toString(); // 90 - less than deposited
 
         try {
             await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Operate, currentVersion + 1, allocations, { state: 'test' });
@@ -170,7 +174,7 @@ describe('App session state v0.4 error cases', () => {
 
         it('should fail on negative delta', async () => {
             let allocations = structuredClone(START_ALLOCATIONS);
-            allocations[0].amount = (BigInt(allocations[0].amount) - BigInt(10)).toString(); // 90 USDC - less than deposited
+            allocations[0].amount = (BigInt(allocations[0].amount) - BigInt(10)).toString(); // 90 - less than deposited
 
             try {
                 await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Deposit, currentVersion + 1, allocations, { state: 'test' });
@@ -187,8 +191,8 @@ describe('App session state v0.4 error cases', () => {
 
         it('should fail on positive and negative allocation deltas', async () => {
             let allocations = structuredClone(START_ALLOCATIONS);
-            allocations[0].amount = (BigInt(allocations[0].amount) + BigInt(20)).toString(); // 120 USDC - more than deposited
-            allocations[1].amount = (BigInt(allocations[1].amount) - BigInt(10)).toString(); // 90 USDC - less than deposited
+            allocations[0].amount = (BigInt(allocations[0].amount) + BigInt(20)).toString(); // 120 - more than deposited
+            allocations[1].amount = (BigInt(allocations[1].amount) - BigInt(10)).toString(); // 90 - less than deposited
 
             try {
                 await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Deposit, currentVersion + 1, allocations, { state: 'test' });
@@ -206,8 +210,8 @@ describe('App session state v0.4 error cases', () => {
         it('should fail on insufficient unified balance', async () => {
             // Try to deposit more than Alice has in ledger (she has 1000, already deposited 100, so has 900 available)
             let allocations = structuredClone(START_ALLOCATIONS);
-            const hugeAmount = onChainDepositAmount * BigInt(10); // 10,000 USDC
-            allocations[0].amount = hugeAmount.toString(); // 10,000 USDC - way more than available
+            const hugeAmount = onChainDepositAmount * BigInt(10); // 10,000
+            allocations[0].amount = hugeAmount.toString(); // 10,000 - way more than available
 
             try {
                 await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Deposit, currentVersion + 1, allocations, { state: 'test' });
@@ -229,12 +233,13 @@ describe('App session state v0.4 error cases', () => {
                 bobAppIdentity,
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_2,
+                ASSET_SYMBOL,
                 appSessionDepositAmount,
                 START_SESSION_DATA
             );
 
             let allocations = structuredClone(START_ALLOCATIONS);
-            allocations[0].amount = (BigInt(allocations[0].amount) + BigInt(10)).toString(); // 110 USDC - more than deposited
+            allocations[0].amount = (BigInt(allocations[0].amount) + BigInt(10)).toString(); // 110 - more than deposited
 
             try {
                 await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, v02AppSessionId, RPCAppStateIntent.Deposit, 2, allocations, { state: 'test' });
@@ -249,7 +254,7 @@ describe('App session state v0.4 error cases', () => {
         it('should fail on quorum reached but without depositor', async () => {
             let allocations = structuredClone(START_ALLOCATIONS);
             // Bob is depositing
-            allocations[1].amount = (BigInt(allocations[1].amount) + BigInt(10)).toString(); // 10 USDC - more than deposited
+            allocations[1].amount = (BigInt(allocations[1].amount) + BigInt(10)).toString(); // 10 - more than deposited
 
             try {
                 // Alice signs and constitutes 100% of quorum, but is not a depositor
@@ -271,7 +276,7 @@ describe('App session state v0.4 error cases', () => {
 
             let allocations = structuredClone(START_ALLOCATIONS);
             // Bob is depositing
-            allocations[1].amount = (BigInt(allocations[1].amount) + BigInt(10)).toString(); // 10 USDC - more than deposited
+            allocations[1].amount = (BigInt(allocations[1].amount) + BigInt(10)).toString(); // 10 - more than deposited
 
             try {
                 // Bob signs and constitutes 0% of quorum, but is a depositor
@@ -307,7 +312,7 @@ describe('App session state v0.4 error cases', () => {
 
         it('should fail on positive delta', async () => {
             let allocations = structuredClone(START_ALLOCATIONS);
-            allocations[0].amount = (BigInt(allocations[0].amount) + BigInt(10)).toString(); // 110 USDC - more than deposited
+            allocations[0].amount = (BigInt(allocations[0].amount) + BigInt(10)).toString(); // 110 - more than deposited
 
             try {
                 await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Withdraw, currentVersion + 1, allocations, { state: 'test' });
@@ -324,8 +329,8 @@ describe('App session state v0.4 error cases', () => {
 
         it('should fail on positive and negative allocation deltas', async () => {
             let allocations = structuredClone(START_ALLOCATIONS);
-            allocations[0].amount = (BigInt(allocations[0].amount) + BigInt(10)).toString(); // 110 USDC - more than deposited
-            allocations[1].amount = (BigInt(allocations[1].amount) - BigInt(20)).toString(); // 80 USDC - less than deposited
+            allocations[0].amount = (BigInt(allocations[0].amount) + BigInt(10)).toString(); // 110 - more than deposited
+            allocations[1].amount = (BigInt(allocations[1].amount) - BigInt(20)).toString(); // 80 - less than deposited
 
             try {
                 await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Withdraw, currentVersion + 1, allocations, { state: 'test' });
@@ -347,12 +352,13 @@ describe('App session state v0.4 error cases', () => {
                 bobAppIdentity,
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_2,
+                ASSET_SYMBOL,
                 appSessionDepositAmount,
                 START_SESSION_DATA
             );
 
             let allocations = structuredClone(START_ALLOCATIONS);
-            allocations[0].amount = (BigInt(allocations[0].amount) - BigInt(10)).toString(); // 90 USDC - less than deposited
+            allocations[0].amount = (BigInt(allocations[0].amount) - BigInt(10)).toString(); // 90 - less than deposited
 
             try {
                 await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, v02AppSessionId, RPCAppStateIntent.Withdraw, 2, allocations, { state: 'test' });
@@ -370,14 +376,14 @@ describe('App session state v0.4 error cases', () => {
 
             // for Bob to withdraw, he needs to get a balance first
             let allocations = structuredClone(START_ALLOCATIONS);
-            allocations[0].amount = (BigInt(allocations[0].amount) - BigInt(50)).toString(); // 50 USDC
-            allocations[1].amount = (BigInt(allocations[1].amount) + BigInt(50)).toString(); // 50 USDC
+            allocations[0].amount = (BigInt(allocations[0].amount) - BigInt(50)).toString(); // 50
+            allocations[1].amount = (BigInt(allocations[1].amount) + BigInt(50)).toString(); // 50
 
             const INTERMEDIATE_SESSION_DATA = { state: 'intermediate' };
             await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Operate, currentVersion + 1, allocations, INTERMEDIATE_SESSION_DATA);
 
             // Bob is withdrawing
-            allocations[1].amount = (BigInt(allocations[1].amount) - BigInt(10)).toString(); // 40 USDC - less than before
+            allocations[1].amount = (BigInt(allocations[1].amount) - BigInt(10)).toString(); // 40 - less than before
 
             try {
                 // Bob signs and constitutes 0% of quorum

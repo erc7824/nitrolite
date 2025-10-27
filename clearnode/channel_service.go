@@ -14,14 +14,15 @@ import (
 
 // ChannelService handles the business logic for channel operations.
 type ChannelService struct {
-	db       *gorm.DB
-	networks map[uint32]*NetworkConfig
-	signer   *Signer
+	db          *gorm.DB
+	blockchains map[uint32]BlockchainConfig
+	assetsCfg   *AssetsConfig
+	signer      *Signer
 }
 
 // NewChannelService creates a new ChannelService.
-func NewChannelService(db *gorm.DB, networks map[uint32]*NetworkConfig, signer *Signer) *ChannelService {
-	return &ChannelService{db: db, networks: networks, signer: signer}
+func NewChannelService(db *gorm.DB, blockchains map[uint32]BlockchainConfig, assetsCfg *AssetsConfig, signer *Signer) *ChannelService {
+	return &ChannelService{db: db, blockchains: blockchains, assetsCfg: assetsCfg, signer: signer}
 }
 
 func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChannelParams, rpcSigners map[string]struct{}, logger Logger) (ChannelOperationResponse, error) {
@@ -38,7 +39,7 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		return ChannelOperationResponse{}, RPCErrorf("an open channel with broker already exists: %s", existingOpenChannel.ChannelID)
 	}
 
-	if _, err := GetAssetByToken(s.db, params.Token, params.ChainID); err != nil {
+	if _, ok := s.assetsCfg.GetAssetTokenByAddressAndChainID(params.Token, params.ChainID); !ok {
 		return ChannelOperationResponse{}, RPCErrorf("token not supported: %s", params.Token)
 	}
 
@@ -55,7 +56,7 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		},
 	}
 
-	networkConfig, ok := s.networks[params.ChainID]
+	networkConfig, ok := s.blockchains[params.ChainID]
 	if !ok {
 		return ChannelOperationResponse{}, RPCErrorf("unsupported chain ID: %d", params.ChainID)
 	}
@@ -71,7 +72,7 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 
 	channel := nitrolite.Channel{
 		Participants: []common.Address{userParticipant, s.signer.GetAddress()},
-		Adjudicator:  common.HexToAddress(networkConfig.AdjudicatorAddress),
+		Adjudicator:  common.HexToAddress(networkConfig.ContractAddresses.Adjudicator),
 		Challenge:    3600,
 		Nonce:        uint64(time.Now().UnixMilli()),
 	}
@@ -134,9 +135,9 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 		return ChannelOperationResponse{}, RPCErrorf("invalid signature")
 	}
 
-	asset, err := GetAssetByToken(s.db, channel.Token, channel.ChainID)
-	if err != nil {
-		logger.Error("failed to find asset", "error", err)
+	asset, ok := s.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, channel.ChainID)
+	if !ok {
+		logger.Error("failed to find asset for an existing channel", "token", channel.Token, "chainID", channel.ChainID)
 		return ChannelOperationResponse{}, RPCErrorf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID)
 	}
 
@@ -159,7 +160,7 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 		return ChannelOperationResponse{}, RPCErrorf(ErrGetAccountBalance+" for asset %s", asset.Symbol)
 	}
 
-	rawBalance := balance.Shift(int32(asset.Decimals))
+	rawBalance := balance.Shift(int32(asset.Token.Decimals))
 	newChannelRawAmount := channel.RawAmount.Add(*params.AllocateAmount)
 
 	if rawBalance.Cmp(newChannelRawAmount) < 0 {
@@ -243,9 +244,9 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 		return ChannelOperationResponse{}, RPCErrorf("invalid signature")
 	}
 
-	asset, err := GetAssetByToken(s.db, channel.Token, channel.ChainID)
-	if err != nil {
-		logger.Error("failed to find asset", "error", err)
+	asset, ok := s.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, channel.ChainID)
+	if !ok {
+		logger.Error("failed to find asset for an existing channel", "token", channel.Token, "chainID", channel.ChainID)
 		return ChannelOperationResponse{}, RPCErrorf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID)
 	}
 
@@ -260,7 +261,7 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 		return ChannelOperationResponse{}, RPCErrorf("negative balance")
 	}
 
-	rawBalance := balance.Shift(int32(asset.Decimals)).BigInt()
+	rawBalance := balance.Shift(int32(asset.Token.Decimals)).BigInt()
 	channelRawAmount := channel.RawAmount.BigInt()
 	if channelRawAmount.Cmp(rawBalance) < 0 {
 		return ChannelOperationResponse{}, RPCErrorf("resize this channel first")

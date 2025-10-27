@@ -25,6 +25,7 @@ export const CONFIG = {
     ],
 
     CHAIN_ID: 31337,
+    TOKEN_SYMBOL: 'yintegration.usd',
     ADDRESSES: {
         CUSTODY_ADDRESS: '0x8658501c98C3738026c4e5c361c6C3fa95DfB255' as Address,
         DUMMY_ADJUDICATOR_ADDRESS: '0xcbbc03a873c11beeFA8D99477E830be48d8Ae6D7' as Address,

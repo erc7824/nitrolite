@@ -63,11 +63,10 @@ describe('Create channel', () => {
             identity.walletAddress
         );
 
-        const msg = await createCreateChannelMessage(identity.messageSigner, {
+        const msg = await createCreateChannelMessage(identity.walletMessageSigner, {
             chain_id: chain.id,
             token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount,
-            session_key: identity.sessionAddress,
         });
         const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
         expect(createResponse).toBeDefined();
@@ -111,7 +110,7 @@ describe('Create channel', () => {
         expect(responseChannel.chainId).toBe(CONFIG.CHAIN_ID);
         expect(responseChannel.challenge).toBe(CONFIG.DEFAULT_CHALLENGE_TIMEOUT);
         expect(responseChannel.channelId).toBe(channelId);
-        expect(responseChannel.participant).toBe(identity.sessionAddress);
+        expect(responseChannel.participant).toBe(identity.walletAddress);
         expect(responseChannel.status).toBe(RPCChannelStatus.Open);
         expect(responseChannel.token).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
 
@@ -147,11 +146,10 @@ describe('Create channel', () => {
 
         expect(postBalance.rawBalance).toBe(prevBalance.rawBalance - depositAmount);
 
-        const msg = await createCreateChannelMessage(identity.messageSigner, {
+        const msg = await createCreateChannelMessage(identity.walletMessageSigner, {
             chain_id: chain.id,
             token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount,
-            session_key: identity.sessionAddress,
         });
         const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
         expect(createResponse).toBeDefined();
@@ -195,7 +193,7 @@ describe('Create channel', () => {
         expect(responseChannel.chainId).toBe(CONFIG.CHAIN_ID);
         expect(responseChannel.challenge).toBe(CONFIG.DEFAULT_CHALLENGE_TIMEOUT);
         expect(responseChannel.channelId).toBe(channelId);
-        expect(responseChannel.participant).toBe(identity.sessionAddress);
+        expect(responseChannel.participant).toBe(identity.walletAddress);
         expect(responseChannel.status).toBe(RPCChannelStatus.Open);
         expect(responseChannel.token).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
     });

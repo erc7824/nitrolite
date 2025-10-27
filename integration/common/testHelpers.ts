@@ -50,12 +50,13 @@ export async function authenticateAppWithAllowances(
     participantAppWS: TestWebSocket,
     participantAppIdentity: Identity,
     asset: string,
-    decimalDepositAmount: bigint
+    decimalDepositAmount: bigint,
+    application: string = 'App Domain'
 ): Promise<void> {
     await createAuthSessionWithClearnode(participantAppWS, participantAppIdentity, {
         address: participantAppIdentity.walletAddress,
         session_key: participantAppIdentity.sessionAddress,
-        application: 'App Domain',
+        application: application,
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
         allowances: [
@@ -77,10 +78,11 @@ export async function createTestAppSession(
     protocol: RPCProtocolVersion,
     asset: string,
     decimalDepositAmount: bigint,
-    sessionData: object
+    sessionData: object,
+    application: string = 'App Domain'
 ): Promise<string> {
     const definition: RPCAppDefinition = {
-        application: 'clearnode',
+        application: application,
         protocol,
         participants: [aliceAppIdentity.walletAddress, bobAppIdentity.walletAddress],
         weights: [100, 0],

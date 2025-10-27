@@ -274,6 +274,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 	for i, session := range sessions {
 		respAppSessions[i] = AppSessionResponse{
 			AppSessionID:       session.SessionID,
+			Application:        session.Application,
 			Status:             string(session.Status),
 			ParticipantWallets: session.ParticipantWallets,
 			SessionData:        session.SessionData,

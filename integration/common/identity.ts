@@ -7,9 +7,11 @@ import { SessionKeyStateSigner } from '@erc7824/nitrolite/dist/client/signer';
 export class Identity {
     public walletClient = null;
     public stateSigner = null;
+    public walletStateSigner = null;
     public walletAddress: Address;
     public sessionAddress: Address;
     public messageSigner = null;
+    public walletMessageSigner = null;
 
     constructor(walletPrivateKey: Hex, sessionPrivateKey: Hex) {
         const walletAccount = privateKeyToAccount(walletPrivateKey);
@@ -24,5 +26,8 @@ export class Identity {
         this.stateSigner = new SessionKeyStateSigner(sessionPrivateKey);
         this.messageSigner = createECDSAMessageSigner(sessionPrivateKey);
         this.sessionAddress = this.stateSigner.getAddress();
+
+        this.walletStateSigner = new SessionKeyStateSigner(walletPrivateKey);
+        this.walletMessageSigner = createECDSAMessageSigner(walletPrivateKey);
     }
 }

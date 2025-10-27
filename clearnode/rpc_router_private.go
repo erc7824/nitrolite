@@ -67,6 +67,7 @@ type AppAllocation struct {
 
 type AppSessionResponse struct {
 	AppSessionID       string   `json:"app_session_id"`
+	Application        string   `json:"application"`
 	Status             string   `json:"status"`
 	ParticipantWallets []string `json:"participants"`
 	SessionData        string   `json:"session_data,omitempty"`

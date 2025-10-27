@@ -3,7 +3,6 @@ import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { TestWebSocket } from '@/ws';
-import { createAuthSessionWithClearnode } from '@/auth';
 import { CONFIG } from '@/setup';
 import { RPCAppStateIntent, RPCProtocolVersion } from '@erc7824/nitrolite';
 import { Hex } from 'viem';
@@ -17,6 +16,7 @@ import {
     getLedgerBalances,
 } from '@/testHelpers';
 import { submitAppStateUpdate_v04 } from '@/testAppSessionHelpers';
+import { setupTestIdentitiesAndConnections } from '@/testSetup';
 
 describe('Session Key Spending Caps', () => {
     const onChainDepositAmount = BigInt(1000);
@@ -48,22 +48,10 @@ describe('Session Key Spending Caps', () => {
         blockUtils = new BlockchainUtils();
         databaseUtils = new DatabaseUtils();
 
-        alice = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);
-        aliceWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
-        aliceClient = new TestNitroliteClient(alice);
-        await aliceWS.connect();
-        await createAuthSessionWithClearnode(aliceWS, alice);
+        ({ alice, aliceWS, aliceClient, aliceAppIdentity, aliceAppWS, bob, bobWS, bobClient, bobAppIdentity } =
+            await setupTestIdentitiesAndConnections());
 
-        aliceAppIdentity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].APP_SESSION_PK);
-        aliceAppWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
-        await aliceAppWS.connect();
-
-        bob = new Identity(CONFIG.IDENTITIES[1].WALLET_PK, CONFIG.IDENTITIES[1].SESSION_PK);
-        bobAppIdentity = new Identity(CONFIG.IDENTITIES[1].WALLET_PK, CONFIG.IDENTITIES[1].APP_SESSION_PK);
-        bobWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
-        bobClient = new TestNitroliteClient(bob);
-        await bobWS.connect();
-        await createAuthSessionWithClearnode(bobWS, bob);
+        await blockUtils.makeSnapshot();
     });
 
     beforeEach(async () => {
@@ -94,6 +82,9 @@ describe('Session Key Spending Caps', () => {
         aliceAppWS.close();
         bobWS.close();
 
+        await blockUtils.resetSnapshot();
+
+        await databaseUtils.resetClearnodeState();
         await databaseUtils.close();
     });
 

@@ -182,15 +182,15 @@ Clearnode requires the following environment variables to be properly configured
 
 ### Quick Start
 
-1. Create a configuration directory with `blockchains.yaml`:
+1. Create a configuration directory:
 
 ```bash
-mkdir -p config/compose/local
-cp config/compose/example/blockchains.yaml config/compose/local/
-# Edit config/compose/local/blockchains.yaml for your networks
+cp -r config/compose/example config/compose/local
 ```
 
-2. Set up environment variables in `.env` file:
+2. Reconfigure `blockchains.yaml` and `assets.yaml` in `config/compose/local` to suit your setup.
+
+3. Set up environment variables in `config/compose/local/.env` file:
 
 ```bash
 # Required

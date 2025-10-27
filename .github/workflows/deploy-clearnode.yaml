@@ -87,5 +87,5 @@ jobs:
           --reuse-values \
           ${IMAGE_TAG_ARG} \
           -f clearnode/chart/config/${HELM_CONFIG_ENV}/clearnode.yaml \
-          --set-file=config.blockchains=chart/config/${HELM_CONFIG_ENV}/blockchains.yaml \
-          --set-file=config.assets=chart/config/${HELM_CONFIG_ENV}/assets.yaml
+          --set-file=config.blockchains=clearnode/chart/config/${HELM_CONFIG_ENV}/blockchains.yaml \
+          --set-file=config.assets=clearnode/chart/config/${HELM_CONFIG_ENV}/assets.yaml

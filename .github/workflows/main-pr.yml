@@ -5,6 +5,15 @@ on:
     branches: [ main ]
 
 jobs:
+  deploy-uat:
+    name: Deploy to UAT
+    uses: ./.github/workflows/deploy-clearnode.yaml
+    with:
+      target-env: uat
+    secrets:
+      gke-project: ${{ secrets.GKE_PROJECT }}
+      gke-sa-key: ${{ secrets.GKE_UAT_SA_KEY }}
+
   test-clearnode:
     name: Test (Clearnode)
     uses: ./.github/workflows/test-go.yml

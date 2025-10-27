@@ -32,9 +32,9 @@ config:
   # -- Name of the secret containing environment variables
   envSecret: ""
   # -- Blockchains configuration
-  blockchains: {}
+  blockchains: ""
   # -- Assets configuration
-  assets: {}
+  assets: ""
 
 # -- Number of replicas
 replicaCount: 1

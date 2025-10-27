@@ -16,10 +16,14 @@ const (
 // AssetTokenConfig represents a combination of asset metadata and a specific token instance.
 // This is returned by lookup functions to provide both asset-level and token-level information.
 type AssetTokenConfig struct {
-	Name    string
-	Symbol  string
-	Enabled bool
-	Token   TokenConfig
+	// Name is the human-readable name of the asset (e.g., "USD Coin")
+	Name string
+	// Symbol is the ticker symbol for the asset (e.g., "USDC")
+	Symbol string
+	// Disabled determines if this asset should be processed
+	Disabled bool
+	// Token contains the blockchain-specific token implementation
+	Token TokenConfig
 }
 
 // AssetsConfig represents the root configuration structure for all asset settings.
@@ -38,8 +42,8 @@ type AssetConfig struct {
 	// Symbol is the ticker symbol for the asset (e.g., "USDC")
 	// This field is required for enabled assets
 	Symbol string `yaml:"symbol"`
-	// Enabled determines if this asset should be processed
-	Enabled bool `yaml:"enabled"`
+	// Disabled determines if this asset should be processed
+	Disabled bool `yaml:"disabled"`
 	// Tokens contains the blockchain-specific token implementations
 	Tokens []TokenConfig `yaml:"tokens"`
 }
@@ -55,8 +59,8 @@ type TokenConfig struct {
 	Symbol string `yaml:"symbol"`
 	// BlockchainID is the chain ID where this token is deployed
 	BlockchainID uint32 `yaml:"blockchain_id"`
-	// Enabled determines if this token should be processed
-	Enabled bool `yaml:"enabled"`
+	// Disabled determines if this token should be processed
+	Disabled bool `yaml:"disabled"`
 	// Address is the token's contract address on the blockchain
 	// Must be a valid Ethereum address (0x followed by 40 hex characters)
 	Address string `yaml:"address"`
@@ -102,7 +106,7 @@ func LoadAssets(configDirPath string) (AssetsConfig, error) {
 // back to the original slice due to Go's value semantics in range loops.
 func (cfg *AssetsConfig) verifyVariables() error {
 	for i, asset := range cfg.Assets {
-		if !asset.Enabled {
+		if asset.Disabled {
 			continue
 		}
 
@@ -115,7 +119,7 @@ func (cfg *AssetsConfig) verifyVariables() error {
 
 		asset = cfg.Assets[i]
 		for j, token := range asset.Tokens {
-			if !token.Enabled {
+			if token.Disabled {
 				continue
 			}
 
@@ -144,21 +148,20 @@ func (cfg *AssetsConfig) verifyVariables() error {
 // Only enabled assets and tokens are considered in the search.
 func (cfg AssetsConfig) GetAssetTokenByAddressAndChainID(tokenAddress string, chainID uint32) (AssetTokenConfig, bool) {
 	for _, asset := range cfg.Assets {
-		if !asset.Enabled {
+		if asset.Disabled {
 			continue
 		}
 
 		for _, token := range asset.Tokens {
-			if !token.Enabled {
+			if token.Disabled {
 				continue
 			}
 
 			if token.BlockchainID == chainID && strings.EqualFold(token.Address, tokenAddress) {
 				return AssetTokenConfig{
-					Name:    asset.Name,
-					Symbol:  asset.Symbol,
-					Enabled: asset.Enabled,
-					Token:   token,
+					Name:   asset.Name,
+					Symbol: asset.Symbol,
+					Token:  token,
 				}, true
 			}
 		}
@@ -173,17 +176,16 @@ func (cfg AssetsConfig) GetAssetTokenByAddressAndChainID(tokenAddress string, ch
 func (cfg AssetsConfig) GetAssetTokensByChainID(chainID uint32) []AssetTokenConfig {
 	var tokens []AssetTokenConfig
 	for _, asset := range cfg.Assets {
-		if !asset.Enabled {
+		if asset.Disabled {
 			continue
 		}
 
 		for _, token := range asset.Tokens {
-			if token.Enabled && token.BlockchainID == chainID {
+			if !token.Disabled && token.BlockchainID == chainID {
 				tokens = append(tokens, AssetTokenConfig{
-					Name:    asset.Name,
-					Symbol:  asset.Symbol,
-					Enabled: asset.Enabled,
-					Token:   token,
+					Name:   asset.Name,
+					Symbol: asset.Symbol,
+					Token:  token,
 				})
 			}
 		}

@@ -14,8 +14,7 @@ func TestAssetsConfig_verifyVariables(t *testing.T) {
 		cfg := AssetsConfig{
 			Assets: []AssetConfig{
 				{
-					Symbol:  "", // Missing symbol
-					Enabled: true,
+					Symbol: "", // Missing symbol
 				},
 			},
 		}
@@ -29,15 +28,13 @@ func TestAssetsConfig_verifyVariables(t *testing.T) {
 		cfg := AssetsConfig{
 			Assets: []AssetConfig{
 				{
-					Name:    "USD Coin",
-					Symbol:  "USDC",
-					Enabled: true,
+					Name:   "USD Coin",
+					Symbol: "USDC",
 					Tokens: []TokenConfig{
 						{
 							Name:         "USD Coin",
 							Symbol:       "USDC",
 							BlockchainID: 1,
-							Enabled:      true,
 							Address:      "", // Missing address
 						},
 					},
@@ -54,15 +51,13 @@ func TestAssetsConfig_verifyVariables(t *testing.T) {
 		cfg := AssetsConfig{
 			Assets: []AssetConfig{
 				{
-					Name:    "USD Coin",
-					Symbol:  "USDC",
-					Enabled: true,
+					Name:   "USD Coin",
+					Symbol: "USDC",
 					Tokens: []TokenConfig{
 						{
 							Name:         "USD Coin",
 							Symbol:       "USDC",
 							BlockchainID: 1,
-							Enabled:      true,
 							Address:      "0xinvalid", // Invalid address
 						},
 					},
@@ -79,15 +74,13 @@ func TestAssetsConfig_verifyVariables(t *testing.T) {
 		cfg := AssetsConfig{
 			Assets: []AssetConfig{
 				{
-					Name:    "USD Coin",
-					Symbol:  "USDC",
-					Enabled: true,
+					Name:   "USD Coin",
+					Symbol: "USDC",
 					Tokens: []TokenConfig{
 						{
 							Name:         "Bridged USDC",
 							Symbol:       "", // Should inherit "USDC" from asset
 							BlockchainID: 137,
-							Enabled:      true,
 							Address:      "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
 						},
 					},
@@ -106,15 +99,15 @@ func TestAssetsConfig_GetAssetTokenByAddressAndChainID(t *testing.T) {
 	cfg := AssetsConfig{
 		Assets: []AssetConfig{
 			{
-				Name:    "USD Coin",
-				Symbol:  "USDC",
-				Enabled: true,
+				Name:     "USD Coin",
+				Symbol:   "USDC",
+				Disabled: false,
 				Tokens: []TokenConfig{
 					{
 						Name:         "USD Coin",
 						Symbol:       "USDC",
 						BlockchainID: 1,
-						Enabled:      true,
+						Disabled:     false,
 						Address:      "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
 						Decimals:     6,
 					},
@@ -122,22 +115,22 @@ func TestAssetsConfig_GetAssetTokenByAddressAndChainID(t *testing.T) {
 						Name:         "USD Coin",
 						Symbol:       "USDC",
 						BlockchainID: 137,
-						Enabled:      false, // Disabled token
+						Disabled:     true, // Disabled token
 						Address:      "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
 						Decimals:     6,
 					},
 				},
 			},
 			{
-				Name:    "Tether",
-				Symbol:  "USDT",
-				Enabled: false, // Disabled asset
+				Name:     "Tether",
+				Symbol:   "USDT",
+				Disabled: true, // Disabled asset
 				Tokens: []TokenConfig{
 					{
 						Name:         "Tether",
 						Symbol:       "USDT",
 						BlockchainID: 1,
-						Enabled:      true,
+						Disabled:     false,
 						Address:      "0xdac17f958d2ee523a2206206994597c13d831ec7",
 						Decimals:     6,
 					},
@@ -175,13 +168,13 @@ func TestAssetsConfig_GetAssetTokenByAddressAndChainID(t *testing.T) {
 		// Verify asset-level data
 		assert.Equal(t, "USD Coin", result.Name)
 		assert.Equal(t, "USDC", result.Symbol)
-		assert.True(t, result.Enabled)
+		assert.False(t, result.Disabled)
 
 		// Verify token-level data
 		assert.Equal(t, "USD Coin", result.Token.Name)
 		assert.Equal(t, "USDC", result.Token.Symbol)
 		assert.Equal(t, uint32(1), result.Token.BlockchainID)
-		assert.True(t, result.Token.Enabled)
+		assert.False(t, result.Token.Disabled)
 		assert.Equal(t, "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", result.Token.Address)
 		assert.Equal(t, uint8(6), result.Token.Decimals)
 	})
@@ -193,15 +186,15 @@ func TestAssetsConfig_GetAssetTokensByChainID(t *testing.T) {
 	cfg := AssetsConfig{
 		Assets: []AssetConfig{
 			{
-				Name:    "USD Coin",
-				Symbol:  "USDC",
-				Enabled: true,
+				Name:     "USD Coin",
+				Symbol:   "USDC",
+				Disabled: false,
 				Tokens: []TokenConfig{
 					{
 						Name:         "USD Coin",
 						Symbol:       "USDC",
 						BlockchainID: 1,
-						Enabled:      true,
+						Disabled:     false,
 						Address:      "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
 						Decimals:     6,
 					},
@@ -209,37 +202,37 @@ func TestAssetsConfig_GetAssetTokensByChainID(t *testing.T) {
 						Name:         "USD Coin",
 						Symbol:       "USDC",
 						BlockchainID: 1,
-						Enabled:      false, // Disabled token on same chain
+						Disabled:     true, // Disabled token on same chain
 						Address:      "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb49",
 						Decimals:     6,
 					},
 				},
 			},
 			{
-				Name:    "Tether",
-				Symbol:  "USDT",
-				Enabled: false, // Disabled asset
+				Name:     "Tether",
+				Symbol:   "USDT",
+				Disabled: true, // Disabled asset
 				Tokens: []TokenConfig{
 					{
 						Name:         "Tether",
 						Symbol:       "USDT",
 						BlockchainID: 1,
-						Enabled:      true,
+						Disabled:     false,
 						Address:      "0xdac17f958d2ee523a2206206994597c13d831ec7",
 						Decimals:     6,
 					},
 				},
 			},
 			{
-				Name:    "WETH",
-				Symbol:  "WETH",
-				Enabled: true,
+				Name:     "WETH",
+				Symbol:   "WETH",
+				Disabled: false,
 				Tokens: []TokenConfig{
 					{
 						Name:         "Wrapped Ether",
 						Symbol:       "WETH",
 						BlockchainID: 1,
-						Enabled:      true,
+						Disabled:     false,
 						Address:      "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
 						Decimals:     18,
 					},
@@ -264,13 +257,13 @@ func TestAssetsConfig_GetAssetTokensByChainID(t *testing.T) {
 		// Verify first token (USDC)
 		assert.Equal(t, "USD Coin", tokens[0].Name)
 		assert.Equal(t, "USDC", tokens[0].Symbol)
-		assert.True(t, tokens[0].Enabled)
+		assert.False(t, tokens[0].Disabled)
 		assert.Equal(t, "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", tokens[0].Token.Address)
 
 		// Verify second token (WETH)
 		assert.Equal(t, "WETH", tokens[1].Name)
 		assert.Equal(t, "WETH", tokens[1].Symbol)
-		assert.True(t, tokens[1].Enabled)
+		assert.False(t, tokens[1].Disabled)
 		assert.Equal(t, "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", tokens[1].Token.Address)
 	})
 }

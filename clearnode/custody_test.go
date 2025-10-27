@@ -71,11 +71,9 @@ func setupMockCustody(t *testing.T) (*Custody, *gorm.DB, func()) {
 	assetsCfg := &AssetsConfig{
 		Assets: []AssetConfig{
 			{
-				Symbol:  "usdc",
-				Enabled: true,
+				Symbol: "usdc",
 				Tokens: []TokenConfig{
 					{
-						Enabled:      true,
 						BlockchainID: uint32(chainID.Int64()),
 						Address:      tokenAddress,
 						Symbol:       "usdc",

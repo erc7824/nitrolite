@@ -5,11 +5,9 @@ default_contract_addresses:
 blockchains:
 - name: polygon
   id: 137
-  enabled: true
   contract_addresses:
     balance_checker: "0x2352c63A83f9Fd126af8676146721Fa00924d7e4"
 - name: ethereum_sepolia
   id: 11155111
-  enabled: true
   contract_addresses:
     balance_checker: "0xBfbCed302deD369855fc5f7668356e123ca4B329"

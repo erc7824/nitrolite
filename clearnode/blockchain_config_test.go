@@ -30,13 +30,11 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 							Custody:     "0x1111111111111111111111111111111111111111",
 							Adjudicator: "0x2222222222222222222222222222222222222222",
 						},
-						Enabled:   true,
 						BlockStep: 10,
 					},
 					{
-						ID:      11155111,
-						Name:    "ethereum_sepolia",
-						Enabled: true,
+						ID:   11155111,
+						Name: "ethereum_sepolia",
 					},
 				},
 			},
@@ -50,7 +48,7 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 				assert.Equal(t, "0x1111111111111111111111111111111111111111", ethCfg.ContractAddresses.Custody)
 				assert.Equal(t, "0x2222222222222222222222222222222222222222", ethCfg.ContractAddresses.Adjudicator)
 				assert.Equal(t, "0x0000000000000000000000000000000000000003", ethCfg.ContractAddresses.BalanceChecker)
-				assert.True(t, ethCfg.Enabled)
+				assert.False(t, ethCfg.Disabled)
 				assert.Equal(t, uint64(10), ethCfg.BlockStep)
 
 				sepoliaCfg := blockchains[1]
@@ -59,7 +57,7 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 				assert.Equal(t, "0x0000000000000000000000000000000000000001", sepoliaCfg.ContractAddresses.Custody)
 				assert.Equal(t, "0x0000000000000000000000000000000000000002", sepoliaCfg.ContractAddresses.Adjudicator)
 				assert.Equal(t, "0x0000000000000000000000000000000000000003", sepoliaCfg.ContractAddresses.BalanceChecker)
-				assert.True(t, sepoliaCfg.Enabled)
+				assert.False(t, sepoliaCfg.Disabled)
 				assert.Equal(t, defaultBlockStep, sepoliaCfg.BlockStep)
 			},
 		},
@@ -68,9 +66,8 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						Name:    "Invalid Name!",
-						ID:      1,
-						Enabled: true,
+						Name: "Invalid Name!",
+						ID:   1,
 					},
 				},
 			},
@@ -81,9 +78,8 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						Name:    "_foo_",
-						ID:      1,
-						Enabled: true,
+						Name: "_foo_",
+						ID:   1,
 					},
 				},
 			},
@@ -99,14 +95,14 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 				},
 				Blockchains: []BlockchainConfig{
 					{
-						ID:      1,
-						Name:    "ethereum",
-						Enabled: true,
+						ID:       1,
+						Name:     "ethereum",
+						Disabled: false,
 					},
 					{
-						ID:      11155111,
-						Name:    "_ethereum_sepolia_",
-						Enabled: false,
+						ID:       11155111,
+						Name:     "_ethereum_sepolia_",
+						Disabled: true,
 					},
 				},
 			},
@@ -163,7 +159,6 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 					{
 						ID:                1,
 						Name:              "ethereum",
-						Enabled:           true,
 						ContractAddresses: ContractAddressesConfig{},
 					},
 				},
@@ -175,9 +170,8 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						ID:      1,
-						Name:    "ethereum",
-						Enabled: true,
+						ID:   1,
+						Name: "ethereum",
 						ContractAddresses: ContractAddressesConfig{
 							Custody: "0x1111111111111111111111111111111111111111"},
 					},
@@ -190,9 +184,8 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						ID:      1,
-						Name:    "ethereum",
-						Enabled: true,
+						ID:   1,
+						Name: "ethereum",
 						ContractAddresses: ContractAddressesConfig{
 							Custody:     "0x1111111111111111111111111111111111111111",
 							Adjudicator: "0x2222222222222222222222222222222222222222",
@@ -207,9 +200,8 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						ID:      1,
-						Name:    "ethereum",
-						Enabled: true,
+						ID:   1,
+						Name: "ethereum",
 						ContractAddresses: ContractAddressesConfig{
 							Custody:        "0x0000s00000000000000000000000000000000001",
 							Adjudicator:    "0x0000s00000000000000000000000000000000002",
@@ -225,9 +217,8 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						ID:      1,
-						Name:    "ethereum",
-						Enabled: true,
+						ID:   1,
+						Name: "ethereum",
 						ContractAddresses: ContractAddressesConfig{
 							Custody:        "0x0000000000000000000000000000000000000001",
 							Adjudicator:    "0x0000s00000000000000000000000000000000002",
@@ -243,9 +234,8 @@ func TestBlockchainConfig_verifyVariables(t *testing.T) {
 			cfg: BlockchainsConfig{
 				Blockchains: []BlockchainConfig{
 					{
-						ID:      1,
-						Name:    "ethereum",
-						Enabled: true,
+						ID:   1,
+						Name: "ethereum",
 						ContractAddresses: ContractAddressesConfig{
 							Custody:        "0x0000000000000000000000000000000000000001",
 							Adjudicator:    "0x0000000000000000000000000000000000000002",

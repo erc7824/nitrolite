@@ -19,13 +19,11 @@ func seedAsset(t *testing.T, assetsCfg *AssetsConfig, tokenAddress string, chain
 		BlockchainID: chainID,
 		Address:      tokenAddress,
 		Decimals:     decimals,
-		Enabled:      true,
 	}
 	asset := AssetTokenConfig{
-		Name:    symbol,
-		Symbol:  symbol,
-		Enabled: true,
-		Token:   token,
+		Name:   symbol,
+		Symbol: symbol,
+		Token:  token,
 	}
 
 	index := -1
@@ -39,9 +37,8 @@ func seedAsset(t *testing.T, assetsCfg *AssetsConfig, tokenAddress string, chain
 
 	if index == -1 {
 		assetsCfg.Assets = append(assetsCfg.Assets, AssetConfig{
-			Name:    symbol,
-			Symbol:  symbol,
-			Enabled: true,
+			Name:   symbol,
+			Symbol: symbol,
 		})
 		index = len(assetsCfg.Assets) - 1
 	}

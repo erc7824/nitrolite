@@ -40,8 +40,8 @@ type BlockchainConfig struct {
 	Name string `yaml:"name"`
 	// ID is the chain ID used for RPC validation
 	ID uint32 `yaml:"id"`
-	// Enabled determines if this blockchain should be connected
-	Enabled bool `yaml:"enabled"`
+	// Disabled determines if this blockchain should be connected
+	Disabled bool `yaml:"disabled"`
 	// BlockchainRPC is populated from environment variable <NAME>_BLOCKCHAIN_RPC
 	BlockchainRPC string
 	// BlockStep defines the block range for scanning (default: 10000)
@@ -108,7 +108,7 @@ func (cfg *BlockchainsConfig) verifyVariables() error {
 	}
 
 	for i, bc := range cfg.Blockchains {
-		if !bc.Enabled {
+		if bc.Disabled {
 			continue
 		}
 
@@ -160,7 +160,7 @@ func (cfg *BlockchainsConfig) verifyVariables() error {
 // and verifies that each endpoint returns the expected chain ID.
 func (cfg *BlockchainsConfig) verifyRPCs() error {
 	for i, bc := range cfg.Blockchains {
-		if !bc.Enabled {
+		if bc.Disabled {
 			continue
 		}
 
@@ -184,7 +184,7 @@ func (cfg *BlockchainsConfig) verifyRPCs() error {
 func (cfg *BlockchainsConfig) getEnabled() map[uint32]BlockchainConfig {
 	enabledBlockchains := make(map[uint32]BlockchainConfig)
 	for _, bc := range cfg.Blockchains {
-		if bc.Enabled {
+		if !bc.Disabled {
 			enabledBlockchains[bc.ID] = bc
 		}
 	}

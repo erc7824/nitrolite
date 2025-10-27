@@ -69,6 +69,25 @@ export async function authenticateAppWithAllowances(
 }
 
 /**
+ * Authenticates a participant's app identity with multiple asset allowances for deposits.
+ */
+export async function authenticateAppWithMultiAssetAllowances(
+    participantAppWS: TestWebSocket,
+    participantAppIdentity: Identity,
+    allowances: Array<{ asset: string; amount: string }>,
+    application: string = 'App Domain'
+): Promise<void> {
+    await createAuthSessionWithClearnode(participantAppWS, participantAppIdentity, {
+        address: participantAppIdentity.walletAddress,
+        session_key: participantAppIdentity.sessionAddress,
+        application: application,
+        expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
+        scope: 'console',
+        allowances: allowances,
+    });
+}
+
+/**
  * Creates a test app session between Alice and Bob with the specified protocol version.
  */
 export async function createTestAppSession(

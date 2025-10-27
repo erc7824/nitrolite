@@ -10,6 +10,7 @@ import { RPCAppStateIntent, RPCProtocolVersion } from '@erc7824/nitrolite';
 import {
     createTestChannels,
     authenticateAppWithAllowances,
+    authenticateAppWithMultiAssetAllowances,
     createTestAppSession,
     toRaw,
     getLedgerBalances,
@@ -357,11 +358,160 @@ describe('Session Key Spending Caps', () => {
 
     describe('Multi-asset spending caps', () => {
         it('should enforce spending cap per asset independently', async () => {
-            // Note: This test would require multi-asset support in the test helpers
-            // For now, we document the expected behavior:
-            // - Each asset in allowances has its own independent spending cap
-            // - Spending on USDC doesn't affect ETH cap and vice versa
-            // - Session key tracks cumulative spending per asset
+            // Authenticate with allowances for both USDC and ETH
+            const usdcCap = BigInt(300);
+            const ethCap = BigInt(2);
+
+            await authenticateAppWithMultiAssetAllowances(aliceAppWS, aliceAppIdentity, [
+                { asset: 'usdc', amount: usdcCap.toString() },
+                { asset: 'eth', amount: ethCap.toString() },
+            ]);
+
+            // Create app session with 200 USDC deposit (within 300 USDC cap)
+            const appSessionId1 = await createTestAppSession(
+                aliceAppIdentity,
+                bobAppIdentity,
+                aliceAppWS,
+                RPCProtocolVersion.NitroRPC_0_4,
+                BigInt(200),
+                SESSION_DATA
+            );
+            expect(appSessionId1).toBeDefined();
+
+            // Create second app session with 1 ETH deposit (within 2 ETH cap)
+            const appSessionId2 = await createTestAppSession(
+                aliceAppIdentity,
+                bobAppIdentity,
+                aliceAppWS,
+                RPCProtocolVersion.NitroRPC_0_4,
+                BigInt(0),
+                SESSION_DATA
+            );
+            expect(appSessionId2).toBeDefined();
+
+            // Add 1 ETH to second session
+            let allocations = [
+                {
+                    participant: aliceAppIdentity.walletAddress,
+                    asset: 'eth',
+                    amount: '1',
+                },
+                {
+                    participant: bobAppIdentity.walletAddress,
+                    asset: 'eth',
+                    amount: '0',
+                },
+            ];
+
+            await submitAppStateUpdate_v04(
+                aliceAppWS,
+                aliceAppIdentity,
+                appSessionId2,
+                RPCAppStateIntent.Deposit,
+                2,
+                allocations,
+                SESSION_DATA
+            );
+
+            // Should still be able to deposit 100 more USDC (200 + 100 = 300, at cap)
+            allocations = [
+                {
+                    participant: aliceAppIdentity.walletAddress,
+                    asset: 'usdc',
+                    amount: '300',
+                },
+                {
+                    participant: bobAppIdentity.walletAddress,
+                    asset: 'usdc',
+                    amount: '0',
+                },
+            ];
+
+            await submitAppStateUpdate_v04(
+                aliceAppWS,
+                aliceAppIdentity,
+                appSessionId1,
+                RPCAppStateIntent.Deposit,
+                2,
+                allocations,
+                SESSION_DATA
+            );
+
+            // Should still be able to deposit 1 more ETH (1 + 1 = 2, at cap)
+            allocations = [
+                {
+                    participant: aliceAppIdentity.walletAddress,
+                    asset: 'eth',
+                    amount: '2',
+                },
+                {
+                    participant: bobAppIdentity.walletAddress,
+                    asset: 'eth',
+                    amount: '0',
+                },
+            ];
+
+            await submitAppStateUpdate_v04(
+                aliceAppWS,
+                aliceAppIdentity,
+                appSessionId2,
+                RPCAppStateIntent.Deposit,
+                3,
+                allocations,
+                SESSION_DATA
+            );
+
+            // Attempting to deposit 1 more USDC should fail (would be 301)
+            allocations = [
+                {
+                    participant: aliceAppIdentity.walletAddress,
+                    asset: 'usdc',
+                    amount: '301',
+                },
+                {
+                    participant: bobAppIdentity.walletAddress,
+                    asset: 'usdc',
+                    amount: '0',
+                },
+            ];
+
+            await expect(
+                submitAppStateUpdate_v04(
+                    aliceAppWS,
+                    aliceAppIdentity,
+                    appSessionId1,
+                    RPCAppStateIntent.Deposit,
+                    3,
+                    allocations,
+                    SESSION_DATA
+                )
+            ).rejects.toThrow(/session key spending validation failed.*insufficient session key allowance/i);
+
+            // Attempting to deposit 0.1 more ETH should fail (would be 2.1)
+            allocations = [
+                {
+                    participant: aliceAppIdentity.walletAddress,
+                    asset: 'eth',
+                    amount: '2.1',
+                },
+                {
+                    participant: bobAppIdentity.walletAddress,
+                    asset: 'eth',
+                    amount: '0',
+                },
+            ];
+
+            await expect(
+                submitAppStateUpdate_v04(
+                    aliceAppWS,
+                    aliceAppIdentity,
+                    appSessionId2,
+                    RPCAppStateIntent.Deposit,
+                    4,
+                    allocations,
+                    SESSION_DATA
+                )
+            ).rejects.toThrow(/session key spending validation failed.*insufficient session key allowance/i);
         });
     });
 });

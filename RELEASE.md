@@ -83,16 +83,12 @@ git push origin main develop --tags
 
 ## Creating a GitHub Release
 
-After tagging the release:
+After pushing the new tag and commits to the remote repository:
 
-1. Push all commits and tags:
-   ```bash
-   git push origin main develop --tags
-   ```
-2. Go to the **GitHub Releases** page.
-3. Click **“Draft a new release”**.
-4. Select the new tag (`vX.Y.Z`), set the release title, and paste the changelog section.
-5. Publish the release.
+1. Go to the **GitHub Releases** page.
+2. Click **“Draft a new release”**.
+3. Select the new tag (`vX.Y.Z`), set the release title, and paste the changelog section.
+4. Publish the release.
 
 ## Versioning
 

@@ -148,24 +148,28 @@ func TestSessionKeySpendingValidation(t *testing.T) {
 	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
+	// Get the session key first
+	sessionKey, err := IsSessionKeyActive(db, sessionKeyAddress)
+	require.NoError(t, err, "Session key should be active")
+
 	// Test 1: Valid spending within limits
-	err = ValidateSessionKeySpending(db, sessionKeyAddress, "usdc", decimal.NewFromInt(100))
+	err = ValidateSessionKeySpending(db, sessionKey, "usdc", decimal.NewFromInt(100))
 	assert.NoError(t, err, "Should allow spending within limits")
 
-	err = ValidateSessionKeySpending(db, sessionKeyAddress, "eth", decimal.NewFromInt(2))
+	err = ValidateSessionKeySpending(db, sessionKey, "eth", decimal.NewFromInt(2))
 	assert.NoError(t, err, "Should allow ETH spending within limits")
 
 	// Test 2: Spending exactly at the limit should be allowed
-	err = ValidateSessionKeySpending(db, sessionKeyAddress, "usdc", decimal.NewFromInt(1000))
+	err = ValidateSessionKeySpending(db, sessionKey, "usdc", decimal.NewFromInt(1000))
 	assert.NoError(t, err, "Should allow spending exactly at limit")
 
 	// Test 3: Spending over limit should fail
-	err = ValidateSessionKeySpending(db, sessionKeyAddress, "usdc", decimal.NewFromInt(1001))
+	err = ValidateSessionKeySpending(db, sessionKey, "usdc", decimal.NewFromInt(1001))
 	assert.Error(t, err, "Should reject spending over limit")
 	assert.Contains(t, err.Error(), "operation denied: insufficient session key allowance")
 
 	// Test 4: Unauthorized asset should fail
-	err = ValidateSessionKeySpending(db, sessionKeyAddress, "BTC", decimal.NewFromInt(1))
+	err = ValidateSessionKeySpending(db, sessionKey, "BTC", decimal.NewFromInt(1))
 	assert.Error(t, err, "Should reject unauthorized asset")
 	assert.Contains(t, err.Error(), "not allowed in session key spending cap")
 
@@ -183,11 +187,14 @@ func TestSessionKeySpendingValidation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "200", currentSpending.String(), "Should correctly calculate current spending")
 
-	// Test 7: Validate remaining allowance
-	err = ValidateSessionKeySpending(db, sessionKeyAddress, "usdc", decimal.NewFromInt(800))
+	// Test 7: Validate remaining allowance (refresh session key after spending)
+	sessionKey, err = IsSessionKeyActive(db, sessionKeyAddress)
+	require.NoError(t, err, "Session key should still be active")
+
+	err = ValidateSessionKeySpending(db, sessionKey, "usdc", decimal.NewFromInt(800))
 	assert.NoError(t, err, "Should allow spending remaining allowance")
 
-	err = ValidateSessionKeySpending(db, sessionKeyAddress, "usdc", decimal.NewFromInt(801))
+	err = ValidateSessionKeySpending(db, sessionKey, "usdc", decimal.NewFromInt(801))
 	assert.Error(t, err, "Should reject spending beyond remaining allowance")
 	assert.Contains(t, err.Error(), "operation denied: insufficient session key allowance")
 
@@ -212,15 +219,18 @@ func TestSessionKeySpendingEdgeCases(t *testing.T) {
 	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "ZeroApp", "trade", zeroAllowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
-	err = ValidateSessionKeySpending(db, sessionKeyAddress, "usdc", decimal.NewFromInt(1))
+	sessionKey, err := IsSessionKeyActive(db, sessionKeyAddress)
+	require.NoError(t, err)
+
+	err = ValidateSessionKeySpending(db, sessionKey, "usdc", decimal.NewFromInt(1))
 	assert.Error(t, err, "Should reject any spending with zero allowance")
 
 	// Test 2: Non-existent session key
-	err = ValidateSessionKeySpending(db, "0xnonexistent", "usdc", decimal.NewFromInt(1))
+	_, err = IsSessionKeyActive(db, "0xnonexistent")
 	assert.Error(t, err, "Should fail for non-existent session key")
 
 	// Test 3: Negative spending amount (should not happen but let's test)
-	err = ValidateSessionKeySpending(db, sessionKeyAddress, "usdc", decimal.NewFromInt(-10))
+	err = ValidateSessionKeySpending(db, sessionKey, "usdc", decimal.NewFromInt(-10))
 	assert.NoError(t, err, "Negative amounts should not trigger spending cap validation")
 }
 

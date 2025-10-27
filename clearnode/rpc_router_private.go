@@ -333,7 +333,12 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 
 			// Validate session key spending cap only when wallet didn't sign
 			if sessionKeyAddress != nil {
-				if err := ValidateSessionKeySpending(tx, *sessionKeyAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
+				sessionKey, err := IsSessionKeyActive(tx, *sessionKeyAddress)
+				if err != nil {
+					return RPCErrorf("session key validation failed: %w", err)
+				}
+
+				if err := ValidateSessionKeySpending(tx, sessionKey, alloc.AssetSymbol, alloc.Amount); err != nil {
 					return RPCErrorf("session key spending validation failed: %w", err)
 				}
 			}

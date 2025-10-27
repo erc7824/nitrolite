@@ -128,11 +128,16 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 
 			// Validate session key spending only when wallet didn't sign
 			if sessionKeyAddress != nil {
+				sessionKey, err := IsSessionKeyActive(tx, *sessionKeyAddress)
+				if err != nil {
+					return UpdateResult{}, RPCErrorf("session key validation failed: %w", err)
+				}
+
 				if err := ValidateSessionKeyApplication(tx, *sessionKeyAddress, d.appSession.Application); err != nil {
 					return UpdateResult{}, RPCErrorf("session key application validation failed: %w", err)
 				}
 
-				if err := ValidateSessionKeySpending(tx, *sessionKeyAddress, alloc.AssetSymbol, depositAmount); err != nil {
+				if err := ValidateSessionKeySpending(tx, sessionKey, alloc.AssetSymbol, depositAmount); err != nil {
 					return UpdateResult{}, RPCErrorf("session key spending validation failed: %w", err)
 				}
 				// Track that this session key was actually used (in case a request has been signed by both wallet and session key)
@@ -389,12 +394,17 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 
 			// Validate session key spending only when wallet didn't sign
 			if sessionKeyAddress != nil {
+				sessionKey, err := IsSessionKeyActive(tx, *sessionKeyAddress)
+				if err != nil {
+					return RPCErrorf("session key validation failed: %w", err)
+				}
+
 				// Validate that session key application matches app session application
 				if err := ValidateSessionKeyApplication(tx, *sessionKeyAddress, params.Definition.Application); err != nil {
 					return RPCErrorf("session key application validation failed: %w", err)
 				}
 
-				if err := ValidateSessionKeySpending(tx, *sessionKeyAddress, alloc.AssetSymbol, alloc.Amount); err != nil {
+				if err := ValidateSessionKeySpending(tx, sessionKey, alloc.AssetSymbol, alloc.Amount); err != nil {
 					return RPCErrorf("session key spending validation failed: %w", err)
 				}
 				// Track that this session key was actually used (in case a request has been signed by both wallet and session key)

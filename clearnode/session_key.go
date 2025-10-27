@@ -33,7 +33,13 @@ func (SessionKey) TableName() string {
 	return "session_keys"
 }
 
-// sessionKeyCache maps session key addresses to wallet addresses
+// sessionKeyCacheEntry stores cached session key data with expiration
+type sessionKeyCacheEntry struct {
+	wallet    string
+	expiresAt time.Time
+}
+
+// sessionKeyCache maps session key addresses to cache entries
 var sessionKeyCache sync.Map
 
 // loadSessionKeyCache populates the cache with session keys
@@ -43,7 +49,10 @@ func loadSessionKeyCache(db *gorm.DB) error {
 		return err
 	}
 	for _, sk := range sessionKeys {
-		sessionKeyCache.Store(sk.Address, sk.WalletAddress)
+		sessionKeyCache.Store(sk.Address, sessionKeyCacheEntry{
+			wallet:    sk.WalletAddress,
+			expiresAt: sk.ExpiresAt,
+		})
 	}
 	return nil
 }
@@ -51,6 +60,8 @@ func loadSessionKeyCache(db *gorm.DB) error {
 // AddSessionKey stores a new session key with its metadata
 // Only one session key per wallet+app combination is allowed - registering a new one invalidates existing ones
 func AddSessionKey(db *gorm.DB, walletAddress, address, applicationName, scope string, allowances []Allowance, expirationTime time.Time) error {
+	var deletedAddresses []string // Track addresses to delete from cache
+
 	err := db.Transaction(func(tx *gorm.DB) error {
 		// Validate expiration time is in the future
 		if expirationTime.IsZero() || expirationTime.Before(time.Now().UTC()) {
@@ -75,7 +86,7 @@ func AddSessionKey(db *gorm.DB, walletAddress, address, applicationName, scope s
 			if err := tx.Delete(&existingKey).Error; err != nil {
 				return fmt.Errorf("failed to remove existing session key: %w", err)
 			}
-			sessionKeyCache.Delete(existingKey.Address)
+			deletedAddresses = append(deletedAddresses, existingKey.Address)
 		}
 
 		spendingCapJSON, err := json.Marshal(allowances)
@@ -99,7 +110,13 @@ func AddSessionKey(db *gorm.DB, walletAddress, address, applicationName, scope s
 
 	// Update cache only after transaction commits successfully
 	if err == nil {
-		sessionKeyCache.Store(address, walletAddress)
+		for _, addr := range deletedAddresses {
+			sessionKeyCache.Delete(addr)
+		}
+		sessionKeyCache.Store(address, sessionKeyCacheEntry{
+			wallet:    walletAddress,
+			expiresAt: expirationTime,
+		})
 	}
 
 	return err
@@ -108,8 +125,14 @@ func AddSessionKey(db *gorm.DB, walletAddress, address, applicationName, scope s
 // GetWalletBySessionKey retrieves the wallet address associated with a given signer
 func GetWalletBySessionKey(sessionKeyAddress string) string {
 	// Check session key cache first
-	if w, ok := sessionKeyCache.Load(sessionKeyAddress); ok {
-		return w.(string)
+	if v, ok := sessionKeyCache.Load(sessionKeyAddress); ok {
+		entry := v.(sessionKeyCacheEntry)
+		// Check if the cached entry has expired
+		if time.Now().UTC().After(entry.expiresAt) {
+			sessionKeyCache.Delete(sessionKeyAddress) // lazy purge
+			return ""
+		}
+		return entry.wallet
 	}
 	return ""
 }
@@ -184,19 +207,28 @@ func CalculateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSym
 	return res.TotalSpent, nil
 }
 
-// ValidateSessionKeySpending checks if a session key can spend the requested amount without exceeding its allowance
-func ValidateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol string, requestedAmount decimal.Decimal) error {
+// IsSessionKeyActive checks if a session key is active (not expired) and returns it
+func IsSessionKeyActive(db *gorm.DB, sessionKeyAddress string) (*SessionKey, error) {
 	sessionKey, err := GetSessionKey(db, sessionKeyAddress)
 	if err != nil {
-		return fmt.Errorf("operation denied: failed to get session key: %w", err)
-	}
-	if sessionKey.Application == AppNameClearnode {
-		return nil // Do not enforce limitations on clearnode session keys
+		return nil, fmt.Errorf("failed to get session key: %w", err)
 	}
 
-	// Check if session key has expired
+	if sessionKey.Application == AppNameClearnode {
+		return sessionKey, nil // Clearnode session keys are always considered active
+	}
+
 	if time.Now().UTC().After(sessionKey.ExpiresAt) {
-		return fmt.Errorf("operation denied: session key expired")
+		return nil, fmt.Errorf("session key expired")
+	}
+
+	return sessionKey, nil
+}
+
+// ValidateSessionKeySpending checks if a session key can spend the requested amount without exceeding its allowance
+func ValidateSessionKeySpending(db *gorm.DB, sessionKey *SessionKey, assetSymbol string, requestedAmount decimal.Decimal) error {
+	if sessionKey.Application == AppNameClearnode {
+		return nil // Do not enforce limitations on clearnode session keys
 	}
 
 	// If no spending cap is set, deny the transaction
@@ -228,7 +260,7 @@ func ValidateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymb
 		return fmt.Errorf("operation denied: asset %s not allowed in session key spending cap", assetSymbol)
 	}
 
-	currentSpending, err := CalculateSessionKeySpending(db, sessionKeyAddress, assetSymbol)
+	currentSpending, err := CalculateSessionKeySpending(db, sessionKey.Address, assetSymbol)
 	if err != nil {
 		return err
 	}

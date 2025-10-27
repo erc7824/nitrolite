@@ -310,7 +310,7 @@ func TestSessionKeyTransferIntegration(t *testing.T) {
 	transferParams3 := TransferParams{
 		Destination: recipientAddress,
 		Allocations: []TransferAllocation{
-			{AssetSymbol: "BTC", Amount: decimal.NewFromInt(1)}, // BTC not in allowances
+			{AssetSymbol: "btc", Amount: decimal.NewFromInt(1)}, // BTC not in allowances
 		},
 	}
 
@@ -323,18 +323,23 @@ func TestSessionKeyTransferIntegration(t *testing.T) {
 }
 
 func TestUnsupportedAssetValidation(t *testing.T) {
-	db := setupTestSqlite(t)
-	err := loadSessionKeyCache(db)
-	require.NoError(t, err)
-
-	supportedAssets := []Asset{
-		{Token: "0xA0b86991c431e803859e9c5092D6B0a2a22B6e", ChainID: 1, Symbol: "usdc", Decimals: 6},
-		{Token: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", ChainID: 1, Symbol: "eth", Decimals: 18},
-	}
-
-	for _, asset := range supportedAssets {
-		err = db.Create(&asset).Error
-		require.NoError(t, err)
+	assetsCfg := &AssetsConfig{
+		Assets: []AssetConfig{
+			{
+				Symbol: "usdc",
+				Name:   "USD Coin",
+				Tokens: []TokenConfig{
+					{BlockchainID: 1, Address: "0xA0b86991c431e803859e9c5092D6B0a2a22B6e", Decimals: 6},
+				},
+			},
+			{
+				Symbol: "eth",
+				Name:   "Ethereum",
+				Tokens: []TokenConfig{
+					{BlockchainID: 1, Address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", Decimals: 18},
+				},
+			},
+		},
 	}
 
 	// Test 1: Supported assets should pass validation
@@ -342,11 +347,11 @@ func TestUnsupportedAssetValidation(t *testing.T) {
 		{Asset: "usdc", Amount: "1000"},
 		{Asset: "eth", Amount: "5"},
 	}
-	err = validateAllowances(db, supportedAllowances)
+	err := validateAllowances(assetsCfg, supportedAllowances)
 	assert.NoError(t, err, "Should accept supported assets")
 
 	// Test 2: Empty allowances should pass validation
-	err = validateAllowances(db, []Allowance{})
+	err = validateAllowances(assetsCfg, []Allowance{})
 	assert.NoError(t, err, "Should accept empty allowances")
 
 	// Test 3: Unsupported asset should fail validation
@@ -354,7 +359,7 @@ func TestUnsupportedAssetValidation(t *testing.T) {
 		{Asset: "usdc", Amount: "1000"}, // supported
 		{Asset: "btc", Amount: "1"},     // unsupported
 	}
-	err = validateAllowances(db, unsupportedAllowances)
+	err = validateAllowances(assetsCfg, unsupportedAllowances)
 	assert.Error(t, err, "Should reject unsupported assets")
 	assert.Contains(t, err.Error(), "asset 'btc' is not supported")
 
@@ -362,14 +367,14 @@ func TestUnsupportedAssetValidation(t *testing.T) {
 	zeroAllowances := []Allowance{
 		{Asset: "usdc", Amount: "0"},
 	}
-	err = validateAllowances(db, zeroAllowances)
+	err = validateAllowances(assetsCfg, zeroAllowances)
 	assert.NoError(t, err, "Should accept zero amounts")
 
 	// Test 5: Negative amount should fail validation
 	negativeAllowances := []Allowance{
 		{Asset: "usdc", Amount: "-100"},
 	}
-	err = validateAllowances(db, negativeAllowances)
+	err = validateAllowances(assetsCfg, negativeAllowances)
 	assert.Error(t, err, "Should reject negative amounts")
 	assert.Contains(t, err.Error(), "allowance amount cannot be negative")
 
@@ -377,7 +382,7 @@ func TestUnsupportedAssetValidation(t *testing.T) {
 	invalidAllowances := []Allowance{
 		{Asset: "usdc", Amount: "not-a-number"},
 	}
-	err = validateAllowances(db, invalidAllowances)
+	err = validateAllowances(assetsCfg, invalidAllowances)
 	assert.Error(t, err, "Should reject invalid decimal format")
 	assert.Contains(t, err.Error(), "invalid amount")
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shopspring/decimal"
-	"gorm.io/gorm"
 )
 
 type AuthRequestParams struct {
@@ -226,7 +225,7 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 	}
 
 	// Validate allowances against supported assets before storing session key
-	if err := validateAllowances(r.DB, challenge.Allowances); err != nil {
+	if err := validateAllowances(&r.Config.assets, challenge.Allowances); err != nil {
 		logger.Error("unsupported asset in allowances", "error", err, "allowances", challenge.Allowances)
 		return nil, nil, RPCErrorf("unsupported token: %w", err)
 	}
@@ -256,20 +255,16 @@ func ValidateTimestamp(ts uint64, expirySeconds int) error {
 }
 
 // validateAllowances validates that all assets in allowances are supported by the system
-func validateAllowances(db *gorm.DB, allowances []Allowance) error {
+func validateAllowances(assetsCfg *AssetsConfig, allowances []Allowance) error {
 	if len(allowances) == 0 {
 		return nil
 	}
 
-	// Note: this would be more efficient once we introduce in-memory assets
-	supportedAssets, err := GetAllAssets(db, nil)
-	if err != nil {
-		return fmt.Errorf("failed to get supported assets: %w", err)
-	}
-
 	supportedSymbols := make(map[string]bool)
-	for _, asset := range supportedAssets {
-		supportedSymbols[asset.Symbol] = true
+	for _, asset := range assetsCfg.Assets {
+		if !asset.Disabled {
+			supportedSymbols[asset.Symbol] = true
+		}
 	}
 
 	for _, allowance := range allowances {

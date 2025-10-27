@@ -356,7 +356,7 @@ describe('App session state v0.4 error cases', () => {
         });
 
         it('should fail on withdrawing from v0.2 app session', async () => {
-            await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, appSessionDepositAmount * BigInt(2));
+            await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount * BigInt(2));
 
             // Create a v0.2 app session (which doesn't support deposits/withdrawals)
             const v02AppSessionId = await createTestAppSession(

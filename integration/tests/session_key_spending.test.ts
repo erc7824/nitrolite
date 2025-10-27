@@ -19,6 +19,7 @@ import { submitAppStateUpdate_v04 } from '@/testAppSessionHelpers';
 import { setupTestIdentitiesAndConnections } from '@/testSetup';
 
 describe('Session Key Spending Caps', () => {
+    const ASSET_SYMBOL = CONFIG.TOKEN_SYMBOL;
     const onChainDepositAmount = BigInt(1000);
     const spendingCapAmount = BigInt(500); // Session key limited to 500 USDC
     const initialDepositAmount = BigInt(100);
@@ -67,7 +68,7 @@ describe('Session Key Spending Caps', () => {
         );
 
         // Authenticate with spending cap of 500 USDC
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, spendingCapAmount);
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, spendingCapAmount);
 
         currentVersion = 1;
     });
@@ -95,6 +96,7 @@ describe('Session Key Spending Caps', () => {
                 bobAppIdentity,
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
+                ASSET_SYMBOL,
                 initialDepositAmount,
                 SESSION_DATA
             );
@@ -115,6 +117,7 @@ describe('Session Key Spending Caps', () => {
                     bobAppIdentity,
                     aliceAppWS,
                     RPCProtocolVersion.NitroRPC_0_4,
+                    ASSET_SYMBOL,
                     excessiveAmount,
                     SESSION_DATA
                 )
@@ -130,6 +133,7 @@ describe('Session Key Spending Caps', () => {
                 bobAppIdentity,
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
+                ASSET_SYMBOL,
                 initialDepositAmount,
                 SESSION_DATA
             );
@@ -286,6 +290,7 @@ describe('Session Key Spending Caps', () => {
                 bobAppIdentity,
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
+                ASSET_SYMBOL,
                 BigInt(300),
                 SESSION_DATA
             );
@@ -381,6 +386,7 @@ describe('Session Key Spending Caps', () => {
                 bobAppIdentity,
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
+                ASSET_SYMBOL,
                 BigInt(200),
                 SESSION_DATA
             );
@@ -392,6 +398,7 @@ describe('Session Key Spending Caps', () => {
                 bobAppIdentity,
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
+                ASSET_SYMBOL,
                 BigInt(0),
                 SESSION_DATA
             );

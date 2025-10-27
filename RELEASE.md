@@ -103,16 +103,6 @@ MAJOR.MINOR.PATCH
 
 Example: `v1.3.2`
 
-## Summary Diagram
-
-```
-      +---------+        +----------+
-      | feature | --->   | develop  | ---> [release/*] ---> main ---> [tag vX.Y.Z]
-      +---------+        +----------+
-                                   ↘
-                                    ↘ hotfix/* ↗
-```
-
 ## Example Release Checklist
 
 Before finalizing a release:

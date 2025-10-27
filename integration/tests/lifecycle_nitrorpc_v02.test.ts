@@ -15,7 +15,7 @@ import {
     parseResizeChannelResponse,
     RPCProtocolVersion,
 } from '@erc7824/nitrolite';
-import { Hex, parseUnits } from 'viem';
+import { Hex } from 'viem';
 import {
     setupTestIdentitiesAndConnections,
     fetchAndParseAppSessions,
@@ -33,8 +33,9 @@ import {
 } from '@/testAppSessionHelpers';
 
 describe('nitrorpc_v02 lifecycle', () => {
-    const onChainDepositAmount = BigInt(1000);
+    const ASSET_SYMBOL = CONFIG.TOKEN_SYMBOL;
 
+    const onChainDepositAmount = BigInt(1000);
     const appSessionDepositAmount = BigInt(100);
 
     let aliceWS: TestWebSocket;
@@ -114,14 +115,14 @@ describe('nitrorpc_v02 lifecycle', () => {
     });
 
     it('should create app session with allowance for participant to deposit', async () => {
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, appSessionDepositAmount);
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount);
     });
 
     it('should take snapshot of ledger balances', async () => {
         const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((onChainDepositAmount).toString());
-        expect(ledgerBalances[0].asset).toBe('USDC');
+        expect(ledgerBalances[0].asset).toBe(ASSET_SYMBOL);
     });
 
     it('should create app session', async () => {
@@ -130,6 +131,7 @@ describe('nitrorpc_v02 lifecycle', () => {
             bobAppIdentity,
             aliceAppWS,
             RPCProtocolVersion.NitroRPC_0_2,
+            ASSET_SYMBOL,
             appSessionDepositAmount,
             SESSION_DATA_WAITING
         );
@@ -139,13 +141,13 @@ describe('nitrorpc_v02 lifecycle', () => {
         const allocations = [
             {
                 participant: aliceAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
+                asset: ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
             },
             {
                 participant: bobAppIdentity.walletAddress,
-                asset: 'USDC',
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
+                asset: ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
             },
         ];
 
@@ -162,12 +164,12 @@ describe('nitrorpc_v02 lifecycle', () => {
         const allocations = [
             {
                 participant: aliceAppIdentity.walletAddress,
-                asset: 'USDC',
+                asset: ASSET_SYMBOL,
                 amount: '0',
             },
             {
                 participant: bobAppIdentity.walletAddress,
-                asset: 'USDC',
+                asset: ASSET_SYMBOL,
                 amount: appSessionDepositAmount.toString(),
             },
         ];
@@ -186,14 +188,14 @@ describe('nitrorpc_v02 lifecycle', () => {
         const ledgerBalances = await getLedgerBalances(aliceAppIdentity, aliceAppWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((appSessionDepositAmount * BigInt(9)).toString()); // 1000 - 100
-        expect(ledgerBalances[0].asset).toBe('USDC');
+        expect(ledgerBalances[0].asset).toBe(ASSET_SYMBOL);
     });
 
     it('should update ledger balances for receiving side', async () => {
         const ledgerBalances = await getLedgerBalances(bobAppIdentity, bobWS);
         expect(ledgerBalances).toHaveLength(1);
         expect(ledgerBalances[0].amount).toBe((appSessionDepositAmount * BigInt(11)).toString()); // 1000 + 100
-        expect(ledgerBalances[0].asset).toBe('USDC');
+        expect(ledgerBalances[0].asset).toBe(ASSET_SYMBOL);
     });
 
     it('should close channel and withdraw without app funds', async () => {

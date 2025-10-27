@@ -22,6 +22,9 @@
 go.work
 go.work.sum
 
+# env file
+.env
+
 # local compose config
 config/compose/local
 

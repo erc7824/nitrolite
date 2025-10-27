@@ -139,15 +139,64 @@ See example configuration: [`config/compose/example/blockchains.yaml`](config/co
 
 - **default_contract_addresses**: Default contract addresses applied to all blockchains unless overridden
   - `custody`: Custody contract address
-  - `adjudicator`: Adjudicator contract address  
+  - `adjudicator`: Adjudicator contract address
   - `balance_checker`: Balance checker contract address
 
 - **blockchains**: Array of blockchain configurations. You can add as many blockchains as needed.
-  - `name`: Blockchain name (lowercase, underscores allowed)
-  - `id`: Chain ID for validation
-  - `enabled`: Whether to connect to this blockchain
+  - `name`: Blockchain name (required; lowercase, underscores allowed)
+  - `id`: Chain ID for validation (required)
+  - `disabled`: Whether to connect to this blockchain
   - `block_step`: Block range for scanning (optional, default: 10000)
   - `contract_addresses`: Override default addresses as needed
+
+## Asset Configuration
+
+Clearnode uses a YAML-based configuration system for managing assets and their token implementations across different blockchains. The configuration file `assets.yaml` should be placed in your configuration directory.
+
+See example configuration: [`config/compose/example/assets.yaml`](config/compose/example/assets.yaml)
+
+### Configuration Structure
+
+- **assets**: Array of asset configurations. Each asset can have multiple token implementations across different blockchains.
+  - `name`: Human-readable name of the asset (e.g., "USD Coin")
+  - `symbol`: Ticker symbol for the asset (required; e.g., "USDC")
+  - `disabled`: Whether to skip processing this asset
+  - `tokens`: Array of blockchain-specific token implementations
+    - `name`: Token name on this blockchain (optional, inherits from asset)
+    - `symbol`: Token symbol on this blockchain (optional, inherits from asset)
+    - `blockchain_id`: Chain ID where this token is deployed (required)
+    - `disabled`: Whether to skip processing this token
+    - `address`: Token's contract address (required)
+    - `decimals`: Number of decimal places for the token (required)
+
+### Asset Token Inheritance
+
+Token configurations inherit values from their parent asset:
+- If a token's `name` is not specified, it uses the asset's `name`
+- If a token's `symbol` is not specified, it uses the asset's `symbol`
+- If an asset's `name` is not specified, it defaults to the asset's `symbol`
+
+### Example Configuration
+
+```yaml
+assets:
+  - name: "USD Coin"
+    symbol: "USDC"
+    tokens:
+      - blockchain_id: 1
+        address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        decimals: 6
+      - name: "Bridged USDC"
+        blockchain_id: 42161
+        address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
+        decimals: 6
+  - symbol: "USDT"
+    disabled: true
+    tokens:
+      - blockchain_id: 1
+        address: "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+        decimals: 6
+```
 
 ### RPC Configuration
 
@@ -170,12 +219,12 @@ Clearnode requires the following environment variables to be properly configured
 |----------|-------------|----------|---------|
 | `BROKER_PRIVATE_KEY` | Private key used for signing broker messages | Yes | - |
 | `DATABASE_DRIVER` | Database driver to use (postgres/sqlite) | No | sqlite |
+| `CLEARNODE_CONFIG_DIR_PATH` | Path to directory containing configuration files | No | . |
 | `CLEARNODE_DATABASE_URL` | Database connection string | No | clearnode.db |
 | `CLEARNODE_LOG_LEVEL` | Logging level (debug, info, warn, error) | No | info |
 | `HTTP_PORT` | Port for the HTTP/WebSocket server | No | 8000 |
 | `METRICS_PORT` | Port for Prometheus metrics | No | 4242 |
 | `MSG_EXPIRY_TIME` | Time in seconds for message timestamp validation | No | 60 |
-| `CONFIG_DIR_PATH` | Path to directory containing configuration files | No | . |
 | `<BLOCKCHAIN_NAME>_BLOCKCHAIN_RPC` | RPC endpoint for each enabled blockchain | Yes (per enabled blockchain) | - |
 
 ## Running with Docker

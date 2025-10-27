@@ -145,12 +145,12 @@ describe('Session Key Spending Caps', () => {
             const allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: (initialDepositAmount + additionalDeposit).toString(),
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '0',
                 },
             ];
@@ -178,12 +178,12 @@ describe('Session Key Spending Caps', () => {
             const allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: (initialDepositAmount + excessiveAdditionalDeposit).toString(),
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '0',
                 },
             ];
@@ -206,12 +206,12 @@ describe('Session Key Spending Caps', () => {
             let allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: (initialDepositAmount + BigInt(150)).toString(),
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '0',
                 },
             ];
@@ -230,12 +230,12 @@ describe('Session Key Spending Caps', () => {
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: (initialDepositAmount + BigInt(150) + BigInt(200)).toString(),
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '0',
                 },
             ];
@@ -258,12 +258,12 @@ describe('Session Key Spending Caps', () => {
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: (initialDepositAmount + BigInt(150) + BigInt(200) + BigInt(100)).toString(),
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '0',
                 },
             ];
@@ -301,12 +301,12 @@ describe('Session Key Spending Caps', () => {
             const allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '200', // Withdraw 100 from 300
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '0',
                 },
             ];
@@ -329,12 +329,12 @@ describe('Session Key Spending Caps', () => {
             const depositAllocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '500', // 200 + 300 = 500
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '0',
                 },
             ];
@@ -354,14 +354,13 @@ describe('Session Key Spending Caps', () => {
     });
 
     describe('Multi-asset spending caps', () => {
+        const ETH_ASSET_SYMBOL = 'yintegration.eth';
         let ethChannelId: Hex;
         let appSessionId1: string;
         let appSessionId2: string;
 
         beforeEach(async () => {
-            // Seed WETH asset in database
-            await databaseUtils.seedAsset(CONFIG.ADDRESSES.WETH_TOKEN_ADDRESS, CONFIG.CHAIN_ID, 'eth', 18);
-
+            // WETH asset is now pre-configured in assets.yaml
             // Create WETH channel for Alice to have ETH in ledger
             const { params: ethChannelParams } = await aliceClient.createAndWaitForChannel(aliceWS, {
                 tokenAddress: CONFIG.ADDRESSES.WETH_TOKEN_ADDRESS,
@@ -376,8 +375,8 @@ describe('Session Key Spending Caps', () => {
             const ethCap = BigInt(2);
 
             await authenticateAppWithMultiAssetAllowances(aliceAppWS, aliceAppIdentity, [
-                { asset: 'usdc', amount: usdcCap.toString() },
-                { asset: 'eth', amount: ethCap.toString() },
+                { asset: ASSET_SYMBOL, amount: usdcCap.toString() },
+                { asset: ETH_ASSET_SYMBOL, amount: ethCap.toString() },
             ]);
 
             // Create app session with 200 USDC deposit (within 300 USDC cap)
@@ -408,12 +407,12 @@ describe('Session Key Spending Caps', () => {
             let allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'eth',
+                    asset: ETH_ASSET_SYMBOL,
                     amount: '1',
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'eth',
+                    asset: ETH_ASSET_SYMBOL,
                     amount: '0',
                 },
             ];
@@ -432,12 +431,12 @@ describe('Session Key Spending Caps', () => {
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '300',
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '0',
                 },
             ];
@@ -456,12 +455,12 @@ describe('Session Key Spending Caps', () => {
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'eth',
+                    asset: ETH_ASSET_SYMBOL,
                     amount: '2',
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'eth',
+                    asset: ETH_ASSET_SYMBOL,
                     amount: '0',
                 },
             ];
@@ -480,12 +479,12 @@ describe('Session Key Spending Caps', () => {
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '301',
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'usdc',
+                    asset: ASSET_SYMBOL,
                     amount: '0',
                 },
             ];
@@ -506,12 +505,12 @@ describe('Session Key Spending Caps', () => {
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
-                    asset: 'eth',
+                    asset: ETH_ASSET_SYMBOL,
                     amount: '2.1',
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
-                    asset: 'eth',
+                    asset: ETH_ASSET_SYMBOL,
                     amount: '0',
                 },
             ];

@@ -92,6 +92,8 @@ const (
 	GetLedgerBalancesMethod Method = "get_ledger_balances"
 	// GetRPCHistoryMethod returns RPC call history (auth required).
 	GetRPCHistoryMethod Method = "get_rpc_history"
+	// GetSessionKeysMethod returns session keys with allowances (auth required).
+	GetSessionKeysMethod Method = "get_session_keys"
 	// CreateChannelMethod creates a new payment channel (auth required).
 	CreateChannelMethod Method = "create_channel"
 	// ResizeChannelMethod resizes an existing channel (auth required).

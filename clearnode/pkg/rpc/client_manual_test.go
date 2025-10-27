@@ -50,15 +50,23 @@ func TestManualClient(t *testing.T) {
 	err = client.Start(ctx, uatWsRpcUrl, handleError)
 	require.NoError(t, err)
 
+	assetSymbol := "ytest.usd"
+	testAllowanceAmount := "100"
+
 	var jwtToken string
 	t.Run("Authenticate With Signature", func(t *testing.T) {
 		authReq := rpc.AuthRequestRequest{
 			Address:     walletSigner.PublicKey().Address().String(),
 			SessionKey:  sessionSigner.PublicKey().Address().String(),
 			Application: "TestClient",
-			Allowances:  []rpc.Allowance{},
-			Expire:      "",
-			Scope:       "",
+			Allowances: []rpc.Allowance{
+				{
+					Asset:  assetSymbol,
+					Amount: testAllowanceAmount,
+				},
+			},
+			Expire: "",
+			Scope:  "",
 		}
 		authRes, _, err := client.AuthWithSig(ctx, authReq, walletSigner)
 		require.NoError(t, err)
@@ -74,7 +82,6 @@ func TestManualClient(t *testing.T) {
 	ctx, cancel = context.WithCancel(t.Context())
 	defer cancel()
 
-	assetSymbol := "ytest.usd"
 	currentBalance := decimal.NewFromInt(-1)
 	currentBalanceMu := sync.RWMutex{}
 
@@ -156,6 +163,51 @@ func TestManualClient(t *testing.T) {
 				userTagRes, _, err := client.GetUserTag(ctx)
 				require.NoError(t, err)
 				fmt.Printf("User Tag: %+v\n", userTagRes.Tag)
+			},
+		},
+		{
+			name: "GetSessionKeys_VerifyAllowances",
+			fn: func(t *testing.T) {
+				sessionKeysRes, _, err := client.GetSessionKeys(ctx, rpc.GetSessionKeysRequest{})
+				require.NoError(t, err)
+				require.NotEmpty(t, sessionKeysRes.SessionKeys, "should have at least one session key")
+
+				// Find our TestClient session key
+				var foundSessionKey *rpc.SessionKeyResponse
+				for i := range sessionKeysRes.SessionKeys {
+					if sessionKeysRes.SessionKeys[i].SessionKey == sessionSigner.PublicKey().Address().String() &&
+						sessionKeysRes.SessionKeys[i].Application == "TestClient" {
+						foundSessionKey = &sessionKeysRes.SessionKeys[i]
+						break
+					}
+				}
+
+				require.NotNil(t, foundSessionKey, "should find TestClient session key")
+				require.Equal(t, "TestClient", foundSessionKey.Application)
+				require.NotEmpty(t, foundSessionKey.Allowances, "should have allowances")
+
+				// Verify the allowance for our test asset
+				var foundAllowance *rpc.AllowanceUsage
+				for i := range foundSessionKey.Allowances {
+					if foundSessionKey.Allowances[i].Asset == assetSymbol {
+						foundAllowance = &foundSessionKey.Allowances[i]
+						break
+					}
+				}
+
+				require.NotNil(t, foundAllowance, "should have allowance for test asset")
+				require.Equal(t, assetSymbol, foundAllowance.Asset)
+				expectedAllowance, err := decimal.NewFromString(testAllowanceAmount)
+				require.NoError(t, err)
+				assert.True(t, expectedAllowance.Equal(foundAllowance.Allowance),
+					"allowance should be %s, got %s", testAllowanceAmount, foundAllowance.Allowance)
+				assert.True(t, foundAllowance.Used.IsZero(),
+					"allowance usage should start at 0, got %s", foundAllowance.Used)
+
+				fmt.Printf("Session Key: %s\n", foundSessionKey.SessionKey)
+				fmt.Printf("Application: %s\n", foundSessionKey.Application)
+				fmt.Printf("Allowance: %s %s (Used: %s)\n",
+					foundAllowance.Allowance, foundAllowance.Asset, foundAllowance.Used)
 			},
 		},
 		{
@@ -328,6 +380,30 @@ func TestManualClient(t *testing.T) {
 
 				balanceDiff := balanceBefore - balanceAfter
 				assert.Equal(t, int64(1), balanceDiff, "balance should decrease by 1 unit")
+
+				// Verify allowance was reduced by 1
+				sessionKeysRes, _, err := client.GetSessionKeys(ctx, rpc.GetSessionKeysRequest{})
+				require.NoError(t, err)
+				var foundSessionKey *rpc.SessionKeyResponse
+				for i := range sessionKeysRes.SessionKeys {
+					if sessionKeysRes.SessionKeys[i].SessionKey == sessionSigner.PublicKey().Address().String() {
+						foundSessionKey = &sessionKeysRes.SessionKeys[i]
+						break
+					}
+				}
+				require.NotNil(t, foundSessionKey, "should find session key")
+				var foundAllowance *rpc.AllowanceUsage
+				for i := range foundSessionKey.Allowances {
+					if foundSessionKey.Allowances[i].Asset == assetSymbol {
+						foundAllowance = &foundSessionKey.Allowances[i]
+						break
+					}
+				}
+				require.NotNil(t, foundAllowance, "should have allowance")
+				assert.True(t, decimal.NewFromInt(1).Equal(foundAllowance.Used),
+					"allowance usage should be 1 after creating app session, got %s", foundAllowance.Used)
+				fmt.Printf("Allowance after CreateAppSession: %s / %s used\n",
+					foundAllowance.Used, foundAllowance.Allowance)
 			},
 		},
 		{
@@ -408,6 +484,30 @@ func TestManualClient(t *testing.T) {
 
 				balanceDiff := balanceBefore - balanceAfter
 				assert.Equal(t, int64(1), balanceDiff, "balance should decrease by 1 unit")
+
+				// Verify allowance was reduced by another 1 (total 2)
+				sessionKeysRes, _, err := client.GetSessionKeys(ctx, rpc.GetSessionKeysRequest{})
+				require.NoError(t, err)
+				var foundSessionKey *rpc.SessionKeyResponse
+				for i := range sessionKeysRes.SessionKeys {
+					if sessionKeysRes.SessionKeys[i].SessionKey == sessionSigner.PublicKey().Address().String() {
+						foundSessionKey = &sessionKeysRes.SessionKeys[i]
+						break
+					}
+				}
+				require.NotNil(t, foundSessionKey, "should find session key")
+				var foundAllowance *rpc.AllowanceUsage
+				for i := range foundSessionKey.Allowances {
+					if foundSessionKey.Allowances[i].Asset == assetSymbol {
+						foundAllowance = &foundSessionKey.Allowances[i]
+						break
+					}
+				}
+				require.NotNil(t, foundAllowance, "should have allowance")
+				assert.True(t, decimal.NewFromInt(2).Equal(foundAllowance.Used),
+					"allowance usage should be 2 after deposit, got %s", foundAllowance.Used)
+				fmt.Printf("Allowance after Deposit: %s / %s used\n",
+					foundAllowance.Used, foundAllowance.Allowance)
 			},
 		},
 		{

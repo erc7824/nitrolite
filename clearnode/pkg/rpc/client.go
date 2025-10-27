@@ -663,6 +663,48 @@ func (c *Client) GetUserTag(ctx context.Context) (GetUserTagResponse, []sign.Sig
 	return resParams, res.Sig, nil
 }
 
+// GetSessionKeys retrieves session keys with allowances for the authenticated user.
+// Returns all active session keys with their spending limits and usage tracking.
+//
+// Requires authentication.
+//
+// Parameters:
+//   - reqParams: Optional filter options (e.g., pagination)
+//
+// Returns:
+//   - GetSessionKeysResponse containing session keys with allowances
+//   - Response signatures for verification
+//   - Error if not authenticated or request fails
+//
+// Example:
+//
+//	sessionKeys, _, err := client.GetSessionKeys(ctx, GetSessionKeysRequest{})
+//	if err != nil {
+//	    log.Error("Failed to get session keys", "error", err)
+//	}
+//	for _, sk := range sessionKeys.SessionKeys {
+//	    fmt.Printf("Session key: %s, Application: %s\n", sk.SessionKey, sk.Application)
+//	    for _, allowance := range sk.Allowances {
+//	        fmt.Printf("  %s: %s / %s used\n", allowance.Asset, allowance.Used, allowance.Allowance)
+//	    }
+//	}
+func (c *Client) GetSessionKeys(ctx context.Context, reqParams GetSessionKeysRequest) (GetSessionKeysResponse, []sign.Signature, error) {
+	var resParams GetSessionKeysResponse
+	var resSig []sign.Signature
+
+	res, err := c.call(ctx, GetSessionKeysMethod, &reqParams)
+	if err != nil {
+		return resParams, resSig, err
+	}
+	resSig = res.Sig
+
+	if err := res.Res.Params.Translate(&resParams); err != nil {
+		return resParams, resSig, err
+	}
+
+	return resParams, res.Sig, nil
+}
+
 // GetLedgerBalances retrieves account balances for the authenticated user.
 // Balances show the current amount of each asset held in the user's accounts.
 //

@@ -51,6 +51,20 @@ export class DatabaseUtils {
         // await this.clearClearnodeCache(); // Uncomment when caching is added
     }
 
+    async seedAsset(token: string, chainId: number, symbol: string, decimals: number): Promise<void> {
+        const client = await this.pool.connect();
+        try {
+            await client.query(
+                `INSERT INTO assets (token, chain_id, symbol, decimals)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (token, chain_id) DO NOTHING`,
+                [token, chainId, symbol, decimals]
+            );
+        } finally {
+            client.release();
+        }
+    }
+
     async getBlockchainActions(filters: { channel_id?: string; action_type?: string }): Promise<any[]> {
         const client = await this.pool.connect();
         try {

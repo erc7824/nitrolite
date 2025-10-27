@@ -6,6 +6,7 @@ import { TestWebSocket } from '@/ws';
 import { createAuthSessionWithClearnode } from '@/auth';
 import { CONFIG } from '@/setup';
 import { RPCAppStateIntent, RPCProtocolVersion } from '@erc7824/nitrolite';
+import { Hex } from 'viem';
 
 import {
     createTestChannels,
@@ -357,6 +358,22 @@ describe('Session Key Spending Caps', () => {
     });
 
     describe('Multi-asset spending caps', () => {
+        let ethChannelId: Hex;
+        let appSessionId1: string;
+        let appSessionId2: string;
+
+        beforeEach(async () => {
+            // Seed WETH asset in database
+            await databaseUtils.seedAsset(CONFIG.ADDRESSES.WETH_TOKEN_ADDRESS, CONFIG.CHAIN_ID, 'eth', 18);
+
+            // Create WETH channel for Alice to have ETH in ledger
+            const { params: ethChannelParams } = await aliceClient.createAndWaitForChannel(aliceWS, {
+                tokenAddress: CONFIG.ADDRESSES.WETH_TOKEN_ADDRESS,
+                amount: toRaw(BigInt(10), 18), // 10 WETH
+            });
+            ethChannelId = ethChannelParams.channelId;
+        });
+
         it('should enforce spending cap per asset independently', async () => {
             // Authenticate with allowances for both USDC and ETH
             const usdcCap = BigInt(300);
@@ -368,7 +385,7 @@ describe('Session Key Spending Caps', () => {
             ]);
 
             // Create app session with 200 USDC deposit (within 300 USDC cap)
-            const appSessionId1 = await createTestAppSession(
+            appSessionId1 = await createTestAppSession(
                 aliceAppIdentity,
                 bobAppIdentity,
                 aliceAppWS,
@@ -378,8 +395,8 @@ describe('Session Key Spending Caps', () => {
             );
             expect(appSessionId1).toBeDefined();
 
-            // Create second app session with 1 ETH deposit (within 2 ETH cap)
-            const appSessionId2 = await createTestAppSession(
+            // Create second app session with 0 initial deposit
+            appSessionId2 = await createTestAppSession(
                 aliceAppIdentity,
                 bobAppIdentity,
                 aliceAppWS,
@@ -389,7 +406,7 @@ describe('Session Key Spending Caps', () => {
             );
             expect(appSessionId2).toBeDefined();
 
-            // Add 1 ETH to second session
+            // Add 1 ETH to second session (within 2 ETH cap)
             let allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
@@ -461,7 +478,7 @@ describe('Session Key Spending Caps', () => {
                 SESSION_DATA
             );
 
-            // Attempting to deposit 1 more USDC should fail (would be 301)
+            // Attempting to deposit 1 more USDC should fail (would be 301, exceeds USDC cap)
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
@@ -487,7 +504,7 @@ describe('Session Key Spending Caps', () => {
                 )
             ).rejects.toThrow(/session key spending validation failed.*insufficient session key allowance/i);
 
-            // Attempting to deposit 0.1 more ETH should fail (would be 2.1)
+            // Attempting to deposit 0.1 more ETH should fail (would be 2.1, exceeds ETH cap)
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,

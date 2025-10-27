@@ -103,7 +103,7 @@ MAJOR.MINOR.PATCH
 
 - **MAJOR**: incompatible API changes  
 - **MINOR**: backward-compatible features  
-- **PATCH**: backward-compatible bug fixes
+- **PATCH**: backward-compatible bug fixes  
 
 Example: `v1.3.2`
 

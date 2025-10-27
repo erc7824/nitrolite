@@ -6,6 +6,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
@@ -65,7 +66,7 @@ func TestManualClient(t *testing.T) {
 					Amount: testAllowanceAmount,
 				},
 			},
-			Expire: "",
+			Expire: time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339),
 			Scope:  "",
 		}
 		authRes, _, err := client.AuthWithSig(ctx, authReq, walletSigner)

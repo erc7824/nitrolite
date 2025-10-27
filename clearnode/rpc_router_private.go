@@ -647,9 +647,11 @@ func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decim
 			return RPCErrorf("asset %s not fully redistributed", asset)
 		}
 	}
-	for asset := range allocationSum {
+	for asset, allocSum := range allocationSum {
 		if _, ok := appSessionBalance[asset]; !ok {
-			return RPCErrorf("allocation references unknown asset %s", asset)
+			if !allocSum.IsZero() {
+				return RPCErrorf("allocation references unknown asset %s", asset)
+			}
 		}
 	}
 	return nil

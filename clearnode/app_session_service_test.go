@@ -110,7 +110,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           rpc.VersionNitroRPCv0_2,
+				Protocol:           rpc.VersionNitroRPCv0_4,
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 1},
 				Quorum:             2,
@@ -152,7 +152,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           rpc.VersionNitroRPCv0_2,
+				Protocol:           rpc.VersionNitroRPCv0_4,
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 0},
 				Quorum:             1,
@@ -177,7 +177,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           rpc.VersionNitroRPCv0_2,
+				Protocol:           rpc.VersionNitroRPCv0_4,
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 0},
 				Quorum:             1,
@@ -203,7 +203,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           rpc.VersionNitroRPCv0_2,
+				Protocol:           rpc.VersionNitroRPCv0_4,
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{1, 0},
 				Quorum:             1,
@@ -231,7 +231,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           rpc.VersionNitroRPCv0_2,
+				Protocol:           rpc.VersionNitroRPCv0_4,
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{3, 5}, // Total weight is 8
 				Quorum:             10,            // Quorum exceeds total weight (10 > 8)
@@ -261,7 +261,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
-				Protocol:           rpc.VersionNitroRPCv0_2,
+				Protocol:           rpc.VersionNitroRPCv0_4,
 				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
 				Weights:            []int64{3, 5}, // Total weight is 8
 				Quorum:             8,             // Quorum equals total weight (8 == 8) - should be valid
@@ -1356,7 +1356,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Application:        "TestApp",
-				Protocol:           rpc.VersionNitroRPCv0_2,
+				Protocol:           rpc.VersionNitroRPCv0_4,
 				ParticipantWallets: []string{walletAddress, userAddressB.Hex()},
 				Weights:            []int64{2, 0},
 				Quorum:             2,
@@ -1381,7 +1381,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Application:        "TestApp",
-				Protocol:           rpc.VersionNitroRPCv0_2,
+				Protocol:           rpc.VersionNitroRPCv0_4,
 				ParticipantWallets: []string{walletAddress, userAddressB.Hex()},
 				Weights:            []int64{2, 1},
 				Quorum:             2,
@@ -1402,7 +1402,7 @@ func TestAppSessionSessionKeySpendingValidation(t *testing.T) {
 		params := &CreateAppSessionParams{
 			Definition: AppDefinition{
 				Application:        "TestApp",
-				Protocol:           rpc.VersionNitroRPCv0_2,
+				Protocol:           rpc.VersionNitroRPCv0_4,
 				ParticipantWallets: []string{walletAddress, userAddressB.Hex()},
 				Weights:            []int64{2, 0},
 				Quorum:             2,

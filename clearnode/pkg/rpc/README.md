@@ -386,7 +386,7 @@ if err != nil {
 // Create multi-party application session
 createSessReq := rpc.CreateAppSessionRequest{
     Definition: rpc.AppDefinition{
-        Protocol:           rpc.VersionNitroRPCv0_2, // Required: "NitroRPC/0.2"
+        Protocol:           rpc.VersionNitroRPCv0_4, // Required: "NitroRPC/0.4"
         ParticipantWallets: []string{player1, player2},
         Weights:            []int64{1, 1},
         Quorum:             2,
@@ -394,8 +394,8 @@ createSessReq := rpc.CreateAppSessionRequest{
         Nonce:              uint64(uuid.New().ID()),
     },
     Allocations: []rpc.AppAllocation{
-        {ParticipantWallet: player1, AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
-        {ParticipantWallet: player2, AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
+        {ParticipantWallet: player1, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+        {ParticipantWallet: player2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
     },
 }
 

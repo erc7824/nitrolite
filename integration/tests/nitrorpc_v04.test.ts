@@ -356,6 +356,8 @@ describe('App session state v0.4 error cases', () => {
         });
 
         it('should fail on withdrawing from v0.2 app session', async () => {
+            await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, appSessionDepositAmount * BigInt(2));
+
             // Create a v0.2 app session (which doesn't support deposits/withdrawals)
             const v02AppSessionId = await createTestAppSession(
                 aliceAppIdentity,
@@ -363,22 +365,12 @@ describe('App session state v0.4 error cases', () => {
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_2,
                 ASSET_SYMBOL,
-                BigInt(0), // No initial deposit
+                appSessionDepositAmount,
                 START_SESSION_DATA
             );
 
-            let allocations = [
-                {
-                    participant: aliceAppIdentity.walletAddress,
-                    asset: 'usdc',
-                    amount: '0', // Keep at 0 (no withdrawal)
-                },
-                {
-                    participant: bobAppIdentity.walletAddress,
-                    asset: 'usdc',
-                    amount: '0',
-                },
-            ];
+            let allocations = structuredClone(START_ALLOCATIONS);
+            allocations[0].amount = (BigInt(allocations[0].amount) - BigInt(10)).toString(); // 90 USDC - less than deposited
 
             try {
                 await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, v02AppSessionId, RPCAppStateIntent.Withdraw, 2, allocations, { state: 'test' });

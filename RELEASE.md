@@ -128,5 +128,5 @@ Before finalizing a release:
 - [ ] Release PR reviewed and approved
 
 ## References
-- Git Flow: https://git-flow.sh/workflows/gitflow/
-- Semantic Versioning: https://semver.org/
+- Git Flow: [https://git-flow.sh/workflows/gitflow/](https://git-flow.sh/workflows/gitflow/)
+- Semantic Versioning: [https://semver.org/](https://semver.org/)

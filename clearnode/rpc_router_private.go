@@ -160,7 +160,7 @@ type SessionKeyResponse struct {
 	Application string           `json:"application"`
 	Allowances  []AllowanceUsage `json:"allowances"`
 	Scope       string           `json:"scope,omitempty"`
-	ExpiresAt   time.Time        `json:"expires_at,omitempty"`
+	ExpiresAt   time.Time        `json:"expires_at"`
 	CreatedAt   time.Time        `json:"created_at"`
 }
 

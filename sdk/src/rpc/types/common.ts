@@ -268,7 +268,7 @@ export interface RPCSessionKey {
     /** Permission scope for this session key (e.g., "app.create", "ledger.readonly"). */
     scope?: string;
     /** When this session key expires. */
-    expiresAt?: Date;
+    expiresAt: Date;
     /** When the session key was created. */
     createdAt: Date;
 }

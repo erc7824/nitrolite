@@ -119,7 +119,7 @@ const SessionKeyObjectSchema = z
         application: z.string(),
         allowances: z.array(AllowanceUsageObjectSchema),
         scope: z.string().optional(),
-        expires_at: z.string().optional(),
+        expires_at: z.string(),
         created_at: z.string(),
     })
     .transform(
@@ -129,7 +129,7 @@ const SessionKeyObjectSchema = z
             application: raw.application,
             allowances: raw.allowances,
             scope: raw.scope,
-            expiresAt: raw.expires_at ? new Date(raw.expires_at) : undefined,
+            expiresAt: new Date(raw.expires_at),
             createdAt: new Date(raw.created_at),
         }),
     );

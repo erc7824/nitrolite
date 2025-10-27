@@ -483,7 +483,7 @@ Each session key includes:
   - `allowance`: Maximum amount the session key can spend for this asset
   - `used`: Amount already spent by this session key (calculated on the fly from ledger entries)
 - `scope`: Permission scope for this session key (e.g., "app.create", "ledger.readonly") (optional field, omitted if empty)
-- `expires_at`: When this session key expires (ISO 8601 format) (optional field, omitted if no expiration)
+- `expires_at`: When this session key expires (ISO 8601 format)
 - `created_at`: When the session key was created (ISO 8601 format)
 
 **Notes:**

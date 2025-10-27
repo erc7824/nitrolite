@@ -308,7 +308,7 @@ type SessionKeyResponse struct {
 	// Scope defines the permission scope for the session (e.g., "app.create", "ledger.readonly")
 	Scope string `json:"scope,omitempty"`
 	// ExpiresAt is when the session key expires
-	ExpiresAt time.Time `json:"expires_at,omitempty"`
+	ExpiresAt time.Time `json:"expires_at"`
 	// CreatedAt is when the session key was created
 	CreatedAt time.Time `json:"created_at"`
 }

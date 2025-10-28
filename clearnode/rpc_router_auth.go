@@ -254,7 +254,7 @@ func ValidateTimestamp(ts uint64, expirySeconds int) error {
 	return nil
 }
 
-// validateAllowances validates that all assets in allowances are supported by the system
+// validateAllowances validates that all assets in allowances are valid abd supported by the system
 func validateAllowances(assetsCfg *AssetsConfig, allowances []Allowance) error {
 	if len(allowances) == 0 {
 		return nil

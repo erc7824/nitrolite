@@ -422,8 +422,6 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router, db, cleanup := setupTestRPCRouter(t)
 		t.Cleanup(cleanup)
 
-		// require.NoError(t, AddSigner(db, senderAddr.Hex(), senderAddr.Hex()))
-
 		// Fund sender's account
 		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000), nil))
 
@@ -1993,8 +1991,6 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		accountID := NewAccountID(userAddr)
 		err = ledger.Record(accountID, "usdc", decimal.NewFromInt(-45), &sessionKey1Addr)
 		require.NoError(t, err)
-
-		// Usage is now calculated on the fly, no need to update
 
 		ctx := createSignedRPCContext(1, "get_session_keys", nil, userSigner)
 		router.HandleGetSessionKeys(ctx)

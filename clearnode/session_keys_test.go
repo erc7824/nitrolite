@@ -43,17 +43,12 @@ func TestSessionKey(t *testing.T) {
 	assert.Equal(t, scope, sk.Scope)
 	assert.WithinDuration(t, expirationTime, sk.ExpiresAt, time.Second)
 
-	// Test JSON serialization/deserialization of allowances
 	var retrievedSpendingCap []Allowance
 	err = json.Unmarshal([]byte(*sk.Allowance), &retrievedSpendingCap)
 	require.NoError(t, err)
 	assert.Equal(t, allowances, retrievedSpendingCap)
-
-	// UsedAllowance is now calculated on the fly, not stored in the database
-
 	assert.Equal(t, walletAddress, GetWalletBySessionKey(sessionSignerAddress))
 
-	// Session keys are queried separately
 	sessionKeys, err := GetSessionKeysByWallet(db, walletAddress)
 	require.NoError(t, err)
 	assert.Len(t, sessionKeys, 1)
@@ -67,7 +62,6 @@ func TestSessionKeyMultipleKeys(t *testing.T) {
 
 	walletAddress := "0x1234567890123456789012345678901234567890"
 
-	// Add multiple session keys for different apps (only one per app allowed)
 	sessionKeys := []struct {
 		signerAddress string
 		application   string
@@ -75,7 +69,7 @@ func TestSessionKeyMultipleKeys(t *testing.T) {
 	}{
 		{"0xkey1", "App1", "trade"},
 		{"0xkey2", "App2", "view"},
-		{"0xkey3", "App3", "admin"}, // Changed from App1 to App3 since only one key per app
+		{"0xkey3", "App3", "admin"},
 	}
 
 	for _, sk := range sessionKeys {
@@ -100,7 +94,6 @@ func TestSessionKeyActiveKeys(t *testing.T) {
 
 	walletAddress := "0x1234567890123456789012345678901234567890"
 
-	// Add an active session key
 	err := AddSessionKey(db, walletAddress, "0xactive123", "ActiveApp", "trade", []Allowance{}, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
@@ -148,7 +141,6 @@ func TestSessionKeySpendingValidation(t *testing.T) {
 	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
-	// Get the session key first
 	sessionKey, err := IsSessionKeyActive(db, sessionKeyAddress)
 	require.NoError(t, err, "Session key should be active")
 
@@ -279,7 +271,6 @@ func TestSessionKeyTransferIntegration(t *testing.T) {
 	ctx.UserID = walletAddress
 	router.HandleTransfer(ctx)
 
-	// Should succeed
 	res := assertResponse(t, ctx, "transfer")
 	transferResp, ok := res.Params.(TransferResponse)
 	require.True(t, ok)
@@ -303,7 +294,6 @@ func TestSessionKeyTransferIntegration(t *testing.T) {
 	ctx2.UserID = walletAddress
 	router.HandleTransfer(ctx2)
 
-	// Should fail with spending cap error
 	assertErrorResponse(t, ctx2, "operation denied: insufficient session key allowance")
 
 	// Test 4: Transfer with unauthorized asset should fail
@@ -404,14 +394,11 @@ func TestOneSessionKeyPerApp(t *testing.T) {
 	err := loadSessionKeyCache(db)
 	require.NoError(t, err)
 
-	// Add first session key for the app
 	err = AddSessionKey(db, walletAddress, sessionKey1, app, "trade", allowances, expiration)
 	require.NoError(t, err)
 
-	// Verify first session key exists and is cached
 	assert.Equal(t, walletAddress, GetWalletBySessionKey(sessionKey1))
 
-	// Verify it exists in database
 	sessionKeys, err := GetSessionKeysByWallet(db, walletAddress)
 	require.NoError(t, err)
 	assert.Len(t, sessionKeys, 1)

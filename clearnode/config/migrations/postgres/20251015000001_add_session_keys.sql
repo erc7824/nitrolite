@@ -1,7 +1,7 @@
 -- +goose Up
 -- +goose StatementBegin
 
--- DROP TABLE IF EXISTS signers; // I would keep the old table in case we want to revert
+-- NOTE: We would keep the old signers table in case we want to revert
 
 -- Create session_keys table for session keys with spending caps
 CREATE TABLE session_keys (
@@ -36,10 +36,5 @@ ALTER TABLE app_sessions DROP COLUMN IF EXISTS application;
 
 DROP INDEX IF EXISTS idx_ledger_session_key;
 ALTER TABLE ledger DROP COLUMN IF EXISTS session_key;
-
-CREATE TABLE signers (
-    signer VARCHAR PRIMARY KEY,
-    wallet VARCHAR NOT NULL
-);
 
 -- +goose StatementEnd

@@ -1231,7 +1231,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			},
 		}
 
-		resp, err := service.CloseApplication(params, rpcSigners(userAddressA, userAddressB))
+		resp, err := service.CloseApplication(params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -1276,7 +1276,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			},
 		}
 
-		resp, err := service.CloseApplication(params, rpcSigners(userAddressA, userAddressB))
+		resp, err := service.CloseApplication(params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 
@@ -1314,7 +1314,7 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			},
 		}
 
-		_, err := service.CloseApplication(params, rpcSigners(userAddressA, userAddressB))
+		_, err := service.CloseApplication(params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), ErrNegativeAllocation)
 	})

@@ -508,7 +508,14 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 		return
 	}
 
-	resp, err := r.AppSessionService.CloseApplication(&params, rpcWallets)
+	rpcSigners, err := c.Message.GetRequestSignersMap()
+	if err != nil {
+		logger.Error("failed to get signers from RPC message", "error", err)
+		c.Fail(err, "failed to get signers from RPC message")
+		return
+	}
+
+	resp, err := r.AppSessionService.CloseApplication(&params, rpcWallets, rpcSigners)
 	if err != nil {
 		logger.Error("failed to close application session", "error", err)
 		c.Fail(err, "failed to close application session")

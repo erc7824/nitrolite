@@ -18,7 +18,7 @@ func TestAuthManager(t *testing.T) {
 	require.NotNil(t, authManager)
 
 	// Generate a challenge
-	challenge, err := authManager.GenerateChallenge("addr", "session_key", "app_name", []Allowance{}, "", "", "")
+	challenge, err := authManager.GenerateChallenge("addr", "session_key", "application", []Allowance{}, "", "")
 	require.NoError(t, err)
 	require.NotEmpty(t, challenge)
 
@@ -95,7 +95,7 @@ func TestAuthManagerJwtManagement(t *testing.T) {
 
 	// Basic JWT verification
 	assert.Equal(t, wallet, claims.Policy.Wallet)
-	assert.Equal(t, sessionKey, claims.Policy.Participant)
+	assert.Equal(t, sessionKey, claims.Policy.SessionKey)
 	assert.Equal(t, scope, claims.Policy.Scope)
 	assert.Equal(t, application, claims.Policy.Application)
 
@@ -155,7 +155,7 @@ func TestAuthManagerJwtExpiration(t *testing.T) {
 	// Create a JWT with custom claims for longer expiration
 	policy := Policy{
 		Wallet:      wallet,
-		Participant: sessionKey,
+		SessionKey:  sessionKey,
 		Scope:       "",
 		Application: "",
 		Allowances:  []Allowance{},

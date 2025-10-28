@@ -648,7 +648,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 			{"eth", decimal.NewFromFloat(-0.5)},
 		}
 		for _, data := range testData1 {
-			err := ledger1.Record(participant1AccountID, data.asset, data.amount)
+			err := ledger1.Record(participant1AccountID, data.asset, data.amount, nil)
 			require.NoError(t, err)
 		}
 
@@ -661,7 +661,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 			{"btc", decimal.NewFromFloat(0.05)},
 		}
 		for _, data := range testData2 {
-			err := ledger2.Record(participant2AccountID, data.asset, data.amount)
+			err := ledger2.Record(participant2AccountID, data.asset, data.amount, nil)
 			require.NoError(t, err)
 		}
 
@@ -801,7 +801,7 @@ func TestRPCRouterHandleGetLedgerEntries(t *testing.T) {
 
 		// Create all entries
 		for _, data := range testData {
-			err := ledger.Record(userAccountID, data.asset, data.amount)
+			err := ledger.Record(userAccountID, data.asset, data.amount, nil)
 			require.NoError(t, err)
 		}
 

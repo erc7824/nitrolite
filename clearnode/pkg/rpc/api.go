@@ -92,6 +92,8 @@ const (
 	GetLedgerBalancesMethod Method = "get_ledger_balances"
 	// GetRPCHistoryMethod returns RPC call history (auth required).
 	GetRPCHistoryMethod Method = "get_rpc_history"
+	// GetSessionKeysMethod returns session keys with allowances (auth required).
+	GetSessionKeysMethod Method = "get_session_keys"
 	// CreateChannelMethod creates a new payment channel (auth required).
 	CreateChannelMethod Method = "create_channel"
 	// ResizeChannelMethod resizes an existing channel (auth required).
@@ -235,16 +237,14 @@ type AuthRequestRequest struct {
 	Address string `json:"address"`
 	// SessionKey is a unique key for this authentication session
 	SessionKey string `json:"session_key"`
-	// AppName identifies the application requesting authentication
-	AppName string `json:"app_name"`
+	// Application identifies the application requesting authentication
+	Application string `json:"application"`
 	// Allowances define spending limits for the authenticated session
 	Allowances []Allowance `json:"allowances"`
 	// Expire defines when the authentication expires (RFC3339 format)
 	Expire string `json:"expire"`
 	// Scope defines the permission scope for the session
 	Scope string `json:"scope"`
-	// ApplicationAddress is the contract address of the requesting application
-	ApplicationAddress string `json:"application"`
 }
 
 // AuthRequestResponse contains the challenge for wallet signature.
@@ -285,6 +285,44 @@ type AuthJWTVerifyResponse struct {
 	SessionKey string `json:"session_key"`
 	// Success indicates if the JWT is valid
 	Success bool `json:"success"`
+}
+
+// GetSessionKeysRequest queries for session keys associated with the authenticated wallet.
+type GetSessionKeysRequest struct {
+	// No parameters - returns all session keys for the authenticated user
+}
+
+// GetSessionKeysResponse contains the list of active session keys.
+type GetSessionKeysResponse struct {
+	SessionKeys []SessionKeyResponse `json:"session_keys"`
+}
+
+// SessionKeyResponse represents a single session key with its allowances and usage.
+type SessionKeyResponse struct {
+	// ID is the internal database identifier
+	ID uint `json:"id"`
+	// SessionKey is the public key/address of the session key
+	SessionKey string `json:"session_key"`
+	// Application is the name or identifier of the application this key is for
+	Application string `json:"application"`
+	// Allowances contains spending limits per asset with usage tracking
+	Allowances []AllowanceUsage `json:"allowances"`
+	// Scope defines the permission scope for the session (e.g., "app.create", "ledger.readonly")
+	Scope string `json:"scope,omitempty"`
+	// ExpiresAt is when the session key expires
+	ExpiresAt time.Time `json:"expires_at"`
+	// CreatedAt is when the session key was created
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// AllowanceUsage represents an asset allowance with usage tracking.
+type AllowanceUsage struct {
+	// Asset is the token/asset symbol
+	Asset string `json:"asset"`
+	// Allowance is the total spending limit for this asset
+	Allowance decimal.Decimal `json:"allowance"`
+	// Used is how much of the allowance has been spent
+	Used decimal.Decimal `json:"used"`
 }
 
 // ============================================================================
@@ -540,6 +578,8 @@ type TransferAllocation struct {
 
 // AppDefinition defines the protocol for a multi-party application.
 type AppDefinition struct {
+	// Application is the identifier of the application
+	Application string `json:"application"`
 	// Protocol identifies the version of the application protocol
 	Protocol Version `json:"protocol"`
 	// ParticipantWallets lists the wallet addresses of all participants
@@ -558,6 +598,8 @@ type AppDefinition struct {
 type AppSession struct {
 	// AppSessionID is the unique session identifier
 	AppSessionID string `json:"app_session_id"`
+	// Application is the name of the application
+	Application string `json:"application"`
 	// Status indicates the session state (open/closed)
 	Status string `json:"status"`
 	// ParticipantWallets lists all participants
@@ -584,8 +626,8 @@ type AppSession struct {
 
 // AppAllocation defines asset distribution for a participant in an app session.
 type AppAllocation struct {
-	// ParticipantWallet is the recipient's address
-	ParticipantWallet string `json:"participant"`
+	// Participant is the recipient's address
+	Participant string `json:"participant"`
 	// AssetSymbol identifies the asset
 	AssetSymbol string `json:"asset"`
 	// Amount allocated to the participant

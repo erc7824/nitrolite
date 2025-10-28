@@ -350,8 +350,7 @@ sessionSigner, _ := sign.NewEthereumSigner(sessionPrivateKey)
 authReq := rpc.AuthRequestRequest{
     Address:            walletSigner.PublicKey().Address().String(),
     SessionKey:         sessionSigner.PublicKey().Address().String(), // Different from Address
-    AppName:            "MyApp",
-    ApplicationAddress: appContractAddress,
+    Application:            "MyApp",
 }
 
 authResp, _, err := client.AuthWithSig(ctx, authReq, walletSigner)
@@ -371,7 +370,7 @@ balances, _, err := client.GetLedgerBalances(ctx, rpc.GetLedgerBalancesRequest{}
 transferReq := rpc.TransferRequest{
     Destination: recipientAddress,
     Allocations: []rpc.TransferAllocation{
-        {AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
+        {AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
     },
 }
 
@@ -387,7 +386,7 @@ if err != nil {
 // Create multi-party application session
 createSessReq := rpc.CreateAppSessionRequest{
     Definition: rpc.AppDefinition{
-        Protocol:           rpc.VersionNitroRPCv0_2, // Required: "NitroRPC/0.2"
+        Protocol:           rpc.VersionNitroRPCv0_4, // Required: "NitroRPC/0.4"
         ParticipantWallets: []string{player1, player2},
         Weights:            []int64{1, 1},
         Quorum:             2,
@@ -395,8 +394,8 @@ createSessReq := rpc.CreateAppSessionRequest{
         Nonce:              uint64(uuid.New().ID()),
     },
     Allocations: []rpc.AppAllocation{
-        {ParticipantWallet: player1, AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
-        {ParticipantWallet: player2, AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
+        {ParticipantWallet: player1, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+        {ParticipantWallet: player2, AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
     },
 }
 

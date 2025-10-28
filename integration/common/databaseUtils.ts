@@ -16,7 +16,7 @@ export class DatabaseUtils {
 
     async cleanupDatabaseData(): Promise<void> {
         try {
-            const tables = ['app_sessions', 'channels', 'contract_events', 'ledger', 'rpc_store', 'signers', 'ledger_transactions', 'blockchain_actions'];
+            const tables = ['app_sessions', 'channels', 'contract_events', 'ledger', 'rpc_store', 'session_keys', 'ledger_transactions', 'blockchain_actions'];
 
             const client = await this.pool.connect();
             try {
@@ -49,6 +49,20 @@ export class DatabaseUtils {
 
         // Future-proof: if Clearnode adds in-memory caching, add cache-clear API call here
         // await this.clearClearnodeCache(); // Uncomment when caching is added
+    }
+
+    async seedAsset(token: string, chainId: number, symbol: string, decimals: number): Promise<void> {
+        const client = await this.pool.connect();
+        try {
+            await client.query(
+                `INSERT INTO assets (token, chain_id, symbol, decimals)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (token, chain_id) DO NOTHING`,
+                [token, chainId, symbol, decimals]
+            );
+        } finally {
+            client.release();
+        }
     }
 
     async getBlockchainActions(filters: { channel_id?: string; action_type?: string }): Promise<any[]> {

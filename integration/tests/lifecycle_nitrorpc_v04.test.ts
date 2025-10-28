@@ -120,7 +120,7 @@ describe('nitrorpc_v04 lifecycle', () => {
     });
 
     it('should create app session with allowance for participant to deposit', async () => {
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount);
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount, 'clearnode');
     });
 
     it('should take snapshot of ledger balances', async () => {
@@ -138,7 +138,8 @@ describe('nitrorpc_v04 lifecycle', () => {
             RPCProtocolVersion.NitroRPC_0_4,
             ASSET_SYMBOL,
             appSessionDepositAmount,
-            SESSION_DATA_WAITING
+            SESSION_DATA_WAITING,
+            'clearnode'
         );
     });
 
@@ -147,12 +148,12 @@ describe('nitrorpc_v04 lifecycle', () => {
             {
                 participant: aliceAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(4) * BigInt(3)).toString(), // 75
+                amount: (appSessionDepositAmount / BigInt(4) * BigInt(3)).toString(), // 75 USDC
             },
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(4)).toString(), // 25
+                amount: (appSessionDepositAmount / BigInt(4)).toString(), // 25 USDC
             },
         ];
 
@@ -170,12 +171,12 @@ describe('nitrorpc_v04 lifecycle', () => {
             {
                 participant: aliceAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
         ];
 
@@ -189,18 +190,18 @@ describe('nitrorpc_v04 lifecycle', () => {
     });
 
     it('should allow to top-up app session', async () => {
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount + appSessionTopUpAmount);
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount + appSessionTopUpAmount, 'clearnode');
 
         const updatedAllocations = [
             {
                 participant: aliceAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount).toString(), // 100
+                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount).toString(), // 100 USDC
             },
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
         ];
         await submitAppStateUpdate_v04(aliceAppWS, aliceAppIdentity, appSessionId, RPCAppStateIntent.Deposit, ++currentVersion, updatedAllocations, SESSION_DATA_ACTIVE_2);
@@ -225,12 +226,12 @@ describe('nitrorpc_v04 lifecycle', () => {
             {
                 participant: aliceAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 75
+                amount: (appSessionDepositAmount / BigInt(2) + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 75 USDC
             },
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
         ];
 
@@ -261,7 +262,7 @@ describe('nitrorpc_v04 lifecycle', () => {
             {
                 participant: bobAppIdentity.walletAddress,
                 asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 125
+                amount: (appSessionDepositAmount + appSessionTopUpAmount - appSessionPartialWithdrawalAmount).toString(), // 125 USDC
             },
         ];
 
@@ -290,7 +291,7 @@ describe('nitrorpc_v04 lifecycle', () => {
     });
 
     it('should close channel and withdraw without app funds', async () => {
-        const msg = await createCloseChannelMessage(alice.messageSigner, aliceChannelId, alice.walletAddress);
+        const msg = await createCloseChannelMessage(alice.messageWalletSigner, aliceChannelId, alice.walletAddress);
 
         const closeResponse = await aliceWS.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();
@@ -317,7 +318,7 @@ describe('nitrorpc_v04 lifecycle', () => {
     });
 
     it('should resize channel by withdrawing received funds from app to channel', async () => {
-        const msg = await createResizeChannelMessage(bob.messageSigner, {
+        const msg = await createResizeChannelMessage(bob.messageWalletSigner, {
             channel_id: bobChannelId,
             allocate_amount: toRaw(finalBobAmount - onChainDepositAmount), // 1000 + 100 + 25 - 1000 = 125
             funds_destination: bob.walletAddress,
@@ -373,7 +374,7 @@ describe('nitrorpc_v04 lifecycle', () => {
     });
 
     it('should close channel and withdraw with app funds', async () => {
-        const msg = await createCloseChannelMessage(bob.messageSigner, bobChannelId, bob.walletAddress);
+        const msg = await createCloseChannelMessage(bob.messageWalletSigner, bobChannelId, bob.walletAddress);
 
         const closeResponse = await bobWS.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();

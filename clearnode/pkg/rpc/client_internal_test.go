@@ -32,7 +32,7 @@ func TestClient_authRequest(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "0x1234", authReq.Address)
 		assert.Equal(t, "0x5678", authReq.SessionKey)
-		assert.Equal(t, "TestApp", authReq.AppName)
+		assert.Equal(t, "TestApp", authReq.Application)
 
 		// Return auth_challenge response
 		params, _ := NewParams(AuthRequestResponse{
@@ -44,9 +44,9 @@ func TestClient_authRequest(t *testing.T) {
 	}
 
 	authReq := AuthRequestRequest{
-		Address:    "0x1234",
-		SessionKey: "0x5678",
-		AppName:    "TestApp",
+		Address:     "0x1234",
+		SessionKey:  "0x5678",
+		Application: "TestApp",
 	}
 
 	resp, sigs, err := client.authRequest(context.Background(), authReq)
@@ -132,13 +132,12 @@ func TestSignChallenge(t *testing.T) {
 	mockSigner := sign.NewMockSigner("signer1")
 
 	authReq := AuthRequestRequest{
-		Address:            "0x1234567890123456789012345678901234567890",
-		SessionKey:         "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-		AppName:            "TestApp",
-		ApplicationAddress: "0x1111111111111111111111111111111111111111",
-		Allowances:         []Allowance{},
-		Expire:             "3600",
-		Scope:              "trade",
+		Address:     "0x1234567890123456789012345678901234567890",
+		SessionKey:  "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+		Application: "TestApp",
+		Allowances:  []Allowance{},
+		Expire:      "3600",
+		Scope:       "trade",
 	}
 
 	challengeToken := "test-challenge-token"

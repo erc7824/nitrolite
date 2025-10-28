@@ -78,11 +78,10 @@ A Challenge represents an authentication challenge for verifying address ownersh
 - `Token` (uuid): Random challenge token
 - `Address` (string): Address this challenge was created for
 - `SessionKey` (string): Optional delegated session key
-- `AppName` (string): Name of the application which opened the connection
+- `Application` (string): Name of the application which opened the connection
 - `Allowances` (Allowance[]): Asset allowances for this session
 - `Scope` (string): Permission scope
 - `Expire` (string): Policy expiration
-- `ApplicationAddress` (string): Policy application address
 - `CreatedAt` (timestamp): When the challenge was created
 - `ExpiresAt` (timestamp): When the challenge expires
 - `Completed` (bool): Whether the challenge has been used

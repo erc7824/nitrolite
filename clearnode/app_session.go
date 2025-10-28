@@ -13,6 +13,7 @@ type AppSession struct {
 	ID                 uint           `gorm:"primaryKey"`
 	Protocol           rpc.Version    `gorm:"column:protocol;default:'NitroRPC/0.2';not null"`
 	SessionID          string         `gorm:"column:session_id;not null;uniqueIndex"`
+	Application        string         `gorm:"column:application;not null"`
 	Challenge          uint64         `gorm:"column:challenge;"`
 	Nonce              uint64         `gorm:"column:nonce;not null"`
 	ParticipantWallets pq.StringArray `gorm:"type:text[];column:participants;not null"`

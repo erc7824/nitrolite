@@ -61,17 +61,8 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		return ChannelOperationResponse{}, RPCErrorf("unsupported chain ID: %d", params.ChainID)
 	}
 
-	userParticipant := wallet
-	if params.SessionKey != nil {
-		sessionKeyAddress := common.HexToAddress(*params.SessionKey)
-		if sessionKeyAddress == wallet {
-			return ChannelOperationResponse{}, RPCErrorf("session key cannot be the same as the wallet address")
-		}
-		userParticipant = sessionKeyAddress
-	}
-
 	channel := nitrolite.Channel{
-		Participants: []common.Address{userParticipant, s.signer.GetAddress()},
+		Participants: []common.Address{wallet, s.signer.GetAddress()},
 		Adjudicator:  common.HexToAddress(networkConfig.ContractAddresses.Adjudicator),
 		Challenge:    3600,
 		Nonce:        uint64(time.Now().UnixMilli()),

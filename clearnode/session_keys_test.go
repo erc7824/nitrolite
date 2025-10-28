@@ -141,7 +141,7 @@ func TestSessionKeySpendingValidation(t *testing.T) {
 	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
-	sessionKey, err := IsSessionKeyActive(db, sessionKeyAddress)
+	sessionKey, err := GetSessionKey(db, sessionKeyAddress)
 	require.NoError(t, err, "Session key should be active")
 
 	// Test 1: Valid spending within limits
@@ -180,7 +180,7 @@ func TestSessionKeySpendingValidation(t *testing.T) {
 	assert.Equal(t, "200", currentSpending.String(), "Should correctly calculate current spending")
 
 	// Test 7: Validate remaining allowance (refresh session key after spending)
-	sessionKey, err = IsSessionKeyActive(db, sessionKeyAddress)
+	sessionKey, err = GetSessionKey(db, sessionKeyAddress)
 	require.NoError(t, err, "Session key should still be active")
 
 	err = ValidateSessionKeySpending(db, sessionKey, "usdc", decimal.NewFromInt(800))
@@ -211,14 +211,14 @@ func TestSessionKeySpendingEdgeCases(t *testing.T) {
 	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "ZeroApp", "trade", zeroAllowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
 
-	sessionKey, err := IsSessionKeyActive(db, sessionKeyAddress)
+	sessionKey, err := GetSessionKey(db, sessionKeyAddress)
 	require.NoError(t, err)
 
 	err = ValidateSessionKeySpending(db, sessionKey, "usdc", decimal.NewFromInt(1))
 	assert.Error(t, err, "Should reject any spending with zero allowance")
 
 	// Test 2: Non-existent session key
-	_, err = IsSessionKeyActive(db, "0xnonexistent")
+	_, err = GetSessionKey(db, "0xnonexistent")
 	assert.Error(t, err, "Should fail for non-existent session key")
 
 	// Test 3: Negative spending amount (should not happen but let's test)

@@ -122,13 +122,18 @@ func AddSessionKey(db *gorm.DB, walletAddress, address, applicationName, scope s
 	return err
 }
 
+// isExpired checks if the given expiration time has passed
+func isExpired(expiresAt time.Time) bool {
+	return time.Now().UTC().After(expiresAt)
+}
+
 // GetWalletBySessionKey retrieves the wallet address associated with a given signer
 func GetWalletBySessionKey(sessionKeyAddress string) string {
 	// Check session key cache first
 	if v, ok := sessionKeyCache.Load(sessionKeyAddress); ok {
 		entry := v.(sessionKeyCacheEntry)
 		// Check if the cached entry has expired
-		if time.Now().UTC().After(entry.expiresAt) {
+		if isExpired(entry.expiresAt) {
 			sessionKeyCache.Delete(sessionKeyAddress) // lazy purge
 			return ""
 		}
@@ -178,13 +183,18 @@ func GetActiveSessionKeysByWallet(db *gorm.DB, walletAddress string, listOpts *L
 	return sessionKeys, nil
 }
 
-// GetSessionKey retrieves a specific session key
+// GetSessionKey retrieves a specific session key and validates its expiration
 func GetSessionKey(db *gorm.DB, sessionKeyAddress string) (*SessionKey, error) {
 	var sk SessionKey
 	err := db.Where("address = ?", sessionKeyAddress).First(&sk).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve session key %s: %w", sessionKeyAddress, err)
 	}
+
+	if sk.Application != AppNameClearnode && isExpired(sk.ExpiresAt) {
+		return nil, fmt.Errorf("session key expired")
+	}
+
 	return &sk, nil
 }
 
@@ -205,24 +215,6 @@ func CalculateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSym
 	}
 
 	return res.TotalSpent, nil
-}
-
-// IsSessionKeyActive checks if a session key is active (not expired) and returns it
-func IsSessionKeyActive(db *gorm.DB, sessionKeyAddress string) (*SessionKey, error) {
-	sessionKey, err := GetSessionKey(db, sessionKeyAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session key: %w", err)
-	}
-
-	if sessionKey.Application == AppNameClearnode {
-		return sessionKey, nil // Clearnode session keys are always considered active
-	}
-
-	if time.Now().UTC().After(sessionKey.ExpiresAt) {
-		return nil, fmt.Errorf("session key expired")
-	}
-
-	return sessionKey, nil
 }
 
 // ValidateSessionKeySpending checks if a session key can spend the requested amount without exceeding its allowance
@@ -275,12 +267,7 @@ func ValidateSessionKeySpending(db *gorm.DB, sessionKey *SessionKey, assetSymbol
 	return nil
 }
 
-func ValidateSessionKeyApplication(db *gorm.DB, sessionKeyAddress string, appApplication string) error {
-	sessionKey, err := GetSessionKey(db, sessionKeyAddress)
-	if err != nil {
-		return fmt.Errorf("failed to get session key: %w", err)
-	}
-
+func ValidateSessionKeyApplication(sessionKey *SessionKey, appApplication string) error {
 	if sessionKey.Application == AppNameClearnode {
 		return nil
 	}

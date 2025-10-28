@@ -17,3 +17,9 @@ assets:
       - blockchain_id: 1449000
         address: "0xDB9F293e3898c9E5536A3be1b0C56c89d2b32DEb"
         decimals: 6
+  - name: Ethereum
+    symbol: eth
+    tokens:
+      - blockchain_id: 0
+        address: "0x0ethethethethethethethethethethethetheth"
+        decimals: 18

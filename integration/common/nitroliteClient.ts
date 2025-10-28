@@ -31,7 +31,7 @@ export class TestNitroliteClient extends NitroliteClient {
             // @ts-ignore
             publicClient,
             walletClient: identity.walletClient,
-            stateSigner: identity.walletStateSigner,
+            stateSigner: identity.stateWalletSigner,
             account: identity.walletClient.account,
             chainId: chain.id,
             challengeDuration: BigInt(CONFIG.DEFAULT_CHALLENGE_TIMEOUT), // min
@@ -47,7 +47,7 @@ export class TestNitroliteClient extends NitroliteClient {
         ws: TestWebSocket,
         { tokenAddress, amount, depositAmount }: { tokenAddress: Address; amount: bigint; depositAmount?: bigint }
     ) => {
-        const msg = await createCreateChannelMessage(this.identity.walletMessageSigner, {
+        const msg = await createCreateChannelMessage(this.identity.messageWalletSigner, {
             chain_id: chain.id,
             token: tokenAddress,
             amount,
@@ -83,7 +83,7 @@ export class TestNitroliteClient extends NitroliteClient {
 
     closeAndWithdrawChannel = async (ws: TestWebSocket, channelId: Hex) => {
         const msg = await createCloseChannelMessage(
-            this.identity.walletMessageSigner,
+            this.identity.messageWalletSigner,
             channelId,
             this.identity.walletAddress
         );

@@ -568,7 +568,7 @@ ws.addEventListener('message', async (event) => {
     // Request channel information using the built-in helper function
     const getChannelsMsg = await createGetChannelsMessage(
       messageSigner, // Provide message signer function from previous example
-      client.stateWalletClient.account.address
+      client.stateWalletSigner.getAddress()
     );
     
     ws.send(getChannelsMsg);

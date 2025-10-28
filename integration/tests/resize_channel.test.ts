@@ -64,7 +64,7 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, {
+        const msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: depositAmount,
             allocate_amount: parseUnits('0', 6),
@@ -153,7 +153,7 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, {
+        const msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: -depositAmount,
             allocate_amount: parseUnits('0', 6),
@@ -233,7 +233,7 @@ describe('Resize channel', () => {
         );
         expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
 
-        const msg = await createResizeChannelMessage(identity.messageSigner, {
+        const msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: parseUnits('0', 6),
             allocate_amount: -depositAmount,

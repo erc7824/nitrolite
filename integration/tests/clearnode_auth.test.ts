@@ -27,7 +27,7 @@ describe('Clearnode Authentication', () => {
 
     const authRequestParams: AuthRequestParams = {
         address: identity.walletAddress,
-        session_key: identity.sessionAddress,
+        session_key: identity.sessionKeyAddress,
         application: 'clearnode',
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',

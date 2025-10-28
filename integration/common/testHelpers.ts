@@ -55,7 +55,7 @@ export async function authenticateAppWithAllowances(
 ): Promise<void> {
     await createAuthSessionWithClearnode(participantAppWS, participantAppIdentity, {
         address: participantAppIdentity.walletAddress,
-        session_key: participantAppIdentity.sessionAddress,
+        session_key: participantAppIdentity.sessionKeyAddress,
         application: application,
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
@@ -79,7 +79,7 @@ export async function authenticateAppWithMultiAssetAllowances(
 ): Promise<void> {
     await createAuthSessionWithClearnode(participantAppWS, participantAppIdentity, {
         address: participantAppIdentity.walletAddress,
-        session_key: participantAppIdentity.sessionAddress,
+        session_key: participantAppIdentity.sessionKeyAddress,
         application: application,
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
@@ -123,7 +123,7 @@ export async function createTestAppSession(
         },
     ];
 
-    const createAppSessionMsg = await createAppSessionMessage(aliceAppIdentity.messageSigner, {
+    const createAppSessionMsg = await createAppSessionMessage(aliceAppIdentity.messageSKSigner, {
         definition,
         allocations,
         session_data: JSON.stringify(sessionData),
@@ -152,7 +152,7 @@ export async function createTestAppSession(
  * */
 export async function getLedgerBalances(appIdentity: Identity, appWS: TestWebSocket): Promise<RPCBalance[]> {
     const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
-        appIdentity.messageSigner,
+        appIdentity.messageSKSigner,
         appIdentity.walletAddress
     );
     const getLedgerBalancesResponse = await appWS.sendAndWaitForResponse(

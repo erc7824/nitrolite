@@ -63,7 +63,7 @@ describe('Create channel', () => {
             identity.walletAddress
         );
 
-        const msg = await createCreateChannelMessage(identity.walletMessageSigner, {
+        const msg = await createCreateChannelMessage(identity.messageWalletSigner, {
             chain_id: chain.id,
             token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount,
@@ -146,7 +146,7 @@ describe('Create channel', () => {
 
         expect(postBalance.rawBalance).toBe(prevBalance.rawBalance - depositAmount);
 
-        const msg = await createCreateChannelMessage(identity.walletMessageSigner, {
+        const msg = await createCreateChannelMessage(identity.messageWalletSigner, {
             chain_id: chain.id,
             token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount,

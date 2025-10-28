@@ -45,7 +45,7 @@ func getSessionKeyForAppParticipant(appParticipantWallet string, rpcSigners map[
 
 // validateDepositWithSessionKey validates session key for deposit operations (includes spending limits).
 func validateDepositWithSessionKey(tx *gorm.DB, sessionKeyAddress string, application string, assetSymbol string, amount decimal.Decimal) error {
-	sessionKey, err := GetSessionKey(tx, sessionKeyAddress)
+	sessionKey, err := GetSessionKeyIfActive(tx, sessionKeyAddress)
 	if err != nil {
 		return RPCErrorf("session key validation failed: %w", err)
 	}
@@ -66,7 +66,7 @@ func validateQuorumSessionKeysApplication(tx *gorm.DB, rpcSigners map[string]str
 	for signer := range rpcSigners {
 		appParticipantWallet := GetWalletBySessionKey(signer)
 		if appParticipantWallet != "" && appParticipantWallet != signer {
-			sessionKey, err := GetSessionKey(tx, signer)
+			sessionKey, err := GetSessionKeyIfActive(tx, signer)
 			if err != nil {
 				return RPCErrorf("failed to get session key for signer %s: %w", signer, err)
 			}

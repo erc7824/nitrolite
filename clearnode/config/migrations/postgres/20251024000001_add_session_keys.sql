@@ -37,4 +37,8 @@ ALTER TABLE app_sessions DROP COLUMN IF EXISTS application;
 DROP INDEX IF EXISTS idx_ledger_session_key;
 ALTER TABLE ledger DROP COLUMN IF EXISTS session_key;
 
+DROP INDEX IF EXISTS idx_session_keys_unique_wallet_app;
+DROP INDEX IF EXISTS idx_session_keys_wallet_address;
+DROP TABLE IF EXISTS session_keys;
+
 -- +goose StatementEnd

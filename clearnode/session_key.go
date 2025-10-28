@@ -183,8 +183,8 @@ func GetActiveSessionKeysByWallet(db *gorm.DB, walletAddress string, listOpts *L
 	return sessionKeys, nil
 }
 
-// GetSessionKey retrieves a specific session key and validates its expiration
-func GetSessionKey(db *gorm.DB, sessionKeyAddress string) (*SessionKey, error) {
+// GetSessionKeyIfActive retrieves a specific session key and validates its expiration
+func GetSessionKeyIfActive(db *gorm.DB, sessionKeyAddress string) (*SessionKey, error) {
 	var sk SessionKey
 	err := db.Where("address = ?", sessionKeyAddress).First(&sk).Error
 	if err != nil {

@@ -133,21 +133,21 @@ func NewMetricsWithRegistry(registry prometheus.Registerer) *Metrics {
 				Name: "clearnet_broker_balance_available",
 				Help: "Available balance of the broker on the custody contract",
 			},
-			[]string{"network", "token", "asset"},
+			[]string{"blockchainID", "token", "asset"},
 		),
 		BrokerChannelCount: factory.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "clearnet_broker_channel_count",
 				Help: "Number of channels for the broker on the custody contract",
 			},
-			[]string{"network"},
+			[]string{"blockchainID"},
 		),
 		BrokerWalletBalance: factory.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "clearnet_broker_wallet_balance",
 				Help: "Broker wallet balance",
 			},
-			[]string{"network", "token", "asset"},
+			[]string{"blockchainID", "token", "asset"},
 		),
 	}
 

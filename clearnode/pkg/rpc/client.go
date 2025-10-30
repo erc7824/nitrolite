@@ -1024,15 +1024,23 @@ func (c *Client) CloseChannel(ctx context.Context, req *Request) (CloseChannelRe
 //	for _, tx := range response.Transactions {
 //	    fmt.Printf("Transferred %s %s to %s\n", tx.Amount, tx.Asset, tx.ToAccount)
 //	}
-func (c *Client) Transfer(ctx context.Context, reqParams TransferRequest) (TransferResponse, []sign.Signature, error) {
+func (c *Client) Transfer(ctx context.Context, req *Request) (TransferResponse, []sign.Signature, error) {
+	if req == nil || req.Req.Method != string(TransferMethod) {
+		return TransferResponse{}, nil, ErrInvalidRequestMethod
+	}
+
 	var resParams TransferResponse
 	var resSig []sign.Signature
 
-	res, err := c.call(ctx, TransferMethod, &reqParams)
+	res, err := c.dialer.Call(ctx, req)
 	if err != nil {
-		return resParams, resSig, err
+		return resParams, res.Sig, err
 	}
 	resSig = res.Sig
+
+	if err := res.Res.Params.Error(); err != nil {
+		return resParams, res.Sig, err
+	}
 
 	if err := res.Res.Params.Translate(&resParams); err != nil {
 		return resParams, resSig, err
@@ -1466,7 +1474,8 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 			"Allowance": {
 				{Name: "asset", Type: "string"},
 				{Name: "amount", Type: "uint256"}, // FIXME: currently allowance amount is string, so it will fail if there are some allowances
-			}},
+			},
+		},
 		PrimaryType: "Policy",
 		Domain: apitypes.TypedDataDomain{
 			Name: req.Application,

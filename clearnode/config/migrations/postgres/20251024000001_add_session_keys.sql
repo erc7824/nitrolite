@@ -25,7 +25,7 @@ CREATE UNIQUE INDEX idx_session_keys_unique_wallet_app
 ALTER TABLE ledger ADD COLUMN IF NOT EXISTS session_key VARCHAR;
 CREATE INDEX IF NOT EXISTS idx_ledger_session_key ON ledger(session_key);
 
-ALTER TABLE app_sessions ADD COLUMN IF NOT EXISTS application VARCHAR NOT NULL DEFAULT '';
+ALTER TABLE app_sessions ADD COLUMN IF NOT EXISTS application VARCHAR NOT NULL DEFAULT 'clearnode';
 
 -- +goose StatementEnd
 

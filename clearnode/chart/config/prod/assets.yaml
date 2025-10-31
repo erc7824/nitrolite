@@ -26,6 +26,18 @@ assets:
       - blockchain_id: 1440000
         address: "0xa16148c6Ac9EDe0D82f0c52899e22a575284f131"
         decimals: 6
+  - name: "Tether USD"
+    symbol: "USDT"
+    tokens:
+      - blockchain_id: 8453
+        address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2"
+        decimals: 6
+  - name: "Ethereum"
+    symbol: "eth"
+    tokens:
+      - blockchain_id: 8453
+        address: "0x0000000000000000000000000000000000000000"
+        decimals: 18
   - name: "wETH"
     symbol: "weth"
     tokens:

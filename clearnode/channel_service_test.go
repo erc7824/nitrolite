@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -64,11 +63,10 @@ func seedChannel(t *testing.T, db *gorm.DB, channelID, participant, wallet, toke
 	return ch
 }
 
-func getCreateChannelParams(chainID uint32, token string, amount decimal.Decimal) *CreateChannelParams {
+func getCreateChannelParams(chainID uint32, token string) *CreateChannelParams {
 	return &CreateChannelParams{
 		ChainID: chainID,
 		Token:   token,
-		Amount:  &amount,
 	}
 }
 
@@ -337,8 +335,7 @@ func TestChannelService(t *testing.T) {
 		asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
 		service := NewChannelService(db, blockchains, assetsCfg, &signer)
 
-		amount := decimal.NewFromInt(1000000) // 1 USDC in raw units
-		params := getCreateChannelParams(chainID, asset.Token.Address, amount)
+		params := getCreateChannelParams(chainID, asset.Token.Address)
 		response, err := service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
 		require.NoError(t, err)
 
@@ -355,7 +352,7 @@ func TestChannelService(t *testing.T) {
 		// Verify allocations
 		assert.Equal(t, userAddress.Hex(), response.State.Allocations[0].Participant, "First allocation should be for user")
 		assert.Equal(t, asset.Token.Address, response.State.Allocations[0].TokenAddress, "Token address should match")
-		assert.Equal(t, amount, response.State.Allocations[0].RawAmount, "Amount should match")
+		assert.True(t, response.State.Allocations[0].RawAmount.IsZero(), "User allocation should be zero")
 
 		assert.Equal(t, signer.GetAddress().Hex(), response.State.Allocations[1].Participant, "Second allocation should be for broker")
 		assert.Equal(t, asset.Token.Address, response.State.Allocations[1].TokenAddress, "Token address should match")
@@ -366,23 +363,6 @@ func TestChannelService(t *testing.T) {
 		assert.NotEqual(t, uint64(0), response.Channel.Nonce, "Nonce should not be 0")
 	})
 
-	t.Run("RequestCreate_ZeroAmount", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
-		t.Cleanup(cleanup)
-
-		assetsCfg := &AssetsConfig{}
-		asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
-		service := NewChannelService(db, blockchains, assetsCfg, &signer)
-
-		amount := decimal.Zero // Zero amount channel
-		params := getCreateChannelParams(chainID, asset.Token.Address, amount)
-		response, err := service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
-		require.NoError(t, err)
-
-		assert.True(t, response.State.Allocations[0].RawAmount.IsZero(), "User allocation should be zero")
-		assert.True(t, response.State.Allocations[1].RawAmount.IsZero(), "Broker allocation should be zero")
-	})
-
 	t.Run("RequestCreate_ErrorInvalidSignature", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		t.Cleanup(cleanup)
@@ -391,8 +371,7 @@ func TestChannelService(t *testing.T) {
 		asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
 		service := NewChannelService(db, blockchains, assetsCfg, &signer)
 
-		amount := decimal.NewFromInt(1000000)
-		params := getCreateChannelParams(chainID, asset.Token.Address, amount)
+		params := getCreateChannelParams(chainID, asset.Token.Address)
 		rpcSigners := map[string]struct{}{} // Empty signers map
 
 		_, err = service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
@@ -410,8 +389,7 @@ func TestChannelService(t *testing.T) {
 		_ = seedChannel(t, db, channelID, userAddress.Hex(), userAddress.Hex(), asset.Token.Address, chainID, channelAmountRaw, 1, ChannelStatusOpen)
 		service := NewChannelService(db, blockchains, assetsCfg, &signer)
 
-		amount := decimal.NewFromInt(1000000)
-		params := getCreateChannelParams(chainID, asset.Token.Address, amount)
+		params := getCreateChannelParams(chainID, asset.Token.Address)
 		_, err = service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 
@@ -425,8 +403,7 @@ func TestChannelService(t *testing.T) {
 		assetsCfg := &AssetsConfig{}
 		service := NewChannelService(db, blockchains, assetsCfg, &signer)
 
-		amount := decimal.NewFromInt(1000000)
-		params := getCreateChannelParams(chainID, "0xUnsupportedToken1234567890123456789012", amount)
+		params := getCreateChannelParams(chainID, "0xUnsupportedToken1234567890123456789012")
 
 		_, err = service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
 		require.Error(t, err)
@@ -443,28 +420,11 @@ func TestChannelService(t *testing.T) {
 		asset := seedAsset(t, assetsCfg, tokenAddress, 999, tokenSymbol, 6)
 		service := NewChannelService(db, blockchains, assetsCfg, &signer)
 
-		amount := decimal.NewFromInt(1000000)
-		params := getCreateChannelParams(999, asset.Token.Address, amount)
+		params := getCreateChannelParams(999, asset.Token.Address)
 		_, err = service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 
 		assert.Contains(t, err.Error(), "unsupported chain ID")
-	})
-
-	t.Run("RequestCreate_LargeAmount", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
-		t.Cleanup(cleanup)
-
-		assetsCfg := &AssetsConfig{}
-		asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
-		service := NewChannelService(db, blockchains, assetsCfg, &signer)
-
-		largeAmount := decimal.NewFromBigInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(30), nil), 0) // 10^30
-		params := getCreateChannelParams(chainID, asset.Token.Address, largeAmount)
-		response, err := service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
-		require.NoError(t, err)
-
-		assert.Equal(t, largeAmount, response.State.Allocations[0].RawAmount, "Large amount should be preserved")
 	})
 
 	t.Run("RequestCreate_ErrorDifferentUserSignature", func(t *testing.T) {
@@ -481,8 +441,7 @@ func TestChannelService(t *testing.T) {
 		differentSigner := Signer{privateKey: differentKey}
 		differentAddress := differentSigner.GetAddress()
 
-		amount := decimal.NewFromInt(1000000)
-		params := getCreateChannelParams(chainID, asset.Token.Address, amount)
+		params := getCreateChannelParams(chainID, asset.Token.Address)
 
 		// Use different user's signature but pass userAddress as wallet
 		rpcSigners := map[string]struct{}{

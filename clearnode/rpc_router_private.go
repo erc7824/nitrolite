@@ -82,9 +82,8 @@ type AppSessionResponse struct {
 }
 
 type CreateChannelParams struct {
-	ChainID uint32           `json:"chain_id" validate:"required"`
-	Token   string           `json:"token" validate:"required"`
-	Amount  *decimal.Decimal `json:"amount" validate:"required,bigint"`
+	ChainID uint32 `json:"chain_id" validate:"required"`
+	Token   string `json:"token" validate:"required"`
 }
 
 type ResizeChannelParams struct {

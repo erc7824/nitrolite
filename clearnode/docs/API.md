@@ -1015,6 +1015,7 @@ The optional `session_data` field can be used to provide final application-speci
 ### Create Channel
 
 Requests opening a channel with a Clearnode broker on a specific network.
+Please note that a channel must be created with a zero initial deposit. Later a user may top it up by calling `resize_channel`.
 
 **Request:**
 
@@ -1023,16 +1024,15 @@ Requests opening a channel with a Clearnode broker on a specific network.
   "req": [1, "create_channel", [{
     "chain_id": 137,
     "token": "0xeeee567890abcdef...",
-    "amount": "100000000",
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
 
 The request parameters are:
+
 - `chain_id`: The blockchain network ID where the channel should be created
 - `token`: The token contract address for the channel
-- `amount`: The initial amount to deposit in the channel (in raw token units)
 
 **Response:**
 
@@ -1056,7 +1056,7 @@ Returns signed initial state with the requested amounts ready to submit on Block
         {
           "destination": "0x1234567890abcdef...",
           "token": "0xeeee567890abcdef...",
-          "amount": "100000000"
+          "amount": "0"
         },
         {
           "destination": "0xbbbb567890abcdef...",
@@ -1072,6 +1072,7 @@ Returns signed initial state with the requested amounts ready to submit on Block
 ```
 
 The response includes:
+
 - `channel_id`: Unique identifier for the channel
 - `channel`: Channel definition with participants, adjudicator, challenge period, and nonce
 - `state`: Complete initial state structure containing intent, version, state_data, and allocations

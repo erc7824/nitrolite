@@ -27,7 +27,7 @@ assets:
         address: "0xa16148c6Ac9EDe0D82f0c52899e22a575284f131"
         decimals: 6
   - name: "Tether USD"
-    symbol: "USDT"
+    symbol: "usdt"
     tokens:
       - blockchain_id: 8453
         address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2"

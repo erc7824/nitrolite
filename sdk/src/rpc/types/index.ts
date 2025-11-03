@@ -135,8 +135,7 @@ export type MultiMessageVerifier = (
  */
 export interface PartialEIP712AuthMessage {
     scope: string;
-    application: Address;
-    participant: Address;
+    session_key: Address;
     expire: string;
     allowances: RPCAllowance[];
 }
@@ -165,8 +164,7 @@ export const EIP712AuthTypes = {
         { name: 'challenge', type: 'string' },
         { name: 'scope', type: 'string' },
         { name: 'wallet', type: 'address' },
-        { name: 'application', type: 'address' },
-        { name: 'participant', type: 'address' },
+        { name: 'session_key', type: 'address' },
         { name: 'expire', type: 'uint256' },
         { name: 'allowances', type: 'Allowance[]' },
     ],
@@ -189,6 +187,7 @@ export enum RPCMethod {
     GetLedgerEntries = 'get_ledger_entries',
     GetLedgerTransactions = 'get_ledger_transactions',
     GetUserTag = 'get_user_tag',
+    GetSessionKeys = 'get_session_keys',
     CreateAppSession = 'create_app_session',
     SubmitAppState = 'submit_app_state',
     CloseAppSession = 'close_app_session',

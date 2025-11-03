@@ -34,6 +34,7 @@ type GetAppDefinitionParams struct {
 }
 
 type AppDefinition struct {
+	Application        string      `json:"application"`
 	Protocol           rpc.Version `json:"protocol"`
 	ParticipantWallets []string    `json:"participants"`
 	Weights            []int64     `json:"weights"` // Signature weight for each participant.
@@ -273,6 +274,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 	for i, session := range sessions {
 		respAppSessions[i] = AppSessionResponse{
 			AppSessionID:       session.SessionID,
+			Application:        session.Application,
 			Status:             string(session.Status),
 			ParticipantWallets: session.ParticipantWallets,
 			SessionData:        session.SessionData,

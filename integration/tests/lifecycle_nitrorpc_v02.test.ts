@@ -115,7 +115,7 @@ describe('nitrorpc_v02 lifecycle', () => {
     });
 
     it('should create app session with allowance for participant to deposit', async () => {
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount);
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount, 'clearnode');
     });
 
     it('should take snapshot of ledger balances', async () => {
@@ -133,7 +133,8 @@ describe('nitrorpc_v02 lifecycle', () => {
             RPCProtocolVersion.NitroRPC_0_2,
             ASSET_SYMBOL,
             appSessionDepositAmount,
-            SESSION_DATA_WAITING
+            SESSION_DATA_WAITING,
+            'clearnode'
         );
     });
 
@@ -141,13 +142,13 @@ describe('nitrorpc_v02 lifecycle', () => {
         const allocations = [
             {
                 participant: aliceAppIdentity.walletAddress,
-                asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                asset:  ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
             {
                 participant: bobAppIdentity.walletAddress,
-                asset: ASSET_SYMBOL,
-                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50
+                asset:  ASSET_SYMBOL,
+                amount: (appSessionDepositAmount / BigInt(2)).toString(), // 50 USDC
             },
         ];
 
@@ -199,7 +200,8 @@ describe('nitrorpc_v02 lifecycle', () => {
     });
 
     it('should close channel and withdraw without app funds', async () => {
-        const msg = await createCloseChannelMessage(alice.messageSigner, aliceChannelId, alice.walletAddress);
+        // Use wallet signer for channel operations, not session key
+        const msg = await createCloseChannelMessage(alice.messageWalletSigner, aliceChannelId, alice.walletAddress);
 
         const closeResponse = await aliceWS.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();
@@ -226,7 +228,8 @@ describe('nitrorpc_v02 lifecycle', () => {
     });
 
     it('should resize channel by withdrawing received funds from app to channel', async () => {
-        const msg = await createResizeChannelMessage(bob.messageSigner, {
+        // Use wallet signer for channel operations, not session key
+        const msg = await createResizeChannelMessage(bob.messageWalletSigner, {
             channel_id: bobChannelId,
             allocate_amount: toRaw(appSessionDepositAmount),
             funds_destination: bob.walletAddress,
@@ -282,7 +285,8 @@ describe('nitrorpc_v02 lifecycle', () => {
     });
 
     it('should close channel and withdraw with app funds', async () => {
-        const msg = await createCloseChannelMessage(bob.messageSigner, bobChannelId, bob.walletAddress);
+        // Use wallet signer for channel operations, not session key
+        const msg = await createCloseChannelMessage(bob.messageWalletSigner, bobChannelId, bob.walletAddress);
 
         const closeResponse = await bobWS.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();

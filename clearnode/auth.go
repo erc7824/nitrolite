@@ -14,17 +14,16 @@ import (
 
 // Challenge represents an authentication challenge
 type Challenge struct {
-	Token              uuid.UUID   // Random challenge token
-	Address            string      // Address this challenge was created for
-	SessionKey         string      // SessionKey that is going to be used for this session
-	AppName            string      // Name of the application which opened the connection
-	Allowances         []Allowance // Allowances for this connection
-	Scope              string      // Policy scope
-	Expire             string      // Policy expiration
-	ApplicationAddress string      // Policy application address
-	CreatedAt          time.Time   // When the challenge was created
-	ExpiresAt          time.Time   // When the challenge expires
-	Completed          bool        // Whether the challenge has been used
+	Token       uuid.UUID   // Random challenge token
+	Address     string      // Address this challenge was created for
+	SessionKey  string      // SessionKey that is going to be used for this session
+	Application string      // Name of the application which opened the connection
+	Allowances  []Allowance // Allowances for this connection
+	Scope       string      // Policy scope
+	Expire      string      // Policy expiration
+	CreatedAt   time.Time   // When the challenge was created
+	ExpiresAt   time.Time   // When the challenge expires
+	Completed   bool        // Whether the challenge has been used
 }
 
 // AuthManager handles authentication challenges
@@ -47,7 +46,7 @@ type JWTClaims struct {
 
 type Policy struct {
 	Wallet      string      `json:"wallet"`      // Main wallet address authorizing the session
-	Participant string      `json:"participant"` // Delegated session key address
+	SessionKey  string      `json:"session_key"` // Delegated session key address
 	Scope       string      `json:"scope"`       // Permission scope (e.g., "app.create", "ledger.readonly")
 	Application string      `json:"application"` // Application public address
 	Allowances  []Allowance `json:"allowance"`   // Array of asset allowances
@@ -75,11 +74,10 @@ func NewAuthManager(signingKey *ecdsa.PrivateKey) (*AuthManager, error) {
 func (am *AuthManager) GenerateChallenge(
 	address string,
 	sessionKey string,
-	appName string,
+	application string,
 	allowances []Allowance,
 	scope string,
 	expire string,
-	applicationAddress string,
 ) (uuid.UUID, error) {
 	// Normalize address
 	if !strings.HasPrefix(address, "0x") {
@@ -89,17 +87,16 @@ func (am *AuthManager) GenerateChallenge(
 	// Create challenge with expiration
 	now := time.Now()
 	challenge := &Challenge{
-		Token:              uuid.New(),
-		Address:            address,
-		SessionKey:         sessionKey,
-		AppName:            appName,
-		Allowances:         allowances,
-		Scope:              scope,
-		Expire:             expire,
-		ApplicationAddress: applicationAddress,
-		CreatedAt:          now,
-		ExpiresAt:          now.Add(am.challengeTTL),
-		Completed:          false,
+		Token:       uuid.New(),
+		Address:     address,
+		SessionKey:  sessionKey,
+		Application: application,
+		Allowances:  allowances,
+		Scope:       scope,
+		Expire:      expire,
+		CreatedAt:   now,
+		ExpiresAt:   now.Add(am.challengeTTL),
+		Completed:   false,
 	}
 
 	// Store challenge
@@ -216,7 +213,7 @@ func (am *AuthManager) UpdateSession(address string) bool {
 func (am *AuthManager) GenerateJWT(address string, sessionKey string, scope string, application string, allowances []Allowance) (*JWTClaims, string, error) {
 	policy := Policy{
 		Wallet:      address,
-		Participant: sessionKey,
+		SessionKey:  sessionKey,
 		Scope:       scope,
 		Application: application,
 		Allowances:  allowances,

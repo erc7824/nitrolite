@@ -50,21 +50,40 @@ export async function authenticateAppWithAllowances(
     participantAppWS: TestWebSocket,
     participantAppIdentity: Identity,
     asset: string,
-    decimalDepositAmount: bigint
+    decimalDepositAmount: bigint,
+    application: string = 'App Domain'
 ): Promise<void> {
     await createAuthSessionWithClearnode(participantAppWS, participantAppIdentity, {
         address: participantAppIdentity.walletAddress,
-        session_key: participantAppIdentity.sessionAddress,
-        app_name: 'App Domain',
+        session_key: participantAppIdentity.sessionKeyAddress,
+        application: application,
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
-        application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // random address, no use for now
         allowances: [
             {
                 asset,
                 amount: decimalDepositAmount.toString(),
             },
         ],
+    });
+}
+
+/**
+ * Authenticates a participant's app identity with multiple asset allowances for deposits.
+ */
+export async function authenticateAppWithMultiAssetAllowances(
+    participantAppWS: TestWebSocket,
+    participantAppIdentity: Identity,
+    allowances: Array<{ asset: string; amount: string }>,
+    application: string = 'App Domain'
+): Promise<void> {
+    await createAuthSessionWithClearnode(participantAppWS, participantAppIdentity, {
+        address: participantAppIdentity.walletAddress,
+        session_key: participantAppIdentity.sessionKeyAddress,
+        application: application,
+        expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
+        scope: 'console',
+        allowances: allowances,
     });
 }
 
@@ -78,9 +97,11 @@ export async function createTestAppSession(
     protocol: RPCProtocolVersion,
     asset: string,
     decimalDepositAmount: bigint,
-    sessionData: object
+    sessionData: object,
+    application: string = 'App Domain'
 ): Promise<string> {
     const definition: RPCAppDefinition = {
+        application: application,
         protocol,
         participants: [aliceAppIdentity.walletAddress, bobAppIdentity.walletAddress],
         weights: [100, 0],
@@ -102,7 +123,7 @@ export async function createTestAppSession(
         },
     ];
 
-    const createAppSessionMsg = await createAppSessionMessage(aliceAppIdentity.messageSigner, {
+    const createAppSessionMsg = await createAppSessionMessage(aliceAppIdentity.messageSKSigner, {
         definition,
         allocations,
         session_data: JSON.stringify(sessionData),
@@ -131,7 +152,7 @@ export async function createTestAppSession(
  * */
 export async function getLedgerBalances(appIdentity: Identity, appWS: TestWebSocket): Promise<RPCBalance[]> {
     const getLedgerBalancesMsg = await createGetLedgerBalancesMessage(
-        appIdentity.messageSigner,
+        appIdentity.messageSKSigner,
         appIdentity.walletAddress
     );
     const getLedgerBalancesResponse = await appWS.sendAndWaitForResponse(

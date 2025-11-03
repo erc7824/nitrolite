@@ -160,7 +160,7 @@ The client initiates authentication by sending an `auth_request` request with th
   "req": [1, "auth_request", {
     "address": "0x1234567890abcdef...",
     "session_key": "0x9876543210fedcba...", // Optional: If specified, enables delegation
-    "app_name": "Example App", // Optional: Application name
+    "application": "Example App", // Optional: Application name
     "allowances": [ // Optional: Asset allowances
       {
         "asset": "usdc", 

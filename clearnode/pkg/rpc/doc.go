@@ -134,8 +134,7 @@
 //	authReq := rpc.AuthRequestRequest{
 //	    Address:            walletAddress,
 //	    SessionKey:         sessionKeyAddress,
-//	    AppName:            "MyApp",
-//	    ApplicationAddress: appAddress,
+//	    Application:        "MyApp",
 //	}
 //	authResp, _, err := client.AuthWithSig(ctx, authReq, walletSigner)
 //	if err != nil {
@@ -174,7 +173,7 @@
 // The package includes comprehensive type definitions for the ClearNode RPC API:
 //
 // - Request/Response types for all RPC methods
-// - Asset and network configuration types  
+// - Asset and network configuration types
 // - Payment channel state and operations
 // - Application session management
 // - Ledger and transaction types
@@ -197,25 +196,25 @@
 //	        // Handle authentication
 //	    },
 //	}
-//	
+//
 //	node, err := rpc.NewWebsocketNode(config)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-//	
+//
 //	// Register handlers
 //	node.Handle("get_balance", handleGetBalance)
 //	node.Handle("transfer", handleTransfer)
-//	
+//
 //	// Add middleware
 //	node.Use(loggingMiddleware)
 //	node.Use(authMiddleware)
-//	
+//
 //	// Create handler groups
 //	privateGroup := node.NewGroup("private")
 //	privateGroup.Use(requireAuthMiddleware)
 //	privateGroup.Handle("create_channel", handleCreateChannel)
-//	
+//
 //	// Start the server
 //	http.Handle("/ws", node)
 //	http.ListenAndServe(":8080", nil)
@@ -229,10 +228,10 @@
 //	        c.Fail(nil, "invalid parameters")
 //	        return
 //	    }
-//	    
+//
 //	    // Process request
 //	    balance := getBalanceForUser(c.UserID, req.Asset)
-//	    
+//
 //	    // Send response
 //	    c.Succeed("get_balance", rpc.Params{"balance": balance})
 //	}
@@ -251,7 +250,7 @@
 //	        }
 //	        c.UserID = userID
 //	    }
-//	    
+//
 //	    // Continue to next handler
 //	    c.Next()
 //	}
@@ -302,6 +301,7 @@
 //	    }
 //	    // ... handle transfer ...
 //	}
+//
 // # Testing
 //
 // The package includes a comprehensive test suite with mock implementations:
@@ -313,5 +313,4 @@
 // The manual test demonstrates real-world usage patterns and can be run with:
 //
 //	TEST_WALLET_PK=<wallet_private_key> TEST_SESSION_PK=<session_private_key> go test -run TestManualClient
-//
 package rpc

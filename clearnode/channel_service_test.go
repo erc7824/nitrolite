@@ -128,7 +128,7 @@ func TestChannelService(t *testing.T) {
 
 		// Fund participant ledger with 1500 USDC (enough for resize)
 		ledger := GetWalletLedger(db, userAddress)
-		require.NoError(t, ledger.Record(userAccountID, tokenSymbol, decimal.NewFromInt(1500)))
+		require.NoError(t, ledger.Record(userAccountID, tokenSymbol, decimal.NewFromInt(1500), nil))
 
 		initialBalance, err := ledger.Balance(userAccountID, tokenSymbol)
 		require.NoError(t, err)
@@ -173,7 +173,7 @@ func TestChannelService(t *testing.T) {
 		ch := seedChannel(t, db, channelID, userAddress.Hex(), userAddress.Hex(), asset.Token.Address, chainID, channelAmountRaw, 1, ChannelStatusOpen)
 
 		ledger := GetWalletLedger(db, userAddress)
-		require.NoError(t, ledger.Record(userAccountID, tokenSymbol, decimal.NewFromInt(500)))
+		require.NoError(t, ledger.Record(userAccountID, tokenSymbol, decimal.NewFromInt(500), nil))
 
 		service := NewChannelService(db, nil, assetsCfg, &signer)
 
@@ -252,7 +252,7 @@ func TestChannelService(t *testing.T) {
 		// Fund with very small amount (0.000001 USDC), but try to allocate 200 raw units
 		// This will create insufficient balance when converted to raw units
 		ledger := GetWalletLedger(db, userAddress)
-		require.NoError(t, ledger.Record(userAccountID, tokenSymbol, decimal.NewFromFloat(0.000001)))
+		require.NoError(t, ledger.Record(userAccountID, tokenSymbol, decimal.NewFromFloat(0.000001), nil))
 
 		service := NewChannelService(db, map[uint32]BlockchainConfig{}, assetsCfg, &signer)
 
@@ -296,6 +296,7 @@ func TestChannelService(t *testing.T) {
 			userAccountID,
 			tokenSymbol,
 			rawToDecimal(channelAmountRaw.BigInt(), asset.Token.Decimals),
+			nil,
 		))
 
 		service := NewChannelService(db, map[uint32]BlockchainConfig{}, assetsCfg, &signer)

@@ -27,11 +27,10 @@ describe('Clearnode Authentication', () => {
 
     const authRequestParams: AuthRequestParams = {
         address: identity.walletAddress,
-        session_key: identity.sessionAddress,
-        app_name: 'Test Domain',
+        session_key: identity.sessionKeyAddress,
+        application: 'clearnode',
         expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
-        application: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // random address, no use for now
         allowances: [],
     };
 
@@ -39,13 +38,12 @@ describe('Clearnode Authentication', () => {
         identity.walletClient,
         {
             scope: authRequestParams.scope,
-            application: authRequestParams.application,
-            participant: authRequestParams.session_key,
+            session_key: authRequestParams.session_key,
             expire: authRequestParams.expire,
             allowances: authRequestParams.allowances,
         },
         {
-            name: 'Test Domain',
+            name: 'clearnode',
         }
     );
 

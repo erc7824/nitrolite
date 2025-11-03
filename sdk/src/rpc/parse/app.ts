@@ -19,6 +19,7 @@ const AppAllocationObject = z.object({
 
 const AppSessionObject = z.object({
     app_session_id: hexSchema,
+    application: z.string(),
     status: statusEnum,
     participants: z.array(addressSchema),
     protocol: protocolVersionEnum,
@@ -36,6 +37,7 @@ const AppSessionObjectSchema = AppSessionObject
     .transform(
         (raw): RPCAppSession => ({
             appSessionId: raw.app_session_id,
+            application: raw.application,
             status: raw.status,
             participants: raw.participants,
             protocol: raw.protocol,
@@ -82,6 +84,7 @@ const CloseAppSessionParamsSchema = z
 
 const GetAppDefinitionParamsSchema = z
     .object({
+        application: z.string(),
         protocol: protocolVersionEnum,
         participants: z.array(addressSchema),
         weights: z.array(z.number()),
@@ -91,6 +94,7 @@ const GetAppDefinitionParamsSchema = z
     })
     .transform(
         (raw): GetAppDefinitionResponseParams => ({
+            application: raw.application,
             protocol: raw.protocol,
             participants: raw.participants as Address[],
             weights: raw.weights,
@@ -117,6 +121,7 @@ const AppSessionUpdateObjectSchema = z
     })
     .transform((raw) => ({
         appSessionId: raw.app_session.app_session_id,
+        application: raw.app_session.application,
         status: raw.app_session.status,
         participants: raw.app_session.participants,
         sessionData: raw.app_session.session_data,

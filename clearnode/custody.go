@@ -231,11 +231,6 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		return
 	}
 
-	if err := AddSigner(c.db, wallet, participantSigner); err != nil {
-		logger.Error("failed to add signer", "error", err)
-		return
-	}
-
 	var ch Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
@@ -296,14 +291,14 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 		walletAccountID := NewAccountID(walletAddress.Hex())
 
 		ledger := GetWalletLedger(tx, walletAddress)
-		if err := ledger.Record(channelAccountID, asset.Symbol, amount); err != nil {
+		if err := ledger.Record(channelAccountID, asset.Symbol, amount, nil); err != nil {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
-		if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
+		if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg(), nil); err != nil {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 		ledger = GetWalletLedger(tx, walletAddress)
-		if err := ledger.Record(walletAccountID, asset.Symbol, amount); err != nil {
+		if err := ledger.Record(walletAccountID, asset.Symbol, amount, nil); err != nil {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 
@@ -446,15 +441,15 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			if amount.IsPositive() || amount.IsZero() {
 				// 1. Deposit into a channel account.
 				ledger := GetWalletLedger(tx, walletAddress)
-				if err := ledger.Record(channelAccountID, asset.Symbol, amount); err != nil {
+				if err := ledger.Record(channelAccountID, asset.Symbol, amount, nil); err != nil {
 					return fmt.Errorf("error recording balance update for wallet: %w", err)
 				}
 				// 2. Immediately transfer from the channel account into the unified account.
-				if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
+				if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg(), nil); err != nil {
 					return fmt.Errorf("error recording balance update for wallet: %w", err)
 				}
 				ledger = GetWalletLedger(tx, walletAddress)
-				if err := ledger.Record(walletAccountID, asset.Symbol, amount); err != nil {
+				if err := ledger.Record(walletAccountID, asset.Symbol, amount, nil); err != nil {
 					return fmt.Errorf("error recording balance update for participant: %w", err)
 				}
 				_, err := RecordLedgerTransaction(tx, TransactionTypeDeposit, channelAccountID, walletAccountID, asset.Symbol, amount)
@@ -464,10 +459,10 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			} else {
 				// 1. Withdraw from the unified account and immediately withdraw from the channel account.
 				ledger := GetWalletLedger(tx, walletAddress)
-				if err := ledger.Record(walletAccountID, asset.Symbol, amount); err != nil {
+				if err := ledger.Record(walletAccountID, asset.Symbol, amount, nil); err != nil {
 					return fmt.Errorf("error recording balance update for participant: %w", err)
 				}
-				if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
+				if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg(), nil); err != nil {
 					return fmt.Errorf("error recording balance update for wallet: %w", err)
 				}
 				_, err := RecordLedgerTransaction(tx, TransactionTypeWithdrawal, walletAccountID, channelAccountID, asset.Symbol, amount)
@@ -476,7 +471,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 				}
 				// 2. Withdraw from the channel account.
 				ledger = GetWalletLedger(tx, walletAddress)
-				if err := ledger.Record(channelAccountID, asset.Symbol, amount); err != nil {
+				if err := ledger.Record(channelAccountID, asset.Symbol, amount, nil); err != nil {
 					return fmt.Errorf("error recording balance update for wallet: %w", err)
 				}
 			}
@@ -539,10 +534,10 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 
 		// Withdraw from unified balance if channel was not in joining state.
 		if channelAccountBalance.IsZero() { // If channel balance is not zero, it means the channel was in joining state.
-			if err := ledger.Record(walletAccountID, asset.Symbol, amount.Neg()); err != nil {
+			if err := ledger.Record(walletAccountID, asset.Symbol, amount.Neg(), nil); err != nil {
 				return fmt.Errorf("error recording balance update for participant: %w", err)
 			}
-			if err := ledger.Record(channelAccountID, asset.Symbol, amount); err != nil {
+			if err := ledger.Record(channelAccountID, asset.Symbol, amount, nil); err != nil {
 				return fmt.Errorf("error recording balance update for wallet: %w", err)
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeWithdrawal, walletAccountID, channelAccountID, asset.Symbol, amount)
@@ -552,7 +547,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		}
 
 		// 2. Withdraw from the channel account.
-		if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg()); err != nil {
+		if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg(), nil); err != nil {
 			return fmt.Errorf("error recording balance update for wallet: %w", err)
 		}
 

@@ -112,9 +112,9 @@ func NewAppSessionNotification(participant string, appSession AppSession, partic
 	rpcAllocations := make([]rpc.AppAllocation, len(participantAllocations))
 	for i, alloc := range participantAllocations {
 		rpcAllocations[i] = rpc.AppAllocation{
-			ParticipantWallet: alloc.ParticipantWallet,
-			AssetSymbol:       alloc.AssetSymbol,
-			Amount:            alloc.Amount,
+			Participant: alloc.Participant,
+			AssetSymbol: alloc.AssetSymbol,
+			Amount:      alloc.Amount,
 		}
 	}
 

@@ -11,13 +11,12 @@ import (
 )
 
 type AuthChallengeParams struct {
-	Address            string `json:"address"`
-	SessionKey         string `json:"session_key"`
-	AppName            string `json:"app_name"`
-	Allowances         []any  `json:"allowances"`
-	Expire             string `json:"expire"`
-	Scope              string `json:"scope"`
-	ApplicationAddress string `json:"application"`
+	Address     string `json:"address"`
+	SessionKey  string `json:"session_key"`
+	Application string `json:"application"`
+	Allowances  []any  `json:"allowances"`
+	Expire      string `json:"expire"`
+	Scope       string `json:"scope"`
 }
 
 func (c *ClearnodeClient) Authenticate(wallet, signer unisig.Signer) (string, error) {
@@ -26,13 +25,12 @@ func (c *ClearnodeClient) Authenticate(wallet, signer unisig.Signer) (string, er
 	}
 
 	ch := AuthChallengeParams{
-		Address:            wallet.Address().Hex(),
-		SessionKey:         signer.Address().Hex(), // Using address as session key for simplicity
-		AppName:            "Cerebro CLI",
-		Allowances:         []any{},                // No allowances for now
-		Expire:             "",                     // No expiration for now
-		Scope:              "",                     // No specific scope for now
-		ApplicationAddress: wallet.Address().Hex(), // Using address as app address for simplicity
+		Address:     wallet.Address().Hex(),
+		SessionKey:  signer.Address().Hex(), // Using address as session key for simplicity
+		Application: "Cerebro CLI",
+		Allowances:  []any{}, // No allowances for now
+		Expire:      "",      // No expiration for now
+		Scope:       "",      // No specific scope for now
 	}
 	res, err := c.request("auth_request", nil, ch)
 	if err != nil {
@@ -102,8 +100,7 @@ func signChallenge(s unisig.Signer, c AuthChallengeParams, token string) (unisig
 				{Name: "challenge", Type: "string"},
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
-				{Name: "application", Type: "address"},
-				{Name: "participant", Type: "address"},
+				{Name: "session_key", Type: "address"},
 				{Name: "expire", Type: "uint256"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
@@ -113,14 +110,13 @@ func signChallenge(s unisig.Signer, c AuthChallengeParams, token string) (unisig
 			}},
 		PrimaryType: "Policy",
 		Domain: apitypes.TypedDataDomain{
-			Name: c.AppName,
+			Name: c.Application,
 		},
 		Message: map[string]interface{}{
 			"challenge":   token,
 			"scope":       c.Scope,
 			"wallet":      c.Address,
-			"application": c.ApplicationAddress,
-			"participant": c.SessionKey,
+			"session_key": c.SessionKey,
 			"expire":      c.Expire,
 			"allowances":  c.Allowances,
 		},

@@ -51,7 +51,7 @@ describe('API message creators', () => {
         const authRequest: AuthRequestParams = {
             address: clientAddress,
             session_key: clientAddress,
-            app_name: 'test-app',
+            application: 'test-app',
             allowances: [],
             expire: '',
             scope: '',
@@ -67,7 +67,7 @@ describe('API message creators', () => {
                 {
                     address: clientAddress,
                     session_key: clientAddress,
-                    app_name: 'test-app',
+                    application: 'test-app',
                     allowances: [],
                     expire: '',
                     scope: '',

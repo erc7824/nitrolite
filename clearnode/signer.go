@@ -81,13 +81,12 @@ func RecoverAddress(message []byte, sig Signature) (string, error) {
 }
 
 func RecoverAddressFromEip712Signature(
-	addrHex string,
+	walletAddress string,
 	challengeToken string,
 	sessionKey string,
-	appName string,
+	application string,
 	allowances []Allowance,
 	scope string,
-	application string,
 	expire string,
 	sig Signature) (string, error) {
 	convertedAllowances := convertAllowances(allowances)
@@ -101,8 +100,7 @@ func RecoverAddressFromEip712Signature(
 				{Name: "challenge", Type: "string"},
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
-				{Name: "application", Type: "address"},
-				{Name: "participant", Type: "address"},
+				{Name: "session_key", Type: "address"},
 				{Name: "expire", Type: "uint256"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
@@ -112,14 +110,13 @@ func RecoverAddressFromEip712Signature(
 			}},
 		PrimaryType: "Policy",
 		Domain: apitypes.TypedDataDomain{
-			Name: appName,
+			Name: application,
 		},
 		Message: map[string]interface{}{
 			"challenge":   challengeToken,
 			"scope":       scope,
-			"wallet":      addrHex,
-			"application": application,
-			"participant": sessionKey,
+			"wallet":      walletAddress,
+			"session_key": sessionKey,
 			"expire":      expire,
 			"allowances":  convertedAllowances,
 		},

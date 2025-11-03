@@ -133,21 +133,21 @@ func NewMetricsWithRegistry(registry prometheus.Registerer) *Metrics {
 				Name: "clearnet_broker_balance_available",
 				Help: "Available balance of the broker on the custody contract",
 			},
-			[]string{"network", "token", "asset"},
+			[]string{"blockchainID", "token", "asset"},
 		),
 		BrokerChannelCount: factory.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "clearnet_broker_channel_count",
 				Help: "Number of channels for the broker on the custody contract",
 			},
-			[]string{"network"},
+			[]string{"blockchainID"},
 		),
 		BrokerWalletBalance: factory.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "clearnet_broker_wallet_balance",
 				Help: "Broker wallet balance",
 			},
-			[]string{"network", "token", "asset"},
+			[]string{"blockchainID", "token", "asset"},
 		),
 	}
 
@@ -171,26 +171,8 @@ func (m *Metrics) RecordMetricsPeriodically(db *gorm.DB, custodyClients map[uint
 			ctx = SetContextLogger(ctx, logger)
 
 			// Update metrics for each custody client
-			for _, client := range custodyClients {
-				assets, err := GetAllAssets(db, &client.chainID)
-				if err != nil {
-					logger.Error("failed to retrieve assets", "err", err)
-					continue
-				}
-
-				// Append base asset
-				baseAsset := Asset{
-					Token:    "0x0000000000000000000000000000000000000000",
-					ChainID:  client.chainID,
-					Symbol:   "eth",
-					Decimals: 18,
-				}
-				if client.chainID == 137 {
-					baseAsset.Symbol = "pol"
-				}
-				assets = append(assets, baseAsset)
-
-				client.UpdateBalanceMetrics(ctx, assets, m)
+			for _, custodyClient := range custodyClients {
+				custodyClient.UpdateBalanceMetrics(ctx, m)
 			}
 		}
 	}

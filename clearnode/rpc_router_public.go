@@ -34,6 +34,7 @@ type GetAppDefinitionParams struct {
 }
 
 type AppDefinition struct {
+	Application        string      `json:"application"`
 	Protocol           rpc.Version `json:"protocol"`
 	ParticipantWallets []string    `json:"participants"`
 	Weights            []int64     `json:"weights"` // Signature weight for each participant.
@@ -70,17 +71,6 @@ type GetLedgerTransactionsParams struct {
 	AccountID string `json:"account_id,omitempty"` // Optional account ID to filter transactions
 	Asset     string `json:"asset,omitempty"`      // Optional asset to filter transactions
 	TxType    string `json:"tx_type,omitempty"`    // Optional transaction type to filter transactions
-}
-
-type NetworkInfo struct {
-	ChainID            uint32 `json:"chain_id"`
-	CustodyAddress     string `json:"custody_address"`
-	AdjudicatorAddress string `json:"adjudicator_address"`
-}
-
-type BrokerConfig struct {
-	BrokerAddress string        `json:"broker_address"`
-	Networks      []NetworkInfo `json:"networks"`
 }
 
 type TransactionResponse struct {
@@ -121,19 +111,20 @@ func (r *RPCRouter) HandlePing(c *RPCContext) {
 
 // HandleGetConfig returns the broker configuration
 func (r *RPCRouter) HandleGetConfig(c *RPCContext) {
-	supportedNetworks := make([]NetworkInfo, 0, len(r.Config.networks))
+	supportedBlockchains := make([]rpc.BlockchainInfo, 0, len(r.Config.blockchains))
 
-	for _, networkConfig := range r.Config.networks {
-		supportedNetworks = append(supportedNetworks, NetworkInfo{
-			ChainID:            networkConfig.ChainID,
-			CustodyAddress:     networkConfig.CustodyAddress,
-			AdjudicatorAddress: networkConfig.AdjudicatorAddress,
+	for _, blockchain := range r.Config.blockchains {
+		supportedBlockchains = append(supportedBlockchains, rpc.BlockchainInfo{
+			ID:                 blockchain.ID,
+			Name:               blockchain.Name,
+			CustodyAddress:     blockchain.ContractAddresses.Custody,
+			AdjudicatorAddress: blockchain.ContractAddresses.Adjudicator,
 		})
 	}
 
-	brokerConfig := BrokerConfig{
+	brokerConfig := rpc.BrokerConfig{
 		BrokerAddress: r.Signer.GetAddress().Hex(),
-		Networks:      supportedNetworks,
+		Blockchains:   supportedBlockchains,
 	}
 
 	c.Succeed(c.Message.Req.Method, brokerConfig)
@@ -151,17 +142,20 @@ func (r *RPCRouter) HandleGetAssets(c *RPCContext) {
 		return
 	}
 
-	query := applySort(r.DB, "symbol", SortTypeAscending, nil)
-	assets, err := GetAllAssets(query, params.ChainID)
-	if err != nil {
-		logger.Error("failed to get assets", "error", err)
-		c.Fail(err, "failed to get assets")
-		return
-	}
+	respAssets := []AssetResponse{}
+	for _, asset := range r.Config.assets.Assets {
+		for _, token := range asset.Tokens {
+			if params.ChainID != nil && token.BlockchainID != *params.ChainID {
+				continue
+			}
 
-	respAssets := make([]AssetResponse, 0, len(assets))
-	for _, asset := range assets {
-		respAssets = append(respAssets, AssetResponse(asset))
+			respAssets = append(respAssets, AssetResponse{
+				Symbol:   asset.Symbol,
+				ChainID:  token.BlockchainID,
+				Token:    token.Address,
+				Decimals: token.Decimals,
+			})
+		}
 	}
 
 	resp := GetAssetsResponse{
@@ -280,6 +274,7 @@ func (r *RPCRouter) HandleGetAppSessions(c *RPCContext) {
 	for i, session := range sessions {
 		respAppSessions[i] = AppSessionResponse{
 			AppSessionID:       session.SessionID,
+			Application:        session.Application,
 			Status:             string(session.Status),
 			ParticipantWallets: session.ParticipantWallets,
 			SessionData:        session.SessionData,

@@ -26,7 +26,7 @@ func setupTestSqlite(t testing.TB) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(uniqueDSN), &gorm.Config{})
 	require.NoError(t, err)
 
-	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{}, &LedgerTransaction{}, &UserTagModel{}, &UserActionLog{}, &BlockchainAction{})
+	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &ContractEvent{}, &LedgerTransaction{}, &UserTagModel{}, &UserActionLog{}, &BlockchainAction{}, &SessionKey{})
 	require.NoError(t, err)
 
 	return db
@@ -63,7 +63,7 @@ func setupTestPostgres(ctx context.Context, t testing.TB) (*gorm.DB, testcontain
 	db, err := gorm.Open(postgres.Open(url), &gorm.Config{})
 	require.NoError(t, err)
 
-	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &Asset{}, &SignerWallet{}, &ContractEvent{}, &LedgerTransaction{}, &UserTagModel{}, &BlockchainAction{})
+	err = db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &ContractEvent{}, &LedgerTransaction{}, &UserTagModel{}, &BlockchainAction{}, &SessionKey{})
 	require.NoError(t, err)
 
 	return db, postgresContainer
@@ -111,28 +111,34 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, *gorm.DB, func()) {
 	node := NewRPCNode(signer, logger)
 	wsNotifier := NewWSNotifier(node.Notify, logger)
 
-	networks := map[uint32]*NetworkConfig{
+	blockchains := map[uint32]BlockchainConfig{
 		137: {
-			Name:               "polygon",
-			ChainID:            137,
-			BlockchainRPC:      "https://polygon-mainnet.infura.io/v3/test",
-			CustodyAddress:     "0xCustodyAddress",
-			AdjudicatorAddress: "0xAdjudicatorAddress",
+			Name:          "polygon",
+			ID:            137,
+			BlockchainRPC: "https://polygon-mainnet.infura.io/v3/test",
+			ContractAddresses: ContractAddressesConfig{
+				Custody:     "0xCustodyAddress",
+				Adjudicator: "0xAdjudicatorAddress",
+			},
 		},
 		42220: {
-			Name:               "celo",
-			ChainID:            42220,
-			BlockchainRPC:      "https://celo-mainnet.infura.io/v3/test",
-			CustodyAddress:     "0xCustodyAddress2",
-			AdjudicatorAddress: "0xAdjudicatorAddress2",
+			Name:          "celo",
+			ID:            42220,
+			BlockchainRPC: "https://celo-mainnet.infura.io/v3/test",
+			ContractAddresses: ContractAddressesConfig{
+				Custody:     "0xCustodyAddress2",
+				Adjudicator: "0xAdjudicatorAddress2",
+			},
 		},
 	}
 
-	channelService := NewChannelService(db, networks, signer)
+	config := &Config{blockchains: blockchains, assets: AssetsConfig{}}
+	channelService := NewChannelService(db, blockchains, &config.assets, signer)
 
 	// Create an instance of RPCRouter
 	router := &RPCRouter{
 		Node:              node,
+		Config:            config,
 		Signer:            signer,
 		AppSessionService: NewAppSessionService(db, wsNotifier),
 		ChannelService:    channelService,

@@ -67,7 +67,7 @@ describe('Close channel', () => {
 
         expect(postFundBalance.rawBalance).toBe(preFundBalance.rawBalance - depositAmount);
 
-        const msg = await createCloseChannelMessage(identity.messageSigner, params.channelId, identity.walletAddress);
+        const msg = await createCloseChannelMessage(identity.messageSKSigner, params.channelId, identity.walletAddress);
         const closeResponse = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/gorm"
 )
@@ -93,12 +94,12 @@ func NewTransferNotification(wallet string, transferredAllocations TransferRespo
 
 // NewAppSessionNotification creates a notification for an app session update event
 func NewAppSessionNotification(participant string, appSession AppSession, participantAllocations []AppAllocation) *Notification {
-	response := AppSessionResponse{
+	appSessionData := rpc.AppSession{
 		AppSessionID:       appSession.SessionID,
 		Status:             string(appSession.Status),
 		ParticipantWallets: appSession.ParticipantWallets,
 		SessionData:        appSession.SessionData,
-		Protocol:           string(appSession.Protocol),
+		Protocol:           appSession.Protocol,
 		Challenge:          appSession.Challenge,
 		Weights:            appSession.Weights,
 		Quorum:             appSession.Quorum,
@@ -108,15 +109,21 @@ func NewAppSessionNotification(participant string, appSession AppSession, partic
 		UpdatedAt:          appSession.UpdatedAt.Format(time.RFC3339),
 	}
 
+	rpcAllocations := make([]rpc.AppAllocation, len(participantAllocations))
+	for i, alloc := range participantAllocations {
+		rpcAllocations[i] = rpc.AppAllocation{
+			Participant: alloc.Participant,
+			AssetSymbol: alloc.AssetSymbol,
+			Amount:      alloc.Amount,
+		}
+	}
+
 	return &Notification{
 		userID:    participant,
 		eventType: AppSessionUpdateEventType,
-		data: struct {
-			AppSessionResponse
-			ParticipantAllocations []AppAllocation `json:"participant_allocations"`
-		}{
-			AppSessionResponse:     response,
-			ParticipantAllocations: participantAllocations,
+		data: rpc.AppSessionUpdateNotification{
+			AppSession:             appSessionData,
+			ParticipantAllocations: rpcAllocations,
 		},
 	}
 }

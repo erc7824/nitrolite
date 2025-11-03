@@ -37,6 +37,7 @@ services:
   # Custody(58808): 0x8658501c98C3738026c4e5c361c6C3fa95DfB255
   # DummyAdjudicator(35305): 0xcbbc03a873c11beeFA8D99477E830be48d8Ae6D7
   # USDC ERC20(77360): 0xbD24c53072b9693A35642412227043Ffa5fac382
+  # WETH ERC20(88421): 0xAf119209932D7EDe63055E60854E81acC4063a12
   # BalanceChecker(53231): 0x730dB3A1D3Ca47e7BaEb260c24C74ED4378726Bc
   contract-deployer:
     image: ghcr.io/foundry-rs/foundry:v1.2.2
@@ -56,6 +57,7 @@ services:
         (forge script script/DeployCustody.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string)" 58808 "$${DEPLOYER_MNEMONIC}" | grep "Deployed") &&
         (forge script script/DeployDummyAdjudicator.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string)" 35305 "$${DEPLOYER_MNEMONIC}" | grep "Deployed") &&
         (forge script script/DeployAndFundERC20.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string,string,uint8,string)" 77360 "USD Coin" "USDC" 6 "$${DEPLOYER_MNEMONIC}" | grep "Deployed") &&
+        (forge script script/DeployAndFundERC20.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string,string,uint8,string)" 88421 "Wrapped Ether" "WETH" 18 "$${DEPLOYER_MNEMONIC}" | grep "Deployed") &&
         (forge script script/DeployBalanceChecker.s.sol --broadcast --rpc-url $${RPC_URL} --sig "run(uint32,string)" 53231 "$${DEPLOYER_MNEMONIC}" | grep "Deployed")
       '
 
@@ -67,7 +69,8 @@ services:
       PGDATABASE: ${POSTGRES_DB:-postgres}
       PGHOST: database
       PGPORT: 5432
-      TOKEN_ADDRESS: ${TOKEN_ADDRESS:-0xbD24c53072b9693A35642412227043Ffa5fac382}
+      USDC_TOKEN_ADDRESS: ${USDC_TOKEN_ADDRESS:-0xbD24c53072b9693A35642412227043Ffa5fac382}
+      WETH_TOKEN_ADDRESS: ${WETH_TOKEN_ADDRESS:-0xAf119209932D7EDe63055E60854E81acC4063a12}
     volumes:
       - ./clearnode/config/migrations/postgres:/migrations
     command: >
@@ -108,18 +111,32 @@ services:
         done &&
 
         echo 'Checking database...' &&
-        # Check if token already exists
-        TOKEN_EXISTS=$$(psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -t -c \"SELECT COUNT(*) FROM assets WHERE token = '$$TOKEN_ADDRESS' AND chain_id = 31337;\" | xargs) &&
+        # Check if USDC token already exists
+        USDC_EXISTS=$$(psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -t -c \"SELECT COUNT(*) FROM assets WHERE token = '$$USDC_TOKEN_ADDRESS' AND chain_id = 31337;\" | xargs) &&
 
-        if [ \"$$TOKEN_EXISTS\" -eq \"0\" ]; then
-          echo 'Seeding database with tokens...' &&
+        if [ \"$$USDC_EXISTS\" -eq \"0\" ]; then
+          echo 'Seeding database with USDC token...' &&
           psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c \"
             INSERT INTO assets (token, chain_id, symbol, decimals)
-            VALUES ('$$TOKEN_ADDRESS', 31337, 'USDC', 6);
+            VALUES ('$$USDC_TOKEN_ADDRESS', 31337, 'usdc', 6);
           \" &&
-          echo 'Database seeded with tokens successfully'
+          echo 'USDC token seeded successfully'
         else
-          echo 'Database already seeded, skipping'
+          echo 'USDC token already seeded, skipping'
+        fi &&
+
+        # Check if WETH token already exists
+        WETH_EXISTS=$$(psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -t -c \"SELECT COUNT(*) FROM assets WHERE token = '$$WETH_TOKEN_ADDRESS' AND chain_id = 31337;\" | xargs) &&
+
+        if [ \"$$WETH_EXISTS\" -eq \"0\" ]; then
+          echo 'Seeding database with WETH token...' &&
+          psql -h database -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres} -c \"
+            INSERT INTO assets (token, chain_id, symbol, decimals)
+            VALUES ('$$WETH_TOKEN_ADDRESS', 31337, 'eth', 18);
+          \" &&
+          echo 'WETH token seeded successfully'
+        else
+          echo 'WETH token already seeded, skipping'
         fi
       "
     depends_on:
@@ -143,13 +160,12 @@ services:
       db-init:
         condition: service_completed_successfully
     environment:
-      BROKER_PRIVATE_KEY: ${BROKER_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
-      ANVIL_CUSTODY_CONTRACT_ADDRESS: ${ANVIL_CUSTODY_CONTRACT_ADDRESS:-0x8658501c98C3738026c4e5c361c6C3fa95DfB255}
-      ANVIL_ADJUDICATOR_ADDRESS: ${ANVIL_ADJUDICATOR_ADDRESS:-0xcbbc03a873c11beeFA8D99477E830be48d8Ae6D7}
-      ANVIL_BALANCE_CHECKER_ADDRESS: ${ANVIL_BALANCE_CHECKER_ADDRESS:-0x730dB3A1D3Ca47e7BaEb260c24C74ED4378726Bc}
+      CLEARNODE_CONFIG_DIR_PATH: ${CLEARNODE_CONFIG_DIR_PATH:-/config}
       ANVIL_BLOCKCHAIN_RPC: ws://anvil:8545
       CLEARNODE_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-postgres}?sslmode=disable
       CLEARNODE_LOG_LEVEL: ${CLEARNODE_LOG_LEVEL:-info}
+    volumes:
+      - ./clearnode/config/compose/integration:/config:ro
     restart: unless-stopped
 
 volumes:

@@ -69,7 +69,7 @@ export async function fetchAndParseAppSessions(
     appSessionId: string
 ) {
     const getAppSessionsMsg = await createGetAppSessionsMessage(
-        participantAppIdentity.messageSigner,
+        participantAppIdentity.messageSKSigner,
         participantAppIdentity.walletAddress
     );
     const getAppSessionsResponse = await participantAppWS.sendAndWaitForResponse(

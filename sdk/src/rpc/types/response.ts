@@ -15,6 +15,7 @@ import {
     RPCChannelUpdateWithWallet,
     RPCChannelOperation,
     RPCChannel,
+    RPCSessionKey,
 } from '.';
 
 /**
@@ -93,6 +94,17 @@ export interface GetUserTagResponse extends GenericRPCMessage {
     params: {
         /** The user's unique tag identifier. */
         tag: string;
+    };
+}
+
+/**
+ * Represents the response structure for the 'get_session_keys' RPC method.
+ */
+export interface GetSessionKeysResponse extends GenericRPCMessage {
+    method: RPCMethod.GetSessionKeys;
+    params: {
+        /** Array of active session keys for the authenticated user. */
+        sessionKeys: RPCSessionKey[];
     };
 }
 
@@ -374,6 +386,11 @@ export type GetLedgerTransactionsResponseParams = GetLedgerTransactionsResponse[
 export type GetUserTagResponseParams = GetUserTagResponse['params'];
 
 /**
+ * Represents the parameters for the 'get_session_keys' RPC method.
+ */
+export type GetSessionKeysResponseParams = GetSessionKeysResponse['params'];
+
+/**
  * Represents the parameters for the 'create_app_session' RPC method.
  */
 export type CreateAppSessionResponseParams = CreateAppSessionResponse['params'];
@@ -492,6 +509,7 @@ export type RPCResponse =
     | GetLedgerEntriesResponse
     | GetLedgerTransactionsResponse
     | GetUserTagResponse
+    | GetSessionKeysResponse
     | CreateAppSessionResponse
     | SubmitAppStateResponse
     | CloseAppSessionResponse

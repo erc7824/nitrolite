@@ -24,7 +24,7 @@ export async function submitAppStateUpdate_v02(
     expectedVersion: number
 ) {
     const submitAppStateMsg = await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_2>(
-        participantAppIdentity.messageSigner,
+        participantAppIdentity.messageSKSigner,
         {
             app_session_id: appSessionId as Hex,
             allocations,
@@ -60,7 +60,7 @@ export async function submitAppStateUpdate_v04(
     sessionData: object
 ) {
     const submitAppStateMsg = await createSubmitAppStateMessage<RPCProtocolVersion.NitroRPC_0_4>(
-        participantAppIdentity.messageSigner,
+        participantAppIdentity.messageSKSigner,
         {
             app_session_id: appSessionId as Hex,
             intent,
@@ -96,7 +96,7 @@ export async function closeAppSessionWithState(
     sessionData: object,
     expectedVersion: number
 ) {
-    const closeAppSessionMsg = await createCloseAppSessionMessage(participantAppIdentity.messageSigner, {
+    const closeAppSessionMsg = await createCloseAppSessionMessage(participantAppIdentity.messageSKSigner, {
         app_session_id: appSessionId as Hex,
         allocations,
         session_data: JSON.stringify(sessionData),

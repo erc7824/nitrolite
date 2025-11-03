@@ -79,6 +79,7 @@ func NewRPCRouter(
 	privGroup.Handle("get_user_tag", r.HandleGetUserTag)
 	privGroup.Handle("get_ledger_balances", r.HandleGetLedgerBalances)
 	privGroup.Handle("get_rpc_history", r.HandleGetRPCHistory)
+	privGroup.Handle("get_session_keys", r.HandleGetSessionKeys)
 
 	historyGroup := privGroup.NewGroup("")
 	historyGroup.Use(r.HistoryMiddleware)
@@ -101,17 +102,17 @@ func (r *RPCRouter) HandleConnect(send SendRPCMessageFunc) {
 	r.Metrics.ConnectionsTotal.Inc()
 	r.Metrics.ConnectedClients.Inc()
 
-	// Get all assets from the database
-	assets, err := GetAllAssets(r.DB, nil)
-	if err != nil {
-		r.lg.Error("failed to get all assets", "error", err)
-		return
-	}
-
 	// Convert to AssetResponse format
-	respAssets := make([]AssetResponse, 0, len(assets))
-	for _, asset := range assets {
-		respAssets = append(respAssets, AssetResponse(asset))
+	respAssets := []AssetResponse{}
+	for _, asset := range r.Config.assets.Assets {
+		for _, token := range asset.Tokens {
+			respAssets = append(respAssets, AssetResponse{
+				Symbol:   asset.Symbol,
+				ChainID:  token.BlockchainID,
+				Token:    token.Address,
+				Decimals: token.Decimals,
+			})
+		}
 	}
 
 	send("assets", AssetsResponse{Assets: respAssets})

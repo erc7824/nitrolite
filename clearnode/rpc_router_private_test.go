@@ -948,7 +948,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
 		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount)     // Should remain unchanged
 		require.Equal(t, ch.State.Version, unchangedChannel.State.Version) // Should remain unchanged
-		require.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
+		require.Equal(t, ChannelStatusResizing, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, "usdc")
@@ -1487,12 +1487,12 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(expected), "Combined allocation+resize amount mismatch")
 		require.Equal(t, 0, resObj.State.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 
-		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
+		// Verify channel state in database got 'resized status' with other params unchanged
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
 		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount)     // Should remain unchanged
 		require.Equal(t, ch.State.Version, unchangedChannel.State.Version) // Should remain unchanged
-		require.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
+		require.Equal(t, ChannelStatusResizing, unchangedChannel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, "usdc")
@@ -1558,17 +1558,56 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(decimal.Zero), "Combined allocation+resize amount mismatch")
 		require.Equal(t, 0, resObj.State.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 
-		// Verify channel state in database remains unchanged (no update until blockchain confirmation)
-		var unchangedChannel Channel
-		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
-		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount)     // Should remain unchanged
-		require.Equal(t, ch.State.Version, unchangedChannel.State.Version) // Should remain unchanged
-		require.Equal(t, ChannelStatusOpen, unchangedChannel.Status)
+		// Verify channel state in database got 'resized status' with other params unchanged
+		var channel Channel
+		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&channel).Error)
+		require.Equal(t, initialRawAmount, channel.RawAmount)     // Should remain unchanged
+		require.Equal(t, ch.State.Version, channel.State.Version) // Should remain unchanged
+		require.Equal(t, ChannelStatusResizing, channel.Status)
 
-		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
+		// Verify ledger balance was debited by the resize withdrawal amount (0.0001 USDC)
 		finalBalance, err := ledger.Balance(userAccountID, "usdc")
 		require.NoError(t, err)
-		require.Equal(t, decimal.NewFromInt(2000), finalBalance) // Should remain unchanged
+		require.Equal(t, decimal.NewFromFloat(1999.9999), finalBalance)
+	})
+
+	t.Run("ErrorResizeAlreadyOngoing", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		tokenAddress := "0xTokenResizing"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
+
+		ch := Channel{
+			ChannelID:   "0xChanResizing",
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
+			Status:      ChannelStatusResizing,
+			Token:       tokenAddress,
+			ChainID:     137,
+			RawAmount:   decimal.NewFromInt(1000),
+			State: UnsignedState{
+				Version: 1,
+			},
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		ledger := GetWalletLedger(db, userAddress)
+		require.NoError(t, ledger.Record(userAccountID, "usdc", decimal.NewFromInt(2000), nil))
+
+		allocateAmount := decimal.NewFromInt(100)
+		resizeParams := ResizeChannelParams{
+			ChannelID:        ch.ChannelID,
+			AllocateAmount:   &allocateAmount,
+			FundsDestination: userAddress.Hex(),
+		}
+
+		ctx := createSignedRPCContext(1, "resize_channel", resizeParams, userSigner)
+		router.HandleResizeChannel(ctx)
+
+		assertErrorResponse(t, ctx, "operation denied: resize already ongoing")
 	})
 }
 
@@ -1689,6 +1728,56 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		router.HandleCloseChannel(ctx)
 
 		assertErrorResponse(t, ctx, "has challenged channels")
+	})
+
+	t.Run("SuccessfulCloseResizingChannel", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		tokenAddress := "0xTokenCloseResizing"
+		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
+
+		initialRawAmount := decimal.NewFromInt(1000)
+		ch := Channel{
+			ChannelID:   "0xChanCloseResizing",
+			Participant: userAddress.Hex(),
+			Wallet:      userAddress.Hex(),
+			Status:      ChannelStatusResizing,
+			Token:       tokenAddress,
+			ChainID:     137,
+			RawAmount:   initialRawAmount,
+			State: UnsignedState{
+				Version: 2,
+			},
+		}
+		require.NoError(t, db.Create(&ch).Error)
+
+		require.NoError(t, GetWalletLedger(db, userAddress).Record(
+			userAccountID,
+			"usdc",
+			rawToDecimal(initialRawAmount.BigInt(), 6),
+			nil,
+		))
+
+		closeParams := CloseChannelParams{
+			ChannelID:        ch.ChannelID,
+			FundsDestination: userAddress.Hex(),
+		}
+
+		ctx := createSignedRPCContext(10, "close_channel", closeParams, userSigner)
+		router.HandleCloseChannel(ctx)
+
+		res := assertResponse(t, ctx, "close_channel")
+		resObj, ok := res.Params.(ChannelOperationResponse)
+		require.True(t, ok, "Response should be CloseChannelResponse")
+		require.Equal(t, ch.ChannelID, resObj.ChannelID)
+
+		require.Equal(t, ch.State.Version+1, resObj.State.Version)
+
+		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(initialRawAmount), "Primary allocation mismatch")
+		require.Equal(t, 0, resObj.State.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 	})
 }
 

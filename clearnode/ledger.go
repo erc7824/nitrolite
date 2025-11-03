@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	ErrGetAccountBalance        = "failed to get account balance"
-	ErrDebitSourceAccount       = "failed to debit source account"
-	ErrCreditDestinationAccount = "failed to credit destination account"
+	ErrGetAccountBalance = "failed to get account balance"
+	ErrRecordLedgerEntry = "failed to record a ledger entry"
 )
 
 // Entry represents a ledger entry in the database
@@ -77,7 +76,12 @@ func (l *WalletLedger) Record(accountID AccountID, assetSymbol string, amount de
 	}
 
 	fmt.Println("recording entry for: ", l.wallet, " in account ", accountID, " ", assetSymbol, " ", amount)
-	return l.db.Create(entry).Error
+
+	err := l.db.Create(entry).Error
+	if err != nil {
+		return RPCErrorf(ErrRecordLedgerEntry+" : %w", err)
+	}
+	return nil
 }
 
 func (l *WalletLedger) Balance(accountID AccountID, assetSymbol string) (decimal.Decimal, error) {

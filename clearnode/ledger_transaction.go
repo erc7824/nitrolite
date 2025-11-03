@@ -15,10 +15,13 @@ const (
 	TransactionTypeWithdrawal    TransactionType = 202
 	TransactionTypeAppDeposit    TransactionType = 301
 	TransactionTypeAppWithdrawal TransactionType = 302
+	TransactionTypeEscrowLock    TransactionType = 401
+	TransactionTypeEscrowUnlock  TransactionType = 402
 )
 
 var (
 	ErrInvalidLedgerTransactionType = RPCErrorf("invalid ledger transaction type")
+	ErrRecordTransaction            = "failed to record transaction"
 )
 
 type LedgerTransaction struct {
@@ -46,8 +49,10 @@ func RecordLedgerTransaction(tx *gorm.DB, txType TransactionType, fromAccount, t
 	}
 
 	err := tx.Create(transaction).Error
-
-	return transaction, err
+	if err != nil {
+		return nil, RPCErrorf(ErrRecordTransaction+" : %w", err)
+	}
+	return transaction, nil
 }
 
 type TransactionWithTags struct {
@@ -95,6 +100,10 @@ func (t TransactionType) String() string {
 		return "app_deposit"
 	case TransactionTypeAppWithdrawal:
 		return "app_withdrawal"
+	case TransactionTypeEscrowLock:
+		return "escrow_lock"
+	case TransactionTypeEscrowUnlock:
+		return "escrow_unlock"
 	default:
 		return ""
 	}
@@ -113,6 +122,10 @@ func parseLedgerTransactionType(s string) (TransactionType, error) {
 		return TransactionTypeAppDeposit, nil
 	case "app_withdrawal":
 		return TransactionTypeAppWithdrawal, nil
+	case "escrow_lock":
+		return TransactionTypeEscrowLock, nil
+	case "escrow_unlock":
+		return TransactionTypeEscrowUnlock, nil
 	default:
 		return 0, ErrInvalidLedgerTransactionType
 	}

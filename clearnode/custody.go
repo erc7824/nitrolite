@@ -292,19 +292,19 @@ func (c *Custody) handleCreated(logger Logger, ev *nitrolite.CustodyCreated) {
 
 		ledger := GetWalletLedger(tx, walletAddress)
 		if err := ledger.Record(channelAccountID, asset.Symbol, amount, nil); err != nil {
-			return fmt.Errorf("error recording balance update for wallet: %w", err)
+			return err
 		}
 		if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg(), nil); err != nil {
-			return fmt.Errorf("error recording balance update for wallet: %w", err)
+			return err
 		}
 		ledger = GetWalletLedger(tx, walletAddress)
 		if err := ledger.Record(walletAccountID, asset.Symbol, amount, nil); err != nil {
-			return fmt.Errorf("error recording balance update for wallet: %w", err)
+			return err
 		}
 
 		_, err = RecordLedgerTransaction(tx, TransactionTypeDeposit, channelAccountID, walletAccountID, asset.Symbol, amount)
 		if err != nil {
-			return fmt.Errorf("failed to record transaction: %w", err)
+			return err
 		}
 
 		logger.Info("handled created event", "channelId", channelID)
@@ -326,16 +326,20 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 	channelID := common.Hash(ev.ChannelId)
 	logger.Debug("parsed event", "channelId", channelID)
 
-	var channel Channel
+	var channel *Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
 		if err := c.saveContractEvent(tx, "challenged", *ev, ev.Raw); err != nil {
 			return err
 		}
 
-		result := tx.Where("channel_id = ?", channelID.Hex()).First(&channel)
-		if result.Error != nil {
-			return fmt.Errorf("error finding channel: %w", result.Error)
+		var err error
+		channel, err = GetChannelByID(tx, channelID.Hex())
+		if err != nil {
+			return fmt.Errorf("error finding channel: %w", err)
+		}
+		if channel == nil {
+			return fmt.Errorf("channel with ID %s not found", channelID)
 		}
 
 		challengedVersion := ev.State.Version.Uint64()
@@ -371,7 +375,7 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 		return
 	}
 
-	c.wsNotifier.Notify(NewChannelNotification(channel))
+	c.wsNotifier.Notify(NewChannelNotification(*channel))
 }
 
 func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
@@ -384,16 +388,20 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 		return
 	}
 
-	var channel Channel
+	var channel *Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
 		// Save event in DB
 		if err := c.saveContractEvent(tx, "resized", *ev, ev.Raw); err != nil {
 			return err
 		}
 
-		result := tx.Where("channel_id = ?", channelID).First(&channel)
-		if result.Error != nil {
-			return fmt.Errorf("error finding channel: %w", result.Error)
+		var err error
+		channel, err = GetChannelByID(tx, channelID)
+		if err != nil {
+			return fmt.Errorf("error finding channel: %w", err)
+		}
+		if channel == nil {
+			return fmt.Errorf("channel with ID %s not found", channelID)
 		}
 
 		newRawAmount := channel.RawAmount.BigInt()
@@ -414,9 +422,14 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 			channel.State.Allocations[1].RawAmount = channel.State.Allocations[1].RawAmount.Add(decimal.NewFromBigInt(ev.DeltaAllocations[1], 0))
 		}
 
+		if channel.Status == ChannelStatusOpen {
+			logger.Error("received resized event for a not resizing channel", "channelId", channelID)
+		}
+
 		channel.RawAmount = decimal.NewFromBigInt(newRawAmount, 0)
 		channel.UpdatedAt = time.Now()
 		channel.State.Version++
+		channel.Status = ChannelStatusOpen
 		channel.ServerStateSignature = nil // Reset server signature
 		channel.UserStateSignature = nil   // Reset user signature
 		if err := tx.Save(&channel).Error; err != nil {
@@ -438,41 +451,34 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 
 			amount := rawToDecimal(resizeAmount, asset.Token.Decimals)
 			// Keep correct order of operation for deposits and withdrawals into the channel.
-			if amount.IsPositive() || amount.IsZero() {
+			if amount.IsPositive() {
 				// 1. Deposit into a channel account.
 				ledger := GetWalletLedger(tx, walletAddress)
 				if err := ledger.Record(channelAccountID, asset.Symbol, amount, nil); err != nil {
-					return fmt.Errorf("error recording balance update for wallet: %w", err)
+					return err
 				}
 				// 2. Immediately transfer from the channel account into the unified account.
 				if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg(), nil); err != nil {
-					return fmt.Errorf("error recording balance update for wallet: %w", err)
+					return err
 				}
 				ledger = GetWalletLedger(tx, walletAddress)
 				if err := ledger.Record(walletAccountID, asset.Symbol, amount, nil); err != nil {
-					return fmt.Errorf("error recording balance update for participant: %w", err)
+					return err
 				}
 				_, err := RecordLedgerTransaction(tx, TransactionTypeDeposit, channelAccountID, walletAccountID, asset.Symbol, amount)
 				if err != nil {
-					return fmt.Errorf("failed to record transaction: %w", err)
+					return err
 				}
-			} else {
-				// 1. Withdraw from the unified account and immediately withdraw from the channel account.
+			}
+			if amount.IsNegative() {
+				// Withdraw from the channel escrow account.
 				ledger := GetWalletLedger(tx, walletAddress)
-				if err := ledger.Record(walletAccountID, asset.Symbol, amount, nil); err != nil {
-					return fmt.Errorf("error recording balance update for participant: %w", err)
-				}
-				if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg(), nil); err != nil {
-					return fmt.Errorf("error recording balance update for wallet: %w", err)
+				if err := ledger.Record(channelAccountID, asset.Symbol, amount, nil); err != nil {
+					return err
 				}
 				_, err := RecordLedgerTransaction(tx, TransactionTypeWithdrawal, walletAccountID, channelAccountID, asset.Symbol, amount)
 				if err != nil {
-					return fmt.Errorf("failed to record transaction: %w", err)
-				}
-				// 2. Withdraw from the channel account.
-				ledger = GetWalletLedger(tx, walletAddress)
-				if err := ledger.Record(channelAccountID, asset.Symbol, amount, nil); err != nil {
-					return fmt.Errorf("error recording balance update for wallet: %w", err)
+					return err
 				}
 			}
 		}
@@ -489,7 +495,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 
 	c.wsNotifier.Notify(
 		NewBalanceNotification(channel.Wallet, c.db),
-		NewChannelNotification(channel),
+		NewChannelNotification(*channel),
 	)
 }
 
@@ -498,19 +504,19 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 	channelID := common.Hash(ev.ChannelId).Hex()
 	logger.Debug("parsed event", "channelId", channelID, "final", ev.FinalState)
 
-	var channel Channel
+	var channel *Channel
 	err := c.db.Transaction(func(tx *gorm.DB) error {
-		// Save event in DB
 		if err := c.saveContractEvent(tx, "closed", *ev, ev.Raw); err != nil {
 			return err
 		}
 
-		result := tx.Where("channel_id = ?", channelID).First(&channel)
-		if result.Error != nil {
-			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-				return fmt.Errorf("channel with ID %s not found", channelID)
-			}
-			return fmt.Errorf("error finding channel: %w", result.Error)
+		var err error
+		channel, err = GetChannelByID(tx, channelID)
+		if err != nil {
+			return fmt.Errorf("error finding channel: %w", err)
+		}
+		if channel == nil {
+			return fmt.Errorf("channel with ID %s not found", channelID)
 		}
 
 		asset, ok := c.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, c.chainID)
@@ -525,33 +531,44 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		channelAccountID := NewAccountID(channelID)
 		walletAccountID := NewAccountID(channel.Wallet)
 
-		// Transfer from unified account into channel account and then withdraw immediately.
 		ledger := GetWalletLedger(tx, walletAddress)
-		channelAccountBalance, err := ledger.Balance(channelAccountID, asset.Symbol)
+		channelEscrowAccountBalance, err := ledger.Balance(channelAccountID, asset.Symbol)
 		if err != nil {
 			return fmt.Errorf("error fetching channel balance: %w", err)
 		}
 
-		// Withdraw from unified balance if channel was not in joining state.
-		if channelAccountBalance.IsZero() { // If channel balance is not zero, it means the channel was in joining state.
-			if err := ledger.Record(walletAccountID, asset.Symbol, amount.Neg(), nil); err != nil {
-				return fmt.Errorf("error recording balance update for participant: %w", err)
+		// 1. Unlock funds from channel Escrow if not empty
+		if !channelEscrowAccountBalance.IsZero() {
+			if err := ledger.Record(channelAccountID, asset.Symbol, channelEscrowAccountBalance.Neg(), nil); err != nil {
+				return err
+
 			}
-			if err := ledger.Record(channelAccountID, asset.Symbol, amount, nil); err != nil {
-				return fmt.Errorf("error recording balance update for wallet: %w", err)
+			if err := ledger.Record(walletAccountID, asset.Symbol, channelEscrowAccountBalance, nil); err != nil {
+				return err
 			}
-			_, err = RecordLedgerTransaction(tx, TransactionTypeWithdrawal, walletAccountID, channelAccountID, asset.Symbol, amount)
+			_, err := RecordLedgerTransaction(tx, TransactionTypeEscrowUnlock, channelAccountID, walletAccountID, asset.Symbol, channelEscrowAccountBalance)
 			if err != nil {
-				return fmt.Errorf("failed to record transaction: %w", err)
+				return err
 			}
 		}
 
-		// 2. Withdraw from the channel account.
+		// 2. Complete the withdrawal
+		if err := ledger.Record(walletAccountID, asset.Symbol, amount.Neg(), nil); err != nil {
+			return err
+		}
+		if err := ledger.Record(channelAccountID, asset.Symbol, amount, nil); err != nil {
+			return err
+		}
 		if err := ledger.Record(channelAccountID, asset.Symbol, amount.Neg(), nil); err != nil {
-			return fmt.Errorf("error recording balance update for wallet: %w", err)
+			return err
 		}
 
-		// Update channel state with final state
+		_, err = RecordLedgerTransaction(tx, TransactionTypeWithdrawal, walletAccountID, channelAccountID, asset.Symbol, amount)
+		if err != nil {
+			return err
+		}
+
+		// Update channel state with final the state
 		if len(ev.FinalState.Allocations) == 2 {
 			channel.State.Allocations = []Allocation{
 				{
@@ -592,7 +609,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 
 	c.wsNotifier.Notify(
 		NewBalanceNotification(channel.Wallet, c.db),
-		NewChannelNotification(channel),
+		NewChannelNotification(*channel),
 	)
 }
 

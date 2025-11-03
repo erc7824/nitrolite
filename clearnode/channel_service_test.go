@@ -154,7 +154,7 @@ func TestChannelService(t *testing.T) {
 		require.NotNil(t, channel)
 		assert.Equal(t, channelAmountRaw, channel.RawAmount)
 		assert.Equal(t, ch.State.Version, channel.State.Version)
-		assert.Equal(t, ChannelStatusOpen, channel.Status)
+		assert.Equal(t, ChannelStatusResizing, channel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, tokenSymbol)

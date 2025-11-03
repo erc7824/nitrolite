@@ -15,6 +15,7 @@ type ChannelStatus string
 var (
 	ChannelStatusOpen       ChannelStatus = "open"
 	ChannelStatusClosed     ChannelStatus = "closed"
+	ChannelStatusResizing   ChannelStatus = "resizing"
 	ChannelStatusChallenged ChannelStatus = "challenged"
 )
 

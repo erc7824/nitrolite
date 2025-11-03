@@ -1,6 +1,6 @@
 assets:
   - name: "USD Coin"
-    symbol: "USDC"
+    symbol: "usdc"
     tokens:
       - blockchain_id: 137
         address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
@@ -26,6 +26,18 @@ assets:
       - blockchain_id: 1440000
         address: "0xa16148c6Ac9EDe0D82f0c52899e22a575284f131"
         decimals: 6
+  - name: "Tether USD"
+    symbol: "usdt"
+    tokens:
+      - blockchain_id: 8453
+        address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2"
+        decimals: 6
+  - name: "Ether"
+    symbol: "eth"
+    tokens:
+      - blockchain_id: 8453
+        address: "0x0000000000000000000000000000000000000000"
+        decimals: 18
   - name: "wETH"
     symbol: "weth"
     tokens:

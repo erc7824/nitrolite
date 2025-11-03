@@ -83,6 +83,10 @@ jobs:
           IMAGE_TAG=${CURRENT_IMAGE##*:}
           echo "Reusing Deployed Image Tag: ${IMAGE_TAG}"
         fi
+        if [ -z "${IMAGE_TAG}" ]; then
+          echo "Error: IMAGE_TAG is empty"
+          exit 1
+        fi
 
         helm upgrade -i ${HELM_RELEASE} clearnode/chart \
           -n ${HELM_NAMESPACE} \

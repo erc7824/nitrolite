@@ -11,7 +11,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/shopspring/decimal"
 
-	"github.com/erc7824/nitrolite/examples/cerebro/clearnet"
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/erc7824/nitrolite/examples/cerebro/custody"
 )
 
@@ -33,14 +33,14 @@ func (o *Operator) handleOpenChannel(args []string) {
 		return
 	}
 
-	network := o.config.GetNetworkByID(uint32(chainID.Uint64()))
-	if network == nil {
+	blockchain := o.config.GetBlockchainByID(uint32(chainID.Uint64()))
+	if blockchain == nil {
 		fmt.Printf("Unknown chain: %s.\n", chainIDStr)
 		return
 	}
 
 	assetSymbol := args[3]
-	asset := network.GetAssetBySymbol(assetSymbol)
+	asset := blockchain.GetAssetBySymbol(assetSymbol)
 	if asset == nil {
 		fmt.Printf("Asset %s is not supported on %s.\n", assetSymbol, chainID.String())
 		return
@@ -50,7 +50,7 @@ func (o *Operator) handleOpenChannel(args []string) {
 		return
 	}
 
-	creationRes, err := o.clearnode.RequestChannelCreation(network.ChainID, o.config.Signer.Address(), asset.Token)
+	creationRes, err := o.clearnode.RequestChannelCreation(blockchain.ID, asset.Token.Hex())
 	if err != nil {
 		fmt.Printf("Failed to request channel creation for chain %s: %s\n", chainID.String(), err.Error())
 		return
@@ -61,7 +61,7 @@ func (o *Operator) handleOpenChannel(args []string) {
 		return
 	}
 
-	chainRPC, err := o.getChainRPC(network.ChainID)
+	chainRPC, err := o.getChainRPC(blockchain.ID)
 	if err != nil {
 		fmt.Printf("Failed to get RPC for chain %s: %s\n", chainID.String(), err.Error())
 		return
@@ -71,9 +71,9 @@ func (o *Operator) handleOpenChannel(args []string) {
 
 	channelID, err := o.custody.OpenChannel(
 		o.config.Wallet, o.config.Signer,
-		network.ChainID, chainRPC,
-		network.CustodyAddress,
-		network.AdjudicatorAddress,
+		blockchain.ID, chainRPC,
+		blockchain.CustodyAddress,
+		blockchain.AdjudicatorAddress,
 		o.config.BrokerAddress,
 		asset.Token,
 		creationRes.Channel.Challenge,
@@ -111,14 +111,14 @@ func (o *Operator) handleCloseChannel(args []string) {
 		return
 	}
 
-	network := o.config.GetNetworkByID(uint32(chainID.Uint64()))
-	if network == nil {
+	blockchain := o.config.GetBlockchainByID(uint32(chainID.Uint64()))
+	if blockchain == nil {
 		fmt.Printf("Unknown chain: %s.\n", chainIDStr)
 		return
 	}
 
 	assetSymbol := args[3]
-	asset := network.GetAssetBySymbol(assetSymbol)
+	asset := blockchain.GetAssetBySymbol(assetSymbol)
 	if asset == nil {
 		fmt.Printf("Asset %s is not supported on %s.\n", assetSymbol, chainID.String())
 		return
@@ -128,13 +128,13 @@ func (o *Operator) handleCloseChannel(args []string) {
 		return
 	}
 
-	closureRes, err := o.clearnode.RequestChannelClosure(o.config.Wallet.Address(), asset.ChannelID)
+	closureRes, err := o.clearnode.RequestChannelClosure(o.config.Wallet.PublicKey().Address(), asset.ChannelID)
 	if err != nil {
 		fmt.Printf("Failed to request channel closure for chain %s: %s\n", chainID.String(), err.Error())
 		return
 	}
 
-	chainRPC, err := o.getChainRPC(network.ChainID)
+	chainRPC, err := o.getChainRPC(blockchain.ID)
 	if err != nil {
 		fmt.Printf("Failed to get RPC for chain %s: %s\n", chainID.String(), err.Error())
 		return
@@ -149,8 +149,8 @@ func (o *Operator) handleCloseChannel(args []string) {
 
 	if err := o.custody.CloseChannel(
 		o.config.Wallet, o.config.Signer,
-		network.ChainID, chainRPC,
-		network.CustodyAddress,
+		blockchain.ID, chainRPC,
+		blockchain.CustodyAddress,
 		common.HexToHash(closureRes.ChannelID),
 		new(big.Int).SetUint64(closureRes.State.Version),
 		allocations,
@@ -187,14 +187,14 @@ func (o *Operator) handleResizeChannel(args []string) {
 		return
 	}
 
-	network := o.config.GetNetworkByID(uint32(chainID.Uint64()))
-	if network == nil {
+	blockchain := o.config.GetBlockchainByID(uint32(chainID.Uint64()))
+	if blockchain == nil {
 		fmt.Printf("Unknown chain: %s.\n", chainIDStr)
 		return
 	}
 
 	assetSymbol := args[3]
-	asset := network.GetAssetBySymbol(assetSymbol)
+	asset := blockchain.GetAssetBySymbol(assetSymbol)
 	if asset == nil {
 		fmt.Printf("Asset %s is not supported on %s.\n", assetSymbol, chainID.String())
 		return
@@ -204,15 +204,16 @@ func (o *Operator) handleResizeChannel(args []string) {
 		return
 	}
 
-	chainRPC, err := o.getChainRPC(network.ChainID)
+	chainRPC, err := o.getChainRPC(blockchain.ID)
 	if err != nil {
 		fmt.Printf("Failed to get RPC for chain %s: %s\n", chainID.String(), err.Error())
 		return
 	}
 
+	walletAddress := common.HexToAddress(o.config.Wallet.PublicKey().Address().String())
 	rawCustodyBalance, err := o.custody.GetLedgerBalance(
-		network.ChainID, chainRPC,
-		network.CustodyAddress, o.config.Wallet.Address(), asset.Token)
+		blockchain.ID, chainRPC,
+		blockchain.CustodyAddress, walletAddress, asset.Token)
 	if err != nil {
 		fmt.Printf("Failed to get balance for asset %s on %s: %s\n", assetSymbol, chainID.String(), err.Error())
 		return
@@ -221,14 +222,14 @@ func (o *Operator) handleResizeChannel(args []string) {
 
 	channelBalance := decimal.NewFromBigInt(asset.RawChannelBalance, -int32(asset.Decimals))
 
-	unifiedBalances, err := o.clearnode.GetLedgerBalances()
+	getLedgerBalancesRes, err := o.clearnode.GetLedgerBalances()
 	if err != nil {
 		fmt.Printf("Failed to get ledger balances: %s\n", err.Error())
 		return
 	}
 
 	unifiedBalance := decimal.New(0, 0)
-	for _, balance := range unifiedBalances {
+	for _, balance := range getLedgerBalancesRes.LedgerBalances {
 		if balance.Asset == asset.Symbol {
 			unifiedBalance = balance.Amount
 			break
@@ -284,7 +285,7 @@ func (o *Operator) handleResizeChannel(args []string) {
 		return
 	}
 
-	resizeRes, err := o.clearnode.RequestChannelResize(o.config.Wallet.Address(), asset.ChannelID, rawAllocateAmount, rawResizeAmount)
+	resizeRes, err := o.clearnode.RequestChannelResize(o.config.Wallet.PublicKey().Address(), asset.ChannelID, rawAllocateAmount, rawResizeAmount)
 	if err != nil {
 		fmt.Printf("Failed to request channel resize on %s: %s\n", chainID.String(), err.Error())
 		return
@@ -305,8 +306,8 @@ func (o *Operator) handleResizeChannel(args []string) {
 
 	if err := o.custody.Resize(
 		o.config.Wallet, o.config.Signer,
-		network.ChainID, chainRPC,
-		network.CustodyAddress,
+		blockchain.ID, chainRPC,
+		blockchain.CustodyAddress,
 		common.HexToHash(resizeRes.ChannelID),
 		new(big.Int).SetUint64(resizeRes.State.Version),
 		stateData,
@@ -325,10 +326,10 @@ func (o *Operator) handleResizeChannel(args []string) {
 	fmt.Printf("Successfully resized custody channel (%s) on %s!\n", asset.ChannelID, chainID.String())
 }
 
-func convertAllocationRes(a clearnet.AllocationRes) custody.Allocation {
+func convertAllocationRes(a rpc.StateAllocation) custody.Allocation {
 	return custody.Allocation{
-		Destination: common.HexToAddress(a.Destination),
-		Token:       common.HexToAddress(a.Token),
-		Amount:      a.Amount.BigInt(),
+		Destination: common.HexToAddress(a.Participant),
+		Token:       common.HexToAddress(a.TokenAddress),
+		Amount:      a.RawAmount.BigInt(),
 	}
 }

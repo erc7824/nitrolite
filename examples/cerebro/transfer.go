@@ -20,13 +20,13 @@ func (o *Operator) handleTransfer(args []string) {
 	}
 
 	assetSymbol := args[1]
-	balances, err := o.clearnode.GetLedgerBalances()
+	getLedgerBalancesRes, err := o.clearnode.GetLedgerBalances()
 	if err != nil {
 		fmt.Printf("Failed to get ledger balances: %s\n", err.Error())
 		return
 	}
 	assetBalance := decimal.New(0, 0)
-	for _, balance := range balances {
+	for _, balance := range getLedgerBalancesRes.LedgerBalances {
 		if balance.Asset == assetSymbol {
 			assetBalance = balance.Amount
 			break

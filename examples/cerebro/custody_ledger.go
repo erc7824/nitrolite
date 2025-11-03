@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/shopspring/decimal"
 
@@ -24,26 +25,27 @@ func (o *Operator) handleDepositCustody(args []string) {
 		return
 	}
 
-	network := o.config.GetNetworkByID(uint32(chainID.Uint64()))
-	if network == nil {
+	blockchain := o.config.GetBlockchainByID(uint32(chainID.Uint64()))
+	if blockchain == nil {
 		fmt.Printf("Unknown chain: %s.\n", chainIDStr)
 		return
 	}
 
 	assetSymbol := args[3]
-	asset := network.GetAssetBySymbol(assetSymbol)
+	asset := blockchain.GetAssetBySymbol(assetSymbol)
 	if asset == nil {
 		fmt.Printf("Asset %s is not supported on %s.\n", assetSymbol, chainID.String())
 		return
 	}
 
-	chainRPC, err := o.getChainRPC(network.ChainID)
+	chainRPC, err := o.getChainRPC(blockchain.ID)
 	if err != nil {
 		fmt.Printf("Failed to get RPC for chain %s: %s\n", chainID.String(), err.Error())
 		return
 	}
 
-	rawTokenBalance, err := custody.GetTokenBalance(network.ChainID, chainRPC, asset.Token, o.config.Wallet.Address())
+	walletAddress := common.HexToAddress(o.config.Wallet.PublicKey().Address().String())
+	rawTokenBalance, err := custody.GetTokenBalance(blockchain.ID, chainRPC, asset.Token, walletAddress)
 	if err != nil {
 		fmt.Printf("Failed to get token balance for asset %s on chain %s: %s\n", assetSymbol, chainID.String(), err.Error())
 		return
@@ -74,16 +76,16 @@ func (o *Operator) handleDepositCustody(args []string) {
 		return
 	}
 
-	if err := custody.ApproveAllowance(o.config.Wallet, network.ChainID, chainRPC,
-		asset.Token, network.CustodyAddress, rawAmount); err != nil {
+	if err := custody.ApproveAllowance(o.config.Wallet, blockchain.ID, chainRPC,
+		asset.Token, blockchain.CustodyAddress, rawAmount); err != nil {
 		fmt.Printf("Failed to approve allowance for %s on chain %s: %s\n", assetSymbol, chainID.String(), err.Error())
 		return
 	}
 
 	if err := o.custody.Deposit(
 		o.config.Wallet,
-		network.ChainID, chainRPC,
-		network.CustodyAddress, asset.Token,
+		blockchain.ID, chainRPC,
+		blockchain.CustodyAddress, asset.Token,
 		rawAmount,
 	); err != nil {
 		fmt.Printf("Failed to deposit %s on chain %s: %s\n", assetSymbol, chainID.String(), err.Error())
@@ -107,28 +109,29 @@ func (o *Operator) handleWithdrawCustody(args []string) {
 		return
 	}
 
-	network := o.config.GetNetworkByID(uint32(chainID.Uint64()))
-	if network == nil {
+	blockchain := o.config.GetBlockchainByID(uint32(chainID.Uint64()))
+	if blockchain == nil {
 		fmt.Printf("Unknown chain: %s.\n", chainIDStr)
 		return
 	}
 
 	assetSymbol := args[3]
-	asset := network.GetAssetBySymbol(assetSymbol)
+	asset := blockchain.GetAssetBySymbol(assetSymbol)
 	if asset == nil {
 		fmt.Printf("Asset %s is not supported on %s.\n", assetSymbol, chainID.String())
 		return
 	}
 
-	chainRPC, err := o.getChainRPC(network.ChainID)
+	chainRPC, err := o.getChainRPC(blockchain.ID)
 	if err != nil {
 		fmt.Printf("Failed to get RPC for chain %s: %s\n", chainID.String(), err.Error())
 		return
 	}
 
+	walletAddress := common.HexToAddress(o.config.Wallet.PublicKey().Address().String())
 	rawCustodyBalance, err := o.custody.GetLedgerBalance(
-		network.ChainID, chainRPC,
-		network.CustodyAddress, o.config.Wallet.Address(), asset.Token)
+		blockchain.ID, chainRPC,
+		blockchain.CustodyAddress, walletAddress, asset.Token)
 	if err != nil {
 		fmt.Printf("Failed to get custody balance for asset %s on %s: %s\n", assetSymbol, chainID.String(), err.Error())
 		return
@@ -164,8 +167,8 @@ func (o *Operator) handleWithdrawCustody(args []string) {
 	rawAmount := amount.Shift(int32(asset.Decimals)).BigInt()
 	if err := o.custody.Withdraw(
 		o.config.Wallet,
-		network.ChainID, chainRPC,
-		network.CustodyAddress, asset.Token,
+		blockchain.ID, chainRPC,
+		blockchain.CustodyAddress, asset.Token,
 		rawAmount,
 	); err != nil {
 		fmt.Printf("Failed to withdraw %s on %s: %s\n", assetSymbol, chainID.String(), err.Error())

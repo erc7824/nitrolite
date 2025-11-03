@@ -1,472 +1,247 @@
 package clearnet
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"net"
-	"sync"
-	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/gorilla/websocket"
 	"github.com/shopspring/decimal"
 
-	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
-)
-
-const (
-	pingRequestID = 100             // Request ID for ping messages
-	pingInterval  = 5 * time.Second // Interval for ping messages
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
 type ClearnodeClient struct {
-	conn   *websocket.Conn
-	signer unisig.Signer // User's Signer
+	rpcDialer rpc.Dialer
+	rpcClient *rpc.Client
+	signer    sign.Signer // User's Session Key
 
-	printEvents   bool
-	responseSinks map[uint64]chan *RPCResponse // Map of request IDs to response channels
-	mu            sync.RWMutex                 // Mutex to protect access to responseSinks
-	exitCh        chan struct{}                // Channel to signal client exit
-}
-
-type NetworkInfo struct {
-	ChainID            uint32 `json:"chain_id"`
-	CustodyAddress     string `json:"custody_address"`
-	AdjudicatorAddress string `json:"adjudicator_address"`
-}
-
-type BrokerConfig struct {
-	BrokerAddress string        `json:"broker_address"`
-	Networks      []NetworkInfo `json:"networks"`
+	exitCh chan struct{} // Channel to signal client exit
 }
 
 func NewClearnodeClient(wsURL string) (*ClearnodeClient, error) {
-	dialer := websocket.Dialer{
-		HandshakeTimeout:  5 * time.Second,
-		EnableCompression: true,
-	}
-
-	conn, _, err := dialer.Dial(wsURL, nil)
-	if err != nil {
-		return nil, err
-	}
+	dialer := rpc.NewWebsocketDialer(rpc.DefaultWebsocketDialerConfig)
+	rpcClient := rpc.NewClient(dialer)
 
 	client := &ClearnodeClient{
-		conn:          conn,
-		responseSinks: make(map[uint64]chan *RPCResponse),
-		exitCh:        make(chan struct{}),
+		rpcDialer: dialer,
+		rpcClient: rpcClient,
+		exitCh:    make(chan struct{}),
 	}
-	go client.readMessages()
-	go client.pingPeriodically()
+
+	handleError := func(err error) {
+		fmt.Printf("Clearnode RPC error: %s\n", err.Error())
+		client.exit()
+	}
+
+	err := rpcClient.Start(context.Background(), wsURL, handleError)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start RPC client: %w", err)
+	}
 
 	return client, nil
 }
 
-func (c *ClearnodeClient) GetConfig() (*BrokerConfig, error) {
-	res, err := c.request("get_config", nil, nil)
+func (c *ClearnodeClient) GetConfig() (rpc.GetConfigResponse, error) {
+	res, _, err := c.rpcClient.GetConfig(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch config: %w", err)
+		return rpc.GetConfigResponse{}, fmt.Errorf("failed to fetch config: %w", err)
 	}
-	if res.Res.Method != "get_config" {
-		return nil, fmt.Errorf("unexpected response to config request: %v", res.Res)
-	}
+	return res, nil
+}
 
-	configJSON, err := json.Marshal(res.Res.Params)
+func (c *ClearnodeClient) GetSupportedAssets() (rpc.GetAssetsResponse, error) {
+	res, _, err := c.rpcClient.GetAssets(context.Background(), rpc.GetAssetsRequest{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config data: %w", err)
+		return rpc.GetAssetsResponse{}, fmt.Errorf("failed to fetch supported assets: %w", err)
 	}
-
-	var config BrokerConfig
-	if err := json.Unmarshal(configJSON, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse broker config: %w", err)
-	}
-
-	return &config, nil
+	return res, nil
 }
 
-type GetAssetsReq struct {
-	ChainID *uint32 `json:"chain_id"`
-}
-
-type GetAssetsRes struct {
-	Assets []AssetRes `json:"assets"`
-}
-
-func (c *ClearnodeClient) GetSupportedAssets() ([]AssetRes, error) {
-	res, err := c.request("get_assets", nil, GetAssetsReq{ChainID: nil})
+func (c *ClearnodeClient) GetLedgerBalances() (rpc.GetLedgerBalancesResponse, error) {
+	res, _, err := c.rpcClient.GetLedgerBalances(context.Background(), rpc.GetLedgerBalancesRequest{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch assets: %w", err)
+		return rpc.GetLedgerBalancesResponse{}, fmt.Errorf("failed to fetch ledger balances: %w", err)
 	}
-	if res.Res.Method != "get_assets" {
-		return nil, fmt.Errorf("unexpected response to assets request: %v", res.Res)
-	}
+	return res, nil
+}
 
-	assetsJSON, err := json.Marshal(res.Res.Params)
+func (c *ClearnodeClient) GetChannels(participant, status string) (rpc.GetChannelsResponse, error) {
+	res, _, err := c.rpcClient.GetChannels(context.Background(), rpc.GetChannelsRequest{
+		Participant: participant,
+		Status:      status,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal assets data: %w", err)
+		return rpc.GetChannelsResponse{}, fmt.Errorf("failed to fetch channels: %w", err)
 	}
-
-	var assetsRes GetAssetsRes
-	if err := json.Unmarshal(assetsJSON, &assetsRes); err != nil {
-		return nil, fmt.Errorf("failed to parse assets: %w, %s", err, string(assetsJSON))
-	}
-
-	return assetsRes.Assets, nil
+	return res, nil
 }
 
-type GetLedgerBalancesReq struct {
-	AccountID string `json:"account_id,omitempty"`
-}
-
-type GetLedgerBalancesRes struct {
-	LedgerBalances []BalanceRes `json:"ledger_balances"`
-}
-
-type BalanceRes struct {
-	Asset  string          `json:"asset"`
-	Amount decimal.Decimal `json:"amount"`
-}
-
-func (c *ClearnodeClient) GetLedgerBalances() ([]BalanceRes, error) {
-	res, err := c.request("get_ledger_balances", nil, GetLedgerBalancesReq{})
+func (c *ClearnodeClient) GetUserTag() (rpc.GetUserTagResponse, error) {
+	res, _, err := c.rpcClient.GetUserTag(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch balances: %w", err)
+		return rpc.GetUserTagResponse{}, fmt.Errorf("failed to fetch user tag: %w", err)
 	}
-	if res.Res.Method != "get_ledger_balances" {
-		return nil, fmt.Errorf("unexpected response to get_ledger_balances request: %v", res.Res)
-	}
-
-	assetsJSON, err := json.Marshal(res.Res.Params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal assets data: %w", err)
-	}
-
-	var balancesRes GetLedgerBalancesRes
-	if err := json.Unmarshal(assetsJSON, &balancesRes); err != nil {
-		return nil, fmt.Errorf("failed to parse assets: %w", err)
-	}
-
-	return balancesRes.LedgerBalances, nil
+	return res, nil
 }
 
-type GetChannelsRes struct {
-	Channels []ChannelRes `json:"channels"`
-}
-
-func (c *ClearnodeClient) GetChannels(participant, status string) ([]ChannelRes, error) {
-	params := map[string]any{
-		"participant": participant,
-		"status":      status,
-	}
-
-	res, err := c.request("get_channels", nil, params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch channels: %w", err)
-	}
-	if res.Res.Method != "get_channels" {
-		return nil, fmt.Errorf("unexpected response to channels request: %v", res.Res)
-	}
-
-	channelsJSON, err := json.Marshal(res.Res.Params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal channels data: %w", err)
-	}
-
-	var channelsRes GetChannelsRes
-	if err := json.Unmarshal(channelsJSON, &channelsRes); err != nil {
-		return nil, fmt.Errorf("failed to parse channels: %w", err)
-	}
-
-	return channelsRes.Channels, nil
-}
-
-type ChannelOperationRes struct {
-	ChannelID string `json:"channel_id"`
-	Channel   *struct {
-		Participants [2]string `json:"participants"`
-		Adjudicator  string    `json:"adjudicator"`
-		Challenge    uint64    `json:"challenge"`
-		Nonce        uint64    `json:"nonce"`
-	} `json:"channel,omitempty"`
-	State          UnsignedState    `json:"state"`
-	StateSignature unisig.Signature `json:"server_signature"`
-}
-
-type UnsignedState struct {
-	Intent      uint8           `json:"intent"`
-	Version     uint64          `json:"version"`
-	Data        string          `json:"state_data"`
-	Allocations []AllocationRes `json:"allocations"`
-}
-
-type AllocationRes struct {
-	Destination string          `json:"destination"`
-	Token       string          `json:"token"`
-	Amount      decimal.Decimal `json:"amount"`
-}
-
-func (c *ClearnodeClient) RequestChannelCreation(chainID uint32, signerAddress, assetAddress common.Address) (*ChannelOperationRes, error) {
+func (c *ClearnodeClient) RequestChannelCreation(chainID uint32, assetAddress string) (rpc.CreateChannelResponse, error) {
 	if c.signer == nil {
-		return nil, fmt.Errorf("client not authenticated")
+		return rpc.CreateChannelResponse{}, fmt.Errorf("client not authenticated")
 	}
 
-	params := map[string]any{
-		"chain_id":    chainID,
-		"session_key": c.signer.Address().Hex(),
-		"token":       assetAddress.Hex(),
-		"amount":      decimal.NewFromInt(0), // Default to 0
+	sessionKey := c.signer.PublicKey().Address().String()
+	amount := decimal.NewFromInt(0)
+	params := rpc.CreateChannelRequest{
+		ChainID:    chainID,
+		SessionKey: &sessionKey,
+		Token:      assetAddress,
+		Amount:     &amount,
 	}
-
-	res, err := c.request("create_channel", nil, params)
+	payload, err := c.rpcClient.PreparePayload(rpc.CreateChannelMethod, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to request channel creation: %w", err)
-	}
-	if res.Res.Method != "create_channel" {
-		return nil, fmt.Errorf("unexpected response to create_channel: %v", res.Res)
+		return rpc.CreateChannelResponse{}, fmt.Errorf("failed to prepare payload: %w", err)
 	}
 
-	opResJSON, err := json.Marshal(res.Res.Params)
+	hash, err := payload.Hash()
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal creation response: %w", err)
+		return rpc.CreateChannelResponse{}, fmt.Errorf("failed to hash payload: %w", err)
 	}
 
-	var opRes ChannelOperationRes
-	if err := json.Unmarshal(opResJSON, &opRes); err != nil {
-		return nil, fmt.Errorf("failed to parse channels: %w", err)
+	sig, err := c.signer.Sign(hash)
+	if err != nil {
+		return rpc.CreateChannelResponse{}, fmt.Errorf("failed to sign payload: %w", err)
 	}
 
-	return &opRes, nil
+	req := rpc.NewRequest(payload, sig)
+	res, _, err := c.rpcClient.CreateChannel(context.Background(), &req)
+	if err != nil {
+		return rpc.CreateChannelResponse{}, fmt.Errorf("failed to create channel: %w", err)
+	}
+
+	return res, nil
 }
 
-func (c *ClearnodeClient) RequestChannelClosure(walletAddress common.Address, channelID string) (*ChannelOperationRes, error) {
+func (c *ClearnodeClient) RequestChannelClosure(walletAddress sign.Address, channelID string) (rpc.CloseChannelResponse, error) {
 	if c.signer == nil {
-		return nil, fmt.Errorf("client not authenticated")
+		return rpc.CloseChannelResponse{}, fmt.Errorf("client not authenticated")
 	}
 
-	params := map[string]any{
-		"funds_destination": walletAddress.Hex(),
-		"channel_id":        channelID,
+	params := rpc.CloseChannelRequest{
+		FundsDestination: walletAddress.String(),
+		ChannelID:        channelID,
 	}
-
-	res, err := c.request("close_channel", nil, params)
+	payload, err := c.rpcClient.PreparePayload(rpc.CloseChannelMethod, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to request channel closure: %w", err)
-	}
-	if res.Res.Method != "close_channel" {
-		return nil, fmt.Errorf("unexpected response to close_channel: %v", res.Res)
+		return rpc.CloseChannelResponse{}, fmt.Errorf("failed to prepare payload: %w", err)
 	}
 
-	opResJSON, err := json.Marshal(res.Res.Params)
+	hash, err := payload.Hash()
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal closure response: %w", err)
+		return rpc.CloseChannelResponse{}, fmt.Errorf("failed to hash payload: %w", err)
 	}
 
-	var opRes ChannelOperationRes
-	if err := json.Unmarshal(opResJSON, &opRes); err != nil {
-		return nil, fmt.Errorf("failed to parse channels: %w", err)
+	sig, err := c.signer.Sign(hash)
+	if err != nil {
+		return rpc.CloseChannelResponse{}, fmt.Errorf("failed to sign payload: %w", err)
 	}
 
-	return &opRes, nil
+	req := rpc.NewRequest(payload, sig)
+	res, _, err := c.rpcClient.CloseChannel(context.Background(), &req)
+	if err != nil {
+		return rpc.CloseChannelResponse{}, fmt.Errorf("failed to close channel: %w", err)
+	}
+
+	return res, nil
 }
 
-func (c *ClearnodeClient) RequestChannelResize(walletAddress common.Address, channelID string, allocateAmount, resizeAmount decimal.Decimal) (*ChannelOperationRes, error) {
+func (c *ClearnodeClient) RequestChannelResize(walletAddress sign.Address, channelID string, allocateAmount, resizeAmount decimal.Decimal) (rpc.ResizeChannelResponse, error) {
 	if c.signer == nil {
-		return nil, fmt.Errorf("client not authenticated")
+		return rpc.ResizeChannelResponse{}, fmt.Errorf("client not authenticated")
 	}
 
-	params := map[string]any{
-		"funds_destination": walletAddress.Hex(),
-		"channel_id":        channelID,
-		"allocate_amount":   allocateAmount,
-		"resize_amount":     resizeAmount,
+	params := rpc.ResizeChannelRequest{
+		ChannelID:        channelID,
+		FundsDestination: walletAddress.String(),
+		AllocateAmount:   &allocateAmount,
+		ResizeAmount:     &resizeAmount,
 	}
-
-	res, err := c.request("resize_channel", nil, params)
+	payload, err := c.rpcClient.PreparePayload(rpc.ResizeChannelMethod, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to request channel resize: %w", err)
-	}
-	if res.Res.Method != "resize_channel" {
-		return nil, fmt.Errorf("unexpected response to resize_channel: %v", res.Res)
+		return rpc.ResizeChannelResponse{}, fmt.Errorf("failed to prepare payload: %w", err)
 	}
 
-	opResJSON, err := json.Marshal(res.Res.Params)
+	hash, err := payload.Hash()
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal closure response: %w", err)
+		return rpc.ResizeChannelResponse{}, fmt.Errorf("failed to hash payload: %w", err)
 	}
 
-	var opRes ChannelOperationRes
-	if err := json.Unmarshal(opResJSON, &opRes); err != nil {
-		return nil, fmt.Errorf("failed to parse channels: %w", err)
+	sig, err := c.signer.Sign(hash)
+	if err != nil {
+		return rpc.ResizeChannelResponse{}, fmt.Errorf("failed to sign payload: %w", err)
 	}
 
-	return &opRes, nil
+	req := rpc.NewRequest(payload, sig)
+	res, _, err := c.rpcClient.ResizeChannel(context.Background(), &req)
+	if err != nil {
+		return rpc.ResizeChannelResponse{}, fmt.Errorf("failed to resize channel: %w", err)
+	}
+
+	return res, nil
 }
 
-type TransferReq struct {
-	Destination        string               `json:"destination"`
-	DestinationUserTag string               `json:"destination_user_tag"`
-	Allocations        []TransferAllocation `json:"allocations"`
-}
-
-type TransferAllocation struct {
-	AssetSymbol string          `json:"asset"`
-	Amount      decimal.Decimal `json:"amount"`
-}
-
-type TransactionResponse struct {
-	Id             uint            `json:"id"`
-	TxType         string          `json:"tx_type"`
-	FromAccount    string          `json:"from_account"`
-	FromAccountTag string          `json:"from_account_tag,omitempty"` // Optional tag for the source account
-	ToAccount      string          `json:"to_account"`
-	ToAccountTag   string          `json:"to_account_tag,omitempty"` // Optional tag for the destination account
-	Asset          string          `json:"asset"`
-	Amount         decimal.Decimal `json:"amount"`
-	CreatedAt      time.Time       `json:"created_at"`
-}
-
-func (c *ClearnodeClient) Transfer(transferByTag bool, destinationValue string, assetSymbol string, amount decimal.Decimal) (*TransactionResponse, error) {
+func (c *ClearnodeClient) Transfer(transferByTag bool, destinationValue string, assetSymbol string, amount decimal.Decimal) (rpc.TransferResponse, error) {
 	if c.signer == nil {
-		return nil, fmt.Errorf("client not authenticated")
+		return rpc.TransferResponse{}, fmt.Errorf("client not authenticated")
 	}
 
-	params := TransferReq{
-		Allocations: []TransferAllocation{
+	destination := ""
+	destinationUserTag := ""
+	if transferByTag {
+		destinationUserTag = destinationValue
+	} else {
+		destination = destinationValue
+	}
+	params := rpc.TransferRequest{
+		Destination:        destination,
+		DestinationUserTag: destinationUserTag,
+		Allocations: []rpc.TransferAllocation{
 			{
 				AssetSymbol: assetSymbol,
 				Amount:      amount,
 			},
 		},
 	}
-	if transferByTag {
-		params.DestinationUserTag = destinationValue
-	} else {
-		params.Destination = destinationValue
-	}
-
-	res, err := c.request("transfer", nil, params)
+	payload, err := c.rpcClient.PreparePayload(rpc.TransferMethod, params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to transfer: %w", err)
-	}
-	if res.Res.Method != "transfer" {
-		return nil, fmt.Errorf("unexpected response to transfer: %v", res.Res)
+		return rpc.TransferResponse{}, fmt.Errorf("failed to prepare payload: %w", err)
 	}
 
-	resizeResJSON, err := json.Marshal(res.Res.Params)
+	hash, err := payload.Hash()
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal closure response: %w", err)
+		return rpc.TransferResponse{}, fmt.Errorf("failed to hash payload: %w", err)
 	}
 
-	var txs []TransactionResponse
-	if err := json.Unmarshal(resizeResJSON, &txs); err != nil {
-		return nil, fmt.Errorf("failed to parse channels: %w", err)
-	}
-	if len(txs) == 0 {
-		return nil, fmt.Errorf("no transactions returned from transfer request")
-	}
-
-	return &txs[0], nil
-}
-
-func (c *ClearnodeClient) readMessages() {
-	defer c.exit() // Ensure exit channel is closed when done
-
-	for {
-		_, messageBytes, err := c.conn.ReadMessage()
-		if _, ok := err.(net.Error); ok {
-			fmt.Println("Websocket connection timeout")
-			return
-		} else if err != nil {
-			fmt.Printf("Error reading message: %s\n", err.Error())
-			return
-		}
-
-		var msg RPCResponse
-		if err := json.Unmarshal(messageBytes, &msg); err != nil {
-			fmt.Printf("Malformed message: %s\n", string(messageBytes))
-			continue
-		}
-
-		c.mu.Lock()
-		responseSink, exists := c.responseSinks[msg.Res.RequestID]
-		c.mu.Unlock()
-		if !exists {
-			c.handleEvent(msg.Res) // Handle response as an event if no response sink exists
-			continue
-		}
-		responseSink <- &msg // Send the response to the channel
-	}
-}
-
-func (c *ClearnodeClient) pingPeriodically() {
-	ticker := time.NewTicker(pingInterval)
-	defer ticker.Stop()
-	defer c.exit() // Ensure exit channel is closed when done
-
-	for range ticker.C {
-		res, err := c.request("ping", nil, nil)
-		if err != nil {
-			fmt.Printf("Error sending ping: %s\n", err.Error())
-			return
-		}
-
-		if res.Res.Method != "pong" {
-			fmt.Printf("Unexpected response to ping: %s\n", res.Res.Method)
-			continue
-		}
-	}
-}
-
-func (c *ClearnodeClient) request(method string, sigs []unisig.Signature, params any) (*RPCResponse, error) {
-	if params == nil {
-		params = []any{} // Ensure params is never nil
-	}
-
-	reqID := uint64(time.Now().UnixMilli())
-	rpcData := RPCData{
-		RequestID: reqID,
-		Method:    method,
-		Params:    params,
-		Timestamp: uint64(time.Now().UnixMilli()),
-	}
-
-	if len(sigs) == 0 && c.signer != nil {
-		sig, err := signRPCData(c.signer, rpcData)
-		if err != nil {
-			return nil, fmt.Errorf("error signing RPC data: %w", err)
-		}
-		sigs = []unisig.Signature{sig}
-	}
-
-	req := RPCRequest{
-		Req: rpcData,
-		Sig: sigs,
-	}
-
-	responseSink := make(chan *RPCResponse, 1) // Create a channel for this request
-	c.mu.Lock()
-	c.responseSinks[reqID] = responseSink
-	c.mu.Unlock()
-
-	reqJSON, err := json.Marshal(req)
+	sig, err := c.signer.Sign(hash)
 	if err != nil {
-		return nil, fmt.Errorf("error marshaling request: %w", err)
+		return rpc.TransferResponse{}, fmt.Errorf("failed to sign payload: %w", err)
 	}
 
-	if err := c.conn.WriteMessage(websocket.TextMessage, reqJSON); err != nil {
-		return nil, fmt.Errorf("error sending request: %w", err)
+	req := rpc.NewRequest(payload, sig)
+	res, err := c.rpcDialer.Call(context.Background(), &req)
+	if err != nil {
+		return rpc.TransferResponse{}, fmt.Errorf("failed to transfer funds: %w", err)
 	}
 
-	res := <-responseSink // Wait for the response
-	c.mu.Lock()
-	delete(c.responseSinks, reqID) // Remove the response sink after receiving
-	c.mu.Unlock()
-
-	if res == nil {
-		return nil, fmt.Errorf("no response received for request %d", reqID)
+	if err := res.Res.Params.Error(); err != nil {
+		return rpc.TransferResponse{}, fmt.Errorf("failed to transfer funds: %w", err)
 	}
 
-	return res, nil
+	var resParams rpc.TransferResponse
+	if err := res.Res.Params.Translate(&resParams); err != nil {
+		return resParams, err
+	}
+
+	return resParams, nil
 }
 
 func (c *ClearnodeClient) WaitCh() <-chan struct{} {

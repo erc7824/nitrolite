@@ -20,10 +20,10 @@ func (o *Operator) handleListChains() {
 	t.AppendHeader(table.Row{"ID", "Asset", "RPCs", "Last Used"})
 	t.AppendSeparator()
 
-	for _, network := range o.config.Networks {
-		chainRPCDTOs, err := o.store.GetChainRPCs(network.ChainID)
+	for _, network := range o.config.Blockchains {
+		chainRPCDTOs, err := o.store.GetChainRPCs(network.ID)
 		if err != nil {
-			fmt.Printf("Failed to get RPCs for chain %d: %s\n", network.ChainID, err.Error())
+			fmt.Printf("Failed to get RPCs for chain %d: %s\n", network.ID, err.Error())
 			continue
 		}
 
@@ -34,7 +34,7 @@ func (o *Operator) handleListChains() {
 		}
 
 		for _, asset := range network.Assets {
-			t.AppendRow(table.Row{network.ChainID, asset.Symbol, numRPCs, lastUsed.Format(time.RFC3339)})
+			t.AppendRow(table.Row{network.ID, asset.Symbol, numRPCs, lastUsed.Format(time.RFC3339)})
 		}
 	}
 	t.SetColumnConfigs(
@@ -56,7 +56,7 @@ func (o *Operator) handleListChannels() {
 	t.AppendHeader(table.Row{"ChainID", "Asset", "ID", "Balance"})
 	t.AppendSeparator()
 
-	for _, network := range o.config.Networks {
+	for _, network := range o.config.Blockchains {
 		for _, asset := range network.Assets {
 			channelID := "N/A"
 			channelBalance := decimal.NewFromInt(0)
@@ -65,7 +65,7 @@ func (o *Operator) handleListChannels() {
 				channelBalance = decimal.NewFromBigInt(asset.RawChannelBalance, -int32(asset.Decimals))
 			}
 
-			t.AppendRow(table.Row{network.ChainID, asset.Symbol, channelID, fmtDec(channelBalance)})
+			t.AppendRow(table.Row{network.ID, asset.Symbol, channelID, fmtDec(channelBalance)})
 		}
 	}
 	t.SetColumnConfigs(

@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/erc7824/nitrolite/examples/cerebro/clearnet"
 	"github.com/erc7824/nitrolite/examples/cerebro/custody"
 	"github.com/erc7824/nitrolite/examples/cerebro/storage"
@@ -226,37 +227,37 @@ func (o *Operator) readSelectionArg(name string, suggestions []prompt.Suggest) s
 }
 
 func (o *Operator) reloadConfig() {
-	brokerConfig, err := o.clearnode.GetConfig()
+	getConfigRes, err := o.clearnode.GetConfig()
 	if err != nil {
 		fmt.Printf("[Reload] Failed to fetch broker config: %s\n", err.Error())
 		return
 	}
 
-	assets, err := o.clearnode.GetSupportedAssets()
+	getAssetsRes, err := o.clearnode.GetSupportedAssets()
 	if err != nil {
 		fmt.Printf("[Reload] Failed to fetch supported assets: %s\n", err.Error())
 		return
 	}
 
-	channels := []clearnet.ChannelRes{}
+	getChannelsRes := rpc.GetChannelsResponse{}
 	if o.isUserAuthenticated() {
-		channels, err = o.clearnode.GetChannels(o.config.Wallet.Address().Hex(), "open")
+		getChannelsRes, err = o.clearnode.GetChannels(o.config.Wallet.PublicKey().Address().String(), "open")
 		if err != nil {
 			fmt.Printf("[Reload] Failed to fetch channels: %s\n", err.Error())
 			return
 		}
 	}
 
-	o.config.BrokerAddress = common.HexToAddress(brokerConfig.BrokerAddress)
-	o.config.Networks = make([]NetworkConfig, 0, len(brokerConfig.Networks))
-	for _, network := range brokerConfig.Networks {
+	o.config.BrokerAddress = common.HexToAddress(getConfigRes.BrokerAddress)
+	o.config.Blockchains = make([]BlockchainConfig, 0, len(getConfigRes.Blockchains))
+	for _, blockchain := range getConfigRes.Blockchains {
 		chainAssets := make([]ChainAssetConfig, 0)
-		for _, asset := range assets {
-			if asset.ChainID == network.ChainID {
+		for _, asset := range getAssetsRes.Assets {
+			if asset.ChainID == blockchain.ID {
 				channelID := ""
 				rawChannelBalance := new(big.Int)
-				for _, channel := range channels {
-					if channel.ChainID == network.ChainID && channel.Token == asset.Token {
+				for _, channel := range getChannelsRes.Channels {
+					if channel.ChainID == blockchain.ID && channel.Token == asset.Token {
 						channelID = channel.ChannelID
 						rawChannelBalance = channel.RawAmount.BigInt()
 						break
@@ -273,10 +274,10 @@ func (o *Operator) reloadConfig() {
 			}
 		}
 
-		o.config.Networks = append(o.config.Networks, NetworkConfig{
-			ChainID:            network.ChainID,
-			CustodyAddress:     common.HexToAddress(network.CustodyAddress),
-			AdjudicatorAddress: common.HexToAddress(network.AdjudicatorAddress),
+		o.config.Blockchains = append(o.config.Blockchains, BlockchainConfig{
+			ID:                 blockchain.ID,
+			CustodyAddress:     common.HexToAddress(blockchain.CustodyAddress),
+			AdjudicatorAddress: common.HexToAddress(blockchain.AdjudicatorAddress),
 			Assets:             chainAssets,
 		})
 	}
@@ -286,14 +287,14 @@ func (o *Operator) reloadConfig() {
 // filterEnabled can be 0 (all chains), >0 (only enabled chains), or <0 (only disabled chains).
 func (o *Operator) getChainSuggestions(filterEnabled int) []prompt.Suggest {
 	suggestions := make([]prompt.Suggest, 0)
-	for _, network := range o.config.Networks {
+	for _, network := range o.config.Blockchains {
 		include := filterEnabled == 0 || // Default to including all chains
 			(filterEnabled > 0 && network.HasEnabledAssets()) || // Include only chains with enabled assets
 			(filterEnabled < 0 && network.HasDisabledAssets()) // Include only chains with disabled assets
 
 		if include {
 			suggestions = append(suggestions, prompt.Suggest{
-				Text: fmt.Sprintf("%d", network.ChainID),
+				Text: fmt.Sprintf("%d", network.ID),
 			})
 		}
 	}
@@ -322,13 +323,13 @@ func (o *Operator) getAssetSuggestions(chainIDStr string, filterEnabled int) []p
 		return nil
 	}
 
-	network := o.config.GetNetworkByID(uint32(chainID.Uint64()))
-	if network == nil {
+	blockchain := o.config.GetBlockchainByID(uint32(chainID.Uint64()))
+	if blockchain == nil {
 		return nil
 	}
 
 	suggestions := make([]prompt.Suggest, 0)
-	for _, asset := range network.Assets {
+	for _, asset := range blockchain.Assets {
 		include := filterEnabled == 0 || // Default to including all assets
 			(filterEnabled > 0 && asset.IsEnabled()) || // Include only enabled assets
 			(filterEnabled < 0 && !asset.IsEnabled()) // Include only disabled assets

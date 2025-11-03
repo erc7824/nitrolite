@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
 const (
@@ -27,11 +27,11 @@ func NewCustodyClient() *CustodyClient {
 }
 
 func (c *CustodyClient) OpenChannel(
-	wallet, signer unisig.Signer,
+	wallet, signer sign.Signer,
 	chainID uint32, chainRPC string,
 	custodyAddress, adjudicatorAddress, brokerAddress, tokenAddress common.Address,
 	challenge, nonce uint64,
-	brokerSig unisig.Signature,
+	brokerSig sign.Signature,
 ) (string, error) {
 	client, err := ethclient.Dial(chainRPC)
 	if err != nil {
@@ -49,9 +49,11 @@ func (c *CustodyClient) OpenChannel(
 		return "", fmt.Errorf("challenge period must be at least %d seconds", minCustodyChallengePeriod)
 	}
 
+	walletAddress := common.HexToAddress(wallet.PublicKey().Address().String())
+	signerAddress := common.HexToAddress(signer.PublicKey().Address().String())
 	channel := Channel{
 		Adjudicator:  adjudicatorAddress,
-		Participants: []common.Address{signer.Address(), brokerAddress},
+		Participants: []common.Address{signerAddress, brokerAddress},
 		Challenge:    challenge,
 		Nonce:        nonce,
 	}
@@ -61,7 +63,7 @@ func (c *CustodyClient) OpenChannel(
 		Data:    []byte(""),
 		Allocations: []Allocation{
 			{
-				Destination: wallet.Address(),
+				Destination: walletAddress,
 				Token:       tokenAddress,
 				Amount:      big.NewInt(0), // Initial amount is zero
 			},
@@ -111,13 +113,13 @@ func (c *CustodyClient) OpenChannel(
 }
 
 func (c *CustodyClient) CloseChannel(
-	wallet, signer unisig.Signer,
+	wallet, signer sign.Signer,
 	chainID uint32, chainRPC string,
 	custodyAddress common.Address,
 	channelID common.Hash,
 	version *big.Int,
 	allocations []Allocation,
-	brokerSig unisig.Signature,
+	brokerSig sign.Signature,
 ) error {
 	client, err := ethclient.Dial(chainRPC)
 	if err != nil {
@@ -168,14 +170,14 @@ func (c *CustodyClient) CloseChannel(
 }
 
 func (c *CustodyClient) Resize(
-	wallet, signer unisig.Signer,
+	wallet, signer sign.Signer,
 	chainID uint32, chainRPC string,
 	custodyAddress common.Address,
 	channelID common.Hash,
 	version *big.Int,
 	data []byte,
 	allocations []Allocation,
-	brokerSig unisig.Signature,
+	brokerSig sign.Signature,
 ) error {
 	client, err := ethclient.Dial(chainRPC)
 	if err != nil {
@@ -231,7 +233,7 @@ func (c *CustodyClient) Resize(
 }
 
 func (c *CustodyClient) Deposit(
-	wallet unisig.Signer,
+	wallet sign.Signer,
 	chainID uint32, chainRPC string,
 	custodyAddress, tokenAddress common.Address,
 	amount *big.Int,
@@ -253,7 +255,8 @@ func (c *CustodyClient) Deposit(
 	}
 	txOpts.GasPrice = gasPrice.Add(gasPrice, gasPrice)
 
-	tx, err := custody.Deposit(txOpts, wallet.Address(), tokenAddress, amount)
+	walletAddress := common.HexToAddress(wallet.PublicKey().Address().String())
+	tx, err := custody.Deposit(txOpts, walletAddress, tokenAddress, amount)
 	if err != nil {
 		return fmt.Errorf("failed to deposit into custody: %w", err)
 	}
@@ -266,7 +269,7 @@ func (c *CustodyClient) Deposit(
 }
 
 func (c *CustodyClient) Withdraw(
-	wallet unisig.Signer,
+	wallet sign.Signer,
 	chainID uint32, chainRPC string,
 	custodyAddress, tokenAddress common.Address,
 	amount *big.Int,
@@ -427,11 +430,12 @@ func GetChannelID(ch Channel, chainID uint32) (common.Hash, error) {
 	return crypto.Keccak256Hash(packed), nil
 }
 
-func signerTxOpts(signer unisig.Signer, chainID uint32) *bind.TransactOpts {
+func signerTxOpts(signer sign.Signer, chainID uint32) *bind.TransactOpts {
 	bigChainID := big.NewInt(int64(chainID))
 	signingMethod := types.LatestSignerForChainID(bigChainID)
+	signerAddress := common.HexToAddress(signer.PublicKey().Address().String())
 	signerFn := func(address common.Address, tx *types.Transaction) (*types.Transaction, error) {
-		if address != signer.Address() {
+		if address != signerAddress {
 			return nil, bind.ErrNotAuthorized
 		}
 
@@ -449,7 +453,7 @@ func signerTxOpts(signer unisig.Signer, chainID uint32) *bind.TransactOpts {
 	}
 
 	return &bind.TransactOpts{
-		From:    signer.Address(),
+		From:    signerAddress,
 		Signer:  signerFn,
 		Context: context.Background(),
 	}

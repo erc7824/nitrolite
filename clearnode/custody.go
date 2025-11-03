@@ -361,7 +361,7 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 		channel.Status = ChannelStatusChallenged
 		channel.UpdatedAt = time.Now()
 
-		if err := tx.Save(&channel).Error; err != nil {
+		if err := tx.Save(channel).Error; err != nil {
 			return fmt.Errorf("error saving channel in database: %w", err)
 		}
 
@@ -432,7 +432,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 		channel.Status = ChannelStatusOpen
 		channel.ServerStateSignature = nil // Reset server signature
 		channel.UserStateSignature = nil   // Reset user signature
-		if err := tx.Save(&channel).Error; err != nil {
+		if err := tx.Save(channel).Error; err != nil {
 			return fmt.Errorf("error saving channel in database: %w", err)
 		}
 		if len(ev.DeltaAllocations) == 0 {
@@ -593,7 +593,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		channel.RawAmount = decimal.Zero
 		channel.UpdatedAt = time.Now()
 
-		if err := tx.Save(&channel).Error; err != nil {
+		if err := tx.Save(channel).Error; err != nil {
 			return fmt.Errorf("failed to close channel: %w", err)
 		}
 

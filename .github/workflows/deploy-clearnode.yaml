@@ -76,16 +76,22 @@ jobs:
         HTTPS_PROXY: http://localhost:8888
       run: |-
         IMAGE_TAG=${{ inputs.image-tag }}
-
-        IMAGE_TAG_ARG=""
-        if [ -n "${IMAGE_TAG}" ]; then
-          IMAGE_TAG_ARG="--set image.tag=${IMAGE_TAG}"
+        if [ -z "${IMAGE_TAG}" ]; then
+          CURRENT_IMAGE=$(kubectl get deploy ${HELM_RELEASE} \
+            -n ${HELM_NAMESPACE} \
+            -o go-template='{{ (index .spec.template.spec.containers 0).image }}')
+          IMAGE_TAG=${CURRENT_IMAGE##*:}
+          echo "Reusing Deployed Image Tag: ${IMAGE_TAG}"
+        fi
+        if [ -z "${IMAGE_TAG}" ]; then
+          echo "Error: IMAGE_TAG is empty"
+          exit 1
         fi
 
         helm upgrade -i ${HELM_RELEASE} clearnode/chart \
           -n ${HELM_NAMESPACE} \
           --reuse-values \
-          ${IMAGE_TAG_ARG} \
+          --set image.tag=${IMAGE_TAG} \
           -f clearnode/chart/config/${HELM_CONFIG_ENV}/clearnode.yaml \
           --set-file=config.blockchains=clearnode/chart/config/${HELM_CONFIG_ENV}/blockchains.yaml \
           --set-file=config.assets=clearnode/chart/config/${HELM_CONFIG_ENV}/assets.yaml

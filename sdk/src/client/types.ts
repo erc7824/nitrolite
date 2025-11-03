@@ -91,23 +91,6 @@ export interface FinalState extends UnsignedState {
     serverSignature: Signature;
 }
 
-// Legacy types for backward compatibility
-export interface LegacyChannel {
-    participants: [Address, Address]; // Legacy: exactly 2 participants
-    adjudicator: Address;
-    challenge: bigint;
-    nonce: bigint;
-    chainId: number; // Legacy field not in contract
-}
-
-export interface LegacyState {
-    intent: StateIntent;
-    version: bigint;
-    data: Hex;
-    allocations: [Allocation, Allocation]; // Legacy: exactly 2 allocations
-    sigs: Signature[];
-}
-
 /**
  * Configuration for initializing the NitroliteClient.
  */
@@ -142,6 +125,7 @@ export interface NitroliteClientConfig {
 
 /**
  * Parameters required for creating a new state channel.
+ * NOTE: The initial allocation for the first participant must be zero.
  */
 export interface CreateChannelParams {
     channel: Channel;

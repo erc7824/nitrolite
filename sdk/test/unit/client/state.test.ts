@@ -4,7 +4,6 @@
 import { describe, test, expect, beforeEach, jest } from '@jest/globals';
 import { Hex } from 'viem';
 import { _prepareAndSignInitialState, _prepareAndSignFinalState } from '../../../src/client/state';
-import * as utils from '../../../src/utils';
 import { Errors } from '../../../src/errors';
 import { State, Channel, CreateChannelParams, StateIntent } from '../../../src/client/types';
 
@@ -54,7 +53,8 @@ describe('_prepareAndSignInitialState', () => {
             data: '0xcustomData',
             intent: StateIntent.INITIALIZE,
             allocations: [
-                { destination: deps.account.address, token: tokenAddress, amount: 10n },
+                // NOTE: first allocation amount is zero
+                { destination: deps.account.address, token: tokenAddress, amount: 0n },
                 { destination: guestAddress, token: tokenAddress, amount: 20n },
             ],
             version: 0n,
@@ -77,7 +77,7 @@ describe('_prepareAndSignInitialState', () => {
             data: '0xcustomData',
             intent: StateIntent.INITIALIZE,
             allocations: [
-                { destination: deps.account.address, token: tokenAddress, amount: 10n },
+                { destination: deps.account.address, token: tokenAddress, amount: 0n },
                 { destination: guestAddress, token: tokenAddress, amount: 20n },
             ],
             version: 0n,
@@ -110,6 +110,18 @@ describe('_prepareAndSignInitialState', () => {
 
     test('throws if bad allocations length', async () => {
         const localState = { ...defaultState, allocations: [] } as any;
+
+        await expect(
+            _prepareAndSignInitialState(deps, {
+                channel: defaultChannel,
+                unsignedInitialState: localState,
+                serverSignature: '0xSRVSIG',
+            }),
+        ).rejects.toThrow(Errors.InvalidParameterError);
+    });
+
+    test('throws if first allocation amount is NOT zero', async () => {
+        const localState = { ...defaultState, allocations: [{ ...defaultState.allocations[0], amount: 1n }] } as any;
 
         await expect(
             _prepareAndSignInitialState(deps, {

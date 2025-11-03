@@ -9,7 +9,6 @@ config:
     user: clearnet_uat_admin
   envSecret: ""
   extraEnvs:
-    CLEARNODE_LOG_LEVEL: "debug"
     MSG_EXPIRY_TIME: "60"
 
 image:

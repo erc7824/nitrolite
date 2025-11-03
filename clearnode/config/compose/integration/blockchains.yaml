@@ -1,0 +1,9 @@
+default_contract_addresses:
+
+blockchains:
+- name: anvil
+  id: 31337
+  contract_addresses:
+    custody: "0x8658501c98C3738026c4e5c361c6C3fa95DfB255"
+    adjudicator: "0xcbbc03a873c11beeFA8D99477E830be48d8Ae6D7"
+    balance_checker: "0x730dB3A1D3Ca47e7BaEb260c24C74ED4378726Bc"

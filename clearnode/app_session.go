@@ -13,6 +13,7 @@ type AppSession struct {
 	ID                 uint           `gorm:"primaryKey"`
 	Protocol           rpc.Version    `gorm:"column:protocol;default:'NitroRPC/0.2';not null"`
 	SessionID          string         `gorm:"column:session_id;not null;uniqueIndex"`
+	Application        string         `gorm:"column:application;not null"`
 	Challenge          uint64         `gorm:"column:challenge;"`
 	Nonce              uint64         `gorm:"column:nonce;not null"`
 	ParticipantWallets pq.StringArray `gorm:"type:text[];column:participants;not null"`
@@ -31,8 +32,11 @@ func (AppSession) TableName() string {
 
 func getAppSession(tx *gorm.DB, sessionID, status string) (*AppSession, error) {
 	var appSession AppSession
-	if err := tx.Where("session_id = ? AND status = ?", sessionID, status).
-		Order("nonce DESC").First(&appSession).Error; err != nil {
+	query := tx.Where("session_id = ?", sessionID)
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if err := query.Order("nonce DESC").First(&appSession).Error; err != nil {
 		return nil, err
 	}
 	return &appSession, nil

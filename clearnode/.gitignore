@@ -25,6 +25,9 @@ go.work.sum
 # env file
 .env
 
+# local compose config
+config/compose/local
+
 # RPC Testing client private keys
 testing/signer_key_*.hex
 *.csv

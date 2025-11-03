@@ -37,7 +37,7 @@ describe('Get User Tag Integration', () => {
 
     describe('createGetUserTagMessage', () => {
         it('should successfully request user tag', async () => {
-            const msg = await createGetUserTagMessage(identity.messageSigner);
+            const msg = await createGetUserTagMessage(identity.messageSKSigner);
 
             const response = await ws.sendAndWaitForResponse(msg, getGetUserTagPredicate(), 5000);
 
@@ -53,12 +53,12 @@ describe('Get User Tag Integration', () => {
 
         it('should return consistent user tag across multiple requests', async () => {
             // First request
-            const msg1 = await createGetUserTagMessage(identity.messageSigner);
+            const msg1 = await createGetUserTagMessage(identity.messageSKSigner);
             const response1 = await ws.sendAndWaitForResponse(msg1, getGetUserTagPredicate(), 5000);
             const parsedResponse1 = parseGetUserTagResponse(response1);
 
             // Second request
-            const msg2 = await createGetUserTagMessage(identity.messageSigner);
+            const msg2 = await createGetUserTagMessage(identity.messageSKSigner);
             const response2 = await ws.sendAndWaitForResponse(msg2, getGetUserTagPredicate(), 5000);
             const parsedResponse2 = parseGetUserTagResponse(response2);
 
@@ -66,7 +66,7 @@ describe('Get User Tag Integration', () => {
         });
 
         it('should return valid tag format', async () => {
-            const msg = await createGetUserTagMessage(identity.messageSigner);
+            const msg = await createGetUserTagMessage(identity.messageSKSigner);
             const response = await ws.sendAndWaitForResponse(msg, getGetUserTagPredicate(), 5000);
             const parsedResponse = parseGetUserTagResponse(response);
 

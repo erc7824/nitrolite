@@ -16,6 +16,7 @@
 | `get_ledger_entries`      | Retrieves detailed ledger entries for a participant                      | Public  |
 | `get_ledger_transactions` | Retrieves transaction history with optional filtering                    | Public  |
 | `get_user_tag`            | Retrieves user's tag                                                     | Private |
+| `get_session_keys`        | Retrieves all active session keys for the authenticated user             | Private |
 | `get_rpc_history`         | Retrieves all RPC message history for a participant                      | Private |
 | `get_ledger_balances`     | Lists participants and their balances for a ledger account               | Private |
 | `transfer`                | Transfers funds from user's unified balance to another account           | Private |
@@ -46,7 +47,7 @@ Initiates authentication with the server.
   "req": [1, "auth_request", {
     "address": "0x1234567890abcdef...",
     "session_key": "0x9876543210fedcba...", // If specified, enables delegation to this key
-    "app_name": "Example App", // Application name for analytics
+    "application": "Example App", // Application name for analytics (defaults to "clearnode" if not provided)
     "allowances": [ // Asset allowances for the session
       {
         "asset": "usdc", 
@@ -114,6 +115,18 @@ After successful authentication, the server provides a JWT token that can be use
 - Standard JWT claims (issued at, expiration, etc.)
 
 The JWT token has a default validity period of 24 hours and must be refreshed by making a new authentication request before expiration.
+
+#### Session Key Spending Caps
+
+When authenticating with a session key, you can specify spending allowances to limit the amount of each asset that can be spent using that session key:
+
+- **With allowances**: If you provide an `allowances` array with specific assets and amounts, the session key will be limited to spending those amounts. Once a session key reaches its spending cap for an asset, all further operations requiring that asset will be rejected with an error: `"operation denied: insufficient session key allowance: X required, Y available"`
+
+- **Empty allowances**: If you provide an empty `allowances` array (`[]`), the session key will have zero spending allowed for all assets. Any operation attempting to spend funds will be rejected.
+
+- **Validation**: All assets specified in allowances must be supported by the system. Unsupported assets will cause authentication to fail with an error: `"unsupported token: asset 'X' is not supported"`
+
+The server tracks spending per session key by recording which session key was used for each ledger debit operation. You can view current spending usage via the `get_session_keys` endpoint.
 
 ## Ledger Management
 
@@ -397,6 +410,89 @@ Retrieves the user's tag, which can be used for transfer operations. The tag is 
   "sig": ["0xabcd1234..."]
 }
 ```
+
+### Get Session Keys
+
+Retrieves all active (non-expired) session keys for the authenticated user. Session keys are delegated keys that can perform operations on behalf of the user's wallet with spending caps and expiration times.
+
+This endpoint returns only session keys, not custody signers. Each session key includes its spending allowances and current usage tracking.
+
+**Request:**
+
+```json
+{
+  "req": [1, "get_session_keys", {}, 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "get_session_keys", {
+    "session_keys": [
+      {
+        "id": 1,
+        "session_key": "0xabcdef1234567890...",
+        "application": "Chess Game",
+        "allowances": [
+          {
+            "asset": "usdc",
+            "allowance": "100.0",
+            "used": "45.0"
+          },
+          {
+            "asset": "eth",
+            "allowance": "0.5",
+            "used": "0.0"
+          }
+        ],
+        "scope": "app.create",
+        "expires_at": "2024-12-31T23:59:59Z",
+        "created_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 2,
+        "session_key": "0xfedcba0987654321...",
+        "application": "Trading Bot",
+        "allowances": [
+          {
+            "asset": "usdc",
+            "allowance": "500.0",
+            "used": "250.0"
+          }
+        ],
+        "scope": "app.create",
+        "expires_at": "2024-06-30T23:59:59Z",
+        "created_at": "2024-01-15T10:30:00Z"
+      }
+    ]
+  }, 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+Each session key includes:
+
+- `id`: Unique identifier for the session key record
+- `session_key`: The address of the session key that can sign transactions
+- `application`: Name of the application this session key is authorized for. If set to `"clearnode"`, the session key has root access and bypasses spending allowance and application validation checks.
+- `allowances`: Array of asset allowances with usage tracking. Each entry contains:
+  - `asset`: Symbol of the asset (e.g., "usdc", "eth")
+  - `allowance`: Maximum amount the session key can spend for this asset
+  - `used`: Amount already spent by this session key (calculated on the fly from ledger entries)
+- `scope`: Permission scope for this session key (e.g., "app.create", "ledger.readonly") (optional field, omitted if empty)
+- `expires_at`: When this session key expires (ISO 8601 format)
+- `created_at`: When the session key was created (ISO 8601 format)
+
+**Notes:**
+
+- Only active (non-expired) session keys are returned
+- If a session key has an empty spending cap array, all operations using that key will be denied (no spending allowed)
+- The `used_allowance` is calculated by summing all debit entries in the ledger that were made using this session key
+- Available allowance for an asset = `allowance - used_allowance`
+- **Special case**: Session keys with `application` set to `"clearnode"` have root access and are exempt from spending allowance limits and application validation. This facilitates backwards compatibility, and will be deprecated after a migration period for developers elapses.
 
 ### Transfer Funds
 
@@ -723,6 +819,7 @@ The optional `session_data` field can be used to store application-specific data
 {
   "req": [1, "create_app_session", {
     "definition": {
+      "application": "clearnode",
       "protocol": "NitroRPC/0.2",
       "participants": [
         "0xAaBbCcDdEeFf0011223344556677889900aAbBcC",
@@ -927,7 +1024,6 @@ Requests opening a channel with a Clearnode broker on a specific network.
     "chain_id": 137,
     "token": "0xeeee567890abcdef...",
     "amount": "100000000",
-    "session_key": "0x1234567890abcdef..." // Optional
   }], 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
@@ -937,7 +1033,6 @@ The request parameters are:
 - `chain_id`: The blockchain network ID where the channel should be created
 - `token`: The token contract address for the channel
 - `amount`: The initial amount to deposit in the channel (in raw token units)
-- `session_key`: An optional session key for channel operations
 
 **Response:**
 

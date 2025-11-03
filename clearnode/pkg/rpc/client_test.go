@@ -82,8 +82,8 @@ func TestClient_GetConfig(t *testing.T) {
 
 	config := rpc.BrokerConfig{
 		BrokerAddress: testWallet,
-		Networks: []rpc.NetworkInfo{{
-			ChainID:            testChainID,
+		Blockchains: []rpc.BlockchainInfo{{
+			ID:                 testChainID,
 			CustodyAddress:     "0xabc",
 			AdjudicatorAddress: "0xdef",
 		}},
@@ -216,7 +216,7 @@ func TestClient_Ledger(t *testing.T) {
 		balances := rpc.GetLedgerBalancesResponse{
 			LedgerBalances: []rpc.LedgerBalance{
 				{Asset: testSymbol, Amount: decimal.NewFromInt(1000)},
-				{Asset: "ETH", Amount: decimal.NewFromInt(5)},
+				{Asset: "eth", Amount: decimal.NewFromInt(5)},
 			},
 		}
 		registerSimpleHandler(dialer, rpc.GetLedgerBalancesMethod, balances)
@@ -338,8 +338,8 @@ func TestClient_AppSessions(t *testing.T) {
 		req := rpc.CreateAppSessionRequest{
 			Definition: appDef,
 			Allocations: []rpc.AppAllocation{
-				{ParticipantWallet: testWallet, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
-				{ParticipantWallet: testWallet2, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
+				{Participant: testWallet, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
+				{Participant: testWallet2, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
 			},
 		}
 		payload, err := client.PreparePayload(rpc.CreateAppSessionMethod, req)

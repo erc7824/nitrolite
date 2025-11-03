@@ -19,6 +19,7 @@ const AppAllocationObject = z.object({
 
 const AppSessionObject = z.object({
     app_session_id: hexSchema,
+    application: z.string(),
     status: statusEnum,
     participants: z.array(addressSchema),
     protocol: protocolVersionEnum,
@@ -36,6 +37,7 @@ const AppSessionObjectSchema = AppSessionObject
     .transform(
         (raw): RPCAppSession => ({
             appSessionId: raw.app_session_id,
+            application: raw.application,
             status: raw.status,
             participants: raw.participants,
             protocol: raw.protocol,
@@ -82,6 +84,7 @@ const CloseAppSessionParamsSchema = z
 
 const GetAppDefinitionParamsSchema = z
     .object({
+        application: z.string(),
         protocol: protocolVersionEnum,
         participants: z.array(addressSchema),
         weights: z.array(z.number()),
@@ -91,6 +94,7 @@ const GetAppDefinitionParamsSchema = z
     })
     .transform(
         (raw): GetAppDefinitionResponseParams => ({
+            application: raw.application,
             protocol: raw.protocol,
             participants: raw.participants as Address[],
             weights: raw.weights,
@@ -112,22 +116,23 @@ const GetAppSessionsParamsSchema = z
 
 const AppSessionUpdateObjectSchema = z
     .object({
-        ...AppSessionObject.shape,
+        app_session: AppSessionObject,
         participant_allocations: z.array(AppAllocationObject),
     })
     .transform((raw) => ({
-        appSessionId: raw.app_session_id,
-        status: raw.status,
-        participants: raw.participants,
-        sessionData: raw.session_data,
-        protocol: raw.protocol,
-        challenge: raw.challenge,
-        weights: raw.weights,
-        quorum: raw.quorum,
-        version: raw.version,
-        nonce: raw.nonce,
-        createdAt: raw.created_at,
-        updatedAt: raw.updated_at,
+        appSessionId: raw.app_session.app_session_id,
+        application: raw.app_session.application,
+        status: raw.app_session.status,
+        participants: raw.app_session.participants,
+        sessionData: raw.app_session.session_data,
+        protocol: raw.app_session.protocol,
+        challenge: raw.app_session.challenge,
+        weights: raw.app_session.weights,
+        quorum: raw.app_session.quorum,
+        version: raw.app_session.version,
+        nonce: raw.app_session.nonce,
+        createdAt: raw.app_session.created_at,
+        updatedAt: raw.app_session.updated_at,
         participantAllocations: raw.participant_allocations.map((a) => ({
                 participant: a.participant,
                 asset: a.asset,

@@ -19,6 +19,7 @@ spec:
       annotations:
         {{- include "clearnode.component.metricsAnnotations" .Values.metrics | nindent 8 }}
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
       labels:
         {{- include "clearnode.common.selectorLabels" . | nindent 8 }}
     spec:
@@ -43,9 +44,16 @@ spec:
                 name: {{ include "clearnode.common.fullname" . }}-secret-env
             {{- end }}
           {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
           {{- include "clearnode.component.ports" .Values.service | nindent 10 }}
           {{- include "clearnode.component.resources" .Values.resources | nindent 10 }}
           {{- include "clearnode.component.probes" . | nindent 10 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "clearnode.common.fullname" . }}-config
       {{- include "clearnode.common.imagePullSecrets" . | nindent 6 }}
       {{- include "clearnode.common.nodeSelectorLabels" . | nindent 6 }}
       {{- include "clearnode.common.affinity" . | nindent 6 }}

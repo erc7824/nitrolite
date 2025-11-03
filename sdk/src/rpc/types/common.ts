@@ -32,6 +32,8 @@ export enum RPCProtocolVersion {
  * Defines the structure of an application definition used when creating an application.
  */
 export interface RPCAppDefinition {
+    /** Application identifier */
+    application: string;
     /** Protocol identifies the version of the application protocol */
     protocol: RPCProtocolVersion;
     /** An array of participant addresses (Ethereum addresses) involved in the application. Must have at least 2 participants. */
@@ -97,7 +99,7 @@ export interface RPCNetworkInfo {
  * Represents the balance information from clearnode.
  */
 export interface RPCBalance {
-    /** The asset symbol (e.g., "ETH", "USDC"). */
+    /** The asset symbol (e.g., "eth", "usdc"). */
     asset: string;
     /** The balance amount. */
     amount: string;
@@ -140,6 +142,8 @@ export enum RPCAppStateIntent {
 export interface RPCAppSession {
     /** The unique identifier for the application session. */
     appSessionId: Hex;
+    /** Application identifier */
+    application: string;
     /** The current status of the channel (e.g., "open", "closed"). */
     status: RPCChannelStatus;
     /** List of participant Ethereum addresses. */
@@ -196,7 +200,7 @@ export interface RPCAsset {
     token: Address;
     /** The chain ID where the asset exists. */
     chainId: number;
-    /** The asset symbol (e.g., "ETH", "USDC"). */
+    /** The asset symbol (e.g., "eth", "usdc"). */
     symbol: string;
     /** The number of decimal places for the asset. */
     decimals: number;
@@ -231,10 +235,42 @@ export interface RPCTransaction {
  * This interface is extended by specific RPC request and response types.
  */
 export interface RPCAllowance {
-    /** The symbol of the asset (e.g., "USDC", "USDT"). */
+    /** The symbol of the asset (e.g., "eth", "usdc"). */
     asset: string;
     /** The amount of the asset that is allowed to be spent. */
     amount: string;
+}
+
+/**
+ * Represents an allowance with usage tracking, combining both limit and used amount.
+ */
+export interface RPCAllowanceUsage {
+    /** The symbol of the asset (e.g., "eth", "usdc"). */
+    asset: string;
+    /** The maximum amount of the asset that is allowed to be spent. */
+    allowance: string;
+    /** The amount of the asset that has been used. */
+    used: string;
+}
+
+/**
+ * Represents a session key with its allowances and usage tracking.
+ */
+export interface RPCSessionKey {
+    /** Unique identifier for the session key record. */
+    id: number;
+    /** The address of the session key that can sign transactions. */
+    sessionKey: Address;
+    /** Name of the application this session key is authorized for. */
+    application: string;
+    /** Array of asset allowances with usage tracking. */
+    allowances: RPCAllowanceUsage[];
+    /** Permission scope for this session key (e.g., "app.create", "ledger.readonly"). */
+    scope?: string;
+    /** When this session key expires. */
+    expiresAt: Date;
+    /** When the session key was created. */
+    createdAt: Date;
 }
 
 // TODO: create single domain allocation type
@@ -245,7 +281,7 @@ export interface RPCAllowance {
  * It includes the participant's address, the asset (usdc, usdt, etc) being allocated, and the amount.
  */
 export interface RPCAppSessionAllocation {
-    /** The symbol of the asset (e.g., "USDC", "USDT", "ETH"). */
+    /** The symbol of the asset (e.g., "eth", "usdc"). */
     asset: string;
     /** The amount of the asset. Must be a positive number. */
     amount: string;
@@ -271,7 +307,7 @@ export interface RPCChannelAllocation {
  * This structure is used to define the asset and amount being transferred.
  */
 export interface RPCTransferAllocation {
-    /** The symbol of the asset (e.g., "USDC", "USDT", "ETH"). */
+    /** The symbol of the asset (e.g., "eth", "usdc"). */
     asset: string;
     /** The amount of the asset being transferred. */
     amount: string;

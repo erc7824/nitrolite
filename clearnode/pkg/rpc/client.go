@@ -428,7 +428,7 @@ func (c *Client) GetChannels(ctx context.Context, reqParams GetChannelsRequest) 
 // Example:
 //
 //	entries, _, err := client.GetLedgerEntries(ctx, GetLedgerEntriesRequest{
-//	    Asset: "USDC",
+//	    Asset: "usdc",
 //	    Wallet: userWallet,
 //	    ListOptions: ListOptions{Limit: 50},
 //	})
@@ -470,7 +470,7 @@ func (c *Client) GetLedgerEntries(ctx context.Context, reqParams GetLedgerEntrie
 //
 //	// Get recent USDC transactions
 //	txns, _, err := client.GetLedgerTransactions(ctx, GetLedgerTransactionsRequest{
-//	    Asset: "USDC",
+//	    Asset: "usdc",
 //	    ListOptions: ListOptions{
 //	        Limit: 20,
 //	        Sort: &SortTypeDescending,
@@ -508,11 +508,10 @@ func (c *Client) GetLedgerTransactions(ctx context.Context, reqParams GetLedgerT
 //   - reqParams: Authentication request containing:
 //   - Address: Main wallet address requesting authentication (cold wallet)
 //   - SessionKey: Address of a different key that will be used for signing during this session (hot wallet)
-//   - AppName: Name of the application
+//   - Application: Name of the application
 //   - Allowances: Spending limits for the session
 //   - Expire: When the authentication expires (RFC3339 or empty)
 //   - Scope: Permission scope (e.g., "trade", "view", or empty)
-//   - ApplicationAddress: Contract address of the requesting application
 //   - signer: Signer interface to sign the challenge (should correspond to Address, not SessionKey)
 //
 // Returns:
@@ -528,9 +527,8 @@ func (c *Client) GetLedgerTransactions(ctx context.Context, reqParams GetLedgerT
 //	authReq := AuthRequestRequest{
 //	    Address:            walletSigner.PublicKey().Address().String(),   // Main wallet
 //	    SessionKey:         sessionSigner.PublicKey().Address().String(),  // Different key for session
-//	    AppName:            "MyDApp",
-//	    Allowances:         []Allowance{{Asset: "USDC", Amount: "1000"}},
-//	    ApplicationAddress: appContractAddress,
+//	    Application:            "MyDApp",
+//	    Allowances:         []Allowance{{Asset: "usdc", Amount: "1000"}},
 //	}
 //
 //	// Sign with main wallet, but SessionKey will be used for subsequent operations
@@ -653,6 +651,48 @@ func (c *Client) GetUserTag(ctx context.Context) (GetUserTagResponse, []sign.Sig
 	var resSig []sign.Signature
 
 	res, err := c.call(ctx, GetUserTagMethod, nil)
+	if err != nil {
+		return resParams, resSig, err
+	}
+	resSig = res.Sig
+
+	if err := res.Res.Params.Translate(&resParams); err != nil {
+		return resParams, resSig, err
+	}
+
+	return resParams, res.Sig, nil
+}
+
+// GetSessionKeys retrieves session keys with allowances for the authenticated user.
+// Returns all active session keys with their spending limits and usage tracking.
+//
+// Requires authentication.
+//
+// Parameters:
+//   - reqParams: Optional filter options (e.g., pagination)
+//
+// Returns:
+//   - GetSessionKeysResponse containing session keys with allowances
+//   - Response signatures for verification
+//   - Error if not authenticated or request fails
+//
+// Example:
+//
+//	sessionKeys, _, err := client.GetSessionKeys(ctx, GetSessionKeysRequest{})
+//	if err != nil {
+//	    log.Error("Failed to get session keys", "error", err)
+//	}
+//	for _, sk := range sessionKeys.SessionKeys {
+//	    fmt.Printf("Session key: %s, Application: %s\n", sk.SessionKey, sk.Application)
+//	    for _, allowance := range sk.Allowances {
+//	        fmt.Printf("  %s: %s / %s used\n", allowance.Asset, allowance.Used, allowance.Allowance)
+//	    }
+//	}
+func (c *Client) GetSessionKeys(ctx context.Context, reqParams GetSessionKeysRequest) (GetSessionKeysResponse, []sign.Signature, error) {
+	var resParams GetSessionKeysResponse
+	var resSig []sign.Signature
+
+	res, err := c.call(ctx, GetSessionKeysMethod, &reqParams)
 	if err != nil {
 		return resParams, resSig, err
 	}
@@ -972,8 +1012,8 @@ func (c *Client) CloseChannel(ctx context.Context, req *Request) (CloseChannelRe
 //	transferReq := TransferRequest{
 //	    Destination: "0xRecipient...",
 //	    Allocations: []TransferAllocation{
-//	        {AssetSymbol: "USDC", Amount: decimal.NewFromInt(100)},
-//	        {AssetSymbol: "ETH", Amount: decimal.NewFromFloat(0.1)},
+//	        {AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+//	        {AssetSymbol: "eth", Amount: decimal.NewFromFloat(0.1)},
 //	    },
 //	}
 //
@@ -1419,8 +1459,7 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 				{Name: "challenge", Type: "string"},
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
-				{Name: "application", Type: "address"},
-				{Name: "participant", Type: "address"},
+				{Name: "session_key", Type: "address"},
 				{Name: "expire", Type: "uint256"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
@@ -1430,14 +1469,13 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 			}},
 		PrimaryType: "Policy",
 		Domain: apitypes.TypedDataDomain{
-			Name: req.AppName,
+			Name: req.Application,
 		},
 		Message: map[string]any{
 			"challenge":   token,
 			"scope":       req.Scope,
 			"wallet":      req.Address,
-			"application": req.ApplicationAddress,
-			"participant": req.SessionKey,
+			"session_key": req.SessionKey,
 			"expire":      req.Expire,
 			"allowances":  req.Allowances,
 		},

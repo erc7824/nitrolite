@@ -299,10 +299,14 @@ func TestClient_Transfer(t *testing.T) {
 		return createResponse(rpc.TransferMethod, txns)
 	})
 
-	resp, _, err := client.Transfer(testCtx, rpc.TransferRequest{
+	payload, err := client.PreparePayload(rpc.TransferMethod, rpc.TransferRequest{
 		Destination: testWallet2,
 		Allocations: []rpc.TransferAllocation{{AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)}},
 	})
+	require.NoError(t, err)
+	fullReq := rpc.NewRequest(payload, sign.Signature{})
+
+	resp, _, err := client.Transfer(testCtx, &fullReq)
 	require.NoError(t, err)
 	assert.Len(t, resp.Transactions, 1)
 }

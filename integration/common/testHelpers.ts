@@ -55,7 +55,7 @@ export async function authenticateAppWithAllowances(
     participantAppWS: TestWebSocket,
     participantAppIdentity: Identity,
     asset: string,
-    decimalDepositAmount: bigint,
+    decimalDepositAmount: string,
     application: string = 'App Domain'
 ): Promise<void> {
     await createAuthSessionWithClearnode(participantAppWS, participantAppIdentity, {
@@ -67,7 +67,7 @@ export async function authenticateAppWithAllowances(
         allowances: [
             {
                 asset,
-                amount: decimalDepositAmount.toString(),
+                amount: decimalDepositAmount,
             },
         ],
     });
@@ -101,7 +101,7 @@ export async function createTestAppSession(
     aliceAppWS: TestWebSocket,
     protocol: RPCProtocolVersion,
     asset: string,
-    decimalDepositAmount: bigint,
+    decimalDepositAmount: string,
     sessionData: object,
     application: string = 'App Domain'
 ): Promise<string> {
@@ -119,7 +119,7 @@ export async function createTestAppSession(
         {
             participant: aliceAppIdentity.walletAddress,
             asset,
-            amount: decimalDepositAmount.toString(),
+            amount: decimalDepositAmount,
         },
         {
             participant: bobAppIdentity.walletAddress,

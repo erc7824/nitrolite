@@ -165,12 +165,12 @@ export const EIP712AuthTypes = {
         { name: 'scope', type: 'string' },
         { name: 'wallet', type: 'address' },
         { name: 'session_key', type: 'address' },
-        { name: 'expire', type: 'uint256' },
+        { name: 'expire', type: 'string' },
         { name: 'allowances', type: 'Allowance[]' },
     ],
     Allowance: [
         { name: 'asset', type: 'string' },
-        { name: 'amount', type: 'uint256' },
+        { name: 'amount', type: 'string' },
     ],
 };
 

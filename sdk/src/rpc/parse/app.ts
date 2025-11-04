@@ -9,12 +9,12 @@ import {
     GetAppSessionsResponseParams,
     RPCAppSession,
 } from '../types';
-import { hexSchema, addressSchema, statusEnum, ParamsParser, dateSchema, protocolVersionEnum, bigIntSchema } from './common';
+import { hexSchema, addressSchema, statusEnum, ParamsParser, dateSchema, protocolVersionEnum } from './common';
 
 const AppAllocationObject = z.object({
     participant: addressSchema,
     asset: z.string(),
-    amount: bigIntSchema,
+    amount: z.string(),
 });
 
 const AppSessionObject = z.object({
@@ -136,7 +136,7 @@ const AppSessionUpdateObjectSchema = z
         participantAllocations: raw.participant_allocations.map((a) => ({
                 participant: a.participant,
                 asset: a.asset,
-                amount: BigInt(a.amount),
+                amount: a.amount,
             })),
     }));
 

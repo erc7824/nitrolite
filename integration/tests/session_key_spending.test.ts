@@ -68,7 +68,7 @@ describe('Session Key Spending Caps', () => {
         );
 
         // Authenticate with spending cap of 500 USDC
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, spendingCapAmount);
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, spendingCapAmount.toString());
 
         currentVersion = 1;
     });
@@ -97,7 +97,7 @@ describe('Session Key Spending Caps', () => {
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
                 ASSET_SYMBOL,
-                initialDepositAmount,
+                initialDepositAmount.toString(),
                 SESSION_DATA
             );
 
@@ -118,7 +118,7 @@ describe('Session Key Spending Caps', () => {
                     aliceAppWS,
                     RPCProtocolVersion.NitroRPC_0_4,
                     ASSET_SYMBOL,
-                    excessiveAmount,
+                    excessiveAmount.toString(),
                     SESSION_DATA
                 )
             ).rejects.toThrow(/session key spending validation failed.*insufficient session key allowance/i);
@@ -134,7 +134,7 @@ describe('Session Key Spending Caps', () => {
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
                 ASSET_SYMBOL,
-                initialDepositAmount,
+                initialDepositAmount.toString(),
                 SESSION_DATA
             );
         });
@@ -291,7 +291,7 @@ describe('Session Key Spending Caps', () => {
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
                 ASSET_SYMBOL,
-                BigInt(300),
+                '300',
                 SESSION_DATA
             );
         });
@@ -353,6 +353,81 @@ describe('Session Key Spending Caps', () => {
         });
     });
 
+    describe('Float amounts in allowances', () => {
+        it('should support float amounts in spending caps', async () => {
+            // Authenticate with float spending cap (500.5 USDC)
+            await authenticateAppWithAllowances(
+                aliceAppWS,
+                aliceAppIdentity,
+                ASSET_SYMBOL,
+                '500.5'
+            );
+
+            // Create app session with float deposit (100.25 USDC)
+            const testSessionId = await createTestAppSession(
+                aliceAppIdentity,
+                bobAppIdentity,
+                aliceAppWS,
+                RPCProtocolVersion.NitroRPC_0_4,
+                ASSET_SYMBOL,
+                '100.25',
+                SESSION_DATA
+            );
+
+            expect(testSessionId).toBeDefined();
+
+            // Verify we can deposit additional float amount
+            const allocations = [
+                {
+                    participant: aliceAppIdentity.walletAddress,
+                    asset: ASSET_SYMBOL,
+                    amount: '250.75', // Total: 100.25 + 150.5 = 250.75 (within 500.5 cap)
+                },
+                {
+                    participant: bobAppIdentity.walletAddress,
+                    asset: ASSET_SYMBOL,
+                    amount: '0',
+                },
+            ];
+
+            await submitAppStateUpdate_v04(
+                aliceAppWS,
+                aliceAppIdentity,
+                testSessionId,
+                RPCAppStateIntent.Deposit,
+                2,
+                allocations,
+                SESSION_DATA
+            );
+
+            // Try to exceed cap with float amount (should fail)
+            const excessiveAllocations = [
+                {
+                    participant: aliceAppIdentity.walletAddress,
+                    asset: ASSET_SYMBOL,
+                    amount: '501.0', // 501.0 > 500.5 cap
+                },
+                {
+                    participant: bobAppIdentity.walletAddress,
+                    asset: ASSET_SYMBOL,
+                    amount: '0',
+                },
+            ];
+
+            await expect(
+                submitAppStateUpdate_v04(
+                    aliceAppWS,
+                    aliceAppIdentity,
+                    testSessionId,
+                    RPCAppStateIntent.Deposit,
+                    3,
+                    excessiveAllocations,
+                    SESSION_DATA
+                )
+            ).rejects.toThrow(/session key spending validation failed.*insufficient session key allowance/i);
+        });
+    });
+
     describe('Multi-asset spending caps', () => {
         const ETH_ASSET_SYMBOL = 'yintegration.eth';
         let ethChannelId: Hex;
@@ -386,7 +461,7 @@ describe('Session Key Spending Caps', () => {
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
                 ASSET_SYMBOL,
-                BigInt(200),
+                '200',
                 SESSION_DATA
             );
             expect(appSessionId1).toBeDefined();
@@ -398,7 +473,7 @@ describe('Session Key Spending Caps', () => {
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
                 ASSET_SYMBOL,
-                BigInt(0),
+                '0',
                 SESSION_DATA
             );
             expect(appSessionId2).toBeDefined();

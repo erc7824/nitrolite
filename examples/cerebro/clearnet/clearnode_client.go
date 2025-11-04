@@ -57,10 +57,27 @@ func (c *ClearnodeClient) GetSupportedAssets() (rpc.GetAssetsResponse, error) {
 	return res, nil
 }
 
-func (c *ClearnodeClient) GetLedgerBalances() (rpc.GetLedgerBalancesResponse, error) {
-	res, _, err := c.rpcClient.GetLedgerBalances(context.Background(), rpc.GetLedgerBalancesRequest{})
+func (c *ClearnodeClient) GetLedgerBalances(accountID string) (rpc.GetLedgerBalancesResponse, error) {
+	res, _, err := c.rpcClient.GetLedgerBalances(context.Background(), rpc.GetLedgerBalancesRequest{
+		AccountID: accountID,
+	})
 	if err != nil {
 		return rpc.GetLedgerBalancesResponse{}, fmt.Errorf("failed to fetch ledger balances: %w", err)
+	}
+	return res, nil
+}
+
+func (c *ClearnodeClient) GetLedgerTransactions(accountID, assetSymbol string, offset, limit uint32) (rpc.GetLedgerTransactionsResponse, error) {
+	res, _, err := c.rpcClient.GetLedgerTransactions(context.Background(), rpc.GetLedgerTransactionsRequest{
+		ListOptions: rpc.ListOptions{
+			Offset: offset,
+			Limit:  limit,
+		},
+		AccountID: accountID,
+		Asset:     assetSymbol,
+	})
+	if err != nil {
+		return rpc.GetLedgerTransactionsResponse{}, fmt.Errorf("failed to fetch ledger transactions: %w", err)
 	}
 	return res, nil
 }
@@ -72,6 +89,21 @@ func (c *ClearnodeClient) GetChannels(participant, status string) (rpc.GetChanne
 	})
 	if err != nil {
 		return rpc.GetChannelsResponse{}, fmt.Errorf("failed to fetch channels: %w", err)
+	}
+	return res, nil
+}
+
+func (c *ClearnodeClient) GetAppSessions(participant, status string, offset, limit uint32) (rpc.GetAppSessionsResponse, error) {
+	res, _, err := c.rpcClient.GetAppSessions(context.Background(), rpc.GetAppSessionsRequest{
+		ListOptions: rpc.ListOptions{
+			Offset: offset,
+			Limit:  limit,
+		},
+		Participant: participant,
+		Status:      status,
+	})
+	if err != nil {
+		return rpc.GetAppSessionsResponse{}, fmt.Errorf("failed to fetch app sessions: %w", err)
 	}
 	return res, nil
 }

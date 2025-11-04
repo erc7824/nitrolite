@@ -71,6 +71,9 @@ func (o *Operator) complete(d prompt.Document) []prompt.Suggest {
 			return []prompt.Suggest{
 				{Text: "chains", Description: "List all available chains"},
 				{Text: "channels", Description: "List all open channels on the current wallet"},
+				{Text: "app-sessions", Description: "List all app sessions of the current wallet"},
+				{Text: "ledger-balances", Description: "List ledger balances of the current wallet"},
+				{Text: "ledger-transactions", Description: "List ledger transactions of the current wallet"},
 				{Text: "wallets", Description: "List all imported wallets"},
 				{Text: "signers", Description: "List all imported signers"},
 			}
@@ -156,6 +159,12 @@ func (o *Operator) Execute(s string) {
 			o.handleListChains()
 		case "channels":
 			o.handleListChannels()
+		case "app-sessions":
+			o.handleListAppSessions()
+		case "ledger-balances":
+			o.handleListLedgerBalances()
+		case "ledger-transactions":
+			o.handleListLedgerTransactions()
 		case "wallets", "signers":
 			o.handleListPKeys(args)
 		default:

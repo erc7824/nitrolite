@@ -222,7 +222,7 @@ func (o *Operator) handleResizeChannel(args []string) {
 
 	channelBalance := decimal.NewFromBigInt(asset.RawChannelBalance, -int32(asset.Decimals))
 
-	getLedgerBalancesRes, err := o.clearnode.GetLedgerBalances()
+	getLedgerBalancesRes, err := o.clearnode.GetLedgerBalances(o.config.Wallet.PublicKey().Address().String())
 	if err != nil {
 		fmt.Printf("Failed to get ledger balances: %s\n", err.Error())
 		return

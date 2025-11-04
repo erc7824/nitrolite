@@ -5,8 +5,15 @@ import (
 	"os"
 	"time"
 
+	"github.com/c-bata/go-prompt"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/shopspring/decimal"
+)
+
+const (
+	initialQueryOffset = uint32(0)
+	pageSize           = uint32(10)
 )
 
 func (o *Operator) handleListChains() {
@@ -40,6 +47,7 @@ func (o *Operator) handleListChains() {
 	t.SetColumnConfigs(
 		[]table.ColumnConfig{
 			{Number: 1, AutoMerge: true},
+			{Number: 3, AutoMerge: true},
 		},
 	)
 	t.Render()
@@ -74,6 +82,122 @@ func (o *Operator) handleListChannels() {
 		},
 	)
 	t.Render()
+}
+
+func (o *Operator) handleListAppSessions() {
+	fmt.Println("Specify participant filter for app sessions (required):")
+	participant := o.readExtraArg("participant")
+	if !common.IsHexAddress(participant) {
+		fmt.Println("Invalid address format. Please provide a valid Ethereum address.")
+		return
+	}
+
+	fmt.Println("Specify status filter for app sessions (leave empty for no filter):")
+	statusSuggestions := []prompt.Suggest{
+		{Text: "open", Description: "List only open sessions"},
+		{Text: "closed", Description: "List only closed sessions"},
+	}
+	statusFilter := o.readSelectionArg("status", statusSuggestions)
+
+	offset := initialQueryOffset
+	for {
+		res, err := o.clearnode.GetAppSessions(participant, statusFilter, offset, pageSize)
+		if err != nil {
+			fmt.Printf("Failed to get app sessions: %s\n", err.Error())
+			return
+		}
+
+		fmt.Printf("App Sessions for participant %s:\n", participant)
+		for _, session := range res.AppSessions {
+			t := table.NewWriter()
+			t.SetOutputMirror(os.Stdout)
+
+			t.AppendRow(table.Row{"ID", session.AppSessionID, session.AppSessionID, session.AppSessionID}, table.RowConfig{AutoMerge: true})
+			t.AppendRow(table.Row{"NAME", "", "PROTOCOL", session.Protocol}, table.RowConfig{AutoMerge: true})
+			t.AppendRow(table.Row{"NONCE", session.Nonce, "CHALLENGE", session.Challenge}, table.RowConfig{AutoMerge: true})
+			t.AppendRow(table.Row{"VERSION", session.Version, "STATUS", session.Status}, table.RowConfig{AutoMerge: true})
+			t.AppendRow(table.Row{"CREATED_AT", session.CreatedAt, "UPDATED_AT", session.UpdatedAt}, table.RowConfig{AutoMerge: true})
+			t.AppendSeparator()
+			for i := range session.ParticipantWallets {
+				t.AppendRow(table.Row{fmt.Sprintf("PARTICIPANT_%d", i+1), session.ParticipantWallets[i], fmt.Sprintf("WEIGHT_%d", i+1), session.Weights[i]}, table.RowConfig{AutoMerge: true})
+			}
+
+			t.Render()
+		}
+
+		fmt.Println("Do you want to see the next page?")
+		actionSuggestions := []prompt.Suggest{
+			{Text: "yes", Description: "Show next page"},
+			{Text: "no", Description: "Quit listing"},
+		}
+		showNextPage := o.readSelectionArg("answer", actionSuggestions) == "yes"
+		if !showNextPage {
+			break
+		}
+
+		offset += pageSize
+	}
+}
+
+func (o *Operator) handleListLedgerBalances() {
+	if !o.isUserAuthenticated() {
+		fmt.Println("Not authenticated. Please authenticate first.")
+		return
+	}
+
+	res, err := o.clearnode.GetLedgerBalances(o.config.Wallet.PublicKey().Address().String())
+	if err != nil {
+		fmt.Printf("Failed to get ledger balances: %s\n", err.Error())
+		return
+	}
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"Asset", "Balance"})
+	t.AppendSeparator()
+
+	for _, balance := range res.LedgerBalances {
+		t.AppendRow(table.Row{balance.Asset, fmtDec(balance.Amount)})
+	}
+	t.Render()
+}
+
+func (o *Operator) handleListLedgerTransactions() {
+	if !o.isUserAuthenticated() {
+		fmt.Println("Not authenticated. Please authenticate first.")
+		return
+	}
+
+	offset := initialQueryOffset
+	for {
+		res, err := o.clearnode.GetLedgerTransactions(o.config.Wallet.PublicKey().Address().String(), "", offset, pageSize)
+		if err != nil {
+			fmt.Printf("Failed to get ledger transactions: %s\n", err.Error())
+			return
+		}
+
+		t := table.NewWriter()
+		t.SetOutputMirror(os.Stdout)
+		t.AppendHeader(table.Row{"ID", "Type", "From", "To", "Asset", "Amount", "Timestamp"})
+		t.AppendSeparator()
+
+		for _, tx := range res.LedgerTransactions {
+			t.AppendRow(table.Row{tx.Id, tx.TxType, tx.FromAccount, tx.ToAccount, tx.Asset, fmtDec(tx.Amount), tx.CreatedAt.Format(time.RFC3339)})
+		}
+		t.Render()
+
+		fmt.Println("Do you want to see the next page?")
+		actionSuggestions := []prompt.Suggest{
+			{Text: "yes", Description: "Show next page"},
+			{Text: "no", Description: "Quit listing"},
+		}
+		showNextPage := o.readSelectionArg("answer", actionSuggestions) == "yes"
+		if !showNextPage {
+			break
+		}
+
+		offset += pageSize
+	}
 }
 
 func (o *Operator) handleListPKeys(args []string) {

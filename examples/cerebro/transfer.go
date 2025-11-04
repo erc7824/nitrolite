@@ -20,7 +20,7 @@ func (o *Operator) handleTransfer(args []string) {
 	}
 
 	assetSymbol := args[1]
-	getLedgerBalancesRes, err := o.clearnode.GetLedgerBalances()
+	getLedgerBalancesRes, err := o.clearnode.GetLedgerBalances(o.config.Wallet.PublicKey().Address().String())
 	if err != nil {
 		fmt.Printf("Failed to get ledger balances: %s\n", err.Error())
 		return

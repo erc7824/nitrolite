@@ -568,7 +568,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 			return err
 		}
 
-		// Update channel state with final the state
+		// Update channel state with the final state
 		if len(ev.FinalState.Allocations) == 2 {
 			channel.State.Allocations = []Allocation{
 				{

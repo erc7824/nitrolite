@@ -1487,7 +1487,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(expected), "Combined allocation+resize amount mismatch")
 		require.Equal(t, 0, resObj.State.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 
-		// Verify channel state in database got 'resized status' with other params unchanged
+		// Verify channel state in database got 'resizing' status with other params unchanged
 		var unchangedChannel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&unchangedChannel).Error)
 		require.Equal(t, initialRawAmount, unchangedChannel.RawAmount)     // Should remain unchanged
@@ -1558,7 +1558,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		require.Equal(t, 0, resObj.State.Allocations[0].RawAmount.Cmp(decimal.Zero), "Combined allocation+resize amount mismatch")
 		require.Equal(t, 0, resObj.State.Allocations[1].RawAmount.Cmp(decimal.Zero), "Broker allocation should be zero")
 
-		// Verify channel state in database got 'resized status' with other params unchanged
+		// Verify channel state in database got 'resizing' status with other params unchanged
 		var channel Channel
 		require.NoError(t, db.Where("channel_id = ?", ch.ChannelID).First(&channel).Error)
 		require.Equal(t, initialRawAmount, channel.RawAmount)     // Should remain unchanged

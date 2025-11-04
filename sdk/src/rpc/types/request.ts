@@ -168,7 +168,7 @@ export interface GetAppSessionsRequest extends GenericRPCMessage {
  * @remarks
  * Now it is impossible to request the Node for a non-zero initial user allocation as
  * channels are created with zero deposit and must be funded separately via resize_channel.
- * This is a temporary fix for a critical vulnerability. A more elaborate solution will be implemented in the next major release.
+ * This constraint ensures proper funding sequencing and will be refined in the next major release.
  */
 export interface CreateChannelRequest extends GenericRPCMessage {
     method: RPCMethod.CreateChannel;

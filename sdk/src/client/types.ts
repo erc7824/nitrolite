@@ -129,7 +129,7 @@ export interface NitroliteClientConfig {
  * The initial allocation (`allocations[0]`) must have amount set to zero as
  * channels are created with zero deposit and must be funded separately via resize_channel.
  * It is impossible to request the backend for channel creation user deposit to be non-zero.
- * This is a temporary fix for a critical vulnerability. A more elaborate solution will be implemented in the next major release.
+ * This constraint ensures proper funding sequencing and will be refined in the next major release.
  */
 export interface CreateChannelParams {
     channel: Channel;

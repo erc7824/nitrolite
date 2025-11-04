@@ -1709,11 +1709,9 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		// Create channel params
-		amount := decimal.NewFromInt(1000000) // 1 USDC in raw units (6 decimals)
 		createParams := CreateChannelParams{
 			ChainID: 137,
 			Token:   tokenAddress,
-			Amount:  &amount,
 		}
 
 		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
@@ -1736,7 +1734,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		// Verify allocations
 		require.Equal(t, userAddress.Hex(), resObj.State.Allocations[0].Participant, "First allocation should be for user")
 		require.Equal(t, tokenAddress, resObj.State.Allocations[0].TokenAddress, "Token address should match")
-		require.Equal(t, amount, resObj.State.Allocations[0].RawAmount, "Amount should match")
+		require.True(t, resObj.State.Allocations[0].RawAmount.IsZero(), "User allocation should be zero")
 
 		require.Equal(t, router.Signer.GetAddress().Hex(), resObj.State.Allocations[1].Participant, "Second allocation should be for broker")
 		require.Equal(t, tokenAddress, resObj.State.Allocations[1].TokenAddress, "Token address should match")
@@ -1753,11 +1751,9 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		tokenAddress := "0xTokenCreate"
 		seedAsset(t, &router.Config.assets, tokenAddress, 999, "usdc", 6)
 
-		amount := decimal.NewFromInt(1000000)
 		createParams := CreateChannelParams{
 			ChainID: 999, // Unsupported chain ID
 			Token:   tokenAddress,
-			Amount:  &amount,
 		}
 
 		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
@@ -1773,11 +1769,9 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		t.Cleanup(cleanup)
 
 		// Don't seed any assets
-		amount := decimal.NewFromInt(1000000)
 		createParams := CreateChannelParams{
 			ChainID: 137,
 			Token:   "0xUnsupportedToken",
-			Amount:  &amount,
 		}
 
 		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
@@ -1812,11 +1806,9 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		require.NoError(t, db.Create(&existingChannel).Error)
 
 		// Try to create another channel with same token/chain
-		amount := decimal.NewFromInt(1000000)
 		createParams := CreateChannelParams{
 			ChainID: 137,
 			Token:   tokenAddress,
-			Amount:  &amount,
 		}
 
 		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
@@ -1836,11 +1828,9 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
 
 		// Create channel params
-		amount := decimal.NewFromInt(1000000)
 		createParams := CreateChannelParams{
 			ChainID: 137,
 			Token:   tokenAddress,
-			Amount:  &amount,
 		}
 
 		// Create context without signature (empty signers)
@@ -1850,59 +1840,6 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		router.HandleCreateChannel(ctx)
 
 		assertErrorResponse(t, ctx, "invalid signature")
-	})
-
-	t.Run("SuccessfulZeroAmount", func(t *testing.T) {
-		t.Parallel()
-
-		router, _, cleanup := setupTestRPCRouter(t)
-		t.Cleanup(cleanup)
-
-		// Seed asset
-		tokenAddress := "0xTokenCreate"
-		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
-
-		// Try to create channel with zero amount
-		amount := decimal.Zero
-		createParams := CreateChannelParams{
-			ChainID: 137,
-			Token:   tokenAddress,
-			Amount:  &amount,
-		}
-
-		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
-		router.HandleCreateChannel(ctx)
-
-		// This should work as zero amount channels are allowed
-		res := assertResponse(t, ctx, "create_channel")
-		resObj, ok := res.Params.(ChannelOperationResponse)
-		require.True(t, ok, "Response should be CreateChannelResponse")
-		require.True(t, resObj.State.Allocations[0].RawAmount.IsZero(), "User allocation should be zero")
-	})
-
-	t.Run("ErrorNegativeAmount", func(t *testing.T) {
-		t.Parallel()
-
-		router, _, cleanup := setupTestRPCRouter(t)
-		t.Cleanup(cleanup)
-
-		// Seed asset
-		tokenAddress := "0xTokenCreate"
-		seedAsset(t, &router.Config.assets, tokenAddress, 137, "usdc", 6)
-
-		// Try to create channel with negative amount
-		amount := decimal.NewFromInt(-1000)
-		createParams := CreateChannelParams{
-			ChainID: 137,
-			Token:   tokenAddress,
-			Amount:  &amount,
-		}
-
-		ctx := createSignedRPCContext(1, "create_channel", createParams, userSigner)
-		router.HandleCreateChannel(ctx)
-
-		// This should fail during validation or processing
-		assertErrorResponse(t, ctx, "")
 	})
 }
 

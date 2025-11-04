@@ -4,6 +4,7 @@ import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
+import { composeResizeChannelParams } from '@/testHelpers';
 import { getResizeChannelPredicate, TestWebSocket } from '@/ws';
 import { createResizeChannelMessage, parseResizeChannelResponse } from '@erc7824/nitrolite';
 import { Hex, parseUnits } from 'viem';
@@ -49,11 +50,17 @@ describe('Resize channel', () => {
     });
 
     it('should resize channel by adding funds from deposit to channel', async () => {
-        const { params: createResponseParams } = await client.createAndWaitForChannel(ws, {
+        const { params: createResponseParams, state: createResponseState } = await client.createAndWaitForChannel(ws, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount * BigInt(5),
             depositAmount: depositAmount * BigInt(10), // depositing more than initial amount to have resize buffer
         });
+
+        const channelBalance = await client.getChannelBalance(
+            createResponseParams.channelId,
+            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS
+        );
+        expect(channelBalance).toBe(depositAmount * BigInt(5)); // 500
 
         const preResizeAccountBalance = await client.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
         expect(preResizeAccountBalance).toBe(depositAmount * BigInt(5)); // 1000 - 500
@@ -76,7 +83,7 @@ describe('Resize channel', () => {
         expect(resizeResponseParams.channelId).toBe(createResponseParams.channelId);
         expect(resizeResponseParams.state.stateData).toBeDefined();
         expect(resizeResponseParams.state.intent).toBe(2); // StateIntent.RESIZE // TODO: add enum to sdk
-        expect(resizeResponseParams.state.version).toBe(createResponseParams.version + 1);
+        expect(resizeResponseParams.state.version).toBe(Number(createResponseState.version) + 1);
 
         expect(resizeResponseParams.serverSignature).toBeDefined();
 
@@ -91,36 +98,12 @@ describe('Resize channel', () => {
         expect(String(resizeResponseParams.state.allocations[1].token)).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
-        const resizeChannelTxHash = await client.resizeChannel({
-            resizeState: {
-                channelId: resizeResponseParams.channelId as Hex,
-                intent: resizeResponseParams.state.intent,
-                version: BigInt(resizeResponseParams.state.version),
-                data: resizeResponseParams.state.stateData as Hex,
-                allocations: resizeResponseParams.state.allocations,
-                serverSignature: resizeResponseParams.serverSignature,
-            },
-            proofStates: [
-                // NOTE: Dummy adjudicator doesn't validate proofs, so we can pass any valid (from Custody POV) state
-                {
-                    intent: 1, // StateIntent.INITIALIZE
-                    version: BigInt(createResponseParams.version),
-                    data: '0x',
-                    allocations: [
-                        {
-                            destination: identity.walletAddress,
-                            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-                            amount: depositAmount * BigInt(5),
-                        },
-                        {
-                            destination: CONFIG.ADDRESSES.GUEST_ADDRESS,
-                            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-                            amount: BigInt(0),
-                        },
-                    ],
-                    sigs: [],
-                },
-            ],
+        const {txHash: resizeChannelTxHash} = await client.resizeChannel({
+            ...composeResizeChannelParams(
+                resizeResponseParams.channelId as Hex,
+                resizeResponseParams,
+                createResponseState
+            ),
         });
         expect(resizeChannelTxHash).toBeDefined();
 
@@ -138,7 +121,7 @@ describe('Resize channel', () => {
     });
 
     it('should resize channel by withdrawing funds from channel to deposit', async () => {
-        const { params: createResponseParams } = await client.createAndWaitForChannel(ws, {
+        const { params: createResponseParams, state: createResponseState } = await client.createAndWaitForChannel(ws, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount * BigInt(5),
             depositAmount: depositAmount * BigInt(10), // depositing more than initial amount to have resize buffer
@@ -161,6 +144,7 @@ describe('Resize channel', () => {
         });
 
         const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
+
         const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
         expect(resizeResponseParams.state.allocations).toBeDefined();
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
@@ -171,36 +155,12 @@ describe('Resize channel', () => {
         expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
-        const resizeChannelTxHash = await client.resizeChannel({
-            resizeState: {
-                channelId: resizeResponseParams.channelId as Hex,
-                intent: resizeResponseParams.state.intent,
-                version: BigInt(resizeResponseParams.state.version),
-                data: resizeResponseParams.state.stateData as Hex,
-                allocations: resizeResponseParams.state.allocations,
-                serverSignature: resizeResponseParams.serverSignature,
-            },
-            proofStates: [
-                // NOTE: Dummy adjudicator doesn't validate proofs, so we can pass any valid (from Custody POV) state
-                {
-                    intent: 1, // StateIntent.INITIALIZE
-                    version: BigInt(createResponseParams.version),
-                    data: '0x',
-                    allocations: [
-                        {
-                            destination: identity.walletAddress,
-                            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-                            amount: depositAmount * BigInt(5), // 500
-                        },
-                        {
-                            destination: CONFIG.ADDRESSES.GUEST_ADDRESS,
-                            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-                            amount: BigInt(0),
-                        },
-                    ],
-                    sigs: [],
-                },
-            ],
+        const {txHash: resizeChannelTxHash} = await client.resizeChannel({
+            ...composeResizeChannelParams(
+                resizeResponseParams.channelId as Hex,
+                resizeResponseParams,
+                createResponseState
+            ),
         });
         expect(resizeChannelTxHash).toBeDefined();
 
@@ -218,7 +178,7 @@ describe('Resize channel', () => {
     });
 
     it('should resize channel by allocating funds from channel to virtual ledger', async () => {
-        const { params: createResponseParams } = await client.createAndWaitForChannel(ws, {
+        const { params: createResponseParams, state: createResponseState } = await client.createAndWaitForChannel(ws, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount * BigInt(5),
             depositAmount: depositAmount * BigInt(10), // depositing more than initial amount to have resize buffer
@@ -251,36 +211,12 @@ describe('Resize channel', () => {
         expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
-        const resizeChannelTxHash = await client.resizeChannel({
-            resizeState: {
-                channelId: resizeResponseParams.channelId as Hex,
-                intent: resizeResponseParams.state.intent,
-                version: BigInt(resizeResponseParams.state.version),
-                data: resizeResponseParams.state.stateData as Hex,
-                allocations: resizeResponseParams.state.allocations,
-                serverSignature: resizeResponseParams.serverSignature,
-            },
-            proofStates: [
-                // NOTE: Dummy adjudicator doesn't validate proofs, so we can pass any valid (from Custody POV) state
-                {
-                    intent: 1, // StateIntent.INITIALIZE
-                    version: BigInt(createResponseParams.version),
-                    data: '0x',
-                    allocations: [
-                        {
-                            destination: identity.walletAddress,
-                            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-                            amount: depositAmount * BigInt(5), // 500
-                        },
-                        {
-                            destination: CONFIG.ADDRESSES.GUEST_ADDRESS,
-                            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-                            amount: BigInt(0),
-                        },
-                    ],
-                    sigs: [],
-                },
-            ],
+        const {txHash: resizeChannelTxHash} = await client.resizeChannel({
+            ...composeResizeChannelParams(
+                resizeResponseParams.channelId as Hex,
+                resizeResponseParams,
+                createResponseState
+            )
         });
         expect(resizeChannelTxHash).toBeDefined();
 

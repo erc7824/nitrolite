@@ -47,6 +47,10 @@ export async function _prepareAndSignInitialState(
         throw new Errors.InvalidParameterError('Initial allocation amounts must be provided for both participants.');
     }
 
+    if (unsignedInitialState.allocations[0].amount !== 0n) {
+        throw new Errors.InvalidParameterError('Initial allocation amount for the first participant must be zero.');
+    }
+
     if (!channel) {
         throw new Errors.MissingParameterError("Channel's fixed part is required for creating the channel");
     }

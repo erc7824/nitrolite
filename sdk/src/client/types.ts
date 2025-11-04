@@ -91,23 +91,6 @@ export interface FinalState extends UnsignedState {
     serverSignature: Signature;
 }
 
-// Legacy types for backward compatibility
-export interface LegacyChannel {
-    participants: [Address, Address]; // Legacy: exactly 2 participants
-    adjudicator: Address;
-    challenge: bigint;
-    nonce: bigint;
-    chainId: number; // Legacy field not in contract
-}
-
-export interface LegacyState {
-    intent: StateIntent;
-    version: bigint;
-    data: Hex;
-    allocations: [Allocation, Allocation]; // Legacy: exactly 2 allocations
-    sigs: Signature[];
-}
-
 /**
  * Configuration for initializing the NitroliteClient.
  */
@@ -142,6 +125,11 @@ export interface NitroliteClientConfig {
 
 /**
  * Parameters required for creating a new state channel.
+ * @remarks
+ * The initial allocation (`allocations[0]`) must have amount set to zero as
+ * channels are created with zero deposit and must be funded separately via resize_channel.
+ * It is impossible to request the backend for channel creation user deposit to be non-zero.
+ * This constraint ensures proper funding sequencing and will be refined in the next major release.
  */
 export interface CreateChannelParams {
     channel: Channel;

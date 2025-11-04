@@ -361,8 +361,6 @@ type CreateChannelRequest struct {
 	ChainID uint32 `json:"chain_id" validate:"required"`
 	// Token is the asset/token address for the channel
 	Token string `json:"token" validate:"required"`
-	// Amount is the initial funding amount
-	Amount *decimal.Decimal `json:"amount" validate:"required,bigint"`
 	// SessionKey optionally specifies a custom session identifier
 	SessionKey *string `json:"session_key,omitempty" validate:"omitempty"`
 }

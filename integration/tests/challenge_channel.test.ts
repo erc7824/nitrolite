@@ -45,13 +45,13 @@ describe('Challenge channel', () => {
     });
 
     it('should mark channel as challenged when valid current state is challenged', async () => {
-        const { params: createResponse, initialState } = await client.createAndWaitForChannel(ws, {
+        const { params: createResponse, state: initialState } = await client.createAndWaitForChannel(ws, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount * BigInt(10),
         });
 
         const channelId = createResponse.channelId;
-        expect(createResponse.version).toBe(0);
+        expect(createResponse.version).toBe(1); // 1 because channel was resized as well
 
         const challengeReceipt = await client.challengeChannel({
             channelId: channelId,

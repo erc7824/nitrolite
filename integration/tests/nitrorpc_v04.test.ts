@@ -3,7 +3,7 @@ import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { TestWebSocket } from '@/ws';
-import { RPCAppStateIntent, RPCProtocolVersion } from '@erc7824/nitrolite';
+import { RPCAppStateIntent, RPCProtocolVersion, State } from '@erc7824/nitrolite';
 import { Hex } from 'viem';
 import { fetchAndParseAppSessions, setupTestIdentitiesAndConnections } from '@/testSetup';
 import {
@@ -69,8 +69,8 @@ describe('App session state v0.4 error cases', () => {
 
     beforeEach(async () => {
         await blockUtils.makeSnapshot();
-
-        [aliceChannelId, bobChannelId] = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], toRaw(onChainDepositAmount));
+        let states: State[];
+        ({channelIds: [aliceChannelId, bobChannelId], states} = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], toRaw(onChainDepositAmount)));
 
         await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount);
 
@@ -84,7 +84,7 @@ describe('App session state v0.4 error cases', () => {
             START_SESSION_DATA
         );
 
-        currentVersion = 1;
+        currentVersion = Number(states[0].version);
     });
 
     afterEach(async () => {

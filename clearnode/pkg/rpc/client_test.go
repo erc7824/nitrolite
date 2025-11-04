@@ -167,7 +167,7 @@ func TestClient_Channels(t *testing.T) {
 	t.Parallel()
 
 	client, dialer := setupClient()
-	amount := decimal.NewFromInt(1000)
+	amount := decimal.NewFromInt(0) // Zero amount for channel creation
 
 	t.Run("create", func(t *testing.T) {
 		expected := rpc.CreateChannelResponse{
@@ -182,7 +182,7 @@ func TestClient_Channels(t *testing.T) {
 		}
 		registerSimpleHandler(dialer, rpc.CreateChannelMethod, expected)
 
-		req := rpc.CreateChannelRequest{ChainID: testChainID, Token: testToken, Amount: &amount}
+		req := rpc.CreateChannelRequest{ChainID: testChainID, Token: testToken}
 		payload, err := client.PreparePayload(rpc.CreateChannelMethod, req)
 		require.NoError(t, err)
 		fullReq := rpc.NewRequest(payload, sign.Signature{})

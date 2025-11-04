@@ -15,6 +15,7 @@ import {
     parseResizeChannelResponse,
     RPCProtocolVersion,
     RPCAppStateIntent,
+    State,
 } from '@erc7824/nitrolite';
 import { Hex } from 'viem';
 import {
@@ -27,6 +28,7 @@ import {
     createTestAppSession,
     getLedgerBalances,
     toRaw,
+    composeResizeChannelParams,
 } from '@/testHelpers';
 import {
     submitAppStateUpdate_v04,
@@ -61,6 +63,10 @@ describe('nitrorpc_v04 lifecycle', () => {
 
     let aliceChannelId: Hex;
     let bobChannelId: Hex;
+
+    let initialAliceState: State;
+    let initialBobState: State;
+
     let appSessionId: string;
 
     let currentVersion = 1;
@@ -116,7 +122,7 @@ describe('nitrorpc_v04 lifecycle', () => {
     });
 
     it('should create and init two channels', async () => {
-        [aliceChannelId, bobChannelId] = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], toRaw(onChainDepositAmount));
+        ({channelIds: [aliceChannelId, bobChannelId], states: [initialAliceState, initialBobState]} = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], toRaw(onChainDepositAmount)));
     });
 
     it('should create app session with allowance for participant to deposit', async () => {
@@ -336,36 +342,12 @@ describe('nitrorpc_v04 lifecycle', () => {
         expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
-        const resizeChannelTxHash = await bobClient.resizeChannel({
-            resizeState: {
-                channelId: resizeResponseParams.channelId as Hex,
-                intent: resizeResponseParams.state.intent,
-                version: BigInt(resizeResponseParams.state.version),
-                data: resizeResponseParams.state.stateData as Hex,
-                allocations: resizeResponseParams.state.allocations,
-                serverSignature: resizeResponseParams.serverSignature,
-            },
-            proofStates: [
-                // NOTE: Dummy adjudicator doesn't validate proofs, so we can pass any valid (from Custody POV) state
-                {
-                    intent: 1, // StateIntent.INITIALIZE
-                    version: BigInt(0),
-                    data: '0x',
-                    allocations: [
-                        {
-                            destination: bob.walletAddress,
-                            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-                            amount: toRaw(onChainDepositAmount),
-                        },
-                        {
-                            destination: CONFIG.ADDRESSES.GUEST_ADDRESS,
-                            token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
-                            amount: BigInt(0),
-                        },
-                    ],
-                    sigs: [],
-                },
-            ],
+        const {txHash: resizeChannelTxHash} = await bobClient.resizeChannel({
+            ...composeResizeChannelParams(
+                resizeResponseParams.channelId as Hex,
+                resizeResponseParams,
+                initialBobState
+            ),
         });
         expect(resizeChannelTxHash).toBeDefined();
 

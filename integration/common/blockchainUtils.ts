@@ -17,6 +17,7 @@ import {
 } from 'viem';
 import { chain } from './setup';
 import { privateKeyToAccount } from 'viem/accounts';
+import { custodyAbi } from '@erc7824/nitrolite/dist/abis/generated';
 
 export class BlockchainUtils {
     private client = null;
@@ -97,6 +98,40 @@ export class BlockchainUtils {
             };
         } catch (error) {
             throw new Error(`Error getting ERC20 balance: ${error.message}`);
+        }
+    }
+
+    async getChannelBalance(
+        custodyAddress: Address,
+        channelId: Hash,
+        tokenAddress: Address,
+        decimals?: number
+    ): Promise<{ rawBalance: bigint; formattedBalance: string }> {
+        try {
+            // Get channel balance
+            const balances = await this.client.readContract({
+                address: custodyAddress,
+                abi: custodyAbi,
+                functionName: 'getChannelBalances',
+                args: [channelId, [tokenAddress]],
+            });
+
+            const channelBalance = balances[0];
+
+            const tokenDecimals =
+                decimals ??
+                (await this.client.readContract({
+                    address: tokenAddress,
+                    abi: erc20Abi,
+                    functionName: 'decimals',
+                }));
+
+            return {
+                rawBalance: channelBalance,
+                formattedBalance: formatUnits(channelBalance, tokenDecimals),
+            };
+        } catch (error) {
+            throw new Error(`Error getting channel balance: ${error.message}`);
         }
     }
 

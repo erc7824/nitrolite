@@ -4,11 +4,14 @@ import {
     convertRPCToClientState,
     createCloseChannelMessage,
     createCreateChannelMessage,
+    createResizeChannelMessage,
     NitroliteClient,
     parseChannelUpdateResponse,
     parseCloseChannelResponse,
     parseCreateChannelResponse,
+    parseResizeChannelResponse,
     RPCChannelStatus,
+    State,
 } from '@erc7824/nitrolite';
 import { Identity } from './identity';
 import { Address, createPublicClient, Hex, http } from 'viem';
@@ -19,6 +22,7 @@ import {
     getCreateChannelPredicate,
     TestWebSocket,
 } from './ws';
+import { composeResizeChannelParams } from './testHelpers';
 
 export class TestNitroliteClient extends NitroliteClient {
     constructor(private identity: Identity) {
@@ -50,12 +54,13 @@ export class TestNitroliteClient extends NitroliteClient {
         const msg = await createCreateChannelMessage(this.identity.messageWalletSigner, {
             chain_id: chain.id,
             token: tokenAddress,
-            amount,
         });
+
         const createResponse = await ws.sendAndWaitForResponse(msg, getCreateChannelPredicate(), 5000);
         expect(createResponse).toBeDefined();
 
         const { params: createParsedResponseParams } = parseCreateChannelResponse(createResponse);
+
 
         const openChannelPromise = ws.waitForMessage(
             getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),
@@ -64,7 +69,7 @@ export class TestNitroliteClient extends NitroliteClient {
         );
 
         depositAmount = depositAmount ?? amount;
-        const { initialState } = await this.depositAndCreateChannel(tokenAddress, depositAmount, {
+        const { channelId, initialState } = await this.depositAndCreateChannel(tokenAddress, depositAmount, {
             unsignedInitialState: convertRPCToClientState(
                 createParsedResponseParams.state,
                 createParsedResponseParams.serverSignature
@@ -73,12 +78,64 @@ export class TestNitroliteClient extends NitroliteClient {
             serverSignature: createParsedResponseParams.serverSignature,
         });
 
-        const openResponse = await openChannelPromise;
+        // wait for Clearnode to process channel opening
+        await openChannelPromise;
 
-        const openParsedResponse = parseChannelUpdateResponse(openResponse);
-        const responseChannel = openParsedResponse.params;
+        const resizeChannelPromise = ws.waitForMessage(
+            getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),
+            undefined,
+            5000
+        );
 
-        return { params: responseChannel, initialState };
+        const {state} = await this.topUpChannel(ws, channelId, initialState, amount, this.identity.walletAddress);
+
+        const resizeResponse = await resizeChannelPromise;
+        const resizeParsedResponse = parseChannelUpdateResponse(resizeResponse);
+        const responseChannel = resizeParsedResponse.params;
+
+        return { params: responseChannel, state };
+    };
+
+    topUpChannel = async (
+        ws: TestWebSocket,
+        channelId: Hex,
+        previousState: State,
+        resizeAmount: bigint,
+        fundsDestination: Address
+    ) => {
+        const msg = await createResizeChannelMessage(this.identity.messageWalletSigner, {
+            channel_id: channelId,
+            resize_amount: resizeAmount,
+            funds_destination: fundsDestination,
+        });
+
+        const resizeResponse = await ws.sendAndWaitForResponse(msg, (msg: any) => {
+            try {
+                const parsed = parseResizeChannelResponse(msg);
+                return parsed.method === 'resize_channel';
+            } catch {
+                return false;
+            }
+        }, 5000);
+
+        const resizeParsedResponse = parseResizeChannelResponse(resizeResponse);
+
+        const resizeChannelUpdatePromise = ws.waitForMessage(
+            getChannelUpdatePredicateWithStatus(RPCChannelStatus.Open),
+            undefined,
+            5000
+        );
+
+        const resizeStateParams = composeResizeChannelParams(channelId, resizeParsedResponse.params, previousState);
+        const { resizeState } = await this.resizeChannel({
+            ...resizeStateParams
+        });
+
+        const resizeChannelUpdateResponse = await resizeChannelUpdatePromise;
+        const resizeChannelUpdateParsedResponse = parseChannelUpdateResponse(resizeChannelUpdateResponse);
+        const responseChannel = resizeChannelUpdateParsedResponse.params;
+
+        return { params: responseChannel, state: resizeState };
     };
 
     closeAndWithdrawChannel = async (ws: TestWebSocket, channelId: Hex) => {

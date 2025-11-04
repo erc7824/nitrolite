@@ -12,6 +12,9 @@ import {
     createGetLedgerBalancesMessage,
     parseGetLedgerBalancesResponse,
     RPCBalance,
+    ResizeChannelParams,
+    RPCChannelOperation,
+    State,
 } from '@erc7824/nitrolite';
 import { Hex } from 'viem';
 
@@ -28,19 +31,21 @@ export async function createTestChannels(
         ws: TestWebSocket;
     }[],
     depositAmount: bigint
-): Promise<Hex[]> {
+): Promise<{channelIds: Hex[], states: State[]}> {
     const channelIds: Hex[] = [];
+    const states: State[] = [];
 
     for (const { client, ws } of params) {
-        const { params: channelParams } = await client.createAndWaitForChannel(ws, {
+        const { params: channelParams, state } = await client.createAndWaitForChannel(ws, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount,
         });
 
         channelIds.push(channelParams.channelId);
+        states.push(state);
     }
 
-    return channelIds;
+    return { channelIds, states };
 }
 
 /**
@@ -165,4 +170,21 @@ export async function getLedgerBalances(appIdentity: Identity, appWS: TestWebSoc
     expect(getLedgerBalancesParsedResponse).toBeDefined();
 
     return getLedgerBalancesParsedResponse.params.ledgerBalances;
+}
+
+export function composeResizeChannelParams(
+    channelId: Hex,
+    resizeResponseParams: RPCChannelOperation,
+    previousState: State,
+): ResizeChannelParams {
+    return {
+            resizeState: {
+                channelId,
+                ...resizeResponseParams.state,
+                serverSignature: resizeResponseParams.serverSignature,
+                data: resizeResponseParams.state.stateData as Hex,
+                version: BigInt(resizeResponseParams.state.version),
+            },
+            proofStates: [previousState],
+        };
 }

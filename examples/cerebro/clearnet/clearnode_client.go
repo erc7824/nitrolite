@@ -11,9 +11,9 @@ import (
 )
 
 type ClearnodeClient struct {
-	rpcDialer rpc.Dialer
-	rpcClient *rpc.Client
-	signer    sign.Signer // User's Session Key
+	rpcDialer  rpc.Dialer
+	rpcClient  *rpc.Client
+	sessionKey sign.Signer // User's Session Key
 
 	exitCh chan struct{} // Channel to signal client exit
 }
@@ -133,35 +133,21 @@ func (c *ClearnodeClient) GetUserTag() (rpc.GetUserTagResponse, error) {
 }
 
 func (c *ClearnodeClient) RequestChannelCreation(chainID uint32, assetAddress string) (rpc.CreateChannelResponse, error) {
-	if c.signer == nil {
-		return rpc.CreateChannelResponse{}, fmt.Errorf("client not authenticated")
-	}
-
-	sessionKey := c.signer.PublicKey().Address().String()
+	sessionKeyAddress := c.sessionKey.PublicKey().Address().String()
 	amount := decimal.NewFromInt(0)
 	params := rpc.CreateChannelRequest{
 		ChainID:    chainID,
-		SessionKey: &sessionKey,
+		SessionKey: &sessionKeyAddress,
 		Token:      assetAddress,
 		Amount:     &amount,
 	}
-	payload, err := c.rpcClient.PreparePayload(rpc.CreateChannelMethod, params)
+
+	req, err := c.prepareSignedRequest(rpc.CreateChannelMethod, params)
 	if err != nil {
-		return rpc.CreateChannelResponse{}, fmt.Errorf("failed to prepare payload: %w", err)
+		return rpc.CreateChannelResponse{}, fmt.Errorf("failed to prepare create channel request: %w", err)
 	}
 
-	hash, err := payload.Hash()
-	if err != nil {
-		return rpc.CreateChannelResponse{}, fmt.Errorf("failed to hash payload: %w", err)
-	}
-
-	sig, err := c.signer.Sign(hash)
-	if err != nil {
-		return rpc.CreateChannelResponse{}, fmt.Errorf("failed to sign payload: %w", err)
-	}
-
-	req := rpc.NewRequest(payload, sig)
-	res, _, err := c.rpcClient.CreateChannel(context.Background(), &req)
+	res, _, err := c.rpcClient.CreateChannel(context.Background(), req)
 	if err != nil {
 		return rpc.CreateChannelResponse{}, fmt.Errorf("failed to create channel: %w", err)
 	}
@@ -170,31 +156,17 @@ func (c *ClearnodeClient) RequestChannelCreation(chainID uint32, assetAddress st
 }
 
 func (c *ClearnodeClient) RequestChannelClosure(walletAddress sign.Address, channelID string) (rpc.CloseChannelResponse, error) {
-	if c.signer == nil {
-		return rpc.CloseChannelResponse{}, fmt.Errorf("client not authenticated")
-	}
-
 	params := rpc.CloseChannelRequest{
 		FundsDestination: walletAddress.String(),
 		ChannelID:        channelID,
 	}
-	payload, err := c.rpcClient.PreparePayload(rpc.CloseChannelMethod, params)
+
+	req, err := c.prepareSignedRequest(rpc.CloseChannelMethod, params)
 	if err != nil {
-		return rpc.CloseChannelResponse{}, fmt.Errorf("failed to prepare payload: %w", err)
+		return rpc.CloseChannelResponse{}, fmt.Errorf("failed to prepare close channel request: %w", err)
 	}
 
-	hash, err := payload.Hash()
-	if err != nil {
-		return rpc.CloseChannelResponse{}, fmt.Errorf("failed to hash payload: %w", err)
-	}
-
-	sig, err := c.signer.Sign(hash)
-	if err != nil {
-		return rpc.CloseChannelResponse{}, fmt.Errorf("failed to sign payload: %w", err)
-	}
-
-	req := rpc.NewRequest(payload, sig)
-	res, _, err := c.rpcClient.CloseChannel(context.Background(), &req)
+	res, _, err := c.rpcClient.CloseChannel(context.Background(), req)
 	if err != nil {
 		return rpc.CloseChannelResponse{}, fmt.Errorf("failed to close channel: %w", err)
 	}
@@ -203,33 +175,19 @@ func (c *ClearnodeClient) RequestChannelClosure(walletAddress sign.Address, chan
 }
 
 func (c *ClearnodeClient) RequestChannelResize(walletAddress sign.Address, channelID string, allocateAmount, resizeAmount decimal.Decimal) (rpc.ResizeChannelResponse, error) {
-	if c.signer == nil {
-		return rpc.ResizeChannelResponse{}, fmt.Errorf("client not authenticated")
-	}
-
 	params := rpc.ResizeChannelRequest{
 		ChannelID:        channelID,
 		FundsDestination: walletAddress.String(),
 		AllocateAmount:   &allocateAmount,
 		ResizeAmount:     &resizeAmount,
 	}
-	payload, err := c.rpcClient.PreparePayload(rpc.ResizeChannelMethod, params)
+
+	req, err := c.prepareSignedRequest(rpc.ResizeChannelMethod, params)
 	if err != nil {
-		return rpc.ResizeChannelResponse{}, fmt.Errorf("failed to prepare payload: %w", err)
+		return rpc.ResizeChannelResponse{}, fmt.Errorf("failed to prepare resize channel request: %w", err)
 	}
 
-	hash, err := payload.Hash()
-	if err != nil {
-		return rpc.ResizeChannelResponse{}, fmt.Errorf("failed to hash payload: %w", err)
-	}
-
-	sig, err := c.signer.Sign(hash)
-	if err != nil {
-		return rpc.ResizeChannelResponse{}, fmt.Errorf("failed to sign payload: %w", err)
-	}
-
-	req := rpc.NewRequest(payload, sig)
-	res, _, err := c.rpcClient.ResizeChannel(context.Background(), &req)
+	res, _, err := c.rpcClient.ResizeChannel(context.Background(), req)
 	if err != nil {
 		return rpc.ResizeChannelResponse{}, fmt.Errorf("failed to resize channel: %w", err)
 	}
@@ -238,10 +196,6 @@ func (c *ClearnodeClient) RequestChannelResize(walletAddress sign.Address, chann
 }
 
 func (c *ClearnodeClient) Transfer(transferByTag bool, destinationValue string, assetSymbol string, amount decimal.Decimal) (rpc.TransferResponse, error) {
-	if c.signer == nil {
-		return rpc.TransferResponse{}, fmt.Errorf("client not authenticated")
-	}
-
 	destination := ""
 	destinationUserTag := ""
 	if transferByTag {
@@ -259,23 +213,13 @@ func (c *ClearnodeClient) Transfer(transferByTag bool, destinationValue string, 
 			},
 		},
 	}
-	payload, err := c.rpcClient.PreparePayload(rpc.TransferMethod, params)
+
+	req, err := c.prepareSignedRequest(rpc.TransferMethod, params)
 	if err != nil {
-		return rpc.TransferResponse{}, fmt.Errorf("failed to prepare payload: %w", err)
+		return rpc.TransferResponse{}, fmt.Errorf("failed to prepare transfer request: %w", err)
 	}
 
-	hash, err := payload.Hash()
-	if err != nil {
-		return rpc.TransferResponse{}, fmt.Errorf("failed to hash payload: %w", err)
-	}
-
-	sig, err := c.signer.Sign(hash)
-	if err != nil {
-		return rpc.TransferResponse{}, fmt.Errorf("failed to sign payload: %w", err)
-	}
-
-	req := rpc.NewRequest(payload, sig)
-	res, err := c.rpcDialer.Call(context.Background(), &req)
+	res, err := c.rpcDialer.Call(context.Background(), req)
 	if err != nil {
 		return rpc.TransferResponse{}, fmt.Errorf("failed to transfer funds: %w", err)
 	}
@@ -290,6 +234,30 @@ func (c *ClearnodeClient) Transfer(transferByTag bool, destinationValue string, 
 	}
 
 	return resParams, nil
+}
+
+func (c *ClearnodeClient) prepareSignedRequest(method rpc.Method, params any) (*rpc.Request, error) {
+	if c.sessionKey == nil {
+		return nil, fmt.Errorf("client not authenticated")
+	}
+
+	payload, err := c.rpcClient.PreparePayload(method, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare payload: %w", err)
+	}
+
+	hash, err := payload.Hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash payload: %w", err)
+	}
+
+	sig, err := c.sessionKey.Sign(hash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign payload: %w", err)
+	}
+
+	req := rpc.NewRequest(payload, sig)
+	return &req, nil
 }
 
 func (c *ClearnodeClient) WaitCh() <-chan struct{} {

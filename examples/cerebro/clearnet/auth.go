@@ -18,15 +18,16 @@ type AuthChallengeParams struct {
 }
 
 func (c *ClearnodeClient) Authenticate(wallet, signer sign.Signer) (rpc.AuthSigVerifyResponse, error) {
-	if c.signer != nil {
+	if c.sessionKey != nil {
 		return rpc.AuthSigVerifyResponse{}, nil // Already authenticated
 	}
 
 	params := rpc.AuthRequestRequest{
-		Address:    wallet.PublicKey().Address().String(),
-		SessionKey: signer.PublicKey().Address().String(), // Using address as session key for simplicity
-		AppName:    "clearnode",
-		Allowances: []rpc.Allowance{}, // No allowances for now
+		Address:            wallet.PublicKey().Address().String(),
+		SessionKey:         signer.PublicKey().Address().String(), // Using address as session key for simplicity
+		AppName:            "clearnode",                           // Indicates that we create a session key with root permissions
+		ApplicationAddress: wallet.PublicKey().Address().String(),
+		Allowances:         []rpc.Allowance{}, // No allowances for now
 		// TODO: Expire:      time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339),
 	}
 	res, _, err := c.rpcClient.AuthWithSig(context.Background(), params, wallet)
@@ -34,6 +35,6 @@ func (c *ClearnodeClient) Authenticate(wallet, signer sign.Signer) (rpc.AuthSigV
 		return rpc.AuthSigVerifyResponse{}, fmt.Errorf("authentication failed: %w", err)
 	}
 
-	c.signer = signer
+	c.sessionKey = signer
 	return res, nil
 }

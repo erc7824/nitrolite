@@ -119,6 +119,13 @@ func (o *Operator) handleListAppSessions() {
 			t.AppendRow(table.Row{"VERSION", session.Version, "STATUS", session.Status}, table.RowConfig{AutoMerge: true})
 			t.AppendRow(table.Row{"CREATED_AT", session.CreatedAt, "UPDATED_AT", session.UpdatedAt}, table.RowConfig{AutoMerge: true})
 			t.AppendSeparator()
+
+			if len(session.ParticipantWallets) > len(session.Weights) {
+				fmt.Printf("Warning: Mismatched participant wallets and weights in session %s\n", session.AppSessionID)
+				session.Weights = append(session.Weights, make([]int64, len(session.ParticipantWallets)-len(session.Weights))...)
+				continue
+			}
+
 			for i := range session.ParticipantWallets {
 				t.AppendRow(table.Row{fmt.Sprintf("PARTICIPANT_%d", i+1), session.ParticipantWallets[i], fmt.Sprintf("WEIGHT_%d", i+1), fmt.Sprintf("%d/%d", session.Weights[i], session.Quorum)}, table.RowConfig{AutoMerge: true})
 			}

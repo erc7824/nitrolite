@@ -1468,12 +1468,12 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
 				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "uint256"},
+				{Name: "expire", Type: "string"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {
 				{Name: "asset", Type: "string"},
-				{Name: "amount", Type: "uint256"}, // FIXME: currently allowance amount is string, so it will fail if there are some allowances
+				{Name: "amount", Type: "string"},
 			},
 		},
 		PrimaryType: "Policy",

@@ -101,12 +101,12 @@ func signChallenge(s unisig.Signer, c AuthChallengeParams, token string) (unisig
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
 				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "uint256"},
+				{Name: "expire", Type: "string"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {
 				{Name: "asset", Type: "string"},
-				{Name: "amount", Type: "uint256"},
+				{Name: "amount", Type: "string"},
 			}},
 		PrimaryType: "Policy",
 		Domain: apitypes.TypedDataDomain{

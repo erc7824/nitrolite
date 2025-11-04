@@ -59,7 +59,7 @@
     },
     "dependencies": {
         "abitype": "^0.10.3",
-        "viem": "^2.37.8",
+        "viem": "^2.38.2",
         "zod": "^3.25.76"
     },
     "devDependencies": {

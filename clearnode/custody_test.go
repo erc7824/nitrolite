@@ -563,6 +563,115 @@ func TestHandleClosedEvent(t *testing.T) {
 		assert.True(t, finalAmountDecimal.Equal(tx.Amount), "Transaction amount should match final amount")
 		assert.False(t, tx.CreatedAt.IsZero(), "CreatedAt should be set")
 	})
+
+	t.Run("Close Resizing Channel With Escrow", func(t *testing.T) {
+		custody, db, cleanup := setupMockCustody(t)
+		defer cleanup()
+
+		initialRawAmount := decimal.NewFromInt(1000000)
+		escrowAmount := decimal.NewFromInt(300000) // Amount locked in channel escrow during resize
+		finalAmount := big.NewInt(500000)          // Final amount after close
+
+		channelID := "0x0102030400000000000000000000000000000000000000000000000000000000"
+		channelAccountID := NewAccountID(channelID)
+		walletAddr := newTestCommonAddress("0xWallet123")
+		walletAccountID := NewAccountID(walletAddr.Hex())
+		participantAddr := newTestCommonAddress("0xParticipant1")
+
+		initialChannel := Channel{
+			ChannelID:   channelID,
+			Wallet:      walletAddr.Hex(),
+			Participant: participantAddr.Hex(),
+			Status:      ChannelStatusResizing, // Channel is in resizing state
+			Token:       tokenAddress,
+			ChainID:     custody.chainID,
+			RawAmount:   initialRawAmount,
+			Nonce:       12345,
+			State: UnsignedState{
+				Version: 1,
+			},
+			Challenge:   3600,
+			Adjudicator: newTestCommonAddress("0xAdjudicatorAddress").Hex(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+		err := db.Create(&initialChannel).Error
+		require.NoError(t, err)
+
+		asset, ok := custody.assetsCfg.GetAssetTokenByAddressAndChainID(tokenAddress, custody.chainID)
+		require.True(t, ok)
+
+		ledger := GetWalletLedger(db, walletAddr)
+		initialWalletBalanceDecimal := decimal.NewFromBigInt(initialRawAmount.BigInt(), 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
+		escrowAmountDecimal := escrowAmount.Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
+
+		// Set up wallet balance
+		require.NoError(t, ledger.Record(walletAccountID, asset.Symbol, initialWalletBalanceDecimal, nil))
+		// Set up channel escrow balance (simulating funds locked during resize)
+		require.NoError(t, ledger.Record(channelAccountID, asset.Symbol, escrowAmountDecimal, nil))
+
+		_, mockEvent := createMockClosedEvent(t, custody.signer, tokenAddress, finalAmount)
+
+		capturedNotifications := make(map[string][]Notification)
+		custody.wsNotifier.notify = func(userID string, method string, params RPCDataParams) {
+			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
+				userID:    userID,
+				eventType: EventType(method),
+				data:      params,
+			})
+		}
+
+		logger := custody.logger.With("event", "Closed")
+		custody.handleClosed(logger, mockEvent)
+
+		var updatedChannel Channel
+		err = db.Where("channel_id = ?", channelID).First(&updatedChannel).Error
+		require.NoError(t, err)
+
+		// Verify channel is closed
+		assert.Equal(t, ChannelStatusClosed, updatedChannel.Status)
+		assert.Equal(t, decimal.NewFromInt(0), updatedChannel.RawAmount, "Amount should be zero after closing")
+
+		// Verify channel escrow balance is now zero (unlocked)
+		channelBalance, err := ledger.Balance(channelAccountID, asset.Symbol)
+		require.NoError(t, err)
+		assert.True(t, channelBalance.IsZero(), "Channel escrow balance should be zero after closing")
+
+		// Verify wallet balance
+		finalAmountDecimal := decimal.NewFromBigInt(finalAmount, 0).Div(decimal.NewFromInt(10).Pow(decimal.NewFromInt(int64(asset.Token.Decimals))))
+		expectedWalletBalance := initialWalletBalanceDecimal.Add(escrowAmountDecimal).Sub(finalAmountDecimal)
+
+		walletBalance, err := ledger.Balance(walletAccountID, asset.Symbol)
+		require.NoError(t, err)
+		assert.True(t, walletBalance.Equal(expectedWalletBalance),
+			"Wallet balance should be %s (initial %s + escrow %s - final %s), got %s",
+			expectedWalletBalance, initialWalletBalanceDecimal, escrowAmountDecimal, finalAmountDecimal, walletBalance)
+
+		// Verify transactions were recorded
+		var transactions []LedgerTransaction
+		err = db.Where("from_account = ? OR to_account = ?", channelID, channelID).Order("created_at ASC").Find(&transactions).Error
+		require.NoError(t, err)
+		assert.Len(t, transactions, 2, "Should have 2 transactions: escrow unlock and withdrawal")
+
+		// First transaction should be escrow unlock
+		unlockTx := transactions[0]
+		assert.Equal(t, TransactionTypeEscrowUnlock, unlockTx.Type, "First transaction should be escrow unlock")
+		assert.Equal(t, channelID, unlockTx.FromAccount, "Escrow unlock from account should be channel ID")
+		assert.Equal(t, walletAddr.Hex(), unlockTx.ToAccount, "Escrow unlock to account should be wallet address")
+		assert.Equal(t, asset.Symbol, unlockTx.AssetSymbol, "Asset symbol should match")
+		assert.True(t, escrowAmountDecimal.Equal(unlockTx.Amount), "Unlock amount should match escrow amount")
+
+		// Second transaction should be withdrawal
+		withdrawalTx := transactions[1]
+		assert.Equal(t, TransactionTypeWithdrawal, withdrawalTx.Type, "Second transaction should be withdrawal")
+		assert.Equal(t, walletAddr.Hex(), withdrawalTx.FromAccount, "Withdrawal from account should be wallet address")
+		assert.Equal(t, channelID, withdrawalTx.ToAccount, "Withdrawal to account should be channel ID")
+		assert.Equal(t, asset.Symbol, withdrawalTx.AssetSymbol, "Asset symbol should match")
+		assert.True(t, finalAmountDecimal.Equal(withdrawalTx.Amount), "Withdrawal amount should match final amount")
+
+		// Verify notifications
+		assertNotifications(t, capturedNotifications, walletAddr.Hex(), 2)
+	})
 }
 
 func TestHandleChallengedEvent(t *testing.T) {

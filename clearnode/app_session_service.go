@@ -149,6 +149,10 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 
 			noDeposits = false
 
+			if err := ensureWalletHasZeroChannelAllocation(tx, walletAddress); err != nil {
+				return UpdateResult{}, err
+			}
+
 			// Check if participant has signed directly or via session key
 			sigCtx := getSessionKeyForAppParticipant(alloc.Participant, d.rpcSigners)
 			if !sigCtx.HasSignature {
@@ -425,6 +429,10 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 			walletAddress := alloc.Participant
 
 			if err := checkChallengedChannels(tx, walletAddress); err != nil {
+				return err
+			}
+
+			if err := ensureWalletHasZeroChannelAllocation(tx, walletAddress); err != nil {
 				return err
 			}
 

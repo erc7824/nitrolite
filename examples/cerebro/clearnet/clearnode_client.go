@@ -67,6 +67,22 @@ func (c *ClearnodeClient) GetLedgerBalances(accountID string) (rpc.GetLedgerBala
 	return res, nil
 }
 
+func (c *ClearnodeClient) GetLedgerEntries(wallet, accountID, assetSymbol string, offset, limit uint32) (rpc.GetLedgerEntriesResponse, error) {
+	res, _, err := c.rpcClient.GetLedgerEntries(context.Background(), rpc.GetLedgerEntriesRequest{
+		ListOptions: rpc.ListOptions{
+			Offset: offset,
+			Limit:  limit,
+		},
+		Wallet:    wallet,
+		AccountID: accountID,
+		Asset:     assetSymbol,
+	})
+	if err != nil {
+		return rpc.GetLedgerEntriesResponse{}, fmt.Errorf("failed to fetch ledger entries: %w", err)
+	}
+	return res, nil
+}
+
 func (c *ClearnodeClient) GetLedgerTransactions(accountID, assetSymbol string, offset, limit uint32) (rpc.GetLedgerTransactionsResponse, error) {
 	res, _, err := c.rpcClient.GetLedgerTransactions(context.Background(), rpc.GetLedgerTransactionsRequest{
 		ListOptions: rpc.ListOptions{

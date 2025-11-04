@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	initialQueryOffset = uint32(0)
-	pageSize           = uint32(10)
+	initialQueryOffset    = uint32(0)
+	defaultPageSize       = uint32(10)
+	ledgerEntriesPageSize = uint32(100)
 )
 
 func (o *Operator) handleListChains() {
@@ -101,7 +102,7 @@ func (o *Operator) handleListAppSessions() {
 
 	offset := initialQueryOffset
 	for {
-		res, err := o.clearnode.GetAppSessions(participant, statusFilter, offset, pageSize)
+		res, err := o.clearnode.GetAppSessions(participant, statusFilter, offset, defaultPageSize)
 		if err != nil {
 			fmt.Printf("Failed to get app sessions: %s\n", err.Error())
 			return
@@ -119,7 +120,7 @@ func (o *Operator) handleListAppSessions() {
 			t.AppendRow(table.Row{"CREATED_AT", session.CreatedAt, "UPDATED_AT", session.UpdatedAt}, table.RowConfig{AutoMerge: true})
 			t.AppendSeparator()
 			for i := range session.ParticipantWallets {
-				t.AppendRow(table.Row{fmt.Sprintf("PARTICIPANT_%d", i+1), session.ParticipantWallets[i], fmt.Sprintf("WEIGHT_%d", i+1), session.Weights[i]}, table.RowConfig{AutoMerge: true})
+				t.AppendRow(table.Row{fmt.Sprintf("PARTICIPANT_%d", i+1), session.ParticipantWallets[i], fmt.Sprintf("WEIGHT_%d", i+1), fmt.Sprintf("%d/%d", session.Weights[i], session.Quorum)}, table.RowConfig{AutoMerge: true})
 			}
 
 			t.Render()
@@ -135,7 +136,7 @@ func (o *Operator) handleListAppSessions() {
 			break
 		}
 
-		offset += pageSize
+		offset += defaultPageSize
 	}
 }
 
@@ -170,7 +171,7 @@ func (o *Operator) handleListLedgerTransactions() {
 
 	offset := initialQueryOffset
 	for {
-		res, err := o.clearnode.GetLedgerTransactions(o.config.Wallet.PublicKey().Address().String(), "", offset, pageSize)
+		res, err := o.clearnode.GetLedgerTransactions(o.config.Wallet.PublicKey().Address().String(), "", offset, defaultPageSize)
 		if err != nil {
 			fmt.Printf("Failed to get ledger transactions: %s\n", err.Error())
 			return
@@ -196,8 +197,44 @@ func (o *Operator) handleListLedgerTransactions() {
 			break
 		}
 
-		offset += pageSize
+		offset += defaultPageSize
 	}
+}
+
+func (o *Operator) handleListLedgerEntries() {
+	fmt.Println("Specify wallet filter (required):")
+	wallet := o.readExtraArg("wallet")
+	if !common.IsHexAddress(wallet) {
+		fmt.Println("Invalid address format. Please provide a valid Ethereum address.")
+		return
+	}
+
+	fmt.Println("Specify account ID (required):")
+	accountID := o.readExtraArg("account_id")
+
+	fmt.Println("Specify asset symbol (required):")
+	assetSymbol := o.readExtraArg("asset_symbol")
+
+	res, err := o.clearnode.GetLedgerEntries(wallet, accountID, assetSymbol, 0, ledgerEntriesPageSize)
+	if err != nil {
+		fmt.Printf("Failed to get ledger transactions: %s\n", err.Error())
+		return
+	}
+
+	t := table.NewWriter()
+	t.SetOutputMirror(os.Stdout)
+	t.AppendHeader(table.Row{"ID", "Wallet", "Account", "Asset", "Debit", "Credit", "Timestamp"})
+	t.AppendSeparator()
+
+	totalCredit := decimal.NewFromInt(0)
+	totalDebit := decimal.NewFromInt(0)
+	for _, tx := range res.LedgerEntries {
+		t.AppendRow(table.Row{tx.ID, tx.Participant, tx.AccountID, tx.Asset, fmtDec(tx.Debit), fmtDec(tx.Credit), tx.CreatedAt.Format(time.RFC3339)})
+		totalCredit = totalCredit.Add(tx.Credit)
+		totalDebit = totalDebit.Add(tx.Debit)
+	}
+	t.AppendFooter(table.Row{"", "", "", "TOTAL", fmtDec(totalDebit), fmtDec(totalCredit), ""})
+	t.Render()
 }
 
 func (o *Operator) handleListPKeys(args []string) {

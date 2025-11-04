@@ -47,7 +47,7 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 		{
 			Destination: wallet,
 			Token:       common.HexToAddress(params.Token),
-			Amount:      big.NewInt(0), // force opening with zero amount. TODO: remove this fix when good solution is found
+			Amount:      big.NewInt(0), // open the channel with zero amount for user. TODO: remove this fix when good solution is found
 		},
 		{
 			Destination: s.signer.GetAddress(),

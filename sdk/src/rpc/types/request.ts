@@ -173,8 +173,6 @@ export interface CreateChannelRequest extends GenericRPCMessage {
         chain_id: number;
         /** The token contract address for the channel. */
         token: Address;
-        /** The initial amount to deposit in the channel (in raw token units). */
-        amount: bigint;
     };
 }
 

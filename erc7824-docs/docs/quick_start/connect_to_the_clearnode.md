@@ -491,7 +491,7 @@ The format of the EIP-712 message is as follows:
       { "name": "wallet", "type": "address" },
       { "name": "session_key", "type": "address" },
       { "name": "expire", "type": "string" },
-      { "name": "allowances", "type": "Allowances[]" }
+      { "name": "allowances", "type": "Allowance[]" }
     ],
     "Allowance": [
       { "name": "asset", "type": "string" },
@@ -508,7 +508,7 @@ The format of the EIP-712 message is as follows:
     scope: 'console',
     wallet: '0xYourWalletAddress',
     session_key: '0xYourSignerAddress',
-    expire: 100500,
+    expire: "100500",
     allowances: []
   }
 }

@@ -18,7 +18,7 @@ func TestEIPSignature(t *testing.T) {
 	allowances := []Allowance{
 		{
 			Asset:  "usdc",
-			Amount: "0",
+			Amount: "123.45",
 		},
 	}
 	convertedAllowances := convertAllowances(allowances)
@@ -67,6 +67,6 @@ func TestEIPSignature(t *testing.T) {
 		sigBytes,
 	)
 
-	assert.Equal(t, recoveredSigner, walletAddress)
 	assert.NoError(t, err)
+	assert.Equal(t, walletAddress, recoveredSigner)
 }

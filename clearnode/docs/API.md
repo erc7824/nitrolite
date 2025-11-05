@@ -1130,9 +1130,9 @@ In the request, the user must specify funds destination. After the channel is cl
 
 Adjusts the capacity of a channel by depositing or withdrawing funds.
 
-**IMPORTANT**: Once a resize is requested, the channel enters a "resizing" state. The resize state must be submitted to the blockchain to complete the resize operation. If the resize transaction is not submitted, the channel will remain in the resizing state and the only way to recover is to close the channel. Then user can reopen a channel.
+**IMPORTANT**: Once a resize is requested, the channel moves to a "resizing" status. The resize on-chain channel state must be submitted to the blockchain to complete the resize operation. If the resize transaction is not submitted and lost, the channel will remain in the resizing status indefinitely, and the only way to recover the funds would be to close the channel. Later to resume operations, the user will be able to reopen a channel.
 
-**Fund Locking**: When withdrawing funds (negative `resize_amount`), the funds being withdrawn are immediately locked until the resize transaction on-chain confirmation is received.
+**Fund Locking**: When withdrawing funds (negative `resize_amount`), the funds being withdrawn are immediately locked until the resize transaction on-chain confirmation is seen and processed by the Node.
 
 **Request:**
 
@@ -1152,7 +1152,7 @@ Adjusts the capacity of a channel by depositing or withdrawing funds.
 
 - `channel_id`: The ID of the channel to resize
 - `resize_amount`: Amount to deposit (positive) or withdraw (negative) from the channel.
-- `allocate_amount`: Amount to allocate (positive) or deallocate (negative) to this specific channel from the user's unified balance.
+- `allocate_amount`: Amount to allocate to (positive) or deallocate from (negative) this specific channel from the user's unified balance.
 - `funds_destination`: an address where funds should be sent (used for withdrawals)
 
 **Example Scenarios:**
@@ -1205,7 +1205,7 @@ Adjusts the capacity of a channel by depositing or withdrawing funds.
 **Important Notes:**
 
 1. **Channel Status**: After calling `resize_channel`, the channel enters `resizing` status and cannot be used for other operations until the resize state is submitted on-chain
-2. **Blockchain Submission Required**: You must submit the returned state to the blockchain using the Custody contract's resize method. The channel remains in "resizing" status until this transaction is confirmed
+2. **Blockchain Submission Required**: You must submit the returned state to the blockchain using the Custody contract's `resize(...)` method. The channel remains in "resizing" status until this transaction is confirmed
 3. **Recovery**: If you don't submit the resize transaction, you cannot perform any other operations on this channel except closing it
 4. **Fund Locking**: For withdrawals (negative `resize_amount`), the withdrawn funds are locked in your unified balance and cannot be spent until the blockchain transaction is confirmed or the channel is closed.
 

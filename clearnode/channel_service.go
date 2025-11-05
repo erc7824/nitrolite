@@ -126,7 +126,7 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 		}
 
 		if channel.Status != ChannelStatusOpen {
-			return RPCErrorf("channel %s is not open: %s", params.ChannelID, channel.Status)
+			return RPCErrorf("operation denied: channel %s is not open: %s", params.ChannelID, channel.Status)
 		}
 
 		_, ok := rpcSigners[channel.Wallet]
@@ -261,7 +261,7 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 	}
 
 	if channel.Status != ChannelStatusOpen && channel.Status != ChannelStatusResizing {
-		return ChannelOperationResponse{}, RPCErrorf("channel %s is not open: %s", params.ChannelID, channel.Status)
+		return ChannelOperationResponse{}, RPCErrorf("channel %s is not open or resizing: %s", params.ChannelID, channel.Status)
 	}
 
 	_, ok := rpcSigners[channel.Wallet]

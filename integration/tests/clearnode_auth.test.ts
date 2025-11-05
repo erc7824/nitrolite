@@ -29,7 +29,7 @@ describe('Clearnode Authentication', () => {
         address: identity.walletAddress,
         session_key: identity.sessionKeyAddress,
         application: 'clearnode',
-        expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
+        expire: BigInt(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
         allowances: [],
     };

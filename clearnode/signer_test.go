@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -31,7 +32,7 @@ func TestEIPSignature(t *testing.T) {
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
 				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "string"},
+				{Name: "expire", Type: "uint64"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {
@@ -46,7 +47,7 @@ func TestEIPSignature(t *testing.T) {
 			"scope":       "console",
 			"wallet":      walletAddress,
 			"session_key": "0x6966978ce78df3228993aa46984eab6d68bbe195",
-			"expire":      "1748608702",
+			"expire":      big.NewInt(1748608702),
 			"allowances":  convertedAllowances,
 		},
 	}
@@ -63,7 +64,7 @@ func TestEIPSignature(t *testing.T) {
 		"Yellow App Store",
 		allowances,
 		"console",
-		"1748608702",
+		uint64(1748608702),
 		sigBytes,
 	)
 

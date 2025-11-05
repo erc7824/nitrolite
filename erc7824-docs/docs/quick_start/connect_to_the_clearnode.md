@@ -490,7 +490,7 @@ The format of the EIP-712 message is as follows:
       { "name": "scope", "type": "string" },
       { "name": "wallet", "type": "address" },
       { "name": "session_key", "type": "address" },
-      { "name": "expire", "type": "string" },
+      { "name": "expire", "type": "uint64" },
       { "name": "allowances", "type": "Allowance[]" }
     ],
     "Allowance": [

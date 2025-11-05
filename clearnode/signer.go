@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"math/big"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/ethereum/go-ethereum/common"
@@ -85,7 +86,7 @@ func RecoverAddressFromEip712Signature(
 	application string,
 	allowances []Allowance,
 	scope string,
-	expire string,
+	expire uint64,
 	sig Signature) (string, error) {
 	convertedAllowances := convertAllowances(allowances)
 
@@ -99,7 +100,7 @@ func RecoverAddressFromEip712Signature(
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
 				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "string"},
+				{Name: "expire", Type: "uint64"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {
@@ -115,7 +116,7 @@ func RecoverAddressFromEip712Signature(
 			"scope":       scope,
 			"wallet":      walletAddress,
 			"session_key": sessionKey,
-			"expire":      expire,
+			"expire":      new(big.Int).SetUint64(expire),
 			"allowances":  convertedAllowances,
 		},
 	}

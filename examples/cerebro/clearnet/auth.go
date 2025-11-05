@@ -15,7 +15,7 @@ type AuthChallengeParams struct {
 	SessionKey  string `json:"session_key"`
 	Application string `json:"application"`
 	Allowances  []any  `json:"allowances"`
-	Expire      string `json:"expire"`
+	Expire      uint64 `json:"expire"`
 	Scope       string `json:"scope"`
 }
 
@@ -29,7 +29,7 @@ func (c *ClearnodeClient) Authenticate(wallet, signer unisig.Signer) (string, er
 		SessionKey:  signer.Address().Hex(), // Using address as session key for simplicity
 		Application: "Cerebro CLI",
 		Allowances:  []any{}, // No allowances for now
-		Expire:      "",      // No expiration for now
+		Expire:      0,       // No expiration for now
 		Scope:       "",      // No specific scope for now
 	}
 	res, err := c.request("auth_request", nil, ch)
@@ -101,7 +101,7 @@ func signChallenge(s unisig.Signer, c AuthChallengeParams, token string) (unisig
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
 				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "string"},
+				{Name: "expire", Type: "uint64"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {

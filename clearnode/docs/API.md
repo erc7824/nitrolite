@@ -1150,10 +1150,10 @@ Adjusts the capacity of a channel by depositing or withdrawing funds.
 
 **Request Parameters:**
 
-- `channel_id`: The ID of the channel to resize
+- `channel_id`: The ID of the channel to resize.
 - `resize_amount`: Amount to deposit (positive) or withdraw (negative) from the channel.
 - `allocate_amount`: Amount to allocate to (positive) or deallocate from (negative) this specific channel from the user's unified balance.
-- `funds_destination`: an address where funds should be sent (used for withdrawals)
+- `funds_destination`: User's allocation funds destination for the resize state.
 
 **Example Scenarios:**
 

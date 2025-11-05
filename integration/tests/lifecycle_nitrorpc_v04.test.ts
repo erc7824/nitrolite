@@ -296,7 +296,41 @@ describe('nitrorpc_v04 lifecycle', () => {
         expect(ledgerBalances[0].asset).toBe(ASSET_SYMBOL);
     });
 
-    it('should close channel and withdraw without app funds', async () => {
+    it('should resize channel and withdraw without app funds', async () => {
+        const msg = await createResizeChannelMessage(alice.messageWalletSigner, {
+            channel_id: aliceChannelId,
+            allocate_amount: toRaw(finalAliceAmount), // 1000 - 100 - 50 + 25 = 875
+            resize_amount: -toRaw(finalAliceAmount), // -(1000 - 100 - 50 + 25) = -875
+            funds_destination: alice.walletAddress,
+        });
+
+        const resizeResponse = await aliceWS.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
+
+        expect(resizeResponseParams.state.allocations).toBeDefined();
+        expect(resizeResponseParams.state.allocations).toHaveLength(2);
+        expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(alice.walletAddress);
+        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
+
+        const {txHash: resizeChannelTxHash} = await aliceClient.resizeChannel({
+            ...composeResizeChannelParams(
+                resizeResponseParams.channelId as Hex,
+                resizeResponseParams,
+                initialAliceState
+            ),
+        });
+        expect(resizeChannelTxHash).toBeDefined();
+
+        const resizeReceipt = await blockUtils.waitForTransaction(resizeChannelTxHash);
+        expect(resizeReceipt).toBeDefined();
+
+        const postCloseAccountBalance = await aliceClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(postCloseAccountBalance).toBe(toRaw(finalAliceAmount)); // 875
+    });
+
+    it('should close Alice channel', async () => {
         const msg = await createCloseChannelMessage(alice.messageWalletSigner, aliceChannelId, alice.walletAddress);
 
         const closeResponse = await aliceWS.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
@@ -320,13 +354,14 @@ describe('nitrorpc_v04 lifecycle', () => {
         expect(closeReceipt).toBeDefined();
 
         const postCloseAccountBalance = await aliceClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(postCloseAccountBalance).toBe(toRaw(finalAliceAmount)); // 1000 - 100 - 50 + 25 = 875
+        expect(postCloseAccountBalance).toBe(toRaw(finalAliceAmount)); // 875
     });
 
     it('should resize channel by withdrawing received funds from app to channel', async () => {
         const msg = await createResizeChannelMessage(bob.messageWalletSigner, {
             channel_id: bobChannelId,
-            allocate_amount: toRaw(finalBobAmount - onChainDepositAmount), // 1000 + 100 + 25 - 1000 = 125
+            allocate_amount: toRaw(finalBobAmount), // 1000 + 100 + 25 = 1125
+            resize_amount: -toRaw(finalBobAmount), // -(1000 + 100 + 25) = -1125
             funds_destination: bob.walletAddress,
         });
 
@@ -336,9 +371,7 @@ describe('nitrorpc_v04 lifecycle', () => {
         expect(resizeResponseParams.state.allocations).toBeDefined();
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(bob.walletAddress);
-        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
-            (toRaw(finalBobAmount)).toString() // 1000 + 100 + 25 = 1125
-        );
+        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
         expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
@@ -353,9 +386,12 @@ describe('nitrorpc_v04 lifecycle', () => {
 
         const resizeReceipt = await blockUtils.waitForTransaction(resizeChannelTxHash);
         expect(resizeReceipt).toBeDefined();
+
+        const postCloseAccountBalance = await bobClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(postCloseAccountBalance).toBe(toRaw(finalBobAmount)); // 1125
     });
 
-    it('should close channel and withdraw with app funds', async () => {
+    it('should close Bob channel', async () => {
         const msg = await createCloseChannelMessage(bob.messageWalletSigner, bobChannelId, bob.walletAddress);
 
         const closeResponse = await bobWS.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
@@ -379,7 +415,7 @@ describe('nitrorpc_v04 lifecycle', () => {
         expect(closeReceipt).toBeDefined();
 
         const postCloseAccountBalance = await bobClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(postCloseAccountBalance).toBe(toRaw(finalBobAmount)); // 1000 + 100 + 25 = 1125
+        expect(postCloseAccountBalance).toBe(toRaw(finalBobAmount)); // 1125
     });
 
     it('should withdraw funds from channel for participant sending', async () => {

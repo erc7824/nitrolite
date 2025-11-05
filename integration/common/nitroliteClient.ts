@@ -106,6 +106,7 @@ export class TestNitroliteClient extends NitroliteClient {
         const msg = await createResizeChannelMessage(this.identity.messageWalletSigner, {
             channel_id: channelId,
             resize_amount: resizeAmount,
+            allocate_amount: -resizeAmount,
             funds_destination: fundsDestination,
         });
 

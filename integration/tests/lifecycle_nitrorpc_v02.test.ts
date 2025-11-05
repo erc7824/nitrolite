@@ -33,6 +33,7 @@ import {
     submitAppStateUpdate_v02,
     closeAppSessionWithState,
 } from '@/testAppSessionHelpers';
+import { on } from 'events';
 
 describe('nitrorpc_v02 lifecycle', () => {
     const ASSET_SYMBOL = CONFIG.TOKEN_SYMBOL;
@@ -205,7 +206,41 @@ describe('nitrorpc_v02 lifecycle', () => {
         expect(ledgerBalances[0].asset).toBe(ASSET_SYMBOL);
     });
 
-    it('should close channel and withdraw without app funds', async () => {
+    it('should resize channel and withdraw without app funds', async () => {
+        const msg = await createResizeChannelMessage(alice.messageWalletSigner, {
+            channel_id: aliceChannelId,
+            allocate_amount: toRaw(onChainDepositAmount - appSessionDepositAmount), // 1000 - 100 = 900
+            resize_amount: -toRaw(onChainDepositAmount - appSessionDepositAmount), // -(1000 - 100) = -900
+            funds_destination: alice.walletAddress,
+        });
+
+        const resizeResponse = await aliceWS.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
+
+        expect(resizeResponseParams.state.allocations).toBeDefined();
+        expect(resizeResponseParams.state.allocations).toHaveLength(2);
+        expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(alice.walletAddress);
+        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
+
+        const {txHash: resizeChannelTxHash} = await aliceClient.resizeChannel({
+            ...composeResizeChannelParams(
+                resizeResponseParams.channelId as Hex,
+                resizeResponseParams,
+                initialAliceState
+            ),
+        });
+        expect(resizeChannelTxHash).toBeDefined();
+
+        const resizeReceipt = await blockUtils.waitForTransaction(resizeChannelTxHash);
+        expect(resizeReceipt).toBeDefined();
+
+        const postCloseAccountBalance = await aliceClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(postCloseAccountBalance).toBe(toRaw(onChainDepositAmount - appSessionDepositAmount)); // 875
+    });
+
+    it('should close Alice channel', async () => {
         // Use wallet signer for channel operations, not session key
         const msg = await createCloseChannelMessage(alice.messageWalletSigner, aliceChannelId, alice.walletAddress);
 
@@ -230,14 +265,15 @@ describe('nitrorpc_v02 lifecycle', () => {
         expect(closeReceipt).toBeDefined();
 
         const postCloseAccountBalance = await aliceClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(postCloseAccountBalance).toBe(toRaw(onChainDepositAmount - appSessionDepositAmount)); // 1000 - 100
+        expect(postCloseAccountBalance).toBe(toRaw(onChainDepositAmount - appSessionDepositAmount)); // 900
     });
 
     it('should resize channel by withdrawing received funds from app to channel', async () => {
         // Use wallet signer for channel operations, not session key
         const msg = await createResizeChannelMessage(bob.messageWalletSigner, {
             channel_id: bobChannelId,
-            allocate_amount: toRaw(appSessionDepositAmount),
+            allocate_amount: toRaw(onChainDepositAmount + appSessionDepositAmount), // 1000 + 100 = 1100
+            resize_amount: -toRaw(onChainDepositAmount + appSessionDepositAmount), // -(1000 + 100) = -1100
             funds_destination: bob.walletAddress,
         });
 
@@ -247,9 +283,7 @@ describe('nitrorpc_v02 lifecycle', () => {
         expect(resizeResponseParams.state.allocations).toBeDefined();
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(bob.walletAddress);
-        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
-            (toRaw(onChainDepositAmount + appSessionDepositAmount)).toString() // 1000 + 100
-        );
+        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
         expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
@@ -264,9 +298,12 @@ describe('nitrorpc_v02 lifecycle', () => {
 
         const resizeReceipt = await blockUtils.waitForTransaction(resizeChannelTxHash);
         expect(resizeReceipt).toBeDefined();
+
+        const postCloseAccountBalance = await bobClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(postCloseAccountBalance).toBe(toRaw(onChainDepositAmount + appSessionDepositAmount)); // 1100
     });
 
-    it('should close channel and withdraw with app funds', async () => {
+    it('should close Bob channel', async () => {
         // Use wallet signer for channel operations, not session key
         const msg = await createCloseChannelMessage(bob.messageWalletSigner, bobChannelId, bob.walletAddress);
 
@@ -291,7 +328,7 @@ describe('nitrorpc_v02 lifecycle', () => {
         expect(closeReceipt).toBeDefined();
 
         const postCloseAccountBalance = await bobClient.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(postCloseAccountBalance).toBe(toRaw(onChainDepositAmount + appSessionDepositAmount)); // 1000 + 100
+        expect(postCloseAccountBalance).toBe(toRaw(onChainDepositAmount + appSessionDepositAmount)); // 1100
     });
 
     it('should withdraw funds from channel for providing side', async () => {

@@ -4,8 +4,14 @@ import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
-import { getCloseChannelPredicate, TestWebSocket } from '@/ws';
-import { createCloseChannelMessage, parseCloseChannelResponse } from '@erc7824/nitrolite';
+import { composeResizeChannelParams } from '@/testHelpers';
+import { getCloseChannelPredicate, getResizeChannelPredicate, TestWebSocket } from '@/ws';
+import {
+    createResizeChannelMessage,
+    parseResizeChannelResponse,
+    createCloseChannelMessage,
+    parseCloseChannelResponse,
+} from '@erc7824/nitrolite';
 import { Hex, parseUnits } from 'viem';
 
 describe('Close channel', () => {
@@ -49,13 +55,13 @@ describe('Close channel', () => {
         expect(client).toHaveProperty('withdrawal');
     });
 
-    it('should close channel and withdraw funds', async () => {
+    it('should resize, close channel and withdraw funds', async () => {
         const preFundBalance = await blockUtils.getErc20Balance(
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             identity.walletAddress
         );
 
-        const { params } = await client.createAndWaitForChannel(ws, {
+        const { params, state } = await client.createAndWaitForChannel(ws, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount,
         });
@@ -67,7 +73,36 @@ describe('Close channel', () => {
 
         expect(postFundBalance.rawBalance).toBe(preFundBalance.rawBalance - depositAmount);
 
-        const msg = await createCloseChannelMessage(identity.messageSKSigner, params.channelId, identity.walletAddress);
+        let msg = await createResizeChannelMessage(identity.messageSKSigner, {
+            channel_id: params.channelId,
+            allocate_amount: depositAmount,
+            resize_amount: -depositAmount,
+            funds_destination: identity.walletAddress,
+        });
+
+        const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
+
+        expect(resizeResponseParams.state.allocations).toBeDefined();
+        expect(resizeResponseParams.state.allocations).toHaveLength(2);
+        expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);
+        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
+
+        const {txHash: resizeChannelTxHash} = await client.resizeChannel({
+            ...composeResizeChannelParams(
+                resizeResponseParams.channelId as Hex,
+                resizeResponseParams,
+                state,
+            ),
+        });
+        expect(resizeChannelTxHash).toBeDefined();
+
+        const resizeReceipt = await blockUtils.waitForTransaction(resizeChannelTxHash);
+        expect(resizeReceipt).toBeDefined();
+
+        msg = await createCloseChannelMessage(identity.messageSKSigner, params.channelId, identity.walletAddress);
         const closeResponse = await ws.sendAndWaitForResponse(msg, getCloseChannelPredicate(), 1000);
         expect(closeResponse).toBeDefined();
 

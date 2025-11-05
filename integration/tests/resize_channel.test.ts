@@ -5,8 +5,13 @@ import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import { composeResizeChannelParams, getLedgerBalances, toRaw } from '@/testHelpers';
-import { getChannelUpdatePredicateWithStatus, getResizeChannelPredicate, TestWebSocket } from '@/ws';
-import { createResizeChannelMessage, parseResizeChannelResponse, RPCChannelStatus } from '@erc7824/nitrolite';
+import { getGetLedgerBalancesPredicate, getChannelUpdatePredicateWithStatus, getResizeChannelPredicate, TestWebSocket } from '@/ws';
+import {
+    createResizeChannelMessage,
+    parseResizeChannelResponse, RPCChannelStatus,
+    createGetLedgerBalancesMessage,
+    parseGetLedgerBalancesResponse,
+} from '@erc7824/nitrolite';
 import { Hex, parseUnits } from 'viem';
 
 describe('Resize channel', () => {
@@ -23,6 +28,12 @@ describe('Resize channel', () => {
         databaseUtils = new DatabaseUtils();
         identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);
         ws = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
+
+        client = new TestNitroliteClient(identity);
+
+        expect(client).toBeDefined();
+        expect(client).toHaveProperty('depositAndCreateChannel');
+        expect(client).toHaveProperty('resizeChannel');
     });
 
     beforeEach(async () => {
@@ -41,14 +52,6 @@ describe('Resize channel', () => {
         await databaseUtils.close();
     });
 
-    it('should create nitrolite client to resize channels', async () => {
-        client = new TestNitroliteClient(identity);
-
-        expect(client).toBeDefined();
-        expect(client).toHaveProperty('depositAndCreateChannel');
-        expect(client).toHaveProperty('resizeChannel');
-    });
-
     it('should resize channel by adding funds from deposit to channel', async () => {
         const { params: createResponseParams, state: createResponseState } = await client.createAndWaitForChannel(ws, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
@@ -60,21 +63,22 @@ describe('Resize channel', () => {
             createResponseParams.channelId,
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS
         );
-        expect(channelBalance).toBe(depositAmount * BigInt(5)); // 500
+        expect(channelBalance).toBe(BigInt(0));
+
+        let msg = await createGetLedgerBalancesMessage(identity.messageSKSigner, identity.walletAddress);
+        let lbResponse = await ws.sendAndWaitForResponse(msg, getGetLedgerBalancesPredicate(), 1000);
+        let { params: lbResponseParams } = parseGetLedgerBalancesResponse(lbResponse);
+        expect(lbResponseParams.ledgerBalances).toBeDefined();
+        expect(lbResponseParams.ledgerBalances).toHaveLength(1);
+        expect(String(lbResponseParams.ledgerBalances[0].amount)).toBe('500'); // 500
 
         const preResizeAccountBalance = await client.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
         expect(preResizeAccountBalance).toBe(depositAmount * BigInt(5)); // 1000 - 500
 
-        const preResizeChannelBalance = await client.getChannelBalance(
-            createResponseParams.channelId,
-            CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS
-        );
-        expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
-
-        const msg = await createResizeChannelMessage(identity.messageSKSigner, {
+        msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: depositAmount,
-            allocate_amount: parseUnits('0', 6),
+            allocate_amount: -depositAmount,
             funds_destination: identity.walletAddress,
         });
 
@@ -91,9 +95,7 @@ describe('Resize channel', () => {
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);
         expect(String(resizeResponseParams.state.allocations[0].token)).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
-            (depositAmount * BigInt(6)).toString() // 500 + 100
-        );
+        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
         expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].token)).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
@@ -117,7 +119,14 @@ describe('Resize channel', () => {
             createResponseParams.channelId,
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS
         );
-        expect(postResizeChannelBalance).toBe(depositAmount * BigInt(6)); // 500 + 100
+        expect(postResizeChannelBalance).toBe(BigInt(0));
+
+        msg = await createGetLedgerBalancesMessage(identity.messageSKSigner, identity.walletAddress);
+        lbResponse = await ws.sendAndWaitForResponse(msg, getGetLedgerBalancesPredicate(), 1000);
+        ({ params: lbResponseParams } = parseGetLedgerBalancesResponse(lbResponse));
+        expect(lbResponseParams.ledgerBalances).toBeDefined();
+        expect(lbResponseParams.ledgerBalances).toHaveLength(1);
+        expect(String(lbResponseParams.ledgerBalances[0].amount)).toBe('600'); // 500 + 100
     });
 
     it('should resize channel by withdrawing funds from channel to deposit', async () => {
@@ -134,12 +143,19 @@ describe('Resize channel', () => {
             createResponseParams.channelId,
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS
         );
-        expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
+        expect(preResizeChannelBalance).toBe(BigInt(0));
 
-        const msg = await createResizeChannelMessage(identity.messageSKSigner, {
+        let msg = await createGetLedgerBalancesMessage(identity.messageSKSigner, identity.walletAddress);
+        let lbResponse = await ws.sendAndWaitForResponse(msg, getGetLedgerBalancesPredicate(), 1000);
+        let { params: lbResponseParams } = parseGetLedgerBalancesResponse(lbResponse);
+        expect(lbResponseParams.ledgerBalances).toBeDefined();
+        expect(lbResponseParams.ledgerBalances).toHaveLength(1);
+        expect(String(lbResponseParams.ledgerBalances[0].amount)).toBe('500'); // 500
+
+        msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: -depositAmount,
-            allocate_amount: parseUnits('0', 6),
+            allocate_amount: depositAmount,
             funds_destination: identity.walletAddress,
         });
 
@@ -149,9 +165,7 @@ describe('Resize channel', () => {
         expect(resizeResponseParams.state.allocations).toBeDefined();
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);
-        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
-            (depositAmount * BigInt(4)).toString() // 500 - 100
-        );
+        expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
         expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
@@ -174,10 +188,17 @@ describe('Resize channel', () => {
             createResponseParams.channelId,
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS
         );
-        expect(postResizeChannelBalance).toBe(depositAmount * BigInt(4)); // 500 - 100
+        expect(postResizeChannelBalance).toBe(BigInt(0));
+
+        msg = await createGetLedgerBalancesMessage(identity.messageSKSigner, identity.walletAddress);
+        lbResponse = await ws.sendAndWaitForResponse(msg, getGetLedgerBalancesPredicate(), 1000);
+        ({ params: lbResponseParams } = parseGetLedgerBalancesResponse(lbResponse));
+        expect(lbResponseParams.ledgerBalances).toBeDefined();
+        expect(lbResponseParams.ledgerBalances).toHaveLength(1);
+        expect(String(lbResponseParams.ledgerBalances[0].amount)).toBe('400'); // 500 - 100
     });
 
-    it('should resize channel by allocating funds from channel to virtual ledger', async () => {
+    it('should resize channel by allocating funds from virtual ledger to channel', async () => {
         const { params: createResponseParams, state: createResponseState } = await client.createAndWaitForChannel(ws, {
             tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
             amount: depositAmount * BigInt(5),
@@ -191,12 +212,19 @@ describe('Resize channel', () => {
             createResponseParams.channelId,
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS
         );
-        expect(preResizeChannelBalance).toBe(depositAmount * BigInt(5)); // 500
+        expect(preResizeChannelBalance).toBe(BigInt(0));
 
-        const msg = await createResizeChannelMessage(identity.messageSKSigner, {
+        let msg = await createGetLedgerBalancesMessage(identity.messageSKSigner, identity.walletAddress);
+        let lbResponse = await ws.sendAndWaitForResponse(msg, getGetLedgerBalancesPredicate(), 1000);
+        let { params: lbResponseParams } = parseGetLedgerBalancesResponse(lbResponse);
+        expect(lbResponseParams.ledgerBalances).toBeDefined();
+        expect(lbResponseParams.ledgerBalances).toHaveLength(1);
+        expect(String(lbResponseParams.ledgerBalances[0].amount)).toBe('500'); // 500
+
+        msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: parseUnits('0', 6),
-            allocate_amount: -depositAmount,
+            allocate_amount: depositAmount,
             funds_destination: identity.walletAddress,
         });
 
@@ -206,7 +234,7 @@ describe('Resize channel', () => {
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);
         expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
-            (depositAmount * BigInt(4)).toString() // 500 - 100
+            (depositAmount * BigInt(1)).toString() // 100
         );
         expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
@@ -230,7 +258,14 @@ describe('Resize channel', () => {
             createResponseParams.channelId,
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS
         );
-        expect(postResizeChannelBalance).toBe(depositAmount * BigInt(4)); // 1000 - 500 - 100
+        expect(postResizeChannelBalance).toBe(depositAmount * BigInt(1)); // 100
+
+        msg = await createGetLedgerBalancesMessage(identity.messageSKSigner, identity.walletAddress);
+        lbResponse = await ws.sendAndWaitForResponse(msg, getGetLedgerBalancesPredicate(), 1000);
+        ({ params: lbResponseParams } = parseGetLedgerBalancesResponse(lbResponse));
+        expect(lbResponseParams.ledgerBalances).toBeDefined();
+        expect(lbResponseParams.ledgerBalances).toHaveLength(1);
+        expect(String(lbResponseParams.ledgerBalances[0].amount)).toBe('500'); // 1000 - 500 (100 allocated to the channel are still in virtual ledger)
     });
 
     it('should subtract resize amount from unified balance after withdrawal resize request', async () => {
@@ -249,6 +284,7 @@ describe('Resize channel', () => {
         const msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: -toRaw(WITHDRAWAL_AMOUNT),
+            allocate_amount: toRaw(WITHDRAWAL_AMOUNT),
             funds_destination: identity.walletAddress,
         });
 
@@ -338,6 +374,7 @@ describe('Resize channel', () => {
         const msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: -toRaw(WITHDRAW_AMOUNT),
+            allocate_amount: toRaw(WITHDRAW_AMOUNT),
             funds_destination: identity.walletAddress,
         });
 
@@ -348,6 +385,7 @@ describe('Resize channel', () => {
         const msg2 = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: -toRaw(WITHDRAW_AMOUNT),
+            allocate_amount: toRaw(WITHDRAW_AMOUNT),
             funds_destination: identity.walletAddress,
         });
 
@@ -375,6 +413,7 @@ describe('Resize channel', () => {
         const msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: -toRaw(WITHDRAWAL_AMOUNT),
+            allocate_amount: toRaw(WITHDRAWAL_AMOUNT),
             funds_destination: identity.walletAddress,
         });
 
@@ -390,9 +429,10 @@ describe('Resize channel', () => {
         const response = await client.closeAndWithdrawChannel(ws, createResponseParams.channelId);
         await resizeChannelUpdatePromise;
 
-        // after channel is closed, all funds are withdrawn, so unified balance should be 0
         const postResizeUnifiedBalance = await getLedgerBalances(identity, ws);
         expect(postResizeUnifiedBalance.length).toBe(1);
-        expect(postResizeUnifiedBalance[0].amount).toBe("0");
+        // channel does NOT have any amount allocated, thus "close(...)" should NOT withdraw any funds,
+        // but rather release funds locked after resize request
+        expect(postResizeUnifiedBalance[0].amount).toBe("10");
     });
 });

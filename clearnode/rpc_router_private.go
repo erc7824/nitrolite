@@ -784,6 +784,9 @@ func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
 func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {
 	for asset, bal := range appSessionBalance {
 		if bal.IsZero() {
+			if alloc, ok := allocationSum[asset]; ok && !alloc.IsZero() {
+				return RPCErrorf("asset %s is not deposited into the app session. Please deposit the asset first", asset)
+			}
 			continue
 		}
 		if alloc, ok := allocationSum[asset]; !ok || !bal.Equal(alloc) {

@@ -530,6 +530,78 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		assert.True(t, usdcBalA.IsZero())
 		assert.True(t, usdcBalB.IsZero())
 	})
+
+	t.Run("Operate_AllocateWithdrawnAsset_Error", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		service := createTestAppSessionService(db, nil)
+		session := createTestAppSession(t, db, "test-session-allocate-withdrawn", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		// Step 1: Simulate that USDC was deposited and then fully withdrawn
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+		})
+		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(-100), nil))
+
+		// Step 2: Deposit ETH into the session
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"eth": 100},
+		})
+
+		// Step 3: Try to operate on both ETH and USDC, but USDC has zero balance
+		// This should fail because we're trying to allocate a withdrawn asset
+		params := &SubmitAppStateParams{
+			AppSessionID: session.SessionID,
+			Intent:       rpc.AppSessionIntentOperate,
+			Version:      2,
+			Allocations: []AppAllocation{
+				{Participant: userAddressA.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(50)},
+			},
+		}
+
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "asset usdc is not deposited into the app session")
+	})
+
+	t.Run("Operate_AllocateNeverDepositedAsset_Error", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		service := createTestAppSessionService(db, nil)
+		session := createTestAppSession(t, db, "test-session-never-deposited", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		// Only deposit ETH into the session
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"eth": 100},
+		})
+
+		// Try to operate on both ETH and USDC, but USDC was never deposited
+		params := &SubmitAppStateParams{
+			AppSessionID: session.SessionID,
+			Intent:       rpc.AppSessionIntentOperate,
+			Version:      2,
+			Allocations: []AppAllocation{
+				{Participant: userAddressA.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(30)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(70)},
+			},
+		}
+
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
+		require.Error(t, err)
+		// When asset was never deposited, it's not in appSessionBalance, so caught by second validation loop
+		assert.Contains(t, err.Error(), "allocation references unknown asset usdc")
+	})
 }
 
 func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {

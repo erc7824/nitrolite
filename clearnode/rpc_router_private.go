@@ -643,6 +643,9 @@ func (r *RPCRouter) HandleGetRPCHistory(c *RPCContext) {
 
 func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {
 	for asset, bal := range appSessionBalance {
+		if bal.IsZero() {
+			continue
+		}
 		if alloc, ok := allocationSum[asset]; !ok || !bal.Equal(alloc) {
 			return RPCErrorf("asset %s not fully redistributed", asset)
 		}

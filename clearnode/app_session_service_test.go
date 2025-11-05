@@ -420,6 +420,54 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 		assert.True(t, appBalA.IsZero())
 		assert.True(t, appBalB.IsZero())
 	})
+
+	t.Run("Operate_WithdrawnAsset_NotRequired", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		service := createTestAppSessionService(db, nil)
+		session := createTestAppSession(t, db, "test-session-withdrawn-asset", rpc.VersionNitroRPCv0_4,
+			[]string{userAddressA.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		// Step 1: Simulate that USDC was deposited and then fully withdrawn
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"usdc": 100},
+		})
+		require.NoError(t, GetWalletLedger(db, userAddressA).Record(sessionAccountID, "usdc", decimal.NewFromInt(-100), nil))
+
+		// Step 2: Deposit ETH into the session
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			userAddressA: {"eth": 100},
+		})
+
+		// Step 3: Operate on ETH only - should NOT require USDC allocations
+		params := &SubmitAppStateParams{
+			AppSessionID: session.SessionID,
+			Intent:       rpc.AppSessionIntentOperate,
+			Version:      2,
+			Allocations: []AppAllocation{
+				{Participant: userAddressA.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(50)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "eth", Amount: decimal.NewFromInt(50)},
+			},
+		}
+
+		resp, err := service.SubmitAppState(context.Background(), params, rpcSigners(userAddressA, userAddressB), rpcSigners(userAddressA, userAddressB))
+		require.NoError(t, err, "Should succeed without mentioning withdrawn USDC")
+		assert.Equal(t, uint64(2), resp.Version)
+
+		// Verify ETH was redistributed correctly
+		appBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "eth")
+		appBalB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "eth")
+		assert.Equal(t, decimal.NewFromInt(50), appBalA)
+		assert.Equal(t, decimal.NewFromInt(50), appBalB)
+
+		// Verify USDC balance remains zero and wasn't affected
+		usdcBalA, _ := GetWalletLedger(db, userAddressA).Balance(sessionAccountID, "usdc")
+		usdcBalB, _ := GetWalletLedger(db, userAddressB).Balance(sessionAccountID, "usdc")
+		assert.True(t, usdcBalA.IsZero())
+		assert.True(t, usdcBalB.IsZero())
+	})
 }
 
 func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {

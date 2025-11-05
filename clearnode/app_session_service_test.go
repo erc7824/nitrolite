@@ -276,6 +276,44 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 		assert.Equal(t, uint64(1), appSession.Version)
 		assert.Equal(t, string(ChannelStatusOpen), appSession.Status)
 	})
+
+	t.Run("ErrorNonZeroChannelAllocation", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		setupWallets(t, db, map[common.Address]map[string]int{userAddressA: {"usdc": 100}})
+
+		// Should error if depositor has non-zero allocation in any open channel
+		ch := &Channel{
+			ChannelID:   "0xChannel",
+			Wallet:      userAddressA.Hex(),
+			Participant: userAddressA.Hex(),
+			Status:      ChannelStatusOpen,
+			Token:       "0xTokenXYZ",
+			Nonce:       1,
+			RawAmount:   decimal.NewFromInt(1),
+		}
+		require.NoError(t, db.Create(ch).Error)
+
+		service := createTestAppSessionService(db, nil)
+
+		params := &CreateAppSessionParams{
+			Definition: AppDefinition{
+				Protocol:           rpc.VersionNitroRPCv0_4,
+				ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
+				Weights:            []int64{1, 0},
+				Quorum:             1,
+				Nonce:              uint64(time.Now().Unix()),
+			},
+			Allocations: []AppAllocation{
+				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+			},
+		}
+
+		_, err := service.CreateAppSession(params, rpcSigners(userAddressA))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "operation denied: non-zero allocation in 1 channel(s) detected. Please, un-allocate those funds via resize first")
+	})
 }
 
 func TestAppSessionService_SubmitAppState(t *testing.T) {
@@ -351,6 +389,18 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 			userAddressA: {"usdc": 100},
 			userAddressB: {"usdc": 0},
 		})
+
+		// Shouldn't return error if operator has non-zero allocation in any open channel
+		ch := &Channel{
+			ChannelID:   "0xChannel",
+			Wallet:      userAddressA.Hex(),
+			Participant: userAddressA.Hex(),
+			Status:      ChannelStatusOpen,
+			Token:       "0xTokenXYZ",
+			Nonce:       1,
+			RawAmount:   decimal.NewFromInt(1),
+		}
+		require.NoError(t, db.Create(ch).Error)
 
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
@@ -487,6 +537,7 @@ func TestAppSessionService_SubmitAppState(t *testing.T) {
 func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 	depositorAddress := userAddressA
 	depositorAccountID := userAccountIDA
+
 	t.Run("BasicDepositSuccess", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
 		defer cleanup()
@@ -982,6 +1033,56 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		assert.Equal(t, "275", balanceB.String())
 		assert.Equal(t, "200", balanceC.String())
 	})
+
+	t.Run("ErrorNonZeroChannelAllocation", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		defer cleanup()
+
+		setupWallets(t, db, map[common.Address]map[string]int{
+			depositorAddress: {"usdc": 200},
+			userAddressB:     {"usdc": 100},
+		})
+
+		session := createTestAppSession(t, db, "test-session-deposit", rpc.VersionNitroRPCv0_4,
+			[]string{depositorAddress.Hex(), userAddressB.Hex()}, []int64{1, 1}, 2)
+		sessionAccountID := NewAccountID(session.SessionID)
+
+		setupAppSessionBalances(t, db, sessionAccountID, map[common.Address]map[string]int{
+			depositorAddress: {"usdc": 100},
+			userAddressB:     {"usdc": 100},
+		})
+
+		capturedNotifications := make(map[string][]Notification)
+		service := createTestAppSessionService(db, capturedNotifications)
+
+		// Should error if depositor has non-zero allocation in any open channel
+		ch := &Channel{
+			ChannelID:   "0xChannel",
+			Wallet:      depositorAddress.Hex(),
+			Participant: depositorAddress.Hex(),
+			Status:      ChannelStatusOpen,
+			Token:       "0xTokenXYZ",
+			Nonce:       1,
+			RawAmount:   decimal.NewFromInt(1),
+		}
+		require.NoError(t, db.Create(ch).Error)
+
+		params := &SubmitAppStateParams{
+			AppSessionID: session.SessionID,
+			Intent:       rpc.AppSessionIntentDeposit,
+			Version:      2,
+			SessionData:  nil,
+			Allocations: []AppAllocation{
+				{Participant: depositorAddress.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(150)},
+				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+			},
+		}
+
+		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB), rpcSigners(depositorAddress, userAddressB))
+		require.Error(t, err)
+
+		assert.Contains(t, err.Error(), "operation denied: non-zero allocation in 1 channel(s) detected. Please, un-allocate those funds via resize first")
+	})
 }
 
 func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
@@ -1007,6 +1108,18 @@ func TestAppSessionService_SubmitAppStateWithdraw(t *testing.T) {
 
 		capturedNotifications := make(map[string][]Notification)
 		service := createTestAppSessionService(db, capturedNotifications)
+
+		// Shouldn't return error if withdrawer has non-zero allocation in any open channel
+		ch := &Channel{
+			ChannelID:   "0xChannel",
+			Wallet:      withdrawerAddress.Hex(),
+			Participant: withdrawerAddress.Hex(),
+			Status:      ChannelStatusOpen,
+			Token:       "0xTokenXYZ",
+			Nonce:       1,
+			RawAmount:   decimal.NewFromInt(1),
+		}
+		require.NoError(t, db.Create(ch).Error)
 
 		params := &SubmitAppStateParams{
 			AppSessionID: session.SessionID,
@@ -1222,6 +1335,18 @@ func TestAppSessionService_CloseApplication(t *testing.T) {
 			userAddressA: {"usdc": 100},
 			userAddressB: {"usdc": 200},
 		})
+
+		// Shouldn't return error if withdrawer has non-zero allocation in any open channel
+		ch := &Channel{
+			ChannelID:   "0xChannel",
+			Wallet:      userAddressA.Hex(),
+			Participant: userAddressA.Hex(),
+			Status:      ChannelStatusOpen,
+			Token:       "0xTokenXYZ",
+			Nonce:       1,
+			RawAmount:   decimal.NewFromInt(1),
+		}
+		require.NoError(t, db.Create(ch).Error)
 
 		params := &CloseAppSessionParams{
 			AppSessionID: session.SessionID,

@@ -855,7 +855,7 @@ func ensureWalletHasZeroChannelAllocation(tx *gorm.DB, wallet string) error {
 	if err != nil {
 		return err
 	}
-	if channelAmountSum.Count > 0 && !channelAmountSum.Sum.IsZero() {
+	if !channelAmountSum.Sum.IsZero() {
 		return RPCErrorf("operation denied: non-zero allocation in %d channel(s) detected. Please, un-allocate those funds via resize first", channelAmountSum.Count)
 	}
 	return nil

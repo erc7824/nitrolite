@@ -336,10 +336,7 @@ func (c *Custody) handleChallenged(logger Logger, ev *nitrolite.CustodyChallenge
 		var err error
 		channel, err = GetChannelByID(tx, channelID.Hex())
 		if err != nil {
-			return fmt.Errorf("error finding channel: %w", err)
-		}
-		if channel == nil {
-			return fmt.Errorf("channel with ID %s not found", channelID)
+			return fmt.Errorf("channel %s not found: %w", channelID.Hex(), err)
 		}
 
 		challengedVersion := ev.State.Version.Uint64()
@@ -398,10 +395,7 @@ func (c *Custody) handleResized(logger Logger, ev *nitrolite.CustodyResized) {
 		var err error
 		channel, err = GetChannelByID(tx, channelID)
 		if err != nil {
-			return fmt.Errorf("error finding channel: %w", err)
-		}
-		if channel == nil {
-			return fmt.Errorf("channel with ID %s not found", channelID)
+			return fmt.Errorf("channel %s not found: %w", channelID, err)
 		}
 
 		newRawAmount := channel.RawAmount.BigInt()
@@ -513,10 +507,7 @@ func (c *Custody) handleClosed(logger Logger, ev *nitrolite.CustodyClosed) {
 		var err error
 		channel, err = GetChannelByID(tx, channelID)
 		if err != nil {
-			return fmt.Errorf("error finding channel: %w", err)
-		}
-		if channel == nil {
-			return fmt.Errorf("channel with ID %s not found", channelID)
+			return fmt.Errorf("channel %s not found: %w", channelID, err)
 		}
 
 		asset, ok := c.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, c.chainID)

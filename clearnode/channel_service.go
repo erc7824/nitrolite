@@ -110,9 +110,6 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 		channel, err = GetChannelByID(tx, params.ChannelID)
 		if err != nil {
 			logger.Error("failed to find channel", "error", err)
-			return RPCErrorf("failed to find channel: %s", params.ChannelID)
-		}
-		if channel == nil {
 			return RPCErrorf("channel %s not found", params.ChannelID)
 		}
 
@@ -249,9 +246,6 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 	channel, err := GetChannelByID(s.db, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)
-		return ChannelOperationResponse{}, RPCErrorf("failed to find channel: %s", params.ChannelID)
-	}
-	if channel == nil {
 		return ChannelOperationResponse{}, RPCErrorf("channel %s not found", params.ChannelID)
 	}
 

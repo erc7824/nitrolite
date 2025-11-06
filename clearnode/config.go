@@ -12,6 +12,7 @@ import (
 const (
 	configDirPathEnv     = "CLEARNODE_CONFIG_DIR_PATH"
 	defaultConfigDirPath = "."
+	defaultMessageExpiry = 60 // in seconds
 )
 
 // Config represents the overall application configuration
@@ -66,7 +67,7 @@ func LoadConfig(logger Logger) (*Config, error) {
 		logger.Fatal("BROKER_PRIVATE_KEY environment variable is required")
 	}
 
-	messageTimestampExpiry := 60
+	messageTimestampExpiry := defaultMessageExpiry
 	if messageExpiry := os.Getenv("MSG_EXPIRY_TIME"); messageExpiry != "" {
 		if parsed, err := strconv.Atoi(messageExpiry); err == nil && parsed > 0 {
 			messageTimestampExpiry = parsed

@@ -103,76 +103,107 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 }
 
 func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners map[string]struct{}, logger Logger) (ChannelOperationResponse, error) {
-	channel, err := GetChannelByID(s.db, params.ChannelID)
-	if err != nil {
-		logger.Error("failed to find channel", "error", err)
-		return ChannelOperationResponse{}, RPCErrorf("failed to find channel: %s", params.ChannelID)
-	}
-	if channel == nil {
-		return ChannelOperationResponse{}, RPCErrorf("channel %s not found", params.ChannelID)
-	}
+	var channel *Channel
+	var allocations []nitrolite.Allocation
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		channel, err = GetChannelByID(tx, params.ChannelID)
+		if err != nil {
+			logger.Error("failed to find channel", "error", err)
+			return RPCErrorf("channel %s not found", params.ChannelID)
+		}
 
-	if err = checkChallengedChannels(s.db, channel.Wallet); err != nil {
-		logger.Error("failed to check challenged channels", "error", err)
+		if err = checkChallengedChannels(tx, channel.Wallet); err != nil {
+			logger.Error("failed to check challenged channels", "error", err)
+			return err
+		}
+
+		if channel.Status == ChannelStatusResizing {
+			return RPCErrorf("operation denied: resize already ongoing. Please complete the resize or close the channel %s", params.ChannelID)
+		}
+
+		if channel.Status != ChannelStatusOpen {
+			return RPCErrorf("operation denied: channel %s is not open: %s", params.ChannelID, channel.Status)
+		}
+
+		_, ok := rpcSigners[channel.Wallet]
+		if !ok {
+			return RPCErrorf("invalid signature")
+		}
+
+		asset, ok := s.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, channel.ChainID)
+		if !ok {
+			logger.Error("failed to find asset for an existing channel", "token", channel.Token, "chainID", channel.ChainID)
+			return RPCErrorf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID)
+		}
+
+		if params.ResizeAmount == nil {
+			params.ResizeAmount = &decimal.Zero
+		}
+		if params.AllocateAmount == nil {
+			params.AllocateAmount = &decimal.Zero
+		}
+
+		// Prevent no-op resize operations
+		if params.ResizeAmount.Cmp(decimal.Zero) == 0 && params.AllocateAmount.Cmp(decimal.Zero) == 0 {
+			return RPCErrorf("resize operation requires non-zero ResizeAmount or AllocateAmount")
+		}
+
+		ledger := GetWalletLedger(tx, common.HexToAddress(channel.Wallet))
+		balance, err := ledger.Balance(NewAccountID(channel.Wallet), asset.Symbol)
+		if err != nil {
+			logger.Error(ErrGetAccountBalance, "error", err)
+			return RPCErrorf(ErrGetAccountBalance+" for asset %s", asset.Symbol)
+		}
+
+		rawBalance := balance.Shift(int32(asset.Token.Decimals))
+		newChannelRawAmount := channel.RawAmount.Add(*params.AllocateAmount)
+
+		if rawBalance.Cmp(newChannelRawAmount) < 0 {
+			return RPCErrorf("insufficient unified balance for channel %s: required %s, available %s", channel.ChannelID, newChannelRawAmount.String(), rawBalance.String())
+		}
+		newChannelRawAmount = newChannelRawAmount.Add(*params.ResizeAmount)
+		if newChannelRawAmount.Cmp(decimal.Zero) < 0 {
+			return RPCErrorf("new channel amount must be positive: %s", newChannelRawAmount.String())
+		}
+
+		channel.Status = ChannelStatusResizing
+
+		if err := tx.Save(channel).Error; err != nil {
+			return RPCErrorf("error saving channel in database: %w", err)
+		}
+
+		if params.ResizeAmount.Cmp(decimal.Zero) < 0 {
+			decimalResizeAmount := rawToDecimal(params.ResizeAmount.BigInt(), asset.Token.Decimals)
+			// Lock funds in the channel account.
+			if err := ledger.Record(NewAccountID(channel.Wallet), asset.Symbol, decimalResizeAmount, nil); err != nil {
+				return err
+			}
+			if err := ledger.Record(NewAccountID(channel.ChannelID), asset.Symbol, decimalResizeAmount.Neg(), nil); err != nil {
+				return err
+			}
+			_, err := RecordLedgerTransaction(tx, TransactionTypeEscrowLock, NewAccountID(channel.Wallet), NewAccountID(channel.ChannelID), asset.Symbol, decimalResizeAmount)
+			if err != nil {
+				return err
+			}
+		}
+
+		allocations = []nitrolite.Allocation{
+			{
+				Destination: common.HexToAddress(params.FundsDestination),
+				Token:       common.HexToAddress(channel.Token),
+				Amount:      newChannelRawAmount.BigInt(),
+			},
+			{
+				Destination: s.signer.GetAddress(),
+				Token:       common.HexToAddress(channel.Token),
+				Amount:      big.NewInt(0),
+			},
+		}
+		return nil
+	})
+	if err != nil {
 		return ChannelOperationResponse{}, err
-	}
-
-	if channel.Status != ChannelStatusOpen {
-		return ChannelOperationResponse{}, RPCErrorf("channel %s is not open: %s", params.ChannelID, channel.Status)
-	}
-
-	_, ok := rpcSigners[channel.Wallet]
-	if !ok {
-		return ChannelOperationResponse{}, RPCErrorf("invalid signature")
-	}
-
-	asset, ok := s.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, channel.ChainID)
-	if !ok {
-		logger.Error("failed to find asset for an existing channel", "token", channel.Token, "chainID", channel.ChainID)
-		return ChannelOperationResponse{}, RPCErrorf("failed to find asset for token %s on chain %d", channel.Token, channel.ChainID)
-	}
-
-	if params.ResizeAmount == nil {
-		params.ResizeAmount = &decimal.Zero
-	}
-	if params.AllocateAmount == nil {
-		params.AllocateAmount = &decimal.Zero
-	}
-
-	// Prevent no-op resize operations
-	if params.ResizeAmount.Cmp(decimal.Zero) == 0 && params.AllocateAmount.Cmp(decimal.Zero) == 0 {
-		return ChannelOperationResponse{}, RPCErrorf("resize operation requires non-zero ResizeAmount or AllocateAmount")
-	}
-
-	ledger := GetWalletLedger(s.db, common.HexToAddress(channel.Wallet))
-	balance, err := ledger.Balance(NewAccountID(channel.Wallet), asset.Symbol)
-	if err != nil {
-		logger.Error(ErrGetAccountBalance, "error", err)
-		return ChannelOperationResponse{}, RPCErrorf(ErrGetAccountBalance+" for asset %s", asset.Symbol)
-	}
-
-	rawBalance := balance.Shift(int32(asset.Token.Decimals))
-	newChannelRawAmount := channel.RawAmount.Add(*params.AllocateAmount)
-
-	if rawBalance.Cmp(newChannelRawAmount) < 0 {
-		return ChannelOperationResponse{}, RPCErrorf("insufficient unified balance for channel %s: required %s, available %s", channel.ChannelID, newChannelRawAmount.String(), rawBalance.String())
-	}
-	newChannelRawAmount = newChannelRawAmount.Add(*params.ResizeAmount)
-	if newChannelRawAmount.Cmp(decimal.Zero) < 0 {
-		return ChannelOperationResponse{}, RPCErrorf("new channel amount must be positive: %s", newChannelRawAmount.String())
-	}
-
-	allocations := []nitrolite.Allocation{
-		{
-			Destination: common.HexToAddress(params.FundsDestination),
-			Token:       common.HexToAddress(channel.Token),
-			Amount:      newChannelRawAmount.BigInt(),
-		},
-		{
-			Destination: s.signer.GetAddress(),
-			Token:       common.HexToAddress(channel.Token),
-			Amount:      big.NewInt(0),
-		},
 	}
 
 	resizeAmounts := []*big.Int{params.ResizeAmount.BigInt(), params.AllocateAmount.BigInt()}
@@ -215,9 +246,6 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 	channel, err := GetChannelByID(s.db, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)
-		return ChannelOperationResponse{}, RPCErrorf("failed to find channel: %s", params.ChannelID)
-	}
-	if channel == nil {
 		return ChannelOperationResponse{}, RPCErrorf("channel %s not found", params.ChannelID)
 	}
 
@@ -226,8 +254,8 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 		return ChannelOperationResponse{}, err
 	}
 
-	if channel.Status != ChannelStatusOpen {
-		return ChannelOperationResponse{}, RPCErrorf("channel %s is not open: %s", params.ChannelID, channel.Status)
+	if channel.Status != ChannelStatusOpen && channel.Status != ChannelStatusResizing {
+		return ChannelOperationResponse{}, RPCErrorf("channel %s is not open or resizing: %s", params.ChannelID, channel.Status)
 	}
 
 	_, ok := rpcSigners[channel.Wallet]
@@ -252,22 +280,31 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 		return ChannelOperationResponse{}, RPCErrorf("negative balance")
 	}
 
-	rawBalance := balance.Shift(int32(asset.Token.Decimals)).BigInt()
+	channelAccountID := NewAccountID(channel.ChannelID)
+	channelEscrowAccountBalance, err := ledger.Balance(channelAccountID, asset.Symbol)
+	if err != nil {
+		return ChannelOperationResponse{}, RPCErrorf("error fetching channel balance: %w", err)
+	}
+	balance = balance.Add(channelEscrowAccountBalance)
+
+	userAllocation := balance.Shift(int32(asset.Token.Decimals)).BigInt()
 	channelRawAmount := channel.RawAmount.BigInt()
-	if channelRawAmount.Cmp(rawBalance) < 0 {
-		return ChannelOperationResponse{}, RPCErrorf("resize this channel first")
+
+	// User gets min(userBalance, channelAmount), broker gets the rest
+	if userAllocation.Cmp(channelRawAmount) > 0 {
+		userAllocation = channelRawAmount
 	}
 
 	allocations := []nitrolite.Allocation{
 		{
 			Destination: common.HexToAddress(params.FundsDestination),
 			Token:       common.HexToAddress(channel.Token),
-			Amount:      rawBalance,
+			Amount:      userAllocation,
 		},
 		{
 			Destination: s.signer.GetAddress(),
 			Token:       common.HexToAddress(channel.Token),
-			Amount:      new(big.Int).Sub(channelRawAmount, rawBalance),
+			Amount:      new(big.Int).Sub(channelRawAmount, userAllocation),
 		},
 	}
 

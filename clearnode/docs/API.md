@@ -1128,7 +1128,11 @@ In the request, the user must specify funds destination. After the channel is cl
 
 ### Resize Channel
 
-Adjusts the capacity of a channel.
+Adjusts the capacity of a channel by depositing or withdrawing funds.
+
+**IMPORTANT**: Once a resize is requested, the channel moves to a "resizing" status. The resize on-chain channel state must be submitted to the blockchain to complete the resize operation. If the resize transaction is not submitted and lost, the channel will remain in the resizing status indefinitely, and the only way to recover the funds would be to close the channel. Later to resume operations, the user will be able to reopen a channel.
+
+**Fund Locking**: When withdrawing funds (negative `resize_amount`), the funds being withdrawn are immediately locked until the resize transaction on-chain confirmation is seen and processed by the Node.
 
 **Request:**
 
@@ -1136,18 +1140,22 @@ Adjusts the capacity of a channel.
 {
   "req": [1, "resize_channel", {
     "channel_id": "0x4567890123abcdef...",
-    "allocate_amount": "200000000",
-    "resize_amount": "1000000000",
+    "resize_amount": "-1000000000",
+    "allocate_amount": "+1000000000",
     "funds_destination": "0x1234567890abcdef..."
   }, 1619123456789],
   "sig": ["0x9876fedcba..."]
 }
 ```
 
-`allocate_amount` is how much more token user wants to allocate to this token-network specific channel from his unified balance.
-`resize_amount` is how much user wants to deposit or withdraw from a token-network specific channel.
+**Request Parameters:**
 
-Example:
+- `channel_id`: The ID of the channel to resize.
+- `resize_amount`: Amount to deposit (positive) or withdraw (negative) from the channel.
+- `allocate_amount`: Amount to allocate to (positive) or deallocate from (negative) this specific channel from the user's unified balance.
+- `funds_destination`: User's allocation funds destination for the resize state.
+
+**Example Scenarios:**
 
 - Initial state: user an open channel on Polygon with 20 usdc, and a channel on Celo with 5 usdc.
 - User wants to deposit 75 usdc on Celo. User calls `resize_channel`, with `allocate_amount=0` and `resize_amount=75`.
@@ -1184,7 +1192,22 @@ Example:
 }
 ```
 
-The channel will be resized on the blockchain network where it was originally opened, as identified by the `chain_id` associated with the channel. The `new_amount` parameter specifies the desired capacity for the channel.
+**Response Fields:**
+
+- `channel_id`: The ID of the channel being resized
+- `state`: The complete resize state that must be submitted to the blockchain
+  - `intent`: Always 2 (IntentRESIZE) for resize operations
+  - `version`: The new version number for this channel state
+  - `state_data`: Encoded state data for the resize operation
+  - `allocations`: The final allocation distribution after resize
+- `server_signature`: Clearnode's signature of the resize state (required for blockchain submission)
+
+**Important Notes:**
+
+1. **Channel Status**: After calling `resize_channel`, the channel enters `resizing` status and cannot be used for other operations until the resize state is submitted on-chain
+2. **Blockchain Submission Required**: You must submit the returned state to the blockchain using the Custody contract's `resize(...)` method. The channel remains in "resizing" status until this transaction is confirmed
+3. **Recovery**: If you don't submit the resize transaction, you cannot perform any other operations on this channel except closing it
+4. **Fund Locking**: For withdrawals (negative `resize_amount`), the withdrawn funds are locked in your unified balance and cannot be spent until the blockchain transaction is confirmed or the channel is closed.
 
 ## Messaging
 

@@ -15,7 +15,6 @@ import (
 
 const (
 	ErrNegativeAllocation = "negative allocation"
-	ErrRecordTransaction  = "failed to record transaction"
 )
 
 // SessionKeyContext holds information about session key usage.
@@ -176,14 +175,14 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 			}
 
 			if err := ledger.Record(userAccountID, alloc.AssetSymbol, depositAmount.Neg(), sigCtx.SessionKeyAddress); err != nil {
-				return UpdateResult{}, RPCErrorf(ErrDebitSourceAccount+": %w", err)
+				return UpdateResult{}, err
 			}
 			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, depositAmount, nil); err != nil {
-				return UpdateResult{}, RPCErrorf(ErrCreditDestinationAccount+": %w", err)
+				return UpdateResult{}, err
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppDeposit, userAccountID, sessionAccountID, alloc.AssetSymbol, depositAmount)
 			if err != nil {
-				return UpdateResult{}, RPCErrorf(ErrRecordTransaction+": %w", err)
+				return UpdateResult{}, err
 			}
 
 			participantsWithUpdatedBalance[walletAddress] = true
@@ -260,14 +259,14 @@ func (w *WithdrawUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult
 			ledger := GetWalletLedger(tx, userAddress)
 
 			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, withdrawalAmount.Neg(), nil); err != nil {
-				return UpdateResult{}, RPCErrorf(ErrDebitSourceAccount+": %w", err)
+				return UpdateResult{}, err
 			}
 			if err := ledger.Record(userAccountID, alloc.AssetSymbol, withdrawalAmount, nil); err != nil {
-				return UpdateResult{}, RPCErrorf(ErrCreditDestinationAccount+": %w", err)
+				return UpdateResult{}, err
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppWithdrawal, sessionAccountID, userAccountID, alloc.AssetSymbol, withdrawalAmount)
 			if err != nil {
-				return UpdateResult{}, RPCErrorf(ErrRecordTransaction+": %w", err)
+				return UpdateResult{}, err
 			}
 
 			participantsWithUpdatedBalance[alloc.Participant] = true
@@ -332,7 +331,7 @@ func (o *OperateUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 		diff := alloc.Amount.Sub(balance)
 		if !diff.IsZero() {
 			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, diff, nil); err != nil {
-				return UpdateResult{}, RPCErrorf("failed to update session balance: %w", err)
+				return UpdateResult{}, err
 			}
 		}
 
@@ -442,14 +441,14 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 			}
 
 			if err = ledger.Record(userAccountID, alloc.AssetSymbol, alloc.Amount.Neg(), sigCtx.SessionKeyAddress); err != nil {
-				return RPCErrorf(ErrDebitSourceAccount+": %w", err)
+				return err
 			}
 			if err = ledger.Record(sessionAccountID, alloc.AssetSymbol, alloc.Amount, nil); err != nil {
-				return RPCErrorf(ErrCreditDestinationAccount+": %w", err)
+				return err
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppDeposit, userAccountID, sessionAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
-				return RPCErrorf(ErrRecordTransaction+": %w", err)
+				return err
 			}
 			participantsWithUpdatedBalance[walletAddress] = true
 		}
@@ -645,14 +644,14 @@ func (s *AppSessionService) CloseApplication(params *CloseAppSessionParams, rpcW
 
 			// Debit session, credit participant
 			if err := ledger.Record(sessionAccountID, alloc.AssetSymbol, balance.Neg(), nil); err != nil {
-				return RPCErrorf(ErrDebitSourceAccount+": %w", err)
+				return err
 			}
 			if err := ledger.Record(userAccountID, alloc.AssetSymbol, alloc.Amount, nil); err != nil {
-				return RPCErrorf(ErrCreditDestinationAccount+": %w", err)
+				return err
 			}
 			_, err = RecordLedgerTransaction(tx, TransactionTypeAppWithdrawal, sessionAccountID, userAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
-				return RPCErrorf(ErrRecordTransaction+": %w", err)
+				return err
 			}
 
 			if !alloc.Amount.IsZero() {

@@ -353,18 +353,18 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 				return RPCErrorf("insufficient funds: %s for asset %s", fromWallet, alloc.AssetSymbol)
 			}
 			if err = ledger.Record(fromAccountID, alloc.AssetSymbol, alloc.Amount.Neg(), sessionKeyAddress); err != nil {
-				return RPCErrorf(ErrDebitSourceAccount+": %w", err)
+				return err
 			}
 
 			toAddress := common.HexToAddress(destinationAddress)
 			toAccountID := NewAccountID(destinationAddress)
 			ledger = GetWalletLedger(tx, toAddress)
 			if err = ledger.Record(toAccountID, alloc.AssetSymbol, alloc.Amount, nil); err != nil {
-				return RPCErrorf(ErrCreditDestinationAccount+": %w", err)
+				return err
 			}
 			transaction, err := RecordLedgerTransaction(tx, TransactionTypeTransfer, fromAccountID, toAccountID, alloc.AssetSymbol, alloc.Amount)
 			if err != nil {
-				return fmt.Errorf("failed to record transaction: %w", err)
+				return err
 			}
 			transactions = append(transactions, TransactionWithTags{
 				LedgerTransaction: *transaction,

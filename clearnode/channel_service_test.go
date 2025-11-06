@@ -154,7 +154,7 @@ func TestChannelService(t *testing.T) {
 		require.NotNil(t, channel)
 		assert.Equal(t, channelAmountRaw, channel.RawAmount)
 		assert.Equal(t, ch.State.Version, channel.State.Version)
-		assert.Equal(t, ChannelStatusOpen, channel.Status)
+		assert.Equal(t, ChannelStatusResizing, channel.Status)
 
 		// Verify ledger balance remains unchanged (no update until blockchain confirmation)
 		finalBalance, err := ledger.Balance(userAccountID, tokenSymbol)
@@ -325,6 +325,124 @@ func TestChannelService(t *testing.T) {
 		require.Error(t, err)
 
 		assert.Contains(t, err.Error(), "has challenged channels")
+	})
+
+	t.Run("RequestClose_SuccessWithChannelEscrowBalance", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		t.Cleanup(cleanup)
+
+		assetsCfg := &AssetsConfig{}
+		asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
+		ch := seedChannel(t, db, channelID, userAddress.Hex(), userAddress.Hex(), asset.Token.Address, chainID, channelAmountRaw, 2, ChannelStatusOpen)
+
+		ledger := GetWalletLedger(db, userAddress)
+
+		// Fund wallet account with 600 raw units
+		require.NoError(t, ledger.Record(
+			userAccountID,
+			tokenSymbol,
+			rawToDecimal(decimal.NewFromInt(600).BigInt(), asset.Token.Decimals),
+			nil,
+		))
+
+		// Lock 400 raw units in channel escrow account
+		channelAccountID := NewAccountID(ch.ChannelID)
+		require.NoError(t, ledger.Record(
+			channelAccountID,
+			tokenSymbol,
+			rawToDecimal(decimal.NewFromInt(400).BigInt(), asset.Token.Decimals),
+			nil,
+		))
+
+		service := NewChannelService(db, map[uint32]BlockchainConfig{}, assetsCfg, &signer)
+
+		params := getCloseChannelParams(ch.ChannelID, userAddress.Hex())
+		// Request close for a channel with amount of 1000 raw units
+		response, err := service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
+		require.NoError(t, err)
+
+		assert.Equal(t, ch.ChannelID, response.ChannelID)
+		assert.Equal(t, ch.State.Version+1, response.State.Version)
+		assert.Equal(t, 0, response.State.Allocations[0].RawAmount.Cmp(channelAmountRaw))
+		assert.Equal(t, 0, response.State.Allocations[1].RawAmount.Cmp(decimal.Zero))
+	})
+
+	t.Run("RequestClose_SuccessWithBalanceLessThanInChannel", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		t.Cleanup(cleanup)
+
+		assetsCfg := &AssetsConfig{}
+		asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
+		// Channel has 1000 raw amount
+		ch := seedChannel(t, db, channelID, userAddress.Hex(), userAddress.Hex(), asset.Token.Address, chainID, channelAmountRaw, 2, ChannelStatusOpen)
+
+		ledger := GetWalletLedger(db, userAddress)
+
+		// Fund wallet account with 300 raw units
+		require.NoError(t, ledger.Record(
+			userAccountID,
+			tokenSymbol,
+			rawToDecimal(decimal.NewFromInt(300).BigInt(), asset.Token.Decimals),
+			nil,
+		))
+
+		service := NewChannelService(db, map[uint32]BlockchainConfig{}, assetsCfg, &signer)
+
+		params := getCloseChannelParams(ch.ChannelID, userAddress.Hex())
+		response, err := service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
+		require.NoError(t, err)
+
+		assert.Equal(t, ch.ChannelID, response.ChannelID)
+		assert.Equal(t, ch.State.Version+1, response.State.Version)
+
+		// User gets 300 (their available balance)
+		assert.Equal(t, 0, response.State.Allocations[0].RawAmount.Cmp(decimal.NewFromInt(300)))
+		// Broker gets 700 (the difference: 1000 - 300)
+		assert.Equal(t, 0, response.State.Allocations[1].RawAmount.Cmp(decimal.NewFromInt(700)))
+	})
+
+	t.Run("RequestClose_SuccessWithExcessBalance", func(t *testing.T) {
+		db, cleanup := setupTestDB(t)
+		t.Cleanup(cleanup)
+
+		assetsCfg := &AssetsConfig{}
+		asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
+		// Channel has 1000 raw amount
+		ch := seedChannel(t, db, channelID, userAddress.Hex(), userAddress.Hex(), asset.Token.Address, chainID, channelAmountRaw, 2, ChannelStatusOpen)
+
+		ledger := GetWalletLedger(db, userAddress)
+
+		// Fund wallet account with 700 raw units
+		require.NoError(t, ledger.Record(
+			userAccountID,
+			tokenSymbol,
+			rawToDecimal(decimal.NewFromInt(700).BigInt(), asset.Token.Decimals),
+			nil,
+		))
+
+		// Lock 400 raw units in channel escrow account
+		// User's balance for closing: 700 + 400 = 1100 raw units, which is MORE than channel amount (1000)
+		// The allocations will be based on min(balance, channelAmount) = 1000
+		channelAccountID := NewAccountID(ch.ChannelID)
+		require.NoError(t, ledger.Record(
+			channelAccountID,
+			tokenSymbol,
+			rawToDecimal(decimal.NewFromInt(400).BigInt(), asset.Token.Decimals),
+			nil,
+		))
+
+		service := NewChannelService(db, map[uint32]BlockchainConfig{}, assetsCfg, &signer)
+
+		params := getCloseChannelParams(ch.ChannelID, userAddress.Hex())
+		response, err := service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
+		require.NoError(t, err)
+
+		assert.Equal(t, ch.ChannelID, response.ChannelID)
+		assert.Equal(t, ch.State.Version+1, response.State.Version)
+		// User gets the full channel amount (1000), broker gets 0
+		// The excess 100 units remains in the user's unified balance
+		assert.Equal(t, 0, response.State.Allocations[0].RawAmount.Cmp(channelAmountRaw))
+		assert.Equal(t, 0, response.State.Allocations[1].RawAmount.Cmp(decimal.Zero))
 	})
 
 	t.Run("RequestCreate_Success", func(t *testing.T) {

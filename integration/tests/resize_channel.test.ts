@@ -4,9 +4,9 @@ import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
-import { composeResizeChannelParams } from '@/testHelpers';
-import { getResizeChannelPredicate, TestWebSocket } from '@/ws';
-import { createResizeChannelMessage, parseResizeChannelResponse } from '@erc7824/nitrolite';
+import { composeResizeChannelParams, getLedgerBalances, toRaw } from '@/testHelpers';
+import { getChannelUpdatePredicateWithStatus, getResizeChannelPredicate, TestWebSocket } from '@/ws';
+import { createResizeChannelMessage, parseResizeChannelResponse, RPCChannelStatus } from '@erc7824/nitrolite';
 import { Hex, parseUnits } from 'viem';
 
 describe('Resize channel', () => {
@@ -231,5 +231,168 @@ describe('Resize channel', () => {
             CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS
         );
         expect(postResizeChannelBalance).toBe(depositAmount * BigInt(4)); // 1000 - 500 - 100
+    });
+
+    it('should subtract resize amount from unified balance after withdrawal resize request', async () => {
+        const DEPOSIT_AMOUNT = BigInt(10)
+        const WITHDRAWAL_AMOUNT = BigInt(1)
+
+        const { params: createResponseParams, state: createResponseState } = await client.createAndWaitForChannel(ws, {
+            tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            amount: toRaw(DEPOSIT_AMOUNT)
+        });
+
+        const preResizeUnifiedBalance = await getLedgerBalances(identity, ws);
+        expect(preResizeUnifiedBalance.length).toBe(1);
+        expect(preResizeUnifiedBalance[0].amount).toBe(DEPOSIT_AMOUNT.toString());
+
+        const msg = await createResizeChannelMessage(identity.messageSKSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: -toRaw(WITHDRAWAL_AMOUNT),
+            funds_destination: identity.walletAddress,
+        });
+
+        const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
+
+        // after resize withdrawal is requested, the unified balance should decrease by resize amount
+        const postResizeReqUnifiedBalance = await getLedgerBalances(identity, ws);
+        expect(postResizeReqUnifiedBalance.length).toBe(1);
+        expect(postResizeReqUnifiedBalance[0].amount).toBe((DEPOSIT_AMOUNT - WITHDRAWAL_AMOUNT).toString());
+
+        const {txHash: resizeChannelTxHash} = await client.resizeChannel({
+            ...composeResizeChannelParams(
+                resizeResponseParams.channelId as Hex,
+                resizeResponseParams,
+                createResponseState
+            ),
+        });
+        expect(resizeChannelTxHash).toBeDefined();
+
+        const resizeReceipt = await blockUtils.waitForTransaction(resizeChannelTxHash);
+        expect(resizeReceipt).toBeDefined();
+
+        const postResizeUnifiedBalance = await getLedgerBalances(identity, ws);
+        expect(postResizeUnifiedBalance.length).toBe(1);
+        expect(postResizeUnifiedBalance[0].amount).toBe((DEPOSIT_AMOUNT - WITHDRAWAL_AMOUNT).toString());
+    });
+
+    it('should NOT subtract resize amount from unified balance after top-up resize request', async () => {
+        const DEPOSIT_AMOUNT = BigInt(10)
+        const TOP_UP_AMOUNT = BigInt(1)
+
+        const { params: createResponseParams, state: createResponseState } = await client.createAndWaitForChannel(ws, {
+            tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            amount: toRaw(DEPOSIT_AMOUNT),
+            depositAmount: toRaw(DEPOSIT_AMOUNT + TOP_UP_AMOUNT), // deposit more to have top-up buffer
+        });
+
+        const preResizeUnifiedBalance = await getLedgerBalances(identity, ws);
+        expect(preResizeUnifiedBalance.length).toBe(1);
+        expect(preResizeUnifiedBalance[0].amount).toBe(DEPOSIT_AMOUNT.toString());
+
+        const msg = await createResizeChannelMessage(identity.messageSKSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: toRaw(TOP_UP_AMOUNT),
+            funds_destination: identity.walletAddress,
+        });
+
+        const resizeResponse = await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
+        const { params: resizeResponseParams } = parseResizeChannelResponse(resizeResponse);
+
+        // after resize deposit is requested, the unified balance should NOT change
+        const postResizeReqUnifiedBalance = await getLedgerBalances(identity, ws);
+        expect(postResizeReqUnifiedBalance.length).toBe(1);
+        expect(postResizeReqUnifiedBalance[0].amount).toBe(DEPOSIT_AMOUNT.toString());
+
+        const {txHash: resizeChannelTxHash} = await client.resizeChannel({
+            ...composeResizeChannelParams(
+                resizeResponseParams.channelId as Hex,
+                resizeResponseParams,
+                createResponseState
+            ),
+        });
+        expect(resizeChannelTxHash).toBeDefined();
+
+        const resizeReceipt = await blockUtils.waitForTransaction(resizeChannelTxHash);
+        expect(resizeReceipt).toBeDefined();
+
+        const postResizeUnifiedBalance = await getLedgerBalances(identity, ws);
+        expect(postResizeUnifiedBalance.length).toBe(1);
+        expect(postResizeUnifiedBalance[0].amount).toBe((DEPOSIT_AMOUNT + TOP_UP_AMOUNT).toString());
+    });
+
+    it('fail on requesting resize after resize was already requested', async () => {
+        const DEPOSIT_AMOUNT = BigInt(10)
+        const WITHDRAW_AMOUNT = BigInt(1)
+
+        const { params: createResponseParams } = await client.createAndWaitForChannel(ws, {
+            tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            amount: toRaw(DEPOSIT_AMOUNT),
+        });
+
+        const preResizeUnifiedBalance = await getLedgerBalances(identity, ws);
+        expect(preResizeUnifiedBalance.length).toBe(1);
+        expect(preResizeUnifiedBalance[0].amount).toBe(DEPOSIT_AMOUNT.toString());
+
+        const msg = await createResizeChannelMessage(identity.messageSKSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: -toRaw(WITHDRAW_AMOUNT),
+            funds_destination: identity.walletAddress,
+        });
+
+        await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
+
+        // do NOT perform the resize again, just send the request and expect error
+
+        const msg2 = await createResizeChannelMessage(identity.messageSKSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: -toRaw(WITHDRAW_AMOUNT),
+            funds_destination: identity.walletAddress,
+        });
+
+        try {
+            await ws.sendAndWaitForResponse(msg2, getResizeChannelPredicate(), 1000);
+        } catch (e) {
+            expect(e).toBeDefined();
+            expect(e.message).toMatch(/RPC Error.*operation denied: resize already ongoing/);
+        }
+    });
+
+    it('should release locked funds after close if resize was requested, but not performed', async () => {
+        const DEPOSIT_AMOUNT = BigInt(10)
+        const WITHDRAWAL_AMOUNT = BigInt(1)
+
+        const { params: createResponseParams } = await client.createAndWaitForChannel(ws, {
+            tokenAddress: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
+            amount: toRaw(DEPOSIT_AMOUNT)
+        });
+
+        const preResizeUnifiedBalance = await getLedgerBalances(identity, ws);
+        expect(preResizeUnifiedBalance.length).toBe(1);
+        expect(preResizeUnifiedBalance[0].amount).toBe(DEPOSIT_AMOUNT.toString());
+
+        const msg = await createResizeChannelMessage(identity.messageSKSigner, {
+            channel_id: createResponseParams.channelId,
+            resize_amount: -toRaw(WITHDRAWAL_AMOUNT),
+            funds_destination: identity.walletAddress,
+        });
+
+        await ws.sendAndWaitForResponse(msg, getResizeChannelPredicate(), 1000);
+
+        // do NOT perform the resize, just close the channel
+        const resizeChannelUpdatePromise = ws.waitForMessage(
+            getChannelUpdatePredicateWithStatus(RPCChannelStatus.Closed),
+            undefined,
+            5000
+        );
+
+        const response = await client.closeAndWithdrawChannel(ws, createResponseParams.channelId);
+        await resizeChannelUpdatePromise;
+
+        // after channel is closed, all funds are withdrawn, so unified balance should be 0
+        const postResizeUnifiedBalance = await getLedgerBalances(identity, ws);
+        expect(postResizeUnifiedBalance.length).toBe(1);
+        expect(postResizeUnifiedBalance[0].amount).toBe("0");
     });
 });

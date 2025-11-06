@@ -500,7 +500,7 @@ The format of the EIP-712 message is as follows:
   },
   // Domain and primary type
   domain: {
-    name: 'Your App Identifier'
+    name: 'Your App Domain'
   },
   primaryType: 'Policy',
   message: {
@@ -508,7 +508,7 @@ The format of the EIP-712 message is as follows:
     scope: 'console',
     wallet: '0xYourWalletAddress',
     session_key: '0xYourSignerAddress',
-    expire: "100500",
+    expire: 1762417301,
     allowances: []
   }
 }

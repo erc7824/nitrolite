@@ -249,7 +249,6 @@ describe('Resize channel', () => {
         const msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: -toRaw(WITHDRAWAL_AMOUNT),
-            allocate_amount: -toRaw(WITHDRAWAL_AMOUNT),
             funds_destination: identity.walletAddress,
         });
 
@@ -376,7 +375,6 @@ describe('Resize channel', () => {
         const msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: -toRaw(WITHDRAWAL_AMOUNT),
-            allocate_amount: -toRaw(WITHDRAWAL_AMOUNT),
             funds_destination: identity.walletAddress,
         });
 

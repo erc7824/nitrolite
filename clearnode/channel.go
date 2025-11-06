@@ -74,7 +74,7 @@ func CreateChannel(tx *gorm.DB, channelID, wallet, participantSigner string, non
 func GetChannelByID(tx *gorm.DB, channelID string) (*Channel, error) {
 	var channel Channel
 	if err := tx.Where("channel_id = ?", channelID).First(&channel).Error; err != nil {
-		return nil, fmt.Errorf("error finding channel: %w", err)
+		return nil, err
 	}
 
 	return &channel, nil

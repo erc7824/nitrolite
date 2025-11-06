@@ -3,7 +3,6 @@ package main
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"log"
 	"math/big"
 
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
@@ -87,7 +86,7 @@ func RecoverAddressFromEip712Signature(
 	application string,
 	allowances []Allowance,
 	scope string,
-	expire string,
+	expire uint64,
 	sig Signature) (string, error) {
 	convertedAllowances := convertAllowances(allowances)
 
@@ -101,12 +100,12 @@ func RecoverAddressFromEip712Signature(
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
 				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "uint256"},
+				{Name: "expire", Type: "uint64"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {
 				{Name: "asset", Type: "string"},
-				{Name: "amount", Type: "uint256"},
+				{Name: "amount", Type: "string"},
 			}},
 		PrimaryType: "Policy",
 		Domain: apitypes.TypedDataDomain{
@@ -117,7 +116,7 @@ func RecoverAddressFromEip712Signature(
 			"scope":       scope,
 			"wallet":      walletAddress,
 			"session_key": sessionKey,
-			"expire":      expire,
+			"expire":      new(big.Int).SetUint64(expire),
 			"allowances":  convertedAllowances,
 		},
 	}
@@ -147,14 +146,9 @@ func RecoverAddressFromEip712Signature(
 func convertAllowances(input []Allowance) []map[string]interface{} {
 	out := make([]map[string]interface{}, len(input))
 	for i, a := range input {
-		amountInt, ok := new(big.Int).SetString(a.Amount, 10)
-		if !ok {
-			log.Printf("Invalid amount in allowance: %s", a.Amount)
-			continue
-		}
 		out[i] = map[string]interface{}{
 			"asset":  a.Asset,
-			"amount": amountInt,
+			"amount": a.Amount,
 		}
 	}
 	return out

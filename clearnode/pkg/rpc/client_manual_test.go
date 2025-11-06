@@ -66,7 +66,7 @@ func TestManualClient(t *testing.T) {
 					Amount: testAllowanceAmount,
 				},
 			},
-			Expire: time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339),
+			Expire: uint64(time.Now().Add(1 * time.Hour).Unix()),
 			Scope:  "",
 		}
 		authRes, _, err := client.AuthWithSig(ctx, authReq, walletSigner)

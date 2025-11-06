@@ -55,7 +55,7 @@ Initiates authentication with the server.
       }
     ],
     "scope": "app.create", // Permission scope (e.g., "app.create", "ledger.readonly")
-    "expire": "3600", //  Session expiration
+    "expire": 1762417328, // Session expiration timestamp
     "application": "0xApp1234567890abcdef..." // Application public address
   }, 1619123456789],
   "sig": ["0x5432abcdef..."] // Client's signature of the entire 'req' object

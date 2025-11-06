@@ -257,8 +257,8 @@ export interface AuthRequest extends GenericRPCMessage {
         application: string;
         /** The allowances for the connection. */
         allowances: RPCAllowance[];
-        /** The expiration timestamp for the authorization. */
-        expire: string;
+        /** The expiration timestamp for the authorization (Unix timestamp as bigint). */
+        expire: bigint;
         /** The scope of the authorization. */
         scope: string;
     };

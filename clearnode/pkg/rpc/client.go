@@ -7,6 +7,7 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
@@ -1468,12 +1469,12 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
 				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "uint256"},
+				{Name: "expire", Type: "uint64"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {
 				{Name: "asset", Type: "string"},
-				{Name: "amount", Type: "uint256"}, // FIXME: currently allowance amount is string, so it will fail if there are some allowances
+				{Name: "amount", Type: "string"},
 			},
 		},
 		PrimaryType: "Policy",
@@ -1485,7 +1486,7 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 			"scope":       req.Scope,
 			"wallet":      req.Address,
 			"session_key": req.SessionKey,
-			"expire":      req.Expire,
+			"expire":      new(big.Int).SetUint64(req.Expire),
 			"allowances":  req.Allowances,
 		},
 	}

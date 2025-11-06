@@ -15,7 +15,7 @@ type AuthRequestParams struct {
 	SessionKey  string      `json:"session_key"` // The session key for the authentication
 	Application string      `json:"application"` // The name of the application requesting authentication
 	Allowances  []Allowance `json:"allowances"`  // Allowances for the application
-	Expire      string      `json:"expire"`      // Expiration time for the authentication
+	Expire      uint64      `json:"expire"`      // Expiration time for the authentication
 	Scope       string      `json:"scope"`       // Scope of the authentication
 }
 

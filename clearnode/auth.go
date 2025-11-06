@@ -20,7 +20,7 @@ type Challenge struct {
 	Application string      // Name of the application which opened the connection
 	Allowances  []Allowance // Allowances for this connection
 	Scope       string      // Policy scope
-	Expire      string      // Policy expiration
+	Expire      uint64      // Policy expiration
 	CreatedAt   time.Time   // When the challenge was created
 	ExpiresAt   time.Time   // When the challenge expires
 	Completed   bool        // Whether the challenge has been used
@@ -77,7 +77,7 @@ func (am *AuthManager) GenerateChallenge(
 	application string,
 	allowances []Allowance,
 	scope string,
-	expire string,
+	expire uint64,
 ) (uuid.UUID, error) {
 	// Normalize address
 	if !strings.HasPrefix(address, "0x") {

@@ -230,6 +230,15 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
+	// Check for duplicate transfer by hashing the RPC message
+	messageHash := HashMessage(&c.Message)
+
+	if r.MessageCache.Exists(messageHash) {
+		r.Metrics.TransferAttemptsFail.Inc()
+		c.Fail(nil, "operation denied: the request has already been processed")
+		return
+	}
+
 	// Allow only ledger accounts as destination at the current stage. In the future we'll unlock application accounts.
 	switch {
 	case params.Destination == "" && params.DestinationUserTag == "":
@@ -387,6 +396,9 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		c.Fail(err, "failed to process transfer")
 		return
 	}
+
+	// Add message to cache after successful processing to prevent duplicates
+	r.MessageCache.Add(messageHash)
 
 	resp := TransferResponse{
 		Transactions: respTransactions,

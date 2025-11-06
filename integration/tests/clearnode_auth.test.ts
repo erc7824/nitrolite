@@ -16,11 +16,11 @@ import {
 describe('Clearnode Authentication', () => {
     let ws: TestWebSocket;
 
-    afterAll(() => {
+    afterAll(async () => {
         ws.close();
         const databaseUtils = new DatabaseUtils();
-        databaseUtils.resetClearnodeState();
-        databaseUtils.close();
+        await databaseUtils.resetClearnodeState();
+        await databaseUtils.close();
     });
 
     const identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, CONFIG.IDENTITIES[0].SESSION_PK);

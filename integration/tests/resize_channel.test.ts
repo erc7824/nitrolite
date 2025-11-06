@@ -393,10 +393,9 @@ describe('Resize channel', () => {
         await resizeChannelUpdatePromise;
         console.log(response.params.amount);
 
-        // after channel is closed, the locked funds for resize should be released back to unified balance
+        // after channel is closed, all funds are withdrawn, so unified balance should be 0
         const postResizeUnifiedBalance = await getLedgerBalances(identity, ws);
         expect(postResizeUnifiedBalance.length).toBe(1);
-        // NOTE: this will become equal to "DEPOSIT_AMOUNT" after zero-allocation channel enforcement is implemented
-        expect(postResizeUnifiedBalance[0].amount).toBe((WITHDRAWAL_AMOUNT).toString());
+        expect(postResizeUnifiedBalance[0].amount).toBe("0");
     });
 });

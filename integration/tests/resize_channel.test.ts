@@ -389,7 +389,6 @@ describe('Resize channel', () => {
 
         const response = await client.closeAndWithdrawChannel(ws, createResponseParams.channelId);
         await resizeChannelUpdatePromise;
-        console.log(response.params.amount);
 
         // after channel is closed, all funds are withdrawn, so unified balance should be 0
         const postResizeUnifiedBalance = await getLedgerBalances(identity, ws);

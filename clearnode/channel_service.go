@@ -280,22 +280,31 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 		return ChannelOperationResponse{}, RPCErrorf("negative balance")
 	}
 
+	channelAccountID := NewAccountID(channel.ChannelID)
+	channelEscrowAccountBalance, err := ledger.Balance(channelAccountID, asset.Symbol)
+	if err != nil {
+		return ChannelOperationResponse{}, RPCErrorf("error fetching channel balance: %w", err)
+	}
+	balance = balance.Add(channelEscrowAccountBalance)
+
 	rawBalance := balance.Shift(int32(asset.Token.Decimals)).BigInt()
 	channelRawAmount := channel.RawAmount.BigInt()
-	if channelRawAmount.Cmp(rawBalance) < 0 {
-		return ChannelOperationResponse{}, RPCErrorf("resize this channel first")
+
+	userAllocation := rawBalance
+	if rawBalance.Cmp(channelRawAmount) > 0 {
+		userAllocation = channelRawAmount
 	}
 
 	allocations := []nitrolite.Allocation{
 		{
 			Destination: common.HexToAddress(params.FundsDestination),
 			Token:       common.HexToAddress(channel.Token),
-			Amount:      rawBalance,
+			Amount:      userAllocation,
 		},
 		{
 			Destination: s.signer.GetAddress(),
 			Token:       common.HexToAddress(channel.Token),
-			Amount:      new(big.Int).Sub(channelRawAmount, rawBalance),
+			Amount:      new(big.Int).Sub(channelRawAmount, userAllocation),
 		},
 	}
 

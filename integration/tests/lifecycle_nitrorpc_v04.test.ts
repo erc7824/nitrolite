@@ -126,7 +126,7 @@ describe('nitrorpc_v04 lifecycle', () => {
     });
 
     it('should create app session with allowance for participant to deposit', async () => {
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount, 'clearnode');
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount.toString(), 'clearnode');
     });
 
     it('should take snapshot of ledger balances', async () => {
@@ -143,7 +143,7 @@ describe('nitrorpc_v04 lifecycle', () => {
             aliceAppWS,
             RPCProtocolVersion.NitroRPC_0_4,
             ASSET_SYMBOL,
-            appSessionDepositAmount,
+            appSessionDepositAmount.toString(),
             SESSION_DATA_WAITING,
             'clearnode'
         );
@@ -196,7 +196,7 @@ describe('nitrorpc_v04 lifecycle', () => {
     });
 
     it('should allow to top-up app session', async () => {
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount + appSessionTopUpAmount, 'clearnode');
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, (appSessionDepositAmount + appSessionTopUpAmount).toString(), 'clearnode');
 
         const updatedAllocations = [
             {

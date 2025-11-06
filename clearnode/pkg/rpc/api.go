@@ -241,8 +241,8 @@ type AuthRequestRequest struct {
 	Application string `json:"application"`
 	// Allowances define spending limits for the authenticated session
 	Allowances []Allowance `json:"allowances"`
-	// Expire defines when the authentication expires (RFC3339 format)
-	Expire string `json:"expire"`
+	// Expire defines when the authentication expires (Unix timestamp)
+	Expire uint64 `json:"expire"`
 	// Scope defines the permission scope for the session
 	Scope string `json:"scope"`
 }

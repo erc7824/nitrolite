@@ -72,7 +72,7 @@ describe('App session state v0.4 error cases', () => {
         let states: State[];
         ({channelIds: [aliceChannelId, bobChannelId], states} = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], toRaw(onChainDepositAmount)));
 
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount);
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount.toString());
 
         appSessionId = await createTestAppSession(
             aliceAppIdentity,
@@ -80,7 +80,7 @@ describe('App session state v0.4 error cases', () => {
             aliceAppWS,
             RPCProtocolVersion.NitroRPC_0_4,
             ASSET_SYMBOL,
-            appSessionDepositAmount,
+            appSessionDepositAmount.toString(),
             START_SESSION_DATA
         );
 
@@ -234,7 +234,7 @@ describe('App session state v0.4 error cases', () => {
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_2,
                 ASSET_SYMBOL,
-                BigInt(0), // No initial deposit to avoid spending Alice's allowance
+                '0', // No initial deposit to avoid spending Alice's allowance
                 START_SESSION_DATA
             );
 
@@ -356,7 +356,7 @@ describe('App session state v0.4 error cases', () => {
         });
 
         it('should fail on withdrawing from v0.2 app session', async () => {
-            await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount * BigInt(2));
+            await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, (appSessionDepositAmount * BigInt(2)).toString());
 
             // Create a v0.2 app session (which doesn't support deposits/withdrawals)
             const v02AppSessionId = await createTestAppSession(
@@ -365,7 +365,7 @@ describe('App session state v0.4 error cases', () => {
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_2,
                 ASSET_SYMBOL,
-                appSessionDepositAmount,
+                appSessionDepositAmount.toString(),
                 START_SESSION_DATA
             );
 

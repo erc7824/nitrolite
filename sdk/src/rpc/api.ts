@@ -51,7 +51,9 @@ export async function createAuthRequestMessage(
         requestId,
         timestamp,
     });
-    return JSON.stringify(request);
+    return JSON.stringify(request, (_, value) =>
+        typeof value === 'bigint' ? Number(value) : value
+    );
 }
 
 /**

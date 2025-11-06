@@ -489,27 +489,26 @@ The format of the EIP-712 message is as follows:
       { "name": "challenge", "type": "string" },
       { "name": "scope", "type": "string" },
       { "name": "wallet", "type": "address" },
-      { "name": "application", "type": "address" },
-      { "name": "participant", "type": "address" },
-      { "name": "expire", "type": "uint256" },
-      { "name": "allowances", "type": "Allowances[]" }
+      { "name": "session_key", "type": "address" },
+      { "name": "expire", "type": "uint64" },
+      { "name": "allowances", "type": "Allowance[]" }
     ],
     "Allowance": [
       { "name": "asset", "type": "string" },
-      { "name": "amount", "type": "uint256" }
+      { "name": "amount", "type": "string" }
     ]
   },
   // Domain and primary type
   domain: {
-    name: 'Your Domain'
+    name: 'Your App Domain'
   },
   primaryType: 'Policy',
   message: {
     challenge: 'RandomChallengeString',
     scope: 'console',
     wallet: '0xYourWalletAddress',
-    participant: '0xYourSignerAddress',
-    expire: 100500,
+    session_key: '0xYourSignerAddress',
+    expire: 1762417301,
     allowances: []
   }
 }

@@ -55,19 +55,19 @@ export async function authenticateAppWithAllowances(
     participantAppWS: TestWebSocket,
     participantAppIdentity: Identity,
     asset: string,
-    decimalDepositAmount: bigint,
+    decimalDepositAmount: string,
     application: string = 'App Domain'
 ): Promise<void> {
     await createAuthSessionWithClearnode(participantAppWS, participantAppIdentity, {
         address: participantAppIdentity.walletAddress,
         session_key: participantAppIdentity.sessionKeyAddress,
         application: application,
-        expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
+        expire: BigInt(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
         allowances: [
             {
                 asset,
-                amount: decimalDepositAmount.toString(),
+                amount: decimalDepositAmount,
             },
         ],
     });
@@ -86,7 +86,7 @@ export async function authenticateAppWithMultiAssetAllowances(
         address: participantAppIdentity.walletAddress,
         session_key: participantAppIdentity.sessionKeyAddress,
         application: application,
-        expire: String(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
+        expire: BigInt(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
         allowances: allowances,
     });
@@ -101,7 +101,7 @@ export async function createTestAppSession(
     aliceAppWS: TestWebSocket,
     protocol: RPCProtocolVersion,
     asset: string,
-    decimalDepositAmount: bigint,
+    decimalDepositAmount: string,
     sessionData: object,
     application: string = 'App Domain'
 ): Promise<string> {
@@ -119,7 +119,7 @@ export async function createTestAppSession(
         {
             participant: aliceAppIdentity.walletAddress,
             asset,
-            amount: decimalDepositAmount.toString(),
+            amount: decimalDepositAmount,
         },
         {
             participant: bobAppIdentity.walletAddress,

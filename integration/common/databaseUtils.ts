@@ -65,6 +65,28 @@ export class DatabaseUtils {
         }
     }
 
+    async seedLedger(walletAddress: string, accountId: string, accountType: number, assetSymbol: string, amount: number): Promise<void> {
+        let credit = '0';
+        let debit = '0';
+
+        if (amount >= 0) {
+            credit = amount.toString();
+        } else {
+            debit = Math.abs(amount).toString();
+        }
+
+        const client = await this.pool.connect();
+        try {
+            await client.query(
+                `INSERT INTO ledger (wallet, account_id, account_type, asset_symbol, credit, debit)
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                [walletAddress, accountId, accountType, assetSymbol, credit, debit]
+            );
+        } finally {
+            client.release();
+        }
+    }
+
     async getBlockchainActions(filters: { channel_id?: string; action_type?: string }): Promise<any[]> {
         const client = await this.pool.connect();
         try {

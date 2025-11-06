@@ -287,12 +287,11 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 	}
 	balance = balance.Add(channelEscrowAccountBalance)
 
-	rawBalance := balance.Shift(int32(asset.Token.Decimals)).BigInt()
+	userAllocation := balance.Shift(int32(asset.Token.Decimals)).BigInt()
 	channelRawAmount := channel.RawAmount.BigInt()
 
-	// User gets min(balance, channelAmount), broker gets the rest
-	userAllocation := rawBalance
-	if rawBalance.Cmp(channelRawAmount) > 0 {
+	// User gets min(userBalance, channelAmount), broker gets the rest
+	if userAllocation.Cmp(channelRawAmount) > 0 {
 		userAllocation = channelRawAmount
 	}
 

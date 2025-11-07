@@ -24,6 +24,7 @@ type RPCRouter struct {
 	Metrics           *Metrics
 	RPCStore          *RPCStore
 	wsNotifier        *WSNotifier
+	MessageCache      *MessageCache
 
 	lg Logger
 }
@@ -52,6 +53,7 @@ func NewRPCRouter(
 		AuthManager:       authManager,
 		Metrics:           metrics,
 		RPCStore:          rpcStore,
+		MessageCache:      NewMessageCache(time.Duration(conf.msgExpiryTime) * time.Second),
 		lg:                logger.NewSystem("rpc-router"),
 	}
 

@@ -31,8 +31,8 @@ describe('Get User Tag Integration', () => {
         }
 
         // Clean up database
-        databaseUtils.resetClearnodeState();
-        databaseUtils.close();
+        await databaseUtils.resetClearnodeState();
+        await databaseUtils.close();
     });
 
     describe('createGetUserTagMessage', () => {

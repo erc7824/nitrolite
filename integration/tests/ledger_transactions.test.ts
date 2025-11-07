@@ -36,8 +36,8 @@ describe('Ledger Transactions Integration', () => {
         }
 
         // Clean up database
-        databaseUtils.resetClearnodeState();
-        databaseUtils.close();
+        await databaseUtils.resetClearnodeState();
+        await databaseUtils.close();
     });
 
     describe('createGetLedgerTransactionsMessage', () => {

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
@@ -132,7 +133,7 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, *gorm.DB, func()) {
 		},
 	}
 
-	config := &Config{blockchains: blockchains, assets: AssetsConfig{}}
+	config := &Config{blockchains: blockchains, assets: AssetsConfig{}, msgExpiryTime: 60}
 	channelService := NewChannelService(db, blockchains, &config.assets, signer)
 
 	// Create an instance of RPCRouter
@@ -144,6 +145,7 @@ func setupTestRPCRouter(t *testing.T) (*RPCRouter, *gorm.DB, func()) {
 		ChannelService:    channelService,
 		DB:                db,
 		wsNotifier:        wsNotifier,
+		MessageCache:      NewMessageCache(60 * time.Second),
 		lg:                logger.NewSystem("rpc-router"),
 		Metrics:           NewMetricsWithRegistry(prometheus.NewRegistry()),
 	}

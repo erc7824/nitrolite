@@ -575,6 +575,64 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 
 		assertErrorResponse(t, ctx, "invalid signature")
 	})
+
+	t.Run("DuplicateTransferRejected", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Fund sender's account
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000), nil))
+
+		transferParams := TransferParams{
+			Destination: recipientAddr.Hex(),
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
+			},
+		}
+
+		// First transfer - should succeed
+		ctx1 := createSignedRPCContext(50, "transfer", transferParams, senderSigner)
+		router.HandleTransfer(ctx1)
+
+		res1 := assertResponse(t, ctx1, "transfer")
+		transferResp1, ok := res1.Params.(TransferResponse)
+		require.True(t, ok, "First transfer should succeed")
+		require.Len(t, transferResp1.Transactions, 1, "First transfer should have 1 transaction")
+
+		// Verify first transfer succeeded
+		senderBalance, err := GetWalletLedger(db, senderAddr).Balance(senderAccountID, "usdc")
+		require.NoError(t, err)
+		require.Equal(t, decimal.NewFromInt(900).String(), senderBalance.String(), "Sender should have 900 USDC after first transfer")
+
+		recipientBalance, err := GetWalletLedger(db, recipientAddr).Balance(recipientAccountID, "usdc")
+		require.NoError(t, err)
+		require.Equal(t, decimal.NewFromInt(100).String(), recipientBalance.String(), "Recipient should have 100 USDC after first transfer")
+
+		// Second transfer with EXACT same parameters - should be rejected as duplicate
+		// Using the same request ID to ensure it generates the same hash
+		ctx2 := createSignedRPCContext(50, "transfer", transferParams, senderSigner)
+		router.HandleTransfer(ctx2)
+
+		assertErrorResponse(t, ctx2, "operation denied: the request has already been processed")
+
+		// Verify balances haven't changed after rejected duplicate
+		senderBalanceAfter, err := GetWalletLedger(db, senderAddr).Balance(senderAccountID, "usdc")
+		require.NoError(t, err)
+		require.Equal(t, decimal.NewFromInt(900).String(), senderBalanceAfter.String(), "Sender balance should remain 900 USDC")
+
+		recipientBalanceAfter, err := GetWalletLedger(db, recipientAddr).Balance(recipientAccountID, "usdc")
+		require.NoError(t, err)
+		require.Equal(t, decimal.NewFromInt(100).String(), recipientBalanceAfter.String(), "Recipient balance should remain 100 USDC")
+
+		// Verify only one transaction was recorded in the database
+		var transactions []LedgerTransaction
+		err = db.Where("from_account = ? AND to_account = ? AND asset_symbol = ?",
+			senderAddr.Hex(), recipientAddr.Hex(), "usdc").Find(&transactions).Error
+		require.NoError(t, err)
+		require.Len(t, transactions, 1, "Should only have 1 transaction recorded (duplicate was rejected)")
+	})
 }
 
 func TestRPCRouterHandleCreateAppSession(t *testing.T) {

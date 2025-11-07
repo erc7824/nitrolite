@@ -193,7 +193,7 @@ export const getChannelUpdatePredicateWithStatus = (status: RPCChannelStatus) =>
 export const getCreateChannelPredicate = () => {
     return (data: string, reqId?: number): boolean => {
         return genericPredicate(data, (r) => r.method === RPCMethod.CreateChannel, reqId);
-    }  
+    }
 };
 
 export const getCloseChannelPredicate = () => {
@@ -236,6 +236,12 @@ export const getGetLedgerTransactionsPredicate = () => {
 export const getGetUserTagPredicate = () => {
     return (data: string, reqId?: number): boolean => {
         return genericPredicate(data, (r) => r.method === RPCMethod.GetUserTag, reqId);
+    };
+};
+
+export const getTransferPredicate = () => {
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.Transfer, reqId);
     };
 };
 

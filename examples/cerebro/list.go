@@ -108,6 +108,11 @@ func (o *Operator) handleListAppSessions() {
 			return
 		}
 
+		if len(res.AppSessions) == 0 {
+			fmt.Println("No more app sessions found.")
+			break
+		}
+
 		fmt.Printf("App Sessions for participant %s:\n", participant)
 		for _, session := range res.AppSessions {
 			t := table.NewWriter()
@@ -123,7 +128,6 @@ func (o *Operator) handleListAppSessions() {
 			if len(session.ParticipantWallets) > len(session.Weights) {
 				fmt.Printf("Warning: Mismatched participant wallets and weights in session %s\n", session.AppSessionID)
 				session.Weights = append(session.Weights, make([]int64, len(session.ParticipantWallets)-len(session.Weights))...)
-				continue
 			}
 
 			for i := range session.ParticipantWallets {
@@ -189,6 +193,11 @@ func (o *Operator) handleListLedgerTransactions() {
 		t.AppendHeader(table.Row{"ID", "Type", "From", "To", "Asset", "Amount", "Timestamp"})
 		t.AppendSeparator()
 
+		if len(res.LedgerTransactions) == 0 {
+			fmt.Println("No more ledger transactions found.")
+			break
+		}
+
 		for _, tx := range res.LedgerTransactions {
 			t.AppendRow(table.Row{tx.Id, tx.TxType, tx.FromAccount, tx.ToAccount, tx.Asset, fmtDec(tx.Amount), tx.CreatedAt.Format(time.RFC3339)})
 		}
@@ -217,14 +226,19 @@ func (o *Operator) handleListLedgerEntries() {
 	}
 
 	fmt.Println("Specify account ID (required):")
+	fmt.Println(`> How to choose?
+> If you want to see ledger entries associated with a wallet's unified balance, paste here the same wallet address.
+> If you want to see ledger entries related to allocations in a specific app session of the participant having specified wallet address, paste here the corresponding app session ID.
+> If you want to see ledger entries associated with wallet's channel escrow, paste here the channel ID.`)
 	accountID := o.readExtraArg("account_id")
 
 	fmt.Println("Specify asset symbol (required):")
-	assetSymbol := o.readExtraArg("asset_symbol")
+	assetSuggestions := o.getAssetSuggestions("", 0)
+	assetSymbol := o.readSelectionArg("asset_symbol", assetSuggestions)
 
 	res, err := o.clearnode.GetLedgerEntries(wallet, accountID, assetSymbol, 0, ledgerEntriesPageSize)
 	if err != nil {
-		fmt.Printf("Failed to get ledger transactions: %s\n", err.Error())
+		fmt.Printf("Failed to get ledger entries: %s\n", err.Error())
 		return
 	}
 

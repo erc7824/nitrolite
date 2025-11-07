@@ -318,7 +318,7 @@ func (o *Operator) getChainSuggestions(filterEnabled int) []prompt.Suggest {
 // >0 (only enabled assets), or <0 (only disabled assets).
 func (o *Operator) getAssetSuggestions(chainIDStr string, filterEnabled int) []prompt.Suggest {
 	if chainIDStr == "" {
-		assetSymbols := o.config.GetSymbolsOfEnabledAssets()
+		assetSymbols := o.config.GetAssetSymbols()
 		suggestions := make([]prompt.Suggest, len(assetSymbols))
 		for i, symbol := range assetSymbols {
 			suggestions[i] = prompt.Suggest{

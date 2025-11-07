@@ -24,12 +24,12 @@ func (c OperatorConfig) GetBlockchainByID(chainID uint32) *BlockchainConfig {
 	return nil
 }
 
-func (c OperatorConfig) GetSymbolsOfEnabledAssets() []string {
+func (c OperatorConfig) GetAssetSymbols() []string {
 	var symbols []string
 	var alreadyAdded = make(map[string]bool)
 	for _, network := range c.Blockchains {
 		for _, asset := range network.Assets {
-			if asset.IsEnabled() && !alreadyAdded[asset.Symbol] {
+			if !alreadyAdded[asset.Symbol] {
 				symbols = append(symbols, asset.Symbol)
 				alreadyAdded[asset.Symbol] = true
 			}

@@ -124,6 +124,10 @@ func (mc *MessageCache) recalculateCleanupInterval() {
 //   - Already available in go-ethereum/crypto
 //   - Provides sufficient collision resistance for cache deduplication
 func HashMessage(msg *RPCMessage) string {
+	if msg == nil || msg.Req == nil {
+		return ""
+	}
+
 	hash := crypto.Keccak256(msg.Req.rawBytes)
 	return hex.EncodeToString(hash)
 }

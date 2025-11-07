@@ -251,95 +251,67 @@ func TestMessageCache(t *testing.T) {
 }
 
 func TestHashMessage(t *testing.T) {
-	// Create test RPC message
-	reqData := &RPCData{
-		RequestID: 123,
-		Method:    "transfer",
-		Params:    []any{"param1", "param2"},
-		Timestamp: 1234567890,
-	}
+	t.Run("Well formatted message", func(t *testing.T) {
+		// Create test RPC message
+		reqData := &RPCData{
+			RequestID: 123,
+			Method:    "transfer",
+			Params:    []any{"param1", "param2"},
+			Timestamp: 1234567890,
+		}
 
-	// Marshal to get rawBytes
-	rawBytes, err := json.Marshal([]any{reqData.RequestID, reqData.Method, reqData.Params, reqData.Timestamp})
-	require.NoError(t, err)
-	reqData.rawBytes = rawBytes
+		// Marshal to get rawBytes
+		rawBytes, err := json.Marshal([]any{reqData.RequestID, reqData.Method, reqData.Params, reqData.Timestamp})
+		require.NoError(t, err)
+		reqData.rawBytes = rawBytes
 
-	msg := &RPCMessage{
-		Req: reqData,
-	}
+		msg := &RPCMessage{
+			Req: reqData,
+		}
 
-	// Generate hash
-	hash1 := HashMessage(msg)
+		// Generate hash
+		hash1 := HashMessage(msg)
 
-	// Check hash is not empty
-	require.NotEmpty(t, hash1)
+		// Check hash is not empty
+		require.NotEmpty(t, hash1)
 
-	// Check hash is hexadecimal string (64 chars for Keccak256)
-	require.Equal(t, 64, len(hash1))
+		// Check hash is hexadecimal string (64 chars for Keccak256)
+		require.Equal(t, 64, len(hash1))
 
-	// Same message should produce same hash
-	hash2 := HashMessage(msg)
-	require.Equal(t, hash1, hash2)
+		// Same message should produce same hash
+		hash2 := HashMessage(msg)
+		require.Equal(t, hash1, hash2)
 
-	// Different message should produce different hash
-	reqData2 := &RPCData{
-		RequestID: 456,
-		Method:    "transfer",
-		Params:    []any{"param1", "param2"},
-		Timestamp: 1234567890,
-	}
-	rawBytes2, err := json.Marshal([]any{reqData2.RequestID, reqData2.Method, reqData2.Params, reqData2.Timestamp})
-	require.NoError(t, err)
-	reqData2.rawBytes = rawBytes2
+		// Different message should produce different hash
+		reqData2 := &RPCData{
+			RequestID: 456,
+			Method:    "transfer",
+			Params:    []any{"param1", "param2"},
+			Timestamp: 1234567890,
+		}
+		rawBytes2, err := json.Marshal([]any{reqData2.RequestID, reqData2.Method, reqData2.Params, reqData2.Timestamp})
+		require.NoError(t, err)
+		reqData2.rawBytes = rawBytes2
 
-	msg2 := &RPCMessage{
-		Req: reqData2,
-	}
+		msg2 := &RPCMessage{
+			Req: reqData2,
+		}
 
-	hash3 := HashMessage(msg2)
-	require.NotEqual(t, hash1, hash3)
-}
+		hash3 := HashMessage(msg2)
+		require.NotEqual(t, hash1, hash3)
+	})
 
-func BenchmarkMessageCache_Add(b *testing.B) {
-	cache := NewMessageCache(60 * time.Second)
+	t.Run("Nil message", func(t *testing.T) {
+		var msg *RPCMessage = nil
+		hash := HashMessage(msg)
+		require.Equal(t, "", hash)
+	})
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		cache.Add(string(rune(i)))
-	}
-}
-
-func BenchmarkMessageCache_Exists(b *testing.B) {
-	cache := NewMessageCache(60 * time.Second)
-
-	// Pre-populate cache
-	for i := 0; i < 1000; i++ {
-		cache.Add(string(rune(i)))
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		cache.Exists(string(rune(i % 1000)))
-	}
-}
-
-func BenchmarkHashMessage(b *testing.B) {
-	reqData := &RPCData{
-		RequestID: 123,
-		Method:    "transfer",
-		Params:    []any{"param1", "param2"},
-		Timestamp: 1234567890,
-	}
-
-	rawBytes, _ := json.Marshal([]any{reqData.RequestID, reqData.Method, reqData.Params, reqData.Timestamp})
-	reqData.rawBytes = rawBytes
-
-	msg := &RPCMessage{
-		Req: reqData,
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		HashMessage(msg)
-	}
+	t.Run("Nil RPCData", func(t *testing.T) {
+		msg := &RPCMessage{
+			Req: nil,
+		}
+		hash := HashMessage(msg)
+		require.Equal(t, "", hash)
+	})
 }

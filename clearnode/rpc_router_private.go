@@ -333,7 +333,7 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 			return err
 		}
 
-		if err := ensureWalletHasZeroChannelAllocation(tx, fromWallet); err != nil {
+		if err := ensureWalletHasAllAllocationsEmpty(tx, fromWallet); err != nil {
 			return err
 		}
 
@@ -850,13 +850,13 @@ func verifySigner(rpc *RPCMessage, channelWallet string) error {
 	return nil
 }
 
-func ensureWalletHasZeroChannelAllocation(tx *gorm.DB, wallet string) error {
+func ensureWalletHasAllAllocationsEmpty(tx *gorm.DB, wallet string) error {
 	channelAmountSum, err := GetChannelAmountSumByWallet(tx, wallet)
 	if err != nil {
 		return err
 	}
 	if !channelAmountSum.Sum.IsZero() {
-		return RPCErrorf("operation denied: non-zero allocation in %d channel(s) detected. Please, un-allocate those funds via resize first", channelAmountSum.Count)
+		return RPCErrorf("operation denied: non-zero allocation in %d channel(s) detected owned by wallet %s", channelAmountSum.Count, wallet)
 	}
 	return nil
 }

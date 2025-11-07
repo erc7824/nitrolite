@@ -666,7 +666,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		ctx := createSignedRPCContext(1, "transfer", transferParams, senderSigner)
 		router.HandleTransfer(ctx)
 
-		assertErrorResponse(t, ctx, "operation denied: non-zero allocation in 1 channel(s) detected. Please, un-allocate those funds via resize first")
+		assertErrorResponse(t, ctx, "operation denied: non-zero allocation in 1 channel(s) detected owned by wallet "+senderAddr.Hex())
 	})
 }
 
@@ -791,50 +791,6 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		router.HandleCreateApplication(ctx)
 
 		assertErrorResponse(t, ctx, "has challenged channels")
-	})
-	t.Run("ErrorNonZeroChannelAllocation", func(t *testing.T) {
-		t.Parallel()
-
-		router, db, cleanup := setupTestRPCRouter(t)
-		t.Cleanup(cleanup)
-
-		for i, p := range []string{userAddressA.Hex(), userAddressB.Hex()} {
-			ch := &Channel{
-				ChannelID:   fmt.Sprintf("0xChannel%ctx", 'A'+i),
-				Wallet:      p,
-				Participant: p,
-				Status:      ChannelStatusOpen,
-				Token:       "0xTokenXYZ",
-				Nonce:       1,
-				RawAmount:   decimal.NewFromInt(1),
-			}
-			require.NoError(t, db.Create(ch).Error)
-		}
-
-		require.NoError(t, GetWalletLedger(db, userAddressA).Record(accountIDA, "usdc", decimal.NewFromInt(100), nil))
-		require.NoError(t, GetWalletLedger(db, userAddressB).Record(accountIDB, "usdc", decimal.NewFromInt(200), nil))
-
-		ts := uint64(time.Now().Unix())
-		def := AppDefinition{
-			Protocol:           rpc.VersionNitroRPCv0_4,
-			ParticipantWallets: []string{userAddressA.Hex(), userAddressB.Hex()},
-			Weights:            []int64{1, 1},
-			Quorum:             2,
-			Challenge:          60,
-			Nonce:              ts,
-		}
-		createParams := CreateAppSessionParams{
-			Definition: def,
-			Allocations: []AppAllocation{
-				{Participant: userAddressA.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(100)},
-				{Participant: userAddressB.Hex(), AssetSymbol: "usdc", Amount: decimal.NewFromInt(200)},
-			},
-		}
-
-		ctx := createSignedRPCContext(1, "create_app_session", createParams, userA, userB)
-		router.HandleCreateApplication(ctx)
-
-		assertErrorResponse(t, ctx, "operation denied: non-zero allocation in 1 channel(s) detected. Please, un-allocate those funds via resize first")
 	})
 }
 

@@ -149,7 +149,11 @@ func (d *DepositUpdater) Update(ctx context.Context, tx *gorm.DB) (UpdateResult,
 
 			noDeposits = false
 
-			if err := ensureWalletHasZeroChannelAllocation(tx, walletAddress); err != nil {
+			if err := checkChallengedChannels(tx, walletAddress); err != nil {
+				return UpdateResult{}, err
+			}
+
+			if err := ensureWalletHasAllAllocationsEmpty(tx, walletAddress); err != nil {
 				return UpdateResult{}, err
 			}
 
@@ -432,7 +436,7 @@ func (s *AppSessionService) CreateAppSession(params *CreateAppSessionParams, rpc
 				return err
 			}
 
-			if err := ensureWalletHasZeroChannelAllocation(tx, walletAddress); err != nil {
+			if err := ensureWalletHasAllAllocationsEmpty(tx, walletAddress); err != nil {
 				return err
 			}
 

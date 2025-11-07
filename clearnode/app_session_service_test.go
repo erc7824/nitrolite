@@ -312,7 +312,7 @@ func TestAppSessionService_CreateApplication(t *testing.T) {
 
 		_, err := service.CreateAppSession(params, rpcSigners(userAddressA))
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "operation denied: non-zero allocation in 1 channel(s) detected. Please, un-allocate those funds via resize first")
+		assert.Contains(t, err.Error(), "operation denied: non-zero allocation in 1 channel(s) detected owned by wallet "+userAddressA.Hex())
 	})
 }
 
@@ -1081,7 +1081,7 @@ func TestAppSessionService_SubmitAppStateDeposit(t *testing.T) {
 		_, err := service.SubmitAppState(context.Background(), params, rpcSigners(depositorAddress, userAddressB), rpcSigners(depositorAddress, userAddressB))
 		require.Error(t, err)
 
-		assert.Contains(t, err.Error(), "operation denied: non-zero allocation in 1 channel(s) detected. Please, un-allocate those funds via resize first")
+		assert.Contains(t, err.Error(), "operation denied: non-zero allocation in 1 channel(s) detected owned by wallet "+depositorAddress.Hex())
 	})
 }
 

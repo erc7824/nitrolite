@@ -17,6 +17,7 @@
 | `get_ledger_transactions` | Retrieves transaction history with optional filtering                    | Public  |
 | `get_user_tag`            | Retrieves user's tag                                                     | Private |
 | `get_session_keys`        | Retrieves all active session keys for the authenticated user             | Private |
+| `revoke_session_key`      | Revokes a session key by setting its expiration to now                   | Private |
 | `get_rpc_history`         | Retrieves all RPC message history for a participant                      | Private |
 | `get_ledger_balances`     | Lists participants and their balances for a ledger account               | Private |
 | `transfer`                | Transfers funds from user's unified balance to another account           | Private |
@@ -491,6 +492,59 @@ Each session key includes:
 - Only active (non-expired) session keys are returned
 - If a session key has an empty spending cap array, all operations using that key will be denied (no spending allowed)
 - The `used_allowance` is calculated by summing all debit entries in the ledger that were made using this session key
+
+### Revoke Session Key
+
+Revokes a session key by immediately invalidating it. The session key can no longer be used for any operations after revocation.
+
+**Permission Rules:**
+- A wallet can revoke any of its session keys
+- A session key can revoke itself
+- A session key with `application: "clearnode"` can revoke other session keys belonging to the same wallet
+- A non-clearnode session key cannot revoke other session keys (only itself)
+
+**Request:**
+
+```json
+{
+  "req": [1, "revoke_session_key", {
+    "session_key": "0xabcdef1234567890..."
+  }, 1619123456789],
+  "sig": ["0x9876fedcba..."]  // Signed by main wallet or session key
+}
+```
+
+**Response:**
+
+```json
+{
+  "res": [1, "revoke_session_key", {
+    "session_key": "0xabcdef1234567890..."
+  }, 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+```
+
+**Parameters:**
+
+- `session_key`: The address of the session key to revoke
+
+**Response Fields:**
+
+- `session_key`: The address of the revoked session key (confirmation)
+
+**Error Cases:**
+
+- Session key does not exist or is already expired: `"operation denied: provided address is not a session key of the session wallet"`
+- Attempting to revoke another wallet's session key: `"operation denied: provided address is not a session key of the session wallet"`
+- Non-clearnode session key attempting to revoke another session key: `"operation denied: insufficient permissions for the active session key"`
+
+**Notes:**
+
+- Revocation is immediate and cannot be undone
+- After revocation, any operations attempted with the revoked session key will fail with a validation error
+- The revoked session key will no longer appear in the `get_session_keys` response
+- Revocation is useful for security purposes when a session key may have been compromised
 - Available allowance for an asset = `allowance - used_allowance`
 - **Special case**: Session keys with `application` set to `"clearnode"` have root access and are exempt from spending allowance limits and application validation. This facilitates backwards compatibility, and will be deprecated after a migration period for developers elapses.
 

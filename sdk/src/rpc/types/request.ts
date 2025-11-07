@@ -102,6 +102,17 @@ export interface GetSessionKeysRequest extends GenericRPCMessage {
 }
 
 /**
+ * Represents the request structure for the 'revoke_session_key' RPC method.
+ */
+export interface RevokeSessionKeyRequest extends GenericRPCMessage {
+    method: RPCMethod.RevokeSessionKey;
+    params: {
+        /** The session key address to revoke */
+        session_key: Address;
+    };
+}
+
+/**
  * Represents the request structure for the 'create_app_session' RPC method.
  */
 export interface CreateAppSessionRequest extends GenericRPCMessage {
@@ -473,6 +484,7 @@ export type RPCRequest =
     | GetLedgerTransactionsRequest
     | GetUserTagRequest
     | GetSessionKeysRequest
+    | RevokeSessionKeyRequest
     | CreateAppSessionRequest
     | SubmitAppStateRequest
     | CloseAppSessionRequest

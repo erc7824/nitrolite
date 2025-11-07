@@ -2244,8 +2244,8 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 }
 
 func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
-	// AC1: User revokes their own active session key A (logged in with session key A)
-	t.Run("AC1: Revoke session key A while logged in with session key A", func(t *testing.T) {
+	// User revokes their own active session key A (logged in with session key A)
+	t.Run("Revoke session key A while logged in with session key A", func(t *testing.T) {
 		t.Parallel()
 
 		router, db, cleanup := setupTestRPCRouter(t)
@@ -2265,8 +2265,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 			{Asset: "usdc", Amount: "100"},
 		}
 		expiresAt := time.Now().Add(24 * time.Hour)
-		err := AddSessionKey(db, userAddr, sessionKeyAAddr, AppNameClearnode, "all", allowances, expiresAt)
-		require.NoError(t, err)
+		require.NoError(t, AddSessionKey(db, userAddr, sessionKeyAAddr, AppNameClearnode, "all", allowances, expiresAt))
 
 		// Verify session key is in cache
 		require.Equal(t, userAddr, GetWalletBySessionKey(sessionKeyAAddr))
@@ -2287,16 +2286,15 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify session key is expired in database
 		var sessionKey SessionKey
-		err = db.Where("address = ?", sessionKeyAAddr).First(&sessionKey).Error
-		require.NoError(t, err)
+		require.NoError(t, db.Where("address = ?", sessionKeyAAddr).First(&sessionKey).Error)
 		require.True(t, isExpired(sessionKey.ExpiresAt), "Session key should be expired")
 
 		// Verify session key is removed from cache
 		require.Equal(t, "", GetWalletBySessionKey(sessionKeyAAddr))
 	})
 
-	// AC2: User with clearnode session key A revokes another session key B
-	t.Run("AC2: Revoke session key B while logged in with clearnode session key A", func(t *testing.T) {
+	// User with clearnode session key A revokes another session key B
+	t.Run("Revoke session key B while logged in with clearnode session key A", func(t *testing.T) {
 		t.Parallel()
 
 		router, db, cleanup := setupTestRPCRouter(t)
@@ -2319,12 +2317,10 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 			{Asset: "usdc", Amount: "100"},
 		}
 		expiresAt := time.Now().Add(24 * time.Hour)
-		err := AddSessionKey(db, userAddr, sessionKeyAAddr, AppNameClearnode, "all", allowances, expiresAt)
-		require.NoError(t, err)
+		require.NoError(t, AddSessionKey(db, userAddr, sessionKeyAAddr, AppNameClearnode, "all", allowances, expiresAt))
 
 		// Create another session key B for a different app
-		err = AddSessionKey(db, userAddr, sessionKeyBAddr, "Chess Game", "all", allowances, expiresAt)
-		require.NoError(t, err)
+		require.NoError(t, AddSessionKey(db, userAddr, sessionKeyBAddr, "Chess Game", "all", allowances, expiresAt))
 
 		// Verify both session keys are in cache
 		require.Equal(t, userAddr, GetWalletBySessionKey(sessionKeyAAddr))
@@ -2346,8 +2342,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify session key B is expired in database
 		var sessionKey SessionKey
-		err = db.Where("address = ?", sessionKeyBAddr).First(&sessionKey).Error
-		require.NoError(t, err)
+		require.NoError(t, db.Where("address = ?", sessionKeyBAddr).First(&sessionKey).Error)
 		require.True(t, isExpired(sessionKey.ExpiresAt), "Session key B should be expired")
 
 		// Verify session key B is removed from cache
@@ -2355,13 +2350,12 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify session key A is still active in database
 		var skA SessionKey
-		err = db.Where("address = ?", sessionKeyAAddr).First(&skA).Error
-		require.NoError(t, err)
+		require.NoError(t, db.Where("address = ?", sessionKeyAAddr).First(&skA).Error)
 		require.False(t, isExpired(skA.ExpiresAt), "Session key A should still be active")
 	})
 
-	// AC3: User with non-clearnode session key cannot revoke another session key
-	t.Run("AC3: Non-clearnode session key cannot revoke another session key", func(t *testing.T) {
+	// User with non-clearnode session key cannot revoke another session key
+	t.Run("Non-clearnode session key cannot revoke another session key", func(t *testing.T) {
 		t.Parallel()
 
 		router, db, cleanup := setupTestRPCRouter(t)
@@ -2384,12 +2378,10 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 			{Asset: "usdc", Amount: "100"},
 		}
 		expiresAt := time.Now().Add(24 * time.Hour)
-		err := AddSessionKey(db, userAddr, sessionKeyAAddr, "Chess Game", "all", allowances, expiresAt)
-		require.NoError(t, err)
+		require.NoError(t, AddSessionKey(db, userAddr, sessionKeyAAddr, "Chess Game", "all", allowances, expiresAt))
 
 		// Create another session key B
-		err = AddSessionKey(db, userAddr, sessionKeyBAddr, "Trading Bot", "all", allowances, expiresAt)
-		require.NoError(t, err)
+		require.NoError(t, AddSessionKey(db, userAddr, sessionKeyBAddr, "Trading Bot", "all", allowances, expiresAt))
 
 		// Try to revoke session key B with non-clearnode session key A
 		params := map[string]interface{}{
@@ -2404,16 +2396,15 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify session key B is still active in database
 		var sessionKey SessionKey
-		err = db.Where("address = ?", sessionKeyBAddr).First(&sessionKey).Error
-		require.NoError(t, err)
+		require.NoError(t, db.Where("address = ?", sessionKeyBAddr).First(&sessionKey).Error)
 		require.False(t, isExpired(sessionKey.ExpiresAt), "Session key B should still be active")
 
 		// Verify session key B is still in cache
 		require.Equal(t, userAddr, GetWalletBySessionKey(sessionKeyBAddr))
 	})
 
-	// AC4: User cannot revoke a session key that doesn't belong to them
-	t.Run("AC4: Cannot revoke session key of another user", func(t *testing.T) {
+	// User cannot revoke a session key that doesn't belong to them
+	t.Run("Cannot revoke session key of another user", func(t *testing.T) {
 		t.Parallel()
 
 		router, db, cleanup := setupTestRPCRouter(t)
@@ -2434,8 +2425,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 			{Asset: "usdc", Amount: "100"},
 		}
 		expiresAt := time.Now().Add(24 * time.Hour)
-		err := AddSessionKey(db, otherUserAddr, otherSessionKeyAddr, AppNameClearnode, "all", allowances, expiresAt)
-		require.NoError(t, err)
+		require.NoError(t, AddSessionKey(db, otherUserAddr, otherSessionKeyAddr, AppNameClearnode, "all", allowances, expiresAt))
 
 		// Try to revoke other user's session key
 		params := map[string]interface{}{
@@ -2449,16 +2439,15 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify session key is still active
 		var sessionKey SessionKey
-		err = db.Where("address = ?", otherSessionKeyAddr).First(&sessionKey).Error
-		require.NoError(t, err)
+		require.NoError(t, db.Where("address = ?", otherSessionKeyAddr).First(&sessionKey).Error)
 		require.False(t, isExpired(sessionKey.ExpiresAt), "Session key should still be active")
 
 		// Verify session key is still in cache
 		require.Equal(t, otherUserAddr, GetWalletBySessionKey(otherSessionKeyAddr))
 	})
 
-	// AC4: User cannot revoke an expired session key
-	t.Run("AC4: Cannot revoke expired session key", func(t *testing.T) {
+	// User cannot revoke an expired session key
+	t.Run("Cannot revoke expired session key", func(t *testing.T) {
 		t.Parallel()
 
 		router, db, cleanup := setupTestRPCRouter(t)
@@ -2490,8 +2479,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 			Scope:         "all",
 			ExpiresAt:     expiresAt,
 		}
-		err := db.Create(sessionKey).Error
-		require.NoError(t, err)
+		require.NoError(t, db.Create(sessionKey).Error)
 
 		// Try to revoke expired session key
 		params := map[string]interface{}{
@@ -2501,11 +2489,11 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 		router.HandleRevokeSessionKey(ctx)
 
 		// Verify error response
-		assertErrorResponse(t, ctx, "operation denied: provided address is not a session key of the session wallet")
+		assertErrorResponse(t, ctx, "operation denied: provided address is not an active session key of the session wallet")
 	})
 
-	// AC4: User cannot revoke a non-existent session key (random address)
-	t.Run("AC4: Cannot revoke non-existent session key", func(t *testing.T) {
+	// User cannot revoke a non-existent session key (random address)
+	t.Run("Cannot revoke non-existent session key", func(t *testing.T) {
 		t.Parallel()
 
 		router, _, cleanup := setupTestRPCRouter(t)
@@ -2529,7 +2517,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 		assertErrorResponse(t, ctx, "operation denied: provided address is not a session key of the session wallet")
 	})
 
-	// Additional test: User revokes session key while logged in with wallet (not session key)
+	// User revokes session key while logged in with wallet (not session key)
 	t.Run("User revokes session key while logged in with wallet", func(t *testing.T) {
 		t.Parallel()
 
@@ -2550,8 +2538,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 			{Asset: "usdc", Amount: "100"},
 		}
 		expiresAt := time.Now().Add(24 * time.Hour)
-		err := AddSessionKey(db, userAddr, sessionKeyAAddr, "Chess Game", "all", allowances, expiresAt)
-		require.NoError(t, err)
+		require.NoError(t, AddSessionKey(db, userAddr, sessionKeyAAddr, "Chess Game", "all", allowances, expiresAt))
 
 		// Revoke session key, signed by the wallet (not a session key)
 		params := map[string]interface{}{
@@ -2568,12 +2555,11 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify session key is expired in database
 		var sessionKey SessionKey
-		err = db.Where("address = ?", sessionKeyAAddr).First(&sessionKey).Error
-		require.NoError(t, err)
+		require.NoError(t, db.Where("address = ?", sessionKeyAAddr).First(&sessionKey).Error)
 		require.True(t, isExpired(sessionKey.ExpiresAt), "Session key should be expired")
 	})
 
-	// Additional test: Missing session_key parameter
+	// Missing session_key parameter
 	t.Run("Missing session_key parameter", func(t *testing.T) {
 		t.Parallel()
 

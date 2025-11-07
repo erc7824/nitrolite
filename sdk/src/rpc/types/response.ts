@@ -109,6 +109,17 @@ export interface GetSessionKeysResponse extends GenericRPCMessage {
 }
 
 /**
+ * Represents the response structure for the 'revoke_session_key' RPC method.
+ */
+export interface RevokeSessionKeyResponse extends GenericRPCMessage {
+    method: RPCMethod.RevokeSessionKey;
+    params: {
+        /** The session key address that was revoked. */
+        sessionKey: Address;
+    };
+}
+
+/**
  * Represents the response structure for the 'create_app_session' RPC method.
  */
 export interface CreateAppSessionResponse extends GenericRPCMessage {
@@ -391,6 +402,11 @@ export type GetUserTagResponseParams = GetUserTagResponse['params'];
 export type GetSessionKeysResponseParams = GetSessionKeysResponse['params'];
 
 /**
+ * Represents the parameters for the 'revoke_session_key' RPC method.
+ */
+export type RevokeSessionKeyResponseParams = RevokeSessionKeyResponse['params'];
+
+/**
  * Represents the parameters for the 'create_app_session' RPC method.
  */
 export type CreateAppSessionResponseParams = CreateAppSessionResponse['params'];
@@ -510,6 +526,7 @@ export type RPCResponse =
     | GetLedgerTransactionsResponse
     | GetUserTagResponse
     | GetSessionKeysResponse
+    | RevokeSessionKeyResponse
     | CreateAppSessionResponse
     | SubmitAppStateResponse
     | CloseAppSessionResponse

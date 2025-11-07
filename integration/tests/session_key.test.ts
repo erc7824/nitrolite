@@ -4,7 +4,14 @@ import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { TestWebSocket } from '@/ws';
 import { CONFIG } from '@/setup';
-import { RPCAppStateIntent, RPCProtocolVersion } from '@erc7824/nitrolite';
+import {
+    RPCAppStateIntent,
+    RPCProtocolVersion,
+    createRevokeSessionKeyMessage,
+    createTransferMessage,
+    parseAnyRPCResponse,
+    RPCMethod,
+} from '@erc7824/nitrolite';
 import { Hex } from 'viem';
 
 import {
@@ -18,7 +25,7 @@ import {
 import { submitAppStateUpdate_v04 } from '@/testAppSessionHelpers';
 import { setupTestIdentitiesAndConnections } from '@/testSetup';
 
-describe('Session Key Spending Caps', () => {
+describe('Session Keys', () => {
     const ASSET_SYMBOL = CONFIG.TOKEN_SYMBOL;
     const onChainDepositAmount = BigInt(1000);
     const spendingCapAmount = BigInt(500); // Session key limited to 500 USDC
@@ -601,6 +608,76 @@ describe('Session Key Spending Caps', () => {
                     SESSION_DATA
                 )
             ).rejects.toThrow(/session key spending validation failed.*insufficient session key allowance/i);
+        });
+    });
+
+    describe('Session key revocation', () => {
+        beforeEach(async () => {
+            // Authenticate with a non-clearnode application and allowance
+            await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, spendingCapAmount.toString());
+        });
+
+        it('should reject transfer after session key is revoked', async () => {
+            // Verify session key works with a transfer
+            const transferMsg = await createTransferMessage(aliceAppIdentity.messageSKSigner, {
+                destination: bob.walletAddress,
+                allocations: [{ asset: ASSET_SYMBOL, amount: '100' }],
+            });
+
+            const transferResponse = await aliceAppWS.sendAndWaitForResponse(
+                transferMsg,
+                (data: string) => {
+                    const parsed = parseAnyRPCResponse(data);
+                    return parsed.method === RPCMethod.Transfer;
+                },
+                5000
+            );
+            expect(parseAnyRPCResponse(transferResponse).method).toBe(RPCMethod.Transfer);
+
+            // Revoke the session key using wallet signature
+            const revokeMsg = await createRevokeSessionKeyMessage(
+                aliceAppIdentity.messageWalletSigner,
+                aliceAppIdentity.sessionKeyAddress
+            );
+
+            const revokeResponse = await aliceAppWS.sendAndWaitForResponse(
+                revokeMsg,
+                (data: string) => {
+                    const parsed = parseAnyRPCResponse(data);
+                    return parsed.method === RPCMethod.RevokeSessionKey;
+                },
+                5000
+            );
+
+            const parsedRevoke = parseAnyRPCResponse(revokeResponse);
+            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
+            expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
+
+            // Try transfer with revoked session key - should fail
+            const transferMsg2 = await createTransferMessage(aliceAppIdentity.messageSKSigner, {
+                destination: bob.walletAddress,
+                allocations: [{ asset: ASSET_SYMBOL, amount: '100' }],
+            });
+
+            await expect(
+                aliceAppWS.sendAndWaitForResponse(
+                    transferMsg2,
+                    (data: string) => {
+                        const parsed = parseAnyRPCResponse(data);
+                        const requestId = JSON.parse(transferMsg2).req[0];
+
+                        if (parsed.requestId === requestId) {
+                            if (parsed.method === RPCMethod.Error) {
+                                const errorMsg = (parsed.params as any)?.error || 'Unknown error';
+                                throw new Error(`RPC Error: ${errorMsg}`);
+                            }
+                            return parsed.method === RPCMethod.Transfer;
+                        }
+                        return false;
+                    },
+                    5000
+                )
+            ).rejects.toThrow();
         });
     });
 });

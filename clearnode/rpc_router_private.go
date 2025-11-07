@@ -24,6 +24,10 @@ type GetSessionKeysParams struct {
 	ListOptions
 }
 
+type RevokeSessionKeyParams struct {
+	SessionKey string `json:"session_key"`
+}
+
 type TransferParams struct {
 	Destination        string               `json:"destination"`
 	DestinationUserTag string               `json:"destination_user_tag"`
@@ -795,6 +799,104 @@ func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
 	}
 
 	c.Succeed(req.Method, resp)
+}
+
+// HandleRevokeSessionKey revokes a session key by setting its expiration to now
+func (r *RPCRouter) HandleRevokeSessionKey(c *RPCContext) {
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+
+	var params RevokeSessionKeyParams
+	if err := parseParams(req.Params, &params); err != nil {
+		c.Fail(err, "failed to parse parameters")
+		return
+	}
+
+	// Validate that session_key parameter is provided
+	if params.SessionKey == "" {
+		c.Fail(nil, "session_key parameter is required")
+		return
+	}
+
+	// Get the active session key from the RPC message to determine permissions
+	rpcSignersMap, err := c.Message.GetRequestSignersMap()
+	if err != nil {
+		logger.Error("failed to get signers from RPC message", "error", err)
+		c.Fail(err, "failed to get signers from RPC message")
+		return
+	}
+
+	// Determine the active session key (if any) used to sign this request
+	var activeSessionKeyAddress *string
+	for signer := range rpcSignersMap {
+		if GetWalletBySessionKey(signer) == c.UserID {
+			s := signer
+			activeSessionKeyAddress = &s
+			break
+		}
+	}
+
+	err = r.DB.Transaction(func(tx *gorm.DB) error {
+		// First, get the target session key from DB (without expiration check)
+		var targetSessionKey SessionKey
+		err := tx.Where("address = ?", params.SessionKey).First(&targetSessionKey).Error
+		if err != nil {
+			return RPCErrorf("operation denied: provided address is not a session key of the session wallet")
+		}
+
+		// Check if the session key is already expired
+		if isExpired(targetSessionKey.ExpiresAt) {
+			return RPCErrorf("operation denied: provided address is not a session key of the session wallet")
+		}
+
+		// Verify ownership: the session key must belong to the authenticated user's wallet
+		if targetSessionKey.WalletAddress != c.UserID {
+			return RPCErrorf("operation denied: provided address is not a session key of the session wallet")
+		}
+
+		// Check permissions: if request was signed with a session key (not the wallet directly)
+		if activeSessionKeyAddress != nil {
+			// If trying to revoke a different session key (not self-revocation)
+			if *activeSessionKeyAddress != params.SessionKey {
+				activeSessionKey, err := GetSessionKeyIfActive(tx, *activeSessionKeyAddress)
+				if err != nil {
+					return RPCErrorf("operation denied: active session key is invalid")
+				}
+
+				// Only "clearnode" application session keys can revoke other session keys
+				if activeSessionKey.Application != AppNameClearnode {
+					return RPCErrorf("operation denied: insufficient permissions for the active session key")
+				}
+			}
+			// If revoking self, allow it regardless of application type
+		}
+
+		// Revoke the session key by setting its expiration to now
+		now := time.Now().UTC()
+		if err := tx.Model(&SessionKey{}).
+			Where("address = ?", params.SessionKey).
+			Update("expires_at", now).Error; err != nil {
+			return fmt.Errorf("failed to revoke session key: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		logger.Error("failed to revoke session key", "error", err, "sessionKey", params.SessionKey)
+		c.Fail(err, "failed to revoke session key")
+		return
+	}
+
+	// Remove from cache after successful transaction
+	sessionKeyCache.Delete(params.SessionKey)
+
+	c.Succeed(req.Method, map[string]any{
+		"success":     true,
+		"session_key": params.SessionKey,
+	})
+	logger.Info("session key revoked", "userID", c.UserID, "sessionKey", params.SessionKey)
 }
 
 func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {

@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
 func (o *Operator) handleAuthenticate(args []string) {
@@ -21,7 +21,7 @@ func (o *Operator) handleAuthenticate(args []string) {
 		fmt.Printf("Failed to retrieve wallet private key: %s\n", err.Error())
 		return
 	}
-	wallet, err := unisig.NewEcdsaSigner(walletPKey.PrivateKey)
+	wallet, err := sign.NewEthereumSigner(walletPKey.PrivateKey)
 	if err != nil {
 		fmt.Printf("Failed to create wallet signer: %s\n", err.Error())
 		return
@@ -32,20 +32,25 @@ func (o *Operator) handleAuthenticate(args []string) {
 		fmt.Printf("Failed to retrieve signer private key: %s\n", err.Error())
 		return
 	}
-	signer, err := unisig.NewEcdsaSigner(signerPKey.PrivateKey)
+	signer, err := sign.NewEthereumSigner(signerPKey.PrivateKey)
 	if err != nil {
 		fmt.Printf("Failed to create signer: %s\n", err.Error())
 		return
 	}
 
-	userTag, err := o.clearnode.Authenticate(wallet, signer)
-	if err != nil {
+	if _, err := o.clearnode.Authenticate(wallet, signer); err != nil {
 		fmt.Printf("\nAuthentication failed: %s\n", err.Error())
+		return
+	}
+
+	userTagRes, err := o.clearnode.GetUserTag()
+	if err != nil {
+		fmt.Printf("Failed to retrieve user tag: %s\n", err.Error())
 		return
 	}
 
 	o.config.Wallet = wallet
 	o.config.Signer = signer
 	fmt.Println("Authentication successful!")
-	fmt.Printf("Welcome, \"%s\"!\n", userTag)
+	fmt.Printf("Welcome, \"%s\"!\n", userTagRes.Tag)
 }

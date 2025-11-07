@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
 func GetTokenBalance(chainID uint32, chainRPC string,
@@ -32,7 +32,7 @@ func GetTokenBalance(chainID uint32, chainRPC string,
 	return balance, nil
 }
 
-func ApproveAllowance(wallet unisig.Signer, chainID uint32, chainRPC string,
+func ApproveAllowance(wallet sign.Signer, chainID uint32, chainRPC string,
 	tokenAddress, spenderAddress common.Address, amount *big.Int) error {
 	client, err := ethclient.Dial(chainRPC)
 	if err != nil {

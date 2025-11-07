@@ -11,6 +11,7 @@ import (
 type Signer interface {
 	PublicKey() PublicKey                // Public key associated with this signer.
 	Sign(data []byte) (Signature, error) // Sign generates a signature for the given data.
+	// TODO: add Address() Address               // Address derived from the signer's public key.
 }
 
 // AddressRecoverer is an interface for recovering addresses from signatures.

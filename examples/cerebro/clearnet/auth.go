@@ -1,13 +1,11 @@
 package clearnet
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/signer/core/apitypes"
-
-	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
 type AuthChallengeParams struct {
@@ -19,133 +17,24 @@ type AuthChallengeParams struct {
 	Scope       string `json:"scope"`
 }
 
-func (c *ClearnodeClient) Authenticate(wallet, signer unisig.Signer) (string, error) {
-	if c.signer != nil {
-		return "", nil // Already authenticated
+func (c *ClearnodeClient) Authenticate(wallet, signer sign.Signer) (rpc.AuthSigVerifyResponse, error) {
+	if c.sessionKey != nil {
+		return rpc.AuthSigVerifyResponse{}, nil // Already authenticated
 	}
 
-	ch := AuthChallengeParams{
-		Address:     wallet.Address().Hex(),
-		SessionKey:  signer.Address().Hex(), // Using address as session key for simplicity
-		Application: "Cerebro CLI",
-		Allowances:  []any{}, // No allowances for now
-		Expire:      0,       // No expiration for now
-		Scope:       "",      // No specific scope for now
+	params := rpc.AuthRequestRequest{
+		Address:            wallet.PublicKey().Address().String(),
+		SessionKey:         signer.PublicKey().Address().String(), // Using address as session key for simplicity
+		AppName:            "clearnode",                           // Indicates that we create a session key with root permissions
+		ApplicationAddress: wallet.PublicKey().Address().String(),
+		Allowances:         []rpc.Allowance{}, // No allowances for now
+		// TODO: Expire:      time.Now().Add(1 * time.Hour).UTC().Format(time.RFC3339),
 	}
-	res, err := c.request("auth_request", nil, ch)
+	res, _, err := c.rpcClient.AuthWithSig(context.Background(), params, wallet)
 	if err != nil {
-		return "", fmt.Errorf("authentication request failed: %w", err)
-	}
-	if res.Res.Method != "auth_challenge" {
-		return "", fmt.Errorf("unexpected response to auth_request: %v", res.Res)
+		return rpc.AuthSigVerifyResponse{}, fmt.Errorf("authentication failed: %w", err)
 	}
 
-	challengeMap, ok := res.Res.Params.(map[string]any)
-	if !ok {
-		return "", fmt.Errorf("invalid auth_challenge response format: %v", res.Res.Params)
-	}
-	challengeToken, ok := challengeMap["challenge_message"].(string)
-	if !ok {
-		return "", fmt.Errorf("challenge_message not found in auth_challenge response: %v", challengeMap)
-	}
-
-	chSig, err := signChallenge(wallet, ch, challengeToken)
-	if err != nil {
-		return "", fmt.Errorf("failed to sign challenge: %w", err)
-	}
-	authVerifyChallenge := map[string]any{
-		"challenge": challengeToken,
-	}
-	res, err = c.request("auth_verify", []unisig.Signature{chSig}, authVerifyChallenge)
-	if err != nil {
-		return "", fmt.Errorf("authentication verification failed: %w", err)
-	}
-	if res.Res.Method != "auth_verify" {
-		return "", fmt.Errorf("unexpected response to auth_verify: %v", res.Res)
-	}
-
-	verifyMap, ok := res.Res.Params.(map[string]any)
-	if !ok {
-		return "", fmt.Errorf("invalid auth_verify response format: %v", res.Res.Params)
-	}
-	if authSuccess, _ := verifyMap["success"].(bool); !authSuccess {
-		return "", fmt.Errorf("authentication failed: %v", verifyMap)
-	}
-
-	res, err = c.request("get_user_tag", nil, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to get user tag: %w", err)
-	}
-	if res.Res.Method != "get_user_tag" {
-		return "", fmt.Errorf("unexpected response to get_user_tag: %v", res.Res)
-	}
-
-	tagMap, ok := res.Res.Params.(map[string]any)
-	if !ok {
-		return "", fmt.Errorf("invalid auth_verify response format: %v", res.Res.Params)
-	}
-	userTag, _ := tagMap["tag"].(string)
-
-	c.signer = signer
-	return userTag, nil
-}
-
-func signChallenge(s unisig.Signer, c AuthChallengeParams, token string) (unisig.Signature, error) {
-	typedData := apitypes.TypedData{
-		Types: apitypes.Types{
-			"EIP712Domain": {
-				{Name: "name", Type: "string"},
-			},
-			"Policy": {
-				{Name: "challenge", Type: "string"},
-				{Name: "scope", Type: "string"},
-				{Name: "wallet", Type: "address"},
-				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "uint64"},
-				{Name: "allowances", Type: "Allowance[]"},
-			},
-			"Allowance": {
-				{Name: "asset", Type: "string"},
-				{Name: "amount", Type: "string"},
-			}},
-		PrimaryType: "Policy",
-		Domain: apitypes.TypedDataDomain{
-			Name: c.Application,
-		},
-		Message: map[string]interface{}{
-			"challenge":   token,
-			"scope":       c.Scope,
-			"wallet":      c.Address,
-			"session_key": c.SessionKey,
-			"expire":      c.Expire,
-			"allowances":  c.Allowances,
-		},
-	}
-
-	hash, _, err := apitypes.TypedDataAndHash(typedData)
-	if err != nil {
-		return unisig.Signature{}, err
-	}
-
-	signature, err := s.Sign(hash)
-	if err != nil {
-		return unisig.Signature{}, fmt.Errorf("failed to sign challenge: %w", err)
-	}
-
-	return signature, nil
-}
-
-func signRPCData(signer unisig.Signer, rpcData RPCData) (unisig.Signature, error) {
-	dataBytes, err := json.Marshal(rpcData)
-	if err != nil {
-		return unisig.Signature{}, fmt.Errorf("failed to marshal RPC data: %w", err)
-	}
-
-	dataHash := crypto.Keccak256(dataBytes)
-	signature, err := signer.Sign(dataHash)
-	if err != nil {
-		return unisig.Signature{}, fmt.Errorf("failed to sign RPC data: %w", err)
-	}
-
-	return signature, nil
+	c.sessionKey = signer
+	return res, nil
 }

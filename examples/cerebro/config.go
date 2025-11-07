@@ -5,31 +5,31 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 )
 
 type OperatorConfig struct {
 	BrokerAddress common.Address
-	Networks      []NetworkConfig
-	Wallet        unisig.Signer
-	Signer        unisig.Signer
+	Blockchains   []BlockchainConfig
+	Wallet        sign.Signer
+	Signer        sign.Signer
 }
 
-func (c OperatorConfig) GetNetworkByID(chainID uint32) *NetworkConfig {
-	for _, network := range c.Networks {
-		if network.ChainID == chainID {
-			return &network
+func (c OperatorConfig) GetBlockchainByID(chainID uint32) *BlockchainConfig {
+	for _, blockchain := range c.Blockchains {
+		if blockchain.ID == chainID {
+			return &blockchain
 		}
 	}
 	return nil
 }
 
-func (c OperatorConfig) GetSymbolsOfEnabledAssets() []string {
+func (c OperatorConfig) GetAssetSymbols() []string {
 	var symbols []string
 	var alreadyAdded = make(map[string]bool)
-	for _, network := range c.Networks {
+	for _, network := range c.Blockchains {
 		for _, asset := range network.Assets {
-			if asset.IsEnabled() && !alreadyAdded[asset.Symbol] {
+			if !alreadyAdded[asset.Symbol] {
 				symbols = append(symbols, asset.Symbol)
 				alreadyAdded[asset.Symbol] = true
 			}
@@ -38,14 +38,14 @@ func (c OperatorConfig) GetSymbolsOfEnabledAssets() []string {
 	return symbols
 }
 
-type NetworkConfig struct {
-	ChainID            uint32
+type BlockchainConfig struct {
+	ID                 uint32
 	AdjudicatorAddress common.Address
 	CustodyAddress     common.Address
 	Assets             []ChainAssetConfig
 }
 
-func (c NetworkConfig) GetAssetBySymbol(symbol string) *ChainAssetConfig {
+func (c BlockchainConfig) GetAssetBySymbol(symbol string) *ChainAssetConfig {
 	for _, asset := range c.Assets {
 		if asset.Symbol == symbol {
 			return &asset
@@ -54,7 +54,7 @@ func (c NetworkConfig) GetAssetBySymbol(symbol string) *ChainAssetConfig {
 	return nil
 }
 
-func (c NetworkConfig) HasEnabledAssets() bool {
+func (c BlockchainConfig) HasEnabledAssets() bool {
 	for _, asset := range c.Assets {
 		if asset.IsEnabled() {
 			return true
@@ -63,7 +63,7 @@ func (c NetworkConfig) HasEnabledAssets() bool {
 	return false
 }
 
-func (c NetworkConfig) HasDisabledAssets() bool {
+func (c BlockchainConfig) HasDisabledAssets() bool {
 	for _, asset := range c.Assets {
 		if !asset.IsEnabled() {
 			return true

@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-
-	"github.com/erc7824/nitrolite/examples/cerebro/unisig"
 )
 
 const (
@@ -50,7 +49,7 @@ type PrivateKeyDTO struct {
 }
 
 func (s *Storage) AddPrivateKey(name, privateKeyHex string, isSigner bool) (*PrivateKeyDTO, error) {
-	_, address, err := unisig.DecodeEcdsaPrivateKey(privateKeyHex)
+	signer, err := sign.NewEthereumSigner(privateKeyHex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode private key: %w", err)
 	}
@@ -60,7 +59,7 @@ func (s *Storage) AddPrivateKey(name, privateKeyHex string, isSigner bool) (*Pri
 	}
 
 	dto := PrivateKeyDTO{
-		Address:    address.Hex(),
+		Address:    signer.PublicKey().Address().String(),
 		Name:       name,
 		PrivateKey: privateKeyHex,
 		IsSigner:   isSigner,

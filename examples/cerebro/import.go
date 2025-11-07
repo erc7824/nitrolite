@@ -53,8 +53,8 @@ func (o *Operator) handleImportRPC(args []string) {
 		return
 	}
 
-	network := o.config.GetNetworkByID(uint32(chainID.Uint64()))
-	if network == nil {
+	blockchain := o.config.GetBlockchainByID(uint32(chainID.Uint64()))
+	if blockchain == nil {
 		fmt.Printf("Unknown chain: %s.\n", chainIDStr)
 		return
 	}
@@ -66,7 +66,7 @@ func (o *Operator) handleImportRPC(args []string) {
 		return
 	}
 
-	if err := o.store.AddChainRPC(string(rpcURL), network.ChainID); err != nil {
+	if err := o.store.AddChainRPC(string(rpcURL), blockchain.ID); err != nil {
 		fmt.Printf("Failed to import chain RPC: %s\n", err.Error())
 		return
 	}

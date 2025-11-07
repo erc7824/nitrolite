@@ -2,7 +2,7 @@ name: Temp Push on PR branch
 
 on:
   push:
-    branches: [ feat/off-chain-eth ]
+    branches: [ fix/app-state-empty-assets-deploy-temp ]
 
 jobs:
   build-and-publish-clearnode:

@@ -47,6 +47,7 @@ func (mc *MessageCache) Add(hash string) {
 
 	mc.entries[hash] = time.Now().Add(mc.ttl).UnixMilli()
 
+	// TODO: improve this logic to avoid cleanup on every Add when under high load
 	// Lazy cleanup every N operations
 	mc.cleanupCounter++
 	if mc.cleanupCounter >= mc.cleanupEvery {

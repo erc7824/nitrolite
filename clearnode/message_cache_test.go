@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -128,7 +129,7 @@ func TestMessageCache(t *testing.T) {
 		}
 
 		for _, tt := range tests {
-			t.Run(string(rune(tt.cacheSize)), func(t *testing.T) {
+			t.Run(fmt.Sprintf("size_%d", tt.cacheSize), func(t *testing.T) {
 				// Simulate cache size by adding entries
 				cache.entries = make(map[string]int64, tt.cacheSize)
 				for i := 0; i < tt.cacheSize; i++ {

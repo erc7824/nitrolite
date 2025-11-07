@@ -136,7 +136,7 @@ export type MultiMessageVerifier = (
 export interface PartialEIP712AuthMessage {
     scope: string;
     session_key: Address;
-    expire: bigint;
+    expires_at: bigint;
     allowances: RPCAllowance[];
 }
 
@@ -165,7 +165,7 @@ export const EIP712AuthTypes = {
         { name: 'scope', type: 'string' },
         { name: 'wallet', type: 'address' },
         { name: 'session_key', type: 'address' },
-        { name: 'expire', type: 'uint64' },
+        { name: 'expires_at', type: 'uint64' },
         { name: 'allowances', type: 'Allowance[]' },
     ],
     Allowance: [

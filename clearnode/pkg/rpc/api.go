@@ -241,8 +241,8 @@ type AuthRequestRequest struct {
 	Application string `json:"application"`
 	// Allowances define spending limits for the authenticated session
 	Allowances []Allowance `json:"allowances"`
-	// Expire defines when the authentication expires (Unix timestamp)
-	Expire uint64 `json:"expire"`
+	// ExpiresAt defines when the authentication expires (Unix timestamp)
+	ExpiresAt uint64 `json:"expires_at"`
 	// Scope defines the permission scope for the session
 	Scope string `json:"scope"`
 }
@@ -323,6 +323,18 @@ type AllowanceUsage struct {
 	Allowance decimal.Decimal `json:"allowance"`
 	// Used is how much of the allowance has been spent
 	Used decimal.Decimal `json:"used"`
+}
+
+// RevokeSessionKeyRequest contains the parameters for revoking a session key.
+type RevokeSessionKeyRequest struct {
+	// SessionKey is the address of the session key to revoke
+	SessionKey string `json:"session_key"`
+}
+
+// RevokeSessionKeyResponse indicates successful revocation of a session key.
+type RevokeSessionKeyResponse struct {
+	// SessionKey is the address of the revoked session key
+	SessionKey string `json:"session_key"`
 }
 
 // ============================================================================

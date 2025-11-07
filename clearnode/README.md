@@ -88,7 +88,7 @@ struct Policy {
     address wallet; // Main wallet address authorizing the session
     address application; // Application public address
     address participant; // Delegated session key address
-    uint256 expire; // Expiration timestamp
+    uint256 expires_at; // Expiration timestamp
     Allowance[] allowances; // Array of asset allowances
 }
 ```

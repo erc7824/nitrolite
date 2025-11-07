@@ -892,10 +892,10 @@ func (r *RPCRouter) HandleRevokeSessionKey(c *RPCContext) {
 	// Remove from cache after successful transaction
 	sessionKeyCache.Delete(params.SessionKey)
 
-	c.Succeed(req.Method, map[string]any{
-		"success":     true,
-		"session_key": params.SessionKey,
-	})
+	resp := rpc.RevokeSessionKeyResponse{
+		SessionKey: params.SessionKey,
+	}
+	c.Succeed(req.Method, resp)
 	logger.Info("session key revoked", "userID", c.UserID, "sessionKey", params.SessionKey)
 }
 

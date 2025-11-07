@@ -511,7 +511,7 @@ func (c *Client) GetLedgerTransactions(ctx context.Context, reqParams GetLedgerT
 //   - SessionKey: Address of a different key that will be used for signing during this session (hot wallet)
 //   - Application: Name of the application
 //   - Allowances: Spending limits for the session
-//   - Expire: When the authentication expires (RFC3339 or empty)
+//   - ExpiresAt: When the authentication expires (Unix timestamp)
 //   - Scope: Permission scope (e.g., "trade", "view", or empty)
 //   - signer: Signer interface to sign the challenge (should correspond to Address, not SessionKey)
 //
@@ -1469,7 +1469,7 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
 				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "uint64"},
+				{Name: "expires_at", Type: "uint64"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {
@@ -1486,7 +1486,7 @@ func signChallenge(signer sign.Signer, req AuthRequestRequest, token string) (si
 			"scope":       req.Scope,
 			"wallet":      req.Address,
 			"session_key": req.SessionKey,
-			"expire":      new(big.Int).SetUint64(req.Expire),
+			"expires_at":  new(big.Int).SetUint64(req.ExpiresAt),
 			"allowances":  req.Allowances,
 		},
 	}

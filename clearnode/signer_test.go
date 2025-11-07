@@ -32,7 +32,7 @@ func TestEIPSignature(t *testing.T) {
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
 				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "uint64"},
+				{Name: "expires_at", Type: "uint64"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {
@@ -47,7 +47,7 @@ func TestEIPSignature(t *testing.T) {
 			"scope":       "console",
 			"wallet":      walletAddress,
 			"session_key": "0x6966978ce78df3228993aa46984eab6d68bbe195",
-			"expire":      big.NewInt(1748608702),
+			"expires_at":  big.NewInt(1748608702),
 			"allowances":  convertedAllowances,
 		},
 	}

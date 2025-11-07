@@ -15,7 +15,7 @@ type AuthRequestParams struct {
 	SessionKey  string      `json:"session_key"` // The session key for the authentication
 	Application string      `json:"application"` // The name of the application requesting authentication
 	Allowances  []Allowance `json:"allowances"`  // Allowances for the application
-	Expire      uint64      `json:"expire"`      // Expiration time for the authentication
+	ExpiresAt   uint64      `json:"expires_at"`  // Expiration time for the authentication
 	Scope       string      `json:"scope"`       // Scope of the authentication
 }
 
@@ -51,7 +51,7 @@ func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 		"application", authParams.Application,
 		"rawAllowances", authParams.Allowances,
 		"scope", authParams.Scope,
-		"expire", authParams.Expire)
+		"expires_at", authParams.ExpiresAt)
 
 	// Generate a challenge for this address
 	token, err := r.AuthManager.GenerateChallenge(
@@ -60,7 +60,7 @@ func (r *RPCRouter) HandleAuthRequest(c *RPCContext) {
 		authParams.Application,
 		authParams.Allowances,
 		authParams.Scope,
-		authParams.Expire,
+		authParams.ExpiresAt,
 	)
 	if err != nil {
 		logger.Error("failed to generate challenge", "error", err)
@@ -199,7 +199,7 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 		challenge.Application,
 		challenge.Allowances,
 		challenge.Scope,
-		challenge.Expire,
+		challenge.SessionKeyExpiresAt,
 		sig)
 	if err != nil {
 		logger.Error("failed to recover address from signature", "error", err)

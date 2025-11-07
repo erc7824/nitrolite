@@ -53,7 +53,7 @@ describe('API message creators', () => {
             session_key: clientAddress,
             application: 'test-app',
             allowances: [],
-            expire: '',
+            expires_at: 0n,
             scope: '',
             application: clientAddress,
         };
@@ -69,7 +69,7 @@ describe('API message creators', () => {
                     session_key: clientAddress,
                     application: 'test-app',
                     allowances: [],
-                    expire: '',
+                    expires_at: 0,
                     scope: '',
                     application: clientAddress,
                 },

@@ -134,12 +134,10 @@ func (c *ClearnodeClient) GetUserTag() (rpc.GetUserTagResponse, error) {
 
 func (c *ClearnodeClient) RequestChannelCreation(chainID uint32, assetAddress string) (rpc.CreateChannelResponse, error) {
 	sessionKeyAddress := c.sessionKey.PublicKey().Address().String()
-	amount := decimal.NewFromInt(0)
 	params := rpc.CreateChannelRequest{
 		ChainID:    chainID,
 		SessionKey: &sessionKeyAddress,
 		Token:      assetAddress,
-		Amount:     &amount,
 	}
 
 	req, err := c.prepareSignedRequest(rpc.CreateChannelMethod, params)

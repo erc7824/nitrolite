@@ -81,9 +81,9 @@ A Challenge represents an authentication challenge for verifying address ownersh
 - `Application` (string): Name of the application which opened the connection
 - `Allowances` (Allowance[]): Asset allowances for this session
 - `Scope` (string): Permission scope
-- `Expire` (string): Policy expiration
+- `SessionKeyExpiresAt` (uint64): Session key expiration timestamp
 - `CreatedAt` (timestamp): When the challenge was created
-- `ExpiresAt` (timestamp): When the challenge expires
+- `ChallengeExpiresAt` (timestamp): When the challenge expires
 - `Completed` (bool): Whether the challenge has been used
 
 Challenges are used in the authentication flow to verify that users own the private keys to their addresses.

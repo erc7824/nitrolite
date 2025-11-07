@@ -136,7 +136,7 @@ func TestSignChallenge(t *testing.T) {
 		SessionKey:  "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
 		Application: "TestApp",
 		Allowances:  []Allowance{},
-		Expire:      uint64(3600),
+		ExpiresAt:   uint64(3600),
 		Scope:       "trade",
 	}
 

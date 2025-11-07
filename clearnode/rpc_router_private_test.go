@@ -2281,10 +2281,9 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify response
 		res := assertResponse(t, ctx, "revoke_session_key")
-		revokeResp, ok := res.Params.(map[string]any)
+		revokeResp, ok := res.Params.(rpc.RevokeSessionKeyResponse)
 		require.True(t, ok)
-		require.Equal(t, true, revokeResp["success"])
-		require.Equal(t, sessionKeyAAddr, revokeResp["session_key"])
+		require.Equal(t, sessionKeyAAddr, revokeResp.SessionKey)
 
 		// Verify session key is expired in database
 		var sessionKey SessionKey
@@ -2341,10 +2340,9 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify response
 		res := assertResponse(t, ctx, "revoke_session_key")
-		revokeResp, ok := res.Params.(map[string]any)
+		revokeResp, ok := res.Params.(rpc.RevokeSessionKeyResponse)
 		require.True(t, ok)
-		require.Equal(t, true, revokeResp["success"])
-		require.Equal(t, sessionKeyBAddr, revokeResp["session_key"])
+		require.Equal(t, sessionKeyBAddr, revokeResp.SessionKey)
 
 		// Verify session key B is expired in database
 		var sessionKey SessionKey
@@ -2564,9 +2562,9 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify response
 		res := assertResponse(t, ctx, "revoke_session_key")
-		revokeResp, ok := res.Params.(map[string]any)
+		revokeResp, ok := res.Params.(rpc.RevokeSessionKeyResponse)
 		require.True(t, ok)
-		require.Equal(t, true, revokeResp["success"])
+		require.Equal(t, sessionKeyAAddr, revokeResp.SessionKey)
 
 		// Verify session key is expired in database
 		var sessionKey SessionKey

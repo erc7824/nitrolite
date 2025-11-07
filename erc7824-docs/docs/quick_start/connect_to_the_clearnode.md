@@ -283,7 +283,7 @@ const authRequestMsg = await createAuthRequestMessage({
   address: '0xYourWalletAddress',
   session_key: '0xYourSignerAddress',
   application: 'YourAppDomain',
-  expire: (Math.floor(Date.now() / 1000) + 3600).toString(), // 1 hour expiration (as string)
+  expires_at: (Math.floor(Date.now() / 1000) + 3600).toString(), // 1 hour expiration (as string)
   scope: 'console',
   allowances: [],
 });
@@ -313,7 +313,7 @@ ws.onmessage = async (event) => {
             scope: authRequestMsg.scope,
             application: authRequestMsg.application,
             participant: authRequestMsg.participant,
-            expire: authRequestMsg.expire,
+            expires_at: authRequestMsg.expires_at,
             allowances: authRequestMsg.allowances,
           },
           { 
@@ -372,7 +372,7 @@ ws.onopen = async () => {
     address: '0xYourWalletAddress',
     session_key: '0xYourSignerAddress',
     application: 'YourAppDomain',
-    expire: (Math.floor(Date.now() / 1000) + 3600).toString(), // 1 hour expiration (as string)
+    expires_at: (Math.floor(Date.now() / 1000) + 3600).toString(), // 1 hour expiration (as string)
     scope: 'console',
     allowances: [],
   });
@@ -399,7 +399,7 @@ ws.onmessage = async (event) => {
             scope: authRequestMsg.scope,
             application: authRequestMsg.application,
             participant: authRequestMsg.participant,
-            expire: authRequestMsg.expire,
+            expires_at: authRequestMsg.expires_at,
             allowances: authRequestMsg.allowances,
           },
           { 
@@ -490,7 +490,7 @@ The format of the EIP-712 message is as follows:
       { "name": "scope", "type": "string" },
       { "name": "wallet", "type": "address" },
       { "name": "session_key", "type": "address" },
-      { "name": "expire", "type": "uint64" },
+      { "name": "expires_at", "type": "uint64" },
       { "name": "allowances", "type": "Allowance[]" }
     ],
     "Allowance": [
@@ -508,7 +508,7 @@ The format of the EIP-712 message is as follows:
     scope: 'console',
     wallet: '0xYourWalletAddress',
     session_key: '0xYourSignerAddress',
-    expire: 1762417301,
+    expires_at: 1762417301,
     allowances: []
   }
 }

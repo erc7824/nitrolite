@@ -86,7 +86,7 @@ func RecoverAddressFromEip712Signature(
 	application string,
 	allowances []Allowance,
 	scope string,
-	expire uint64,
+	expiresAt uint64,
 	sig Signature) (string, error) {
 	convertedAllowances := convertAllowances(allowances)
 
@@ -100,7 +100,7 @@ func RecoverAddressFromEip712Signature(
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
 				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "uint64"},
+				{Name: "expires_at", Type: "uint64"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {
@@ -116,7 +116,7 @@ func RecoverAddressFromEip712Signature(
 			"scope":       scope,
 			"wallet":      walletAddress,
 			"session_key": sessionKey,
-			"expire":      new(big.Int).SetUint64(expire),
+			"expires_at":  new(big.Int).SetUint64(expiresAt),
 			"allowances":  convertedAllowances,
 		},
 	}

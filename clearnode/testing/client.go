@@ -391,7 +391,7 @@ func (c *Client) Authenticate() error {
 				{Name: "scope", Type: "string"},
 				{Name: "wallet", Type: "address"},
 				{Name: "session_key", Type: "address"},
-				{Name: "expire", Type: "uint64"},
+				{Name: "expires_at", Type: "uint64"},
 				{Name: "allowances", Type: "Allowance[]"},
 			},
 			"Allowance": {
@@ -406,7 +406,7 @@ func (c *Client) Authenticate() error {
 			"scope":       "all",
 			"wallet":      c.address,
 			"session_key": c.addresses[0],
-			"expire":      big.NewInt(3600),
+			"expires_at":  big.NewInt(3600),
 			"allowances":  convertedAllowances,
 		},
 	}

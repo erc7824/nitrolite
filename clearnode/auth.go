@@ -14,16 +14,16 @@ import (
 
 // Challenge represents an authentication challenge
 type Challenge struct {
-	Token       uuid.UUID   // Random challenge token
-	Address     string      // Address this challenge was created for
-	SessionKey  string      // SessionKey that is going to be used for this session
-	Application string      // Name of the application which opened the connection
-	Allowances  []Allowance // Allowances for this connection
-	Scope       string      // Policy scope
-	Expire      uint64      // Policy expiration
-	CreatedAt   time.Time   // When the challenge was created
-	ExpiresAt   time.Time   // When the challenge expires
-	Completed   bool        // Whether the challenge has been used
+	Token               uuid.UUID   // Random challenge token
+	Address             string      // Address this challenge was created for
+	SessionKey          string      // SessionKey that is going to be used for this session
+	Application         string      // Name of the application which opened the connection
+	Allowances          []Allowance // Allowances for this connection
+	Scope               string      // Policy scope
+	SessionKeyExpiresAt uint64      // Session key expiration
+	CreatedAt           time.Time   // When the challenge was created
+	ChallengeExpiresAt  time.Time   // When the challenge expires
+	Completed           bool        // Whether the challenge has been used
 }
 
 // AuthManager handles authentication challenges
@@ -77,7 +77,7 @@ func (am *AuthManager) GenerateChallenge(
 	application string,
 	allowances []Allowance,
 	scope string,
-	expire uint64,
+	expiresAt uint64,
 ) (uuid.UUID, error) {
 	// Normalize address
 	if !strings.HasPrefix(address, "0x") {
@@ -87,16 +87,16 @@ func (am *AuthManager) GenerateChallenge(
 	// Create challenge with expiration
 	now := time.Now()
 	challenge := &Challenge{
-		Token:       uuid.New(),
-		Address:     address,
-		SessionKey:  sessionKey,
-		Application: application,
-		Allowances:  allowances,
-		Scope:       scope,
-		Expire:      expire,
-		CreatedAt:   now,
-		ExpiresAt:   now.Add(am.challengeTTL),
-		Completed:   false,
+		Token:               uuid.New(),
+		Address:             address,
+		SessionKey:          sessionKey,
+		Application:         application,
+		Allowances:          allowances,
+		Scope:               scope,
+		SessionKeyExpiresAt: expiresAt,
+		CreatedAt:           now,
+		ChallengeExpiresAt:  now.Add(am.challengeTTL),
+		Completed:           false,
 	}
 
 	// Store challenge
@@ -148,7 +148,7 @@ func (am *AuthManager) ValidateChallenge(challengeToken uuid.UUID, recoveredSign
 	}
 
 	// Check if challenge is expired
-	if time.Now().After(challenge.ExpiresAt) {
+	if time.Now().After(challenge.ChallengeExpiresAt) {
 		delete(am.challenges, challengeToken)
 		return errors.New("challenge expired")
 	}
@@ -163,7 +163,7 @@ func (am *AuthManager) ValidateChallenge(challengeToken uuid.UUID, recoveredSign
 	challenge.Completed = true
 
 	// Clean up
-	challenge.ExpiresAt = time.Now().Add(30 * time.Second) // Keep briefly for reference
+	challenge.ChallengeExpiresAt = time.Now().Add(30 * time.Second) // Keep briefly for reference
 
 	// Register authenticated session
 	am.registerAuthSession(recoveredSigner)
@@ -293,7 +293,7 @@ func (am *AuthManager) cleanupExpiredChallenges() {
 		// Cleanup challenges
 		am.challengesMu.Lock()
 		for token, challenge := range am.challenges {
-			if now.After(challenge.ExpiresAt) {
+			if now.After(challenge.ChallengeExpiresAt) {
 				delete(am.challenges, token)
 			}
 		}

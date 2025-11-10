@@ -29,7 +29,7 @@ describe('Clearnode Authentication', () => {
         address: identity.walletAddress,
         session_key: identity.sessionKeyAddress,
         application: 'clearnode',
-        expire: BigInt(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
+        expires_at: BigInt(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
         allowances: [],
     };
@@ -39,7 +39,7 @@ describe('Clearnode Authentication', () => {
         {
             scope: authRequestParams.scope,
             session_key: authRequestParams.session_key,
-            expire: authRequestParams.expire,
+            expires_at: authRequestParams.expires_at,
             allowances: authRequestParams.allowances,
         },
         {

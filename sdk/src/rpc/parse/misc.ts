@@ -8,6 +8,7 @@ import {
     RPCHistoryEntry,
     GetUserTagResponseParams,
     GetSessionKeysResponseParams,
+    RevokeSessionKeyResponseParams,
     RPCSessionKey,
     RPCAllowance,
 } from '../types';
@@ -144,6 +145,17 @@ const GetSessionKeysParamsSchema = z
         }),
     );
 
+const RevokeSessionKeyParamsSchema = z
+    .object({
+        session_key: addressSchema,
+    })
+    .strict()
+    .transform(
+        (raw): RevokeSessionKeyResponseParams => ({
+            sessionKey: raw.session_key,
+        }),
+    );
+
 const parseMessageParams: ParamsParser<unknown> = (params) => {
     return params;
 };
@@ -154,5 +166,6 @@ export const miscParamsParsers: Record<string, ParamsParser<unknown>> = {
     [RPCMethod.GetRPCHistory]: (params) => GetRPCHistoryParamsSchema.parse(params),
     [RPCMethod.GetUserTag]: (params) => GetUserTagParamsSchema.parse(params),
     [RPCMethod.GetSessionKeys]: (params) => GetSessionKeysParamsSchema.parse(params),
+    [RPCMethod.RevokeSessionKey]: (params) => RevokeSessionKeyParamsSchema.parse(params),
     [RPCMethod.Message]: parseMessageParams,
 };

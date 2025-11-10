@@ -718,6 +718,32 @@ export async function createTransferMessage(
 }
 
 /**
+ * Creates a revoke session key message
+ *
+ * @param signer - The message signer to sign the request
+ * @param sessionKey - The session key address to revoke
+ * @param requestId - Optional request ID (auto-generated if not provided)
+ * @param timestamp - Optional timestamp (auto-generated if not provided)
+ * @returns JSON string of the signed RPC message
+ */
+export async function createRevokeSessionKeyMessage(
+    signer: MessageSigner,
+    sessionKey: Address,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.RevokeSessionKey,
+        params: { session_key: sessionKey },
+        requestId,
+        timestamp,
+    });
+    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+
+    return JSON.stringify(signedRequest);
+}
+
+/**
  * Creates EIP-712 signing function for challenge verification with proper challenge extraction
  *
  * @param walletClient - The WalletClient instance to use for signing.

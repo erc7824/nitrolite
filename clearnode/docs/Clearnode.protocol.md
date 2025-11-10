@@ -168,7 +168,7 @@ The client initiates authentication by sending an `auth_request` request with th
       }
     ],
     "scope": "app.create", // Optional: Permission scope
-    "expire": 1762417328, // Optional: Session expiration timestamp
+    "expires_at": 1762417328, // Optional: Session expiration timestamp
     "application": "0xApplication1234..." // Optional: Application public address
   }, 1619123456789],
   "sig": ["0x5432abcdef..."]

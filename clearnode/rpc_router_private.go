@@ -24,6 +24,10 @@ type GetSessionKeysParams struct {
 	ListOptions
 }
 
+type RevokeSessionKeyParams struct {
+	SessionKey string `json:"session_key"`
+}
+
 type TransferParams struct {
 	Destination        string               `json:"destination"`
 	DestinationUserTag string               `json:"destination_user_tag"`
@@ -255,16 +259,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 		return
 	}
 
-	// Build signer maps once; use them to determine wallet/session-key context deterministically.
-	rpcSignersMap, err := c.Message.GetRequestSignersMap()
+	signerAddress, err := verifySigner(&c.Message, c.UserID)
 	if err != nil {
-		r.Metrics.TransferAttemptsFail.Inc()
-		logger.Error("failed to get signers from RPC message", "error", err)
-		c.Fail(err, "failed to get signers from RPC message")
-		return
-	}
-
-	if err := verifySigner(&c.Message, c.UserID); err != nil {
 		r.Metrics.TransferAttemptsFail.Inc()
 		logger.Error("failed to verify signer", "error", err)
 		c.Fail(err, "failed to verify signer")
@@ -319,14 +315,8 @@ func (r *RPCRouter) HandleTransfer(c *RPCContext) {
 	var respTransactions []TransactionResponse
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
 		var sessionKeyAddress *string
-		if _, ok := rpcSignersMap[fromWallet]; !ok {
-			for signer := range rpcSignersMap {
-				if GetWalletBySessionKey(signer) == fromWallet {
-					s := signer
-					sessionKeyAddress = &s
-					break
-				}
-			}
+		if signerAddress != fromWallet {
+			sessionKeyAddress = &signerAddress
 		}
 
 		if err := checkChallengedChannels(tx, fromWallet); err != nil {
@@ -797,6 +787,83 @@ func (r *RPCRouter) HandleGetSessionKeys(c *RPCContext) {
 	c.Succeed(req.Method, resp)
 }
 
+// HandleRevokeSessionKey revokes a session key
+func (r *RPCRouter) HandleRevokeSessionKey(c *RPCContext) {
+	ctx := c.Context
+	logger := LoggerFromContext(ctx)
+	req := c.Message.Req
+
+	var params RevokeSessionKeyParams
+	if err := parseParams(req.Params, &params); err != nil {
+		c.Fail(err, "failed to parse parameters")
+		return
+	}
+
+	if params.SessionKey == "" {
+		c.Fail(nil, "session_key parameter is required")
+		return
+	}
+
+	signerAddress, err := verifySigner(&c.Message, c.UserID)
+	if err != nil {
+		logger.Error("failed to verify signer", "error", err)
+		c.Fail(err, "failed to verify signer")
+		return
+	}
+
+	var activeSessionKeyAddress *string
+	if signerAddress != c.UserID {
+		activeSessionKeyAddress = &signerAddress
+	}
+
+	err = r.DB.Transaction(func(tx *gorm.DB) error {
+		_, err := GetActiveSessionKeyForWallet(tx, params.SessionKey, c.UserID)
+		if err != nil {
+			return RPCErrorf("operation denied: provided address is not an active session key of this user")
+		}
+
+		if activeSessionKeyAddress != nil {
+			// If trying to revoke a different session key (not self-revocation)
+			if *activeSessionKeyAddress != params.SessionKey {
+				activeSessionKey, err := GetSessionKeyIfActive(tx, *activeSessionKeyAddress)
+				if err != nil {
+					return RPCErrorf("operation denied: active session key is invalid")
+				}
+
+				// Only "clearnode" session keys can revoke other session keys
+				if activeSessionKey.Application != AppNameClearnode {
+					return RPCErrorf("operation denied: insufficient permissions for the active session key")
+				}
+			}
+		}
+
+		if err := RevokeSessionKeyFromDB(tx, params.SessionKey); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		logger.Error("failed to revoke session key", "error", err, "sessionKey", params.SessionKey)
+		c.Fail(err, "failed to revoke session key")
+		return
+	}
+
+	sessionKeyCache.Delete(params.SessionKey)
+
+	resp := rpc.RevokeSessionKeyResponse{
+		SessionKey: params.SessionKey,
+	}
+	c.Succeed(req.Method, resp)
+
+	authorizedBy := c.UserID
+	if activeSessionKeyAddress != nil {
+		authorizedBy = *activeSessionKeyAddress
+	}
+	logger.Info("session key revoked", "userID", c.UserID, "revokedSessionKey", params.SessionKey, "operationAuthorizedBy", authorizedBy)
+}
+
 func verifyAllocations(appSessionBalance, allocationSum map[string]decimal.Decimal) error {
 	for asset, bal := range appSessionBalance {
 		if bal.IsZero() {
@@ -839,21 +906,22 @@ func getWallets(rpc *RPCMessage) (map[string]struct{}, error) {
 }
 
 // verifySigner checks that the recovered signer matches the channel's wallet.
-func verifySigner(rpc *RPCMessage, channelWallet string) error {
+func verifySigner(rpc *RPCMessage, channelWallet string) (string, error) {
 	if len(rpc.Sig) < 1 {
-		return RPCErrorf("missing participant signature")
+		return "", RPCErrorf("missing participant signature")
 	}
 	recovered, err := RecoverAddress(rpc.Req.rawBytes, rpc.Sig[0])
 	if err != nil {
-		return err
+		return "", err
 	}
+	signerAddress := recovered
 	if mapped := GetWalletBySessionKey(recovered); mapped != "" {
 		recovered = mapped
 	}
 	if recovered != channelWallet {
-		return RPCErrorf("invalid signature")
+		return "", RPCErrorf("invalid signature")
 	}
-	return nil
+	return signerAddress, nil
 }
 
 func ensureWalletHasAllAllocationsEmpty(tx *gorm.DB, wallet string) error {

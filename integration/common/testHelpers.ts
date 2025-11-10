@@ -62,7 +62,7 @@ export async function authenticateAppWithAllowances(
         address: participantAppIdentity.walletAddress,
         session_key: participantAppIdentity.sessionKeyAddress,
         application: application,
-        expire: BigInt(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
+        expires_at: BigInt(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
         allowances: [
             {
@@ -86,7 +86,7 @@ export async function authenticateAppWithMultiAssetAllowances(
         address: participantAppIdentity.walletAddress,
         session_key: participantAppIdentity.sessionKeyAddress,
         application: application,
-        expire: BigInt(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
+        expires_at: BigInt(Math.floor(Date.now() / 1000) + 3600), // 1 hour expiration
         scope: 'console',
         allowances: allowances,
     });

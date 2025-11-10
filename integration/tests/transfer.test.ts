@@ -9,7 +9,6 @@ import {
     createTransferMessage,
     parseTransferResponse,
     parseAnyRPCResponse,
-    RPCTransferAllocation,
     TransferRequestParams,
     RPCMethod,
 } from '@erc7824/nitrolite';
@@ -186,5 +185,7 @@ describe('Transfer Integration', () => {
             expect(err.message).toMatch(/RPC Error.*operation denied.*non-zero allocation.*detected/i);
             return;
         }
+
+        throw new Error('Transfer request was not rejected as expected.');
     });
 });

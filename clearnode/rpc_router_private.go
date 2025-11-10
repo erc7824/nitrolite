@@ -857,7 +857,7 @@ func (r *RPCRouter) HandleRevokeSessionKey(c *RPCContext) {
 	}
 	c.Succeed(req.Method, resp)
 
-	authorizedBy := "wallet"
+	authorizedBy := c.UserID
 	if activeSessionKeyAddress != nil {
 		authorizedBy = *activeSessionKeyAddress
 	}

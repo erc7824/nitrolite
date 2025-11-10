@@ -112,3 +112,21 @@ func CheckExistingChannels(tx *gorm.DB, wallet, token string, chainID uint32) (*
 
 	return &channel, nil
 }
+
+type ChannelAmountSum struct {
+	Count int             `gorm:"column:count"`
+	Sum   decimal.Decimal `gorm:"column:sum"`
+}
+
+func GetChannelAmountSumByWallet(tx *gorm.DB, senderWallet string) (ChannelAmountSum, error) {
+	var result ChannelAmountSum
+	err := tx.Model(&Channel{}).
+		Select("COUNT(channel_id) as count, COALESCE(SUM(CAST(raw_amount AS NUMERIC)), 0) as sum").
+		Where("wallet = ? AND status IN (?, ?)", senderWallet, ChannelStatusOpen, ChannelStatusResizing).
+		Scan(&result).Error
+	if err != nil {
+		return ChannelAmountSum{}, fmt.Errorf("error calculating channel amount sum: %w", err)
+	}
+
+	return result, nil
+}

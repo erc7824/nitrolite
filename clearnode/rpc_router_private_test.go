@@ -633,6 +633,41 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, transactions, 1, "Should only have 1 transaction recorded (duplicate was rejected)")
 	})
+
+	t.Run("ErrorNonZeroChannelAllocation", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		ch := &Channel{
+			ChannelID:   "0xChannel",
+			Wallet:      senderAddr.Hex(),
+			Participant: senderAddr.Hex(),
+			Status:      ChannelStatusOpen,
+			Token:       "0xTokenXYZ",
+			Nonce:       1,
+			RawAmount:   decimal.NewFromInt(1),
+		}
+		require.NoError(t, db.Create(ch).Error)
+
+		// Fund sender's account
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "usdc", decimal.NewFromInt(1000), nil))
+		require.NoError(t, GetWalletLedger(db, senderAddr).Record(senderAccountID, "eth", decimal.NewFromInt(5), nil))
+
+		transferParams := TransferParams{
+			Destination: recipientAddr.Hex(),
+			Allocations: []TransferAllocation{
+				{AssetSymbol: "usdc", Amount: decimal.NewFromInt(500)},
+				{AssetSymbol: "eth", Amount: decimal.NewFromInt(2)},
+			},
+		}
+
+		ctx := createSignedRPCContext(1, "transfer", transferParams, senderSigner)
+		router.HandleTransfer(ctx)
+
+		assertErrorResponse(t, ctx, "operation denied: non-zero allocation in 1 channel(s) detected owned by wallet "+senderAddr.Hex())
+	})
 }
 
 func TestRPCRouterHandleCreateAppSession(t *testing.T) {

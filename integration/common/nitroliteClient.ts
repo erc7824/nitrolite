@@ -87,7 +87,7 @@ export class TestNitroliteClient extends NitroliteClient {
             5000
         );
 
-        const {state} = await this.topUpChannel(ws, channelId, initialState, amount, this.identity.walletAddress);
+        const {state} = await this.resizeChannelAndWait(ws, channelId, initialState, this.identity.walletAddress, amount);
 
         const resizeResponse = await resizeChannelPromise;
         const resizeParsedResponse = parseChannelUpdateResponse(resizeResponse);
@@ -96,16 +96,18 @@ export class TestNitroliteClient extends NitroliteClient {
         return { params: responseChannel, state };
     };
 
-    topUpChannel = async (
+    resizeChannelAndWait = async (
         ws: TestWebSocket,
         channelId: Hex,
         previousState: State,
+        fundsDestination: Address,
         resizeAmount: bigint,
-        fundsDestination: Address
+        allocateAmount: bigint = -resizeAmount,
     ) => {
         const msg = await createResizeChannelMessage(this.identity.messageWalletSigner, {
             channel_id: channelId,
             resize_amount: resizeAmount,
+            allocate_amount: allocateAmount,
             funds_destination: fundsDestination,
         });
 

@@ -817,14 +817,9 @@ func (r *RPCRouter) HandleRevokeSessionKey(c *RPCContext) {
 	}
 
 	err = r.DB.Transaction(func(tx *gorm.DB) error {
-		var targetSessionKey SessionKey
-		err := tx.Where("address = ? AND wallet_address = ?", params.SessionKey, c.UserID).First(&targetSessionKey).Error
+		_, err := GetActiveSessionKeyForWallet(tx, params.SessionKey, c.UserID)
 		if err != nil {
-			return RPCErrorf("operation denied: provided address is not a session key of the session wallet")
-		}
-
-		if isExpired(targetSessionKey.ExpiresAt) {
-			return RPCErrorf("operation denied: provided address is not an active session key of the session wallet")
+			return RPCErrorf("operation denied: provided address is not an active session key of this user")
 		}
 
 		if activeSessionKeyAddress != nil {
@@ -842,11 +837,8 @@ func (r *RPCRouter) HandleRevokeSessionKey(c *RPCContext) {
 			}
 		}
 
-		now := time.Now().UTC()
-		if err := tx.Model(&SessionKey{}).
-			Where("address = ?", params.SessionKey).
-			Update("expires_at", now).Error; err != nil {
-			return fmt.Errorf("failed to revoke session key: %w", err)
+		if err := RevokeSessionKeyFromDB(tx, params.SessionKey); err != nil {
+			return err
 		}
 
 		return nil

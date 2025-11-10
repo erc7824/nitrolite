@@ -537,8 +537,7 @@ Revokes a session key by immediately invalidating it. The session key can no lon
 
 **Error Cases:**
 
-- Session key does not exist, it is already expired or it belongs to another wallet: `"operation denied: provided address is not a session key of the session wallet"`
-- Attempting to revoke another wallet's session key: `"operation denied: provided address is not a session key of the session wallet"`
+- Session key does not exist, belongs to another wallet, or is expired: `"operation denied: provided address is not an active session key of this user"`
 - Non-"clearnode" session key attempting to revoke another session key: `"operation denied: insufficient permissions for the active session key"`
 
 **Notes:**

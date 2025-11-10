@@ -198,6 +198,21 @@ func GetSessionKeyIfActive(db *gorm.DB, sessionKeyAddress string) (*SessionKey, 
 	return &sk, nil
 }
 
+// GetActiveSessionKeyForWallet retrieves a session key and validates it belongs to the specified wallet and is active
+func GetActiveSessionKeyForWallet(tx *gorm.DB, sessionKeyAddress, walletAddress string) (*SessionKey, error) {
+	var sk SessionKey
+	err := tx.Where("address = ? AND wallet_address = ?", sessionKeyAddress, walletAddress).First(&sk).Error
+	if err != nil {
+		return nil, fmt.Errorf("session key not found for wallet")
+	}
+
+	if isExpired(sk.ExpiresAt) {
+		return nil, fmt.Errorf("session key expired")
+	}
+
+	return &sk, nil
+}
+
 // CalculateSessionKeySpending calculates total amount spent by a session key for a specific asset
 func CalculateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSymbol string) (decimal.Decimal, error) {
 	type result struct {
@@ -277,5 +292,16 @@ func ValidateSessionKeyApplication(sessionKey *SessionKey, appApplication string
 			sessionKey.Application, appApplication)
 	}
 
+	return nil
+}
+
+// RevokeSessionKeyFromDB revokes a session key by setting its expiration to the current time
+func RevokeSessionKeyFromDB(tx *gorm.DB, sessionKeyAddress string) error {
+	now := time.Now().UTC()
+	if err := tx.Model(&SessionKey{}).
+		Where("address = ?", sessionKeyAddress).
+		Update("expires_at", now).Error; err != nil {
+		return fmt.Errorf("failed to revoke session key: %w", err)
+	}
 	return nil
 }

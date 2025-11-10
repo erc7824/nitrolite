@@ -2477,7 +2477,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 		router.HandleRevokeSessionKey(ctx)
 
 		// Verify error response
-		assertErrorResponse(t, ctx, "operation denied: provided address is not a session key of the session wallet")
+		assertErrorResponse(t, ctx, "operation denied: provided address is not an active session key of this user")
 
 		// Verify session key is still active
 		var sessionKey SessionKey
@@ -2531,7 +2531,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 		router.HandleRevokeSessionKey(ctx)
 
 		// Verify error response
-		assertErrorResponse(t, ctx, "operation denied: provided address is not an active session key of the session wallet")
+		assertErrorResponse(t, ctx, "operation denied: provided address is not an active session key of this user")
 	})
 
 	// User cannot revoke a non-existent session key (random address)
@@ -2556,7 +2556,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 		router.HandleRevokeSessionKey(ctx)
 
 		// Verify error response
-		assertErrorResponse(t, ctx, "operation denied: provided address is not a session key of the session wallet")
+		assertErrorResponse(t, ctx, "operation denied: provided address is not an active session key of this user")
 	})
 
 	// Missing session_key parameter

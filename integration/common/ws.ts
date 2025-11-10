@@ -239,6 +239,12 @@ export const getGetUserTagPredicate = () => {
     };
 };
 
+export const getRevokeSessionKeyPredicate = () => {
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.RevokeSessionKey, reqId);
+    };
+};
+
 export const getTransferPredicate = () => {
     return (data: string, reqId?: number): boolean => {
         return genericPredicate(data, (r) => r.method === RPCMethod.Transfer, reqId);

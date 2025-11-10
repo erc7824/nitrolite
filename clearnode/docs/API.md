@@ -492,6 +492,8 @@ Each session key includes:
 - Only active (non-expired) session keys are returned
 - If a session key has an empty spending cap array, all operations using that key will be denied (no spending allowed)
 - The `used_allowance` is calculated by summing all debit entries in the ledger that were made using this session key
+- Available allowance for an asset = `allowance - used_allowance`
+- **Special case**: Session keys with `application` set to `"clearnode"` have root access and are exempt from spending allowance limits and application validation. This facilitates backwards compatibility, and will be deprecated after a migration period for developers elapses.
 
 ### Revoke Session Key
 
@@ -501,7 +503,7 @@ Revokes a session key by immediately invalidating it. The session key can no lon
 - A wallet can revoke any of its session keys
 - A session key can revoke itself
 - A session key with `application: "clearnode"` can revoke other session keys belonging to the same wallet
-- A non-clearnode session key cannot revoke other session keys (only itself)
+- A non-"clearnode" session key cannot revoke other session keys (only itself)
 
 **Request:**
 
@@ -535,9 +537,9 @@ Revokes a session key by immediately invalidating it. The session key can no lon
 
 **Error Cases:**
 
-- Session key does not exist or is already expired: `"operation denied: provided address is not a session key of the session wallet"`
+- Session key does not exist, it is already expired or it belongs to another wallet: `"operation denied: provided address is not a session key of the session wallet"`
 - Attempting to revoke another wallet's session key: `"operation denied: provided address is not a session key of the session wallet"`
-- Non-clearnode session key attempting to revoke another session key: `"operation denied: insufficient permissions for the active session key"`
+- Non-"clearnode" session key attempting to revoke another session key: `"operation denied: insufficient permissions for the active session key"`
 
 **Notes:**
 
@@ -545,8 +547,6 @@ Revokes a session key by immediately invalidating it. The session key can no lon
 - After revocation, any operations attempted with the revoked session key will fail with a validation error
 - The revoked session key will no longer appear in the `get_session_keys` response
 - Revocation is useful for security purposes when a session key may have been compromised
-- Available allowance for an asset = `allowance - used_allowance`
-- **Special case**: Session keys with `application` set to `"clearnode"` have root access and are exempt from spending allowance limits and application validation. This facilitates backwards compatibility, and will be deprecated after a migration period for developers elapses.
 
 ### Transfer Funds
 

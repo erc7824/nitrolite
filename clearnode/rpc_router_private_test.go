@@ -2260,12 +2260,12 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 		sessionKeyASigner := Signer{privateKey: sessionKeyA}
 		sessionKeyAAddr := sessionKeyASigner.GetAddress().Hex()
 
-		// Create a "clearnode" session key A
+		// Create a session key A
 		allowances := []Allowance{
 			{Asset: "usdc", Amount: "100"},
 		}
 		expiresAt := time.Now().Add(24 * time.Hour)
-		require.NoError(t, AddSessionKey(db, userAddr, sessionKeyAAddr, AppNameClearnode, "all", allowances, expiresAt))
+		require.NoError(t, AddSessionKey(db, userAddr, sessionKeyAAddr, "app", "all", allowances, expiresAt))
 
 		// Verify session key is in cache
 		require.Equal(t, userAddr, GetWalletBySessionKey(sessionKeyAAddr))
@@ -2352,6 +2352,48 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 		var skA SessionKey
 		require.NoError(t, db.Where("address = ?", sessionKeyAAddr).First(&skA).Error)
 		require.False(t, isExpired(skA.ExpiresAt), "Session key A should still be active")
+	})
+
+	// User revokes session key while logged in with wallet (not session key)
+	t.Run("User revokes session key while logged in with wallet", func(t *testing.T) {
+		t.Parallel()
+
+		router, db, cleanup := setupTestRPCRouter(t)
+		t.Cleanup(cleanup)
+
+		// Generate unique keys for this test
+		userKey, _ := crypto.GenerateKey()
+		userSigner := Signer{privateKey: userKey}
+		userAddr := userSigner.GetAddress().Hex()
+
+		sessionKeyA, _ := crypto.GenerateKey()
+		sessionKeyASigner := Signer{privateKey: sessionKeyA}
+		sessionKeyAAddr := sessionKeyASigner.GetAddress().Hex()
+
+		// Create a session key
+		allowances := []Allowance{
+			{Asset: "usdc", Amount: "100"},
+		}
+		expiresAt := time.Now().Add(24 * time.Hour)
+		require.NoError(t, AddSessionKey(db, userAddr, sessionKeyAAddr, "Chess Game", "all", allowances, expiresAt))
+
+		// Revoke session key, signed by the wallet (not a session key)
+		params := map[string]interface{}{
+			"session_key": sessionKeyAAddr,
+		}
+		ctx := createSignedRPCContext(1, "revoke_session_key", params, userSigner)
+		router.HandleRevokeSessionKey(ctx)
+
+		// Verify response
+		res := assertResponse(t, ctx, "revoke_session_key")
+		revokeResp, ok := res.Params.(rpc.RevokeSessionKeyResponse)
+		require.True(t, ok)
+		require.Equal(t, sessionKeyAAddr, revokeResp.SessionKey)
+
+		// Verify session key is expired in database
+		var sessionKey SessionKey
+		require.NoError(t, db.Where("address = ?", sessionKeyAAddr).First(&sessionKey).Error)
+		require.True(t, isExpired(sessionKey.ExpiresAt), "Session key should be expired")
 	})
 
 	// User with non-clearnode session key cannot revoke another session key
@@ -2515,48 +2557,6 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify error response
 		assertErrorResponse(t, ctx, "operation denied: provided address is not a session key of the session wallet")
-	})
-
-	// User revokes session key while logged in with wallet (not session key)
-	t.Run("User revokes session key while logged in with wallet", func(t *testing.T) {
-		t.Parallel()
-
-		router, db, cleanup := setupTestRPCRouter(t)
-		t.Cleanup(cleanup)
-
-		// Generate unique keys for this test
-		userKey, _ := crypto.GenerateKey()
-		userSigner := Signer{privateKey: userKey}
-		userAddr := userSigner.GetAddress().Hex()
-
-		sessionKeyA, _ := crypto.GenerateKey()
-		sessionKeyASigner := Signer{privateKey: sessionKeyA}
-		sessionKeyAAddr := sessionKeyASigner.GetAddress().Hex()
-
-		// Create a session key
-		allowances := []Allowance{
-			{Asset: "usdc", Amount: "100"},
-		}
-		expiresAt := time.Now().Add(24 * time.Hour)
-		require.NoError(t, AddSessionKey(db, userAddr, sessionKeyAAddr, "Chess Game", "all", allowances, expiresAt))
-
-		// Revoke session key, signed by the wallet (not a session key)
-		params := map[string]interface{}{
-			"session_key": sessionKeyAAddr,
-		}
-		ctx := createSignedRPCContext(1, "revoke_session_key", params, userSigner)
-		router.HandleRevokeSessionKey(ctx)
-
-		// Verify response
-		res := assertResponse(t, ctx, "revoke_session_key")
-		revokeResp, ok := res.Params.(rpc.RevokeSessionKeyResponse)
-		require.True(t, ok)
-		require.Equal(t, sessionKeyAAddr, revokeResp.SessionKey)
-
-		// Verify session key is expired in database
-		var sessionKey SessionKey
-		require.NoError(t, db.Where("address = ?", sessionKeyAAddr).First(&sessionKey).Error)
-		require.True(t, isExpired(sessionKey.ExpiresAt), "Session key should be expired")
 	})
 
 	// Missing session_key parameter

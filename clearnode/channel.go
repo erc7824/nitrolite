@@ -121,7 +121,7 @@ type ChannelAmountSum struct {
 func GetChannelAmountSumByWallet(tx *gorm.DB, senderWallet string) (ChannelAmountSum, error) {
 	var result ChannelAmountSum
 	err := tx.Model(&Channel{}).
-		Select("COUNT(channel_id) as count, SUM(raw_amount) as sum").
+		Select("COUNT(channel_id) as count, COALESCE(SUM(CAST(raw_amount AS NUMERIC)), 0) as sum").
 		Where("wallet = ? AND status IN (?, ?)", senderWallet, ChannelStatusOpen, ChannelStatusResizing).
 		Scan(&result).Error
 	if err != nil {

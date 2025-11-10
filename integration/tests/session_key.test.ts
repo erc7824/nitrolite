@@ -25,6 +25,13 @@ import {
 import { submitAppStateUpdate_v04 } from '@/testAppSessionHelpers';
 import { setupTestIdentitiesAndConnections } from '@/testSetup';
 
+// Helper to generate random private key for testing
+function generateRandomPrivateKey(): Hex {
+    const randomBytes = new Uint8Array(32);
+    crypto.getRandomValues(randomBytes);
+    return `0x${Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('')}` as Hex;
+}
+
 describe('Session Keys', () => {
     const ASSET_SYMBOL = CONFIG.TOKEN_SYMBOL;
     const onChainDepositAmount = BigInt(1000);
@@ -612,9 +619,220 @@ describe('Session Keys', () => {
     });
 
     describe('Session key revocation', () => {
+        let aliceClearnodeWS: TestWebSocket;
+        let aliceClearnodeIdentity: Identity;
+
         beforeEach(async () => {
             // Authenticate with a non-clearnode application and allowance
             await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, spendingCapAmount.toString());
+
+            // Create a clearnode session key for testing privileged revocation
+            const clearnodeSessionPK = generateRandomPrivateKey();
+            aliceClearnodeIdentity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, clearnodeSessionPK);
+            aliceClearnodeWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
+            await aliceClearnodeWS.connect();
+            await authenticateAppWithAllowances(aliceClearnodeWS, aliceClearnodeIdentity, ASSET_SYMBOL, spendingCapAmount.toString(), 'clearnode');
+        });
+
+        afterEach(async () => {
+            if (aliceClearnodeWS) {
+                aliceClearnodeWS.close();
+            }
+        });
+
+        it('should allow session key to revoke itself', async () => {
+            // Session key revokes itself
+            const revokeMsg = await createRevokeSessionKeyMessage(
+                aliceAppIdentity.messageSKSigner,
+                aliceAppIdentity.sessionKeyAddress
+            );
+
+            const revokeResponse = await aliceAppWS.sendAndWaitForResponse(
+                revokeMsg,
+                (data: string) => {
+                    const parsed = parseAnyRPCResponse(data);
+                    return parsed.method === RPCMethod.RevokeSessionKey;
+                },
+                5000
+            );
+
+            const parsedRevoke = parseAnyRPCResponse(revokeResponse);
+            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
+            expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
+
+            // Verify session key can no longer be used
+            const transferMsg = await createTransferMessage(aliceAppIdentity.messageSKSigner, {
+                destination: bob.walletAddress,
+                allocations: [{ asset: ASSET_SYMBOL, amount: '10' }],
+            });
+
+            await expect(
+                aliceAppWS.sendAndWaitForResponse(
+                    transferMsg,
+                    (data: string) => {
+                        const parsed = parseAnyRPCResponse(data);
+                        const requestId = JSON.parse(transferMsg).req[0];
+
+                        if (parsed.requestId === requestId) {
+                            if (parsed.method === RPCMethod.Error) {
+                                const errorMsg = (parsed.params as any)?.error || 'Unknown error';
+                                throw new Error(`RPC Error: ${errorMsg}`);
+                            }
+                            return parsed.method === RPCMethod.Transfer;
+                        }
+                        return false;
+                    },
+                    5000
+                )
+            ).rejects.toThrow();
+        });
+
+        it('should allow wallet to revoke its session key', async () => {
+            // Wallet revokes its session key
+            const revokeMsg = await createRevokeSessionKeyMessage(
+                aliceAppIdentity.messageWalletSigner,
+                aliceAppIdentity.sessionKeyAddress
+            );
+
+            const revokeResponse = await aliceAppWS.sendAndWaitForResponse(
+                revokeMsg,
+                (data: string) => {
+                    const parsed = parseAnyRPCResponse(data);
+                    return parsed.method === RPCMethod.RevokeSessionKey;
+                },
+                5000
+            );
+
+            const parsedRevoke = parseAnyRPCResponse(revokeResponse);
+            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
+            expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
+        });
+
+        it('should allow clearnode session key to revoke another session key', async () => {
+            // Clearnode session key revokes a non-clearnode session key
+            const revokeMsg = await createRevokeSessionKeyMessage(
+                aliceClearnodeIdentity.messageSKSigner,
+                aliceAppIdentity.sessionKeyAddress
+            );
+
+            const revokeResponse = await aliceClearnodeWS.sendAndWaitForResponse(
+                revokeMsg,
+                (data: string) => {
+                    const parsed = parseAnyRPCResponse(data);
+                    return parsed.method === RPCMethod.RevokeSessionKey;
+                },
+                5000
+            );
+
+            const parsedRevoke = parseAnyRPCResponse(revokeResponse);
+            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
+            expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
+        });
+
+        it('should reject non-clearnode session key revoking another session key', async () => {
+            // Create a second non-clearnode session key
+            const app2SessionPK = generateRandomPrivateKey();
+            const aliceApp2Identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, app2SessionPK);
+            const aliceApp2WS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
+            await aliceApp2WS.connect();
+            await authenticateAppWithAllowances(aliceApp2WS, aliceApp2Identity, ASSET_SYMBOL, spendingCapAmount.toString(), 'another-app');
+
+            // Try to revoke the first session key with the second non-clearnode session key
+            const revokeMsg = await createRevokeSessionKeyMessage(
+                aliceApp2Identity.messageSKSigner,
+                aliceAppIdentity.sessionKeyAddress
+            );
+
+            await expect(
+                aliceApp2WS.sendAndWaitForResponse(
+                    revokeMsg,
+                    (data: string) => {
+                        const parsed = parseAnyRPCResponse(data);
+                        const requestId = JSON.parse(revokeMsg).req[0];
+
+                        if (parsed.requestId === requestId) {
+                            if (parsed.method === RPCMethod.Error) {
+                                const errorMsg = (parsed.params as any)?.error || 'Unknown error';
+                                throw new Error(`RPC Error: ${errorMsg}`);
+                            }
+                            return parsed.method === RPCMethod.RevokeSessionKey;
+                        }
+                        return false;
+                    },
+                    5000
+                )
+            ).rejects.toThrow(/insufficient permissions for the active session key/i);
+
+            aliceApp2WS.close();
+        });
+
+        it('should reject revoking another user\'s session key', async () => {
+            // Bob tries to revoke Alice's session key
+            const bobAppSessionPK = generateRandomPrivateKey();
+            const bobAppIdentityLocal = new Identity(CONFIG.IDENTITIES[1].WALLET_PK, bobAppSessionPK);
+            const bobAppWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
+            await bobAppWS.connect();
+            await authenticateAppWithAllowances(bobAppWS, bobAppIdentityLocal, ASSET_SYMBOL, spendingCapAmount.toString(), 'test-app');
+
+            const revokeMsg = await createRevokeSessionKeyMessage(
+                bobAppIdentityLocal.messageWalletSigner,
+                aliceAppIdentity.sessionKeyAddress
+            );
+
+            await expect(
+                bobAppWS.sendAndWaitForResponse(
+                    revokeMsg,
+                    (data: string) => {
+                        const parsed = parseAnyRPCResponse(data);
+                        const requestId = JSON.parse(revokeMsg).req[0];
+
+                        if (parsed.requestId === requestId) {
+                            if (parsed.method === RPCMethod.Error) {
+                                const errorMsg = (parsed.params as any)?.error || 'Unknown error';
+                                throw new Error(`RPC Error: ${errorMsg}`);
+                            }
+                            return parsed.method === RPCMethod.RevokeSessionKey;
+                        }
+                        return false;
+                    },
+                    5000
+                )
+            ).rejects.toThrow(/not an active session key of this user/i);
+
+            bobAppWS.close();
+        });
+
+        it('should reject revoking non-existent session key', async () => {
+            // Generate a random address that's not a session key
+            const randomSessionPK = generateRandomPrivateKey();
+            const randomWalletPK = generateRandomPrivateKey();
+            const randomIdentity = new Identity(randomWalletPK, randomSessionPK);
+            const randomAddress = randomIdentity.sessionKeyAddress;
+
+            const revokeMsg = await createRevokeSessionKeyMessage(
+                aliceAppIdentity.messageWalletSigner,
+                randomAddress
+            );
+
+            await expect(
+                aliceAppWS.sendAndWaitForResponse(
+                    revokeMsg,
+                    (data: string) => {
+                        const parsed = parseAnyRPCResponse(data);
+                        const requestId = JSON.parse(revokeMsg).req[0];
+
+                        if (parsed.requestId === requestId) {
+                            if (parsed.method === RPCMethod.Error) {
+                                const errorMsg = (parsed.params as any)?.error || 'Unknown error';
+                                throw new Error(`RPC Error: ${errorMsg}`);
+                            }
+                            return parsed.method === RPCMethod.RevokeSessionKey;
+                        }
+                        return false;
+                    },
+                    5000
+                )
+            ).rejects.toThrow(/not an active session key of this user/i);
         });
 
         it('should reject transfer after session key is revoked', async () => {

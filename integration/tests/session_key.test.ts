@@ -25,7 +25,6 @@ import {
 import { submitAppStateUpdate_v04 } from '@/testAppSessionHelpers';
 import { setupTestIdentitiesAndConnections } from '@/testSetup';
 import { generatePrivateKey } from 'viem/accounts';
-import { get } from 'http';
 
 describe('Session Keys', () => {
     const ASSET_SYMBOL = CONFIG.TOKEN_SYMBOL;
@@ -644,15 +643,11 @@ describe('Session Keys', () => {
 
             const revokeResponse = await aliceAppWS.sendAndWaitForResponse(
                 revokeMsg,
-                (data: string) => {
-                    const parsed = parseAnyRPCResponse(data);
-                    return parsed.method === RPCMethod.RevokeSessionKey;
-                },
+                getRevokeSessionKeyPredicate(),
                 5000
             );
 
             const parsedRevoke = parseAnyRPCResponse(revokeResponse);
-            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
             expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
 
             // Verify session key can no longer be used
@@ -684,7 +679,6 @@ describe('Session Keys', () => {
             );
 
             const parsedRevoke = parseAnyRPCResponse(revokeResponse);
-            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
             expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
         });
 
@@ -702,7 +696,6 @@ describe('Session Keys', () => {
             );
 
             const parsedRevoke = parseAnyRPCResponse(revokeResponse);
-            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
             expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
         });
 
@@ -814,7 +807,7 @@ describe('Session Keys', () => {
                     getTransferPredicate(),
                     5000
                 )
-            ).rejects.toThrow();
+            ).rejects.toThrow(/invalid signature/i);
         });
 
         it('should reject app session creation after session key is revoked', async () => {
@@ -831,7 +824,6 @@ describe('Session Keys', () => {
             );
 
             const parsedRevoke = parseAnyRPCResponse(revokeResponse);
-            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
             expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
 
             // Try to create app session with revoked session key - should fail
@@ -845,7 +837,7 @@ describe('Session Keys', () => {
                     initialDepositAmount.toString(),
                     SESSION_DATA
                 )
-            ).rejects.toThrow();
+            ).rejects.toThrow(/missing signature for participant/i);
         });
 
         it('should reject app state submission after session key is revoked', async () => {
@@ -875,7 +867,6 @@ describe('Session Keys', () => {
             );
 
             const parsedRevoke = parseAnyRPCResponse(revokeResponse);
-            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
             expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
 
             // Try to submit app state update with revoked session key - should fail
@@ -903,7 +894,7 @@ describe('Session Keys', () => {
                     allocations,
                     SESSION_DATA
                 )
-            ).rejects.toThrow();
+            ).rejects.toThrow(/signature from unknown participant wallet/i);
         });
     });
 });

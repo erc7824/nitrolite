@@ -679,5 +679,100 @@ describe('Session Keys', () => {
                 )
             ).rejects.toThrow();
         });
+
+        it('should reject app session creation after session key is revoked', async () => {
+            // Revoke the session key using wallet signature
+            const revokeMsg = await createRevokeSessionKeyMessage(
+                aliceAppIdentity.messageWalletSigner,
+                aliceAppIdentity.sessionKeyAddress
+            );
+
+            const revokeResponse = await aliceAppWS.sendAndWaitForResponse(
+                revokeMsg,
+                (data: string) => {
+                    const parsed = parseAnyRPCResponse(data);
+                    return parsed.method === RPCMethod.RevokeSessionKey;
+                },
+                5000
+            );
+
+            const parsedRevoke = parseAnyRPCResponse(revokeResponse);
+            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
+            expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
+
+            // Try to create app session with revoked session key - should fail
+            await expect(
+                createTestAppSession(
+                    aliceAppIdentity,
+                    bobAppIdentity,
+                    aliceAppWS,
+                    RPCProtocolVersion.NitroRPC_0_4,
+                    ASSET_SYMBOL,
+                    initialDepositAmount.toString(),
+                    SESSION_DATA
+                )
+            ).rejects.toThrow();
+        });
+
+        it('should reject app state submission after session key is revoked', async () => {
+            // First create an app session before revoking
+            appSessionId = await createTestAppSession(
+                aliceAppIdentity,
+                bobAppIdentity,
+                aliceAppWS,
+                RPCProtocolVersion.NitroRPC_0_4,
+                ASSET_SYMBOL,
+                initialDepositAmount.toString(),
+                SESSION_DATA
+            );
+
+            expect(appSessionId).toBeDefined();
+
+            // Revoke the session key using wallet signature
+            const revokeMsg = await createRevokeSessionKeyMessage(
+                aliceAppIdentity.messageWalletSigner,
+                aliceAppIdentity.sessionKeyAddress
+            );
+
+            const revokeResponse = await aliceAppWS.sendAndWaitForResponse(
+                revokeMsg,
+                (data: string) => {
+                    const parsed = parseAnyRPCResponse(data);
+                    return parsed.method === RPCMethod.RevokeSessionKey;
+                },
+                5000
+            );
+
+            const parsedRevoke = parseAnyRPCResponse(revokeResponse);
+            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
+            expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
+
+            // Try to submit app state update with revoked session key - should fail
+            const additionalDeposit = BigInt(50);
+            const allocations = [
+                {
+                    participant: aliceAppIdentity.walletAddress,
+                    asset: ASSET_SYMBOL,
+                    amount: (initialDepositAmount + additionalDeposit).toString(),
+                },
+                {
+                    participant: bobAppIdentity.walletAddress,
+                    asset: ASSET_SYMBOL,
+                    amount: '0',
+                },
+            ];
+
+            await expect(
+                submitAppStateUpdate_v04(
+                    aliceAppWS,
+                    aliceAppIdentity,
+                    appSessionId,
+                    RPCAppStateIntent.Deposit,
+                    ++currentVersion,
+                    allocations,
+                    SESSION_DATA
+                )
+            ).rejects.toThrow();
+        });
     });
 });

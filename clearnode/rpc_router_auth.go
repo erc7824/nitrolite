@@ -230,9 +230,17 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 		return nil, nil, RPCErrorf("unsupported token: %w", err)
 	}
 
-	if err := AddSessionKey(r.DB, challenge.Address, challenge.SessionKey, challenge.Application, challenge.Scope, challenge.Allowances, claims.Policy.ExpiresAt); err != nil {
-		logger.Error("failed to store session key", "error", err, "sessionKey", challenge.SessionKey)
+	exists, err := CheckSessionKeyExists(challenge.Address, challenge.SessionKey)
+	if err != nil {
+		logger.Error("failed to check existing session key", "error", err, "sessionKey", challenge.SessionKey)
 		return nil, nil, err
+	}
+
+	if !exists {
+		if err := AddSessionKey(r.DB, challenge.Address, challenge.SessionKey, challenge.Application, challenge.Scope, challenge.Allowances, claims.Policy.ExpiresAt); err != nil {
+			logger.Error("failed to store session key", "error", err, "sessionKey", challenge.SessionKey)
+			return nil, nil, err
+		}
 	}
 
 	return &claims.Policy, map[string]any{

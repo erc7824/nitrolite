@@ -122,6 +122,23 @@ func AddSessionKey(db *gorm.DB, walletAddress, address, applicationName, scope s
 	return err
 }
 
+// CheckSessionKeyExists checks if a session key exists and is valid for the given wallet
+func CheckSessionKeyExists(walletAddress, sessionKeyAddress string) (bool, error) {
+	if w, ok := sessionKeyCache.Load(sessionKeyAddress); ok {
+		entry := w.(sessionKeyCacheEntry)
+		if entry.wallet == walletAddress {
+			if !isExpired(entry.expiresAt) {
+				return true, nil
+			}
+
+			return false, RPCErrorf("session key already exists but is expired")
+		}
+		return false, RPCErrorf("signer is already in use for another wallet")
+	}
+
+	return false, nil
+}
+
 // isExpired checks if the given expiration time has passed
 func isExpired(expiresAt time.Time) bool {
 	return time.Now().UTC().After(expiresAt)

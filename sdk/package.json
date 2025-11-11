@@ -58,8 +58,8 @@
         "node": ">=20.0.0"
     },
     "dependencies": {
-        "abitype": "^0.10.3",
-        "viem": "^2.38.2",
+        "abitype": "^1.1.1",
+        "viem": "^2.38.3",
         "zod": "^3.25.76"
     },
     "devDependencies": {

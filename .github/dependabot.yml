@@ -9,14 +9,26 @@ updates:
     directory: "/nitrolite/sdk/" # Location of package manifests
     schedule:
       interval: "weekly"
+    commit-message:
+      prefix: "chore(npm)"
     labels:
       - "dependencies"
-      - "gomod"
+      - "npm"
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
 
   - package-ecosystem: "gomod" # See documentation for possible values
     directory: "/clearnode/" # Location of package manifests
     schedule:
       interval: "weekly"
+    commit-message:
+      prefix: "chore(gomod)"
     labels:
       - "dependencies"
       - "gomod"
+    groups:
+      gomod-dependencies:
+        patterns:
+          - "*"

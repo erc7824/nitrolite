@@ -83,7 +83,7 @@ func TestAuthManagerJwtManagement(t *testing.T) {
 			Asset:  "usdc",
 			Amount: "100000",
 		},
-	})
+	}, uint64(time.Now().Add(1*time.Hour).Unix()))
 	require.NoError(t, err)
 
 	// After JWT generation but before verification, session should still not be valid
@@ -114,7 +114,7 @@ func TestAuthManagerJwtSessionRegistration(t *testing.T) {
 	sessionKey := "0x6966978ce78df3228993aa46984eab6d68bbe195"
 
 	// Generate JWT
-	_, token, err := authManager.GenerateJWT(wallet, sessionKey, "", "", []Allowance{})
+	_, token, err := authManager.GenerateJWT(wallet, sessionKey, "", "", []Allowance{}, uint64(time.Now().Add(1*time.Hour).Unix()))
 	require.NoError(t, err)
 
 	// Before verification, session should not be valid

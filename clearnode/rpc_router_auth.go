@@ -218,7 +218,7 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 	}
 
 	// TODO: to use expiration specified in the Policy, instead of just setting 1 hour
-	claims, jwtToken, err := r.AuthManager.GenerateJWT(challenge.Address, challenge.SessionKey, challenge.Scope, challenge.Application, challenge.Allowances)
+	claims, jwtToken, err := r.AuthManager.GenerateJWT(challenge.Address, challenge.SessionKey, challenge.Scope, challenge.Application, challenge.Allowances, challenge.SessionKeyExpiresAt)
 	if err != nil {
 		logger.Error("failed to generate JWT token", "error", err)
 		return nil, nil, RPCErrorf("failed to generate JWT token")

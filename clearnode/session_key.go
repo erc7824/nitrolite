@@ -60,19 +60,18 @@ func loadSessionKeyCache(db *gorm.DB) error {
 // AddSessionKey stores a new session key with its metadata
 // Only one session key per wallet+app combination is allowed - registering a new one invalidates existing ones
 func AddSessionKey(db *gorm.DB, walletAddress, address, applicationName, scope string, allowances []Allowance, expirationTime time.Time) error {
+	// Validate expiration time is in the future
+	expirationTime = expirationTime.UTC()
+	if isExpired(expirationTime) {
+		return RPCErrorf("expiration time must be set and in the future")
+	}
+
+	if scope == "" {
+		scope = "all"
+	}
+
 	var deletedAddresses []string // Track addresses to delete from cache
-
 	err := db.Transaction(func(tx *gorm.DB) error {
-		// Validate expiration time is in the future
-		if expirationTime.IsZero() || expirationTime.Before(time.Now().UTC()) {
-			return fmt.Errorf("expiration time must be set and in the future")
-		}
-		expirationTime = expirationTime.UTC()
-
-		if scope == "" {
-			scope = "all"
-		}
-
 		// Check for and remove existing session key for this wallet+app combination
 		var existingKeys []SessionKey
 		err := tx.Where("wallet_address = ? AND application = ?",

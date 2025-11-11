@@ -217,14 +217,14 @@ func TestMessageCache(t *testing.T) {
 	})
 
 	t.Run("MultipleEntriesExpiry", func(t *testing.T) {
-		ttl := 10 * time.Millisecond
+		ttl := 100 * time.Millisecond
 		cache := NewMessageCache(ttl)
 
 		// Add multiple entries at different times
 		cache.Add("hash1")
-		time.Sleep(3 * time.Millisecond)
+		time.Sleep(30 * time.Millisecond)
 		cache.Add("hash2")
-		time.Sleep(3 * time.Millisecond)
+		time.Sleep(30 * time.Millisecond)
 		cache.Add("hash3")
 
 		// All should exist
@@ -233,7 +233,7 @@ func TestMessageCache(t *testing.T) {
 		require.True(t, cache.Exists("hash3"))
 
 		// Wait for first to expire
-		time.Sleep(6 * time.Millisecond)
+		time.Sleep(60 * time.Millisecond)
 
 		// hash1 should be expired, others still valid
 		require.False(t, cache.Exists("hash1"))
@@ -241,7 +241,7 @@ func TestMessageCache(t *testing.T) {
 		require.True(t, cache.Exists("hash3"))
 
 		// Wait for all to expire
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// All should be expired
 		require.False(t, cache.Exists("hash1"))

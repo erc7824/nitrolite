@@ -41,7 +41,13 @@
 
 ### Authentication Request
 
-Initiates authentication with the server.
+Initiates authentication with the server and register a session key.
+
+NOTE: currently it is required to register a session key with an authentication request.
+
+NOTE: when authenticating with an already registered session key, you must provide all the fields of the request.
+However, they do not need to be the same as during session key registration as they would just be ignored.
+This logic is to be improved in the future.
 
 **Request:**
 

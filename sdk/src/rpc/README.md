@@ -17,6 +17,9 @@ This module provides RPC communication capabilities for the Nitrolite SDK, allow
 | `createCloseAppSessionMessage`         | Creates a signed close_app_session message                         | `signer`, `params`, `intent`, `requestId?`, `timestamp?`                      |
 | `createApplicationMessage`             | Creates a signed application message                               | `signer`, `appId`, `messageParams`, `requestId?`, `timestamp?`                |
 | `createCloseChannelMessage`            | Creates a signed close_channel message                             | `signer`, `channelId`, `requestId?`, `timestamp?`                             |
+| `createTransferMessage`                | Creates a signed transfer message                                  | `signer`, `params`, `requestId?`, `timestamp?`                                |
+| `createCleanupSessionKeyCacheMessage`  | Creates a signed cleanup_session_key_cache message                 | `signer`, `requestId?`, `timestamp?`                                          |
+| `revokeSessionKeyMessage`              | Creates a signed revoke_session_key message                        | `signer`, `sessionKey`, `requestId?`, `timestamp?`                            |
 
 ## NitroliteRPC Class Methods
 
@@ -29,16 +32,12 @@ This module provides RPC communication capabilities for the Nitrolite SDK, allow
 | `verifySingleSignature`    | Verifies a single signature on a message         | `message`, `expectedSigner`, `verifier`                        |
 | `verifyMultipleSignatures` | Verifies multiple signatures on a message        | `message`, `expectedSigners`, `verifier`                       |
 
-# NitroliteRPC - Simple RPC for State Channels
-
-A minimalist implementation of the NitroliteRPC protocol for communicating.
-
 ## Overview
 
 NitroliteRPC is a lightweight RPC protocol designed for state channels. Messages are formatted as fixed JSON arrays with a standard structure:
 
-```
-[request_id, method, params, timestamp]
+```js
+[request_id, method, params, timestamp];
 ```
 
 ## Message Format

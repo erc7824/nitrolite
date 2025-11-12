@@ -145,6 +145,10 @@ export const parsePongResponse = (raw: string) => _parseSpecificRPCResponse(raw,
 /** Parses `transfer` response */
 export const parseTransferResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.Transfer);
 
+/** Parses `cleanup_session_key_cache` response */
+export const parseCleanupSessionKeyCacheResponse = (raw: string) =>
+    _parseSpecificRPCResponse(raw, RPCMethod.CleanupSessionKeyCache);
+
 /** Parses `tr` response */
 export const parseTransferNotificationResponse = (raw: string) =>
     _parseSpecificRPCResponse(raw, RPCMethod.TransferNotification);

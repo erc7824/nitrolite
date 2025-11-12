@@ -86,6 +86,9 @@ export const parseGetLedgerTransactionsResponse = (raw: string) =>
 /** Parses `get_user_tag` response */
 export const parseGetUserTagResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetUserTag);
 
+/** Parses `get_session_keys` response */
+export const parseGetSessionKeysResponse = (raw: string) => _parseSpecificRPCResponse(raw, RPCMethod.GetSessionKeys)
+
 /** Parses `create_app_session` response */
 export const parseCreateAppSessionResponse = (raw: string) =>
     _parseSpecificRPCResponse(raw, RPCMethod.CreateAppSession);

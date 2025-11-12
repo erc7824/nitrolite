@@ -10,9 +10,7 @@ import {
     createRevokeSessionKeyMessage,
     createTransferMessage,
     parseAnyRPCResponse,
-    RPCMethod,
 } from '@erc7824/nitrolite';
-import { Hex } from 'viem';
 
 import {
     createTestChannels,
@@ -31,6 +29,9 @@ describe('Session Keys', () => {
     const onChainDepositAmount = BigInt(1000);
     const spendingCapAmount = BigInt(500); // Session key limited to 500 USDC
     const initialDepositAmount = BigInt(100);
+
+    const ETH_ASSET_SYMBOL = 'yintegration.eth';
+    const ETH_CAP = BigInt(2); // 2 ETH spending cap
 
     let aliceWS: TestWebSocket;
     let alice: Identity;
@@ -59,8 +60,6 @@ describe('Session Keys', () => {
 
         ({ alice, aliceWS, aliceClient, aliceAppIdentity, aliceAppWS, bob, bobWS, bobClient, bobAppIdentity } =
             await setupTestIdentitiesAndConnections());
-
-        await blockUtils.makeSnapshot();
     });
 
     beforeEach(async () => {
@@ -76,7 +75,10 @@ describe('Session Keys', () => {
         );
 
         // Authenticate with spending cap of 500 USDC
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, spendingCapAmount.toString());
+        await authenticateAppWithMultiAssetAllowances(aliceAppWS, aliceAppIdentity, [
+            { asset: ASSET_SYMBOL, amount: spendingCapAmount.toString()},
+            { asset: ETH_ASSET_SYMBOL, amount: ETH_CAP.toString() },
+        ]);
 
         currentVersion = 1;
     });
@@ -91,9 +93,6 @@ describe('Session Keys', () => {
         aliceAppWS.close();
         bobWS.close();
 
-        await blockUtils.resetSnapshot();
-
-        await databaseUtils.resetClearnodeState();
         await databaseUtils.close();
     });
 
@@ -437,39 +436,26 @@ describe('Session Keys', () => {
     });
 
     describe('Multi-asset spending caps', () => {
-        const ETH_ASSET_SYMBOL = 'yintegration.eth';
-        let ethChannelId: Hex;
         let appSessionId1: string;
         let appSessionId2: string;
 
         beforeEach(async () => {
-            // WETH asset is now pre-configured in assets.yaml
             // Create WETH channel for Alice to have ETH in ledger
-            const { params: ethChannelParams } = await aliceClient.createAndWaitForChannel(aliceWS, {
+            await aliceClient.createAndWaitForChannel(aliceWS, {
                 tokenAddress: CONFIG.ADDRESSES.WETH_TOKEN_ADDRESS,
                 amount: toRaw(BigInt(10), 18), // 10 WETH
             });
-            ethChannelId = ethChannelParams.channelId;
         });
 
         it('should enforce spending cap per asset independently', async () => {
-            // Authenticate with allowances for both USDC and ETH
-            const usdcCap = BigInt(300);
-            const ethCap = BigInt(2);
-
-            await authenticateAppWithMultiAssetAllowances(aliceAppWS, aliceAppIdentity, [
-                { asset: ASSET_SYMBOL, amount: usdcCap.toString() },
-                { asset: ETH_ASSET_SYMBOL, amount: ethCap.toString() },
-            ]);
-
-            // Create app session with 200 USDC deposit (within 300 USDC cap)
+            // Create app session with 400 USDC deposit (within 500 USDC cap)
             appSessionId1 = await createTestAppSession(
                 aliceAppIdentity,
                 bobAppIdentity,
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
                 ASSET_SYMBOL,
-                '200',
+                '400',
                 SESSION_DATA
             );
             expect(appSessionId1).toBeDefined();
@@ -510,12 +496,11 @@ describe('Session Keys', () => {
                 SESSION_DATA
             );
 
-            // Should still be able to deposit 100 more USDC (200 + 100 = 300, at cap)
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
                     asset: ASSET_SYMBOL,
-                    amount: '300',
+                    amount: '500', // at the cap
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
@@ -534,12 +519,11 @@ describe('Session Keys', () => {
                 SESSION_DATA
             );
 
-            // Should still be able to deposit 1 more ETH (1 + 1 = 2, at cap)
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
                     asset: ETH_ASSET_SYMBOL,
-                    amount: '2',
+                    amount: '2', // at the cap
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
@@ -558,12 +542,11 @@ describe('Session Keys', () => {
                 SESSION_DATA
             );
 
-            // Attempting to deposit 1 more USDC should fail (would be 301, exceeds USDC cap)
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
                     asset: ASSET_SYMBOL,
-                    amount: '301',
+                    amount: '501', // exceeds cap, should fail
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
@@ -584,12 +567,11 @@ describe('Session Keys', () => {
                 )
             ).rejects.toThrow(/session key spending validation failed.*insufficient session key allowance/i);
 
-            // Attempting to deposit 0.1 more ETH should fail (would be 2.1, exceeds ETH cap)
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
                     asset: ETH_ASSET_SYMBOL,
-                    amount: '2.1',
+                    amount: '2.1', // exceeds cap, should fail
                 },
                 {
                     participant: bobAppIdentity.walletAddress,

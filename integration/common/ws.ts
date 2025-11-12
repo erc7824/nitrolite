@@ -239,6 +239,12 @@ export const getGetUserTagPredicate = () => {
     };
 };
 
+export const getGetSessionKeysPredicate = () => {
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.GetSessionKeys, reqId);
+    };
+}
+
 export const getRevokeSessionKeyPredicate = () => {
     return (data: string, reqId?: number): boolean => {
         return genericPredicate(data, (r) => r.method === RPCMethod.RevokeSessionKey, reqId);
@@ -272,5 +278,11 @@ export const getGetAppSessionsPredicate = () => {
 export const getCloseAppSessionPredicate = () => {
     return (data: string, reqId?: number): boolean => {
         return genericPredicate(data, (r) => r.method === RPCMethod.CloseAppSession, reqId);
+    };
+};
+
+export const getCleanupSessionKeyCachePredicate = () => {
+    return (data: string, reqId?: number): boolean => {
+        return genericPredicate(data, (r) => r.method === RPCMethod.CleanupSessionKeyCache, reqId);
     };
 };

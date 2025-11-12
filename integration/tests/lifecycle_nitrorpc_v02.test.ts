@@ -206,7 +206,7 @@ describe('nitrorpc_v02 lifecycle', () => {
         expect(ledgerBalances[0].asset).toBe(ASSET_SYMBOL);
     });
 
-    it('should resize channel and withdraw without app funds', async () => {
+    it('should resize Alice channel and withdraw without app funds', async () => {
         const msg = await createResizeChannelMessage(alice.messageWalletSigner, {
             channel_id: aliceChannelId,
             allocate_amount: toRaw(onChainDepositAmount - appSessionDepositAmount), // 1000 - 100 = 900
@@ -268,7 +268,7 @@ describe('nitrorpc_v02 lifecycle', () => {
         expect(postCloseAccountBalance).toBe(toRaw(onChainDepositAmount - appSessionDepositAmount)); // 900
     });
 
-    it('should resize channel by withdrawing received funds from app to channel', async () => {
+    it('should resize Bob channel by withdrawing received funds from app to channel', async () => {
         // Use wallet signer for channel operations, not session key
         const msg = await createResizeChannelMessage(bob.messageWalletSigner, {
             channel_id: bobChannelId,

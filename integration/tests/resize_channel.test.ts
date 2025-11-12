@@ -30,10 +30,6 @@ describe('Resize channel', () => {
         ws = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
 
         client = new TestNitroliteClient(identity);
-
-        expect(client).toBeDefined();
-        expect(client).toHaveProperty('depositAndCreateChannel');
-        expect(client).toHaveProperty('resizeChannel');
     });
 
     beforeEach(async () => {
@@ -65,17 +61,16 @@ describe('Resize channel', () => {
         );
         expect(channelBalance).toBe(BigInt(0));
 
-        let msg = await createGetLedgerBalancesMessage(identity.messageSKSigner, identity.walletAddress);
-        let lbResponse = await ws.sendAndWaitForResponse(msg, getGetLedgerBalancesPredicate(), 1000);
-        let { params: lbResponseParams } = parseGetLedgerBalancesResponse(lbResponse);
-        expect(lbResponseParams.ledgerBalances).toBeDefined();
-        expect(lbResponseParams.ledgerBalances).toHaveLength(1);
-        expect(String(lbResponseParams.ledgerBalances[0].amount)).toBe('500'); // 500
+        const balances = await getLedgerBalances(identity, ws);
+        expect(balances).toBeDefined();
+        expect(balances).toHaveLength(1);
+        expect(balances[0].asset).toBe(CONFIG.TOKEN_SYMBOL);
+        expect(balances[0].amount).toBe('500');
 
-        const preResizeAccountBalance = await client.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(preResizeAccountBalance).toBe(depositAmount * BigInt(5)); // 1000 - 500
+        const preResizeCustodyBalance = await client.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(preResizeCustodyBalance).toBe(depositAmount * BigInt(5)); // 1000 - 500
 
-        msg = await createResizeChannelMessage(identity.messageSKSigner, {
+        let msg = await createResizeChannelMessage(identity.messageSKSigner, {
             channel_id: createResponseParams.channelId,
             resize_amount: depositAmount,
             allocate_amount: -depositAmount,
@@ -112,8 +107,8 @@ describe('Resize channel', () => {
         const resizeReceipt = await blockUtils.waitForTransaction(resizeChannelTxHash);
         expect(resizeReceipt).toBeDefined();
 
-        const postResizeAccountBalance = await client.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
-        expect(postResizeAccountBalance).toBe(depositAmount * BigInt(4)); // 1000 - 500 - 100
+        const postResizeCustodyBalance = await client.getAccountBalance(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
+        expect(postResizeCustodyBalance).toBe(depositAmount * BigInt(4)); // 1000 - 500 - 100
 
         const postResizeChannelBalance = await client.getChannelBalance(
             createResponseParams.channelId,
@@ -121,12 +116,11 @@ describe('Resize channel', () => {
         );
         expect(postResizeChannelBalance).toBe(BigInt(0));
 
-        msg = await createGetLedgerBalancesMessage(identity.messageSKSigner, identity.walletAddress);
-        lbResponse = await ws.sendAndWaitForResponse(msg, getGetLedgerBalancesPredicate(), 1000);
-        ({ params: lbResponseParams } = parseGetLedgerBalancesResponse(lbResponse));
-        expect(lbResponseParams.ledgerBalances).toBeDefined();
-        expect(lbResponseParams.ledgerBalances).toHaveLength(1);
-        expect(String(lbResponseParams.ledgerBalances[0].amount)).toBe('600'); // 500 + 100
+        const newBalances = await getLedgerBalances(identity, ws);
+        expect(newBalances).toBeDefined();
+        expect(newBalances).toHaveLength(1);
+        expect(newBalances[0].asset).toBe(CONFIG.TOKEN_SYMBOL);
+        expect(newBalances[0].amount).toBe('600'); // 500 + 100
     });
 
     it('should resize channel by withdrawing funds from channel to deposit', async () => {

@@ -1262,6 +1262,26 @@ func (c *Client) CloseAppSession(ctx context.Context, req *Request) (CloseAppSes
 	return resParams, res.Sig, nil
 }
 
+// CleanupSessionKeyCache clears cached session key data on the server.
+// This is applicable only when Clearnode is running in test mode.
+//
+// Example:
+//
+//	sigs, err := client.CleanupSessionKeyCache(ctx)
+//	if err != nil {
+//	    log.Error("failed to cleanup session key cache", "error", err)
+//	}
+func (c *Client) CleanupSessionKeyCache(ctx context.Context) ([]sign.Signature, error) {
+	var resSig []sign.Signature
+	res, err := c.call(ctx, CleanupSessionKeyCacheMethod, nil)
+	if err != nil {
+		return resSig, err
+	}
+	resSig = res.Sig
+
+	return resSig, nil
+}
+
 func (c *Client) call(ctx context.Context, method Method, reqParams any, sigs ...sign.Signature) (*Response, error) {
 	payload, err := c.PreparePayload(method, reqParams)
 	if err != nil {

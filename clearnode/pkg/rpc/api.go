@@ -108,6 +108,8 @@ const (
 	SubmitAppStateMethod Method = "submit_app_state"
 	// CloseAppSessionMethod closes an application session (auth required).
 	CloseAppSessionMethod Method = "close_app_session"
+	// CleanupSessionKeyCacheMethod clears the session key cache (test mode only).
+	CleanupSessionKeyCacheMethod Method = "cleanup_session_key_cache"
 )
 
 // String returns the string representation of the method.

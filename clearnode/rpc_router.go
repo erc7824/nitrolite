@@ -75,6 +75,10 @@ func NewRPCRouter(
 	r.Node.Handle("auth_request", r.HandleAuthRequest)
 	r.Node.Handle("auth_verify", r.HandleAuthVerify)
 
+	testModeGroup := r.Node.NewGroup("test_mode")
+	testModeGroup.Use(r.TestModeMiddleware)
+	testModeGroup.Handle("cleanup_session_key_cache", r.HandleCleanupSessionKeyCache)
+
 	privGroup := r.Node.NewGroup("private")
 	privGroup.Use(r.AuthMiddleware)
 
@@ -238,6 +242,20 @@ func (r *RPCRouter) HistoryMiddleware(c *RPCContext) {
 	if err := r.RPCStore.StoreMessage(c.UserID, req, reqSig, resRaw, resSig); err != nil {
 		logger.Error("failed to store RPC message", "error", err)
 	}
+}
+
+func (r *RPCRouter) TestModeMiddleware(c *RPCContext) {
+	if r.Config.mode != ModeTest {
+		c.Fail(nil, "test mode endpoints are disabled")
+		return
+	}
+
+	c.Next()
+}
+
+func (r *RPCRouter) HandleCleanupSessionKeyCache(c *RPCContext) {
+	sessionKeyCache.Clear()
+	c.Succeed(c.Message.Req.Method, nil)
 }
 
 func parseParams(params RPCDataParams, unmarshalTo any) error {

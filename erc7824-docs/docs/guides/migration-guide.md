@@ -12,6 +12,255 @@ import TabItem from '@theme/TabItem';
 
 If you are coming from an earlier version of Nitrolite, you will need to account for the following breaking changes.
 
+## 0.5.x Breaking changes
+
+The 0.5.x release includes breaking changes to channel creation flow, session key management, and authentication parameters listed below.
+
+**Not ready to migrate?** Unfortunately, at this time Yellow Network does not provide ClearNodes running the previous version of the protocol, so you will need to migrate to the latest version to continue using the Network.
+
+### Nitrolite SDK
+
+You should definitely read this section if you are using the Nitrolite SDK.
+
+#### Channel Creation: Zero Initial Deposit Requirement
+
+Channels must now be created with zero initial deposit and funded separately via the `resize_channel` method. This is a significant breaking change to the channel creation flow.
+
+<Tabs>
+  <TabItem value="before" label="Before">
+
+  ```typescript
+  const { channelId } = await client.createChannel({
+    chain_id: 1,
+    token: tokenAddress,
+    amount: BigInt(1000000), // Initial deposit
+    session_key: '0x...' // Optional
+  });
+  ```
+
+  </TabItem>
+  <TabItem value="after" label="After">
+
+  ```typescript
+  // Step 1: Create channel with zero deposit
+  const { channelId } = await client.createChannel({
+    chain_id: 1,
+    token: tokenAddress,
+    // amount and session_key parameters removed
+  });
+  
+  // Step 2: Fund the channel separately
+  await client.resizeChannel({
+    channel_id: channelId,
+    amount: BigInt(1000000),
+  });
+  ```
+
+  </TabItem>
+</Tabs>
+
+#### Authentication: Modified Request Parameters
+
+The authentication request parameters have been restructured with renamed fields and different data types.
+
+<Tabs>
+  <TabItem value="before" label="Before">
+
+  ```typescript
+  const authRequest = {
+    address: '0x...',
+    session_key: '0x...',
+    app_name: 'My Application',
+    allowances: [
+      { asset: 'usdc', amount: '100.0' }
+    ],
+    scope: 'app.create',
+    expire: '3600', // String seconds
+    application: '0xApp...' // Duplicate field
+  };
+  ```
+
+  </TabItem>
+  <TabItem value="after" label="After">
+
+  ```typescript
+  const authRequest = {
+    address: '0x...',
+    session_key: '0x...',
+    application: 'My Application', // Renamed from app_name
+    allowances: [
+      { asset: 'usdc', amount: '100.0' }
+    ],
+    scope: 'app.create',
+    expires_at: BigInt(Date.now() + 3600000), // Now bigint timestamp
+    // application Address field removed
+  };
+  ```
+
+  </TabItem>
+</Tabs>
+
+#### Added: Session Key Management
+
+New methods have been added for comprehensive session key management, including retrieval and revocation.
+
+```typescript
+// Get all active session keys
+const sessionKeys = await client.getSessionKeys();
+
+// Revoke a specific session key
+await client.revokeSessionKey({
+  session_key: '0x...'
+});
+
+// Session key data structure
+interface RPCSessionKey {
+  id: string;
+  sessionKey: Address;
+  application: string;
+  allowances: RPCAllowanceUsage[]; // Includes usage tracking
+  scope: string;
+  expiresAt: bigint;
+  createdAt: bigint;
+}
+```
+
+#### EIP-712 Signatures: String-based Amounts
+
+EIP-712 signature types now use string values for amounts instead of numeric types to support better precision with decimal values.
+
+<Tabs>
+  <TabItem value="before" label="Before">
+
+  ```typescript
+  const types = {
+    Allowance: [
+      { name: 'asset', type: 'string' },
+      { name: 'amount', type: 'uint256' } // Numeric type
+    ]
+  };
+  ```
+
+  </TabItem>
+  <TabItem value="after" label="After">
+
+  ```typescript
+  const types = {
+    Allowance: [
+      { name: 'asset', type: 'string' },
+      { name: 'amount', type: 'string' } // String type
+    ]
+  };
+  ```
+
+  </TabItem>
+</Tabs>
+
+#### Transfer Operations: Enhanced Validations
+
+Transfer operations now include additional validations and restrictions:
+
+1. **Non-replayable transfers**: Duplicate transfers are automatically detected and rejected
+2. **Channel state validation**: Users with non-empty on-chain channels cannot perform off-chain transfers
+3. **Session key spending caps**: Cumulative tracking of session key usage against allowances
+
+```typescript
+// Transfers now properly submit signatures
+const transfer = await client.transfer({
+  to: recipientAddress,
+  token: tokenAddress,
+  amount: BigInt(1000),
+});
+// Signature is automatically included in the RPC submission
+```
+
+### ClearNode API
+
+You should read this section only if you are using the ClearNode API directly.
+
+#### API: Zero Deposit Channel Creation
+
+The `create_channel` method no longer accepts initial deposit parameters.
+
+<Tabs>
+  <TabItem value="before" label="Before">
+
+  ```json
+  {
+    "req": [1, "create_channel", {
+      "chain_id": 137,
+      "token": "0xeeee567890abcdef...",
+      "amount": "100000000",
+      "session_key": "0x1234567890abcdef..."
+    }, 1619123456789],
+    "sig": ["0x9876fedcba..."]
+  }
+  ```
+
+  </TabItem>
+  <TabItem value="after" label="After">
+
+  ```json
+  {
+    "req": [1, "create_channel", {
+      "chain_id": 137,
+      "token": "0xeeee567890abcdef..."
+      // amount and session_key parameters removed
+    }, 1619123456789],
+    "sig": ["0x9876fedcba..."]
+  }
+  ```
+
+  </TabItem>
+</Tabs>
+
+#### API: Session Key Management Methods
+
+New methods for session key operations have been added.
+
+**Get Session Keys Request:**
+```json
+{
+  "req": [1, "get_session_keys", {}, 1619123456789],
+  "sig": ["0x..."]
+}
+```
+
+**Revoke Session Key Request:**
+```json
+{
+  "req": [1, "revoke_session_key", {
+    "session_key": "0x1234567890abcdef..."
+  }, 1619123456789],
+  "sig": ["0x..."]
+}
+```
+
+### Protocol Updates
+
+#### New Protocol Version
+
+A new protocol version `NitroRPC/0.4` has been added with support for:
+- App Session deposits and withdrawals
+- Enhanced session key management
+- Improved transfer validation
+
+#### Dependencies
+
+- **viem**: Upgraded from 2.37.8 to 2.38.3
+- Various security updates and dependency bumps
+
+### Migration Summary
+
+To migrate from 0.4.x to 0.5.x:
+
+1. **Update channel creation code** to use the two-step process (create then resize)
+2. **Update authentication parameters** with new field names and types
+3. **Implement session key revocation** if using session keys
+4. **Update EIP-712 signatures** to use string amounts
+5. **Be aware of new transfer validations** when users have existing channels
+6. **Test thoroughly** as the channel creation flow is fundamentally different
+
 ## 0.3.x Breaking changes
 
 The 0.3.x release includes breaking changes to the SDK architecture, smart contract interfaces, and Clearnode API enhancements listed below.

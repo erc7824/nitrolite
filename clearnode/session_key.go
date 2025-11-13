@@ -14,6 +14,11 @@ var (
 	AppNameClearnode = "clearnode"
 )
 
+var (
+	ErrSessionKeyExistsAndExpired = RPCErrorf("session key already exists but is expired")
+	ErrSignedUsedForAnotherWallet = RPCErrorf("signer is already in use for another wallet")
+)
+
 // SessionKey represents a ledger layer session key
 type SessionKey struct {
 	ID      uint   `gorm:"primaryKey;autoIncrement"`
@@ -122,7 +127,7 @@ func AddSessionKey(db *gorm.DB, walletAddress, address, applicationName, scope s
 }
 
 // CheckSessionKeyExists checks if a session key exists and is valid for the given wallet
-func CheckSessionKeyExists(walletAddress, sessionKeyAddress string) (bool, error) {
+func CheckSessionKeyExists(db *gorm.DB, walletAddress, sessionKeyAddress string) (bool, error) {
 	if w, ok := sessionKeyCache.Load(sessionKeyAddress); ok {
 		entry := w.(sessionKeyCacheEntry)
 		if entry.wallet == walletAddress {
@@ -130,9 +135,24 @@ func CheckSessionKeyExists(walletAddress, sessionKeyAddress string) (bool, error
 				return true, nil
 			}
 
-			return false, RPCErrorf("session key already exists but is expired")
+			return false, ErrSessionKeyExistsAndExpired
 		}
-		return false, RPCErrorf("signer is already in use for another wallet")
+		return false, ErrSignedUsedForAnotherWallet
+	}
+
+	// Not in cache - check DB for expired keys with this address
+	// This handles keys that expired before server restart
+	var existingKey SessionKey
+	if err := db.Where("address = ?", sessionKeyAddress).First(&existingKey).Error; err == nil {
+		if isExpired(existingKey.ExpiresAt) {
+			return false, ErrSessionKeyExistsAndExpired
+		}
+		// Non-expired key found - should have been in cache but wasn't
+		// Return error to prevent conflict
+		if existingKey.WalletAddress == walletAddress {
+			return true, nil
+		}
+		return false, ErrSignedUsedForAnotherWallet
 	}
 
 	return false, nil

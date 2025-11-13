@@ -230,7 +230,7 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 		return nil, nil, RPCErrorf("unsupported token: %w", err)
 	}
 
-	exists, err := CheckSessionKeyExists(challenge.Address, challenge.SessionKey)
+	exists, err := CheckSessionKeyExists(r.DB, challenge.Address, challenge.SessionKey)
 	if err != nil {
 		logger.Error("failed to check existing session key", "error", err, "sessionKey", challenge.SessionKey)
 		return nil, nil, err

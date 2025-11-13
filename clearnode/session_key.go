@@ -16,7 +16,7 @@ var (
 
 var (
 	ErrSessionKeyExistsAndExpired = RPCErrorf("session key already exists but is expired")
-	ErrSignedUsedForAnotherWallet = RPCErrorf("signer is already in use for another wallet")
+	ErrSignerUsedForAnotherWallet = RPCErrorf("signer is already in use for another wallet")
 )
 
 // SessionKey represents a ledger layer session key
@@ -137,7 +137,7 @@ func CheckSessionKeyExists(db *gorm.DB, walletAddress, sessionKeyAddress string)
 
 			return false, ErrSessionKeyExistsAndExpired
 		}
-		return false, ErrSignedUsedForAnotherWallet
+		return false, ErrSignerUsedForAnotherWallet
 	}
 
 	// Not in cache - check DB for expired keys with this address
@@ -152,7 +152,7 @@ func CheckSessionKeyExists(db *gorm.DB, walletAddress, sessionKeyAddress string)
 		if existingKey.WalletAddress == walletAddress {
 			return true, nil
 		}
-		return false, ErrSignedUsedForAnotherWallet
+		return false, ErrSignerUsedForAnotherWallet
 	}
 
 	return false, nil

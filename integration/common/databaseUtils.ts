@@ -1,5 +1,8 @@
 import { Pool } from 'pg';
 import { CONFIG } from './setup';
+import { createCleanupSessionKeyCacheMessage, createECDSAMessageSigner } from '@erc7824/nitrolite';
+import { getCleanupSessionKeyCachePredicate, TestWebSocket } from './ws';
+import { generatePrivateKey } from 'viem/accounts';
 
 export class DatabaseUtils {
     private pool: Pool;
@@ -44,11 +47,26 @@ export class DatabaseUtils {
         }
     }
 
+    async cleanupSessionKeyCache(): Promise<void> {
+        const ws = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
+        await ws.connect();
+
+        const randomSigner = createECDSAMessageSigner(generatePrivateKey());
+        const msg = await createCleanupSessionKeyCacheMessage(randomSigner);
+
+        try {
+            await ws.sendAndWaitForResponse(msg, getCleanupSessionKeyCachePredicate(), 5000);
+        } catch (error) {
+            console.error('Error during cleanup session key cache:', error);
+            throw error;
+        } finally {
+            ws.close();
+        }
+    }
+
     async resetClearnodeState(): Promise<void> {
         await this.cleanupDatabaseData();
-
-        // Future-proof: if Clearnode adds in-memory caching, add cache-clear API call here
-        // await this.clearClearnodeCache(); // Uncomment when caching is added
+        await this.cleanupSessionKeyCache();
     }
 
     async seedAsset(token: string, chainId: number, symbol: string, decimals: number): Promise<void> {

@@ -20,6 +20,7 @@ describe('App session v0.4', () => {
     const ASSET_SYMBOL = CONFIG.TOKEN_SYMBOL;
 
     const onChainDepositAmount = BigInt(1000);
+    const SKAllowanceAmount = BigInt(500);
     const appSessionDepositAmount = BigInt(100);
 
     let aliceWS: TestWebSocket;
@@ -71,7 +72,7 @@ describe('App session v0.4', () => {
         await blockUtils.makeSnapshot();
         ({channelIds: [aliceChannelId, bobChannelId], states: initialStates} = await createTestChannels([{client: aliceClient, ws: aliceWS}, {client: bobClient, ws: bobWS}], toRaw(onChainDepositAmount)));
 
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, appSessionDepositAmount.toString());
+        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, SKAllowanceAmount.toString());
     });
 
     afterEach(async () => {

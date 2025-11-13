@@ -2,11 +2,14 @@ package clearnet
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+)
+
+const (
+	defaultExpirationPeriod = 8760 * time.Hour // 1 year in seconds
 )
 
 type AuthChallengeParams struct {
@@ -28,11 +31,11 @@ func (c *ClearnodeClient) Authenticate(wallet, signer sign.Signer) (rpc.AuthSigV
 		SessionKey:  signer.PublicKey().Address().String(), // Using address as session key for simplicity
 		Application: "clearnode",                           // Indicates that we create a session key with root permissions
 		Allowances:  []rpc.Allowance{},                     // No allowances for now
-		ExpiresAt:   uint64(time.Now().Add(1 * time.Hour).Unix()),
+		ExpiresAt:   uint64(time.Now().Add(defaultExpirationPeriod).Unix()),
 	}
 	res, _, err := c.rpcClient.AuthWithSig(context.Background(), params, wallet)
 	if err != nil {
-		return rpc.AuthSigVerifyResponse{}, fmt.Errorf("authentication failed: %w", err)
+		return rpc.AuthSigVerifyResponse{}, err
 	}
 
 	c.sessionKey = signer

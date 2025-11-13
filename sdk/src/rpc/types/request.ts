@@ -315,6 +315,14 @@ export interface TransferRequest extends GenericRPCMessage {
     };
 }
 
+/**
+ * Represents the request structure for the 'cleanup_session_key_cache' RPC method.
+ */
+export interface CleanupSessionKeyCacheRequest extends GenericRPCMessage {
+    method: RPCMethod.CleanupSessionKeyCache;
+    params: {};
+}
+
 /** Represents the request parameters for the 'auth_challenge' RPC method. */
 export type AuthChallengeRequestParams = AuthChallengeRequest['params'];
 
@@ -471,6 +479,11 @@ export type PongRequestParams = PongRequest['params'];
 export type TransferRequestParams = TransferRequest['params'];
 
 /**
+ * Represents the request parameters for the 'cleanup_session_key_cache' RPC method.
+ */
+export type CleanupSessionKeyCacheRequestParams = CleanupSessionKeyCacheRequest['params'];
+
+/**
  * Union type for all possible RPC request types.
  * This allows for type-safe handling of different request structures.
  */
@@ -499,7 +512,8 @@ export type RPCRequest =
     | PingRequest
     | PongRequest
     | MessageRequest
-    | TransferRequest;
+    | TransferRequest
+    | CleanupSessionKeyCacheRequest;
 
 /**
  * Maps RPC methods to their corresponding request parameter types.
@@ -529,4 +543,5 @@ export type RPCRequestParamsByMethod = {
     [RPCMethod.Pong]: PongRequestParams;
     [RPCMethod.Message]: any;
     [RPCMethod.Transfer]: TransferRequestParams;
+    [RPCMethod.CleanupSessionKeyCache]: CleanupSessionKeyCacheRequestParams;
 };

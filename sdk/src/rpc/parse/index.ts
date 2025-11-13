@@ -18,4 +18,5 @@ export const paramsParsers = {
     // Methods with no params
     [RPCMethod.Ping]: noop,
     [RPCMethod.Pong]: noop,
+    [RPCMethod.CleanupSessionKeyCache]: noop,
 } as Record<RPCMethod, ParamsParser<unknown>>;

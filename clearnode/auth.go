@@ -210,14 +210,14 @@ func (am *AuthManager) UpdateSession(address string) bool {
 	return true
 }
 
-func (am *AuthManager) GenerateJWT(address string, sessionKey string, scope string, application string, allowances []Allowance) (*JWTClaims, string, error) {
+func (am *AuthManager) GenerateJWT(address, sessionKey, scope, application string, allowances []Allowance, sessionKeyExpiresAt uint64) (*JWTClaims, string, error) {
 	policy := Policy{
 		Wallet:      address,
 		SessionKey:  sessionKey,
 		Scope:       scope,
 		Application: application,
 		Allowances:  allowances,
-		ExpiresAt:   time.Now().Add(am.sessionTTL),
+		ExpiresAt:   time.Unix(int64(sessionKeyExpiresAt), 0),
 	}
 	claims := JWTClaims{
 		Policy: policy,

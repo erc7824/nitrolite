@@ -9,6 +9,13 @@ import (
 	"github.com/joho/godotenv"
 )
 
+type Mode string
+
+const (
+	ModeProduction Mode = "production"
+	ModeTest       Mode = "test"
+)
+
 const (
 	configDirPathEnv     = "CLEARNODE_CONFIG_DIR_PATH"
 	defaultConfigDirPath = "."
@@ -17,6 +24,7 @@ const (
 
 // Config represents the overall application configuration
 type Config struct {
+	mode          Mode
 	blockchains   map[uint32]BlockchainConfig
 	assets        AssetsConfig
 	privateKeyHex string
@@ -39,6 +47,14 @@ func LoadConfig(logger Logger) (*Config, error) {
 	if err := godotenv.Load(configDotEnvPath); err != nil {
 		logger.Warn(".env file not found")
 	}
+
+	mode := Mode(os.Getenv("CLEARNODE_MODE"))
+	if mode == "" {
+		mode = ModeProduction
+	} else if mode != ModeProduction && mode != ModeTest {
+		logger.Fatal("invalid CLEARNODE_MODE value", "value", mode)
+	}
+	logger.Info("set mode", "value", mode)
 
 	// Get database URL from environment variables
 	var dbConf DatabaseConfig
@@ -88,6 +104,7 @@ func LoadConfig(logger Logger) (*Config, error) {
 	}
 
 	config := Config{
+		mode:          mode,
 		blockchains:   blockchains,
 		assets:        assets,
 		privateKeyHex: privateKeyHex,

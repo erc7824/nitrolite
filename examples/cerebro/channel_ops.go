@@ -69,8 +69,12 @@ func (o *Operator) handleOpenChannel(args []string) {
 
 	fmt.Printf("Opening custody channel on %s...\n", chainID.String())
 
+	participantSigner := o.config.Signer
+	if creationRes.Channel.Participants[0] == o.config.Wallet.PublicKey().Address().String() {
+		participantSigner = o.config.Wallet
+	}
 	channelID, err := o.custody.OpenChannel(
-		o.config.Wallet, o.config.Signer,
+		o.config.Wallet, participantSigner,
 		blockchain.ID, chainRPC,
 		blockchain.CustodyAddress,
 		blockchain.AdjudicatorAddress,
@@ -147,8 +151,12 @@ func (o *Operator) handleCloseChannel(args []string) {
 		allocations[i] = convertAllocationRes(alloc)
 	}
 
+	participantSigner := o.config.Signer
+	if asset.ChannelParticipant == o.config.Wallet.PublicKey().Address().String() {
+		participantSigner = o.config.Wallet
+	}
 	if err := o.custody.CloseChannel(
-		o.config.Wallet, o.config.Signer,
+		o.config.Wallet, participantSigner,
 		blockchain.ID, chainRPC,
 		blockchain.CustodyAddress,
 		common.HexToHash(closureRes.ChannelID),
@@ -308,8 +316,12 @@ func (o *Operator) handleResizeChannel(args []string) {
 		allocations[i] = convertAllocationRes(alloc)
 	}
 
+	participantSigner := o.config.Signer
+	if asset.ChannelParticipant == o.config.Wallet.PublicKey().Address().String() {
+		participantSigner = o.config.Wallet
+	}
 	if err := o.custody.Resize(
-		o.config.Wallet, o.config.Signer,
+		o.config.Wallet, participantSigner,
 		blockchain.ID, chainRPC,
 		blockchain.CustodyAddress,
 		common.HexToHash(resizeRes.ChannelID),

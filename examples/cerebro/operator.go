@@ -267,6 +267,7 @@ func (o *Operator) reloadConfig() {
 		for _, asset := range getAssetsRes.Assets {
 			if asset.ChainID == blockchain.ID {
 				channelID := ""
+				channelParticipant := ""
 				channelResizing := false
 				rawChannelBalance := new(big.Int)
 				for _, channel := range getChannelsRes.Channels {
@@ -278,18 +279,20 @@ func (o *Operator) reloadConfig() {
 
 					if channel.ChainID == blockchain.ID && channel.Token == asset.Token {
 						channelID = channel.ChannelID
+						channelParticipant = channel.Participant
 						rawChannelBalance = channel.RawAmount.BigInt()
 						break
 					}
 				}
 
 				chainAssets = append(chainAssets, ChainAssetConfig{
-					Token:             common.HexToAddress(asset.Token),
-					Symbol:            asset.Symbol,
-					Decimals:          asset.Decimals,
-					ChannelID:         channelID,
-					ChannelResizing:   channelResizing,
-					RawChannelBalance: rawChannelBalance,
+					Token:              common.HexToAddress(asset.Token),
+					Symbol:             asset.Symbol,
+					Decimals:           asset.Decimals,
+					ChannelID:          channelID,
+					ChannelParticipant: channelParticipant,
+					ChannelResizing:    channelResizing,
+					RawChannelBalance:  rawChannelBalance,
 				})
 			}
 		}

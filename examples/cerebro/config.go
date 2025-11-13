@@ -78,6 +78,7 @@ type ChainAssetConfig struct {
 	Decimals uint8
 
 	ChannelID         string
+	ChannelResizing   bool
 	RawChannelBalance *big.Int
 }
 

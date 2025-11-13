@@ -203,6 +203,10 @@ func (o *Operator) handleResizeChannel(args []string) {
 		fmt.Printf("There are no opened channels for %s on %s.\n", assetSymbol, chainID.String())
 		return
 	}
+	if asset.ChannelResizing {
+		fmt.Printf("Channel for asset %s on %s is already being resized.\n", assetSymbol, chainID.String())
+		return
+	}
 
 	chainRPC, err := o.getChainRPC(blockchain.ID)
 	if err != nil {

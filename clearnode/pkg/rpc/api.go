@@ -698,6 +698,8 @@ type ChannelStatus string
 var (
 	// ChannelStatusOpen indicates an active channel
 	ChannelStatusOpen ChannelStatus = "open"
+	// ChannelStatusResizing indicates a channel being resized
+	ChannelStatusResizing ChannelStatus = "resizing"
 	// ChannelStatusClosed indicates a finalized channel
 	ChannelStatusClosed ChannelStatus = "closed"
 	// ChannelStatusChallenged indicates a channel in dispute

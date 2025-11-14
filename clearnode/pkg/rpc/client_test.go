@@ -535,3 +535,19 @@ func TestClient_AdditionalMethods(t *testing.T) {
 		assert.Equal(t, "closed", resp.Status)
 	})
 }
+
+func TestClient_CleanupSessionKeyCache(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	// CleanupSessionKeyCache returns success
+	dialer.RegisterHandler(rpc.CleanupSessionKeyCacheMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
+		res := rpc.NewResponse(rpc.NewPayload(0, string(rpc.CleanupSessionKeyCacheMethod), rpc.Params{}))
+		return &res, nil
+	})
+
+	sigs, err := client.CleanupSessionKeyCache(testCtx)
+	assert.NoError(t, err)
+	assert.Empty(t, sigs)
+}

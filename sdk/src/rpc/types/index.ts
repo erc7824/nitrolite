@@ -108,11 +108,7 @@ export type ChallengeStateSigner = (stateHash: Hex) => Promise<Hex>;
  * @param address - The Ethereum address of the expected signer.
  * @returns A Promise that resolves to true if the signature is valid for the given payload and address, false otherwise.
  */
-export type SingleMessageVerifier = (
-    payload: RPCData,
-    signature: Hex,
-    address: Address,
-) => Promise<boolean>;
+export type SingleMessageVerifier = (payload: RPCData, signature: Hex, address: Address) => Promise<boolean>;
 
 /**
  * Defines the function signature for verifying multiple message signatures against a payload.
@@ -200,6 +196,8 @@ export enum RPCMethod {
     GetChannels = 'get_channels',
     GetRPCHistory = 'get_rpc_history',
     GetAssets = 'get_assets',
+    CleanupSessionKeyCache = 'cleanup_session_key_cache',
+
     Assets = 'assets',
     Message = 'message',
     BalanceUpdate = 'bu',

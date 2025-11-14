@@ -346,6 +346,14 @@ export interface TransferResponse extends GenericRPCMessage {
 }
 
 /**
+ * Represents the response structure for the 'cleanup_session_key_cache' RPC method.
+ */
+export interface CleanupSessionKeyCacheResponse extends GenericRPCMessage {
+    method: RPCMethod.CleanupSessionKeyCache;
+    params: {};
+}
+
+/**
  * Represents the response structure for the 'transfer_notification' RPC method.
  */
 export interface TransferNotificationResponse extends GenericRPCMessage {
@@ -507,6 +515,11 @@ export type PongResponseParams = PongResponse['params'];
 export type TransferResponseParams = TransferResponse['params'];
 
 /**
+ * Represents the parameters for the 'cleanup_session_key_cache' RPC method.
+ */
+export type CleanupSessionKeyCacheResponseParams = CleanupSessionKeyCacheResponse['params'];
+
+/**
  * Represents the parameters for the 'tr' RPC method.
  */
 export type TransferNotificationResponseParams = TransferNotificationResponse['params'];
@@ -541,11 +554,12 @@ export type RPCResponse =
     | AssetsResponse
     | PingResponse
     | PongResponse
+    | TransferResponse
+    | CleanupSessionKeyCacheResponse
     | MessageResponse
     | BalanceUpdateResponse
     | ChannelsUpdateResponse
     | ChannelUpdateResponse
-    | TransferResponse
     | TransferNotificationResponse;
 
 /**

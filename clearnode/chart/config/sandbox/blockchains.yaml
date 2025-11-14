@@ -19,11 +19,10 @@ blockchains:
   id: 59141
   contract_addresses:
     balance_checker: "0x424A079B89571a515Fd6fe0ba614060D5Fd8E16A"
+  block_step: 5000
 - name: xrpl_evm_testnet
   id: 1449000
-  disabled: true
   contract_addresses:
     custody: "0x442f5544983eA73ED75FbDD252bc03842D185284"
     adjudicator: "0xBa28DC8F50d076Df76fF9959f31A320686faa373"
     balance_checker: "0x714698e8fe7896bb84A46c0705944c4a48580819"
-  block_step: 499

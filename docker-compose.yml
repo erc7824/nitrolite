@@ -161,6 +161,7 @@ services:
         condition: service_completed_successfully
     environment:
       CLEARNODE_CONFIG_DIR_PATH: ${CLEARNODE_CONFIG_DIR_PATH:-/config}
+      CLEARNODE_MODE: test
       ANVIL_BLOCKCHAIN_RPC: ws://anvil:8545
       CLEARNODE_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-postgres}?sslmode=disable
       CLEARNODE_LOG_LEVEL: ${CLEARNODE_LOG_LEVEL:-info}

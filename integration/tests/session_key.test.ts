@@ -2,7 +2,7 @@ import { BlockchainUtils } from '@/blockchainUtils';
 import { DatabaseUtils } from '@/databaseUtils';
 import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
-import { TestWebSocket } from '@/ws';
+import { getRevokeSessionKeyPredicate, getTransferPredicate, TestWebSocket } from '@/ws';
 import { CONFIG } from '@/setup';
 import {
     RPCAppStateIntent,
@@ -10,9 +10,7 @@ import {
     createRevokeSessionKeyMessage,
     createTransferMessage,
     parseAnyRPCResponse,
-    RPCMethod,
 } from '@erc7824/nitrolite';
-import { Hex } from 'viem';
 
 import {
     createTestChannels,
@@ -24,19 +22,16 @@ import {
 } from '@/testHelpers';
 import { submitAppStateUpdate_v04 } from '@/testAppSessionHelpers';
 import { setupTestIdentitiesAndConnections } from '@/testSetup';
-
-// Helper to generate random private key for testing
-function generateRandomPrivateKey(): Hex {
-    const randomBytes = new Uint8Array(32);
-    crypto.getRandomValues(randomBytes);
-    return `0x${Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('')}` as Hex;
-}
+import { generatePrivateKey } from 'viem/accounts';
 
 describe('Session Keys', () => {
     const ASSET_SYMBOL = CONFIG.TOKEN_SYMBOL;
     const onChainDepositAmount = BigInt(1000);
     const spendingCapAmount = BigInt(500); // Session key limited to 500 USDC
     const initialDepositAmount = BigInt(100);
+
+    const ETH_ASSET_SYMBOL = 'yintegration.eth';
+    const ETH_CAP = BigInt(2); // 2 ETH spending cap
 
     let aliceWS: TestWebSocket;
     let alice: Identity;
@@ -65,8 +60,6 @@ describe('Session Keys', () => {
 
         ({ alice, aliceWS, aliceClient, aliceAppIdentity, aliceAppWS, bob, bobWS, bobClient, bobAppIdentity } =
             await setupTestIdentitiesAndConnections());
-
-        await blockUtils.makeSnapshot();
     });
 
     beforeEach(async () => {
@@ -82,7 +75,10 @@ describe('Session Keys', () => {
         );
 
         // Authenticate with spending cap of 500 USDC
-        await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, spendingCapAmount.toString());
+        await authenticateAppWithMultiAssetAllowances(aliceAppWS, aliceAppIdentity, [
+            { asset: ASSET_SYMBOL, amount: spendingCapAmount.toString()},
+            { asset: ETH_ASSET_SYMBOL, amount: ETH_CAP.toString() },
+        ]);
 
         currentVersion = 1;
     });
@@ -97,9 +93,6 @@ describe('Session Keys', () => {
         aliceAppWS.close();
         bobWS.close();
 
-        await blockUtils.resetSnapshot();
-
-        await databaseUtils.resetClearnodeState();
         await databaseUtils.close();
     });
 
@@ -443,39 +436,26 @@ describe('Session Keys', () => {
     });
 
     describe('Multi-asset spending caps', () => {
-        const ETH_ASSET_SYMBOL = 'yintegration.eth';
-        let ethChannelId: Hex;
         let appSessionId1: string;
         let appSessionId2: string;
 
         beforeEach(async () => {
-            // WETH asset is now pre-configured in assets.yaml
             // Create WETH channel for Alice to have ETH in ledger
-            const { params: ethChannelParams } = await aliceClient.createAndWaitForChannel(aliceWS, {
+            await aliceClient.createAndWaitForChannel(aliceWS, {
                 tokenAddress: CONFIG.ADDRESSES.WETH_TOKEN_ADDRESS,
                 amount: toRaw(BigInt(10), 18), // 10 WETH
             });
-            ethChannelId = ethChannelParams.channelId;
         });
 
         it('should enforce spending cap per asset independently', async () => {
-            // Authenticate with allowances for both USDC and ETH
-            const usdcCap = BigInt(300);
-            const ethCap = BigInt(2);
-
-            await authenticateAppWithMultiAssetAllowances(aliceAppWS, aliceAppIdentity, [
-                { asset: ASSET_SYMBOL, amount: usdcCap.toString() },
-                { asset: ETH_ASSET_SYMBOL, amount: ethCap.toString() },
-            ]);
-
-            // Create app session with 200 USDC deposit (within 300 USDC cap)
+            // Create app session with 400 USDC deposit (within 500 USDC cap)
             appSessionId1 = await createTestAppSession(
                 aliceAppIdentity,
                 bobAppIdentity,
                 aliceAppWS,
                 RPCProtocolVersion.NitroRPC_0_4,
                 ASSET_SYMBOL,
-                '200',
+                '400',
                 SESSION_DATA
             );
             expect(appSessionId1).toBeDefined();
@@ -516,12 +496,11 @@ describe('Session Keys', () => {
                 SESSION_DATA
             );
 
-            // Should still be able to deposit 100 more USDC (200 + 100 = 300, at cap)
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
                     asset: ASSET_SYMBOL,
-                    amount: '300',
+                    amount: '500', // at the cap
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
@@ -540,12 +519,11 @@ describe('Session Keys', () => {
                 SESSION_DATA
             );
 
-            // Should still be able to deposit 1 more ETH (1 + 1 = 2, at cap)
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
                     asset: ETH_ASSET_SYMBOL,
-                    amount: '2',
+                    amount: '2', // at the cap
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
@@ -564,12 +542,11 @@ describe('Session Keys', () => {
                 SESSION_DATA
             );
 
-            // Attempting to deposit 1 more USDC should fail (would be 301, exceeds USDC cap)
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
                     asset: ASSET_SYMBOL,
-                    amount: '301',
+                    amount: '501', // exceeds cap, should fail
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
@@ -590,12 +567,11 @@ describe('Session Keys', () => {
                 )
             ).rejects.toThrow(/session key spending validation failed.*insufficient session key allowance/i);
 
-            // Attempting to deposit 0.1 more ETH should fail (would be 2.1, exceeds ETH cap)
             allocations = [
                 {
                     participant: aliceAppIdentity.walletAddress,
                     asset: ETH_ASSET_SYMBOL,
-                    amount: '2.1',
+                    amount: '2.1', // exceeds cap, should fail
                 },
                 {
                     participant: bobAppIdentity.walletAddress,
@@ -627,7 +603,7 @@ describe('Session Keys', () => {
             await authenticateAppWithAllowances(aliceAppWS, aliceAppIdentity, ASSET_SYMBOL, spendingCapAmount.toString());
 
             // Create a clearnode session key for testing privileged revocation
-            const clearnodeSessionPK = generateRandomPrivateKey();
+            const clearnodeSessionPK = generatePrivateKey();
             aliceClearnodeIdentity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, clearnodeSessionPK);
             aliceClearnodeWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
             await aliceClearnodeWS.connect();
@@ -649,15 +625,11 @@ describe('Session Keys', () => {
 
             const revokeResponse = await aliceAppWS.sendAndWaitForResponse(
                 revokeMsg,
-                (data: string) => {
-                    const parsed = parseAnyRPCResponse(data);
-                    return parsed.method === RPCMethod.RevokeSessionKey;
-                },
+                getRevokeSessionKeyPredicate(),
                 5000
             );
 
             const parsedRevoke = parseAnyRPCResponse(revokeResponse);
-            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
             expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
 
             // Verify session key can no longer be used
@@ -669,22 +641,10 @@ describe('Session Keys', () => {
             await expect(
                 aliceAppWS.sendAndWaitForResponse(
                     transferMsg,
-                    (data: string) => {
-                        const parsed = parseAnyRPCResponse(data);
-                        const requestId = JSON.parse(transferMsg).req[0];
-
-                        if (parsed.requestId === requestId) {
-                            if (parsed.method === RPCMethod.Error) {
-                                const errorMsg = (parsed.params as any)?.error || 'Unknown error';
-                                throw new Error(`RPC Error: ${errorMsg}`);
-                            }
-                            return parsed.method === RPCMethod.Transfer;
-                        }
-                        return false;
-                    },
+                    getTransferPredicate(),
                     5000
                 )
-            ).rejects.toThrow();
+            ).rejects.toThrow(/invalid signature/i);
         });
 
         it('should allow wallet to revoke its session key', async () => {
@@ -696,15 +656,11 @@ describe('Session Keys', () => {
 
             const revokeResponse = await aliceAppWS.sendAndWaitForResponse(
                 revokeMsg,
-                (data: string) => {
-                    const parsed = parseAnyRPCResponse(data);
-                    return parsed.method === RPCMethod.RevokeSessionKey;
-                },
+                getRevokeSessionKeyPredicate(),
                 5000
             );
 
             const parsedRevoke = parseAnyRPCResponse(revokeResponse);
-            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
             expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
         });
 
@@ -717,21 +673,17 @@ describe('Session Keys', () => {
 
             const revokeResponse = await aliceClearnodeWS.sendAndWaitForResponse(
                 revokeMsg,
-                (data: string) => {
-                    const parsed = parseAnyRPCResponse(data);
-                    return parsed.method === RPCMethod.RevokeSessionKey;
-                },
+                getRevokeSessionKeyPredicate(),
                 5000
             );
 
             const parsedRevoke = parseAnyRPCResponse(revokeResponse);
-            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
             expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
         });
 
         it('should reject non-clearnode session key revoking another session key', async () => {
             // Create a second non-clearnode session key
-            const app2SessionPK = generateRandomPrivateKey();
+            const app2SessionPK = generatePrivateKey();
             const aliceApp2Identity = new Identity(CONFIG.IDENTITIES[0].WALLET_PK, app2SessionPK);
             const aliceApp2WS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
             await aliceApp2WS.connect();
@@ -746,19 +698,7 @@ describe('Session Keys', () => {
             await expect(
                 aliceApp2WS.sendAndWaitForResponse(
                     revokeMsg,
-                    (data: string) => {
-                        const parsed = parseAnyRPCResponse(data);
-                        const requestId = JSON.parse(revokeMsg).req[0];
-
-                        if (parsed.requestId === requestId) {
-                            if (parsed.method === RPCMethod.Error) {
-                                const errorMsg = (parsed.params as any)?.error || 'Unknown error';
-                                throw new Error(`RPC Error: ${errorMsg}`);
-                            }
-                            return parsed.method === RPCMethod.RevokeSessionKey;
-                        }
-                        return false;
-                    },
+                    getRevokeSessionKeyPredicate(),
                     5000
                 )
             ).rejects.toThrow(/insufficient permissions for the active session key/i);
@@ -768,7 +708,7 @@ describe('Session Keys', () => {
 
         it('should reject revoking another user\'s session key', async () => {
             // Bob tries to revoke Alice's session key
-            const bobAppSessionPK = generateRandomPrivateKey();
+            const bobAppSessionPK = generatePrivateKey();
             const bobAppIdentityLocal = new Identity(CONFIG.IDENTITIES[1].WALLET_PK, bobAppSessionPK);
             const bobAppWS = new TestWebSocket(CONFIG.CLEARNODE_URL, CONFIG.DEBUG_MODE);
             await bobAppWS.connect();
@@ -782,19 +722,7 @@ describe('Session Keys', () => {
             await expect(
                 bobAppWS.sendAndWaitForResponse(
                     revokeMsg,
-                    (data: string) => {
-                        const parsed = parseAnyRPCResponse(data);
-                        const requestId = JSON.parse(revokeMsg).req[0];
-
-                        if (parsed.requestId === requestId) {
-                            if (parsed.method === RPCMethod.Error) {
-                                const errorMsg = (parsed.params as any)?.error || 'Unknown error';
-                                throw new Error(`RPC Error: ${errorMsg}`);
-                            }
-                            return parsed.method === RPCMethod.RevokeSessionKey;
-                        }
-                        return false;
-                    },
+                    getRevokeSessionKeyPredicate(),
                     5000
                 )
             ).rejects.toThrow(/not an active session key of this user/i);
@@ -804,8 +732,8 @@ describe('Session Keys', () => {
 
         it('should reject revoking non-existent session key', async () => {
             // Generate a random address that's not a session key
-            const randomSessionPK = generateRandomPrivateKey();
-            const randomWalletPK = generateRandomPrivateKey();
+            const randomSessionPK = generatePrivateKey();
+            const randomWalletPK = generatePrivateKey();
             const randomIdentity = new Identity(randomWalletPK, randomSessionPK);
             const randomAddress = randomIdentity.sessionKeyAddress;
 
@@ -817,19 +745,7 @@ describe('Session Keys', () => {
             await expect(
                 aliceAppWS.sendAndWaitForResponse(
                     revokeMsg,
-                    (data: string) => {
-                        const parsed = parseAnyRPCResponse(data);
-                        const requestId = JSON.parse(revokeMsg).req[0];
-
-                        if (parsed.requestId === requestId) {
-                            if (parsed.method === RPCMethod.Error) {
-                                const errorMsg = (parsed.params as any)?.error || 'Unknown error';
-                                throw new Error(`RPC Error: ${errorMsg}`);
-                            }
-                            return parsed.method === RPCMethod.RevokeSessionKey;
-                        }
-                        return false;
-                    },
+                    getRevokeSessionKeyPredicate(),
                     5000
                 )
             ).rejects.toThrow(/not an active session key of this user/i);
@@ -842,15 +758,11 @@ describe('Session Keys', () => {
                 allocations: [{ asset: ASSET_SYMBOL, amount: '100' }],
             });
 
-            const transferResponse = await aliceAppWS.sendAndWaitForResponse(
+            await aliceAppWS.sendAndWaitForResponse(
                 transferMsg,
-                (data: string) => {
-                    const parsed = parseAnyRPCResponse(data);
-                    return parsed.method === RPCMethod.Transfer;
-                },
+                getTransferPredicate(),
                 5000
             );
-            expect(parseAnyRPCResponse(transferResponse).method).toBe(RPCMethod.Transfer);
 
             // Revoke the session key using wallet signature
             const revokeMsg = await createRevokeSessionKeyMessage(
@@ -860,16 +772,10 @@ describe('Session Keys', () => {
 
             const revokeResponse = await aliceAppWS.sendAndWaitForResponse(
                 revokeMsg,
-                (data: string) => {
-                    const parsed = parseAnyRPCResponse(data);
-                    return parsed.method === RPCMethod.RevokeSessionKey;
-                },
+                getRevokeSessionKeyPredicate(),
                 5000
             );
-
-            const parsedRevoke = parseAnyRPCResponse(revokeResponse);
-            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
-            expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
+            expect((parseAnyRPCResponse(revokeResponse).params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
 
             // Try transfer with revoked session key - should fail
             const transferMsg2 = await createTransferMessage(aliceAppIdentity.messageSKSigner, {
@@ -880,22 +786,10 @@ describe('Session Keys', () => {
             await expect(
                 aliceAppWS.sendAndWaitForResponse(
                     transferMsg2,
-                    (data: string) => {
-                        const parsed = parseAnyRPCResponse(data);
-                        const requestId = JSON.parse(transferMsg2).req[0];
-
-                        if (parsed.requestId === requestId) {
-                            if (parsed.method === RPCMethod.Error) {
-                                const errorMsg = (parsed.params as any)?.error || 'Unknown error';
-                                throw new Error(`RPC Error: ${errorMsg}`);
-                            }
-                            return parsed.method === RPCMethod.Transfer;
-                        }
-                        return false;
-                    },
+                    getTransferPredicate(),
                     5000
                 )
-            ).rejects.toThrow();
+            ).rejects.toThrow(/invalid signature/i);
         });
 
         it('should reject app session creation after session key is revoked', async () => {
@@ -907,15 +801,11 @@ describe('Session Keys', () => {
 
             const revokeResponse = await aliceAppWS.sendAndWaitForResponse(
                 revokeMsg,
-                (data: string) => {
-                    const parsed = parseAnyRPCResponse(data);
-                    return parsed.method === RPCMethod.RevokeSessionKey;
-                },
+                getRevokeSessionKeyPredicate(),
                 5000
             );
 
             const parsedRevoke = parseAnyRPCResponse(revokeResponse);
-            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
             expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
 
             // Try to create app session with revoked session key - should fail
@@ -929,7 +819,7 @@ describe('Session Keys', () => {
                     initialDepositAmount.toString(),
                     SESSION_DATA
                 )
-            ).rejects.toThrow();
+            ).rejects.toThrow(/missing signature for participant/i);
         });
 
         it('should reject app state submission after session key is revoked', async () => {
@@ -954,15 +844,11 @@ describe('Session Keys', () => {
 
             const revokeResponse = await aliceAppWS.sendAndWaitForResponse(
                 revokeMsg,
-                (data: string) => {
-                    const parsed = parseAnyRPCResponse(data);
-                    return parsed.method === RPCMethod.RevokeSessionKey;
-                },
+                getRevokeSessionKeyPredicate(),
                 5000
             );
 
             const parsedRevoke = parseAnyRPCResponse(revokeResponse);
-            expect(parsedRevoke.method).toBe(RPCMethod.RevokeSessionKey);
             expect((parsedRevoke.params as any).sessionKey).toBe(aliceAppIdentity.sessionKeyAddress);
 
             // Try to submit app state update with revoked session key - should fail
@@ -990,7 +876,7 @@ describe('Session Keys', () => {
                     allocations,
                     SESSION_DATA
                 )
-            ).rejects.toThrow();
+            ).rejects.toThrow(/signature from unknown participant wallet/i);
         });
     });
 });

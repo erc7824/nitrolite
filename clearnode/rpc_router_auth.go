@@ -218,7 +218,7 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 	}
 
 	// TODO: to use expiration specified in the Policy, instead of just setting 1 hour
-	claims, jwtToken, err := r.AuthManager.GenerateJWT(challenge.Address, challenge.SessionKey, challenge.Scope, challenge.Application, challenge.Allowances)
+	claims, jwtToken, err := r.AuthManager.GenerateJWT(challenge.Address, challenge.SessionKey, challenge.Scope, challenge.Application, challenge.Allowances, challenge.SessionKeyExpiresAt)
 	if err != nil {
 		logger.Error("failed to generate JWT token", "error", err)
 		return nil, nil, RPCErrorf("failed to generate JWT token")
@@ -230,9 +230,17 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 		return nil, nil, RPCErrorf("unsupported token: %w", err)
 	}
 
-	if err := AddSessionKey(r.DB, challenge.Address, challenge.SessionKey, challenge.Application, challenge.Scope, challenge.Allowances, claims.Policy.ExpiresAt); err != nil {
-		logger.Error("failed to store session key", "error", err, "sessionKey", challenge.SessionKey)
+	exists, err := CheckSessionKeyExists(r.DB, challenge.Address, challenge.SessionKey)
+	if err != nil {
+		logger.Error("failed to check existing session key", "error", err, "sessionKey", challenge.SessionKey)
 		return nil, nil, err
+	}
+
+	if !exists {
+		if err := AddSessionKey(r.DB, challenge.Address, challenge.SessionKey, challenge.Application, challenge.Scope, challenge.Allowances, claims.Policy.ExpiresAt); err != nil {
+			logger.Error("failed to store session key", "error", err, "sessionKey", challenge.SessionKey)
+			return nil, nil, err
+		}
 	}
 
 	return &claims.Policy, map[string]any{

@@ -51,9 +51,7 @@ export async function createAuthRequestMessage(
         requestId,
         timestamp,
     });
-    return JSON.stringify(request, (_, value) =>
-        typeof value === 'bigint' ? Number(value) : value
-    );
+    return JSON.stringify(request, (_, value) => (typeof value === 'bigint' ? Number(value) : value));
 }
 
 /**
@@ -735,6 +733,30 @@ export async function createRevokeSessionKeyMessage(
     const request = NitroliteRPC.createRequest({
         method: RPCMethod.RevokeSessionKey,
         params: { session_key: sessionKey },
+        requestId,
+        timestamp,
+    });
+    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
+
+    return JSON.stringify(signedRequest);
+}
+
+/**
+ * Creates a cleanup session key cache message
+ *
+ * @param signer - The message signer to sign the request
+ * @param requestId - Optional request ID (auto-generated if not provided)
+ * @param timestamp - Optional timestamp (auto-generated if not provided)
+ * @returns JSON string of the signed RPC message
+ */
+export async function createCleanupSessionKeyCacheMessage(
+    signer: MessageSigner,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.CleanupSessionKeyCache,
+        params: {},
         requestId,
         timestamp,
     });

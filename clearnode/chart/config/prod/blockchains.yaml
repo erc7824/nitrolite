@@ -9,10 +9,8 @@ blockchains:
     balance_checker: "0x2352c63A83f9Fd126af8676146721Fa00924d7e4"
 - name: world_chain
   id: 480
-  disabled: true
   contract_addresses:
     balance_checker: "0x6D3B5EFa1f81f65037cD842F48E44BcBCa48CBEF"
-  block_step: 499
 - name: flow
   id: 747
   disabled: true
@@ -32,9 +30,8 @@ blockchains:
 - name: linea
   id: 59144
   contract_addresses:
-    balance_checker: "0x424A079B89571a515Fd6fe0ba614060D5Fd8E16A"
+    balance_checker: "0xF62e6a41561b3650a69Bb03199C735e3E3328c0D"
 - name: xrpl_evm
   id: 1440000
   contract_addresses:
     balance_checker: "0x714698e8fe7896bb84A46c0705944c4a48580819"
-  block_step: 499

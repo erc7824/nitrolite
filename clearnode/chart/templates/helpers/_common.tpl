@@ -71,6 +71,8 @@ Returns common environment variables
   value: {{ .Values.config.logLevel }}
 - name: CLEARNODE_CONFIG_DIR_PATH
   value: /app/config
+- name: CLEARNODE_MODE
+  value: production
 - name: DATABASE_DRIVER
   value: {{ .Values.config.database.driver }}
 {{- range $key, $value := .Values.config.extraEnvs }}

@@ -12,6 +12,7 @@ import {
     parseResizeChannelResponse,
     RPCChannelStatus,
     State,
+    StateSigner,
 } from '@erc7824/nitrolite';
 import { Identity } from './identity';
 import { Address, createPublicClient, Hex, http } from 'viem';
@@ -25,17 +26,21 @@ import {
 import { composeResizeChannelParams } from './testHelpers';
 
 export class TestNitroliteClient extends NitroliteClient {
-    constructor(private identity: Identity) {
+    constructor(private identity: Identity, stateSigner?: StateSigner) {
         const publicClient = createPublicClient({
             chain,
             transport: http(),
         });
 
+        if (!stateSigner) {
+            stateSigner = identity.stateWalletSigner;
+        }
+
         super({
             // @ts-ignore
             publicClient,
             walletClient: identity.walletClient,
-            stateSigner: identity.stateWalletSigner,
+            stateSigner: stateSigner,
             account: identity.walletClient.account,
             chainId: chain.id,
             challengeDuration: BigInt(CONFIG.DEFAULT_CHALLENGE_TIMEOUT), // min

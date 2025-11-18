@@ -29,7 +29,7 @@ export const CONFIG = {
     ADDRESSES: {
         CUSTODY_ADDRESS: '0x8658501c98C3738026c4e5c361c6C3fa95DfB255' as Address,
         DUMMY_ADJUDICATOR_ADDRESS: '0xcbbc03a873c11beeFA8D99477E830be48d8Ae6D7' as Address,
-        GUEST_ADDRESS: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' as Address,
+        CLEARNODE_ADDRESS: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266' as Address,
         USDC_TOKEN_ADDRESS: '0xbD24c53072b9693A35642412227043Ffa5fac382' as Address,
         // Wrapped Ether token for multi-asset testing
         WETH_TOKEN_ADDRESS: '0xAf119209932D7EDe63055E60854E81acC4063a12' as Address,

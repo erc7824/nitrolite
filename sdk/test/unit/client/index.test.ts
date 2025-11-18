@@ -26,8 +26,8 @@ describe('NitroliteClient', () => {
     const mockAddresses = {
         custody: '0x1111111111111111111111111111111111111111' as Address,
         adjudicator: '0x2222222222222222222222222222222222222222' as Address,
-        guestAddress: '0x3333333333333333333333333333333333333333' as Address,
     };
+    const brokerAddress = '0x3333333333333333333333333333333333333333' as Address;
     const tokenAddress = '0x4444444444444444444444444444444444444444' as Address;
     const challengeDuration = 3600n;
     const chainId = 1;
@@ -240,13 +240,13 @@ describe('NitroliteClient', () => {
             // Mock getChannelData to return proper channel structure
             mockNitroService.getChannelData.mockResolvedValue({
                 channel: {
-                    participants: [mockAccount.address, mockAddresses.guestAddress],
+                    participants: [mockAccount.address, brokerAddress],
                     adjudicator: mockAddresses.adjudicator,
                     challenge: challengeDuration,
                     nonce: 1n,
                 },
                 status: ChannelStatus.ACTIVE,
-                wallets: [mockAccount.address, mockAddresses.guestAddress],
+                wallets: [mockAccount.address, brokerAddress],
                 challengeExpiry: 0n,
                 lastValidState: {} as any,
             });
@@ -309,13 +309,13 @@ describe('NitroliteClient', () => {
             // Mock getChannelData to succeed
             mockNitroService.getChannelData.mockResolvedValue({
                 channel: {
-                    participants: [mockAccount.address, mockAddresses.guestAddress],
+                    participants: [mockAccount.address, brokerAddress],
                     adjudicator: mockAddresses.adjudicator,
                     challenge: challengeDuration,
                     nonce: 1n,
                 },
                 status: ChannelStatus.ACTIVE,
-                wallets: [mockAccount.address, mockAddresses.guestAddress],
+                wallets: [mockAccount.address, brokerAddress],
                 challengeExpiry: 0n,
                 lastValidState: {} as any,
             });

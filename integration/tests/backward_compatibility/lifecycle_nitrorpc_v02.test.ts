@@ -221,7 +221,7 @@ describe('nitrorpc_v02 lifecycle', () => {
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(alice.walletAddress);
         expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
-        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.CLEARNODE_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
         const {txHash: resizeChannelTxHash} = await aliceClient.resizeChannel({
@@ -284,7 +284,7 @@ describe('nitrorpc_v02 lifecycle', () => {
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(bob.walletAddress);
         expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
-        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.CLEARNODE_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
         const {txHash: resizeChannelTxHash} = await bobClient.resizeChannel({

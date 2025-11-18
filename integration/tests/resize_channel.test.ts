@@ -91,7 +91,7 @@ describe('Resize channel', () => {
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);
         expect(String(resizeResponseParams.state.allocations[0].token)).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
-        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.CLEARNODE_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].token)).toBe(CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
@@ -160,7 +160,7 @@ describe('Resize channel', () => {
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);
         expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
-        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.CLEARNODE_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
         const {txHash: resizeChannelTxHash} = await client.resizeChannel({
@@ -230,7 +230,7 @@ describe('Resize channel', () => {
         expect(String(resizeResponseParams.state.allocations[0].amount)).toBe(
             (depositAmount * BigInt(1)).toString() // 100
         );
-        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.CLEARNODE_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
         const {txHash: resizeChannelTxHash} = await client.resizeChannel({

@@ -89,7 +89,7 @@ describe('Backward compatibility: participant as Wallet or Session Key', () => {
                         amount: BigInt(0),
                     },
                     {
-                        destination: CONFIG.ADDRESSES.GUEST_ADDRESS,
+                        destination: CONFIG.ADDRESSES.CLEARNODE_ADDRESS,
                         token: CONFIG.ADDRESSES.USDC_TOKEN_ADDRESS,
                         amount: BigInt(0),
                     },

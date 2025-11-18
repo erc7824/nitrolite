@@ -47,7 +47,6 @@ export class TestNitroliteClient extends NitroliteClient {
             addresses: {
                 custody: CONFIG.ADDRESSES.CUSTODY_ADDRESS,
                 adjudicator: CONFIG.ADDRESSES.DUMMY_ADJUDICATOR_ADDRESS,
-                guestAddress: CONFIG.ADDRESSES.GUEST_ADDRESS,
             },
         });
     }

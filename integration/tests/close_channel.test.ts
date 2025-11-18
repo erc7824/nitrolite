@@ -87,7 +87,7 @@ describe('Close channel', () => {
         expect(resizeResponseParams.state.allocations).toHaveLength(2);
         expect(String(resizeResponseParams.state.allocations[0].destination)).toBe(identity.walletAddress);
         expect(String(resizeResponseParams.state.allocations[0].amount)).toBe('0');
-        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.GUEST_ADDRESS);
+        expect(String(resizeResponseParams.state.allocations[1].destination)).toBe(CONFIG.ADDRESSES.CLEARNODE_ADDRESS);
         expect(String(resizeResponseParams.state.allocations[1].amount)).toBe('0');
 
         const {txHash: resizeChannelTxHash} = await client.resizeChannel({

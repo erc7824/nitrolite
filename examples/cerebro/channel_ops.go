@@ -70,7 +70,7 @@ func (o *Operator) handleOpenChannel(args []string) {
 	fmt.Printf("Opening custody channel on %s...\n", chainID.String())
 
 	participantSigner := o.config.Signer
-	if creationRes.Channel.Participants[0] == o.config.Wallet.PublicKey().Address().String() {
+	if participants := creationRes.Channel.Participants; len(participants) > 0 && participants[0] == o.config.Wallet.PublicKey().Address().String() {
 		participantSigner = o.config.Wallet
 	}
 	channelID, err := o.custody.OpenChannel(

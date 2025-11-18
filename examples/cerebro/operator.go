@@ -271,16 +271,16 @@ func (o *Operator) reloadConfig() {
 				channelResizing := false
 				rawChannelBalance := new(big.Int)
 				for _, channel := range getChannelsRes.Channels {
-					if status := string(channel.Status); status != "open" && status != "resizing" {
+					status := string(channel.Status)
+					if status != "open" && status != "resizing" {
 						continue
-					} else if status == "resizing" {
-						channelResizing = true
 					}
 
 					if channel.ChainID == blockchain.ID && channel.Token == asset.Token {
 						channelID = channel.ChannelID
 						channelParticipant = channel.Participant
 						rawChannelBalance = channel.RawAmount.BigInt()
+						channelResizing = (status == "resizing")
 						break
 					}
 				}

@@ -253,7 +253,7 @@ func (o *Operator) reloadConfig() {
 
 	getChannelsRes := rpc.GetChannelsResponse{}
 	if o.isUserAuthenticated() {
-		getChannelsRes, err = o.clearnode.GetChannels(o.config.Wallet.PublicKey().Address().String(), "open")
+		getChannelsRes, err = o.clearnode.GetChannels(o.config.Wallet.PublicKey().Address().String(), "")
 		if err != nil {
 			fmt.Printf("[Reload] Failed to fetch channels: %s\n", err.Error())
 			return
@@ -267,21 +267,32 @@ func (o *Operator) reloadConfig() {
 		for _, asset := range getAssetsRes.Assets {
 			if asset.ChainID == blockchain.ID {
 				channelID := ""
+				channelParticipant := ""
+				channelResizing := false
 				rawChannelBalance := new(big.Int)
 				for _, channel := range getChannelsRes.Channels {
+					status := string(channel.Status)
+					if status != "open" && status != "resizing" {
+						continue
+					}
+
 					if channel.ChainID == blockchain.ID && channel.Token == asset.Token {
 						channelID = channel.ChannelID
+						channelParticipant = channel.Participant
 						rawChannelBalance = channel.RawAmount.BigInt()
+						channelResizing = (status == "resizing")
 						break
 					}
 				}
 
 				chainAssets = append(chainAssets, ChainAssetConfig{
-					Token:             common.HexToAddress(asset.Token),
-					Symbol:            asset.Symbol,
-					Decimals:          asset.Decimals,
-					ChannelID:         channelID,
-					RawChannelBalance: rawChannelBalance,
+					Token:              common.HexToAddress(asset.Token),
+					Symbol:             asset.Symbol,
+					Decimals:           asset.Decimals,
+					ChannelID:          channelID,
+					ChannelParticipant: channelParticipant,
+					ChannelResizing:    channelResizing,
+					RawChannelBalance:  rawChannelBalance,
 				})
 			}
 		}

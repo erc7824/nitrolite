@@ -5,7 +5,6 @@ import { Address, Hash, Hex } from 'viem';
 import * as stateModule from '../../../src/client/state';
 import {
     Allocation,
-    Channel,
     ChannelId,
     ChannelStatus,
     CreateChannelParams,
@@ -27,8 +26,8 @@ describe('NitroliteClient', () => {
     const mockAddresses = {
         custody: '0x1111111111111111111111111111111111111111' as Address,
         adjudicator: '0x2222222222222222222222222222222222222222' as Address,
-        guestAddress: '0x3333333333333333333333333333333333333333' as Address,
     };
+    const brokerAddress = '0x3333333333333333333333333333333333333333' as Address;
     const tokenAddress = '0x4444444444444444444444444444444444444444' as Address;
     const challengeDuration = 3600n;
     const chainId = 1;
@@ -76,6 +75,11 @@ describe('NitroliteClient', () => {
         client.nitroliteService = mockNitroService;
         // @ts-ignore
         client.erc20Service = mockErc20Service;
+        // also override sharedDeps to use mock services
+        // @ts-ignore
+        client.sharedDeps.nitroliteService = mockNitroService;
+        // @ts-ignore
+        client.sharedDeps.erc20Service = mockErc20Service;
     });
 
     describe('deposit', () => {
@@ -128,7 +132,7 @@ describe('NitroliteClient', () => {
                 challenge: challengeDuration, // Duration in seconds for challenge period
                 nonce: 1n, // Unique per channel with same participants and adjudicator
             },
-            initialState: {
+            unsignedInitialState: {
                 data: '0x00' as Hex,
                 intent: StateIntent.INITIALIZE,
                 allocations: [
@@ -144,28 +148,27 @@ describe('NitroliteClient', () => {
                     } as Allocation,
                 ] as [Allocation, Allocation],
                 version: 0n,
-                sigs: [],
             },
+            serverSignature: '0xSRVSIG' as Hex,
         };
 
         test('success', async () => {
+            const initialState = {
+                ...params.unsignedInitialState,
+                sigs: ['0xaccSig', '0xSRVSIG'] as Hex[],
+            }
+
             const channelId = '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex;
-            jest.spyOn(stateModule, '_prepareAndSignInitialState').mockResolvedValue({
-                initialState: params.initialState,
-                channelId,
-            });
+            jest.spyOn(stateModule, '_prepareAndSignInitialState').mockResolvedValue({initialState, channelId});
             mockNitroService.createChannel.mockResolvedValue('0xCRE' as Hash);
 
             const result = await client.createChannel(params);
 
-            expect(stateModule._prepareAndSignInitialState).toHaveBeenCalledWith(
-                expect.anything(),
-                params,
-            );
-            expect(mockNitroService.createChannel).toHaveBeenCalledWith(params.channel, params.initialState);
+            expect(stateModule._prepareAndSignInitialState).toHaveBeenCalledWith(expect.anything(), params);
+            expect(mockNitroService.createChannel).toHaveBeenCalledWith(params.channel, initialState);
             expect(result).toEqual({
                 channelId,
-                initialState: params.initialState,
+                initialState,
                 txHash: '0xCRE',
             });
         });
@@ -234,6 +237,19 @@ describe('NitroliteClient', () => {
 
     describe('challengeChannel', () => {
         test('success', async () => {
+            // Mock getChannelData to return proper channel structure
+            mockNitroService.getChannelData.mockResolvedValue({
+                channel: {
+                    participants: [mockAccount.address, brokerAddress],
+                    adjudicator: mockAddresses.adjudicator,
+                    challenge: challengeDuration,
+                    nonce: 1n,
+                },
+                status: ChannelStatus.ACTIVE,
+                wallets: [mockAccount.address, brokerAddress],
+                challengeExpiry: 0n,
+                lastValidState: {} as any,
+            });
             mockNitroService.challenge.mockResolvedValue('0xCHL' as Hash);
             const params = {
                 channelId: '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex,
@@ -290,6 +306,20 @@ describe('NitroliteClient', () => {
                 },
                 proofStates: [],
             };
+            // Mock getChannelData to succeed
+            mockNitroService.getChannelData.mockResolvedValue({
+                channel: {
+                    participants: [mockAccount.address, brokerAddress],
+                    adjudicator: mockAddresses.adjudicator,
+                    challenge: challengeDuration,
+                    nonce: 1n,
+                },
+                status: ChannelStatus.ACTIVE,
+                wallets: [mockAccount.address, brokerAddress],
+                challengeExpiry: 0n,
+                lastValidState: {} as any,
+            });
+            // But make challenge fail
             mockNitroService.challenge.mockRejectedValue(new Error('fail'));
             await expect(client.challengeChannel(params)).rejects.toThrow(Errors.ContractCallError);
         });

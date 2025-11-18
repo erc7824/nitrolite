@@ -33,7 +33,7 @@ import { StateSigner } from './signer';
 export type PreparedTransaction = SimulateContractReturnType['request'];
 
 /**
- * @dev Note: `stateWalletClient.signMessage` function should NOT add an EIP-191 prefix to the message signed as
+ * @dev Note: `stateSigner.signState` function should NOT add an EIP-191 prefix to the message signed as
  * the contract expects the raw message to be signed.
  */
 export interface PreparerDependencies {

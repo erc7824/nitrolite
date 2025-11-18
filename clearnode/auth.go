@@ -20,7 +20,7 @@ type Challenge struct {
 	Application         string      // Name of the application which opened the connection
 	Allowances          []Allowance // Allowances for this connection
 	Scope               string      // Policy scope
-	SessionKeyExpiresAt uint64      // Session key expiration
+	SessionKeyExpiresAt uint64      // Session key expiration Unix timestamp (in seconds)
 	CreatedAt           time.Time   // When the challenge was created
 	ChallengeExpiresAt  time.Time   // When the challenge expires
 	Completed           bool        // Whether the challenge has been used
@@ -50,7 +50,7 @@ type Policy struct {
 	Scope       string      `json:"scope"`       // Permission scope (e.g., "app.create", "ledger.readonly")
 	Application string      `json:"application"` // Application public address
 	Allowances  []Allowance `json:"allowance"`   // Array of asset allowances
-	ExpiresAt   time.Time   `json:"expiration"`  // Expiration timestamp
+	ExpiresAt   time.Time   `json:"expiration"`  // Expiration Unix timestamp (in seconds)
 }
 
 // NewAuthManager creates a new authentication manager

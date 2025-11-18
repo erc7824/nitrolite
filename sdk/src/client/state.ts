@@ -1,16 +1,13 @@
-import { Address, Hex } from 'viem';
+import { Address, zeroAddress } from 'viem';
 import * as Errors from '../errors';
 import {
-    generateChannelNonce,
     getChannelId,
     getPackedChallengeState,
-    getPackedState,
-    getStateHash,
 } from '../utils';
 import { PreparerDependencies } from './prepare';
+import { StateSigner, WalletStateSigner } from './signer';
 import {
     ChallengeChannelParams,
-    Channel,
     ChannelId,
     CloseChannelParams,
     CreateChannelParams,
@@ -63,8 +60,9 @@ export async function _prepareAndSignInitialState(
         throw new Errors.InvalidParameterError('Channel must have exactly two participants.');
     }
 
+    const signer = _checkParticipantAndGetSigner(deps, channel.participants[0]);
     const channelId = getChannelId(channel, deps.chainId);
-    const accountSignature = await deps.stateSigner.signState(channelId, unsignedInitialState);
+    const accountSignature = await signer.signState(channelId, unsignedInitialState);
     const signedInitialState: State = {
         ...unsignedInitialState,
         // TODO: remove assumption, that current signer will always be the first participant
@@ -92,7 +90,8 @@ export async function _prepareAndSignChallengeState(
 }> {
     const { channelId, candidateState, proofStates = [] } = params;
     const challengeMsg = getPackedChallengeState(channelId, candidateState);
-    const challengerSig = await deps.stateSigner.signRawMessage(challengeMsg);
+    const signer = await _fetchParticipantAndGetSigner(deps, channelId);
+    const challengerSig = await signer.signRawMessage(challengeMsg);
 
     return { channelId, candidateState, proofs: proofStates, challengerSig };
 }
@@ -124,7 +123,8 @@ export async function _prepareAndSignResizeState(
         sigs: [],
     };
 
-    const accountSignature = await deps.stateSigner.signState(channelId, stateToSign);
+    const signer = await _fetchParticipantAndGetSigner(deps, channelId);
+    const accountSignature = await signer.signState(channelId, stateToSign);
 
     // Create a new state with signatures in the requested style
     const resizeStateWithSigs: State = {
@@ -164,7 +164,8 @@ export async function _prepareAndSignFinalState(
         sigs: [],
     };
 
-    const accountSignature = await deps.stateSigner.signState(channelId, stateToSign);
+    const signer = await _fetchParticipantAndGetSigner(deps, channelId);
+    const accountSignature = await signer.signState(channelId, stateToSign);
 
     // Create a new state with signatures in the requested style
     const finalStateWithSigs: State = {
@@ -173,4 +174,35 @@ export async function _prepareAndSignFinalState(
     };
 
     return { finalStateWithSigs, channelId };
+}
+
+/**
+ * Helper function supporting user participant to be either wallet or session key, returning the respective StateSigner.
+ * This provides backward compatibility with channels created prior to v0.5.0.
+ * Fetches the channel data from the blockchain to get the participant address.
+ * @param deps - The dependencies needed (account, addresses, walletClient, challengeDuration). See {@link PreparerDependencies}.
+ * @param channelId - The id of a channel to get the signer for.
+ * @returns A StateSigner object depending on the user participant address.
+ */
+async function _fetchParticipantAndGetSigner(deps: PreparerDependencies, channelId: ChannelId): Promise<StateSigner> {
+    const {channel: {participants}} = await deps.nitroliteService.getChannelData(channelId);
+    let participant = participants.length == 2 ? participants[0] : zeroAddress;
+
+    return _checkParticipantAndGetSigner(deps, participant);
+}
+
+/**
+ * Helper function supporting user participant to be either wallet or session key, returning the respective StateSigner.
+ * This provides backward compatibility with channels created prior to v0.5.0.
+ * @param deps - The dependencies needed (account, addresses, walletClient, challengeDuration). See {@link PreparerDependencies}.
+ * @param participant - The address of the user participant that a resulting StateSigner depends on.
+ * @returns A StateSigner object depending on the user participant address.
+ */
+function _checkParticipantAndGetSigner(deps: PreparerDependencies, participant: Address): StateSigner {
+    let signer = deps.stateSigner;
+    if (participant == deps.walletClient.account.address) {
+        signer = new WalletStateSigner(deps.walletClient);
+    }
+
+    return signer;
 }

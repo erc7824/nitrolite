@@ -77,8 +77,10 @@ type ChainAssetConfig struct {
 	Symbol   string
 	Decimals uint8
 
-	ChannelID         string
-	RawChannelBalance *big.Int
+	ChannelID          string
+	ChannelResizing    bool
+	ChannelParticipant string
+	RawChannelBalance  *big.Int
 }
 
 func (c ChainAssetConfig) IsEnabled() bool {

@@ -69,8 +69,12 @@ func (o *Operator) handleOpenChannel(args []string) {
 
 	fmt.Printf("Opening custody channel on %s...\n", chainID.String())
 
+	participantSigner := o.config.Signer
+	if participants := creationRes.Channel.Participants; len(participants) > 0 && participants[0] == o.config.Wallet.PublicKey().Address().String() {
+		participantSigner = o.config.Wallet
+	}
 	channelID, err := o.custody.OpenChannel(
-		o.config.Wallet, o.config.Signer,
+		o.config.Wallet, participantSigner,
 		blockchain.ID, chainRPC,
 		blockchain.CustodyAddress,
 		blockchain.AdjudicatorAddress,
@@ -147,8 +151,12 @@ func (o *Operator) handleCloseChannel(args []string) {
 		allocations[i] = convertAllocationRes(alloc)
 	}
 
+	participantSigner := o.config.Signer
+	if asset.ChannelParticipant == o.config.Wallet.PublicKey().Address().String() {
+		participantSigner = o.config.Wallet
+	}
 	if err := o.custody.CloseChannel(
-		o.config.Wallet, o.config.Signer,
+		o.config.Wallet, participantSigner,
 		blockchain.ID, chainRPC,
 		blockchain.CustodyAddress,
 		common.HexToHash(closureRes.ChannelID),
@@ -201,6 +209,10 @@ func (o *Operator) handleResizeChannel(args []string) {
 	}
 	if !asset.IsEnabled() {
 		fmt.Printf("There are no opened channels for %s on %s.\n", assetSymbol, chainID.String())
+		return
+	}
+	if asset.ChannelResizing {
+		fmt.Printf("Channel for asset %s on %s is already being resized.\n", assetSymbol, chainID.String())
 		return
 	}
 
@@ -304,8 +316,12 @@ func (o *Operator) handleResizeChannel(args []string) {
 		allocations[i] = convertAllocationRes(alloc)
 	}
 
+	participantSigner := o.config.Signer
+	if asset.ChannelParticipant == o.config.Wallet.PublicKey().Address().String() {
+		participantSigner = o.config.Wallet
+	}
 	if err := o.custody.Resize(
-		o.config.Wallet, o.config.Signer,
+		o.config.Wallet, participantSigner,
 		blockchain.ID, chainRPC,
 		blockchain.CustodyAddress,
 		common.HexToHash(resizeRes.ChannelID),

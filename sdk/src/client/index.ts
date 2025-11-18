@@ -53,7 +53,6 @@ export class NitroliteClient {
             );
         if (!config.addresses?.custody) throw new Errors.MissingParameterError('addresses.custody');
         if (!config.addresses?.adjudicator) throw new Errors.MissingParameterError('addresses.adjudicator');
-        if (!config.addresses?.guestAddress) throw new Errors.MissingParameterError('addresses.guestAddress');
         if (!config.chainId) throw new Errors.MissingParameterError('chainId');
 
         this.publicClient = config.publicClient;

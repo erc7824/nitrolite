@@ -12,6 +12,7 @@ jest.mock('../../../src/utils', () => ({
     generateChannelNonce: jest.fn(() => 999n),
     getChannelId: jest.fn(() => 'cid' as any),
     getStateHash: jest.fn(() => 'hsh'),
+    getPackedState: jest.fn(() => '0xpacked' as Hex),
     signState: jest.fn(async () => 'accSig'),
     encoders: { numeric: jest.fn(() => 'encData') },
     removeQuotesFromRS: jest.fn((s: string) => s.replace(/"/g, '')),
@@ -35,11 +36,16 @@ describe('_prepareAndSignInitialState', () => {
         deps = {
             account: { address: '0xOWNER' as Hex },
             stateSigner,
+            walletClient: {
+                account: { address: '0xWALLET' as Hex },
+                signMessage: stateSigner.signRawMessage,
+            },
             addresses: {
                 guestAddress,
                 adjudicator: adjudicatorAddress,
             },
             challengeDuration,
+            chainId: 1,
         };
 
         defaultChannel = {
@@ -148,6 +154,24 @@ describe('_prepareAndSignFinalState', () => {
     beforeEach(() => {
         deps = {
             stateSigner,
+            walletClient: {
+                account: { address: '0xWALLET' as Hex },
+                signMessage: stateSigner.signRawMessage,
+            },
+            nitroliteService: {
+                getChannelData: jest.fn(async () => ({
+                    channel: {
+                        participants: ['0xOWNER' as Hex, '0xGUEST' as Hex],
+                        adjudicator: '0xADJ' as Hex,
+                        challenge: 123n,
+                        nonce: 999n,
+                    },
+                    status: 0,
+                    wallets: ['0xW1' as Hex, '0xW2' as Hex],
+                    challengeExpiry: 0n,
+                    lastValidState: {} as any,
+                })),
+            },
             addresses: {
                 /* not used */
             },
@@ -155,6 +179,7 @@ describe('_prepareAndSignFinalState', () => {
                 /* not used */
             },
             challengeDuration: 0,
+            chainId: 1,
         };
     });
 

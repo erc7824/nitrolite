@@ -32,10 +32,16 @@ assets:
       - blockchain_id: 8453
         address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2"
         decimals: 6
+      - blockchain_id: 59144
+        address: "0xA219439258ca9da29E9Cc4cE5596924745e12B93"
+        decimals: 6
   - name: "Ether"
     symbol: "eth"
     tokens:
       - blockchain_id: 8453
+        address: "0x0000000000000000000000000000000000000000"
+        decimals: 18
+      - blockchain_id: 59144
         address: "0x0000000000000000000000000000000000000000"
         decimals: 18
   - name: "wETH"

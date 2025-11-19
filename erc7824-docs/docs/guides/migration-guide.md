@@ -14,7 +14,7 @@ If you are coming from an earlier version of Nitrolite, you will need to account
 
 ## 0.5.x Breaking changes
 
-The 0.5.x release includes fundamental protocol changes affecting session keys, channel operations, state signatures, and channel resize rules.
+The 0.5.x release includes fundamental protocol changes affecting session keys, channel operations, state signatures, and channel resize rules. The main objective of these changes is to enhance security, and provide better experience for developers and users by ability to limit allowances for specific applications.
 
 **Not ready to migrate?** Unfortunately, at this time Yellow Network does not provide ClearNodes running the previous version of the protocol, so you will need to migrate to the latest version to continue using the Network.
 
@@ -34,7 +34,7 @@ Session keys now have enhanced properties that define their access levels and ca
 
 #### Channel Creation: Separate Create and Fund Steps
 
-The protocol no longer supports creating channels with an initial deposit. All channels must be created with zero balance and funded separately through a resize operation. This two-step process ensures cleaner state management and prevents edge cases in channel initialization.
+Clearnode no longer supports creating channels with an initial deposit. All channels must be created with zero balance and funded separately through a resize operation. This two-step process ensures cleaner state management and prevents edge cases in channel initialization.
 
 #### State Signatures: Wallet vs Session Key Signing
 
@@ -52,9 +52,11 @@ The protocol now enforces strict rules about channel balances and their impact o
 
 - **Blocked operations**: Users with any channel containing non-zero amounts cannot perform transfers, submit app states with deposit intent, or create app sessions with non-zero allocations.
 
+- **Resizing state**: After a resize request, channels enter a "resizing" state with locked funds until the on-chain transaction is confirmed. If a channel remains stuck in this state for an extended period, the recommended action is to close the channel and create a new one.
+
 - **Allocate amount semantics**: The resize operation uses `allocate_amount` where negative values withdraw from the channel to unified balance, and positive values deposit to the channel.
 
-- **Legacy channel migration**: Users with existing channels containing non-zero amounts must either resize them to zero or close them to enable full protocol functionality.
+- **Legacy channel migration**: Users with existing channels containing non-zero amounts must either resize them to zero or close them to enable full protocol functionality. The recommended approach is to close old channels and create new ones, because it may be simpler.
 
 ### Nitrolite SDK
 
@@ -77,7 +79,7 @@ Implementing the new session key protocol changes:
       { asset: 'eth', amount: '0.5' }
     ],
     scope: 'app.create',
-    expires_at: BigInt(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+    expires_at: BigInt(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60) // 7 days
   };
   ```
 
@@ -91,7 +93,7 @@ Implementing the new session key protocol changes:
     application: 'clearnode', // Special value for root access
     allowances: [], // Not enforced for root access
     scope: 'app.create',
-    expires_at: BigInt(Date.now() + 365 * 24 * 60 * 60 * 1000) // Long expiration recommended
+    expires_at: BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60) // Long expiration recommended
   };
   ```
 
@@ -373,8 +375,8 @@ New methods for session key operations have been added.
         { "asset": "usdc", "amount": "1000.0", "used": "250.0" }
       ],
       "scope": "app.create",
-      "expires_at": 1719123456789000,
-      "created_at": 1619123456789000
+      "expires_at": 1719123456789,
+      "created_at": 1619123456789
     }]
   }, 1619123456789],
   "sig": ["0x..."]
@@ -416,11 +418,12 @@ To migrate from 0.4.x to 0.5.x:
 1. **Review Protocol Changes**: Understand the fundamental changes to session keys, channel operations, and state signatures
 2. **Update Authentication**: Use the new session key parameters with proper `application`, `allowances`, and `expires_at` fields
 3. **Migrate Channel Creation**: Implement the two-step process (create empty, then resize to fund)
-4. **Handle Legacy Channels**: Help users with non-zero channel balances migrate by resizing to zero
+4. **Handle Legacy Channels**: Help users with non-zero channel balances migrate by resizing to zero or reopening channels
 5. **Update Resize Operations**: Use `resize_amount` and `allocate_amount` with correct sign convention
 6. **Test State Signatures**: Ensure your implementation handles both wallet and session key signing based on participant address
 7. **Plan Session Key Expiration**: Set appropriate expiration times, especially for root access keys
 8. **Monitor Blocked Operations**: Be aware that transfers and app operations are blocked for users with non-zero channel balances
+9. **Resizing State**: Handle channels in "resizing" state appropriately, considering closing and reopening if stuck
 
 ## 0.3.x Breaking changes
 

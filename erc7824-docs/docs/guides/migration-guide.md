@@ -109,38 +109,24 @@ Implementing the new session key protocol changes:
 
 Channels must now be created with zero initial deposit and funded separately via the `resizeChannel` method:
 
-<Tabs>
-  <TabItem value="before" label="Before">
+```typescript
+const { channelId } = await client.createChannel({
+  chain_id: 1,
+  token: tokenAddress,
+  // remove-next-line
+  amount: BigInt(1000000), // Initial deposit
+  // remove-next-line
+  session_key: '0x...' // Optional
+});
 
-  ```typescript
-  const { channelId } = await client.createChannel({
-    chain_id: 1,
-    token: tokenAddress,
-    amount: BigInt(1000000), // Initial deposit
-    session_key: '0x...' // Optional
-  });
-  ```
-
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```typescript
-  // Step 1: Create channel with zero deposit
-  const { channelId } = await client.createChannel({
-    chain_id: 1,
-    token: tokenAddress,
-    // amount and session_key parameters removed
-  });
-  
-  // Step 2: Fund the channel separately
-  await client.resizeChannel({
-    channel_id: channelId,
-    amount: BigInt(1000000),
-  });
-  ```
-
-  </TabItem>
-</Tabs>
+// add-start
+// Step 2: Fund the channel separately
+await client.resizeChannel({
+  channel_id: channelId,
+  amount: BigInt(1000000),
+});
+// add-end
+```
 
 #### Resize Operations with Channel Balance Rules
 
@@ -240,32 +226,17 @@ interface RPCSessionKey {
 
 EIP-712 signature types now use string values for amounts instead of numeric types to support better precision with decimal values.
 
-<Tabs>
-  <TabItem value="before" label="Before">
-
-  ```typescript
-  const types = {
-    Allowance: [
-      { name: 'asset', type: 'string' },
-      { name: 'amount', type: 'uint256' } // Numeric type
-    ]
-  };
-  ```
-
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```typescript
-  const types = {
-    Allowance: [
-      { name: 'asset', type: 'string' },
-      { name: 'amount', type: 'string' } // String type for float amounts
-    ]
-  };
-  ```
-
-  </TabItem>
-</Tabs>
+```typescript
+const types = {
+  Allowance: [
+    { name: 'asset', type: 'string' },
+    // remove-next-line
+    { name: 'amount', type: 'uint256' },
+    // add-next-line
+    { name: 'amount', type: 'string' },
+  ]
+};
+```
 
 ### ClearNode API
 
@@ -319,37 +290,19 @@ The `auth_request` method now uses the enhanced session key parameters:
 
 The `create_channel` method no longer accepts initial deposit parameters:
 
-<Tabs>
-  <TabItem value="before" label="Before">
-
-  ```json
-  {
-    "req": [1, "create_channel", {
-      "chain_id": 137,
-      "token": "0xeeee567890abcdef...",
-      "amount": "100000000",
-      "session_key": "0x1234567890abcdef..."
-    }, 1619123456789],
-    "sig": ["0x9876fedcba..."]
-  }
-  ```
-
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```json
-  {
-    "req": [1, "create_channel", {
-      "chain_id": 137,
-      "token": "0xeeee567890abcdef..."
-      // amount and session_key parameters removed
-    }, 1619123456789],
-    "sig": ["0x9876fedcba..."]
-  }
-  ```
-
-  </TabItem>
-</Tabs>
+```json
+{
+  "req": [1, "create_channel", {
+    "chain_id": 137,
+    "token": "0xeeee567890abcdef...",
+    // remove-next-line
+    "amount": "100000000",
+    // remove-next-line
+    "session_key": "0x1234567890abcdef..."
+  }, 1619123456789],
+  "sig": ["0x9876fedcba..."]
+}
+```
 
 #### API: Session Key Management Methods
 
@@ -441,39 +394,26 @@ The `stateWalletClient` parameter of `NitroliteClient` has been replaced with a 
 
 When initializing the client, you should use either `WalletStateSigner` or `SessionKeyStateSigner` to handle state signing.
 
-<Tabs>
-  <TabItem value="before" label="Before">
+```typescript
+// remove-next-line
+import { createNitroliteClient } from '@erc7824/nitrolite';
+// add-start
+import { 
+  createNitroliteClient,
+  WalletStateSigner
+} from '@erc7824/nitrolite';
+// add-end
 
-  ```typescript
-  import { createNitroliteClient } from '@erc7824/nitrolite';
-  
-  const client = createNitroliteClient({
-    publicClient,
-    walletClient,
-    stateWalletClient: sessionWalletClient,
-    addresses,
-  });
-  ```
-
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```typescript
-  import { 
-    createNitroliteClient,
-    WalletStateSigner
-  } from '@erc7824/nitrolite';
-  
-  const client = createNitroliteClient({
-    publicClient,
-    walletClient,
-    stateSigner: new WalletStateSigner(walletClient),
-    addresses,
-  });
-  ```
-
-  </TabItem>
-</Tabs>
+const client = createNitroliteClient({
+  publicClient,
+  walletClient,
+  // remove-next-line
+  stateWalletClient: sessionWalletClient,
+  // add-next-line
+  stateSigner: new WalletStateSigner(walletClient),
+  addresses,
+});
+```
 
 **For session key signing:**
 
@@ -489,45 +429,37 @@ The `CreateChannelParams` interface has been fully restructured for better clari
 
 You should use the new [`CreateChannel` ClearNode API endpoint](#added-create_channel-method) to get the response, that fully resembles the channel creation parameters.
 
-<Tabs>
-  <TabItem value="before" label="Before">
-
-  ```typescript
-  const { channelId, initialState, txHash } = await client.createChannel(
-    tokenAddress,
-    {
-      initialAllocationAmounts: [amount1, amount2],
-      stateData: '0x...',
-    }
-  );
-  ```
-
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```typescript
-  const { channelId, initialState, txHash } = await client.createChannel({
-    channel: {
-      participants: [address1, address2],
-      adjudicator: adjudicatorAddress,
-      challenge: 86400n,
-      nonce: 42n,
-    },
-    unsignedInitialState: {
-      intent: StateIntent.Initialize,
-      version: 0n,
-      data: '0x',
-      allocations: [
-        { destination: address1, token: tokenAddress, amount: amount1 },
-        { destination: address2, token: tokenAddress, amount: amount2 },
-      ],
-    },
-    serverSignature: '0x...',
-  });
-  ```
-
-  </TabItem>
-</Tabs>
+```typescript
+// remove-start
+const { channelId, initialState, txHash } = await client.createChannel(
+  tokenAddress,
+  {
+    initialAllocationAmounts: [amount1, amount2],
+    stateData: '0x...',
+  }
+);
+// remove-end
+// add-start
+const { channelId, initialState, txHash } = await client.createChannel({
+  channel: {
+    participants: [address1, address2],
+    adjudicator: adjudicatorAddress,
+    challenge: 86400n,
+    nonce: 42n,
+  },
+  unsignedInitialState: {
+    intent: StateIntent.Initialize,
+    version: 0n,
+    data: '0x',
+    allocations: [
+      { destination: address1, token: tokenAddress, amount: amount1 },
+      { destination: address2, token: tokenAddress, amount: amount2 },
+    ],
+  },
+  serverSignature: '0x...',
+});
+// add-end
+```
 
 #### Actions: Structured Typed RPC Request Parameters
 
@@ -535,35 +467,27 @@ RPC requests now use endpoint-specific object-based parameters instead of untype
 
 You should update your RPC request creation code to use the new structured format and RPC types.
 
-<Tabs>
-  <TabItem value="before" label="Before">
-
-  ```typescript
-  const request = NitroliteRPC.createRequest(
-    requestId,
-    RPCMethod.GetChannels,
-    [participant, status],
-    timestamp
-  );
-  ```
-
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```typescript
-  const request = NitroliteRPC.createRequest({
-    method: RPCMethod.GetChannels,
-    params: {
-      participant,
-      status,
-    },
-    requestId,
-    timestamp,
-  });
-  ```
-
-  </TabItem>
-</Tabs>
+```typescript
+// remove-start
+const request = NitroliteRPC.createRequest(
+  requestId,
+  RPCMethod.GetChannels,
+  [participant, status],
+  timestamp
+);
+// remove-end
+// add-start
+const request = NitroliteRPC.createRequest({
+  method: RPCMethod.GetChannels,
+  params: {
+    participant,
+    status,
+  },
+  requestId,
+  timestamp,
+});
+// add-end
+```
 
 #### Actions: Standardized Channel Operations Responses
 
@@ -571,61 +495,53 @@ The responses for `CloseChannel` and `ResizeChannel` methods have been aligned w
 
 Update your response handling code to use the new `RPCChannelOperation` type.
 
-<Tabs>
-  <TabItem value="before" label="Before">
+```typescript
+// remove-start
+export interface ResizeChannelResponseParams {
+  channelId: Hex;
+  stateData: Hex;
+  intent: number;
+  version: number;
+  allocations: RPCAllocation[];
+  stateHash: Hex;
+  serverSignature: ServerSignature;
+}
 
-  ```typescript
-    export interface ResizeChannelResponseParams {
-      channelId: Hex;
-      stateData: Hex;
-      intent: number;
-      version: number;
-      allocations: RPCAllocation[];
-      stateHash: Hex;
-      serverSignature: ServerSignature;
-  }
+export interface CloseChannelResponseParams {
+  channelId: Hex;
+  intent: number;
+  version: number;
+  stateData: Hex;
+  allocations: RPCAllocation[];
+  stateHash: Hex;
+  serverSignature: ServerSignature;
+}
+// remove-end
+// add-start
+export interface RPCChannelOperation {
+  channelId: Hex;
+  state: RPCChannelOperationState;
+  serverSignature: Hex;
+}
 
-  export interface CloseChannelResponseParams {
-      channelId: Hex;
-      intent: number;
-      version: number;
-      stateData: Hex;
-      allocations: RPCAllocation[];
-      stateHash: Hex;
-      serverSignature: ServerSignature;
-  }
-  ```
+export interface CreateChannelResponse extends GenericRPCMessage {
+  method: RPCMethod.CreateChannel;
+  params: RPCChannelOperation & {
+    channel: RPCChannel;
+  };
+}
 
-  </TabItem>
-  <TabItem value="after" label="After">
+export interface ResizeChannelResponse extends GenericRPCMessage {
+  method: RPCMethod.ResizeChannel;
+  params: RPCChannelOperation;
+}
 
-  ```typescript
-  export interface RPCChannelOperation {
-    channelId: Hex;
-    state: RPCChannelOperationState;
-    serverSignature: Hex;
-  }
-
-  export interface CreateChannelResponse extends GenericRPCMessage {
-    method: RPCMethod.CreateChannel;
-    params: RPCChannelOperation & {
-        channel: RPCChannel;
-    };
-  }
-
-  export interface ResizeChannelResponse extends GenericRPCMessage {
-      method: RPCMethod.ResizeChannel;
-      params: RPCChannelOperation;
-  }
-
-  export interface CloseChannelResponse extends GenericRPCMessage {
-      method: RPCMethod.CloseChannel;
-      params: RPCChannelOperation;
-  }
-  ```
-
-  </TabItem>
-</Tabs>
+export interface CloseChannelResponse extends GenericRPCMessage {
+  method: RPCMethod.CloseChannel;
+  params: RPCChannelOperation;
+}
+// add-end
+```
 
 #### Actions: Modified `Signature` Type
 
@@ -633,34 +549,26 @@ The `Signature` struct has been replaced with a simple `Hex` type to support EIP
 
 Update your signature-handling code to use the new `Hex` type. Still, if using Nitrolite utils correctly, you will not need to change anything, as the utils will handle the conversion for you.
 
-<Tabs>
-  <TabItem value="before" label="Before">
+```typescript
+// remove-start
+interface Signature {
+  v: number;
+  r: Hex;
+  s: Hex;
+}
 
-  ```typescript
-  interface Signature {
-    v: number;
-    r: Hex;
-    s: Hex;
-  }
-  
-  const sig: Signature = {
-    v: 27,
-    r: '0x...',
-    s: '0x...'
-  };
-  ```
+const sig: Signature = {
+  v: 27,
+  r: '0x...',
+  s: '0x...'
+};
+// remove-end
+// add-start
+type Signature = Hex;
 
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```typescript
-  type Signature = Hex;
-  
-  const sig: Signature = '0x...'; // Combined signature
-  ```
-
-  </TabItem>
-</Tabs>
+const sig: Signature = '0x...';
+// add-end
+```
 
 #### Added: Pagination Types and Parameters
 
@@ -689,49 +597,35 @@ ClearNode API requests have migrated from array-based parameters to structured o
 
 Update all your ClearNode API requests to use object-based parameters instead of arrays.
 
-<Tabs>
-  <TabItem value="before" label="Before">
-
-  ```json
-  {
-    "req": [1, "auth_request", [{
-      "address": "0x1234567890abcdef...",
-      "session_key": "0x9876543210fedcba...",
-      "app_name": "Example App",
-      "allowances": [ "usdc", "100.0" ],
-      "scope": "app.create",
-      "expire": "3600",
-      "application": "0xApp1234567890abcdef..."
-    }], 1619123456789],
-    "sig": ["0x5432abcdef..."]
-  }
-  ```
-
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```json
-  {
-    "req": [1, "auth_request", {
-      "address": "0x1234567890abcdef...",
-      "session_key": "0x9876543210fedcba...",
-      "app_name": "Example App",
-      "allowances": [
-        {
-          "asset": "usdc",
-          "amount": "100.0"
-        }
-      ],
-      "scope": "app.create",
-      "expire": "3600",
-      "application": "0xApp1234567890abcdef..."
-    }, 1619123456789],
-    "sig": ["0x5432abcdef..."]
-  }
-  ```
-
-  </TabItem>
-</Tabs>
+```json
+{
+  // remove-next-line
+  "req": [1, "auth_request", [{
+  // add-next-line
+  "req": [1, "auth_request", {
+    "address": "0x1234567890abcdef...",
+    "session_key": "0x9876543210fedcba...",
+    "app_name": "Example App",
+    // remove-next-line
+    "allowances": [ "usdc", "100.0" ],
+    // add-start
+    "allowances": [
+      {
+        "asset": "usdc",
+        "amount": "100.0"
+      }
+    ],
+    // add-end
+    "scope": "app.create",
+    "expire": "3600",
+    "application": "0xApp1234567890abcdef..."
+  // remove-next-line
+  }], 1619123456789],
+  // add-next-line
+  }, 1619123456789],
+  "sig": ["0x5432abcdef..."]
+}
+```
 
 #### Added: `create_channel` Method
 
@@ -792,51 +686,43 @@ The responses for `create_channel`, `close_channel`, and `resize_channel` method
 
 Update your response parsing to handle the new unified structure with `channel_id`, `state`, and `server_signature` fields.
 
-<Tabs>
-  <TabItem value="before" label="Before">
-
-  ```json
-  {
-    "res": [1, "close_channel", {
-      "channelId": "0x4567890123abcdef...",
+```json
+// remove-start
+{
+  "res": [1, "close_channel", {
+    "channelId": "0x4567890123abcdef...",
+    "intent": 3,
+    "version": 123,
+    "stateData": "0x0000000000000000000000000000000000000000000000000000000000001ec7",
+    "allocations": [...],
+    "stateHash": "0x...",
+    "serverSignature": "0x..."
+  }, 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+// remove-end
+// add-start
+{
+  "res": [1, "close_channel", {
+    "channel_id": "0x4567890123abcdef...",
+    "state": {
       "intent": 3,
       "version": 123,
-      "stateData": "0x0000000000000000000000000000000000000000000000000000000000001ec7",
-      "allocations": [...],
-      "stateHash": "0x...",
-      "serverSignature": "0x..."
-    }, 1619123456789],
-    "sig": ["0xabcd1234..."]
-  }
-  ```
-
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```json
-  {
-    "res": [1, "close_channel", {
-      "channel_id": "0x4567890123abcdef...",
-      "state": {
-        "intent": 3,
-        "version": 123,
-        "state_data": "0xc0ffee",
-        "allocations": [
-          {
-            "destination": "0x1234567890abcdef...",
-            "token": "0xeeee567890abcdef...",
-            "amount": "50000"
-          }
-        ]
-      },
-      "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c"
-    }, 1619123456789],
-    "sig": ["0xabcd1234..."]
-  }
-  ```
-
-  </TabItem>
-</Tabs>
+      "state_data": "0xc0ffee",
+      "allocations": [
+        {
+          "destination": "0x1234567890abcdef...",
+          "token": "0xeeee567890abcdef...",
+          "amount": "50000"
+        }
+      ]
+    },
+    "server_signature": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1c"
+  }, 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+// add-end
+```
 
 #### Added: Pagination Metadata
 
@@ -844,50 +730,42 @@ Pagination-supporting endpoints now include a `metadata` struct in their respons
 
 Update your response handling for `get_channels`, `get_app_sessions`, `get_ledger_entries`, and `get_ledger_transactions` to use the new metadata structure.
 
-<Tabs>
-  <TabItem value="before" label="Before">
-
-  ```json
-  {
-    "res": [1, "get_channels", [
-      [
-        {
-          "channel_id": "0xfedcba9876543210...",
-          "status": "open",
-          // ... channel data
-        }
-      ]
-    ], 1619123456789],
-    "sig": ["0xabcd1234..."]
-  }
-  ```
-
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```json
-  {
-    "res": [1, "get_channels", {
-      "channels": [
-        {
-          "channel_id": "0xfedcba9876543210...",
-          "status": "open",
-          // ... channel data
-        }
-      ],
-      "metadata": {
-        "page": 1,
-        "per_page": 10,
-        "total_count": 56,
-        "page_count": 6
+```json
+// remove-start
+{
+  "res": [1, "get_channels", [
+    [
+      {
+        "channel_id": "0xfedcba9876543210...",
+        "status": "open",
+        // ... channel data
       }
-    }, 1619123456789],
-    "sig": ["0xabcd1234..."]
-  }
-  ```
-
-  </TabItem>
-</Tabs>
+    ]
+  ], 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+// remove-end
+// add-start
+{
+  "res": [1, "get_channels", {
+    "channels": [
+      {
+        "channel_id": "0xfedcba9876543210...",
+        "status": "open",
+        // ... channel data
+      }
+    ],
+    "metadata": {
+      "page": 1,
+      "per_page": 10,
+      "total_count": 56,
+      "page_count": 6
+    }
+  }, 1619123456789],
+  "sig": ["0xabcd1234..."]
+}
+// add-end
+```
 
 The metadata fields provide:
 - `page`: Current page number
@@ -905,85 +783,61 @@ The `Signature` struct has been removed and replaced with `bytes` type to suppor
 
 Update all contract interactions that use signatures to pass `bytes` instead of the struct.
 
-<Tabs>
-  <TabItem value="before" label="Before">
+```solidity
+// remove-start
+struct Signature {
+  uint8 v;
+  bytes32 r;
+  bytes32 s;
+}
 
-  ```solidity
-  struct Signature {
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
-  }
-  
-  function join(
-    bytes32 channelId,
-    uint256 index,
-    Signature calldata sig
-  ) external returns (bytes32);
-  
-  function challenge(
-    bytes32 channelId,
-    State calldata candidate,
-    State[] calldata proofs,
-    Signature calldata challengerSig
-  ) external;
-  ```
+function join(
+  bytes32 channelId,
+  uint256 index,
+  Signature calldata sig
+) external returns (bytes32);
 
-  </TabItem>
-  <TabItem value="after" label="After">
+function challenge(
+  bytes32 channelId,
+  State calldata candidate,
+  State[] calldata proofs,
+  Signature calldata challengerSig
+) external;
+// remove-end
+// add-start
+// Signature struct is removed
 
-  ```solidity
-  // Signature struct is removed
-  
-  function join(
-    bytes32 channelId,
-    uint256 index,
-    bytes calldata sig
-  ) external returns (bytes32);
-  
-  function challenge(
-    bytes32 channelId,
-    State calldata candidate,
-    State[] calldata proofs,
-    bytes calldata challengerSig
-  ) external;
-  ```
+function join(
+  bytes32 channelId,
+  uint256 index,
+  bytes calldata sig
+) external returns (bytes32);
 
-  </TabItem>
-</Tabs>
+function challenge(
+  bytes32 channelId,
+  State calldata candidate,
+  State[] calldata proofs,
+  bytes calldata challengerSig
+) external;
+// add-end
+```
 
 #### Actions: Updated `State` Signature Array
 
 The `State` struct now uses `bytes[]` for signatures instead of `Signature[]`.
 
-<Tabs>
-  <TabItem value="before" label="Before">
-
-  ```solidity
-  struct State {
-    uint8 intent;
-    uint256 version;
-    bytes data;
-    Allocation[] allocations;
-    Signature[] sigs;
-  }
-  ```
-
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```solidity
-  struct State {
-    uint8 intent;
-    uint256 version;
-    bytes data;
-    Allocation[] allocations;
-    bytes[] sigs;
-  }
-  ```
-
-  </TabItem>
-</Tabs>
+```solidity
+struct State {
+  uint8 intent;
+  uint256 version;
+  bytes data;
+  Allocation[] allocations;
+  // remove-next-line
+  Signature[] sigs;
+  // add-next-line
+  bytes[] sigs;
+}
+```
 
 #### Added: Auto-Join Channel Creation Flow
 
@@ -1033,49 +887,41 @@ The `EIP712AdjudicatorBase` provides:
 
 If you have custom adjudicator contracts, inherit from `EIP712AdjudicatorBase` to enable EIP-712 signature verification.
 
-<Tabs>
-  <TabItem value="before" label="Before">
+```solidity
+// remove-start
+import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
+import {Channel, State, Allocation, StateIntent} from "../interfaces/Types.sol";
 
-  ```solidity
-  import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
-  import {Channel, State, Allocation, StateIntent} from "../interfaces/Types.sol";
+contract MyAdjudicator is IAdjudicator {
+    function adjudicate(
+        Channel calldata chan, 
+        State calldata candidate, 
+        State[] calldata proofs
+    ) external view override returns (bool valid) {
+        return candidate.validateUnanimousSignatures(chan);
+    }
+}
+// remove-end
+// add-start
+import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
+import {Channel, State, Allocation, StateIntent} from "../interfaces/Types.sol";
+import {EIP712AdjudicatorBase} from "./EIP712AdjudicatorBase.sol";
 
-  contract MyAdjudicator is IAdjudicator {
-      function adjudicate(
-          Channel calldata chan, 
-          State calldata candidate, 
-          State[] calldata proofs
-      ) external view override returns (bool valid) {
-          return candidate.validateUnanimousSignatures(chan);
-      }
-  }
-  ```
+contract MyAdjudicator is IAdjudicator, EIP712AdjudicatorBase {
+    constructor(address owner, address channelImpl) 
+        EIP712AdjudicatorBase(owner, channelImpl) {}
 
-  </TabItem>
-  <TabItem value="after" label="After">
-
-  ```solidity
-  import {IAdjudicator} from "../interfaces/IAdjudicator.sol";
-  import {Channel, State, Allocation, StateIntent} from "../interfaces/Types.sol";
-  import {EIP712AdjudicatorBase} from "./EIP712AdjudicatorBase.sol";
-
-  contract MyAdjudicator is IAdjudicator, EIP712AdjudicatorBase {
-      constructor(address owner, address channelImpl) 
-          EIP712AdjudicatorBase(owner, channelImpl) {}
-
-      function adjudicate(
-          Channel calldata chan, 
-          State calldata candidate, 
-          State[] calldata proofs
-      ) external override returns (bool valid) {
-          bytes32 domainSeparator = getChannelImplDomainSeparator();
-          return candidate.validateUnanimousStateSignatures(chan, domainSeparator);
-      }
-  }
-  ```
-
-  </TabItem>
-</Tabs>
+    function adjudicate(
+        Channel calldata chan, 
+        State calldata candidate, 
+        State[] calldata proofs
+    ) external override returns (bool valid) {
+        bytes32 domainSeparator = getChannelImplDomainSeparator();
+        return candidate.validateUnanimousStateSignatures(chan, domainSeparator);
+    }
+}
+// add-end
+```
 
 #### Added: Enhanced Signature Support
 

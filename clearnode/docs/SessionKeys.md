@@ -6,15 +6,21 @@ Session keys are delegated keys that enable applications to perform operations o
 
 ## Core Concepts
 
+### General Rules
+
+> **Important:** When authenticating with an already registered session key, you must still provide all parameters in the `auth_request`. However, the configuration values (`application`, `allowances`, `scope`, and `expires_at`) from the request will be ignored, as the system uses the settings from the initial registration. You may provide arbitrary values for these fields, as they are required by the request format but will not be used.
+
 ### Applications
 
-Each session key is associated with a specific **application name**, which identifies the application or service that will use the session key. This association serves several purposes:
+Each session key is associated with a specific **application name**, which identifies the application or service that will use the session key. The application name is also used to identify **app sessions** that are created using that session key.
+
+This association serves several purposes:
 
 - **Application Isolation**: Different applications get separate session keys, preventing one application from using another's delegated access
 - **Access Control**: Operations performed with a session key are validated against the application specified during registration
 - **Single Active Key**: Only one session key can be active per wallet+application combination. Registering a new session key for the same application automatically invalidates any existing session key for that application
 
-> **Important:** After registering a session key, subsequent authentication requests with the same session key don't require you to specify all parameters again. The session key configuration is already stored in the system and will be used automatically.
+> **Important:** Only one session key is allowed per wallet+application combination. If you register a new session key for the same application, the old one is automatically invalidated and removed from the database.
 
 #### Special Application: "clearnode"
 
@@ -33,7 +39,7 @@ All session keys must have an **expiration timestamp** (`expires_at`) that defin
 
 - **Future Timestamp Required**: The expiration time must be set to a future date when registering a session key
 - **Automatic Invalidation**: Once the expiration time passes, the session key can no longer be used for any operations
-- **Grace Period**: After expiration, the session key is removed from the active keys list
+- **No Re-registration**: It is not possible to re-register an expired session key. You must create a new session key instead
 - **Applies to All Keys**: Even "clearnode" application session keys must respect the expiration timestamp
 
 ### Allowances
@@ -62,8 +68,6 @@ Allowances define **spending limits** for session keys, specifying which assets 
 - **Spending Limits**: Once a session key reaches its spending cap for an asset, further operations requiring that asset are rejected with: `"operation denied: insufficient session key allowance: X required, Y available"`
 - **Empty Allowances**: Providing an empty `allowances` array (`[]`) means zero spending allowed for all assets—any operation attempting to spend funds will be rejected
 
-> **Important:** Only one session key is allowed per wallet+application combination. If you register a new session key for the same application, the old one is automatically invalidated and removed from the database.
-
 #### Allowances for "clearnode" Application
 
 Session keys with `application: "clearnode"` are exempt from allowance enforcement:
@@ -74,7 +78,9 @@ Session keys with `application: "clearnode"` are exempt from allowance enforceme
 
 ## How to Manage Session Keys
 
-### Create and Configure
+### Clearnode
+
+#### Create and Configure
 
 To create a session key, use the `auth_request` method during authentication. This registers the session key with its configuration:
 
@@ -114,12 +120,12 @@ To create a session key, use the `auth_request` method during authentication. Th
 - `session_key` (required): The address of the session key to register
 - `application` (optional): Name of the application using this session key (defaults to "clearnode" if not provided)
 - `allowances` (optional): Array of asset allowances specifying spending limits
-- `scope` (optional): Permission scope (e.g., "app.create", "ledger.readonly")
+- `scope` (optional): Permission scope (e.g., "app.create", "ledger.readonly"). **Note:** This feature is not yet implemented
 - `expires_at` (required): Unix timestamp (in seconds) when this session key expires
 
-> **Note:** When authenticating with an already registered session key, you must still provide all fields in the request. However, the values you provide will be ignored—the system uses the configuration stored during initial registration. This behavior will be improved in future versions.
+> **Note:** When authenticating with an already registered session key, you must still fill in all fields in the request, at least with arbitrary values. This is required by the request itself, however, the values will be ignored as the system uses the session key configuration stored during initial registration. This behavior will be improved in future versions.
 
-### List Active Session Keys
+#### List Active Session Keys
 
 Use the `get_session_keys` method to retrieve all active (non-expired) session keys for the authenticated user:
 
@@ -182,7 +188,7 @@ Use the `get_session_keys` method to retrieve all active (non-expired) session k
 - `expires_at`: When this session key expires (ISO 8601 format)
 - `created_at`: When the session key was created (ISO 8601 format)
 
-### Revoke a Session Key
+#### Revoke a Session Key
 
 To immediately invalidate a session key, use the `revoke_session_key` method:
 
@@ -236,3 +242,7 @@ To immediately invalidate a session key, use the `revoke_session_key` method:
 
 - Session key does not exist, belongs to another wallet, or is expired: `"operation denied: provided address is not an active session key of this user"`
 - Non-"clearnode" session key attempting to revoke another session key: `"operation denied: insufficient permissions for the active session key"`
+
+### Nitrolite SDK
+
+The Nitrolite SDK provides a higher-level abstraction for managing session keys. For detailed information on using session keys with the Nitrolite SDK, please refer to the SDK documentation.

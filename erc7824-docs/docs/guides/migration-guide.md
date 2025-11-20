@@ -56,13 +56,25 @@ The protocol now enforces strict rules about channel balances and their impact o
 
 - **Allocate amount semantics**: The resize operation uses `allocate_amount` where negative values withdraw from the channel to unified balance, and positive values deposit to the channel.
 
-- **Legacy channel migration**: Users with existing channels containing non-zero amounts must either resize them to zero or close them to enable full protocol functionality. The recommended approach is to close old channels and create new ones, because it may be simpler.
+:::warning
+**Legacy channel migration**: Users with existing channels containing non-zero amounts must either resize them to zero (by providing "resize_amount" as 0 and "allocate_amount" as your **negative** on-chain balance) or close them to enable full protocol functionality. If you are unsure how to adjust resize parameters, the safe option is to close the old on-chain channel entirely, and open a new one.
+:::
+
+#### Non-Zero Channel Allocations: Operation Restrictions
+
+The following operations will return errors if the user has any channel with non-zero amount:
+
+- **Transfer**: Returns error code indicating blocked due to non-zero channel balance
+- **Submit App State** (with deposit intent): Rejected if attempting to deposit
+- **Create App Session** (with allocations): Rejected if attempting to allocate
+
+The error is returned has the following format: `operation denied: non-zero allocation in <count> channel(s) detected owned by wallet <address>"`
 
 ### Nitrolite SDK
 
 You should definitely read this section if you are using the Nitrolite SDK.
 
-#### Session Key Configuration
+#### Update Authentication
 
 Implementing the new session key protocol changes:
 
@@ -73,7 +85,7 @@ Implementing the new session key protocol changes:
   const authRequest = {
     address: '0x...',
     session_key: '0x...',
-    application: 'My Trading App', // Application name for scoped access
+    application: 'My Trading App', // Application name for confined access
     allowances: [
       { asset: 'usdc', amount: '1000.0' },
       { asset: 'eth', amount: '0.5' }
@@ -105,7 +117,7 @@ Implementing the new session key protocol changes:
 - Plan expiration times based on your operational needs
 - Application-scoped keys track cumulative spending against allowances
 
-#### Channel Creation: Zero Initial Deposit Requirement
+#### Migrate Channel Creation
 
 Channels must now be created with zero initial deposit and funded separately via the `resizeChannel` method:
 
@@ -128,9 +140,7 @@ await client.resizeChannel({
 // add-end
 ```
 
-#### Resize Operations with Channel Balance Rules
-
-Implementing the new resize semantics with `resize_amount` and `allocate_amount`:
+Use `resize_amount` and `allocate_amount` with correct sign convention (`resize_amount = -allocate_amount`) and help users with non-zero channel balances migrate by resizing to zero or reopening channels:
 
 <Tabs>
   <TabItem value="deposit" label="Deposit to Unified Balance">
@@ -182,22 +192,13 @@ Implementing the new resize semantics with `resize_amount` and `allocate_amount`
 - App state submissions with deposit intent
 - Creating app sessions with allocations
 
-#### State Signing Based on Participant Address
+#### Test State Signatures
 
-The SDK automatically handles the correct signer selection, but for custom implementations:
+If you plan to work with on-chain channels opened PRIOR to v0.5.0, then on NitroliteClient initialization the `stateSigner` you specify must be based on a Session Key used in the channel as participant. Even if this session key is or will expire, you still need to provide a `stateSigner` based on it.
 
-```typescript
-// The SDK internally determines the signer based on participant address
-// If participant is wallet address: uses wallet signer
-// If participant is session key address: uses session key signer
+On the other hand, if you plan to work with channels created SINCE v0.5.0, you can specify the `stateSigner` based on the `walletClient` you have specified.
 
-// If implementing custom state signing:
-const signer = channel.participants.includes(walletAddress) 
-  ? walletSigner 
-  : sessionKeySigner;
-```
-
-#### Added: Session Key Management
+#### Manage Session Keys
 
 New methods have been added for comprehensive session key management, including retrieval and revocation.
 
@@ -242,9 +243,9 @@ const types = {
 
 You should read this section only if you are using the ClearNode API directly.
 
-#### Authentication Request with Enhanced Session Keys
+#### Update Authentication
 
-The `auth_request` method now uses the enhanced session key parameters:
+Use the new session key parameters with proper `application`, `allowances`, and `expires_at` fields:
 
 <Tabs>
   <TabItem value="application" label="Application Auth">
@@ -286,9 +287,11 @@ The `auth_request` method now uses the enhanced session key parameters:
   </TabItem>
 </Tabs>
 
-#### API: Zero Deposit Channel Creation
+#### Migrate Channel Creation
 
-The `create_channel` method no longer accepts initial deposit parameters:
+Implement the two-step process (create empty, then resize to fund)
+
+The `create_channel` method no longer accepts `amount` and `session_key` parameters:
 
 ```json
 {
@@ -304,11 +307,13 @@ The `create_channel` method no longer accepts initial deposit parameters:
 }
 ```
 
-#### API: Session Key Management Methods
+#### Manage Session Keys
 
 New methods for session key operations have been added.
 
-**Get Session Keys Request:**
+##### Get Session Keys
+
+Request:
 ```json
 {
   "req": [1, "get_session_keys", {}, 1619123456789],
@@ -316,7 +321,7 @@ New methods for session key operations have been added.
 }
 ```
 
-**Response includes session key details with application, allowances, and expiration:**
+Response:
 ```json
 {
   "res": [1, "get_session_keys", {
@@ -336,7 +341,9 @@ New methods for session key operations have been added.
 }
 ```
 
-**Revoke Session Key Request:**
+##### Revoke Session Key Request
+
+Request:
 ```json
 {
   "req": [1, "revoke_session_key", {
@@ -346,37 +353,15 @@ New methods for session key operations have been added.
 }
 ```
 
-#### API: Operation Restrictions with Non-Zero Channel Balances
-
-The following operations will return errors if the user has any channel with non-zero amount:
-
-- **Transfer**: Returns error code indicating blocked due to non-zero channel balance
-- **Submit App State** (with deposit intent): Rejected if attempting to deposit
-- **Create App Session** (with allocations): Cannot create funded app sessions
-
-Error response example:
+Response:
 ```json
 {
-  "res": [1, "error", {
-    "error": "operation denied: non-zero allocation in 1 channel(s) detected owned by wallet 0x1234567890abcdef..."
+  "res": [1, "revoke_session_key", {
+    "session_key": "0x1234567890abcdef..."
   }, 1619123456789],
   "sig": ["0x..."]
 }
 ```
-
-### Migration Summary
-
-To migrate from 0.4.x to 0.5.x:
-
-1. **Review Protocol Changes**: Understand the fundamental changes to session keys, channel operations, and state signatures
-2. **Update Authentication**: Use the new session key parameters with proper `application`, `allowances`, and `expires_at` fields
-3. **Migrate Channel Creation**: Implement the two-step process (create empty, then resize to fund)
-4. **Handle Legacy Channels**: Help users with non-zero channel balances migrate by resizing to zero or reopening channels
-5. **Update Resize Operations**: Use `resize_amount` and `allocate_amount` with correct sign convention
-6. **Test State Signatures**: Ensure your implementation handles both wallet and session key signing based on participant address
-7. **Plan Session Key Expiration**: Set appropriate expiration times, especially for root access keys
-8. **Monitor Blocked Operations**: Be aware that transfers and app operations are blocked for users with non-zero channel balances
-9. **Resizing State**: Handle channels in "resizing" state appropriately, considering closing and reopening if stuck
 
 ## 0.3.x Breaking changes
 

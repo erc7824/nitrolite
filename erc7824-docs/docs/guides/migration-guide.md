@@ -140,17 +140,19 @@ await client.resizeChannel({
 // add-end
 ```
 
+#### Resize correctly
+
 Use `resize_amount` and `allocate_amount` with correct sign convention (`resize_amount = -allocate_amount`) and help users with non-zero channel balances migrate by resizing to zero or reopening channels:
 
 <Tabs>
   <TabItem value="deposit" label="Deposit to Unified Balance">
 
   ```typescript
-  // Deposit from channel to unified balance (empty the channel)
+  // Deposit from custody ledger to unified balance
   await client.resizeChannel({
     channel_id: channelId,
-    resize_amount: BigInt(50), // Positive = deposit to unified balance
-    allocate_amount: BigInt(-50), // Negative = withdraw from channel
+    resize_amount: BigInt(50), // Positive = deposit to channel
+    allocate_amount: BigInt(-50), // Negative = deposit to unified balance
   });
   ```
 
@@ -158,11 +160,11 @@ Use `resize_amount` and `allocate_amount` with correct sign convention (`resize_
   <TabItem value="withdraw" label="Withdraw from Unified Balance">
 
   ```typescript
-  // Withdraw from unified balance to channel (not recommended)
+  // Withdraw from unified balance to custody ledger
   await client.resizeChannel({
     channel_id: channelId,
-    resize_amount: BigInt(-100), // Negative = withdraw from unified balance
-    allocate_amount: BigInt(100), // Positive = deposit to channel
+    resize_amount: BigInt(-100), // Negative = withdraw from channel
+    allocate_amount: BigInt(100), // Positive = withdraw from unified balance
   });
   ```
 

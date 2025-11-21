@@ -185,3 +185,29 @@ details[open] summary {
 .navbar__items--right > *:nth-child(3) {
     order: 100;
 }
+
+.git-diff-remove {
+    background-color: rgba(255, 0, 0, 0.125);
+    border-left: 3px solid rgba(255, 0, 0, 0.5);
+    display: block;
+    margin: 0 calc(-1 * var(--ifm-pre-padding));
+    padding: 0 var(--ifm-pre-padding);
+}
+
+.git-diff-add {
+    background-color: rgba(26, 255, 0, 0.125);
+    border-left: 3px solid rgba(26, 255, 0, 0.5);
+    display: block;
+    margin: 0 calc(-1 * var(--ifm-pre-padding));
+    padding: 0 var(--ifm-pre-padding);
+}
+
+[data-theme="dark"] .git-diff-remove {
+    background-color: rgba(255, 0, 0, 0.15);
+    border-left: 3px solid rgba(255, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .git-diff-add {
+    background-color: rgba(26, 255, 0, 0.15);
+    border-left: 3px solid rgba(26, 255, 0, 0.6);
+}

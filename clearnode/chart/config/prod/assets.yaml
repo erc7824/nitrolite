@@ -2,6 +2,13 @@ assets:
   - name: "USD Coin"
     symbol: "usdc"
     tokens:
+      - blockchain_id: 1
+        address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        decimals: 6
+      - blockchain_id: 14
+        symbol: "fusdc"
+        address: "0x66732BE10A9862D9cc8E7C7Dfc0b9036622DcA92"
+        decimals: 6
       - blockchain_id: 137
         address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
         decimals: 6
@@ -19,9 +26,6 @@ assets:
         decimals: 6
       - blockchain_id: 8453
         address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-        decimals: 6
-      - blockchain_id: 1
-        address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
         decimals: 6
       - blockchain_id: 59144
         address: "0x176211869cA2b568f2A7D4EE941E073a821EE1ff"

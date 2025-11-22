@@ -6,8 +6,8 @@ assets:
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
         decimals: 6
       - blockchain_id: 14
-        symbol: "fusdc"
-        address: "0x66732BE10A9862D9cc8E7C7Dfc0b9036622DcA92"
+        symbol: "USDC.e"
+        address: "0xFbDa5F676cB37624f28265A144A48B0d6e87d3b6"
         decimals: 6
       - blockchain_id: 137
         address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"

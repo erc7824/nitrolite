@@ -14,6 +14,9 @@ assets:
       - blockchain_id: 747
         address: "0x2aaBea2058b5aC2D339b163C6Ab6f2b6d53aabED"
         decimals: 6
+      - blockchain_id: 2020
+        address: "0x0b7007c13325c48911f73a2dad5fa5dcbf808adc"
+        decimals: 6
       - blockchain_id: 8453
         address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
         decimals: 6

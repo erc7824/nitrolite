@@ -34,12 +34,14 @@ Our repository uses the following primary branches:
 2. Implement the feature and commit changes.
 3. Open a **Pull Request** (PR) on GitHub into the base branch.
 4. During development, the branch can have all commits to facilitate the review process.
-5. **Before merging**: All commits should be either squashed or interactively rebased to avoid littering the commit history with misleading commits.
+5. **Before merging**: To maintain a clean and understandable git history, interactively rebase your feature branch to squash or fixup any work-in-progress commits into a set of logical, self-contained commits.
 6. After review and approval, merge using "Merge Pull Request" and delete the feature branch.
 
 ### Fix Development
 
-The process is identical to feature development, but uses the `fix/` prefix for branch names:
+Use `fix/*` branches for bug fixes discovered during the development cycle on the `main` or `release/*` branches. For urgent fixes to production code, use the `hotfix` process instead.
+
+The process is otherwise identical to feature development, but uses the `fix/` prefix for branch names:
 ```bash
 git checkout main  # or release/vX.Y.Z
 git pull
@@ -65,7 +67,7 @@ git checkout -b fix/<fix-name>
 4. Tag commits with release candidates:
    - Format: `<version>-rc.<num>` (starting from rc.0)
    - Create initial rc.0 tag on branch creation
-   - Increment the rc number on each merge into the release branch
+   - Increment the rc number when a new release candidate is ready for testing
 
 5. For each release candidate:
    - Publish packages (golang, npm, etc.)

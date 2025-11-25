@@ -34,7 +34,7 @@ Our repository uses the following primary branches:
 2. Implement the feature and commit changes.
 3. Open a **Pull Request** (PR) on GitHub into the base branch.
 4. During development, the branch can have all commits to facilitate the review process.
-5. **Before merging**: To maintain a clean and understandable git history, interactively rebase your feature branch to squash or fixup any work-in-progress commits into a set of logical, self-contained commits.
+5. **Before merging**: To maintain a clean and understandable git history, interactively rebase your feature branch to squash or fix up any work-in-progress commits into a set of logical, self-contained commits.
 6. After review and approval, merge using "Merge Pull Request" and delete the feature branch.
 
 ### Fix Development

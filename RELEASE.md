@@ -13,8 +13,8 @@ Our repository uses the following primary branches:
 |--------|----------|
 | `stable` | Reflects the state in **production**. Every tagged commit on `stable` represents a released version. |
 | `main` | The **main development branch** containing the latest completed features and integration code. |
-| `feat/*` | Used for **feature development**. Can be based on either `main` or `release/*` branches. |
-| `fix/*` | Used for **development fixes**. Can be based on either `main` or `release/*` branches. |
+| `feat/*` | **Feature development** branches. Can be based on either `main` or `release/*` branches. |
+| `fix/*` | **Development fix** branches. Can be based on either `main` or `release/*` branches. |
 | `release/*` | Used to **prepare a new stable release**. Based on `main`. |
 | `hotfix/*` | Used for **urgent fixes to production**. Based on `stable`. |
 

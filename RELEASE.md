@@ -83,6 +83,8 @@ git checkout -b fix/<fix-name>
 
 ### Hotfix Process
 
+Use hotfixes for **urgent, production-impacting fixes** that cannot wait for the next scheduled release; they patch `stable` directly to restore service or address critical defects.
+
 Similar to release branches with key differences:
 
 1. Create from `stable` branch:

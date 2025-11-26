@@ -13,8 +13,8 @@ Our repository uses the following primary branches:
 |--------|----------|
 | `stable` | Reflects the state in **production**. Every tagged commit on `stable` represents a released version. |
 | `main` | The **main development branch** containing the latest completed features and integration code. |
-| `feat/*` | **Feature development** branches. Can be based on either `main` or `release/*` branches. |
-| `fix/*` | **Development fix** branches. Can be based on either `main` or `release/*` branches. |
+| `feat/*` | **Feature development** branches. Can be based on either `main`, `release/*` or `feat/*` branches. |
+| `fix/*` | **Development fix** branches. Can be based on either `main`, `release/*` or `feat/*` branches. |
 | `release/*` | Used to **prepare a new stable release**. Based on `main`. |
 | `hotfix/*` | Used for **urgent fixes to production**. Based on `stable`. |
 
@@ -25,7 +25,7 @@ Our repository uses the following primary branches:
 
 ### Feature Development
 
-1. Create a new branch from either `main` (if no release branch exists) or the appropriate `release/*` branch:
+1. Create a new branch from either `main` (if no release branch exists), the appropriate `release/*` or a `feat/*` branch:
    ```bash
    git checkout main  # or release/vX.Y.Z
    git pull
@@ -39,7 +39,7 @@ Our repository uses the following primary branches:
 
 ### Fix Development
 
-Use `fix/*` branches for bug fixes discovered during the development cycle on the `main` or `release/*` branches. For urgent fixes to production code, use the `hotfix` process instead.
+Use `fix/*` branches for bug fixes discovered during the development cycle on the `main`, `release/*` or `feat/*` branches. For urgent fixes to production code, use the `hotfix` process instead.
 
 The process is otherwise identical to feature development, but uses the `fix/` prefix for branch names:
 ```bash

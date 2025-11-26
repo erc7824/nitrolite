@@ -9,6 +9,7 @@ blockchains:
     balance_checker: "0xb1f8e55c7f64d203c1400b9d8555d050f94adf39"
 - name: flare
   id: 14
+  disabled: true
   contract_addresses:
     balance_checker: "0x714698e8fe7896bb84A46c0705944c4a48580819"
 - name: polygon
@@ -27,6 +28,7 @@ blockchains:
   block_step: 50
 - name: ronin
   id: 2020
+  disabled: true
   contract_addresses:
     balance_checker: "0x714698e8fe7896bb84A46c0705944c4a48580819"
 - name: base

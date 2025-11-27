@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Address } from 'viem';
+import { Address, Hex } from 'viem';
 import {
     RPCMethod,
     GetLedgerBalancesResponseParams,
@@ -68,13 +68,20 @@ const GetLedgerEntriesParamsSchema = z
 
 export const txTypeEnum = z.nativeEnum(RPCTxType);
 
+export const ledgerAccountSchema = z
+      .string()
+      .refine((val) => /^0x[0-9a-fA-F]{40}$/.test(val) || /^0x[0-9a-fA-F]{64}$/.test(val), {
+          message: 'Must be a 0x-prefixed hex string of 40 or 64 hex chars',
+      })
+      .transform((v: string) => v as Hex);
+
 export const TransactionSchema = z
     .object({
         id: z.number(),
         tx_type: txTypeEnum,
-        from_account: addressSchema,
+        from_account: ledgerAccountSchema,
         from_account_tag: z.string().optional(),
-        to_account: addressSchema,
+        to_account: ledgerAccountSchema,
         to_account_tag: z.string().optional(),
         asset: z.string(),
         amount: z.string(),

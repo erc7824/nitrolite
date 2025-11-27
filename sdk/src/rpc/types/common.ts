@@ -1,4 +1,4 @@
-import { Hex, Address } from 'viem';
+import { Hex, Address, Hash } from 'viem';
 
 /** Represents the status of a channel. */
 export enum RPCChannelStatus {
@@ -95,38 +95,6 @@ export interface RPCNetworkInfo {
     adjudicatorAddress: Address;
 }
 
-/**
- * Represents the balance information from clearnode.
- */
-export interface RPCBalance {
-    /** The asset symbol (e.g., "eth", "usdc"). */
-    asset: string;
-    /** The balance amount. */
-    amount: string;
-}
-
-/**
- * Represents a single entry in the ledger.
- */
-export interface RPCLedgerEntry {
-    /** Unique identifier for the ledger entry. */
-    id: number;
-    /** The account identifier associated with the entry. */
-    accountId: string;
-    /** The type of account (e.g., "wallet", "channel"). */
-    accountType: number;
-    /** The asset symbol for the entry. */
-    asset: string;
-    /** The Ethereum address of the participant. */
-    participant: Address;
-    /** The credit amount. */
-    credit: string;
-    /** The debit amount. */
-    debit: string;
-    /** The timestamp when the entry was created. */
-    createdAt: Date;
-}
-
 export enum RPCAppStateIntent {
     /** Intent for a standard state update */
     Operate = 'operate',
@@ -207,6 +175,40 @@ export interface RPCAsset {
 }
 
 /**
+ * Represents the balance information from clearnode.
+ */
+export interface RPCBalance {
+    /** The asset symbol (e.g., "eth", "usdc"). */
+    asset: string;
+    /** The balance amount. */
+    amount: string;
+}
+
+export type LedgerAccountType = Address | Hash;
+
+/**
+ * Represents a single entry in the ledger.
+ */
+export interface RPCLedgerEntry {
+    /** Unique identifier for the ledger entry. */
+    id: number;
+    /** The account identifier associated with the entry. */
+    accountId: LedgerAccountType;
+    /** The type of account (e.g., "wallet", "channel"). */
+    accountType: number;
+    /** The asset symbol for the entry. */
+    asset: string;
+    /** The Ethereum address of the participant. */
+    participant: Address;
+    /** The credit amount. */
+    credit: string;
+    /** The debit amount. */
+    debit: string;
+    /** The timestamp when the entry was created. */
+    createdAt: Date;
+}
+
+/**
  * Represents the parameters for the transfer transaction.
  */
 export interface RPCTransaction {
@@ -215,11 +217,11 @@ export interface RPCTransaction {
     /** The type of transaction. */
     txType: RPCTxType;
     /** The source address from which assets were transferred. */
-    fromAccount: Address;
+    fromAccount: LedgerAccountType;
     /** The user tag for the source account (optional). */
     fromAccountTag?: string;
     /** The destination address to which assets were transferred. */
-    toAccount: Address;
+    toAccount: LedgerAccountType;
     /** The user tag for the destination account (optional). */
     toAccountTag?: string;
     /** The asset symbol that was transferred. */

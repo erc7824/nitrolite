@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Address, Hex } from 'viem';
+import { Address, Hex, isAddress, isHex } from 'viem';
 import {
     RPCMethod,
     GetLedgerBalancesResponseParams,
@@ -32,10 +32,17 @@ const GetLedgerBalancesParamsSchema = z
         }),
     );
 
+export const ledgerAccountSchema = z
+    .string()
+    .refine((val) => isAddress(val) || (isHex(val) && val.length === 66), {
+        message: 'Must be a valid EVM address or a 0x-prefixed 64-char hex string',
+    })
+    .transform((v) => v as Hex);
+
 const LedgerEntryObjectSchema = z
     .object({
         id: z.number(),
-        account_id: z.string(),
+        account_id: ledgerAccountSchema,
         account_type: z.number(),
         asset: z.string(),
         participant: addressSchema,
@@ -67,13 +74,6 @@ const GetLedgerEntriesParamsSchema = z
     );
 
 export const txTypeEnum = z.nativeEnum(RPCTxType);
-
-export const ledgerAccountSchema = z
-      .string()
-      .refine((val) => /^0x[0-9a-fA-F]{40}$/.test(val) || /^0x[0-9a-fA-F]{64}$/.test(val), {
-          message: 'Must be a 0x-prefixed hex string of 40 or 64 hex chars',
-      })
-      .transform((v: string) => v as Hex);
 
 export const TransactionSchema = z
     .object({

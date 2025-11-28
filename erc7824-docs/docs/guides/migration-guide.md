@@ -68,7 +68,7 @@ The following operations will return errors if the user has any channel with non
 - **Submit App State** (with deposit intent): Rejected if attempting to deposit
 - **Create App Session** (with allocations): Rejected if attempting to allocate
 
-The error is returned has the following format: `operation denied: non-zero allocation in <count> channel(s) detected owned by wallet <address>"`
+The returned error has the following format: `operation denied: non-zero allocation in <count> channel(s) detected owned by wallet <address>"`
 
 ### Nitrolite SDK
 

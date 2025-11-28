@@ -142,18 +142,25 @@ await client.resizeChannel({
 
 #### Resize correctly
 
-Use `resize_amount` and `allocate_amount` with correct sign convention (`resize_amount = -allocate_amount`) and help users with non-zero channel balances migrate by resizing to zero or reopening channels:
+Channel resizing must be negotiated with the ClearNode through WebSocket. Use `resize_amount` and `allocate_amount` with correct sign convention (`resize_amount = -allocate_amount`) and help users with non-zero channel balances migrate by resizing to zero or reopening channels:
 
 <Tabs>
   <TabItem value="deposit" label="Deposit to Unified Balance">
 
   ```typescript
   // Deposit from custody ledger to unified balance
-  await client.resizeChannel({
+  const resizeMessage = await createResizeChannelMessage(messageSigner, {
     channel_id: channelId,
     resize_amount: BigInt(50), // Positive = deposit to channel
     allocate_amount: BigInt(-50), // Negative = deposit to unified balance
+    funds_destination: walletAddress,
   });
+  
+  const resizeResponse = await ws.sendAndWaitForResponse(
+    resizeMessage,
+    getResizeChannelPredicate(),
+    5000
+  );
   ```
 
   </TabItem>
@@ -161,11 +168,18 @@ Use `resize_amount` and `allocate_amount` with correct sign convention (`resize_
 
   ```typescript
   // Withdraw from unified balance to custody ledger
-  await client.resizeChannel({
+  const resizeMessage = await createResizeChannelMessage(messageSigner, {
     channel_id: channelId,
     resize_amount: BigInt(-100), // Negative = withdraw from channel
     allocate_amount: BigInt(100), // Positive = withdraw from unified balance
+    funds_destination: walletAddress,
   });
+  
+  const resizeResponse = await ws.sendAndWaitForResponse(
+    resizeMessage,
+    getResizeChannelPredicate(),
+    5000
+  );
   ```
 
   </TabItem>
@@ -178,10 +192,20 @@ Use `resize_amount` and `allocate_amount` with correct sign convention (`resize_
   for (const channel of channels) {
     if (channel.amount > 0) {
       // Must empty channel to enable transfers/app operations
-      await client.resizeChannel({
+      const resizeMessage = await createResizeChannelMessage(messageSigner, {
         channel_id: channel.channelId,
-        allocate_amount: -channel.amount,
+        resize_amount: BigInt(0),
+        allocate_amount: -BigInt(channel.amount),
+        funds_destination: walletAddress,
       });
+      
+      const resizeResponse = await ws.sendAndWaitForResponse(
+        resizeMessage,
+        getResizeChannelPredicate(),
+        5000
+      );
+
+      // Use NitroliteClient for each resize operation
     }
   }
   ```

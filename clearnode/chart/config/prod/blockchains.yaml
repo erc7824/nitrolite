@@ -22,10 +22,8 @@ blockchains:
     balance_checker: "0x6D3B5EFa1f81f65037cD842F48E44BcBCa48CBEF"
 - name: flow
   id: 747
-  disabled: true
   contract_addresses:
     balance_checker: "0xa3f2f64455c9f8D68d9dCAeC2605D64680FaF898"
-  block_step: 50
 - name: ronin
   id: 2020
   disabled: true

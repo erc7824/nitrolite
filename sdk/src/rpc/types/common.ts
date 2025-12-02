@@ -5,7 +5,7 @@ export enum RPCChannelStatus {
     Open = 'open',
     Closed = 'closed',
     Challenged = 'challenged',
-    Resizing = "resizing",
+    Resizing = 'resizing',
 }
 
 /**

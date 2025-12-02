@@ -4,8 +4,8 @@ import { Hex, Address, Hash } from 'viem';
 export enum RPCChannelStatus {
     Open = 'open',
     Closed = 'closed',
-    Challenged = 'challenged',
     Resizing = 'resizing',
+    Challenged = 'challenged',
 }
 
 /**

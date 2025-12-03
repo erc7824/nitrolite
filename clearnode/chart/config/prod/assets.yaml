@@ -24,11 +24,11 @@ assets:
       - blockchain_id: 59144
         address: "0x0000000000000000000000000000000000000000"
         decimals: 18
-  - symbol: "LINK"
+  - symbol: "link"
     name: "ChainLink Token"
     tokens:
       - blockchain_id: 56
-        address: "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD"
+        address: "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD" # pegged
         decimals: 18
   - symbol: "usdc"
     name: "USD Coin"
@@ -41,7 +41,7 @@ assets:
         address: "0xFbDa5F676cB37624f28265A144A48B0d6e87d3b6"
         decimals: 6
       - blockchain_id: 56
-        address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+        address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d" # pegged
         decimals: 18
       - blockchain_id: 137
         address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
@@ -71,7 +71,7 @@ assets:
     name: "Tether USD"
     tokens:
       - blockchain_id: 56
-        address: "0x55d398326f99059fF775485246999027B3197955"
+        address: "0x55d398326f99059fF775485246999027B3197955" # pegged
         decimals: 18
       - blockchain_id: 8453
         address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2"
@@ -83,7 +83,7 @@ assets:
     name: "wETH"
     tokens:
       - blockchain_id: 56
-        address: "0x2170Ed0880ac9A755fd29B2688956BD959F933F8"
+        address: "0x2170Ed0880ac9A755fd29B2688956BD959F933F8" # pegged
         decimals: 18
       - blockchain_id: 137
         address: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"

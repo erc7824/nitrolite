@@ -1,6 +1,37 @@
 assets:
-  - name: "USD Coin"
-    symbol: "usdc"
+# Alphabetically sorted by symbol (case insensitive)
+  - symbol: "beatwav"
+    name: "BeatWav Token"
+    tokens:
+      - blockchain_id: 137
+        address: "0x45268ba6c9A0459Eda6F6fAb4E5083c61730F375"
+        decimals: 6
+      - blockchain_id: 1
+        address: "0xDB33fEC4e2994a675133320867a6439Da4A5acD8"
+        decimals: 18
+  - symbol: "bnb"
+    name: "BNB"
+    tokens:
+      - blockchain_id: 56
+        address: "0x0000000000000000000000000000000000000000"
+        decimals: 18
+  - symbol: "eth"
+    name: "Ether"
+    tokens:
+      - blockchain_id: 8453
+        address: "0x0000000000000000000000000000000000000000"
+        decimals: 18
+      - blockchain_id: 59144
+        address: "0x0000000000000000000000000000000000000000"
+        decimals: 18
+  - symbol: "LINK"
+    name: "ChainLink Token"
+    tokens:
+      - blockchain_id: 56
+        address: "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD"
+        decimals: 18
+  - symbol: "usdc"
+    name: "USD Coin"
     tokens:
       - blockchain_id: 1
         address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
@@ -9,6 +40,9 @@ assets:
         symbol: "USDC.e"
         address: "0xFbDa5F676cB37624f28265A144A48B0d6e87d3b6"
         decimals: 6
+      - blockchain_id: 56
+        address: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+        decimals: 18
       - blockchain_id: 137
         address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
         decimals: 6
@@ -33,40 +67,29 @@ assets:
       - blockchain_id: 1440000
         address: "0xa16148c6Ac9EDe0D82f0c52899e22a575284f131"
         decimals: 6
-  - name: "Tether USD"
-    symbol: "usdt"
+  - symbol: "usdt"
+    name: "Tether USD"
     tokens:
+      - blockchain_id: 56
+        address: "0x55d398326f99059fF775485246999027B3197955"
+        decimals: 18
       - blockchain_id: 8453
         address: "0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2"
         decimals: 6
       - blockchain_id: 59144
         address: "0xA219439258ca9da29E9Cc4cE5596924745e12B93"
         decimals: 6
-  - name: "Ether"
-    symbol: "eth"
+  - symbol: "weth"
+    name: "wETH"
     tokens:
-      - blockchain_id: 8453
-        address: "0x0000000000000000000000000000000000000000"
+      - blockchain_id: 56
+        address: "0x2170Ed0880ac9A755fd29B2688956BD959F933F8"
         decimals: 18
-      - blockchain_id: 59144
-        address: "0x0000000000000000000000000000000000000000"
-        decimals: 18
-  - name: "wETH"
-    symbol: "weth"
-    tokens:
       - blockchain_id: 137
         address: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619"
         decimals: 18
-  - symbol: "beatwav"
-    tokens:
-      - blockchain_id: 137
-        address: "0x45268ba6c9A0459Eda6F6fAb4E5083c61730F375"
-        decimals: 6
-      - blockchain_id: 1
-        address: "0xDB33fEC4e2994a675133320867a6439Da4A5acD8"
-        decimals: 18
-  - name: "Ripple"
-    symbol: "xrp"
+  - symbol: "xrp"
+    name: "Ripple"
     tokens:
       - blockchain_id: 1440000
         address: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"

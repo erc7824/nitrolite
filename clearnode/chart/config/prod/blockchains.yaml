@@ -12,6 +12,10 @@ blockchains:
   disabled: true
   contract_addresses:
     balance_checker: "0x714698e8fe7896bb84A46c0705944c4a48580819"
+- name: bsc
+  id: 56
+  contract_addresses:
+    balance_checker: "0x2352c63A83f9Fd126af8676146721Fa00924d7e4"
 - name: polygon
   id: 137
   contract_addresses:

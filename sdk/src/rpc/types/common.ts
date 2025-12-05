@@ -17,6 +17,8 @@ export enum RPCTxType {
     Withdrawal = 'withdrawal',
     AppDeposit = 'app_deposit',
     AppWithdrawal = 'app_withdrawal',
+    EscrowLock = 'escrow_lock',
+    EscrowUnlock = 'escrow_unlock',
 }
 
 /**
@@ -90,6 +92,8 @@ export interface RPCChannelUpdateWithWallet extends RPCChannelUpdate {
 export interface RPCNetworkInfo {
     /** The chain ID of the network. */
     chainId: number;
+    /** The name of the blockchain (e.g., "polygon_amoy", "base_sepolia"). */
+    name: string;
     /** The custody contract address for the network. */
     custodyAddress: Address;
     /** The adjudicator contract address for the network. */

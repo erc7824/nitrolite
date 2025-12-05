@@ -245,6 +245,7 @@ describe('rpc response parsers', () => {
             networks: [
                 {
                     chain_id: 1,
+                    name: 'ethereum_mainnet',
                     custody_address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
                     adjudicator_address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
                 },
@@ -263,6 +264,7 @@ describe('rpc response parsers', () => {
             networks: [
                 {
                     chainId: 1,
+                    name: 'ethereum_mainnet',
                     custodyAddress: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
                     adjudicatorAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
                 },

@@ -84,8 +84,7 @@ const CloseAppSessionParamsSchema = z
 
 const GetAppDefinitionParamsSchema = z
     .object({
-        application: z.string(),
-        protocol: protocolVersionEnum,
+        protocol: z.string(),
         participants: z.array(addressSchema),
         weights: z.array(z.number()),
         quorum: z.number(),
@@ -94,7 +93,6 @@ const GetAppDefinitionParamsSchema = z
     })
     .transform(
         (raw): GetAppDefinitionResponseParams => ({
-            application: raw.application,
             protocol: raw.protocol,
             participants: raw.participants as Address[],
             weights: raw.weights,

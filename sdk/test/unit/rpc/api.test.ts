@@ -55,7 +55,6 @@ describe('API message creators', () => {
             allowances: [],
             expires_at: 0n,
             scope: '',
-            application: clientAddress,
         };
         const msgStr = await createAuthRequestMessage(authRequest, requestId, timestamp);
         expect(signer).not.toHaveBeenCalled();
@@ -71,7 +70,6 @@ describe('API message creators', () => {
                     allowances: [],
                     expires_at: 0,
                     scope: '',
-                    application: clientAddress,
                 },
                 timestamp,
             ],
@@ -144,9 +142,9 @@ describe('API message creators', () => {
     });
 
     test('createGetLedgerBalancesMessage', async () => {
-        const participant = '0x0123124124124100000000000000000000000000' as Address;
-        const ledgerParams = { participant };
-        const msgStr = await createGetLedgerBalancesMessage(signer, participant, requestId, timestamp);
+        const accountId = '0x0123124124124100000000000000000000000000' as Address;
+        const ledgerParams = { account_id: accountId };
+        const msgStr = await createGetLedgerBalancesMessage(signer, accountId, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerBalances, ledgerParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
@@ -168,6 +166,7 @@ describe('API message creators', () => {
     test('createAppSessionMessage', async () => {
         const params = {
             definition: {
+                application: 'test-app',
                 protocol: RPCProtocolVersion.NitroRPC_0_2,
                 participants: [],
                 weights: [],

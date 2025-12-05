@@ -53,9 +53,7 @@ export interface GetConfigRequest extends GenericRPCMessage {
 export interface GetLedgerBalancesRequest extends GenericRPCMessage {
     method: RPCMethod.GetLedgerBalances;
     params: {
-        /** The participant address to filter balances. */
-        participant: Address;
-        /** Optional account ID to filter balances. If provided, overrides the participant address. */
+        /** Optional account ID to filter balances. */
         account_id?: string;
     };
 }

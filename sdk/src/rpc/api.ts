@@ -231,18 +231,18 @@ export async function createGetSessionKeysMessage(
  * Creates the signed, stringified message body for a 'get_ledger_balances' request.
  *
  * @param signer - The function to sign the request payload.
- * @param participant - The participant address.
+ * @param accountId - Optional account ID to filter balances.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
  */
 export async function createGetLedgerBalancesMessage(
     signer: MessageSigner,
-    participant: Address,
+    accountId?: string,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = { participant: participant };
+    const params = accountId ? { account_id: accountId } : {};
     const request = NitroliteRPC.createRequest({
         method: RPCMethod.GetLedgerBalances,
         params,

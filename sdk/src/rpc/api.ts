@@ -137,15 +137,13 @@ export async function createAuthVerifyMessageWithJWT(
 }
 
 /**
- * Creates the signed, stringified message body for a 'ping' request.
+ * Creates the stringified message body for a 'ping' request.
  *
- * @param signer - The function to sign the request payload.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createPingMessage(
-    signer: MessageSigner,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
@@ -155,21 +153,18 @@ export async function createPingMessage(
         requestId,
         timestamp,
     });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
-    return JSON.stringify(signedRequest);
+    return JSON.stringify(request);
 }
 
 /**
- * Creates the signed, stringified message body for a 'get_config' request.
+ * Creates the stringified message body for a 'get_config' request.
  *
- * @param signer - The function to sign the request payload.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetConfigMessage(
-    signer: MessageSigner,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
@@ -179,9 +174,8 @@ export async function createGetConfigMessage(
         requestId,
         timestamp,
     });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
-    return JSON.stringify(signedRequest);
+    return JSON.stringify(request);
 }
 
 /**
@@ -237,18 +231,18 @@ export async function createGetSessionKeysMessage(
  * Creates the signed, stringified message body for a 'get_ledger_balances' request.
  *
  * @param signer - The function to sign the request payload.
- * @param participant - The participant address.
+ * @param accountId - Optional account ID to filter balances.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
  */
 export async function createGetLedgerBalancesMessage(
     signer: MessageSigner,
-    participant: Address,
+    accountId?: string,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
-    const params = { participant: participant };
+    const params = accountId ? { account_id: accountId } : {};
     const request = NitroliteRPC.createRequest({
         method: RPCMethod.GetLedgerBalances,
         params,
@@ -261,17 +255,15 @@ export async function createGetLedgerBalancesMessage(
 }
 
 /**
- * Creates the signed, stringified message body for a 'get_ledger_entries' request.
+ * Creates the stringified message body for a 'get_ledger_entries' request.
  *
- * @param signer - The function to sign the request payload.
  * @param accountId - The account ID to get entries for.
  * @param asset - Optional asset symbol to filter entries.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetLedgerEntriesMessage(
-    signer: MessageSigner,
     accountId: string,
     asset?: string,
     requestId: RequestID = generateRequestId(),
@@ -287,23 +279,20 @@ export async function createGetLedgerEntriesMessage(
         requestId,
         timestamp,
     });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
-    return JSON.stringify(signedRequest);
+    return JSON.stringify(request);
 }
 
 /**
- * Creates the signed, stringified message body for a 'get_ledger_transactions' request.
+ * Creates the stringified message body for a 'get_ledger_transactions' request.
  *
- * @param signer - The function to sign the request payload.
  * @param accountId - The account ID to get transactions for.
  * @param filters - Optional filters to apply to the transactions.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetLedgerTransactionsMessage(
-    signer: MessageSigner,
     accountId: string,
     filters?: GetLedgerTransactionsFilters,
     requestId: RequestID = generateRequestId(),
@@ -330,22 +319,19 @@ export async function createGetLedgerTransactionsMessage(
         requestId,
         timestamp,
     });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
-    return JSON.stringify(signedRequest);
+    return JSON.stringify(request);
 }
 
 /**
- * Creates the signed, stringified message body for a 'get_app_definition' request.
+ * Creates the stringified message body for a 'get_app_definition' request.
  *
- * @param signer - The function to sign the request payload.
  * @param appSessionId - The Application Session ID to get the definition for.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetAppDefinitionMessage(
-    signer: MessageSigner,
     appSessionId: AccountID,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
@@ -357,23 +343,20 @@ export async function createGetAppDefinitionMessage(
         requestId,
         timestamp,
     });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
-    return JSON.stringify(signedRequest);
+    return JSON.stringify(request);
 }
 
 /**
- * Creates the signed, stringified message body for a 'get_app_sessions' request.
+ * Creates the stringified message body for a 'get_app_sessions' request.
  *
- * @param signer - The function to sign the request payload.
  * @param participant - Participant address to filter sessions.
  * @param status - Optional status to filter sessions.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetAppSessionsMessage(
-    signer: MessageSigner,
     participant: Address,
     status?: RPCChannelStatus,
     requestId: RequestID = generateRequestId(),
@@ -389,9 +372,8 @@ export async function createGetAppSessionsMessage(
         requestId,
         timestamp,
     });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
-    return JSON.stringify(signedRequest);
+    return JSON.stringify(request);
 }
 
 /**
@@ -594,17 +576,15 @@ export async function createResizeChannelMessage(
 }
 
 /**
- * Creates the signed, stringified message body for a 'get_channels' request.
+ * Creates the stringified message body for a 'get_channels' request.
  *
- * @param signer - The function to sign the request payload.
  * @param participant - Optional participant address to filter channels.
  * @param status - Optional status to filter channels.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetChannelsMessage(
-    signer: MessageSigner,
     participant?: Address,
     status?: RPCChannelStatus,
     requestId: RequestID = generateRequestId(),
@@ -620,8 +600,7 @@ export async function createGetChannelsMessage(
         requestId,
         timestamp,
     });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
-    return JSON.stringify(signedRequest);
+    return JSON.stringify(request);
 }
 
 /**
@@ -649,16 +628,14 @@ export async function createGetRPCHistoryMessage(
 }
 
 /**
- * Creates the signed, stringified message body for a 'get_assets' request.
+ * Creates the stringified message body for a 'get_assets' request.
  *
- * @param signer - The function to sign the request payload.
  * @param chainId - Optional chain ID to filter assets.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetAssetsMessage(
-    signer: MessageSigner,
     chainId?: number,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
@@ -672,9 +649,8 @@ export async function createGetAssetsMessage(
         requestId,
         timestamp,
     });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
-    return JSON.stringify(signedRequest);
+    return JSON.stringify(request);
 }
 
 /**

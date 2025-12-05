@@ -141,7 +141,7 @@ export async function createAuthVerifyMessageWithJWT(
  *
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createPingMessage(
     requestId: RequestID = generateRequestId(),
@@ -162,7 +162,7 @@ export async function createPingMessage(
  *
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetConfigMessage(
     requestId: RequestID = generateRequestId(),
@@ -255,17 +255,15 @@ export async function createGetLedgerBalancesMessage(
 }
 
 /**
- * Creates the signed, stringified message body for a 'get_ledger_entries' request.
+ * Creates the stringified message body for a 'get_ledger_entries' request.
  *
- * @param signer - The function to sign the request payload.
  * @param accountId - The account ID to get entries for.
  * @param asset - Optional asset symbol to filter entries.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetLedgerEntriesMessage(
-    signer: MessageSigner,
     accountId: string,
     asset?: string,
     requestId: RequestID = generateRequestId(),
@@ -281,9 +279,8 @@ export async function createGetLedgerEntriesMessage(
         requestId,
         timestamp,
     });
-    const signedRequest = await NitroliteRPC.signRequestMessage(request, signer);
 
-    return JSON.stringify(signedRequest);
+    return JSON.stringify(request);
 }
 
 /**
@@ -293,7 +290,7 @@ export async function createGetLedgerEntriesMessage(
  * @param filters - Optional filters to apply to the transactions.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetLedgerTransactionsMessage(
     accountId: string,
@@ -332,7 +329,7 @@ export async function createGetLedgerTransactionsMessage(
  * @param appSessionId - The Application Session ID to get the definition for.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetAppDefinitionMessage(
     appSessionId: AccountID,
@@ -357,7 +354,7 @@ export async function createGetAppDefinitionMessage(
  * @param status - Optional status to filter sessions.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetAppSessionsMessage(
     participant: Address,
@@ -585,7 +582,7 @@ export async function createResizeChannelMessage(
  * @param status - Optional status to filter channels.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetChannelsMessage(
     participant?: Address,
@@ -636,7 +633,7 @@ export async function createGetRPCHistoryMessage(
  * @param chainId - Optional chain ID to filter assets.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
  */
 export async function createGetAssetsMessage(
     chainId?: number,

@@ -1,11 +1,7 @@
 import {
     Account,
     Address,
-    Chain,
-    ParseAccount,
     SimulateContractReturnType,
-    Transport,
-    WalletClient,
     zeroAddress,
 } from 'viem';
 import { ContractAddresses } from '../abis';
@@ -25,6 +21,7 @@ import {
     ResizeChannelParams,
 } from './types';
 import { StateSigner } from './signer';
+import { getAccountAddress } from './helpers';
 
 /**
  * Represents the data needed to construct a transaction or UserOperation call.
@@ -40,8 +37,7 @@ export interface PreparerDependencies {
     nitroliteService: NitroliteService;
     erc20Service: Erc20Service;
     addresses: ContractAddresses;
-    account: ParseAccount<Account>;
-    walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
+    account: Account | Address;
     stateSigner: StateSigner;
     challengeDuration: bigint;
     chainId: number;
@@ -73,7 +69,7 @@ export class NitroliteTransactionPreparer {
     async prepareDepositTransactions(tokenAddress: Address, amount: bigint): Promise<PreparedTransaction[]> {
         const transactions: PreparedTransaction[] = [];
         const spender = this.deps.addresses.custody;
-        const owner = this.deps.account.address;
+        const owner = getAccountAddress(this.deps.account);
 
         if (tokenAddress !== zeroAddress) {
             const allowance = await this.deps.erc20Service.getTokenAllowance(tokenAddress, owner, spender);
@@ -134,7 +130,7 @@ export class NitroliteTransactionPreparer {
     ): Promise<PreparedTransaction[]> {
         const transactions: PreparedTransaction[] = [];
         const spender = this.deps.addresses.custody;
-        const owner = this.deps.account.address;
+        const owner = getAccountAddress(this.deps.account);
 
         if (tokenAddress !== zeroAddress) {
             const allowance = await this.deps.erc20Service.getTokenAllowance(tokenAddress, owner, spender);

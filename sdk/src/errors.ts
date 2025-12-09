@@ -188,6 +188,19 @@ export class WalletClientRequiredError extends AuthenticationError {
     }
 }
 
+export class ContractWriterRequiredError extends AuthenticationError {
+    constructor(details?: Record<string, any>, cause?: Error) {
+        super(
+            'ContractWriter instance is required for this operation',
+            'CONTRACT_WRITER_REQUIRED',
+            400,
+            'Provide a valid ContractWriter instance during service initialization',
+            details,
+            cause,
+        );
+    }
+}
+
 export class AccountRequiredError extends AuthenticationError {
     constructor(details?: Record<string, any>, cause?: Error) {
         super(
@@ -369,6 +382,7 @@ export const Errors = {
     UnauthorizedError,
     NotParticipantError,
     WalletClientRequiredError,
+    ContractWriterRequiredError,
     AccountRequiredError,
 
     ContractNotFoundError,

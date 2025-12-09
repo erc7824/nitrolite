@@ -199,10 +199,5 @@ async function _fetchParticipantAndGetSigner(deps: PreparerDependencies, channel
  * @returns A StateSigner object depending on the user participant address.
  */
 function _checkParticipantAndGetSigner(deps: PreparerDependencies, participant: Address): StateSigner {
-    let signer = deps.stateSigner;
-    if (participant == deps.walletClient.account.address) {
-        signer = new WalletStateSigner(deps.walletClient);
-    }
-
-    return signer;
+    return deps.stateSigner;
 }

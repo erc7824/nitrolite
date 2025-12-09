@@ -1,8 +1,11 @@
-import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress, Hex } from 'viem';
+import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress, Hex, ContractFunctionParameters } from 'viem';
 import { custodyAbi } from '../../abis/generated';
 import { ContractAddresses } from '../../abis';
 import { Errors } from '../../errors';
 import { Channel, ChannelData, ChannelId, Signature, State } from '../types';
+import { ContractCallParams, ContractWriter } from '../contract_writer/types';
+import { EOAContractWriter } from '../contract_writer/eoa';
+import { getLastTxHashFromWriteResult } from '../helpers';
 
 /**
  * Type utility to properly type the request object from simulateContract
@@ -24,7 +27,7 @@ type PreparedContractRequest = any;
  * @returns Promise<Hash> - The transaction hash
  */
 const executeWriteContract = async (
-    walletClient: WalletClient,
+    contractWriter: ContractWriter,
     request: PreparedContractRequest,
     account: Account | Address,
 ): Promise<Hash> => {
@@ -36,10 +39,18 @@ const executeWriteContract = async (
     //
     // Note: Type assertion is necessary due to viem's complex union types for transaction parameters.
     // The runtime behavior is correct - simulateContract returns compatible parameters for writeContract.
-    return walletClient.writeContract({
-        ...request,
-        account,
-    } as any);
+    const calls = [
+        {
+            ...request,
+            account,
+        },
+    ];
+
+    const result = await contractWriter.write({
+        calls,
+    });
+
+    return getLastTxHashFromWriteResult(result);
 };
 
 /**
@@ -48,15 +59,16 @@ const executeWriteContract = async (
  */
 export class NitroliteService {
     private readonly publicClient: PublicClient;
-    private readonly walletClient?: WalletClient;
     private readonly account?: Account | Address;
     private readonly addresses: ContractAddresses;
+    private readonly contractWriter?: ContractWriter;
 
     constructor(
         publicClient: PublicClient,
         addresses: ContractAddresses,
         walletClient?: WalletClient,
         account?: Account | Address,
+        contractWriter?: ContractWriter,
     ) {
         if (!publicClient) {
             throw new Errors.MissingParameterError('publicClient');
@@ -66,18 +78,27 @@ export class NitroliteService {
             throw new Errors.MissingParameterError('addresses.custody');
         }
 
+        if (contractWriter) {
+            this.contractWriter = contractWriter;
+        } else if (walletClient) {
+            this.contractWriter = new EOAContractWriter({
+                publicClient,
+                // @ts-ignore
+                walletClient,
+            });
+        }
+
         this.publicClient = publicClient;
-        this.walletClient = walletClient;
         this.account = account || walletClient?.account;
         this.addresses = addresses;
     }
 
     /** Ensures a WalletClient is available for write operations. */
-    private ensureWalletClient(): WalletClient {
-        if (!this.walletClient) {
-            throw new Errors.WalletClientRequiredError();
+    private ensureContractWriter(): ContractWriter {
+        if (!this.contractWriter) {
+            throw new Errors.ContractWriterRequiredError();
         }
-        return this.walletClient;
+        return this.contractWriter;
     }
 
     /** Ensures an Account is available for write/simulation operations. */
@@ -127,7 +148,7 @@ export class NitroliteService {
                 token: Address;
                 amount: bigint;
             }[],
-            sigs: state.sigs || [] as readonly Hex[],
+            sigs: state.sigs || ([] as readonly Hex[]),
         } as const;
     }
 
@@ -160,6 +181,21 @@ export class NitroliteService {
         };
     }
 
+    // TODO: comment
+    prepareDepositCallParams(tokenAddress: Address, amount: bigint): ContractCallParams {
+        const account = this.ensureAccount();
+        const accountAddress = typeof account === 'string' ? account : account.address;
+
+        return {
+            address: this.custodyAddress,
+            abi: custodyAbi,
+            functionName: 'deposit',
+            args: [accountAddress, tokenAddress, amount],
+            account: account,
+            value: tokenAddress === zeroAddress ? amount : 0n,
+        };
+    }
+
     /**
      * Prepares the request data for a deposit transaction.
      * Useful for batching multiple calls in a single UserOperation.
@@ -168,19 +204,11 @@ export class NitroliteService {
      * @returns The prepared transaction request object.
      */
     async prepareDeposit(tokenAddress: Address, amount: bigint): Promise<PreparedContractRequest> {
-        const account = this.ensureAccount();
         const operationName = 'prepareDeposit';
-        const accountAddress = typeof account === 'string' ? account : account.address;
 
         try {
-            const { request } = await this.publicClient.simulateContract({
-                address: this.custodyAddress,
-                abi: custodyAbi,
-                functionName: 'deposit',
-                args: [accountAddress, tokenAddress, amount],
-                account: account,
-                value: tokenAddress === zeroAddress ? amount : 0n,
-            });
+            const params = this.prepareDepositCallParams(tokenAddress, amount);
+            const { request } = await this.publicClient.simulateContract(params);
 
             return request;
         } catch (error: any) {
@@ -199,17 +227,32 @@ export class NitroliteService {
      * @error Throws ContractCallError | TransactionError
      */
     async deposit(tokenAddress: Address, amount: bigint): Promise<Hash> {
-        const walletClient = this.ensureWalletClient();
+        const contractWriter = this.ensureContractWriter();
         const account = this.ensureAccount();
         const operationName = 'deposit';
 
         try {
             const request = await this.prepareDeposit(tokenAddress, amount);
-            return await executeWriteContract(walletClient, request, account);
+            return await executeWriteContract(contractWriter, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { tokenAddress, amount });
         }
+    }
+
+    // TODO: comment
+    prepareCreateChannelCallParams(channel: Channel, initial: State): ContractCallParams {
+        const account = this.ensureAccount();
+        const abiChannel = this.convertChannelForABI(channel);
+        const abiState = this.convertStateForABI(initial);
+
+        return {
+            address: this.custodyAddress,
+            abi: custodyAbi,
+            functionName: 'create',
+            args: [abiChannel, abiState],
+            account: account,
+        };
     }
 
     /**
@@ -220,20 +263,11 @@ export class NitroliteService {
      * @returns The prepared transaction request object.
      */
     async prepareCreateChannel(channel: Channel, initial: State): Promise<PreparedContractRequest> {
-        const account = this.ensureAccount();
         const operationName = 'prepareCreateChannel';
 
         try {
-            const abiChannel = this.convertChannelForABI(channel);
-            const abiState = this.convertStateForABI(initial);
-
-            const { request } = await this.publicClient.simulateContract({
-                address: this.custodyAddress,
-                abi: custodyAbi,
-                functionName: 'create',
-                args: [abiChannel, abiState],
-                account: account,
-            });
+            const params = this.prepareCreateChannelCallParams(channel, initial);
+            const { request } = await this.publicClient.simulateContract(params);
 
             return request;
         } catch (error: any) {
@@ -252,17 +286,38 @@ export class NitroliteService {
      * @error Throws ContractCallError | TransactionError
      */
     async createChannel(channel: Channel, initial: State): Promise<Hash> {
-        const walletClient = this.ensureWalletClient();
+        const contractWriter = this.ensureContractWriter();
         const account = this.ensureAccount();
         const operationName = 'createChannel';
 
         try {
             const request = await this.prepareCreateChannel(channel, initial);
-            return await executeWriteContract(walletClient, request, account);
+            return await executeWriteContract(contractWriter, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { channel, initial });
         }
+    }
+
+    // TODO: comment
+    prepareDepositAndCreateChannelCallParams(
+        tokenAddress: Address,
+        amount: bigint,
+        channel: Channel,
+        initial: State,
+    ): ContractCallParams {
+        const account = this.ensureAccount();
+        const abiChannel = this.convertChannelForABI(channel);
+        const abiState = this.convertStateForABI(initial);
+
+        return {
+            address: this.custodyAddress,
+            abi: custodyAbi,
+            functionName: 'depositAndCreate',
+            args: [tokenAddress, amount, abiChannel, abiState],
+            account: account,
+            value: tokenAddress === zeroAddress ? amount : 0n,
+        };
     }
 
     /**
@@ -280,22 +335,11 @@ export class NitroliteService {
         channel: Channel,
         initial: State,
     ): Promise<PreparedContractRequest> {
-        const account = this.ensureAccount();
         const operationName = 'prepareDepositAndCreateChannel';
-        const accountAddress = typeof account === 'string' ? account : account.address;
 
         try {
-            const abiChannel = this.convertChannelForABI(channel);
-            const abiState = this.convertStateForABI(initial);
-
-            const { request } = await this.publicClient.simulateContract({
-                address: this.custodyAddress,
-                abi: custodyAbi,
-                functionName: 'depositAndCreate',
-                args: [tokenAddress, amount, abiChannel, abiState],
-                account: account,
-                value: tokenAddress === zeroAddress ? amount : 0n,
-            });
+            const params = this.prepareDepositAndCreateChannelCallParams(tokenAddress, amount, channel, initial);
+            const { request } = await this.publicClient.simulateContract(params);
 
             return request;
         } catch (error: any) {
@@ -321,17 +365,30 @@ export class NitroliteService {
         channel: Channel,
         initial: State,
     ): Promise<Hash> {
-        const walletClient = this.ensureWalletClient();
+        const contractWriter = this.ensureContractWriter();
         const account = this.ensureAccount();
         const operationName = 'depositAndCreateChannel';
 
         try {
             const request = await this.prepareDepositAndCreateChannel(tokenAddress, amount, channel, initial);
-            return await executeWriteContract(walletClient, request, account);
+            return await executeWriteContract(contractWriter, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { tokenAddress, amount, channel, initial });
         }
+    }
+
+    // TODO: comment
+    prepareJoinChannelCallParams(channelId: ChannelId, index: bigint, sig: Signature): ContractCallParams {
+        const account = this.ensureAccount();
+
+        return {
+            address: this.custodyAddress,
+            abi: custodyAbi,
+            functionName: 'join',
+            args: [channelId, index, sig],
+            account: account,
+        };
     }
 
     /**
@@ -343,17 +400,11 @@ export class NitroliteService {
      * @returns The prepared transaction request object.
      */
     async prepareJoinChannel(channelId: ChannelId, index: bigint, sig: Signature): Promise<PreparedContractRequest> {
-        const account = this.ensureAccount();
         const operationName = 'prepareJoinChannel';
 
         try {
-            const { request } = await this.publicClient.simulateContract({
-                address: this.custodyAddress,
-                abi: custodyAbi,
-                functionName: 'join',
-                args: [channelId, index, sig],
-                account: account,
-            });
+            const params = this.prepareJoinChannelCallParams(channelId, index, sig);
+            const { request } = await this.publicClient.simulateContract(params);
 
             return request;
         } catch (error: any) {
@@ -373,17 +424,32 @@ export class NitroliteService {
      * @error Throws ContractCallError | TransactionError
      */
     async joinChannel(channelId: ChannelId, index: bigint, sig: Signature): Promise<Hash> {
-        const walletClient = this.ensureWalletClient();
+        const contractWriter = this.ensureContractWriter();
         const account = this.ensureAccount();
         const operationName = 'joinChannel';
 
         try {
             const request = await this.prepareJoinChannel(channelId, index, sig);
-            return await executeWriteContract(walletClient, request, account);
+            return await executeWriteContract(contractWriter, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { channelId, index });
         }
+    }
+
+    // TODO: comment
+    prepareCheckpointCallParams(channelId: ChannelId, candidate: State, proofs: State[] = []): ContractCallParams {
+        const account = this.ensureAccount();
+        const abiCandidate = this.convertStateForABI(candidate);
+        const abiProofs = proofs.map((proof) => this.convertStateForABI(proof));
+
+        return {
+            address: this.custodyAddress,
+            abi: custodyAbi,
+            functionName: 'checkpoint',
+            args: [channelId, abiCandidate, abiProofs],
+            account: account,
+        };
     }
 
     /**
@@ -399,20 +465,11 @@ export class NitroliteService {
         candidate: State,
         proofs: State[] = [],
     ): Promise<PreparedContractRequest> {
-        const account = this.ensureAccount();
         const operationName = 'prepareCheckpoint';
 
         try {
-            const abiCandidate = this.convertStateForABI(candidate);
-            const abiProofs = proofs.map((proof) => this.convertStateForABI(proof));
-
-            const { request } = await this.publicClient.simulateContract({
-                address: this.custodyAddress,
-                abi: custodyAbi,
-                functionName: 'checkpoint',
-                args: [channelId, abiCandidate, abiProofs],
-                account: account,
-            });
+            const params = this.prepareCheckpointCallParams(channelId, candidate, proofs);
+            const { request } = await this.publicClient.simulateContract(params);
 
             return request;
         } catch (error: any) {
@@ -432,17 +489,37 @@ export class NitroliteService {
      * @error Throws ContractCallError | TransactionError
      */
     async checkpoint(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<Hash> {
-        const walletClient = this.ensureWalletClient();
+        const contractWriter = this.ensureContractWriter();
         const account = this.ensureAccount();
         const operationName = 'checkpoint';
 
         try {
             const request = await this.prepareCheckpoint(channelId, candidate, proofs);
-            return await executeWriteContract(walletClient, request, account);
+            return await executeWriteContract(contractWriter, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { channelId });
         }
+    }
+
+    // TODO: comment
+    prepareChallengeCallParams(
+        channelId: ChannelId,
+        candidate: State,
+        proofs: State[] = [],
+        challengerSig: Signature,
+    ): ContractCallParams {
+        const account = this.ensureAccount();
+        const abiCandidate = this.convertStateForABI(candidate);
+        const abiProofs = proofs.map((proof) => this.convertStateForABI(proof));
+
+        return {
+            address: this.custodyAddress,
+            abi: custodyAbi,
+            functionName: 'challenge',
+            args: [channelId, abiCandidate, abiProofs, challengerSig],
+            account: account,
+        };
     }
 
     /**
@@ -460,20 +537,11 @@ export class NitroliteService {
         proofs: State[] = [],
         challengerSig: Signature,
     ): Promise<PreparedContractRequest> {
-        const account = this.ensureAccount();
         const operationName = 'prepareChallenge';
 
         try {
-            const abiCandidate = this.convertStateForABI(candidate);
-            const abiProofs = proofs.map((proof) => this.convertStateForABI(proof));
-
-            const { request } = await this.publicClient.simulateContract({
-                address: this.custodyAddress,
-                abi: custodyAbi,
-                functionName: 'challenge',
-                args: [channelId, abiCandidate, abiProofs, challengerSig],
-                account: account,
-            });
+            const params = this.prepareChallengeCallParams(channelId, candidate, proofs, challengerSig);
+            const { request } = await this.publicClient.simulateContract(params);
 
             return request;
         } catch (error: any) {
@@ -498,17 +566,32 @@ export class NitroliteService {
         proofs: State[] = [],
         challengerSig: Signature,
     ): Promise<Hash> {
-        const walletClient = this.ensureWalletClient();
+        const contractWriter = this.ensureContractWriter();
         const account = this.ensureAccount();
         const operationName = 'challenge';
 
         try {
             const request = await this.prepareChallenge(channelId, candidate, proofs, challengerSig);
-            return await executeWriteContract(walletClient, request, account);
+            return await executeWriteContract(contractWriter, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { channelId });
         }
+    }
+
+    // TODO: comment
+    prepareResizeCallParams(channelId: ChannelId, candidate: State, proofs: State[] = []): ContractCallParams {
+        const account = this.ensureAccount();
+        const abiCandidate = this.convertStateForABI(candidate);
+        const abiProofs = proofs.map((proof) => this.convertStateForABI(proof));
+
+        return {
+            address: this.custodyAddress,
+            abi: custodyAbi,
+            functionName: 'resize',
+            args: [channelId, abiCandidate, abiProofs],
+            account: account,
+        };
     }
 
     /**
@@ -524,20 +607,11 @@ export class NitroliteService {
         candidate: State,
         proofs: State[] = [],
     ): Promise<PreparedContractRequest> {
-        const account = this.ensureAccount();
         const operationName = 'prepareResize';
 
         try {
-            const abiCandidate = this.convertStateForABI(candidate);
-            const abiProofs = proofs.map((proof) => this.convertStateForABI(proof));
-
-            const { request } = await this.publicClient.simulateContract({
-                address: this.custodyAddress,
-                abi: custodyAbi,
-                functionName: 'resize',
-                args: [channelId, abiCandidate, abiProofs],
-                account: account,
-            });
+            const params = this.prepareResizeCallParams(channelId, candidate, proofs);
+            const { request } = await this.publicClient.simulateContract(params);
 
             return request;
         } catch (error: any) {
@@ -557,17 +631,32 @@ export class NitroliteService {
      * @error Throws ContractCallError | TransactionError
      */
     async resize(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<Hash> {
-        const walletClient = this.ensureWalletClient();
+        const contractWriter = this.ensureContractWriter();
         const account = this.ensureAccount();
         const operationName = 'resize';
 
         try {
             const request = await this.prepareResize(channelId, candidate, proofs);
-            return await executeWriteContract(walletClient, request, account);
+            return await executeWriteContract(contractWriter, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { channelId });
         }
+    }
+
+    // TODO: comment
+    prepareCloseCallParams(channelId: ChannelId, candidate: State, proofs: State[] = []): ContractCallParams {
+        const account = this.ensureAccount();
+        const abiCandidate = this.convertStateForABI(candidate);
+        const abiProofs = proofs.map((proof) => this.convertStateForABI(proof));
+
+        return {
+            address: this.custodyAddress,
+            abi: custodyAbi,
+            functionName: 'close',
+            args: [channelId, abiCandidate, abiProofs],
+            account: account,
+        };
     }
 
     /**
@@ -579,20 +668,11 @@ export class NitroliteService {
      * @returns The prepared transaction request object.
      */
     async prepareClose(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<PreparedContractRequest> {
-        const account = this.ensureAccount();
         const operationName = 'prepareClose';
 
         try {
-            const abiCandidate = this.convertStateForABI(candidate);
-            const abiProofs = proofs.map((proof) => this.convertStateForABI(proof));
-
-            const { request } = await this.publicClient.simulateContract({
-                address: this.custodyAddress,
-                abi: custodyAbi,
-                functionName: 'close',
-                args: [channelId, abiCandidate, abiProofs],
-                account: account,
-            });
+            const params = this.prepareCloseCallParams(channelId, candidate, proofs);
+            const { request } = await this.publicClient.simulateContract(params);
 
             return request;
         } catch (error: any) {
@@ -612,17 +692,30 @@ export class NitroliteService {
      * @error Throws ContractCallError | TransactionError
      */
     async close(channelId: ChannelId, candidate: State, proofs: State[] = []): Promise<Hash> {
-        const walletClient = this.ensureWalletClient();
+        const contractWriter = this.ensureContractWriter();
         const account = this.ensureAccount();
         const operationName = 'close';
 
         try {
             const request = await this.prepareClose(channelId, candidate, proofs);
-            return await executeWriteContract(walletClient, request, account);
+            return await executeWriteContract(contractWriter, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { channelId });
         }
+    }
+
+    // TODO: comment
+    prepareWithdrawCallParams(tokenAddress: Address, amount: bigint): ContractCallParams {
+        const account = this.ensureAccount();
+
+        return {
+            address: this.custodyAddress,
+            abi: custodyAbi,
+            functionName: 'withdraw',
+            args: [tokenAddress, amount],
+            account: account,
+        };
     }
 
     /**
@@ -633,17 +726,11 @@ export class NitroliteService {
      * @returns The prepared transaction request object.
      */
     async prepareWithdraw(tokenAddress: Address, amount: bigint): Promise<PreparedContractRequest> {
-        const account = this.ensureAccount();
         const operationName = 'prepareWithdraw';
 
         try {
-            const { request } = await this.publicClient.simulateContract({
-                address: this.custodyAddress,
-                abi: custodyAbi,
-                functionName: 'withdraw',
-                args: [tokenAddress, amount],
-                account: account,
-            });
+            const params = this.prepareWithdrawCallParams(tokenAddress, amount);
+            const { request } = await this.publicClient.simulateContract(params);
 
             return request;
         } catch (error: any) {
@@ -662,13 +749,13 @@ export class NitroliteService {
      * @error Throws ContractCallError | TransactionError
      */
     async withdraw(tokenAddress: Address, amount: bigint): Promise<Hash> {
-        const walletClient = this.ensureWalletClient();
+        const contractWriter = this.ensureContractWriter();
         const account = this.ensureAccount();
         const operationName = 'withdraw';
 
         try {
             const request = await this.prepareWithdraw(tokenAddress, amount);
-            return await executeWriteContract(walletClient, request, account);
+            return await executeWriteContract(contractWriter, request, account);
         } catch (error: any) {
             if (error instanceof Errors.NitroliteError) throw error;
             throw new Errors.TransactionError(operationName, error, { tokenAddress, amount });

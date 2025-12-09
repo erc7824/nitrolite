@@ -1,6 +1,7 @@
 import { Account, Address, PublicClient, WalletClient, Hash } from 'viem';
 import { Erc20Abi } from '../../abis/token';
 import { Errors } from '../../errors';
+import { ContractCallParams } from '../contract_writer/types';
 
 /**
  * Type utility to properly type the request object from simulateContract
@@ -122,6 +123,19 @@ export class Erc20Service {
         }
     }
 
+    // TODO: comment
+    prepareApproveCallParams(tokenAddress: Address, spender: Address, amount: bigint): ContractCallParams {
+        const account = this.ensureAccount();
+
+        return {
+            address: tokenAddress,
+            abi: Erc20Abi,
+            functionName: 'approve',
+            args: [spender, amount],
+            account: account,
+        };
+    }
+
     /**
      * Prepares the request data for an ERC20 approve transaction.
      * Useful for batching multiple calls in a single UserOperation.
@@ -133,17 +147,11 @@ export class Erc20Service {
      * @throws {AccountRequiredError} If no account is available for simulation.
      */
     async prepareApprove(tokenAddress: Address, spender: Address, amount: bigint): Promise<PreparedContractRequest> {
-        const account = this.ensureAccount();
         const operationName = 'prepareApprove';
 
         try {
-            const { request } = await this.publicClient.simulateContract({
-                address: tokenAddress,
-                abi: Erc20Abi,
-                functionName: 'approve',
-                args: [spender, amount],
-                account: account,
-            });
+            const params = this.prepareApproveCallParams(tokenAddress, spender, amount);
+            const { request } = await this.publicClient.simulateContract(params);
 
             return request;
         } catch (error: any) {

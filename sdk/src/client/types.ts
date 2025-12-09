@@ -1,6 +1,7 @@
 import { Account, Hex, PublicClient, WalletClient, Chain, Transport, ParseAccount, Address } from 'viem';
 import { ContractAddresses } from '../abis';
 import { StateSigner } from './signer';
+import { ContractWriter } from './contract_writer/types';
 
 /**
  * Channel identifier
@@ -92,21 +93,11 @@ export interface FinalState extends UnsignedState {
 }
 
 /**
- * Configuration for initializing the NitroliteClient.
+ * Base configuration shared by both NitroliteClient config variants.
  */
-export interface NitroliteClientConfig {
+interface BaseNitroliteClientConfig {
     /** The viem PublicClient for reading blockchain data. */
     publicClient: PublicClient;
-
-    /**
-     * The viem WalletClient used for:
-     * 1. Sending on-chain transactions in direct execution methods (e.g., `client.deposit`).
-     * 2. Providing the 'account' context for transaction preparation (`client.txPreparer`).
-     * 3. Signing off-chain states *if* `stateWalletClient` is not provided.
-     * @dev Note that the client's `signMessage` function should NOT add an EIP-191 prefix to the message signed. See {@link SignMessageFn} for details.
-     * viem's `signMessage` can operate in `raw` mode, which suffice.
-     */
-    walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
 
     /**
      * Implementation of the StateSigner interface used for signing protocol states.
@@ -122,6 +113,44 @@ export interface NitroliteClientConfig {
     /** Default challenge duration (in seconds) for new channels. */
     challengeDuration: bigint;
 }
+
+/**
+ * Configuration with WalletClient for EOA-based transaction execution.
+ * @deprecated Legacy configuration, left for backward compatibility. Use NitroliteClientConfigWithContractWriter instead.
+ */
+interface LegacyNitroliteClientConfigWithWalletClient extends BaseNitroliteClientConfig {
+    /**
+     * The viem WalletClient used for:
+     * 1. Sending on-chain transactions in direct execution methods (e.g., `client.deposit`).
+     * 2. Providing the 'account' context for transaction preparation (`client.txPreparer`).
+     * 3. Signing off-chain states *if* `stateWalletClient` is not provided.
+     * @dev Note that the client's `signMessage` function should NOT add an EIP-191 prefix to the message signed. See {@link SignMessageFn} for details.
+     * viem's `signMessage` can operate in `raw` mode, which suffice.
+     */
+    walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
+    contractWriter?: never;
+}
+
+/**
+ * Configuration with ContractWriter for custom transaction execution (e.g., Account Abstraction).
+ */
+interface NitroliteClientConfigWithContractWriter extends BaseNitroliteClientConfig {
+    walletClient?: never;
+    /**
+     * ContractWriter instance for writing contract transactions.
+    */
+    contractWriter: ContractWriter;
+    /**
+     * Account address or Account object for transaction signing and context.
+     */
+    account: Account | Address;
+}
+
+/**
+ * Configuration for initializing the NitroliteClient.
+ * Must provide either walletClient or contractWriter, but not both.
+ */
+export type NitroliteClientConfig = LegacyNitroliteClientConfigWithWalletClient | NitroliteClientConfigWithContractWriter;
 
 /**
  * Parameters required for creating a new state channel.

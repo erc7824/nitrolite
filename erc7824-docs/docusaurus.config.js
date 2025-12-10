@@ -216,10 +216,7 @@ const config = {
                         title: "Docs",
                         items: [
                             { label: "Introduction", to: "/" },
-                            { label: "ERC-7824", to: "/legacy/spec" },
-                            { label: "Protocol", to: "/legacy/protocol" },
-                            { label: "Resources", to: "/legacy/resources" },
-                            { label: "FAQ", to: "/legacy/faq" },
+
                         ],
                     },
                     {
@@ -255,6 +252,23 @@ const config = {
                 theme: prismThemes.github,
                 darkTheme: prismThemes.dracula,
                 additionalLanguages: ["solidity"],
+                magicComments: [
+                    {
+                        className: 'git-diff-remove',
+                        line: 'remove-next-line',
+                        block: { start: 'remove-start', end: 'remove-end' },
+                    },
+                    {
+                        className: 'git-diff-add',
+                        line: 'add-next-line',
+                        block: { start: 'add-start', end: 'add-end' },
+                    },
+                    {
+                        className: 'theme-code-block-highlighted-line',
+                        line: 'highlight-next-line',
+                        block: { start: 'highlight-start', end: 'highlight-end' },
+                    },
+                ],
             },
         }),
 };

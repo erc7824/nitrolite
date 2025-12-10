@@ -9,8 +9,13 @@ blockchains:
     balance_checker: "0xb1f8e55c7f64d203c1400b9d8555d050f94adf39"
 - name: flare
   id: 14
+  disabled: true
   contract_addresses:
     balance_checker: "0x714698e8fe7896bb84A46c0705944c4a48580819"
+- name: bsc
+  id: 56
+  contract_addresses:
+    balance_checker: "0x2352c63A83f9Fd126af8676146721Fa00924d7e4"
 - name: polygon
   id: 137
   contract_addresses:
@@ -21,12 +26,11 @@ blockchains:
     balance_checker: "0x6D3B5EFa1f81f65037cD842F48E44BcBCa48CBEF"
 - name: flow
   id: 747
-  disabled: true
   contract_addresses:
     balance_checker: "0xa3f2f64455c9f8D68d9dCAeC2605D64680FaF898"
-  block_step: 50
 - name: ronin
   id: 2020
+  disabled: true
   contract_addresses:
     balance_checker: "0x714698e8fe7896bb84A46c0705944c4a48580819"
 - name: base

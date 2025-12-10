@@ -55,7 +55,6 @@ describe('API message creators', () => {
             allowances: [],
             expires_at: 0n,
             scope: '',
-            application: clientAddress,
         };
         const msgStr = await createAuthRequestMessage(authRequest, requestId, timestamp);
         expect(signer).not.toHaveBeenCalled();
@@ -71,7 +70,6 @@ describe('API message creators', () => {
                     allowances: [],
                     expires_at: 0,
                     scope: '',
-                    application: clientAddress,
                 },
                 timestamp,
             ],
@@ -116,22 +114,20 @@ describe('API message creators', () => {
     });
 
     test('createPingMessage', async () => {
-        const msgStr = await createPingMessage(signer, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.Ping, {}, timestamp]);
+        const msgStr = await createPingMessage(requestId, timestamp);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.Ping, {}, timestamp],
-            sig: ['0xsig'],
+            sig: [],
         });
     });
 
     test('createGetConfigMessage', async () => {
-        const msgStr = await createGetConfigMessage(signer, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetConfig, {}, timestamp]);
+        const msgStr = await createGetConfigMessage(requestId, timestamp);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.GetConfig, {}, timestamp],
-            sig: ['0xsig'],
+            sig: [],
         });
     });
 
@@ -146,9 +142,9 @@ describe('API message creators', () => {
     });
 
     test('createGetLedgerBalancesMessage', async () => {
-        const participant = '0x0123124124124100000000000000000000000000' as Address;
-        const ledgerParams = { participant };
-        const msgStr = await createGetLedgerBalancesMessage(signer, participant, requestId, timestamp);
+        const accountId = '0x0123124124124100000000000000000000000000' as Address;
+        const ledgerParams = { account_id: accountId };
+        const msgStr = await createGetLedgerBalancesMessage(signer, accountId, requestId, timestamp);
         expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerBalances, ledgerParams, timestamp]);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
@@ -159,18 +155,18 @@ describe('API message creators', () => {
 
     test('createGetAppDefinitionMessage', async () => {
         const appParams = { app_session_id: appId };
-        const msgStr = await createGetAppDefinitionMessage(signer, appId, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetAppDefinition, appParams, timestamp]);
+        const msgStr = await createGetAppDefinitionMessage(appId, requestId, timestamp);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.GetAppDefinition, appParams, timestamp],
-            sig: ['0xsig'],
+            sig: [],
         });
     });
 
     test('createAppSessionMessage', async () => {
         const params = {
             definition: {
+                application: 'test-app',
                 protocol: RPCProtocolVersion.NitroRPC_0_2,
                 participants: [],
                 weights: [],
@@ -277,17 +273,11 @@ describe('API message creators', () => {
 
     test('createGetChannelsMessage', async () => {
         const participant = '0x0123124124124131000000000000000000000000' as Address;
-        const msgStr = await createGetChannelsMessage(signer, participant, RPCChannelStatus.Open, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([
-            requestId,
-            RPCMethod.GetChannels,
-            { participant, status: RPCChannelStatus.Open },
-            timestamp,
-        ]);
+        const msgStr = await createGetChannelsMessage(participant, RPCChannelStatus.Open, requestId, timestamp);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.GetChannels, { participant, status: RPCChannelStatus.Open }, timestamp],
-            sig: ['0xsig'],
+            sig: [],
         });
     });
 
@@ -350,12 +340,11 @@ describe('API message creators', () => {
     test('createGetLedgerTransactionsMessage with no filters', async () => {
         const accountId = 'test-account';
         const expectedParams = { account_id: accountId };
-        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, undefined, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const msgStr = await createGetLedgerTransactionsMessage(accountId, undefined, requestId, timestamp);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
-            sig: ['0xsig'],
+            sig: [],
         });
     });
 
@@ -376,12 +365,11 @@ describe('API message creators', () => {
             limit: 20,
             sort: 'desc',
         };
-        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const msgStr = await createGetLedgerTransactionsMessage(accountId, filters, requestId, timestamp);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
-            sig: ['0xsig'],
+            sig: [],
         });
     });
 
@@ -396,12 +384,11 @@ describe('API message creators', () => {
             asset: 'eth',
             limit: 5,
         };
-        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const msgStr = await createGetLedgerTransactionsMessage(accountId, filters, requestId, timestamp);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
-            sig: ['0xsig'],
+            sig: [],
         });
     });
 
@@ -419,12 +406,11 @@ describe('API message creators', () => {
             tx_type: RPCTxType.Transfer,
             offset: 0,
         };
-        const msgStr = await createGetLedgerTransactionsMessage(signer, accountId, filters, requestId, timestamp);
-        expect(signer).toHaveBeenCalledWith([requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp]);
+        const msgStr = await createGetLedgerTransactionsMessage(accountId, filters, requestId, timestamp);
         const parsed = JSON.parse(msgStr);
         expect(parsed).toEqual({
             req: [requestId, RPCMethod.GetLedgerTransactions, expectedParams, timestamp],
-            sig: ['0xsig'],
+            sig: [],
         });
     });
 

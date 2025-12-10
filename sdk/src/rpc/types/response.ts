@@ -169,8 +169,18 @@ export interface CloseAppSessionResponse extends GenericRPCMessage {
  */
 export interface GetAppDefinitionResponse extends GenericRPCMessage {
     method: RPCMethod.GetAppDefinition;
-    params: RPCAppDefinition & {
-        /** A unique nonce value for the application session to prevent replay attacks. */
+    params: {
+        /** Protocol identifies the version of the application protocol */
+        protocol: string;
+        /** An array of participant addresses (Ethereum addresses) involved in the application. Must have at least 2 participants. */
+        participants: Address[];
+        /** An array representing the relative weights or stakes of participants, often used for dispute resolution or allocation calculations. Order corresponds to the participants array. */
+        weights: number[];
+        /** The number of participants required to reach consensus or approve state updates. */
+        quorum: number;
+        /** A parameter related to the challenge period or mechanism within the application's protocol, in seconds. */
+        challenge: number;
+        /** A unique number used once, often for preventing replay attacks or ensuring uniqueness of the application instance. Must be non-zero. */
         nonce: number;
     };
 }

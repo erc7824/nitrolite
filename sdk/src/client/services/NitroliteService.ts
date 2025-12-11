@@ -5,7 +5,6 @@ import { Errors } from '../../errors';
 import { Channel, ChannelData, ChannelId, Signature, State } from '../types';
 import { ContractCallParams, ContractWriter } from '../contract_writer/types';
 import { EOAContractWriter } from '../contract_writer/eoa';
-import { getLastTxHashFromWriteResult } from '../helpers';
 
 /**
  * Type utility to properly type the request object from simulateContract
@@ -50,7 +49,11 @@ const executeWriteContract = async (
         calls,
     });
 
-    return getLastTxHashFromWriteResult(result);
+    if (result.txHashes.length < 1) {
+        throw new Error('No transaction hashes returned from write operation');
+    }
+
+    return result.txHashes[result.txHashes.length - 1];
 };
 
 /**
@@ -93,7 +96,7 @@ export class NitroliteService {
         this.addresses = addresses;
     }
 
-    /** Ensures a WalletClient is available for write operations. */
+    /** Ensures a ContractWriter is available for write operations. */
     private ensureContractWriter(): ContractWriter {
         if (!this.contractWriter) {
             throw new Errors.ContractWriterRequiredError();

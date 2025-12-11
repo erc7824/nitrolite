@@ -52,13 +52,49 @@ export class WalletStateSigner implements StateSigner {
     }
 
     async signState(channelId: Hex, state: State): Promise<Hex> {
-        const packedState = getPackedState(channelId, state)
+        const packedState = getPackedState(channelId, state);
 
         return this.walletClient.signMessage({ message: { raw: packedState } });
     }
 
     async signRawMessage(message: Hex): Promise<Hex> {
         return this.walletClient.signMessage({ message: { raw: message } });
+    }
+}
+
+/**
+ * Implementation of the StateSigner interface using a viem Account.
+ * This class uses the account to sign states and raw messages.
+ * It is suitable for use in scenarios where the account is available and can sign messages,
+ * e.g. signing with a private key or other account providers.
+ */
+export class AccountStateSigner implements StateSigner {
+    private readonly account: Account;
+
+    constructor(account: Account) {
+        this.account = account;
+    }
+
+    getAddress(): Address {
+        return this.account.address;
+    }
+
+    async signState(channelId: Hex, state: State): Promise<Hex> {
+        if (!this.account.signMessage) {
+            throw new Error('Account does not support message signing');
+        }
+
+        const packedState = getPackedState(channelId, state);
+
+        return this.account.signMessage({ message: { raw: packedState } });
+    }
+
+    async signRawMessage(message: Hex): Promise<Hex> {
+        if (!this.account.signMessage) {
+            throw new Error('Account does not support message signing');
+        }
+
+        return this.account.signMessage({ message: { raw: message } });
     }
 }
 

@@ -24,7 +24,6 @@ import {
 import { StateSigner } from './signer';
 import { CallsDetails, ContractWriter, WriteResult } from './contract_writer/types';
 import { EOAContractWriter } from './contract_writer/eoa';
-import { getAccountAddress, getLastTxHashFromWriteResult } from './helpers';
 
 const CUSTODY_MIN_CHALLENGE_DURATION = 3600n;
 
@@ -34,7 +33,7 @@ const CUSTODY_MIN_CHALLENGE_DURATION = 3600n;
  */
 export class NitroliteClient {
     public readonly publicClient: PublicClient;
-    public readonly account: Account | Address;
+    public readonly account: ParseAccount<Account>;
     public readonly addresses: ContractAddresses;
     public readonly challengeDuration: bigint;
     public readonly txPreparer: NitroliteTransactionPreparer;
@@ -70,9 +69,8 @@ export class NitroliteClient {
                 walletClient: config.walletClient,
             });
         } else if ('contractWriter' in config && config.contractWriter) {
-            if (!config.account) throw new Errors.MissingParameterError('account');
-            this.account = config.account;
             this.contractWriter = config.contractWriter;
+            this.account = this.contractWriter.getAccount();
         } else {
             throw new Errors.MissingParameterError('walletClient or contractWriter');
         }
@@ -84,7 +82,7 @@ export class NitroliteClient {
             this.account,
             this.contractWriter,
         );
-        this.erc20Service = new Erc20Service(this.publicClient, undefined);
+        this.erc20Service = new Erc20Service(this.publicClient, undefined, this.account, this.contractWriter);
 
         this.sharedDeps = {
             nitroliteService: this.nitroliteService,
@@ -107,7 +105,7 @@ export class NitroliteClient {
      * @returns The transaction hash.
      */
     async deposit(tokenAddress: Address, amount: bigint): Promise<Hash> {
-        const owner = getAccountAddress(this.account);
+        const owner = this.account.address;
         const spender = this.addresses.custody;
 
         const callDetails: CallsDetails = {
@@ -126,7 +124,7 @@ export class NitroliteClient {
         callDetails.calls.push(depositCall);
 
         const writeResult = await this.contractWriter.write(callDetails);
-        return getLastTxHashFromWriteResult(writeResult);
+        return this._getLastTxHashFromWriteResult(writeResult);
     }
 
     /**
@@ -147,7 +145,7 @@ export class NitroliteClient {
             );
 
             const writeResult = await this.contractWriter.write({ calls: [createChannelCall] });
-            const txHash = getLastTxHashFromWriteResult(writeResult);
+            const txHash = this._getLastTxHashFromWriteResult(writeResult);
 
             return { channelId, initialState, txHash };
         } catch (err) {
@@ -169,7 +167,7 @@ export class NitroliteClient {
         params: CreateChannelParams,
     ): Promise<{ channelId: ChannelId; initialState: State; txHash: Hash }> {
         try {
-            const owner = getAccountAddress(this.account);
+            const owner = this.account.address;
             const spender = this.addresses.custody;
             const { initialState, channelId } = await _prepareAndSignInitialState(this.sharedDeps, params);
 
@@ -180,7 +178,11 @@ export class NitroliteClient {
             if (tokenAddress !== zeroAddress) {
                 const allowance = await this.erc20Service.getTokenAllowance(tokenAddress, owner, spender);
                 if (allowance < depositAmount) {
-                    const approveCall = this.erc20Service.prepareApproveCallParams(tokenAddress, spender, depositAmount);
+                    const approveCall = this.erc20Service.prepareApproveCallParams(
+                        tokenAddress,
+                        spender,
+                        depositAmount,
+                    );
                     callDetails.calls.push(approveCall);
                 }
             }
@@ -194,7 +196,7 @@ export class NitroliteClient {
             callDetails.calls.push(depositAndCreateChannelCall);
 
             const writeResult = await this.contractWriter.write(callDetails);
-            const txHash = getLastTxHashFromWriteResult(writeResult);
+            const txHash = this._getLastTxHashFromWriteResult(writeResult);
 
             return { channelId, initialState, txHash };
         } catch (err) {
@@ -225,7 +227,7 @@ export class NitroliteClient {
             );
 
             const writeResult = await this.contractWriter.write({ calls: [checkpointCall] });
-            return getLastTxHashFromWriteResult(writeResult);
+            return this._getLastTxHashFromWriteResult(writeResult);
         } catch (err) {
             throw new Errors.ContractCallError('Failed to execute checkpointChannel on contract', err as Error);
         }
@@ -250,7 +252,7 @@ export class NitroliteClient {
             );
 
             const writeResult = await this.contractWriter.write({ calls: [challengeCall] });
-            return getLastTxHashFromWriteResult(writeResult);
+            return this._getLastTxHashFromWriteResult(writeResult);
         } catch (err) {
             throw new Errors.ContractCallError('Failed to execute challengeChannel on contract', err as Error);
         }
@@ -269,7 +271,7 @@ export class NitroliteClient {
             const resizeCall = this.nitroliteService.prepareResizeCallParams(channelId, resizeStateWithSigs, proofs);
 
             const writeResult = await this.contractWriter.write({ calls: [resizeCall] });
-            const txHash = getLastTxHashFromWriteResult(writeResult);
+            const txHash = this._getLastTxHashFromWriteResult(writeResult);
 
             return {
                 resizeState: resizeStateWithSigs,
@@ -292,7 +294,7 @@ export class NitroliteClient {
             const closeCall = this.nitroliteService.prepareCloseCallParams(channelId, finalStateWithSigs);
 
             const writeResult = await this.contractWriter.write({ calls: [closeCall] });
-            return getLastTxHashFromWriteResult(writeResult);
+            return this._getLastTxHashFromWriteResult(writeResult);
         } catch (err) {
             throw new Errors.ContractCallError('Failed to execute closeChannel on contract', err as Error);
         }
@@ -310,7 +312,7 @@ export class NitroliteClient {
             const withdrawCall = this.nitroliteService.prepareWithdrawCallParams(tokenAddress, amount);
 
             const writeResult = await this.contractWriter.write({ calls: [withdrawCall] });
-            return getLastTxHashFromWriteResult(writeResult);
+            return this._getLastTxHashFromWriteResult(writeResult);
         } catch (err) {
             throw new Errors.ContractCallError('Failed to execute withdrawDeposit on contract', err as Error);
         }
@@ -322,7 +324,7 @@ export class NitroliteClient {
      */
     async getOpenChannels(): Promise<ChannelId[]> {
         try {
-            const accountAddress = getAccountAddress(this.account);
+            const accountAddress = this.account.address;
             return await this.nitroliteService.getOpenChannels(accountAddress);
         } catch (err) {
             throw err;
@@ -338,7 +340,7 @@ export class NitroliteClient {
     async getAccountBalance(tokenAddress: Address[]): Promise<bigint[]>;
     async getAccountBalance(tokenAddress: Address | Address[]): Promise<bigint | bigint[]> {
         try {
-            const accountAddress = getAccountAddress(this.account);
+            const accountAddress = this.account.address;
             if (Array.isArray(tokenAddress)) {
                 return await this.nitroliteService.getAccountBalance(accountAddress, tokenAddress);
             } else {
@@ -411,7 +413,7 @@ export class NitroliteClient {
      * @returns The allowance amount as a bigint.
      */
     async getTokenAllowance(tokenAddress: Address): Promise<bigint> {
-        const targetOwner = getAccountAddress(this.account);
+        const targetOwner = this.account.address;
         const targetSpender = this.addresses.custody;
 
         try {
@@ -434,7 +436,7 @@ export class NitroliteClient {
      * @returns The token balance as a bigint.
      */
     async getTokenBalance(tokenAddress: Address): Promise<bigint> {
-        const targetAccount = getAccountAddress(this.account);
+        const targetAccount = this.account.address;
         try {
             return await this.erc20Service.getTokenBalance(tokenAddress, targetAccount);
         } catch (err) {
@@ -447,5 +449,13 @@ export class NitroliteClient {
                 err as Error,
             );
         }
+    }
+
+    private _getLastTxHashFromWriteResult(writeResult: WriteResult): Hash {
+        if (writeResult.txHashes.length < 1) {
+            throw new Error('No transaction hashes returned from write operation');
+        }
+
+        return writeResult.txHashes[writeResult.txHashes.length - 1];
     }
 }

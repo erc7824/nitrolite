@@ -1,17 +1,21 @@
 import {
     Account,
     Chain,
+    Client,
     Hash,
     Hex,
     ParseAccount,
+    publicActions,
     PublicClient,
     TransactionReceipt,
     Transport,
+    WalletActions,
     WalletClient,
 } from 'viem';
 import { CallsDetails, ContractCallParams, ContractWriter, WriteResult } from './types';
+import Errors from '../../errors';
 
-export type EOAContractWriterConfigs = {
+export type EOAContractWriterConfig = {
     publicClient: PublicClient;
     walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
 };
@@ -21,10 +25,13 @@ export class EOAContractWriter implements ContractWriter {
     public readonly walletClient: WalletClient<Transport, Chain, ParseAccount<Account>>;
     public readonly account: ParseAccount<Account>;
 
-    constructor(configs: EOAContractWriterConfigs) {
-        // TODO: add validations
-        this.publicClient = configs.publicClient;
-        this.walletClient = configs.walletClient;
+    constructor(config: EOAContractWriterConfig) {
+        if (!config.publicClient) throw new Errors.MissingParameterError('publicClient');
+        if (!config.walletClient) throw new Errors.MissingParameterError('walletClient');
+        if (!config.walletClient.account) throw new Errors.MissingParameterError('walletClient.account');
+
+        this.publicClient = config.publicClient;
+        this.walletClient = config.walletClient;
         this.account = this.walletClient.account;
     }
 
@@ -36,18 +43,21 @@ export class EOAContractWriter implements ContractWriter {
         const result: WriteResult = { txHashes: [] };
 
         // EOA writer does not support batching, so we execute calls sequentially
-        callsDetails.calls.forEach(async (call) => {
+        for (const call of callsDetails.calls) {
             const txHash = await this._writeCall(call);
             await this.waitForTransaction(txHash);
 
             result.txHashes.push(txHash);
-        });
+        }
 
         return result;
     }
 
+    getAccount(): Account {
+        return this.account;
+    }
+
     private async _writeCall(callParams: ContractCallParams): Promise<Hex> {
-        // TODO: add error handling
         const { request } = await this.publicClient.simulateContract({
             ...callParams,
             account: this.account,
@@ -67,9 +77,5 @@ export class EOAContractWriter implements ContractWriter {
         }
 
         return receipt;
-    }
-
-    withBatch(): boolean {
-        return false;
     }
 }

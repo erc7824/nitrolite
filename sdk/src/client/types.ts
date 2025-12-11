@@ -140,10 +140,6 @@ interface NitroliteClientConfigWithContractWriter extends BaseNitroliteClientCon
      * ContractWriter instance for writing contract transactions.
     */
     contractWriter: ContractWriter;
-    /**
-     * Account address or Account object for transaction signing and context.
-     */
-    account: Account | Address;
 }
 
 /**

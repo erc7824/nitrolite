@@ -2,6 +2,7 @@ import { Abi, Account, Address, Chain, ContractFunctionParameters, Hex } from 'v
 
 export interface ContractWriter {
     write: (callDetails: CallsDetails) => Promise<WriteResult>;
+    getAccount: () => Account;
 }
 
 export interface ContractCallParams<

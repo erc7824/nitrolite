@@ -1,10 +1,12 @@
 import {
+    Account,
     Call,
     encodeFunctionData,
     ExactPartial,
     Hex,
     numberToHex,
     pad,
+    publicActions,
     PublicClient,
     RpcUserOperation,
     SignedAuthorization,
@@ -15,8 +17,9 @@ import { entryPoint06Address, SmartAccount, UserOperation } from 'viem/account-a
 import { AAExecuteAbi } from '../../abis/aa/execute';
 import { BundlerClientV06, PartialUserOperationV06 } from './aa_v06_types';
 import { UserOpEventAbi } from '../../abis/aa/user_op_event';
+import Errors from '../../errors';
 
-export type AAV06ContractWriterConfigs = {
+export type AAV06ContractWriterConfig = {
     publicClient: PublicClient;
     smartAccount: SmartAccount;
     bundlerClient: BundlerClientV06;
@@ -25,7 +28,6 @@ export type AAV06ContractWriterConfigs = {
     pollingTimeout?: number;
 };
 
-// TODO: find a better name for this class
 export class AAV06ContractWriter implements ContractWriter {
     public readonly publicClient: PublicClient;
     public readonly smartAccount: SmartAccount;
@@ -34,14 +36,17 @@ export class AAV06ContractWriter implements ContractWriter {
     private readonly pollingInterval: number;
     private readonly pollingTimeout: number;
 
-    constructor(configs: AAV06ContractWriterConfigs) {
-        // TODO: add validations
-        this.publicClient = configs.publicClient;
-        this.smartAccount = configs.smartAccount;
-        this.bundlerClient = configs.bundlerClient;
+    constructor(config: AAV06ContractWriterConfig) {
+        if (!config.publicClient) throw new Errors.MissingParameterError('publicClient');
+        if (!config.smartAccount) throw new Errors.MissingParameterError('smartAccount');
+        if (!config.bundlerClient) throw new Errors.MissingParameterError('bundlerClient');
 
-        this.pollingInterval = configs.pollingInterval ?? 5000;
-        this.pollingTimeout = configs.pollingTimeout ?? 120000;
+        this.publicClient = config.publicClient;
+        this.smartAccount = config.smartAccount;
+        this.bundlerClient = config.bundlerClient;
+
+        this.pollingInterval = config.pollingInterval ?? 5000;
+        this.pollingTimeout = config.pollingTimeout ?? 120000;
     }
 
     async write(callsDetails: CallsDetails): Promise<WriteResult> {
@@ -51,8 +56,8 @@ export class AAV06ContractWriter implements ContractWriter {
         return { txHashes: [txHash] };
     }
 
-    withBatch(): boolean {
-        return false;
+    getAccount(): Account {
+        return this.smartAccount;
     }
 
     private _prepareCalldata(callParams: ContractCallParams): Call {
@@ -64,7 +69,7 @@ export class AAV06ContractWriter implements ContractWriter {
 
         return {
             to: callParams.address,
-            value: BigInt(0),
+            value: callParams.value ?? 0n,
             data: encoded,
         };
     }
@@ -134,6 +139,13 @@ export class AAV06ContractWriter implements ContractWriter {
         return new Promise<Hex>((resolve, reject) => {
             const intervalId = setInterval(async () => {
                 try {
+                    const chainId = this.publicClient.chain?.id;
+                    if (!chainId) {
+                        clearInterval(intervalId);
+                        reject(new Error('PublicClient chain is not configured'));
+                        return;
+                    }
+
                     const logs = await this.bundlerClient.fetchLogs(
                         this.publicClient.chain!.id,
                         [entryPoint06Address],
@@ -146,9 +158,8 @@ export class AAV06ContractWriter implements ContractWriter {
                         if (txHash) {
                             clearInterval(intervalId);
                             resolve(txHash);
+                            return;
                         }
-
-                        throw new Error('UserOperationEvent log does not contain transactionHash');
                     }
 
                     if (Date.now() - startTime >= this.pollingTimeout) {
@@ -158,6 +169,7 @@ export class AAV06ContractWriter implements ContractWriter {
                         );
 
                         reject(waitTimeoutError);
+                        return;
                     }
                 } catch (error) {
                     clearInterval(intervalId);

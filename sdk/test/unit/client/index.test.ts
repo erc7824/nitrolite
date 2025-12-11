@@ -3,22 +3,19 @@ import { NitroliteClient } from '../../../src/client/index';
 import { Errors } from '../../../src/errors';
 import { Address, Hash, Hex } from 'viem';
 import * as stateModule from '../../../src/client/state';
-import {
-    Allocation,
-    ChannelId,
-    ChannelStatus,
-    CreateChannelParams,
-    StateIntent,
-} from '../../../src/client/types';
+import { Allocation, ChannelId, ChannelStatus, CreateChannelParams, StateIntent } from '../../../src/client/types';
 
 describe('NitroliteClient', () => {
     let client: NitroliteClient;
     const mockPublicClient = {
         waitForTransactionReceipt: jest.fn(() => Promise.resolve({ status: 'success' })),
     } as any;
-    const mockAccount = { address: '0x1234567890123456789012345678901234567890' as Address };
-    const mockSignature = '0x' + '1234567890abcdef'.repeat(8) + '1b'; // 128 hex chars, v = 27
     const mockSignMessage = jest.fn(() => Promise.resolve(mockSignature));
+    const mockAccount = {
+        address: '0x1234567890123456789012345678901234567890' as Address,
+        signMessage: mockSignMessage,
+    };
+    const mockSignature = '0x' + '1234567890abcdef'.repeat(8) + '1b'; // 128 hex chars, v = 27
     const mockWalletClient = {
         account: mockAccount,
         signMessage: mockSignMessage,
@@ -40,7 +37,7 @@ describe('NitroliteClient', () => {
         getAddress: jest.fn(() => mockAccount.address),
         signState: jest.fn(async (_1: Hex, _2: any) => mockSignature as Hex),
         signRawMessage: jest.fn(async (_: Hex) => mockSignature as Hex),
-    }
+    };
 
     beforeEach(() => {
         jest.restoreAllMocks();
@@ -114,7 +111,11 @@ describe('NitroliteClient', () => {
 
             const tx = await client.deposit(tokenAddress, 50n);
 
-            expect(mockErc20Service.prepareApproveCallParams).toHaveBeenCalledWith(tokenAddress, mockAddresses.custody, 50n);
+            expect(mockErc20Service.prepareApproveCallParams).toHaveBeenCalledWith(
+                tokenAddress,
+                mockAddresses.custody,
+                50n,
+            );
             expect(mockContractWriter.write).toHaveBeenCalledWith({ calls: [{ fn: 'approve' }, { fn: 'deposit' }] });
             expect(tx).toBe('0xTXHASH');
         });
@@ -168,10 +169,10 @@ describe('NitroliteClient', () => {
             const initialState = {
                 ...params.unsignedInitialState,
                 sigs: ['0xaccSig', '0xSRVSIG'] as Hex[],
-            }
+            };
 
             const channelId = '0x0000000000000000000000000000000000000000000000000000000000000001' as Hex;
-            jest.spyOn(stateModule, '_prepareAndSignInitialState').mockResolvedValue({initialState, channelId});
+            jest.spyOn(stateModule, '_prepareAndSignInitialState').mockResolvedValue({ initialState, channelId });
             mockNitroService.prepareCreateChannelCallParams.mockReturnValue({ fn: 'createChannel' });
 
             const result = await client.createChannel(params);

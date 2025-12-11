@@ -1,6 +1,7 @@
 import {
     Account,
     Address,
+    ParseAccount,
     SimulateContractReturnType,
     zeroAddress,
 } from 'viem';
@@ -21,7 +22,6 @@ import {
     ResizeChannelParams,
 } from './types';
 import { StateSigner } from './signer';
-import { getAccountAddress } from './helpers';
 
 /**
  * Represents the data needed to construct a transaction or UserOperation call.
@@ -37,7 +37,7 @@ export interface PreparerDependencies {
     nitroliteService: NitroliteService;
     erc20Service: Erc20Service;
     addresses: ContractAddresses;
-    account: Account | Address;
+    account: ParseAccount<Account>;
     stateSigner: StateSigner;
     challengeDuration: bigint;
     chainId: number;
@@ -69,7 +69,7 @@ export class NitroliteTransactionPreparer {
     async prepareDepositTransactions(tokenAddress: Address, amount: bigint): Promise<PreparedTransaction[]> {
         const transactions: PreparedTransaction[] = [];
         const spender = this.deps.addresses.custody;
-        const owner = getAccountAddress(this.deps.account);
+        const owner = this.deps.account.address;
 
         if (tokenAddress !== zeroAddress) {
             const allowance = await this.deps.erc20Service.getTokenAllowance(tokenAddress, owner, spender);
@@ -130,7 +130,7 @@ export class NitroliteTransactionPreparer {
     ): Promise<PreparedTransaction[]> {
         const transactions: PreparedTransaction[] = [];
         const spender = this.deps.addresses.custody;
-        const owner = getAccountAddress(this.deps.account);
+        const owner = this.deps.account.address;
 
         if (tokenAddress !== zeroAddress) {
             const allowance = await this.deps.erc20Service.getTokenAllowance(tokenAddress, owner, spender);

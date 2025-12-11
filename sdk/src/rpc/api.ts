@@ -1,4 +1,4 @@
-import { Address, Hex, keccak256, stringToBytes, toHex, WalletClient } from 'viem';
+import { Account, Address, Hex, keccak256, stringToBytes, toHex, WalletClient } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import {
     MessageSigner,
@@ -814,6 +814,60 @@ export function createEIP712AuthMessageSigner(
             // Sign with EIP-712
             const signature = await walletClient.signTypedData({
                 account: walletClient.account!,
+                domain,
+                types: EIP712AuthTypes,
+                primaryType: 'Policy',
+                message: untypedMessage,
+            });
+
+            return signature;
+        } catch (eip712Error) {
+            const errorMessage = eip712Error instanceof Error ? eip712Error.message : String(eip712Error);
+            console.error('EIP-712 signing failed:', errorMessage);
+            throw new Error(`EIP-712 signing failed: ${errorMessage}`);
+        }
+    };
+}
+
+export function createEIP712AuthMessageSignerFromAccount(
+    account: Account,
+    partialMessage: PartialEIP712AuthMessage,
+    domain: EIP712AuthDomain,
+): MessageSigner {
+    return async (payload: RPCData): Promise<Hex> => {
+        if (!account.signTypedData) {
+            throw new Error('The provided account does not support EIP-712 signing.');
+        }
+
+        const method = payload[1];
+        if (method !== RPCMethod.AuthVerify) {
+            throw new Error(
+                `This EIP-712 signer is designed only for the '${RPCMethod.AuthVerify}' method, but received '${method}'.`,
+            );
+        }
+
+        // Safely extract the challenge from the payload for an AuthVerify request.
+        // The expected structure is `[id, 'auth_verify', [{ challenge: '...' }], ts]`
+        const params = payload[2];
+        if (!('challenge' in params) || typeof params.challenge !== 'string') {
+            throw new Error('Invalid payload for AuthVerify: The challenge string is missing or malformed.');
+        }
+
+        // After the check, TypeScript knows `params` is an object with a `challenge` property of type string.
+        const challengeUUID: string = params.challenge;
+
+        const message: EIP712AuthMessage = {
+            ...partialMessage,
+            challenge: challengeUUID,
+            wallet: account.address,
+        };
+
+        try {
+            // The message for signTypedData must be a plain object.
+            const untypedMessage: Record<string, unknown> = { ...message };
+
+            // Sign with EIP-712
+            const signature = await account.signTypedData({
                 domain,
                 types: EIP712AuthTypes,
                 primaryType: 'Policy',

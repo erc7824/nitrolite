@@ -1,11 +1,8 @@
 import { Address, zeroAddress } from 'viem';
 import * as Errors from '../errors';
-import {
-    getChannelId,
-    getPackedChallengeState,
-} from '../utils';
+import { getChannelId, getPackedChallengeState } from '../utils';
 import { PreparerDependencies } from './prepare';
-import { StateSigner, WalletStateSigner } from './signer';
+import { AccountStateSigner, StateSigner, WalletStateSigner } from './signer';
 import {
     ChallengeChannelParams,
     ChannelId,
@@ -185,7 +182,9 @@ export async function _prepareAndSignFinalState(
  * @returns A StateSigner object depending on the user participant address.
  */
 async function _fetchParticipantAndGetSigner(deps: PreparerDependencies, channelId: ChannelId): Promise<StateSigner> {
-    const {channel: {participants}} = await deps.nitroliteService.getChannelData(channelId);
+    const {
+        channel: { participants },
+    } = await deps.nitroliteService.getChannelData(channelId);
     let participant = participants.length == 2 ? participants[0] : zeroAddress;
 
     return _checkParticipantAndGetSigner(deps, participant);
@@ -199,5 +198,9 @@ async function _fetchParticipantAndGetSigner(deps: PreparerDependencies, channel
  * @returns A StateSigner object depending on the user participant address.
  */
 function _checkParticipantAndGetSigner(deps: PreparerDependencies, participant: Address): StateSigner {
-    return deps.stateSigner;
+    let signer = deps.stateSigner;
+    if (participant == deps.account.address) {
+        signer = new AccountStateSigner(deps.account);
+    }
+    return signer;
 }

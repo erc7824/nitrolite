@@ -73,7 +73,7 @@ export class Erc20Service {
         } else if (walletClient) {
             this.contractWriter = new EOAContractWriter({
                 publicClient,
-                // @ts-ignore
+                // @ts-ignores
                 walletClient,
             });
         }
@@ -149,7 +149,14 @@ export class Erc20Service {
         }
     }
 
-    // TODO: comment
+    /**
+     * Prepares contract call parameters for an ERC20 approve operation.
+     * Returns parameters that can be used with ContractWriter for batching operations.
+     * @param tokenAddress Address of the ERC20 token.
+     * @param spender Address of the spender.
+     * @param amount Amount to approve.
+     * @returns Contract call parameters ready for execution.
+     */
     prepareApproveCallParams(tokenAddress: Address, spender: Address, amount: bigint): ContractCallParams {
         const account = this.ensureAccount();
 

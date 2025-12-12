@@ -184,7 +184,13 @@ export class NitroliteService {
         };
     }
 
-    // TODO: comment
+    /**
+     * Prepares contract call parameters for a deposit operation.
+     * Returns parameters that can be used with ContractWriter for batching operations.
+     * @param tokenAddress Address of the token (use zeroAddress for ETH).
+     * @param amount Amount to deposit.
+     * @returns Contract call parameters ready for execution.
+     */
     prepareDepositCallParams(tokenAddress: Address, amount: bigint): ContractCallParams {
         const account = this.ensureAccount();
         const accountAddress = typeof account === 'string' ? account : account.address;
@@ -243,7 +249,13 @@ export class NitroliteService {
         }
     }
 
-    // TODO: comment
+    /**
+     * Prepares contract call parameters for creating a new channel.
+     * Returns parameters that can be used with ContractWriter for batching operations.
+     * @param channel Channel configuration. See {@link Channel} for details.
+     * @param initial Initial state. See {@link State} for details.
+     * @returns Contract call parameters ready for execution.
+     */
     prepareCreateChannelCallParams(channel: Channel, initial: State): ContractCallParams {
         const account = this.ensureAccount();
         const abiChannel = this.convertChannelForABI(channel);
@@ -302,7 +314,15 @@ export class NitroliteService {
         }
     }
 
-    // TODO: comment
+    /**
+     * Prepares contract call parameters for depositing funds and creating a channel in one operation.
+     * Returns parameters that can be used with ContractWriter for batching operations.
+     * @param tokenAddress Address of the token (use zeroAddress for ETH).
+     * @param amount Amount to deposit.
+     * @param channel Channel configuration. See {@link Channel} for details.
+     * @param initial Initial state. See {@link State} for details.
+     * @returns Contract call parameters ready for execution.
+     */
     prepareDepositAndCreateChannelCallParams(
         tokenAddress: Address,
         amount: bigint,
@@ -381,7 +401,14 @@ export class NitroliteService {
         }
     }
 
-    // TODO: comment
+    /**
+     * Prepares contract call parameters for joining an existing channel.
+     * Returns parameters that can be used with ContractWriter for batching operations.
+     * @param channelId ID of the channel.
+     * @param index Participant index.
+     * @param sig Participant signature.
+     * @returns Contract call parameters ready for execution.
+     */
     prepareJoinChannelCallParams(channelId: ChannelId, index: bigint, sig: Signature): ContractCallParams {
         const account = this.ensureAccount();
 
@@ -440,7 +467,14 @@ export class NitroliteService {
         }
     }
 
-    // TODO: comment
+    /**
+     * Prepares contract call parameters for checkpointing a state.
+     * Returns parameters that can be used with ContractWriter for batching operations.
+     * @param channelId Channel ID. See {@link ChannelId} for details.
+     * @param candidate State to checkpoint. See {@link State} for details.
+     * @param proofs Supporting proofs. See {@link State} for details.
+     * @returns Contract call parameters ready for execution.
+     */
     prepareCheckpointCallParams(channelId: ChannelId, candidate: State, proofs: State[] = []): ContractCallParams {
         const account = this.ensureAccount();
         const abiCandidate = this.convertStateForABI(candidate);
@@ -505,7 +539,15 @@ export class NitroliteService {
         }
     }
 
-    // TODO: comment
+    /**
+     * Prepares contract call parameters for challenging a state.
+     * Returns parameters that can be used with ContractWriter for batching operations.
+     * @param channelId Channel ID.
+     * @param candidate State being challenged. See {@link State} for details.
+     * @param proofs Supporting proofs. See {@link State} for details.
+     * @param challengerSig Challenger signature. See {@link Signature} for details.
+     * @returns Contract call parameters ready for execution.
+     */
     prepareChallengeCallParams(
         channelId: ChannelId,
         candidate: State,
@@ -582,7 +624,14 @@ export class NitroliteService {
         }
     }
 
-    // TODO: comment
+    /**
+     * Prepares contract call parameters for resizing a channel.
+     * Returns parameters that can be used with ContractWriter for batching operations.
+     * @param channelId Channel ID.
+     * @param candidate Candidate state for the resizing channel. See {@link State} for details.
+     * @param proofs Supporting proofs. See {@link State} for details.
+     * @returns Contract call parameters ready for execution.
+     */
     prepareResizeCallParams(channelId: ChannelId, candidate: State, proofs: State[] = []): ContractCallParams {
         const account = this.ensureAccount();
         const abiCandidate = this.convertStateForABI(candidate);
@@ -647,7 +696,14 @@ export class NitroliteService {
         }
     }
 
-    // TODO: comment
+    /**
+     * Prepares contract call parameters for closing a channel.
+     * Returns parameters that can be used with ContractWriter for batching operations.
+     * @param channelId Channel ID.
+     * @param candidate Final state. See {@link State} for details.
+     * @param proofs Supporting proofs. See {@link State} for details.
+     * @returns Contract call parameters ready for execution.
+     */
     prepareCloseCallParams(channelId: ChannelId, candidate: State, proofs: State[] = []): ContractCallParams {
         const account = this.ensureAccount();
         const abiCandidate = this.convertStateForABI(candidate);
@@ -708,7 +764,13 @@ export class NitroliteService {
         }
     }
 
-    // TODO: comment
+    /**
+     * Prepares contract call parameters for withdrawing funds.
+     * Returns parameters that can be used with ContractWriter for batching operations.
+     * @param tokenAddress Address of the token (use zeroAddress for ETH).
+     * @param amount Amount to withdraw.
+     * @returns Contract call parameters ready for execution.
+     */
     prepareWithdrawCallParams(tokenAddress: Address, amount: bigint): ContractCallParams {
         const account = this.ensureAccount();
 

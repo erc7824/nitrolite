@@ -5,10 +5,7 @@ import { Identity } from '@/identity';
 import { TestNitroliteClient } from '@/nitroliteClient';
 import { CONFIG } from '@/setup';
 import { getChannelUpdatePredicateWithStatus, TestWebSocket } from '@/ws';
-import {
-    parseChannelUpdateResponse,
-    RPCChannelStatus,
-} from '@erc7824/nitrolite';
+import { parseChannelUpdateResponse, RPCChannelStatus } from '@erc7824/nitrolite';
 import { parseUnits } from 'viem';
 
 describe('Challenge channel', () => {
@@ -53,6 +50,12 @@ describe('Challenge channel', () => {
         const channelId = createResponse.channelId;
         expect(createResponse.version).toBe(1); // 1 because channel was resized as well
 
+        const challengedChannelUpdatePromise = ws.waitForMessage(
+            getChannelUpdatePredicateWithStatus(RPCChannelStatus.Challenged),
+            undefined,
+            5000
+        );
+
         const challengeReceipt = await client.challengeChannel({
             channelId: channelId,
             candidateState: {
@@ -65,11 +68,6 @@ describe('Challenge channel', () => {
         });
 
         expect(challengeReceipt).toBeDefined();
-
-        const challengedChannelUpdatePromise = ws.waitForMessage(
-            getChannelUpdatePredicateWithStatus(RPCChannelStatus.Challenged),
-            5000
-        );
 
         const challengeConfirmation = await blockUtils.waitForTransaction(challengeReceipt);
         expect(challengeConfirmation).toBeDefined();

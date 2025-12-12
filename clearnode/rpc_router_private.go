@@ -8,6 +8,7 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
 	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -536,6 +537,23 @@ func (r *RPCRouter) HandleCloseApplication(c *RPCContext) {
 	)
 }
 
+func verifyChannelOperationRequest(r *RPCRouter, msg *RPCMessage, userID string) error {
+	if len(msg.Sig) == 0 {
+		return RPCErrorf("missing signature")
+	}
+
+	msgHash := crypto.Keccak256Hash(msg.Req.rawBytes)
+	ok, err := VerifySignature(r.SWBlockchainClient, msgHash, common.HexToAddress(userID), msg.Sig[0])
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return RPCErrorf("invalid signature")
+	}
+
+	return nil
+}
+
 // HandleCreateChannel processes a request to create a payment channel with broker
 func (r *RPCRouter) HandleCreateChannel(c *RPCContext) {
 	ctx := c.Context
@@ -548,14 +566,13 @@ func (r *RPCRouter) HandleCreateChannel(c *RPCContext) {
 		return
 	}
 
-	rpcSigners, err := getWallets(&c.Message)
-	if err != nil {
-		logger.Error("failed to get wallets from RPC message", "error", err)
-		c.Fail(err, "failed to get wallets from RPC message")
+	if err := verifyChannelOperationRequest(r, &c.Message, c.UserID); err != nil {
+		logger.Error("failed to verify channel creation request", "error", err)
+		c.Fail(err, "failed to verify channel creation request")
 		return
 	}
 
-	resp, err := r.ChannelService.RequestCreate(common.HexToAddress(c.UserID), &params, rpcSigners, logger)
+	resp, err := r.ChannelService.RequestCreate(common.HexToAddress(c.UserID), &params, logger)
 	if err != nil {
 		logger.Error("failed to request channel create", "error", err)
 		c.Fail(err, "failed to request channel create")
@@ -581,14 +598,13 @@ func (r *RPCRouter) HandleResizeChannel(c *RPCContext) {
 		return
 	}
 
-	rpcSigners, err := getWallets(&c.Message)
-	if err != nil {
-		logger.Error("failed to get wallets from RPC message", "error", err)
-		c.Fail(err, "failed to get wallets from RPC message")
+	if err := verifyChannelOperationRequest(r, &c.Message, c.UserID); err != nil {
+		logger.Error("failed to verify channel creation request", "error", err)
+		c.Fail(err, "failed to verify channel creation request")
 		return
 	}
 
-	resp, err := r.ChannelService.RequestResize(&params, rpcSigners, logger)
+	resp, err := r.ChannelService.RequestResize(&params, logger)
 	if err != nil {
 		logger.Error("failed to request channel resize", "error", err)
 		c.Fail(err, "failed to request channel resize")
@@ -636,14 +652,13 @@ func (r *RPCRouter) HandleCloseChannel(c *RPCContext) {
 		return
 	}
 
-	rpcSigners, err := getWallets(&c.Message)
-	if err != nil {
-		logger.Error("failed to get wallets from RPC message", "error", err)
-		c.Fail(err, "failed to get wallets from RPC message")
+	if err := verifyChannelOperationRequest(r, &c.Message, c.UserID); err != nil {
+		logger.Error("failed to verify channel creation request", "error", err)
+		c.Fail(err, "failed to verify channel creation request")
 		return
 	}
 
-	resp, err := r.ChannelService.RequestClose(&params, rpcSigners, logger)
+	resp, err := r.ChannelService.RequestClose(&params, logger)
 	if err != nil {
 		logger.Error("failed to request channel closure", "error", err)
 		c.Fail(err, "failed to request channel closure")

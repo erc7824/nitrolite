@@ -93,9 +93,9 @@ func TestChannelService(t *testing.T) {
 	userAddress := signer.GetAddress()
 	userAccountID := NewAccountID(userAddress.Hex())
 
-	rpcSigners := map[string]struct{}{
-		userAddress.Hex(): {},
-	}
+	// rpcSigners := map[string]struct{}{
+	// 	userAddress.Hex(): {},
+	// }
 
 	tokenAddress := "0x1234567890123456789012345678901234567890"
 	tokenSymbol := "usdc"
@@ -136,7 +136,7 @@ func TestChannelService(t *testing.T) {
 
 		allocateAmount := decimal.NewFromInt(200)
 		params := getResizeChannelParams(ch.ChannelID, &allocateAmount, nil, userAddress.Hex())
-		response, err := service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
+		response, err := service.RequestResize(params, LoggerFromContext(context.Background()))
 		require.NoError(t, err)
 
 		// Validate response
@@ -177,7 +177,7 @@ func TestChannelService(t *testing.T) {
 
 		allocateAmount := decimal.NewFromInt(-300)
 		params := getResizeChannelParams(ch.ChannelID, &allocateAmount, nil, userAddress.Hex())
-		response, err := service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
+		response, err := service.RequestResize(params, LoggerFromContext(context.Background()))
 		require.NoError(t, err)
 
 		// Channel amount should decrease
@@ -199,7 +199,7 @@ func TestChannelService(t *testing.T) {
 
 		allocateAmount := decimal.NewFromInt(100)
 		params := getResizeChannelParams("0xNonExistentChannel", &allocateAmount, nil, userAddress.Hex())
-		_, err = service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
+		_, err = service.RequestResize(params, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 
 		assert.Contains(t, err.Error(), "channel 0xNonExistentChannel not found")
@@ -216,7 +216,7 @@ func TestChannelService(t *testing.T) {
 
 		allocateAmount := decimal.NewFromInt(100)
 		params := getResizeChannelParams(ch.ChannelID, &allocateAmount, nil, userAddress.Hex())
-		_, err = service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
+		_, err = service.RequestResize(params, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 
 		assert.Contains(t, err.Error(), "channel 0xDefaultChannelID is not open: closed")
@@ -233,7 +233,7 @@ func TestChannelService(t *testing.T) {
 
 		allocateAmount := decimal.NewFromInt(100)
 		params := getResizeChannelParams(ch.ChannelID, &allocateAmount, nil, userAddress.Hex())
-		_, err = service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
+		_, err = service.RequestResize(params, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 
 		assert.Contains(t, err.Error(), "has challenged channels")
@@ -256,30 +256,30 @@ func TestChannelService(t *testing.T) {
 
 		allocateAmount := decimal.NewFromInt(200)
 		params := getResizeChannelParams(ch.ChannelID, &allocateAmount, nil, userAddress.Hex())
-		_, err = service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
+		_, err = service.RequestResize(params, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 
 		assert.Contains(t, err.Error(), "insufficient unified balance")
 	})
 
-	t.Run("RequestResize_ErrorInvalidSignature", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
-		t.Cleanup(cleanup)
+	// t.Run("RequestResize_ErrorInvalidSignature", func(t *testing.T) {
+	// 	db, cleanup := setupTestDB(t)
+	// 	t.Cleanup(cleanup)
 
-		assetsCfg := &AssetsConfig{}
-		asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
-		ch := seedChannel(t, db, channelID, userAddress.Hex(), userAddress.Hex(), asset.Token.Address, chainID, channelAmountRaw, 1, ChannelStatusOpen)
-		service := NewChannelService(db, map[uint32]BlockchainConfig{}, assetsCfg, &signer)
+	// 	assetsCfg := &AssetsConfig{}
+	// 	asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
+	// 	ch := seedChannel(t, db, channelID, userAddress.Hex(), userAddress.Hex(), asset.Token.Address, chainID, channelAmountRaw, 1, ChannelStatusOpen)
+	// 	service := NewChannelService(db, map[uint32]BlockchainConfig{}, assetsCfg, &signer)
 
-		allocateAmount := decimal.NewFromInt(100)
-		params := getResizeChannelParams(ch.ChannelID, &allocateAmount, nil, userAddress.Hex())
-		rpcSigners := map[string]struct{}{} // Empty signers map
+	// 	allocateAmount := decimal.NewFromInt(100)
+	// 	params := getResizeChannelParams(ch.ChannelID, &allocateAmount, nil, userAddress.Hex())
+	// 	rpcSigners := map[string]struct{}{} // Empty signers map
 
-		_, err = service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
-		require.Error(t, err)
+	// 	_, err = service.RequestResize(params, rpcSigners, LoggerFromContext(context.Background()))
+	// 	require.Error(t, err)
 
-		assert.Contains(t, err.Error(), "invalid signature")
-	})
+	// 	assert.Contains(t, err.Error(), "invalid signature")
+	// })
 
 	t.Run("RequestClose_Success", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
@@ -300,7 +300,7 @@ func TestChannelService(t *testing.T) {
 		service := NewChannelService(db, map[uint32]BlockchainConfig{}, assetsCfg, &signer)
 
 		params := getCloseChannelParams(ch.ChannelID, userAddress.Hex())
-		response, err := service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
+		response, err := service.RequestClose(params, LoggerFromContext(context.Background()))
 		require.NoError(t, err)
 
 		assert.Equal(t, ch.ChannelID, response.ChannelID)
@@ -321,7 +321,7 @@ func TestChannelService(t *testing.T) {
 		service := NewChannelService(db, map[uint32]BlockchainConfig{}, assetsCfg, &signer)
 
 		params := getCloseChannelParams(ch.ChannelID, userAddress.Hex())
-		_, err = service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
+		_, err = service.RequestClose(params, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 
 		assert.Contains(t, err.Error(), "has challenged channels")
@@ -358,7 +358,7 @@ func TestChannelService(t *testing.T) {
 
 		params := getCloseChannelParams(ch.ChannelID, userAddress.Hex())
 		// Request close for a channel with amount of 1000 raw units
-		response, err := service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
+		response, err := service.RequestClose(params, LoggerFromContext(context.Background()))
 		require.NoError(t, err)
 
 		assert.Equal(t, ch.ChannelID, response.ChannelID)
@@ -389,7 +389,7 @@ func TestChannelService(t *testing.T) {
 		service := NewChannelService(db, map[uint32]BlockchainConfig{}, assetsCfg, &signer)
 
 		params := getCloseChannelParams(ch.ChannelID, userAddress.Hex())
-		response, err := service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
+		response, err := service.RequestClose(params, LoggerFromContext(context.Background()))
 		require.NoError(t, err)
 
 		assert.Equal(t, ch.ChannelID, response.ChannelID)
@@ -434,7 +434,7 @@ func TestChannelService(t *testing.T) {
 		service := NewChannelService(db, map[uint32]BlockchainConfig{}, assetsCfg, &signer)
 
 		params := getCloseChannelParams(ch.ChannelID, userAddress.Hex())
-		response, err := service.RequestClose(params, rpcSigners, LoggerFromContext(context.Background()))
+		response, err := service.RequestClose(params, LoggerFromContext(context.Background()))
 		require.NoError(t, err)
 
 		assert.Equal(t, ch.ChannelID, response.ChannelID)
@@ -454,7 +454,7 @@ func TestChannelService(t *testing.T) {
 		service := NewChannelService(db, blockchains, assetsCfg, &signer)
 
 		params := getCreateChannelParams(chainID, asset.Token.Address)
-		response, err := service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
+		response, err := service.RequestCreate(userAddress, params, LoggerFromContext(context.Background()))
 		require.NoError(t, err)
 
 		// Validate response structure
@@ -481,22 +481,22 @@ func TestChannelService(t *testing.T) {
 		assert.NotEqual(t, uint64(0), response.Channel.Nonce, "Nonce should not be 0")
 	})
 
-	t.Run("RequestCreate_ErrorInvalidSignature", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
-		t.Cleanup(cleanup)
+	// t.Run("RequestCreate_ErrorInvalidSignature", func(t *testing.T) {
+	// 	db, cleanup := setupTestDB(t)
+	// 	t.Cleanup(cleanup)
 
-		assetsCfg := &AssetsConfig{}
-		asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
-		service := NewChannelService(db, blockchains, assetsCfg, &signer)
+	// 	assetsCfg := &AssetsConfig{}
+	// 	asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
+	// 	service := NewChannelService(db, blockchains, assetsCfg, &signer)
 
-		params := getCreateChannelParams(chainID, asset.Token.Address)
-		rpcSigners := map[string]struct{}{} // Empty signers map
+	// 	params := getCreateChannelParams(chainID, asset.Token.Address)
+	// 	rpcSigners := map[string]struct{}{} // Empty signers map
 
-		_, err = service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
-		require.Error(t, err)
+	// 	_, err = service.RequestCreate(userAddress, params, LoggerFromContext(context.Background()))
+	// 	require.Error(t, err)
 
-		assert.Contains(t, err.Error(), "invalid signature")
-	})
+	// 	assert.Contains(t, err.Error(), "invalid signature")
+	// })
 
 	t.Run("RequestCreate_ErrorExistingOpenChannel", func(t *testing.T) {
 		db, cleanup := setupTestDB(t)
@@ -508,7 +508,7 @@ func TestChannelService(t *testing.T) {
 		service := NewChannelService(db, blockchains, assetsCfg, &signer)
 
 		params := getCreateChannelParams(chainID, asset.Token.Address)
-		_, err = service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
+		_, err = service.RequestCreate(userAddress, params, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 
 		assert.Contains(t, err.Error(), "an open channel with broker already exists")
@@ -523,7 +523,7 @@ func TestChannelService(t *testing.T) {
 
 		params := getCreateChannelParams(chainID, "0xUnsupportedToken1234567890123456789012")
 
-		_, err = service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
+		_, err = service.RequestCreate(userAddress, params, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 
 		assert.Contains(t, err.Error(), "token not supported")
@@ -539,36 +539,36 @@ func TestChannelService(t *testing.T) {
 		service := NewChannelService(db, blockchains, assetsCfg, &signer)
 
 		params := getCreateChannelParams(999, asset.Token.Address)
-		_, err = service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
+		_, err = service.RequestCreate(userAddress, params, LoggerFromContext(context.Background()))
 		require.Error(t, err)
 
 		assert.Contains(t, err.Error(), "unsupported chain ID")
 	})
 
-	t.Run("RequestCreate_ErrorDifferentUserSignature", func(t *testing.T) {
-		db, cleanup := setupTestDB(t)
-		t.Cleanup(cleanup)
+	// t.Run("RequestCreate_ErrorDifferentUserSignature", func(t *testing.T) {
+	// 	db, cleanup := setupTestDB(t)
+	// 	t.Cleanup(cleanup)
 
-		assetsCfg := &AssetsConfig{}
-		asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
-		service := NewChannelService(db, blockchains, assetsCfg, &signer)
+	// 	assetsCfg := &AssetsConfig{}
+	// 	asset := seedAsset(t, assetsCfg, tokenAddress, chainID, tokenSymbol, 6)
+	// 	service := NewChannelService(db, blockchains, assetsCfg, &signer)
 
-		// Create a different user
-		differentKey, err := crypto.GenerateKey()
-		require.NoError(t, err)
-		differentSigner := Signer{privateKey: differentKey}
-		differentAddress := differentSigner.GetAddress()
+	// 	// Create a different user
+	// 	differentKey, err := crypto.GenerateKey()
+	// 	require.NoError(t, err)
+	// 	differentSigner := Signer{privateKey: differentKey}
+	// 	differentAddress := differentSigner.GetAddress()
 
-		params := getCreateChannelParams(chainID, asset.Token.Address)
+	// 	params := getCreateChannelParams(chainID, asset.Token.Address)
 
-		// Use different user's signature but pass userAddress as wallet
-		rpcSigners := map[string]struct{}{
-			differentAddress.Hex(): {},
-		}
+	// 	// Use different user's signature but pass userAddress as wallet
+	// 	rpcSigners := map[string]struct{}{
+	// 		differentAddress.Hex(): {},
+	// 	}
 
-		_, err = service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
-		require.Error(t, err)
+	// 	_, err = service.RequestCreate(userAddress, params, rpcSigners, LoggerFromContext(context.Background()))
+	// 	require.Error(t, err)
 
-		assert.Contains(t, err.Error(), "invalid signature")
-	})
+	// 	assert.Contains(t, err.Error(), "invalid signature")
+	// })
 }

@@ -25,12 +25,7 @@ func NewChannelService(db *gorm.DB, blockchains map[uint32]BlockchainConfig, ass
 	return &ChannelService{db: db, blockchains: blockchains, assetsCfg: assetsCfg, signer: signer}
 }
 
-func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChannelParams, rpcSigners map[string]struct{}, logger Logger) (ChannelOperationResponse, error) {
-	_, ok := rpcSigners[wallet.Hex()]
-	if !ok {
-		return ChannelOperationResponse{}, RPCErrorf("invalid signature")
-	}
-
+func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChannelParams, logger Logger) (ChannelOperationResponse, error) {
 	existingOpenChannel, err := CheckExistingChannels(s.db, wallet.Hex(), params.Token, params.ChainID)
 	if err != nil {
 		return ChannelOperationResponse{}, RPCErrorf("failed to check existing channels")
@@ -102,7 +97,7 @@ func (s *ChannelService) RequestCreate(wallet common.Address, params *CreateChan
 	return createChannelOperationResponse(channelIDHash.Hex(), state, &channel, sig), nil
 }
 
-func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners map[string]struct{}, logger Logger) (ChannelOperationResponse, error) {
+func (s *ChannelService) RequestResize(params *ResizeChannelParams, logger Logger) (ChannelOperationResponse, error) {
 	var channel *Channel
 	var allocations []nitrolite.Allocation
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -124,11 +119,6 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 
 		if channel.Status != ChannelStatusOpen {
 			return RPCErrorf("operation denied: channel %s is not open: %s", params.ChannelID, channel.Status)
-		}
-
-		_, ok := rpcSigners[channel.Wallet]
-		if !ok {
-			return RPCErrorf("invalid signature")
 		}
 
 		asset, ok := s.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, channel.ChainID)
@@ -242,7 +232,7 @@ func (s *ChannelService) RequestResize(params *ResizeChannelParams, rpcSigners m
 	return createChannelOperationResponse(channel.ChannelID, state, nil, sig), nil
 }
 
-func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map[string]struct{}, logger Logger) (ChannelOperationResponse, error) {
+func (s *ChannelService) RequestClose(params *CloseChannelParams, logger Logger) (ChannelOperationResponse, error) {
 	channel, err := GetChannelByID(s.db, params.ChannelID)
 	if err != nil {
 		logger.Error("failed to find channel", "error", err)
@@ -256,11 +246,6 @@ func (s *ChannelService) RequestClose(params *CloseChannelParams, rpcSigners map
 
 	if channel.Status != ChannelStatusOpen && channel.Status != ChannelStatusResizing {
 		return ChannelOperationResponse{}, RPCErrorf("channel %s is not open or resizing: %s", params.ChannelID, channel.Status)
-	}
-
-	_, ok := rpcSigners[channel.Wallet]
-	if !ok {
-		return ChannelOperationResponse{}, RPCErrorf("invalid signature")
 	}
 
 	asset, ok := s.assetsCfg.GetAssetTokenByAddressAndChainID(channel.Token, channel.ChainID)

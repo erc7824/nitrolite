@@ -192,7 +192,8 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 		logger.Error("failed to get challenge", "error", err)
 		return nil, nil, RPCErrorf("invalid challenge")
 	}
-	recoveredAddress, err := RecoverAddressFromEip712Signature(
+	ok, err := VerifyEip712Signature(
+		r.SWBlockchainClient,
 		challenge.Address,
 		challenge.Token.String(),
 		challenge.SessionKey,
@@ -205,8 +206,11 @@ func (r *RPCRouter) handleAuthSigVerify(ctx context.Context, sig Signature, auth
 		logger.Error("failed to recover address from signature", "error", err)
 		return nil, nil, RPCErrorf("invalid signature")
 	}
+	if !ok {
+		return nil, nil, RPCErrorf("signature does not match provided address")
+	}
 
-	if err := r.AuthManager.ValidateChallenge(authParams.Challenge, recoveredAddress); err != nil {
+	if err := r.AuthManager.ValidateChallenge(authParams.Challenge, challenge.Address); err != nil {
 		logger.Debug("challenge verification failed", "error", err)
 		return nil, nil, RPCErrorf("invalid challenge or signature")
 	}

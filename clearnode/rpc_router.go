@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"gorm.io/gorm"
 )
 
@@ -14,17 +15,18 @@ var (
 )
 
 type RPCRouter struct {
-	Node              *RPCNode
-	Config            *Config
-	Signer            *Signer
-	AppSessionService *AppSessionService
-	ChannelService    *ChannelService
-	DB                *gorm.DB
-	AuthManager       *AuthManager
-	Metrics           *Metrics
-	RPCStore          *RPCStore
-	wsNotifier        *WSNotifier
-	MessageCache      *MessageCache
+	Node               *RPCNode
+	Config             *Config
+	Signer             *Signer
+	AppSessionService  *AppSessionService
+	ChannelService     *ChannelService
+	SWBlockchainClient *ethclient.Client
+	DB                 *gorm.DB
+	AuthManager        *AuthManager
+	Metrics            *Metrics
+	RPCStore           *RPCStore
+	wsNotifier         *WSNotifier
+	MessageCache       *MessageCache
 
 	lg Logger
 }
@@ -35,6 +37,7 @@ func NewRPCRouter(
 	signer *Signer,
 	appSessionService *AppSessionService,
 	channelService *ChannelService,
+	swBlockchainClient *ethclient.Client,
 	db *gorm.DB,
 	authManager *AuthManager,
 	metrics *Metrics,
@@ -43,18 +46,19 @@ func NewRPCRouter(
 	logger Logger,
 ) *RPCRouter {
 	r := &RPCRouter{
-		Node:              node,
-		Config:            conf,
-		Signer:            signer,
-		AppSessionService: appSessionService,
-		ChannelService:    channelService,
-		DB:                db,
-		wsNotifier:        wsNotifier,
-		AuthManager:       authManager,
-		Metrics:           metrics,
-		RPCStore:          rpcStore,
-		MessageCache:      NewMessageCache(time.Duration(conf.msgExpiryTime) * time.Second),
-		lg:                logger.NewSystem("rpc-router"),
+		Node:               node,
+		Config:             conf,
+		Signer:             signer,
+		AppSessionService:  appSessionService,
+		ChannelService:     channelService,
+		SWBlockchainClient: swBlockchainClient,
+		DB:                 db,
+		wsNotifier:         wsNotifier,
+		AuthManager:        authManager,
+		Metrics:            metrics,
+		RPCStore:           rpcStore,
+		MessageCache:       NewMessageCache(time.Duration(conf.msgExpiryTime) * time.Second),
+		lg:                 logger.NewSystem("rpc-router"),
 	}
 
 	r.Node.OnConnect(r.HandleConnect)

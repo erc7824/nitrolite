@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -58,10 +59,33 @@ func main() {
 
 	rpcNode := NewRPCNode(signer, logger)
 	wsNotifier := NewWSNotifier(rpcNode.Notify, logger)
+
+	var swBlockchainClient *ethclient.Client
+	for chainID, blockchain := range config.blockchains {
+		client, err := NewCustody(signer, db, wsNotifier, blockchain, &config.assets, logger)
+		if err != nil {
+			logger.Fatal("failed to initialize blockchain client", "chainID", chainID, "error", err)
+			continue
+		}
+		custodyClients[chainID] = client
+		go client.ListenEvents(context.Background())
+
+		if chainID == uint32(11155111) {
+			var err error
+			swBlockchainClient, err = ethclient.Dial(blockchain.BlockchainRPC)
+			if err != nil {
+				logger.Fatal("failed to connect to SW blockchain client", "error", err)
+			}
+		}
+	}
+	if swBlockchainClient == nil {
+		logger.Fatal("smart wallet blockchain (sepolia) client not initialized")
+	}
+
 	appSessionService := NewAppSessionService(db, wsNotifier)
 	channelService := NewChannelService(db, config.blockchains, &config.assets, signer)
 
-	NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, wsNotifier, logger)
+	NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, swBlockchainClient, db, authManager, metrics, rpcStore, wsNotifier, logger)
 
 	rpcListenAddr := ":8000"
 	rpcListenEndpoint := "/ws"
@@ -71,16 +95,6 @@ func main() {
 	rpcServer := &http.Server{
 		Addr:    rpcListenAddr,
 		Handler: rpcMux,
-	}
-
-	for chainID, blockchain := range config.blockchains {
-		client, err := NewCustody(signer, db, wsNotifier, blockchain, &config.assets, logger)
-		if err != nil {
-			logger.Fatal("failed to initialize blockchain client", "chainID", chainID, "error", err)
-			continue
-		}
-		custodyClients[chainID] = client
-		go client.ListenEvents(context.Background())
 	}
 
 	// Start blockchain action worker for all custody clients

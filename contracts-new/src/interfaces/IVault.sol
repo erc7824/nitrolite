@@ -47,8 +47,9 @@ interface IVault {
     /**
      * @notice Withdraws tokens from the contract
      * @dev Can only withdraw available (not locked in channels) funds
+     * @param account Address of the account to sent tokens to
      * @param token Token address (use address(0) for native tokens)
      * @param amount Amount of tokens to withdraw
      */
-    function withdraw(address token, uint256 amount) external;
+    function withdraw(address account, address token, uint256 amount) external;
 }

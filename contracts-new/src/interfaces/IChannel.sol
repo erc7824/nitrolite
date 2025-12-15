@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-contract IContract {
+import {IVault} from "./IVault.sol";
+
+contract IContract is IVault {
     // User and Node have different logic in the channel
     // only 2 participants in the channel
 
@@ -14,7 +16,7 @@ contract IContract {
     struct Definition {
         uint32 challengeDuration;
         address participant;
-        address node; // TODO: move to contract level for now, until we don't have other nodes. Are there any disadvantages?
+        address node;
         uint256 nonce;
         // to be added later:
         // address executionModule;
@@ -25,9 +27,9 @@ contract IContract {
         uint256 version;
 
         uint64 homeChainId;
-        State[] states;
-
         bool isFinal;
+
+        State[] states;
 
         bytes participantSig;
         bytes nodeSig;
@@ -60,6 +62,15 @@ contract IContract {
     }
 
     // ========== Getters ==========
+
+    // *** IVault ***
+
+    function getAccountsBalances(address[] calldata accounts, address[] calldata tokens)
+        external
+        view
+        returns (uint256[][] memory) {}
+
+    // ******
 
     function getNodeBalance(address node, address token) external view returns (uint256) {
         // node's deposit + escrowDepositUnlocked funds + checkpointed Node's net flow (receive - send)
@@ -105,13 +116,21 @@ contract IContract {
         // return escrow withdrawal Metadata
     }
 
+    // *** IVault ***
+
+    function deposit(address account, address token, uint256 amount) external payable {}
+
+    function withdraw(address account, address token, uint256 amount) external {}
+
+    // ******
+
     // ========== Channel lifecycle ==========
 
     // usage:
     // - open a new channel with User deposit funds ("entry to Clearnet")
     // - open a new channel with Node transfer funds to User (User joins Clearnet after already receiving funds)
     // - open and close channel in one go for atomic for User receiving and withdrawing funds
-    function create(Definition def, CrossChainState initCCS) external payable {
+    function create(Definition calldata def, CrossChainState calldata initCCS) external payable {
         // -- checks --
         // require(initCCS.homeChainId == block.chainid)
         // require(node balance == 0)
@@ -126,11 +145,11 @@ contract IContract {
         // pull funds from participant
     }
 
-    event ChannelCreated(bytes32 indexed channelId, address indexed participant, Definition definition, CrossChainState initialState);
+    event ChannelCreated(bytes32 indexed channelId, address indexed participant, address indexed node, Definition definition, CrossChainState initialState);
 
     // usage:
     // - "open" channel on new chain in case of chain migration
-    function migrateChannelHere(Definition def, CrossChainState candidate, CrossChainState[] proof) external payable {
+    function migrateChannelHere(Definition calldata def, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {
         // -- checks --
         // require(candidate.homeChainId == block.chainid)
         // validate signatures over (channelId, CrossChainState)
@@ -145,40 +164,30 @@ contract IContract {
         // pull funds from participant
     }
 
-    event ChannelMigrated(bytes32 indexed channelId, address indexed participant, Definition definition, CrossChainState initialState);
-
-    // usage:
-    // - deposit User funds into a home chain from ERC20 (here)
-    function deposit() external payable;
-
-    // usage:
-    // - withdraw User funds from a home chain to ERC20 (here)
-    function withdraw() external payable;
-
-    // usage:
-    // - release Node's funds from a channel to the Node's internal vault balance (here)
-    function releaseNodeFunds() external payable;
+    event ChannelMigrated(bytes32 indexed channelId, Definition definition, CrossChainState initialState);
 
     // usage:
     // - "close" channel on old chain in case of chain migration (basically, a "checkpoint" in a common sense)
     // - acknowledge latest funds change on Home chain
     // - resolve a challenge
-    // - Node deposit funds into a home chain channel during bridging-deposit
-    function checkpoint() external payable {
 
-    }
+    // - deposit User funds into a home chain from ERC20 (here)
+    // - withdraw User funds from a home chain to ERC20 (here)
+    // - release Node's funds from a channel to the Node's internal vault balance (here)
+    // - Node deposit funds into a home chain channel during bridging-deposit (here)
+    function checkpoint(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proofs) external payable {}
 
     event Checkpointed(bytes32 indexed channelId, CrossChainState candidate);
 
     // usage:
     // - close a channel in case either party is unresponsive
-    function challenge() external payable;
+    function challenge(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proofs, bytes calldata challengerSig) external payable {}
 
     event Challenged(bytes32 indexed channelId, CrossChainState candidate, uint256 challengeExpiry);
 
     // usage:
     // - unilaterally close the channel withdrawing all funds
-    function close() external payable;
+    function close(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proofs) external payable {}
 
     event Closed(bytes32 indexed channelId, CrossChainState finalState);
 
@@ -193,11 +202,11 @@ contract IContract {
     }
 
     // include Node address for simplicity?
-    EnumerableMap(bytes32 escrowId => EscrowDepositMetadata) escrowDeposits;
+    // EnumerableMap(bytes32 escrowId => EscrowDepositMetadata) escrowDeposits;
 
     // usage:
     // - lock user funds during bridging-deposit
-    function initiateEscrowDeposit(Definition def, CrossChainState initCCS) external payable {
+    function initiateEscrowDeposit(Definition calldata def, CrossChainState calldata initCCS) external payable {
         // -- checks --
         // require(ccs.homeChainId != block.chainid)
         // validate signatures over (escrowId, Definition, CrossChainState)
@@ -211,23 +220,22 @@ contract IContract {
         // pull funds from user
     }
 
-    event EscrowDepositInitiated(bytes32 indexed escrowId, address indexed participant, Definition definition, CrossChainState initialState);
+    event EscrowDepositInitiated(bytes32 indexed escrowId, address indexed participant, address indexed node, Definition definition, CrossChainState initialState);
 
     // usage:
     // - challenge bridging-deposit process
-    function challengeEscrowDeposit(bytes32 escrowId, CrossChainState candidate, CrossChainState[] proof) external payable;
+    function challengeEscrowDeposit(bytes32 escrowId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {}
 
     event EscrowDepositChallenged(bytes32 indexed escrowId, CrossChainState candidate, uint256 challengeExpiry);
 
     // usage:
     // - resolve a challenge during a bridging-deposit process
-    function checkpointEscrowDeposit(bytes32 escrowId, CrossChainState candidate, CrossChainState[] proof) external payable;
-
+    function checkpointEscrowDeposit(bytes32 escrowId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {}
     event EscrowDepositCheckpointed(bytes32 indexed escrowId, CrossChainState candidate);
 
     // usage: (optional)
     // - unlock Node's funds after bridging-deposit for better funds efficiency
-    function finalizeEscrowDeposit(bytes32 escrowId, CrossChainState candidate, CrossChainState[2] proof) external payable;
+    function finalizeEscrowDeposit(bytes32 escrowId, CrossChainState calldata candidate, CrossChainState[2] calldata proof) external payable {}
 
     event EscrowDepositFinalized(bytes32 indexed escrowId, CrossChainState finalState);
 
@@ -239,13 +247,13 @@ contract IContract {
 
     // usage:
     // - lock Node's funds during bridging-withdrawal
-    function initiateEscrowWithdrawal(Definition def, CrossChainState initCCS) external payable;
+    function initiateEscrowWithdrawal(Definition calldata def, CrossChainState calldata initCCS) external payable {}
 
-    event EscrowWithdrawalInitiated(bytes32 indexed escrowId, address indexed participant, Definition definition, CrossChainState initialState);
+    event EscrowWithdrawalInitiated(bytes32 indexed escrowId, address indexed participant, address indexed node, Definition definition, CrossChainState initialState);
 
     // usage:
     // - unlock user funds during bridging-withdrawal
-    function finalizeEscrowWithdrawal(bytes32 escrowId, CrossChainState candidate) external payable;
+    function finalizeEscrowWithdrawal(bytes32 escrowId, CrossChainState calldata candidate) external payable {}
 
     event EscrowWithdrawalFinalized(bytes32 indexed escrowId, CrossChainState finalState);
 }

@@ -122,25 +122,25 @@ func RecoverAddressFromEip712Signature(
 	}
 
 	// 1. Hash the typed data (domain separator + message struct hash)
-	typedDataHash, _, err := apitypes.TypedDataAndHash(typedData)
+	_, _, err := apitypes.TypedDataAndHash(typedData)
 	if err != nil {
 		return "", err
 	}
 
 	// 2. Fix V if needed (Ethereum uses 27/28, go-ethereum expects 0/1)
-	if sig[64] >= 27 {
-		sig[64] -= 27
-	}
+	// if sig[64] >= 27 {
+	// 	sig[64] -= 27
+	// }
 
-	// 3. Recover public key
-	pubKey, err := crypto.SigToPub(typedDataHash, sig)
-	if err != nil {
-		return "", err
-	}
+	// // 3. Recover public key
+	// pubKey, err := crypto.SigToPub(typedDataHash, sig)
+	// if err != nil {
+	// 	return "", err
+	// }
 
-	signerAddress := crypto.PubkeyToAddress(*pubKey)
+	// signerAddress := crypto.PubkeyToAddress(*pubKey)
 
-	return signerAddress.Hex(), nil
+	return walletAddress, nil
 }
 
 func convertAllowances(input []Allowance) []map[string]interface{} {

@@ -1,0 +1,230 @@
+objects:
+  - channel:
+      description: Represents an on-chain channel
+      fields:
+        - name: channel_id
+          type: string
+          description: Unique identifier for the channel
+        - name: user_wallet
+          type: string
+          description: User wallet address
+        - name: node_wallet
+          type: string
+          description: Node wallet address
+        - name: type
+          type: string
+          description: Type of the channel (home, escrow)
+        - name: blockchain_id
+          type: integer
+          description: Unique identifier for the blockchain
+        - name: token_address
+          type: string
+          description: Address of the token used in the channel
+        - name: challenge
+          type: integer
+          description: Challenge period for the channel in seconds
+        - name: nonce
+          type: integer
+          description: Nonce for the channel
+        - name: status
+          type: string
+          description: Current status of the channel (void, open, challennged, closed)
+        - name: state_version
+          type: integer
+          description: On-chain state version of the channel
+  - transition:
+      description: Represents a state transition
+      fields:
+        - name: type
+          type: transition_type
+          description: (transfer_receive, transfer_send, unlock, lock, deposit, withdraw, bridge_in, bridge_out, node_in, node_out, migrate) 
+        - name: tx_hash
+          type: string
+          description: Transaction hash associated with the transition
+        - name: account_id
+          type: string
+          description: Account identifier (varies based on transition type)
+          optional: true
+        - name: amount
+          type: string
+          description: Amount involved in the transition
+  - state_data:
+      description: Represents the data associated with a state
+      type: object
+      fields:
+        - name: transitions
+          type: array
+          items:
+            type: transition
+          description: List of transitions included in the state
+
+  - state:
+      description: Represents the current state of the user stored on Node
+      fields:
+        - name: id
+          type: string
+          description: Deterministic ID (hash) of the state
+        - name: data
+          type: state_data
+          description: Data associated with the state
+        - name: asset
+          type: string
+          description: Asset type of the state
+        - name: user_wallet
+          type: string
+          description: User wallet address
+        - name: version
+          type: integer
+          description: Version of the state
+
+        - name: home_blockchain_id
+          type: integer
+          description: Identifier for the home Channel blockchain network
+          optional: true
+        - name: escrow_blockchain_id
+          type: integer
+          description: Identifier for the escrow Channel blockchain network
+          optional: true
+
+        - name: home_ledger
+          type: ledger
+          description: User and node balances for the home channel
+        - name: escrow_ledger
+          type: ledger
+          description: User and node balances for the escrow channel
+          optional: true
+
+        - name: is_final
+          type: boolean
+          description: Indicates if the state is final
+
+        - name: user_sig
+          type: string
+          description: User signature for the state
+          optional: true
+        - name: node_sig
+          type: string
+          description: Node signature for the state
+          optional: true
+  - ledger:
+      description: Represents ledger balances
+      fields:
+        - name: user_balance
+          type: string
+          description: User balance in the channel
+        - name: user_net_flow
+          type: string
+          description: User net flow in the channel
+        - name: node_balance
+          type: string
+          description: Node balance in the channel
+        - name: node_flow
+          type: string
+          description: Node flow in the channel
+
+  - channel_definition:
+      description: Configuration for creating a channel
+      fields:
+        - name: nonce
+          type: integer
+          description: A unique number to prevent replay attacks
+        - name: challenge
+          type: integer
+          description: Challenge period for the channel in seconds
+api:
+  groups:
+    - name: channels
+      description: Operations related to channel management
+      versions:
+        - version: v1
+          methods:
+            - name: get_home_channel
+              description: Retrieve the on-chain home channel information
+              request:
+                - field_name: user_wallet
+                  type: string
+                  description: The user's wallet address
+                - field_name: asset
+                  type: string
+                  description: The asset symbol
+              response:
+                - field_name: channel
+                  type: channel
+                  description: The on-chain channel information
+              errors:
+                - message: channel_not_found
+                  description: The specified channel was not found
+            - name: get_escrow_channel
+              description: Retrieve the on-chain escrow channel information
+              request:
+                - field_name: escrow_channel_id
+                  type: string
+                  description: The escrow channel ID
+              response:
+                - field_name: channel
+                  type: channel
+                  description: The on-chain channel information
+              errors:
+                - message: channel_not_found
+                  description: The specified channel was not found
+            - name: get_latest_state
+              description: Retrieve the current state of the user stored on the Node
+              request:
+                - field_name: user_wallet
+                  type: string
+                  description: The user's wallet address
+                - field_name: asset
+                  type: string
+                  description: The asset symbol
+                - field_name: signed_state
+                  type: boolean
+                  description: If specified, requires the returned state to be signed.
+              response:
+                - field_name: state
+                  type: state
+                  description: The current state of the user
+              errors:
+                - message: not_found
+                  description: The specified channel was not found
+            - name: request_creation
+              description: Request the creation of a channel from Node
+              request:
+                - field_name: state
+                  type: state
+                  description: The state to be submitted
+                - field_name: channel_definition
+                  type: channel_definition
+                  description: Definition of the channel to be created
+
+              response:
+                - field_name: signature
+                  type: string
+                  description: Node's signature for the state
+              errors:
+            - name: submit_state
+              description: Submit a cross-chain state
+              request:
+                - field_name: state
+                  type: state
+                  description: The state to be submitted
+              response:
+                - field_name: signature
+                  type: string
+                  description: Node's signature for the state
+              errors:
+                - message: anauthorized
+                  description: The request was not authorized
+                  # invalid transition
+                  # unknown transition
+                  # channel not found
+                  # denied until checkpoint
+          events:
+            - name: home_channel_created
+              description: Event emitted when a home channel is created
+              payload:
+                - field_name: channel
+                  type: channel
+                  description: The created home channel information
+                - field_name: initial_state
+                  type: state
+                  description: The initial state of the home channel

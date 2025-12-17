@@ -1,3 +1,8 @@
+
+# GetLedgerBalancesRequest
+# TransferRequest
+# CloseChannelRequest
+# ResizeChannelRequest -> no longer exists
 objects:
   - channel:
       description: Represents an on-chain channel
@@ -109,6 +114,12 @@ objects:
   - ledger:
       description: Represents ledger balances
       fields:
+        - name: token_address
+          type: string
+          description: Address of the token used in this channel
+        - name: blockchain_id
+          type: integer
+          description: Unique identifier for the blockchain
         - name: user_balance
           type: string
           description: User balance in the channel

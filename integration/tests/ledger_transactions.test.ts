@@ -4,7 +4,7 @@ import { Identity } from '@/identity';
 import { CONFIG } from '@/setup';
 import { getGetLedgerTransactionsPredicate, TestWebSocket } from '@/ws';
 import {
-    createGetLedgerTransactionsMessage,
+    createGetLedgerTransactionsMessageV2,
     GetLedgerTransactionsFilters,
     parseGetLedgerTransactionsResponse,
     RPCTxType,
@@ -43,7 +43,7 @@ describe('Ledger Transactions Integration', () => {
     describe('createGetLedgerTransactionsMessage', () => {
         it('should successfully request ledger transactions with no filters', async () => {
             const accountId = identity.walletAddress;
-            const msg = await createGetLedgerTransactionsMessage(accountId);
+            const msg = createGetLedgerTransactionsMessageV2(accountId);
 
             const response = await ws.sendAndWaitForResponse(msg, getGetLedgerTransactionsPredicate(), 5000);
 
@@ -60,7 +60,7 @@ describe('Ledger Transactions Integration', () => {
                 asset: 'usdc',
             };
 
-            const msg = await createGetLedgerTransactionsMessage(accountId, filters);
+            const msg = createGetLedgerTransactionsMessageV2(accountId, filters);
 
             const response = await ws.sendAndWaitForResponse(msg, getGetLedgerTransactionsPredicate(), 5000);
 
@@ -87,7 +87,7 @@ describe('Ledger Transactions Integration', () => {
                 tx_type: RPCTxType.Deposit,
             };
 
-            const msg = await createGetLedgerTransactionsMessage(accountId, filters);
+            const msg = createGetLedgerTransactionsMessageV2(accountId, filters);
 
             const response = await ws.sendAndWaitForResponse(msg, getGetLedgerTransactionsPredicate(), 5000);
 
@@ -115,7 +115,7 @@ describe('Ledger Transactions Integration', () => {
                 offset: 0,
             };
 
-            const msg = await createGetLedgerTransactionsMessage(accountId, filters);
+            const msg = createGetLedgerTransactionsMessageV2(accountId, filters);
 
             const response = await ws.sendAndWaitForResponse(msg, getGetLedgerTransactionsPredicate(), 5000);
 
@@ -139,7 +139,7 @@ describe('Ledger Transactions Integration', () => {
                 limit: 10,
             };
 
-            const msg = await createGetLedgerTransactionsMessage(accountId, filters);
+            const msg = createGetLedgerTransactionsMessageV2(accountId, filters);
 
             const response = await ws.sendAndWaitForResponse(msg, getGetLedgerTransactionsPredicate(), 5000);
 
@@ -172,7 +172,7 @@ describe('Ledger Transactions Integration', () => {
                 sort: 'desc',
             };
 
-            const msg = await createGetLedgerTransactionsMessage(accountId, filters);
+            const msg = createGetLedgerTransactionsMessageV2(accountId, filters);
 
             const response = await ws.sendAndWaitForResponse(msg, getGetLedgerTransactionsPredicate(), 5000);
 
@@ -201,7 +201,7 @@ describe('Ledger Transactions Integration', () => {
                 asset: 'NONEXISTENT_ASSET',
             };
 
-            const msg = await createGetLedgerTransactionsMessage(accountId, filters);
+            const msg = createGetLedgerTransactionsMessageV2(accountId, filters);
 
             const response = await ws.sendAndWaitForResponse(msg, getGetLedgerTransactionsPredicate(), 5000);
 
@@ -219,7 +219,7 @@ describe('Ledger Transactions Integration', () => {
         it('should handle invalid account ID gracefully', async () => {
             const invalidAccountId = '0x0000000000000000000000000000000000000000';
 
-            const msg = await createGetLedgerTransactionsMessage(invalidAccountId);
+            const msg = createGetLedgerTransactionsMessageV2(invalidAccountId);
 
             const response = await ws.sendAndWaitForResponse(msg, getGetLedgerTransactionsPredicate(), 5000);
 

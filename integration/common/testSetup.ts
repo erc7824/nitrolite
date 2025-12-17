@@ -4,7 +4,7 @@ import { CONFIG } from '@/setup';
 import { TestWebSocket, getGetAppSessionsPredicate } from '@/ws';
 import { createAuthSessionWithClearnode } from '@/auth';
 import {
-    createGetAppSessionsMessage,
+    createGetAppSessionsMessageV2,
     parseGetAppSessionsResponse,
 } from '@erc7824/nitrolite';
 
@@ -68,7 +68,7 @@ export async function fetchAndParseAppSessions(
     participantAppIdentity: Identity,
     appSessionId: string
 ) {
-    const getAppSessionsMsg = await createGetAppSessionsMessage(
+    const getAppSessionsMsg = createGetAppSessionsMessageV2(
         participantAppIdentity.walletAddress
     );
     const getAppSessionsResponse = await participantAppWS.sendAndWaitForResponse(

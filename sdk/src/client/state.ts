@@ -2,7 +2,7 @@ import { Address, zeroAddress } from 'viem';
 import * as Errors from '../errors';
 import { getChannelId, getPackedChallengeState } from '../utils';
 import { PreparerDependencies } from './prepare';
-import { AccountStateSigner, StateSigner, WalletStateSigner } from './signer';
+import { StateSigner, WalletStateSigner } from './signer';
 import {
     ChallengeChannelParams,
     ChannelId,
@@ -199,8 +199,8 @@ async function _fetchParticipantAndGetSigner(deps: PreparerDependencies, channel
  */
 function _checkParticipantAndGetSigner(deps: PreparerDependencies, participant: Address): StateSigner {
     let signer = deps.stateSigner;
-    if (participant == deps.account.address) {
-        signer = new AccountStateSigner(deps.account);
-    }
+    // if (participant == deps.account.address) {
+    //     signer = new WalletStateSigner(deps.account);
+    // }
     return signer;
 }

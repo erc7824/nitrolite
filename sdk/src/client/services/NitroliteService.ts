@@ -1,4 +1,4 @@
-import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress, Hex, ContractFunctionParameters } from 'viem';
+import { Account, Address, PublicClient, WalletClient, Hash, zeroAddress, Hex } from 'viem';
 import { custodyAbi } from '../../abis/generated';
 import { ContractAddresses } from '../../abis';
 import { Errors } from '../../errors';

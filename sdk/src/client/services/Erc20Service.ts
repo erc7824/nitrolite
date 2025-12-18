@@ -73,7 +73,7 @@ export class Erc20Service {
         } else if (walletClient) {
             this.contractWriter = new EOAContractWriter({
                 publicClient,
-                // @ts-ignores
+                // @ts-ignore
                 walletClient,
             });
         }

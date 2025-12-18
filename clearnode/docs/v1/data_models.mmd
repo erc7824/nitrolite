@@ -1,6 +1,4 @@
 classDiagram
-
-
     class ChannelStatus {
         open
         closed
@@ -16,7 +14,7 @@ classDiagram
         +string ChannelID // should be different for home and escrow channels
         +string UserWallet // better than ParticipantWallet, because we won't have more than one participant
         +ChannelType Type
-        +uint32 ChainID
+        +uint32 BlockchainID
         +string Token
         +uint64 Challenge
         +uint64 Nonce
@@ -47,13 +45,13 @@ classDiagram
         +int256 HomeUserBalance
         +int64 HomeUserNetFlow
         +int256 HomeNodeBalance
-        +int64 HomeNodeFlow
+        +int64 HomeNodeNetFlow
 
         // Escrow Channel
         +int256 EscrowUserBalance
         +int64 EscrowUserNetFlow
         +int256 EscrowNodeBalance
-        +int64 EscrowNodeFlow
+        +int64 EscrowNodeNetFlow
 
         +bool IsFinal
 
@@ -111,7 +109,7 @@ classDiagram
     }
 
     class TransactionType {
-        %% If isWallet(ToAccount) && isWallet(FromAccount) -> transfer
+        %% isWallet(ToAccount) && isWallet(FromAccount) -> transfer
         transfer
 
         %% ToAccount = AppSessionID -> commit
@@ -127,7 +125,7 @@ classDiagram
         home_deposit
 
         %% FromAccount = UserWallet -> home_withdrawal
-        %% If ToAccount = HomeChannelID -> home_withdrawal
+        %% ToAccount = HomeChannelID -> home_withdrawal
         home_withdrawal
 
         %% ToAccount = EscrowChannelID -> mutual_lock

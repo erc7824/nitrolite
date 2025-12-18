@@ -3,7 +3,6 @@ sequenceDiagram
         actor Client
         actor Node
         actor HomeChain
-        Note left of User: UserWallet, Blockchain A, Token: 0xToken
         Note over Client: Connected to Node
         User->>Client: deposit(blockchainId, asset, amount)
         Client->>Node: GetLastState(UserWallet, asset)
@@ -13,7 +12,6 @@ sequenceDiagram
         Note over Client: newEmptyState(asset) returns state
         Note over Client: state.setID(CalculateStateID(state.userWallet, state.asset, cycleId, state.version))
         Note over Client: GetTokenAddress(blockchainId, asset)
-        %% Аштші
         Note over Client: state.setHomeToken(blockchainId, tokenAddress)
         Note over Client: NewTransition(depositT, state.ID(), userWallet, amount)
         Note over Client: state.applyTransitions(transtions) returns true

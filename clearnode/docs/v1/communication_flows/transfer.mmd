@@ -1,0 +1,41 @@
+sequenceDiagram
+        actor User(Sender)
+        actor SenderClient
+        actor Node
+        actor ReceiverClient
+        
+        Note over SenderClient: Connected to Node
+        Note over Node: Contains user's state with Home Chain 
+
+        User(Sender)->>SenderClient: transfer(DestinationUser(Sender)Wallet, asset, amount)
+        SenderClient->>Node: GetLastState(User(Sender)Wallet, asset)
+        Note right of Node: GetLastState(userWallet, asset)
+        Node->>SenderClient: Returns a state with home chain
+        %% Note over SenderClient: Check current state transitions
+        Note over SenderClient: createNextState(currentState) returns state
+        Note over SenderClient: state.setID(CalculateStateID(state.userWallet, state.asset, cycleId, state.version))
+        Note over SenderClient: NewTransition(transferT, state.ID(), DestinationUser(Sender)Wallet, amount)
+        Note over SenderClient: state.applyTransitions(transtions) returns true
+        Note over SenderClient: signState(state) returns userSig
+
+        SenderClient->>Node: SubmitState(state, userSig)
+        Note right of Node: GetLastState(userWallet, asset) returns currentState
+        Note right of Node: EnsureNoOngoingTransitions()
+        Note right of Node: ValidateStateTransition(currentState, state)
+        Note right of Node: StoreState(state)
+        
+        Note right of Node: CreateReceiverState(DestinationUser(Sender)Wallet)
+        Note right of Node: GetLastState(DestinationUser(Sender)Wallet, asset)
+        %% Note over SenderClient: Check current state transitions
+        Note over Node: createNextState(receiver_state) returns new_receiver_state
+        Note over Node: new_receiver_state.setID(CalculateStateID(new_receiver_state.userWallet, new_receiver_state.asset, cycleId, new_receiver_state.version))
+        Note over Node: NewTransition(transfer_receiveT, new_receiver_state.ID(), DestinationUser(Sender)Wallet, amount)
+        Note over Node: new_receiver_state.applyTransitions(transtions) returns true
+        Note over Node: signState(new_receiver_state) returns userSig
+
+        Node->>SenderClient: Sends ChannelUpdate & BalanceUpdate
+        Node->>ReceiverClient: Sends ChannelUpdate & BalanceUpdate
+
+        Node->>SenderClient: Return node signature
+
+        SenderClient->>User(Sender): Returns success & tx hash

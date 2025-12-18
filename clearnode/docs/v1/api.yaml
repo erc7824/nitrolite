@@ -1,9 +1,4 @@
-
-# GetLedgerBalancesRequest
-# TransferRequest
-# CloseChannelRequest
-# ResizeChannelRequest -> no longer exists
-objects:
+types:
   - channel:
       description: Represents an on-chain channel
       fields:
@@ -33,10 +28,11 @@ objects:
           description: Nonce for the channel
         - name: status
           type: string
-          description: Current status of the channel (void, open, challennged, closed)
+          description: Current status of the channel (void, open, challenged, closed)
         - name: state_version
           type: integer
           description: On-chain state version of the channel
+
   - transition:
       description: Represents a state transition
       fields:
@@ -53,6 +49,7 @@ objects:
         - name: amount
           type: string
           description: Amount involved in the transition
+
   - state_data:
       description: Represents the data associated with a state
       type: object
@@ -81,7 +78,6 @@ objects:
         - name: version
           type: integer
           description: Version of the state
-
         - name: home_blockchain_id
           type: integer
           description: Identifier for the home Channel blockchain network
@@ -90,7 +86,6 @@ objects:
           type: integer
           description: Identifier for the escrow Channel blockchain network
           optional: true
-
         - name: home_ledger
           type: ledger
           description: User and node balances for the home channel
@@ -98,11 +93,9 @@ objects:
           type: ledger
           description: User and node balances for the escrow channel
           optional: true
-
         - name: is_final
           type: boolean
           description: Indicates if the state is final
-
         - name: user_sig
           type: string
           description: User signature for the state
@@ -111,6 +104,7 @@ objects:
           type: string
           description: Node signature for the state
           optional: true
+
   - ledger:
       description: Represents ledger balances
       fields:
@@ -129,9 +123,9 @@ objects:
         - name: node_balance
           type: string
           description: Node balance in the channel
-        - name: node_flow
+        - name: node_net_flow
           type: string
-          description: Node flow in the channel
+          description: Node net flow in the channel
 
   - channel_definition:
       description: Configuration for creating a channel
@@ -142,6 +136,68 @@ objects:
         - name: challenge
           type: integer
           description: Challenge period for the channel in seconds
+
+  - app_participant:
+      description: Definition for an app participant
+      fields:
+        - name: wallet_address
+          type: string
+          description: Participant's wallet address
+        - name: signature_weight
+          type: integer
+          description: Signature weight for the participant
+
+  - app_definition:
+      description: Definition for an app session
+      fields:
+        - name: application_id
+          type: string
+          description: Application identifier from an app registry
+        - name: participants
+          type: array
+          items:
+            type: app_participant
+          description: List of participants in the app session
+        - name: quorum
+          type: integer
+          description: Quorum required for the app session
+        - name: nonce
+          type: integer
+          description: A unique number to prevent replay attacks  
+
+  - app_allocation:
+      description: Definition for an app session
+      fields:
+        - name: participant
+          type: string
+          description: Participant's wallet address
+        - name: asset
+          type: string
+          description: Asset symbol
+        - name: amount
+          type: string
+          description: Amount allocated to the participant
+
+  - app_state:
+      description: Configuration for creating a channel
+      fields:
+        - name: app_session_id
+          type: string
+          description: A unique application session identifier
+        - name: intent
+          type: string
+          description: The intent of the app session update (operate, deposit, withdraw)
+        - name: version
+          type: integer
+          description: Version of the app state
+        - name: allocations
+          type: array
+          items:
+            type: app_allocation
+          description: List of allocations in the app state
+        - name: session_data
+          type: string
+          description: JSON stringified session data
 api:
   groups:
     - name: channels
@@ -187,10 +243,10 @@ api:
                 - field_name: asset
                   type: string
                   description: The asset symbol
-                # by default returs the latest state regardless of signature
+                # by default returns the latest state regardless of signature
                 - field_name: signed_state
                   type: boolean
-                  description: can be enabled to get the latest signed state to know what is the current pending transition
+                  description: Can be enabled to get the latest signed state to know what is the current pending transition
               response:
                 - field_name: state
                   type: state
@@ -224,12 +280,17 @@ api:
                   type: string
                   description: Node's signature for the state
               errors:
-                - message: anauthorized
+                - message: unauthorized
                   description: The request was not authorized
-                  # invalid transition
-                  # unknown transition
-                  # channel not found
-                  # denied until checkpoint
+                - message: invalid_transition
+                  description: The state transition is invalid
+                - message: ongoing_transition
+                  description: There is an ongoing transition that must be resolved first
+                - message: channel_not_found
+                  description: The specified channel was not found
+                - message: denied_until_checkpoint
+                  description: State submissions are denied until the next checkpoint
+        
           events:
             - name: home_channel_created
               description: Event emitted when a home channel is created
@@ -240,3 +301,37 @@ api:
                 - field_name: initial_state
                   type: state
                   description: The initial state of the home channel
+  
+    - name: app_sessions
+      description: Operations related to application session management
+      versions:
+        - version: v1
+          methods:
+            - name: submit_deposit_state
+              description: Submit an application session state update
+              request:
+                - field_name: app_state
+                  type: app_state
+                  description: The application session state to be submitted
+                - field_name: sig_quorum
+                  type: integer
+                  description: The signature quorum for the application session
+                - field_name: user_state
+                  type: state
+                  description: The user state associated with the application session update
+            - name: submit_app_state
+              description: Submit an application session state update
+              request:
+                - field_name: app_state
+                  type: app_state
+                  description: The application session state to be submitted
+                - field_name: sig_quorum
+                  type: integer
+                  description: The signature quorum for the application session
+              response:
+                - field_name: signature
+                  type: string
+                  description: Node's signature for the new User state
+              errors:
+                - message: unauthorized
+                  description: The request was not authorized

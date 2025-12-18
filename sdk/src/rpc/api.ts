@@ -1,5 +1,4 @@
-import { Address, Hex, keccak256, stringToBytes, toHex, WalletClient } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
+import { Address, Hex, toHex, WalletClient } from 'viem';
 import {
     MessageSigner,
     AccountID,
@@ -30,6 +29,15 @@ import {
     CreateChannelRequestParams,
 } from './types/request';
 import { signRawECDSAMessage } from '../utils/sign';
+
+/**
+ * NOTE:
+ * Some RPC message builders in this file have legacy variants that accept a `MessageSigner`.
+ * These exist only for backward compatibility.
+ *
+ * Public RPC methods do NOT require signing.
+ * Prefer `*V2` variants when available.
+ */
 
 /**
  * Creates the signed, stringified message body for an 'auth_request'.
@@ -137,13 +145,21 @@ export async function createAuthVerifyMessageWithJWT(
 }
 
 /**
+ * ⚠️ LEGACY — DO NOT USE IN NEW CODE
+ *
  * Creates the stringified message body for a 'ping' request.
  *
+ * Use {@link createPingMessageV2} instead.
+ *
+ * @deprecated Use createPingMessageV2(). This function will be removed in a future release.
+ *
+ * @param signer - Ignored. Previously required for compatibility.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
+ * @returns A Promise resolving to JSON string of the NitroliteRPCMessage.
  */
 export async function createPingMessage(
+    _signer: MessageSigner,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
 ): Promise<string> {
@@ -158,16 +174,66 @@ export async function createPingMessage(
 }
 
 /**
+ * Creates the stringified message body for a 'ping' request.
+ *
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns JSON string of the NitroliteRPCMessage.
+ */
+export function createPingMessageV2(
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): string {
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.Ping,
+        params: {},
+        requestId,
+        timestamp,
+    });
+
+    return JSON.stringify(request);
+}
+
+/**
+ * ⚠️ LEGACY — DO NOT USE IN NEW CODE
+ *
+ * Creates the stringified message body for a 'get_config' request.
+ *
+ * Use {@link createGetConfigMessageV2} instead.
+ *
+ * @deprecated Use createGetConfigMessageV2(). This function will be removed in a future release.
+ *
+ * @param signer - Ignored. Previously required for compatibility.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to JSON string of the NitroliteRPCMessage.
+ */
+export async function createGetConfigMessage(
+    _signer: MessageSigner,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.GetConfig,
+        params: {},
+        requestId,
+        timestamp,
+    });
+
+    return JSON.stringify(request);
+}
+
+/**
  * Creates the stringified message body for a 'get_config' request.
  *
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
+ * @returns JSON string of the NitroliteRPCMessage.
  */
-export async function createGetConfigMessage(
+export function createGetConfigMessageV2(
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
+): string {
     const request = NitroliteRPC.createRequest({
         method: RPCMethod.GetConfig,
         params: {},
@@ -255,15 +321,23 @@ export async function createGetLedgerBalancesMessage(
 }
 
 /**
+ * ⚠️ LEGACY — DO NOT USE IN NEW CODE
+ *
  * Creates the stringified message body for a 'get_ledger_entries' request.
  *
+ * Use {@link createGetLedgerEntriesMessageV2} instead.
+ *
+ * @deprecated Use createGetLedgerEntriesMessageV2(). This function will be removed in a future release.
+ *
+ * @param signer - Ignored. Previously required for compatibility.
  * @param accountId - The account ID to get entries for.
  * @param asset - Optional asset symbol to filter entries.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
+ * @returns A Promise resolving to JSON string of the NitroliteRPCMessage.
  */
 export async function createGetLedgerEntriesMessage(
+    _signer: MessageSigner,
     accountId: string,
     asset?: string,
     requestId: RequestID = generateRequestId(),
@@ -284,15 +358,52 @@ export async function createGetLedgerEntriesMessage(
 }
 
 /**
+ * Creates the stringified message body for a 'get_ledger_entries' request.
+ *
+ * @param accountId - The account ID to get entries for.
+ * @param asset - Optional asset symbol to filter entries.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns JSON string of the NitroliteRPCMessage.
+ */
+export function createGetLedgerEntriesMessageV2(
+    accountId: string,
+    asset?: string,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): string {
+    const params = {
+        account_id: accountId,
+        ...(asset ? { asset } : {}),
+    };
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.GetLedgerEntries,
+        params,
+        requestId,
+        timestamp,
+    });
+
+    return JSON.stringify(request);
+}
+
+/**
+ * ⚠️ LEGACY — DO NOT USE IN NEW CODE
+ *
  * Creates the stringified message body for a 'get_ledger_transactions' request.
  *
+ * Use {@link createGetLedgerTransactionsMessageV2} instead.
+ *
+ * @deprecated Use createGetLedgerTransactionsMessageV2(). This function will be removed in a future release.
+ *
+ * @param signer - Ignored. Previously required for compatibility.
  * @param accountId - The account ID to get transactions for.
  * @param filters - Optional filters to apply to the transactions.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
+ * @returns A Promise resolving to JSON string of the NitroliteRPCMessage.
  */
 export async function createGetLedgerTransactionsMessage(
+    _signer: MessageSigner,
     accountId: string,
     filters?: GetLedgerTransactionsFilters,
     requestId: RequestID = generateRequestId(),
@@ -324,14 +435,62 @@ export async function createGetLedgerTransactionsMessage(
 }
 
 /**
+ * Creates the stringified message body for a 'get_ledger_transactions' request.
+ *
+ * @param accountId - The account ID to get transactions for.
+ * @param filters - Optional filters to apply to the transactions.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns JSON string of the NitroliteRPCMessage.
+ */
+export function createGetLedgerTransactionsMessageV2(
+    accountId: string,
+    filters?: GetLedgerTransactionsFilters,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): string {
+    // Build filtered parameters object
+    const filteredParams: Partial<GetLedgerTransactionsFilters> = {};
+    if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                (filteredParams as any)[key] = value;
+            }
+        });
+    }
+
+    const params: GetLedgerTransactionsRequestParams = {
+        account_id: accountId,
+        ...filteredParams,
+    };
+
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.GetLedgerTransactions,
+        params,
+        requestId,
+        timestamp,
+    });
+
+    return JSON.stringify(request);
+}
+
+/**
+ * ⚠️ LEGACY — DO NOT USE IN NEW CODE
+ *
  * Creates the stringified message body for a 'get_app_definition' request.
  *
+ * Use {@link createGetAppDefinitionMessageV2} instead.
+ *
+ * @deprecated Use createGetAppDefinitionMessageV2(). This function will be removed in a future release.
+ *
+ * @param signer - Ignored. Previously required for compatibility.
  * @param appSessionId - The Application Session ID to get the definition for.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
+ * @returns A Promise resolving to JSON string of the NitroliteRPCMessage.
  */
 export async function createGetAppDefinitionMessage(
+    _signer: MessageSigner,
     appSessionId: AccountID,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
@@ -348,20 +507,81 @@ export async function createGetAppDefinitionMessage(
 }
 
 /**
+ * Creates the stringified message body for a 'get_app_definition' request.
+ *
+ * @param appSessionId - The Application Session ID to get the definition for.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns JSON string of the NitroliteRPCMessage.
+ */
+export function createGetAppDefinitionMessageV2(
+    appSessionId: AccountID,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): string {
+    const params = { app_session_id: appSessionId };
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.GetAppDefinition,
+        params,
+        requestId,
+        timestamp,
+    });
+
+    return JSON.stringify(request);
+}
+
+/**
+ * ⚠️ LEGACY — DO NOT USE IN NEW CODE
+ *
+ * Creates the stringified message body for a 'get_app_sessions' request.
+ *
+ * Use {@link createGetAppSessionsMessageV2} instead.
+ *
+ * @deprecated Use createGetAppSessionsMessageV2(). This function will be removed in a future release.
+ *
+ * @param signer - Ignored. Previously required for compatibility.
+ * @param participant - Participant address to filter sessions.
+ * @param status - Optional status to filter sessions.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to JSON string of the NitroliteRPCMessage.
+ */
+export async function createGetAppSessionsMessage(
+    _signer: MessageSigner,
+    participant: Address,
+    status?: RPCChannelStatus,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const params = {
+        participant,
+        ...(status ? { status } : {}),
+    };
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.GetAppSessions,
+        params,
+        requestId,
+        timestamp,
+    });
+
+    return JSON.stringify(request);
+}
+
+/**
  * Creates the stringified message body for a 'get_app_sessions' request.
  *
  * @param participant - Participant address to filter sessions.
  * @param status - Optional status to filter sessions.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
+ * @returns JSON string of the NitroliteRPCMessage.
  */
-export async function createGetAppSessionsMessage(
+export function createGetAppSessionsMessageV2(
     participant: Address,
     status?: RPCChannelStatus,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
+): string {
     const params = {
         participant,
         ...(status ? { status } : {}),
@@ -504,6 +724,15 @@ export async function createApplicationMessage(
     return JSON.stringify(signedRequest);
 }
 
+/**
+ * Creates the signed, stringified message body for a 'create_channel' request.
+ *
+ * @param signer - The function to sign the request payload.
+ * @param params - Any specific parameters required by 'create_channel'. See {@link CreateChannelRequestParams} for details.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
+ */
 export async function createCreateChannelMessage(
     signer: MessageSigner,
     params: CreateChannelRequestParams,
@@ -525,7 +754,7 @@ export async function createCreateChannelMessage(
  *
  * @param signer - The function to sign the request payload.
  * @param channelId - The Channel ID to close.
- * @param params - Any specific parameters required by 'close_channel'.
+ * @param fundDestination - The address where remaining funds should be sent upon channel closure.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
  * @returns A Promise resolving to the JSON string of the signed NitroliteRPCMessage.
@@ -576,20 +805,56 @@ export async function createResizeChannelMessage(
 }
 
 /**
+ * ⚠️ LEGACY — DO NOT USE IN NEW CODE
+ *
+ * Creates the stringified message body for a 'get_channels' request.
+ *
+ * Use {@link createGetChannelsMessageV2} instead.
+ *
+ * @deprecated Use createGetChannelsMessageV2(). This function will be removed in a future release.
+ *
+ * @param signer - Ignored. Previously required for compatibility.
+ * @param participant - Optional participant address to filter channels.
+ * @param status - Optional status to filter channels.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to JSON string of the NitroliteRPCMessage.
+ */
+export async function createGetChannelsMessage(
+    _signer: MessageSigner,
+    participant?: Address,
+    status?: RPCChannelStatus,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const params = {
+        ...(participant ? { participant } : {}),
+        ...(status ? { status } : {}),
+    };
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.GetChannels,
+        params,
+        requestId,
+        timestamp,
+    });
+    return JSON.stringify(request);
+}
+
+/**
  * Creates the stringified message body for a 'get_channels' request.
  *
  * @param participant - Optional participant address to filter channels.
  * @param status - Optional status to filter channels.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
+ * @returns JSON string of the NitroliteRPCMessage.
  */
-export async function createGetChannelsMessage(
+export function createGetChannelsMessageV2(
     participant?: Address,
     status?: RPCChannelStatus,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
+): string {
     const params = {
         ...(participant ? { participant } : {}),
         ...(status ? { status } : {}),
@@ -628,18 +893,52 @@ export async function createGetRPCHistoryMessage(
 }
 
 /**
+ * ⚠️ LEGACY — DO NOT USE IN NEW CODE
+ *
+ * Creates the stringified message body for a 'get_assets' request.
+ *
+ * Use {@link createGetAssetsMessageV2} instead.
+ *
+ * @deprecated Use createGetAssetsMessageV2(). This function will be removed in a future release.
+ *
+ * @param signer - Ignored. Previously required for compatibility.
+ * @param chainId - Optional chain ID to filter assets.
+ * @param requestId - Optional request ID.
+ * @param timestamp - Optional timestamp.
+ * @returns A Promise resolving to JSON string of the NitroliteRPCMessage.
+ */
+export async function createGetAssetsMessage(
+    _signer: MessageSigner,
+    chainId?: number,
+    requestId: RequestID = generateRequestId(),
+    timestamp: Timestamp = getCurrentTimestamp(),
+): Promise<string> {
+    const params = {
+        ...(chainId ? { chain_id: chainId } : {}),
+    };
+    const request = NitroliteRPC.createRequest({
+        method: RPCMethod.GetAssets,
+        params,
+        requestId,
+        timestamp,
+    });
+
+    return JSON.stringify(request);
+}
+
+/**
  * Creates the stringified message body for a 'get_assets' request.
  *
  * @param chainId - Optional chain ID to filter assets.
  * @param requestId - Optional request ID.
  * @param timestamp - Optional timestamp.
- * @returns A Promise resolving to the JSON string of the NitroliteRPCMessage.
+ * @returns JSON string of the NitroliteRPCMessage.
  */
-export async function createGetAssetsMessage(
+export function createGetAssetsMessageV2(
     chainId?: number,
     requestId: RequestID = generateRequestId(),
     timestamp: Timestamp = getCurrentTimestamp(),
-): Promise<string> {
+): string {
     const params = {
         ...(chainId ? { chain_id: chainId } : {}),
     };

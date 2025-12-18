@@ -187,9 +187,10 @@ api:
                 - field_name: asset
                   type: string
                   description: The asset symbol
+                # by default returs the latest state regardless of signature
                 - field_name: signed_state
                   type: boolean
-                  description: If specified, requires the returned state to be signed.
+                  description: can be enabled to get the latest signed state to know what is the current pending transition
               response:
                 - field_name: state
                   type: state

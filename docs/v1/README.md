@@ -21,3 +21,44 @@ This directory introduces new Clearnode architecture, models and communication f
 ---
 
 **Note:**  This directory contains ongoing work on Nitrolite V1 protocol architecture.
+
+## Project Structure
+
+```t
+cerebro/
+clearnode/
+    api/ # AppSessionService
+        app_session/
+        channel/
+        user/
+        node/
+    config/
+        migrations/ # database migration files
+            postgres/
+            sqlite/
+    metric/
+        prometheus/ # Prometheus metrics exporter
+    store/
+        db/ # struct Database implements Store interface
+        memory/ # may include in-memory store for Asset's, Blockchain's etc.
+    blockchain_worker.go # service: BlockchainWorker, BWStore
+    config.go
+    event_handler.go # service: EventHandler
+    eth_listener.go # service: SmartContractListener, SCLStore (TBD)
+    main.go # 1st - monolithic clearnode implementation; then - refactor into microservices
+    rpc_router.go # RPC Router binding RPC methods to handlers
+contract/
+docs/
+pkg/
+    amm/
+    app_session/
+    blockchain/
+        evm/ # Client implementations for EVM-based blockchains
+    core/ # Client interface (Create, Checkpoint, Challenge etc.), PackState, UnpackState, TransitionValidator, functions related to State build
+    rpc/ # Node, Client, Requests, Responses, Events, Errors
+sdk/
+    go/
+    ts/ # should include implementations for everything inside /pkg/
+test/ # integration test scenarios executed by all SDKs inside sdk/ directory
+go.mod
+```

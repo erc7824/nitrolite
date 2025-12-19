@@ -38,7 +38,7 @@ types:
       fields:
         - name: type
           type: transition_type
-          description: (transfer_receive, transfer_send, unlock, lock, deposit, withdraw, bridge_in, bridge_out, node_in, node_out, migrate) 
+          description: (transfer_receive, transfer_send, release, commit, home_deposit, home_withdrawal, mutual_lock, escrow_deposit, escrow_lock, escrow_withdraw, migrate) 
         - name: tx_hash
           type: string
           description: Transaction hash associated with the transition
@@ -50,25 +50,17 @@ types:
           type: string
           description: Amount involved in the transition
 
-  - state_data:
-      description: Represents the data associated with a state
-      type: object
-      fields:
-        - name: transitions
-          type: array
-          items:
-            type: transition
-          description: List of transitions included in the state
-
   - state:
       description: Represents the current state of the user stored on Node
       fields:
         - name: id
           type: string
           description: Deterministic ID (hash) of the state
-        - name: data
-          type: state_data
-          description: Data associated with the state
+        - name: transitions
+          type: array
+          items:
+            type: transition
+          description: List of transitions included in the state
         - name: asset
           type: string
           description: Asset type of the state

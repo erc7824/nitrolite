@@ -18,7 +18,7 @@ sequenceDiagram
         Note over Client: state.setEscrowToken(blockchainId, tokenAddress)
         Note over Client: GetEscrowChannelID(homeChannelDef, state.version)
         Note over Client: NewTransition(mutualLockT, state.ID(), homeChannelID, amount)
-        Note over Client: state.applyTransitions(transtions) returns true
+        Note over Client: state.applyTransitions(transitions) returns true
         Note over Client: signState(state) returns userSig
 
         Client->>Node: SubmitState(state, userSig)
@@ -48,7 +48,7 @@ sequenceDiagram
         Note over Client: createNextState(currentState) returns state
         Note over Client: state.setID(CalculateStateID(state.userWallet, state.asset, state.cycleId, state.version))
         Note over Client: NewTransition(escrow_depositT, state.ID(), homeChannelID, amount)
-        Note over Client: state.applyTransitions(transtions) returns true
+        Note over Client: state.applyTransitions(transitions) returns true
         Note over Client: signState(state) returns userSig
 
         Client->>Node: SubmitState(state, userSig)

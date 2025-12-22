@@ -1,5 +1,5 @@
 sequenceDiagram
-        actor User(Sender)
+        actor SenderUser
         actor SenderClient
         actor Node
         actor ReceiverClient
@@ -7,15 +7,15 @@ sequenceDiagram
         Note over SenderClient: Connected to Node
         Note over Node: Contains user's state with Home Chain 
 
-        User(Sender)->>SenderClient: transfer(DestinationUser(Sender)Wallet, asset, amount)
-        SenderClient->>Node: GetLastState(User(Sender)Wallet, asset)
+        SenderUser->>SenderClient: transfer(DestinationUserWallet, asset, amount)
+        SenderClient->>Node: GetLastState(SenderUserWallet, asset)
         Note right of Node: GetLastState(userWallet, asset)
         Node->>SenderClient: Returns a state with home chain
         %% Note over SenderClient: Check current state transitions
         Note over SenderClient: createNextState(currentState) returns state
         Note over SenderClient: state.setID(CalculateStateID(state.userWallet, state.asset, cycleId, state.version))
-        Note over SenderClient: NewTransition(transferT, state.ID(), DestinationUser(Sender)Wallet, amount)
-        Note over SenderClient: state.applyTransitions(transtions) returns true
+        Note over SenderClient: NewTransition(transferT, state.ID(), DestinationSenderUserWallet, amount)
+        Note over SenderClient: state.applyTransitions(transitions) returns true
         Note over SenderClient: signState(state) returns userSig
 
         SenderClient->>Node: SubmitState(state, userSig)
@@ -24,18 +24,18 @@ sequenceDiagram
         Note right of Node: ValidateStateTransition(currentState, state)
         Note right of Node: StoreState(state)
         
-        Note right of Node: CreateReceiverState(DestinationUser(Sender)Wallet)
-        Note right of Node: GetLastState(DestinationUser(Sender)Wallet, asset)
+        Note right of Node: CreateReceiverState(DestinationUserWallet)
+        Note right of Node: GetLastState(DestinationUserWallet, asset)
         %% Note over SenderClient: Check current state transitions
         Note over Node: createNextState(receiver_state) returns new_receiver_state
         Note over Node: new_receiver_state.setID(CalculateStateID(new_receiver_state.userWallet, new_receiver_state.asset, cycleId, new_receiver_state.version))
-        Note over Node: NewTransition(transfer_receiveT, new_receiver_state.ID(), DestinationUser(Sender)Wallet, amount)
-        Note over Node: new_receiver_state.applyTransitions(transtions) returns true
-        Note over Node: signState(new_receiver_state) returns userSig
+        Note over Node: NewTransition(transfer_receiveT, new_receiver_state.ID(), DestinationUserWallet, amount)
+        Note over Node: new_receiver_state.applyTransitions(transitions) returns true
+        Note over Node: signState(new_receiver_state) returns nodeSig
 
         Node->>SenderClient: Sends ChannelUpdate & BalanceUpdate
         Node->>ReceiverClient: Sends ChannelUpdate & BalanceUpdate
 
         Node->>SenderClient: Return node signature
 
-        SenderClient->>User(Sender): Returns success & tx hash
+        SenderClient->>SenderUser: Returns success & tx hash

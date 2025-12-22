@@ -18,11 +18,23 @@ This directory introduces new Clearnode architecture, models and communication f
 - **[home_chan_withdraw.mmd](communication_flows/home_chan_withdraw.mmd)** - Home channel withdrawal
 - **[home_chan_withdraw_on_create_from_state.mmd](communication_flows/home_chan_withdraw_on_create_from_state.mmd)** - State-based channel creation with withdrawal
 
+#### Remaining Flows
+
+The following communication flows are not yet documented but will be added in future iterations:
+
+- **Remaining app session endpoints** are not affected and will be added here later. The only new requirement includes creating app sessions with 0 allocations, and participants depositing one by one. Now app session deposits are limited to one participant deposit at a time.
+
+- **home channel deposit** - Similar to home channel creation with deposit, but for existing channels
+- **home chain migration** - Cross-chain state migration between home channels
+- **off-chain transfer to a non-existing user** - Handles receiver account creation during transfer
+
 ---
 
 **Note:**  This directory contains ongoing work on Nitrolite V1 protocol architecture.
 
 ## Project Structure
+
+The following is a suggested project structure that may change as the implementation evolves:
 
 ```t
 cerebro/

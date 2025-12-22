@@ -54,6 +54,7 @@ classDiagram
         +int64 EscrowNodeNetFlow
 
         +bool IsFinal
+        %% TODO: Remove in the future if redundant 
 
         +string UserSig
         +string NodeSig
@@ -93,7 +94,7 @@ classDiagram
         +[64]char ID
         // Deterministic:
         // 1) Initiated by User: Hash(ToAccount, SenderNewStateID)
-        // 1) Initiated by Node: Hash(FromAccount, ReceiverNewStateID)
+        // 2) Initiated by Node: Hash(FromAccount, ReceiverNewStateID)
 
         +TransactionType Type
         +string AssetSymbol
@@ -101,8 +102,8 @@ classDiagram
         +string FromAccount
         +string ToAccount
 
-        [64]char *SenderNewStateID
-        [64]char *ReceiverNewStateID
+        +[64]char *SenderNewStateID
+        +[64]char *ReceiverNewStateID
 
         +decimal.Decimal Amount
         +time.Time CreatedAt

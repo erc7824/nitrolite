@@ -24,3 +24,4 @@ The structure breakdown:
 - `METHOD`: The name of the method being called (`string`)
 - `PARAMETERS`/`RESPONSE_DATA`: An object of parameters/response data (`map[string]any`)
 - `TIMESTAMP`: Unix timestamp of the request/response in milliseconds (`uint64`)
+This design allows different authentication and signing strategies without modifying the core RPC message format. Signatures are state-specific, not RPC-specific. State signatures are included within the `state` objects passed as parameters, where they logically belong.

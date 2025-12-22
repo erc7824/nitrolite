@@ -15,7 +15,7 @@ sequenceDiagram
         Note over Client: createNextState(currentState) returns state
         Note over Client: state.setID(CalculateStateID(state.userWallet, state.asset, cycleId, state.version))
         Note over Client: NewTransition(withdrawalT, state.ID(), userWallet, amount)
-        Note over Client: state.applyTransitions(transtions) returns true
+        Note over Client: state.applyTransitions(transitions) returns true
         Note over Client: signState(state) returns userSig
 
         Client->>Node: SubmitState(state, userSig)

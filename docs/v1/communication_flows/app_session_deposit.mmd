@@ -33,7 +33,7 @@ sequenceDiagram
         Note over SenderClient: createNextState(currentState) returns state
         Note over SenderClient: state.setID(CalculateStateID(state.userWallet, state.asset, cycleId, state.version))
         Note over SenderClient: NewTransition(commitT, state.ID(), appSessionId, amount)
-        Note over SenderClient: state.applyTransitions(transtions) returns true
+        Note over SenderClient: state.applyTransitions(transitions) returns true
         Note over SenderClient: signState(state) returns userSig
 
         SenderClient->>Node: SubmitDepositState(newAppState, sigQuorum, state, userSig)

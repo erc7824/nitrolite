@@ -158,7 +158,7 @@ types:
           description: A unique number to prevent replay attacks  
 
   - app_allocation:
-      description: Definition for an app session
+      description: Allocation of assets to a participant in an app session
       fields:
         - name: participant
           type: string
@@ -171,7 +171,7 @@ types:
           description: Amount allocated to the participant
 
   - app_state:
-      description: Configuration for creating a channel
+      description: Represents the current state of an application session
       fields:
         - name: app_session_id
           type: string
@@ -244,7 +244,7 @@ api:
                   type: state
                   description: The current state of the user
               errors:
-                - message: not_found
+                - message: channel_not_found
                   description: The specified channel was not found
             - name: request_creation
               description: Request the creation of a channel from Node
@@ -261,6 +261,14 @@ api:
                   type: string
                   description: Node's signature for the state
               errors:
+                - message: invalid_channel_definition
+                  description: The channel definition is invalid
+                - message: invalid_state
+                  description: The submitted state is invalid
+                - message: channel_already_exists
+                  description: A channel with the same parameters already exists
+                - message: unauthorized
+                  description: The request was not authorized
             - name: submit_state
               description: Submit a cross-chain state
               request:
@@ -311,6 +319,19 @@ api:
                 - field_name: user_state
                   type: state
                   description: The user state associated with the application session update
+              response:
+                - field_name: signature
+                  type: string
+                  description: Node's signature for the deposit state
+              errors:
+                - message: unauthorized
+                  description: The request was not authorized
+                - message: invalid_app_state
+                  description: The application session state is invalid
+                - message: quorum_not_met
+                  description: The signature quorum requirement is not satisfied
+                - message: channel_not_found
+                  description: The associated channel was not found
             - name: submit_app_state
               description: Submit an application session state update
               request:
@@ -327,3 +348,9 @@ api:
               errors:
                 - message: unauthorized
                   description: The request was not authorized
+                - message: invalid_app_state
+                  description: The application session state is invalid
+                - message: quorum_not_met
+                  description: The signature quorum requirement is not satisfied
+                - message: ongoing_transition
+                  description: There is an ongoing transition that must be resolved first

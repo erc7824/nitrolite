@@ -240,13 +240,9 @@ contract ChannelsHub is IVault {
 
     event EscrowDepositChallenged(bytes32 indexed escrowId, CrossChainState candidate, uint256 challengeExpiry);
 
-    // usage:
-    // - resolve a challenge during a bridging-deposit process
-    function checkpointEscrowDeposit(bytes32 escrowId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {}
-    event EscrowDepositCheckpointed(bytes32 indexed escrowId, CrossChainState candidate);
-
     // usage: (optional)
     // - unlock Node's funds after bridging-deposit for better funds efficiency
+    // - resolve a challenge during a bridging-deposit process
     function finalizeEscrowDeposit(bytes32 escrowId, CrossChainState calldata candidate, CrossChainState[2] calldata proof) external payable {}
 
     event EscrowDepositFinalized(bytes32 indexed escrowId, CrossChainState finalState);
@@ -262,6 +258,12 @@ contract ChannelsHub is IVault {
     function initiateEscrowWithdrawal(Definition calldata def, CrossChainState calldata initCCS) external payable {}
 
     event EscrowWithdrawalInitiated(bytes32 indexed escrowId, address indexed participant, address indexed node, Definition definition, CrossChainState initialState);
+
+    // usage:
+    // - challenge bridging-withdrawal process
+    function challengeEscrowWithdrawal(bytes32 escrowId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {}
+
+    event EscrowWithdrawalChallenged(bytes32 indexed escrowId, CrossChainState candidate, uint256 challengeExpiry);
 
     // usage:
     // - unlock user funds during bridging-withdrawal

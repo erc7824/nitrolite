@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import {IVault} from "./IVault.sol";
 
-contract IContract is IVault {
+contract ChannelsHub is IVault {
     // User and Node have different logic in the channel
     // only 2 participants in the channel
 
@@ -23,22 +23,34 @@ contract IContract is IVault {
         // address signatureValidator;
     }
 
+    enum StateIntent {
+        OPERATE,
+        CREATE,
+        CLOSE,
+        DEPOSIT,
+        WITHDRAW,
+        MIGRATE_HOME,
+        LOCK,
+        UNLOCK
+    }
+
     struct CrossChainState {
         uint256 version;
 
         uint64 homeChainId;
-        bool isFinal;
+        StateIntent intent;
 
-        State[] states;
+        // to be added for custom executors, e.g. fees, later:
+        // bytes executionData;
+
+        State homeState;
+        State nonHomeState;
 
         bytes participantSig;
         bytes nodeSig;
-
-        // intent?
     }
 
     struct State {
-        // intent?
         uint64 chainId;
         address token;
 

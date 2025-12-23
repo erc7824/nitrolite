@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/log"
+	"github.com/erc7824/nitrolite/clearnode/store/db"
+	"github.com/erc7824/nitrolite/clearnode/store/memory"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"
 )
@@ -25,16 +28,16 @@ const (
 // Config represents the overall application configuration
 type Config struct {
 	mode          Mode
-	blockchains   map[uint32]BlockchainConfig
-	assets        AssetsConfig
+	blockchains   map[uint32]memory.BlockchainConfig
+	assets        memory.AssetsConfig
 	privateKeyHex string
-	dbConf        DatabaseConfig
+	dbConf        db.DatabaseConfig
 	msgExpiryTime int // Time in seconds for message timestamp validation
 }
 
 // LoadConfig builds configuration from environment variables
-func LoadConfig(logger Logger) (*Config, error) {
-	logger = logger.NewSystem("config")
+func LoadConfig(logger log.Logger) (*Config, error) {
+	logger = logger.WithName("config")
 
 	configDirPath := os.Getenv(configDirPathEnv)
 	if configDirPath == "" {
@@ -57,14 +60,14 @@ func LoadConfig(logger Logger) (*Config, error) {
 	logger.Info("set mode", "value", mode)
 
 	// Get database URL from environment variables
-	var dbConf DatabaseConfig
+	var dbConf db.DatabaseConfig
 	dbURL := os.Getenv("CLEARNODE_DATABASE_URL")
 
 	// If DATABASE_URL is not empty, parse the connection string
 	// Otherwise, read the envs in usual way
 	if dbURL != "" {
 		var err error
-		dbConf, err = ParseConnectionString(dbURL)
+		dbConf, err = db.ParseConnectionString(dbURL)
 		if err != nil {
 			logger.Error("failed to parse connection string", "err", err)
 			return nil, err
@@ -93,12 +96,12 @@ func LoadConfig(logger Logger) (*Config, error) {
 	}
 	logger.Info("set message expiry time", "value", messageTimestampExpiry)
 
-	blockchains, err := LoadBlockchains(configDirPath)
+	blockchains, err := memory.LoadBlockchains(configDirPath)
 	if err != nil {
 		logger.Fatal("failed to load blockchains", "error", err)
 	}
 
-	assets, err := LoadAssets(configDirPath)
+	assets, err := memory.LoadAssets(configDirPath)
 	if err != nil {
 		logger.Fatal("failed to load assets", "error", err)
 	}

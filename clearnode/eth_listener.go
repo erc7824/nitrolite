@@ -9,18 +9,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/nitrolite"
+	"github.com/erc7824/nitrolite/clearnode/pkg/log"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
-	"github.com/ipfs/go-log/v2"
 	"github.com/layer-3/clearsync/pkg/debounce"
 	"github.com/pkg/errors"
 )
-
-var ethLogger = log.Logger("base-event-listener")
 
 const (
 	maxBackOffCount = 5
@@ -46,16 +43,13 @@ type Ethereum interface {
 	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
 }
 
-func init() {
-	log.SetAllLoggers(log.LevelDebug)
-	log.SetLogLevel("base-event-listener", "debug")
-
-	var err error
-	custodyAbi, err = nitrolite.CustodyMetaData.GetAbi()
-	if err != nil {
-		panic(err)
-	}
-}
+// func init() {
+// 	var err error
+// 	custodyAbi, err = nitrolite.CustodyMetaData.GetAbi()
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// }
 
 type LogHandler func(ctx context.Context, l types.Log)
 
@@ -69,7 +63,7 @@ func listenEvents(
 	lastBlock uint64,
 	lastIndex uint32,
 	handler LogHandler,
-	logger Logger,
+	logger log.Logger,
 ) {
 	var backOffCount atomic.Uint64
 	var historicalCh, currentCh chan types.Log
@@ -89,7 +83,7 @@ func listenEvents(
 				var header *types.Header
 				var err error
 				headerCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-				err = debounce.Debounce(headerCtx, ethLogger, func(ctx context.Context) error {
+				err = debounce.Debounce(headerCtx, nil, func(ctx context.Context) error {
 					header, err = client.HeaderByNumber(ctx, nil)
 					return err
 				})
@@ -159,7 +153,7 @@ func ReconcileBlockRange(
 	lastBlock uint64,
 	lastIndex uint32,
 	historicalCh chan types.Log,
-	logger Logger,
+	logger log.Logger,
 ) {
 	var backOffCount atomic.Uint64
 	startBlock := lastBlock
@@ -186,7 +180,7 @@ func ReconcileBlockRange(
 		var logs []types.Log
 		var err error
 		logsCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-		err = debounce.Debounce(logsCtx, ethLogger, func(ctx context.Context) error {
+		err = debounce.Debounce(logsCtx, nil, func(ctx context.Context) error {
 			logs, err = client.FilterLogs(ctx, fetchFQ)
 			return err
 		})
@@ -250,7 +244,7 @@ func extractAdvisedBlockRange(msg string) (startBlock, endBlock uint64, err erro
 }
 
 // waitForBackOffTimeout implements exponential backoff between retries
-func waitForBackOffTimeout(logger Logger, backOffCount int, originator string) {
+func waitForBackOffTimeout(logger log.Logger, backOffCount int, originator string) {
 	if backOffCount > maxBackOffCount {
 		logger.Fatal("back off limit reached, exiting", "originator", originator, "backOffCollisionCount", backOffCount)
 		return

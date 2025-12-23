@@ -8,7 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/custody"
 	"github.com/erc7824/nitrolite/clearnode/nitrolite"
+	"github.com/erc7824/nitrolite/clearnode/pkg/log"
+	"github.com/erc7824/nitrolite/clearnode/store/db"
 	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/gorm"
 )
@@ -28,15 +31,15 @@ const (
 
 type BlockchainWorker struct {
 	db      *gorm.DB
-	custody map[uint32]CustodyInterface
-	logger  Logger
+	custody map[uint32]custody.CustodyInterface
+	logger  log.Logger
 }
 
-func NewBlockchainWorker(db *gorm.DB, custody map[uint32]CustodyInterface, logger Logger) *BlockchainWorker {
+func NewBlockchainWorker(db *gorm.DB, custody map[uint32]custody.CustodyInterface, logger log.Logger) *BlockchainWorker {
 	return &BlockchainWorker{
 		db:      db,
 		custody: custody,
-		logger:  logger.NewSystem("blockchain-worker"),
+		logger:  logger.WithName("blockchain-worker"),
 	}
 }
 
@@ -56,7 +59,7 @@ func (w *BlockchainWorker) Start(ctx context.Context) {
 
 func (w *BlockchainWorker) runChainWorker(ctx context.Context, wg *sync.WaitGroup, chainID uint32) {
 	defer wg.Done()
-	chainLogger := w.logger.With("chain", chainID)
+	chainLogger := w.logger.WithKV("chain", chainID)
 	chainLogger.Info("chain worker started", "chainId", chainID)
 
 	ticker := time.NewTicker(chainWorkerTickInterval)
@@ -76,8 +79,8 @@ func (w *BlockchainWorker) runChainWorker(ctx context.Context, wg *sync.WaitGrou
 	}
 }
 
-func (w *BlockchainWorker) processActionsForChain(ctx context.Context, chainID uint32, logger Logger) {
-	actions, err := getActionsForChain(w.db, chainID, actionBatchSize)
+func (w *BlockchainWorker) processActionsForChain(ctx context.Context, chainID uint32, logger log.Logger) {
+	actions, err := db.GetActionsForChain(w.db, chainID, actionBatchSize)
 	if err != nil {
 		logger.Error("failed to get pending actions for chain", "error", err)
 		return
@@ -96,13 +99,13 @@ func (w *BlockchainWorker) processActionsForChain(ctx context.Context, chainID u
 	}
 }
 
-func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainAction) {
+func (w *BlockchainWorker) processAction(ctx context.Context, action db.BlockchainAction) {
 	logger := w.logger.
-		With("id", action.ID).
-		With("type", action.Type).
-		With("channel", action.ChannelID).
-		With("chain", action.ChainID).
-		With("attempt", action.Retries)
+		WithKV("id", action.ID).
+		WithKV("type", action.Type).
+		WithKV("channel", action.ChannelID).
+		WithKV("chain", action.ChainID).
+		WithKV("attempt", action.Retries)
 
 	custody, exists := w.custody[action.ChainID]
 	if !exists {
@@ -118,7 +121,7 @@ func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainA
 	var err error
 
 	switch action.Type {
-	case ActionTypeCheckpoint:
+	case db.ActionTypeCheckpoint:
 		txHash, err = w.processCheckpoint(ctx, action, custody)
 	default:
 		err = fmt.Errorf("unknown action type: %s", action.Type)
@@ -158,8 +161,8 @@ func (w *BlockchainWorker) processAction(ctx context.Context, action BlockchainA
 	logger.Info("action completed successfully", "txHash", txHash.Hex())
 }
 
-func (w *BlockchainWorker) processCheckpoint(ctx context.Context, action BlockchainAction, custody CustodyInterface) (common.Hash, error) {
-	var data CheckpointData
+func (w *BlockchainWorker) processCheckpoint(ctx context.Context, action db.BlockchainAction, custody custody.CustodyInterface) (common.Hash, error) {
+	var data db.CheckpointData
 	if err := json.Unmarshal([]byte(action.Data), &data); err != nil {
 		return common.Hash{}, fmt.Errorf("%s: %w", unmarshalCheckpointDataError, err)
 	}

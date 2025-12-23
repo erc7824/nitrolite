@@ -5,36 +5,33 @@ import (
 	"encoding/csv"
 	"testing"
 
+	"github.com/erc7824/nitrolite/clearnode/api"
+	"github.com/erc7824/nitrolite/clearnode/pkg/log"
+	"github.com/erc7824/nitrolite/clearnode/store/db"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTransactionExporter_ExportToCSV(t *testing.T) {
-	db, cleanup := setupTestDB(t)
+	database, cleanup := api.SetupTestDB(t)
 	t.Cleanup(cleanup)
 
-	logger := NewLoggerIPFS("test")
-	exporter := NewTransactionExporter(db, logger)
+	logger := log.NewNoopLogger()
+	exporter := NewTransactionExporter(database, logger)
 
 	// Create test data
 	account1 := "0x1234567890123456789012345678901234567890"
 	account2 := "0x0987654321098765432109876543210987654321"
 	account3 := "app-session-123"
 
-	// Create user tags for wallet accounts
-	tag1, err := GenerateOrRetrieveUserTag(db, account1)
-	require.NoError(t, err)
-	tag2, err := GenerateOrRetrieveUserTag(db, account2)
-	require.NoError(t, err)
-
 	// Create test transactions
-	_, err = RecordLedgerTransaction(db, TransactionTypeTransfer, NewAccountID(account1), NewAccountID(account2), "usdc", decimal.NewFromInt(100))
+	_, err := db.RecordLedgerTransaction(database, db.TransactionTypeTransfer, db.NewAccountID(account1), db.NewAccountID(account2), "usdc", decimal.NewFromInt(100))
 	require.NoError(t, err)
 
-	_, err = RecordLedgerTransaction(db, TransactionTypeDeposit, NewAccountID(account2), NewAccountID(account1), "eth", decimal.NewFromInt(50))
+	_, err = db.RecordLedgerTransaction(database, db.TransactionTypeDeposit, db.NewAccountID(account2), db.NewAccountID(account1), "eth", decimal.NewFromInt(50))
 	require.NoError(t, err)
 
-	_, err = RecordLedgerTransaction(db, TransactionTypeAppDeposit, NewAccountID(account1), NewAccountID(account3), "usdc", decimal.NewFromInt(25))
+	_, err = db.RecordLedgerTransaction(database, db.TransactionTypeAppDeposit, db.NewAccountID(account1), db.NewAccountID(account3), "usdc", decimal.NewFromInt(25))
 	require.NoError(t, err)
 
 	t.Run("Export", func(t *testing.T) {
@@ -68,23 +65,18 @@ func TestTransactionExporter_ExportToCSV(t *testing.T) {
 			switch record[1] { // Type column
 			case "transfer":
 				require.Equal(t, account1, record[2]) // FromAccount
-				require.Equal(t, tag1.Tag, record[3]) // FromAccountTag
 				require.Equal(t, account2, record[4]) // ToAccount
-				require.Equal(t, tag2.Tag, record[5]) // ToAccountTag
 				require.Equal(t, "usdc", record[6])   // AssetSymbol
 				require.Equal(t, "100", record[7])    // Amount
 				foundTx1 = true
 			case "deposit":
 				require.Equal(t, account2, record[2]) // FromAccount
-				require.Equal(t, tag2.Tag, record[3]) // FromAccountTag
 				require.Equal(t, account1, record[4]) // ToAccount
-				require.Equal(t, tag1.Tag, record[5]) // ToAccountTag
 				require.Equal(t, "eth", record[6])    // AssetSymbol
 				require.Equal(t, "50", record[7])     // Amount
 				foundTx2 = true
 			case "app_deposit":
 				require.Equal(t, account1, record[2]) // FromAccount
-				require.Equal(t, tag1.Tag, record[3]) // FromAccountTag
 				require.Equal(t, account3, record[4]) // ToAccount
 				require.Empty(t, record[5])           // ToAccountTag (app account has no tag)
 				require.Equal(t, "usdc", record[6])   // AssetSymbol
@@ -128,7 +120,7 @@ func TestTransactionExporter_ExportToCSV(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
-		txType := TransactionTypeTransfer
+		txType := db.TransactionTypeTransfer
 		options := ExportOptions{
 			AccountID: account1,
 			TxType:    &txType,

@@ -9,6 +9,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/api"
+	"github.com/erc7824/nitrolite/clearnode/custody"
+	"github.com/erc7824/nitrolite/clearnode/metrics/prometheus"
+	"github.com/erc7824/nitrolite/clearnode/pkg/log"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/clearnode/store/db"
+	"gorm.io/gorm"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -16,7 +24,12 @@ import (
 var embedMigrations embed.FS
 
 func main() {
-	logger := NewLoggerIPFS("root")
+	cfg := log.Config{
+		Format: "json",
+		Level:  log.LevelDebug,
+	}
+
+	logger := log.NewZapLogger(cfg)
 	if len(os.Args) > 1 {
 		// If a CLI command is provided, run it and exit
 		runCli(logger, os.Args[1])
@@ -28,40 +41,33 @@ func main() {
 		logger.Fatal("failed to load configuration", "error", err)
 	}
 
-	db, err := ConnectToDB(config.dbConf)
+	database, err := db.ConnectToDB(config.dbConf, embedMigrations)
 	if err != nil {
 		logger.Fatal("Failed to setup database", "error", err)
 	}
 
-	err = loadSessionKeyCache(db)
+	err = db.LoadSessionKeyCache(database)
 	if err != nil {
 		logger.Fatal("Failed to load session key cache", "error", err)
 	}
 
-	signer, err := NewSigner(config.privateKeyHex)
+	signer, err := sign.NewEthereumSigner(config.privateKeyHex)
 	if err != nil {
 		logger.Fatal("failed to initialise signer", "error", err)
 	}
-	logger.Info("broker signer initialized", "address", signer.GetAddress().Hex())
+	logger.Info("broker signer initialized", "address", signer.PublicKey().Address())
 
-	rpcStore := NewRPCStore(db)
+	rpcStore := db.NewRPCStore(database)
 
 	// Initialize Prometheus metrics
-	metrics := NewMetrics()
+	metrics := prometheus.NewMetrics()
 	// Map to store custody clients for later reference
-	custodyClients := make(map[uint32]*Custody)
+	custodyClients := make(map[uint32]*custody.Custody)
 
-	authManager, err := NewAuthManager(signer.GetPrivateKey())
-	if err != nil {
-		logger.Fatal("failed to initialize auth manager", "error", err)
-	}
+	rpcNode := api.NewRPCNode(signer, logger)
+	wsNotifier := api.NewWSNotifier(rpcNode.Notify, logger)
 
-	rpcNode := NewRPCNode(signer, logger)
-	wsNotifier := NewWSNotifier(rpcNode.Notify, logger)
-	appSessionService := NewAppSessionService(db, wsNotifier)
-	channelService := NewChannelService(db, config.blockchains, &config.assets, signer)
-
-	NewRPCRouter(rpcNode, config, signer, appSessionService, channelService, db, authManager, metrics, rpcStore, wsNotifier, logger)
+	api.NewRPCRouter(rpcNode, config, signer, database, metrics, rpcStore, wsNotifier, logger)
 
 	rpcListenAddr := ":8000"
 	rpcListenEndpoint := "/ws"
@@ -74,7 +80,7 @@ func main() {
 	}
 
 	for chainID, blockchain := range config.blockchains {
-		client, err := NewCustody(signer, db, wsNotifier, blockchain, &config.assets, logger)
+		client, err := custody.NewCustody(signer, database, wsNotifier, blockchain, &config.assets, logger)
 		if err != nil {
 			logger.Fatal("failed to initialize blockchain client", "chainID", chainID, "error", err)
 			continue
@@ -86,11 +92,11 @@ func main() {
 	// Start blockchain action worker for all custody clients
 	// TODO: This can be moved to a separate worker process in the future for better scalability
 	if len(custodyClients) > 0 {
-		custodyClients := make(map[uint32]CustodyInterface, len(custodyClients))
+		custodyClients := make(map[uint32]custody.CustodyInterface, len(custodyClients))
 		for chainID, client := range custodyClients {
 			custodyClients[chainID] = client
 		}
-		worker := NewBlockchainWorker(db, custodyClients, logger)
+		worker := NewBlockchainWorker(database, custodyClients, logger)
 		go worker.Start(context.Background())
 	}
 
@@ -107,7 +113,7 @@ func main() {
 	}
 
 	// Start metrics monitoring
-	go metrics.RecordMetricsPeriodically(db, custodyClients, logger)
+	go RecordMetricsPeriodically(database, custodyClients, metrics, logger)
 
 	go func() {
 		logger.Info("Prometheus metrics available", "listenAddr", metricsListenAddr, "endpoint", metricsEndpoint)
@@ -148,7 +154,7 @@ func main() {
 	logger.Info("shutdown complete")
 }
 
-func runCli(logger Logger, name string) {
+func runCli(logger log.Logger, name string) {
 	switch name {
 	case "reconcile":
 		runReconcileCli(logger)
@@ -156,5 +162,29 @@ func runCli(logger Logger, name string) {
 		runExportTransactionsCli(logger)
 	default:
 		logger.Fatal("Unknown CLI command", "name", name)
+	}
+}
+
+func RecordMetricsPeriodically(db *gorm.DB, custodyClients map[uint32]*custody.Custody, m *prometheus.Metrics, logger log.Logger) {
+	logger = logger.WithName("metrics")
+	dbTicker := time.NewTicker(15 * time.Second)
+	defer dbTicker.Stop()
+
+	balanceTicker := time.NewTicker(30 * time.Second)
+	defer balanceTicker.Stop()
+	for {
+		select {
+		case <-dbTicker.C:
+			m.UpdateChannelMetrics(db)
+			m.UpdateAppSessionMetrics(db)
+		case <-balanceTicker.C:
+			ctx := context.Background()
+			ctx = log.SetContextLogger(ctx, logger)
+
+			// Update metrics for each custody client
+			for _, custodyClient := range custodyClients {
+				custodyClient.UpdateBalanceMetrics(ctx, m)
+			}
+		}
 	}
 }

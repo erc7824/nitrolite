@@ -1,0 +1,356 @@
+types:
+  - channel:
+      description: Represents an on-chain channel
+      fields:
+        - name: channel_id
+          type: string
+          description: Unique identifier for the channel
+        - name: user_wallet
+          type: string
+          description: User wallet address
+        - name: node_wallet
+          type: string
+          description: Node wallet address
+        - name: type
+          type: string
+          description: Type of the channel (home, escrow)
+        - name: blockchain_id
+          type: integer
+          description: Unique identifier for the blockchain
+        - name: token_address
+          type: string
+          description: Address of the token used in the channel
+        - name: challenge
+          type: integer
+          description: Challenge period for the channel in seconds
+        - name: nonce
+          type: integer
+          description: Nonce for the channel
+        - name: status
+          type: string
+          description: Current status of the channel (void, open, challenged, closed)
+        - name: state_version
+          type: integer
+          description: On-chain state version of the channel
+
+  - transition:
+      description: Represents a state transition
+      fields:
+        - name: type
+          type: transition_type
+          description: (transfer_receive, transfer_send, release, commit, home_deposit, home_withdrawal, mutual_lock, escrow_deposit, escrow_lock, escrow_withdraw, migrate) 
+        - name: tx_hash
+          type: string
+          description: Transaction hash associated with the transition
+        - name: account_id
+          type: string
+          description: Account identifier (varies based on transition type)
+          optional: true
+        - name: amount
+          type: string
+          description: Amount involved in the transition
+
+  - state:
+      description: Represents the current state of the user stored on Node
+      fields:
+        - name: id
+          type: string
+          description: Deterministic ID (hash) of the state
+        - name: transitions
+          type: array
+          items:
+            type: transition
+          description: List of transitions included in the state
+        - name: asset
+          type: string
+          description: Asset type of the state
+        - name: user_wallet
+          type: string
+          description: User wallet address
+        - name: version
+          type: integer
+          description: Version of the state
+        - name: home_blockchain_id
+          type: integer
+          description: Identifier for the home Channel blockchain network
+          optional: true
+        - name: escrow_blockchain_id
+          type: integer
+          description: Identifier for the escrow Channel blockchain network
+          optional: true
+        - name: home_ledger
+          type: ledger
+          description: User and node balances for the home channel
+        - name: escrow_ledger
+          type: ledger
+          description: User and node balances for the escrow channel
+          optional: true
+        - name: is_final
+          type: boolean
+          description: Indicates if the state is final
+        - name: user_sig
+          type: string
+          description: User signature for the state
+          optional: true
+        - name: node_sig
+          type: string
+          description: Node signature for the state
+          optional: true
+
+  - ledger:
+      description: Represents ledger balances
+      fields:
+        - name: token_address
+          type: string
+          description: Address of the token used in this channel
+        - name: blockchain_id
+          type: integer
+          description: Unique identifier for the blockchain
+        - name: user_balance
+          type: string
+          description: User balance in the channel
+        - name: user_net_flow
+          type: string
+          description: User net flow in the channel
+        - name: node_balance
+          type: string
+          description: Node balance in the channel
+        - name: node_net_flow
+          type: string
+          description: Node net flow in the channel
+
+  - channel_definition:
+      description: Configuration for creating a channel
+      fields:
+        - name: nonce
+          type: integer
+          description: A unique number to prevent replay attacks
+        - name: challenge
+          type: integer
+          description: Challenge period for the channel in seconds
+
+  - app_participant:
+      description: Definition for an app participant
+      fields:
+        - name: wallet_address
+          type: string
+          description: Participant's wallet address
+        - name: signature_weight
+          type: integer
+          description: Signature weight for the participant
+
+  - app_definition:
+      description: Definition for an app session
+      fields:
+        - name: application_id
+          type: string
+          description: Application identifier from an app registry
+        - name: participants
+          type: array
+          items:
+            type: app_participant
+          description: List of participants in the app session
+        - name: quorum
+          type: integer
+          description: Quorum required for the app session
+        - name: nonce
+          type: integer
+          description: A unique number to prevent replay attacks  
+
+  - app_allocation:
+      description: Allocation of assets to a participant in an app session
+      fields:
+        - name: participant
+          type: string
+          description: Participant's wallet address
+        - name: asset
+          type: string
+          description: Asset symbol
+        - name: amount
+          type: string
+          description: Amount allocated to the participant
+
+  - app_state:
+      description: Represents the current state of an application session
+      fields:
+        - name: app_session_id
+          type: string
+          description: A unique application session identifier
+        - name: intent
+          type: string
+          description: The intent of the app session update (operate, deposit, withdraw)
+        - name: version
+          type: integer
+          description: Version of the app state
+        - name: allocations
+          type: array
+          items:
+            type: app_allocation
+          description: List of allocations in the app state
+        - name: session_data
+          type: string
+          description: JSON stringified session data
+api:
+  groups:
+    - name: channels
+      description: Operations related to channel management
+      versions:
+        - version: v1
+          methods:
+            - name: get_home_channel
+              description: Retrieve the on-chain home channel information
+              request:
+                - field_name: user_wallet
+                  type: string
+                  description: The user's wallet address
+                - field_name: asset
+                  type: string
+                  description: The asset symbol
+              response:
+                - field_name: channel
+                  type: channel
+                  description: The on-chain channel information
+              errors:
+                - message: channel_not_found
+                  description: The specified channel was not found
+            - name: get_escrow_channel
+              description: Retrieve the on-chain escrow channel information
+              request:
+                - field_name: escrow_channel_id
+                  type: string
+                  description: The escrow channel ID
+              response:
+                - field_name: channel
+                  type: channel
+                  description: The on-chain channel information
+              errors:
+                - message: channel_not_found
+                  description: The specified channel was not found
+            - name: get_latest_state
+              description: Retrieve the current state of the user stored on the Node
+              request:
+                - field_name: user_wallet
+                  type: string
+                  description: The user's wallet address
+                - field_name: asset
+                  type: string
+                  description: The asset symbol
+                # by default returns the latest state regardless of signature
+                - field_name: signed_state
+                  type: boolean
+                  description: Can be enabled to get the latest signed state to know what is the current pending transition
+              response:
+                - field_name: state
+                  type: state
+                  description: The current state of the user
+              errors:
+                - message: channel_not_found
+                  description: The specified channel was not found
+            - name: request_creation
+              description: Request the creation of a channel from Node
+              request:
+                - field_name: state
+                  type: state
+                  description: The state to be submitted
+                - field_name: channel_definition
+                  type: channel_definition
+                  description: Definition of the channel to be created
+
+              response:
+                - field_name: signature
+                  type: string
+                  description: Node's signature for the state
+              errors:
+                - message: invalid_channel_definition
+                  description: The channel definition is invalid
+                - message: invalid_state
+                  description: The submitted state is invalid
+                - message: channel_already_exists
+                  description: A channel with the same parameters already exists
+                - message: unauthorized
+                  description: The request was not authorized
+            - name: submit_state
+              description: Submit a cross-chain state
+              request:
+                - field_name: state
+                  type: state
+                  description: The state to be submitted
+              response:
+                - field_name: signature
+                  type: string
+                  description: Node's signature for the state
+              errors:
+                - message: unauthorized
+                  description: The request was not authorized
+                - message: invalid_transition
+                  description: The state transition is invalid
+                - message: ongoing_transition
+                  description: There is an ongoing transition that must be resolved first
+                - message: channel_not_found
+                  description: The specified channel was not found
+                - message: denied_until_checkpoint
+                  description: State submissions are denied until the next checkpoint
+        
+          events:
+            - name: home_channel_created
+              description: Event emitted when a home channel is created
+              payload:
+                - field_name: channel
+                  type: channel
+                  description: The created home channel information
+                - field_name: initial_state
+                  type: state
+                  description: The initial state of the home channel
+  
+    - name: app_sessions
+      description: Operations related to application session management
+      versions:
+        - version: v1
+          methods:
+            - name: submit_deposit_state
+              description: Submit an application session state update
+              request:
+                - field_name: app_state
+                  type: app_state
+                  description: The application session state to be submitted
+                - field_name: sig_quorum
+                  type: integer
+                  description: The signature quorum for the application session
+                - field_name: user_state
+                  type: state
+                  description: The user state associated with the application session update
+              response:
+                - field_name: signature
+                  type: string
+                  description: Node's signature for the deposit state
+              errors:
+                - message: unauthorized
+                  description: The request was not authorized
+                - message: invalid_app_state
+                  description: The application session state is invalid
+                - message: quorum_not_met
+                  description: The signature quorum requirement is not satisfied
+                - message: channel_not_found
+                  description: The associated channel was not found
+            - name: submit_app_state
+              description: Submit an application session state update
+              request:
+                - field_name: app_state
+                  type: app_state
+                  description: The application session state to be submitted
+                - field_name: sig_quorum
+                  type: integer
+                  description: The signature quorum for the application session
+              response:
+                - field_name: signature
+                  type: string
+                  description: Node's signature for the new User state
+              errors:
+                - message: unauthorized
+                  description: The request was not authorized
+                - message: invalid_app_state
+                  description: The application session state is invalid
+                - message: quorum_not_met
+                  description: The signature quorum requirement is not satisfied
+                - message: ongoing_transition
+                  description: There is an ongoing transition that must be resolved first

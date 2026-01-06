@@ -10,7 +10,7 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/pkg/log"
 	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
-	"github.com/erc7824/nitrolite/clearnode/store/db"
+	"github.com/erc7824/nitrolite/clearnode/store/database"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -53,7 +53,7 @@ func runReconcileCli(logger log.Logger) {
 		logger.Fatal("Failed to connect to Ethereum node", "error", err)
 	}
 
-	db, err := db.ConnectToDB(config.dbConf, embedMigrations)
+	db, err := database.ConnectToDB(config.dbConf, embedMigrations)
 	if err != nil {
 		logger.Fatal("Failed to setup database", "error", err)
 	}

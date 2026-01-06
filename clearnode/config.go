@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/log"
-	"github.com/erc7824/nitrolite/clearnode/store/db"
+	db "github.com/erc7824/nitrolite/clearnode/store/database"
 	"github.com/erc7824/nitrolite/clearnode/store/memory"
 	"github.com/ilyakaznacheev/cleanenv"
 	"github.com/joho/godotenv"

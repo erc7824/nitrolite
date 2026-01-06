@@ -1,4 +1,4 @@
-package channel_api
+package channel
 
 import "github.com/ethereum/go-ethereum/common"
 

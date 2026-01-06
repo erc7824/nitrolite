@@ -33,16 +33,16 @@ CREATE TABLE states (
     escrow_channel_id VARCHAR,
 
     -- Home Channel balances and flows
-    home_user_balance DECIMAL(78,0) DEFAULT 0,
-    home_user_net_flow BIGINT DEFAULT 0,
-    home_node_balance DECIMAL(78,0) DEFAULT 0,
-    home_node_net_flow BIGINT DEFAULT 0,
+    home_user_balance DECIMAL(64,18) DEFAULT 0,
+    home_user_net_flow DECIMAL(64,18) DEFAULT 0,
+    home_node_balance DECIMAL(64,18) DEFAULT 0,
+    home_node_net_flow DECIMAL(64,18) DEFAULT 0,
 
     -- Escrow Channel balances and flows
-    escrow_user_balance DECIMAL(78,0) DEFAULT 0,
-    escrow_user_net_flow BIGINT DEFAULT 0,
-    escrow_node_balance DECIMAL(78,0) DEFAULT 0,
-    escrow_node_net_flow BIGINT DEFAULT 0,
+    escrow_user_balance DECIMAL(64,18) DEFAULT 0,
+    escrow_user_net_flow DECIMAL(64,18) DEFAULT 0,
+    escrow_node_balance DECIMAL(64,18) DEFAULT 0,
+    escrow_node_net_flow DECIMAL(64,18) DEFAULT 0,
 
     is_final BOOLEAN DEFAULT FALSE,
 
@@ -60,20 +60,21 @@ CREATE INDEX idx_states_escrow_channel_id ON states(escrow_channel_id) WHERE esc
 
 -- Ledger transactions table: Records all transactions with optional state references
 CREATE TABLE ledger_transactions (
-    id VARCHAR(64) PRIMARY KEY, -- Deterministic hash based on transaction properties
+    id VARCHAR(64) PRIMARY KEY, -- Deterministic hash: Hash(To/FromAccount, Sender/ReceiverNewStateID)
     tx_type VARCHAR NOT NULL, -- 'transfer', 'commit', 'release', 'home_deposit', 'home_withdrawal', 'mutual_lock', 'escrow_deposit', 'escrow_lock', 'escrow_withdraw', 'migrate'
     asset_symbol VARCHAR NOT NULL,
     from_account VARCHAR NOT NULL,
     to_account VARCHAR NOT NULL,
     sender_new_state_id VARCHAR(64),
     receiver_new_state_id VARCHAR(64),
-    amount DECIMAL(38,18) NOT NULL,
+    amount DECIMAL(64,18) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     FOREIGN KEY (sender_new_state_id) REFERENCES states(id) ON DELETE SET NULL,
     FOREIGN KEY (receiver_new_state_id) REFERENCES states(id) ON DELETE SET NULL
 );
 
+-- Ledger TXs are going to be used only for app sessions.
 CREATE INDEX idx_ledger_transactions_type ON ledger_transactions(tx_type);
 CREATE INDEX idx_ledger_transactions_from_account ON ledger_transactions(from_account);
 CREATE INDEX idx_ledger_transactions_to_account ON ledger_transactions(to_account);
@@ -98,10 +99,7 @@ CREATE INDEX idx_ledger_session_key ON ledger(session_key);
 
 -- App sessions table: Application sessions
 CREATE TABLE app_sessions (
-    id SERIAL PRIMARY KEY,
-    protocol VARCHAR NOT NULL DEFAULT 'NitroRPC/0.2',
-    session_id VARCHAR NOT NULL UNIQUE,
-    challenge BIGINT,
+    session_id VARCHAR(32) PRIMARY KEY,
     nonce BIGINT NOT NULL,
     participants TEXT[] NOT NULL,
     weights INTEGER[],
@@ -113,27 +111,21 @@ CREATE TABLE app_sessions (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Signers table: Maps signers to wallets
-CREATE TABLE signers (
-    signer VARCHAR PRIMARY KEY,
-    wallet VARCHAR NOT NULL
-);
-
 -- Session keys table: Session keys with spending caps
-CREATE TABLE session_keys (
-    id SERIAL PRIMARY KEY,
-    address VARCHAR NOT NULL UNIQUE,
-    wallet_address VARCHAR NOT NULL,
-    application VARCHAR NOT NULL,
-    allowance JSONB,
-    scope VARCHAR NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+-- CREATE TABLE session_keys (
+--     id SERIAL PRIMARY KEY,
+--     address VARCHAR NOT NULL UNIQUE,
+--     wallet_address VARCHAR NOT NULL,
+--     application VARCHAR NOT NULL,
+--     allowance JSONB,
+--     scope VARCHAR NOT NULL,
+--     expires_at TIMESTAMPTZ NOT NULL,
+--     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+--     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+-- );
 
-CREATE INDEX idx_session_keys_wallet_address ON session_keys(wallet_address);
-CREATE UNIQUE INDEX idx_session_keys_unique_wallet_app ON session_keys(wallet_address, application);
+-- CREATE INDEX idx_session_keys_wallet_address ON session_keys(wallet_address);
+-- CREATE UNIQUE INDEX idx_session_keys_unique_wallet_app ON session_keys(wallet_address, application);
 
 -- Contract events table: Blockchain event logs
 CREATE TABLE contract_events (
@@ -174,14 +166,11 @@ CREATE INDEX idx_blockchain_actions_pending ON blockchain_actions(status, create
 -- RPC store table: RPC request/response storage
 CREATE TABLE rpc_store (
     id SERIAL PRIMARY KEY,
-    sender VARCHAR(255) NOT NULL,
     req_id BIGINT NOT NULL,
+    msg_type INT NOT NULL, -- 1 for request, 2 for response, 3 for event
     method VARCHAR(255) NOT NULL,
-    params TEXT NOT NULL,
+    payload TEXT NOT NULL,
     timestamp BIGINT NOT NULL,
-    req_sig TEXT[],
-    response TEXT NOT NULL,
-    res_sig TEXT[]
 );
 
 -- +goose Down
@@ -193,7 +182,6 @@ DROP TABLE IF EXISTS contract_events;
 DROP INDEX IF EXISTS idx_session_keys_unique_wallet_app;
 DROP INDEX IF EXISTS idx_session_keys_wallet_address;
 DROP TABLE IF EXISTS session_keys;
-DROP TABLE IF EXISTS signers;
 DROP TABLE IF EXISTS app_sessions;
 DROP INDEX IF EXISTS idx_ledger_session_key;
 DROP TABLE IF EXISTS ledger;

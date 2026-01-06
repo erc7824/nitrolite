@@ -1,4 +1,4 @@
-package app_session_api
+package app_session
 
 import (
 	"context"

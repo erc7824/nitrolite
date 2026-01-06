@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/erc7824/nitrolite/clearnode/store/db"
+	db "github.com/erc7824/nitrolite/clearnode/store/database"
 	"github.com/google/uuid"
 	"github.com/testcontainers/testcontainers-go"
 	container "github.com/testcontainers/testcontainers-go/modules/postgres"

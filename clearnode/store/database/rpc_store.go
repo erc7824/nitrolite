@@ -1,25 +1,29 @@
-package db
+package database
 
 import (
 	"encoding/json"
 
 	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
-	"github.com/lib/pq"
 	"gorm.io/gorm"
+)
+
+type RPCMessageType int
+
+const (
+	RPCMessageTypeRequest  RPCMessageType = 1
+	RPCMessageTypeResponse RPCMessageType = 2
+	RPCMessageTypeEvent    RPCMessageType = 3
 )
 
 // RPCRecord represents an RPC message in the database
 type RPCRecord struct {
 	ID        uint           `gorm:"primaryKey"`
-	Sender    string         `gorm:"column:sender;type:varchar(255);not null"`
 	ReqID     uint64         `gorm:"column:req_id;not null"`
+	MsgType   RPCMessageType `gorm:"column:msg_type;not null"` // 1 for request, 2 for response, 3 for event
 	Method    string         `gorm:"column:method;type:varchar(255);not null"`
-	Params    []byte         `gorm:"column:params;type:text;not null"`
+	Payload   []byte         `gorm:"column:params;type:text;not null"`
 	Timestamp uint64         `gorm:"column:timestamp;not null"`
-	ReqSig    pq.StringArray `gorm:"type:text[];column:req_sig;"`
-	Response  []byte         `gorm:"column:response;type:text;not null"`
-	ResSig    pq.StringArray `gorm:"type:text[];column:res_sig;"`
 }
 
 // TableName specifies the table name for the RPCMessageDB model
@@ -45,13 +49,10 @@ func (s *RPCStore) StoreMessage(sender string, req *rpc.Payload, reqSigs []sign.
 	}
 
 	msg := &RPCRecord{
-		ReqID:    req.RequestID,
-		Sender:   sender,
-		Method:   req.Method,
-		Params:   paramsBytes,
-		Response: resBytes,
-		// ReqSig:    nitrolite.SignaturesToStrings(reqSigs),
-		// ResSig:    nitrolite.SignaturesToStrings(resSigs),
+		ReqID:     req.RequestID,
+		MsgType:   RPCMessageTypeRequest, // TODO: record response and events as well
+		Method:    req.Method,
+		Payload:   paramsBytes,
 		Timestamp: req.Timestamp,
 	}
 

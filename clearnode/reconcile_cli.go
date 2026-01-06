@@ -5,6 +5,12 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/erc7824/nitrolite/clearnode/api"
+	"github.com/erc7824/nitrolite/clearnode/custody"
+	"github.com/erc7824/nitrolite/clearnode/pkg/log"
+	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/clearnode/store/database"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -12,8 +18,8 @@ import (
 
 // runReconcileCli is the entry point for the reconcile command line interface.
 // Example: clearnode reconcile 1 1000000 2000000
-func runReconcileCli(logger Logger) {
-	logger = logger.NewSystem("reconcile")
+func runReconcileCli(logger log.Logger) {
+	logger = logger.WithName("reconcile")
 	if len(os.Args) < 5 {
 		logger.Fatal("Usage: clearnode reconcile <blockchain_id> <block_start> <block_end>")
 	}
@@ -47,20 +53,20 @@ func runReconcileCli(logger Logger) {
 		logger.Fatal("Failed to connect to Ethereum node", "error", err)
 	}
 
-	db, err := ConnectToDB(config.dbConf)
+	db, err := database.ConnectToDB(config.dbConf, embedMigrations)
 	if err != nil {
 		logger.Fatal("Failed to setup database", "error", err)
 	}
 
-	signer, err := NewSigner(config.privateKeyHex)
+	signer, err := sign.NewEthereumSigner(config.privateKeyHex)
 	if err != nil {
 		logger.Fatal("Failed to initialize signer", "error", err)
 	}
 
-	custody, err := NewCustody(
+	custody, err := custody.NewCustody(
 		signer,
 		db,
-		NewWSNotifier(func(userID, method string, params RPCDataParams) {}, logger),
+		api.NewWSNotifier(func(userID, method string, params rpc.Params) {}, logger),
 		blockchain,
 		&config.assets,
 		logger,
@@ -86,6 +92,6 @@ func runReconcileCli(logger Logger) {
 	}()
 
 	for event := range eventCh {
-		custody.handleBlockChainEvent(context.Background(), event)
+		custody.HandleBlockChainEvent(context.Background(), event)
 	}
 }

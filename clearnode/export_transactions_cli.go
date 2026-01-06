@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/log"
+	db "github.com/erc7824/nitrolite/clearnode/store/database"
 	"gorm.io/gorm"
 )
 
@@ -14,7 +16,7 @@ import (
 type ExportOptions struct {
 	AccountID   string
 	AssetSymbol string
-	TxType      *TransactionType
+	TxType      *db.TransactionType
 	OutputDir   string
 }
 
@@ -24,7 +26,7 @@ type TransactionExporter struct {
 }
 
 // NewTransactionExporter creates a new transaction exporter
-func NewTransactionExporter(db *gorm.DB, logger Logger) *TransactionExporter {
+func NewTransactionExporter(db *gorm.DB, logger log.Logger) *TransactionExporter {
 	return &TransactionExporter{
 		db: db,
 	}
@@ -32,7 +34,7 @@ func NewTransactionExporter(db *gorm.DB, logger Logger) *TransactionExporter {
 
 // ExportToCSV exports transactions to CSV format
 func (e *TransactionExporter) ExportToCSV(writer io.Writer, options ExportOptions) error {
-	transactions, err := GetLedgerTransactionsWithTags(e.db, NewAccountID(options.AccountID), options.AssetSymbol, options.TxType)
+	transactions, err := db.GetLedgerTransactions(e.db, db.NewAccountID(options.AccountID), options.AssetSymbol, options.TxType)
 	if err != nil {
 		return fmt.Errorf("failed to get transactions: %w", err)
 	}
@@ -52,9 +54,7 @@ func (e *TransactionExporter) ExportToCSV(writer io.Writer, options ExportOption
 			fmt.Sprintf("%d", tx.ID),
 			tx.Type.String(),
 			tx.FromAccount,
-			tx.FromAccountTag,
 			tx.ToAccount,
-			tx.ToAccountTag,
 			tx.AssetSymbol,
 			tx.Amount.String(),
 			tx.CreatedAt.String(),
@@ -86,8 +86,8 @@ func (e *TransactionExporter) ExportToFile(options ExportOptions) (string, error
 	return fileName, nil
 }
 
-func runExportTransactionsCli(logger Logger) {
-	logger = logger.NewSystem("export-transactions")
+func runExportTransactionsCli(logger log.Logger) {
+	logger = logger.WithName("export-transactions")
 	if len(os.Args) < 3 || len(os.Args) > 5 {
 		logger.Fatal("Usage: clearnode export-transactions <accountID> [asset] [txType]")
 	}
@@ -95,7 +95,7 @@ func runExportTransactionsCli(logger Logger) {
 	accountID := os.Args[2]
 
 	var assetSymbol string
-	var txType *TransactionType
+	var txType *db.TransactionType
 
 	// Optional asset parameter
 	if len(os.Args) > 3 {
@@ -104,7 +104,7 @@ func runExportTransactionsCli(logger Logger) {
 
 	// Optional transaction type parameter
 	if len(os.Args) > 4 {
-		parsedType, err := parseLedgerTransactionType(os.Args[4])
+		parsedType, err := db.ParseLedgerTransactionType(os.Args[4])
 		if err != nil {
 			logger.Fatal("Invalid transaction type", "type", os.Args[4], "error", err)
 		}
@@ -116,7 +116,7 @@ func runExportTransactionsCli(logger Logger) {
 		logger.Fatal("Failed to load configuration", "error", err)
 	}
 
-	db, err := ConnectToDB(config.dbConf)
+	db, err := db.ConnectToDB(config.dbConf, embedMigrations)
 	if err != nil {
 		logger.Fatal("Failed to setup database", "error", err)
 	}

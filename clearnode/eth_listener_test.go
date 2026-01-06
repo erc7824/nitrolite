@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/erc7824/nitrolite/clearnode/pkg/log"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -23,6 +24,6 @@ func TestReconcileBlockRange(t *testing.T) {
 	require.NoError(t, err, "Failed to get chain ID")
 
 	historicalCh := make(chan types.Log, 100)
-	logger := NewLoggerIPFS("test")
+	logger := log.NewNoopLogger()
 	ReconcileBlockRange(client, contractAddress, uint32(chainID.Uint64()), 31530000, 499, 31527936, 0, historicalCh, logger)
 }

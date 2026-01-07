@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 func (o *Operator) handleAuthenticate(args []string) {

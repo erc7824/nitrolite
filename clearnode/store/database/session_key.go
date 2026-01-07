@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )

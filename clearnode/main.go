@@ -12,10 +12,10 @@ import (
 	"github.com/erc7824/nitrolite/clearnode/api"
 	"github.com/erc7824/nitrolite/clearnode/custody"
 	"github.com/erc7824/nitrolite/clearnode/metrics/prometheus"
-	"github.com/erc7824/nitrolite/clearnode/pkg/log"
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
 	db "github.com/erc7824/nitrolite/clearnode/store/database"
+	"github.com/erc7824/nitrolite/pkg/log"
+	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/sign"
 	"gorm.io/gorm"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"

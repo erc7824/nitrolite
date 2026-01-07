@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/erc7824/nitrolite/clearnode/api"
-	"github.com/erc7824/nitrolite/clearnode/pkg/log"
 	db "github.com/erc7824/nitrolite/clearnode/store/database"
+	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )

@@ -3,7 +3,7 @@ package api
 import (
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 )

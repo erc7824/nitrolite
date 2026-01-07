@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/log"
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	db "github.com/erc7824/nitrolite/clearnode/store/database"
+	"github.com/erc7824/nitrolite/pkg/log"
+	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/gorm"
 )

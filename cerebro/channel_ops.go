@@ -11,8 +11,8 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/shopspring/decimal"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/erc7824/nitrolite/examples/cerebro/custody"
+	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
 func (o *Operator) handleOpenChannel(args []string) {

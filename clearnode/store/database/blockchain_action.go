@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"

@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/log"
 	db "github.com/erc7824/nitrolite/clearnode/store/database"
+	"github.com/erc7824/nitrolite/pkg/log"
 	"gorm.io/gorm"
 )
 

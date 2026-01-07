@@ -5,9 +5,113 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
-// TODO: GetHomeChannelID(), GetEscrowChannelID(), GetStateID(), GetTransactionID()
+var (
+	uint8Type, _   = abi.NewType("uint8", "", nil)
+	uint32Type, _  = abi.NewType("uint32", "", nil)
+	uint256Type, _ = abi.NewType("uint256", "", nil)
+)
+
+// GetHomeChannelID generates a unique identifier for a primary channel between a node and a user.
+func GetHomeChannelID(nodeAddress, userAddress, tokenAddress string, nonce, challenge uint64) (string, error) {
+	nodeAddr := common.HexToAddress(nodeAddress)
+	userAddr := common.HexToAddress(userAddress)
+
+	tokenAddr := common.HexToAddress(tokenAddress)
+	// TODO: decide token or asset
+
+	args := abi.Arguments{
+		{Type: abi.Type{T: abi.AddressTy}}, // node
+		{Type: abi.Type{T: abi.AddressTy}}, // user
+		{Type: abi.Type{T: abi.AddressTy}}, // asset
+		{Type: uint32Type},                 // challenge
+		{Type: uint256Type},                // nonce
+	}
+
+	packed, err := args.Pack(nodeAddr, userAddr, tokenAddr, challenge, nonce)
+	if err != nil {
+		return "", err
+	}
+
+	return crypto.Keccak256Hash(packed).Hex(), nil
+}
+
+// GetEscrowChannelID derives an escrow-specific channel ID based on a home channel and state version.
+func GetEscrowChannelID(homeChannelID string, stateVersion uint64) (string, error) {
+	rawHomeChannelID := common.HexToHash(homeChannelID)
+
+	args := abi.Arguments{
+		{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}}, // homeChannelID
+		{Type: uint256Type},                             // stateVersion
+	}
+
+	packed, err := args.Pack(rawHomeChannelID, stateVersion)
+	if err != nil {
+		return "", err
+	}
+
+	return crypto.Keccak256Hash(packed).Hex(), nil
+}
+
+// GetStateID creates a unique hash representing a specific snapshot of a user's wallet and asset state.
+func GetStateID(userWallet, asset string, epoch, version uint64) (string, error) {
+	userAddr := common.HexToAddress(userWallet)
+
+	args := abi.Arguments{
+		{Type: abi.Type{T: abi.AddressTy}}, // userWallet
+		{Type: abi.Type{T: abi.StringTy}},  // asset symbol/string
+		{Type: uint256Type},                // epoch
+		{Type: uint256Type},                // version
+	}
+
+	packed, err := args.Pack(
+		userAddr,
+		asset,
+		new(big.Int).SetUint64(epoch),
+		new(big.Int).SetUint64(version),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to pack state ID: %w", err)
+	}
+
+	return crypto.Keccak256Hash(packed).Hex(), nil
+}
+
+// GetTransactionID calculates a unique transaction reference based on the participating account and the resulting state.
+func GetTransactionID(toAccount, fromAccount string, senderNewStateID, receiverNewStateID *string) (string, error) {
+	var packed []byte
+	var err error
+
+	// 1) User Initiated: Hash(ToAccount, SenderNewStateID)
+	// 2) Node Initiated: Hash(FromAccount, ReceiverNewStateID)
+
+	if senderNewStateID != nil {
+		args := abi.Arguments{
+			{Type: abi.Type{T: abi.StringTy}},               // ToAccount
+			{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}}, // SenderNewStateID
+		}
+		senderStateID := common.HexToHash(*senderNewStateID)
+		packed, err = args.Pack(toAccount, senderStateID)
+	} else if receiverNewStateID != nil {
+		args := abi.Arguments{
+			{Type: abi.Type{T: abi.StringTy}},               // FromAccount
+			{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}}, // ReceiverNewStateID
+		}
+		receiverStateID := common.HexToHash(*receiverNewStateID)
+		packed, err = args.Pack(fromAccount, receiverStateID)
+	} else {
+		return "", fmt.Errorf("transaction must have either SenderNewStateID or ReceiverNewStateID")
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("failed to pack transaction ID arguments: %w", err)
+	}
+
+	return crypto.Keccak256Hash(packed).Hex(), nil
+}
 
 // PackState encodes a channel ID and state into ABI-packed bytes for on-chain submission.
 func PackState(channelID string, state State) ([]byte, error) {
@@ -21,19 +125,10 @@ func PackState(channelID string, state State) ([]byte, error) {
 		return nil, err
 	}
 
-	intentType, err := abi.NewType("uint8", "", nil)
-	if err != nil {
-		return nil, err
-	}
-	versionType, err := abi.NewType("uint256", "", nil)
-	if err != nil {
-		return nil, err
-	}
-
 	args := abi.Arguments{
 		{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}}, // channelID
-		{Type: intentType},               // intent
-		{Type: versionType},              // version
+		{Type: uint8Type},                // intent
+		{Type: uint256Type},              // version
 		{Type: abi.Type{T: abi.BytesTy}}, // stateData
 		{Type: allocationType},           // allocations (tuple[])
 	}
@@ -45,9 +140,8 @@ func PackState(channelID string, state State) ([]byte, error) {
 	return packed, nil
 }
 
-// UnpackState decodes ABI-packed CrossChainState bytes into a State struct, extracting version and signatures.
+// UnpackState decodes ABI-packed bytes back into a State struct for off-chain processing.
 func UnpackState(data []byte) (*State, error) {
-	// Define the CrossChainState tuple type
 	crossChainStateType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{Name: "version", Type: "uint256"},
 		{Name: "homeChainId", Type: "uint64"},
@@ -83,10 +177,7 @@ func UnpackState(data []byte) (*State, error) {
 		return nil, fmt.Errorf("failed to create cross chain state type: %w", err)
 	}
 
-	args := abi.Arguments{
-		{Type: crossChainStateType},
-	}
-
+	args := abi.Arguments{{Type: crossChainStateType}}
 	unpacked, err := args.Unpack(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack data: %w", err)
@@ -96,33 +187,23 @@ func UnpackState(data []byte) (*State, error) {
 		return nil, fmt.Errorf("no data unpacked")
 	}
 
-	// Convert unpacked data to State struct
 	unpackedMap, ok := unpacked[0].(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("failed to convert unpacked data to map")
 	}
 
 	state := &State{}
-
-	// Extract version - skip if not present
 	if version, ok := unpackedMap["version"].(*big.Int); ok {
 		state.Version = version.Uint64()
 	}
-
-	// Extract signatures - skip if not present
 	if participantSig, ok := unpackedMap["participantSig"].([]byte); ok {
 		sigStr := string(participantSig)
 		state.UserSig = &sigStr
 	}
-
 	if nodeSig, ok := unpackedMap["nodeSig"].([]byte); ok {
 		sigStr := string(nodeSig)
 		state.NodeSig = &sigStr
 	}
-
-	// Note: Other fields like homeState, nonHomeState, intent, homeChainId
-	// are not mapped to the State struct from types.go as they don't exist there
-	// They would need to be handled separately if needed
 
 	return state, nil
 }

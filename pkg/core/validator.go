@@ -17,8 +17,8 @@ func NewSimpleTransitionValidator() *TransitionValidator01 {
 // ValidateTransition validates a state transition and returns an error if invalid
 func (v *TransitionValidator01) ValidateTransition(currentState, proposedState State) error {
 	// Version must increment
-	if proposedState.Version == currentState.Version+1 {
-		return fmt.Errorf("proposed state version (%d) must be the consiquent to current version (%d)", proposedState.Version, currentState.Version)
+	if proposedState.Version != currentState.Version+1 {
+		return fmt.Errorf("proposed state version (%d) must be consecutive to current version (%d)", proposedState.Version, currentState.Version)
 	}
 
 	// Proposed state must have at least one transition

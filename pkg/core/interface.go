@@ -39,9 +39,9 @@ type Client interface {
 	// Getters - ChannelsHub
 	GetNodeBalance(token string) (decimal.Decimal, error)
 	GetOpenChannels(user string) ([]string, error)
-	GetHomeChannelData(homeChannelID string) (*HomeChannelDataResponse, error)
-	GetEscrowDepositData(escrowChannelID string) (*EscrowDepositDataResponse, error)
-	GetEscrowWithdrawalData(escrowChannelID string) (*EscrowWithdrawalDataResponse, error)
+	GetHomeChannelData(homeChannelID string) (HomeChannelDataResponse, error)
+	GetEscrowDepositData(escrowChannelID string) (EscrowDepositDataResponse, error)
+	GetEscrowWithdrawalData(escrowChannelID string) (EscrowWithdrawalDataResponse, error)
 
 	// IVault functions
 	Deposit(node, token string, amount decimal.Decimal) (string, error)

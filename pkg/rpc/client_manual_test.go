@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 const (
@@ -67,7 +67,7 @@ func TestManualClient(t *testing.T) {
 				},
 			},
 			ExpiresAt: uint64(time.Now().Add(1 * time.Hour).Unix()),
-			Scope:  "",
+			Scope:     "",
 		}
 		authRes, _, err := client.AuthWithSig(ctx, authReq, walletSigner)
 		require.NoError(t, err)

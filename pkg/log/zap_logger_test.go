@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/log"
+	"github.com/erc7824/nitrolite/pkg/log"
 )
 
 // TestZapLogger comprehensively tests the ZapLogger implementation.

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
 )

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 // Test internal authRequest method

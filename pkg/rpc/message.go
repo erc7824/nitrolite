@@ -1,7 +1,7 @@
 package rpc
 
 import (
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 // Request represents an RPC request message containing a payload and one or more signatures.

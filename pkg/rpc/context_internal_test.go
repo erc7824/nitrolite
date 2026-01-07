@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

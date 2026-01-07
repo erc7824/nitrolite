@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 // Handler defines the function signature for RPC request processors.

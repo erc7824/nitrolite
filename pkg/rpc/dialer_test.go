@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

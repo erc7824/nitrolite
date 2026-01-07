@@ -13,8 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/signer/core/apitypes"
 	"github.com/google/uuid"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/log"
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/log"
+	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 // Client provides a high-level interface for interacting with the ClearNode RPC server.

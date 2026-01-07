@@ -3,7 +3,7 @@ package rpc_test
 import (
 	"context"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
 // MockCallHandler is a function type that handles RPC calls in the mock dialer.

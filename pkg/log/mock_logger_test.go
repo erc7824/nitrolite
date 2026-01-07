@@ -1,6 +1,6 @@
 package log_test
 
-import "github.com/erc7824/nitrolite/clearnode/pkg/log"
+import "github.com/erc7824/nitrolite/pkg/log"
 
 var _ log.Logger = &MockLogger{}
 

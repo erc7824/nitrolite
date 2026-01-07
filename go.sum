@@ -95,6 +95,8 @@ github.com/ebitengine/purego v0.8.4 h1:CF7LEKg5FFOsASUj0+QwaXf8Ht6TlFxg09+S9wz0o
 github.com/ebitengine/purego v0.8.4/go.mod h1:iIjxzd6CiRiOG0UyXP+V1+jWqUXVjPKLAI0mRfJZTmQ=
 github.com/emicklei/dot v1.6.2 h1:08GN+DD79cy/tzN6uLCT84+2Wk9u+wvqP+Hkx/dIR8A=
 github.com/emicklei/dot v1.6.2/go.mod h1:DeV7GvQtIw4h2u73RKBkkFdvVAz0D9fzeJrgPW6gy/s=
+github.com/erc7824/nitrolite/clearnode v0.4.1-0.20251111101210-2b5215255c12 h1:pUvvjNomMr4/xL7NuwwXpym+vkTiNxLA4ex1Jsk9ung=
+github.com/erc7824/nitrolite/clearnode v0.4.1-0.20251111101210-2b5215255c12/go.mod h1:29NJ2/OsZFobKXU2557B4Bv3c44/6ZUoZ7O0XPKj3b0=
 github.com/erc7824/nitrolite/examples/cerebro v0.0.0-20251222072539-8003ddb08458 h1:f04aeNNGLkS0MjNE3O+oXOJkQWBAxiPJDCMbae18i8g=
 github.com/erc7824/nitrolite/examples/cerebro v0.0.0-20251222072539-8003ddb08458/go.mod h1:nY8R7DJpkg5QIw08VZ5gsH6kFu0gmDi8o/JSClRgThg=
 github.com/ethereum/c-kzg-4844/v2 v2.1.5 h1:aVtoLK5xwJ6c5RiqO8g8ptJ5KU+2Hdquf6G3aXiHh5s=

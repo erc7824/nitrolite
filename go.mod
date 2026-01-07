@@ -4,7 +4,6 @@ go 1.25
 
 require (
 	github.com/c-bata/go-prompt v0.2.6
-	github.com/erc7824/nitrolite/examples/cerebro v0.0.0-20251222072539-8003ddb08458
 	github.com/ethereum/go-ethereum v1.16.7
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
@@ -28,12 +27,12 @@ require (
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/dchest/siphash v1.2.3 // indirect
 	github.com/emicklei/dot v1.6.2 // indirect
+	github.com/erc7824/nitrolite/clearnode v0.4.1-0.20251111101210-2b5215255c12 // indirect
 	github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab // indirect
 	github.com/ipfs/go-log/v2 v2.9.0 // indirect
 	github.com/mattn/go-tty v0.0.3 // indirect
 	github.com/pkg/term v1.2.0-beta.2 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	google.golang.org/grpc v1.70.0 // indirect
 )
 
 require (
@@ -86,7 +85,6 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/graph-gophers/graphql-go v1.3.0 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
 	github.com/hashicorp/go-bexpr v0.1.10 // indirect
 	github.com/holiman/billy v0.0.0-20250707135307-f2f9b9aae7db // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect

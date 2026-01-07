@@ -9,10 +9,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/shopspring/decimal"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 	"github.com/erc7824/nitrolite/examples/cerebro/clearnet"
 	"github.com/erc7824/nitrolite/examples/cerebro/custody"
 	"github.com/erc7824/nitrolite/examples/cerebro/storage"
+	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
 type Operator struct {

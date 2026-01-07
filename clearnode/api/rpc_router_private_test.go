@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"

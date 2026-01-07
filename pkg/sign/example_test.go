@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/sign"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
 

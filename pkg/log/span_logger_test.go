@@ -3,7 +3,7 @@ package log_test
 import (
 	"testing"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/log"
+	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/stretchr/testify/assert"
 )
 

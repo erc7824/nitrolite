@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/log"
-	"github.com/erc7824/nitrolite/clearnode/pkg/rpc"
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/log"
+	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 func TestNewWebsocketNode(t *testing.T) {

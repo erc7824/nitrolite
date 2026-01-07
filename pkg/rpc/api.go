@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 // ===========================================================================
@@ -538,18 +538,6 @@ type BrokerConfig struct {
 	BrokerAddress string `json:"broker_address"`
 	// Networks lists all supported blockchain networks
 	Blockchains []BlockchainInfo `json:"networks"` // TODO: rename to "blockchains"
-}
-
-// BlockchainInfo describes a supported blockchain network.
-type BlockchainInfo struct {
-	// ID is the network's chain identifier
-	ID uint32 `json:"chain_id"`
-	// Name is the human-readable name of the blockchain
-	Name string `json:"name"` // TODO: add to SDK
-	// CustodyAddress is the custody contract address
-	CustodyAddress string `json:"custody_address"`
-	// AdjudicatorAddress is the adjudicator contract address
-	AdjudicatorAddress string `json:"adjudicator_address"`
 }
 
 // ============================================================================

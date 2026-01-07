@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/log"
+	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/gorilla/websocket"
 )
 
@@ -32,28 +32,28 @@ type Connection interface {
 	// This ID is generated when the connection is established and remains
 	// constant throughout the connection's lifetime.
 	ConnectionID() string
-	
+
 	// UserID returns the authenticated user's identifier for this connection.
 	// Returns an empty string if the connection has not been authenticated.
 	UserID() string
-	
+
 	// SetUserID sets the UserID for this connection.
 	// This is typically called during authentication when the connection
 	// becomes associated with a specific user account.
 	SetUserID(userID string)
-	
+
 	// RawRequests returns a read-only channel for receiving incoming raw request messages.
 	// Messages received on this channel are raw bytes that need to be unmarshaled
 	// into Request objects for processing. The channel is closed when the
 	// connection is terminated.
 	RawRequests() <-chan []byte
-	
+
 	// WriteRawResponse attempts to send a raw response message to the client.
 	// The method returns true if the message was successfully queued for sending,
 	// or false if the operation timed out (indicating a potentially unresponsive client).
 	// Messages that fail to send may trigger connection closure.
 	WriteRawResponse(message []byte) bool
-	
+
 	// Serve starts the connection's lifecycle by spawning goroutines for reading and writing.
 	// This method returns immediately after starting the goroutines. The handleClosure
 	// callback will be invoked asynchronously when the connection terminates (with an
@@ -114,20 +114,20 @@ type WebsocketConnection struct {
 // All fields except ConnectionID and WebsocketConn have sensible defaults.
 type WebsocketConnectionConfig struct {
 	// ConnectionID is the unique identifier for this connection (required)
-	ConnectionID  string
+	ConnectionID string
 	// UserID is the initial authenticated user ID (optional, can be set later)
-	UserID        string
+	UserID string
 	// WebsocketConn is the underlying WebSocket connection (required)
 	WebsocketConn GorillaWsConnectionAdapter
 
 	// WriteTimeout is the maximum duration to wait for a write operation (default: 5s)
-	WriteTimeout         time.Duration
+	WriteTimeout time.Duration
 	// WriteBufferSize is the capacity of the outgoing message buffer (default: 10)
-	WriteBufferSize      int
+	WriteBufferSize int
 	// ProcessBufferSize is the capacity of the incoming message buffer (default: 10)
-	ProcessBufferSize    int
+	ProcessBufferSize int
 	// Logger for connection events (default: no-op logger)
-	Logger               log.Logger
+	Logger log.Logger
 	// OnMessageSentHandler is called after a message is successfully sent (optional)
 	OnMessageSentHandler func([]byte)
 }

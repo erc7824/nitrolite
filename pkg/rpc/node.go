@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/erc7824/nitrolite/clearnode/pkg/log"
-	"github.com/erc7824/nitrolite/clearnode/pkg/sign"
+	"github.com/erc7824/nitrolite/pkg/log"
+	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )

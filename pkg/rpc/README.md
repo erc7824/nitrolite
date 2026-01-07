@@ -111,7 +111,7 @@ The package includes a `Dialer` interface with a WebSocket implementation:
 ## Installation
 
 ```go
-import "github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+import "github.com/erc7824/nitrolite/pkg/rpc"
 ```
 
 ## Server Usage
@@ -120,9 +120,9 @@ import "github.com/erc7824/nitrolite/clearnode/pkg/rpc"
 
 ```go
 import (
-    "github.com/erc7824/nitrolite/clearnode/pkg/rpc"
-    "github.com/erc7824/nitrolite/clearnode/pkg/sign"
-    "github.com/erc7824/nitrolite/clearnode/pkg/log"
+    "github.com/erc7824/nitrolite/pkg/rpc"
+    "github.com/erc7824/nitrolite/pkg/sign"
+    "github.com/erc7824/nitrolite/pkg/log"
 )
 
 // Create server configuration
@@ -314,7 +314,7 @@ node.Notify(userID, "balance_update", params)
 ### Quick Start
 
 ```go
-import "github.com/erc7824/nitrolite/clearnode/pkg/rpc"
+import "github.com/erc7824/nitrolite/pkg/rpc"
 
 // Create client
 dialer := rpc.NewWebsocketDialer(rpc.DefaultWebsocketDialerConfig)
@@ -712,7 +712,7 @@ The manual test serves two purposes:
 
 ## Dependencies
 
-- `github.com/erc7824/nitrolite/clearnode/pkg/sign`: Signature types and interfaces
+- `github.com/erc7824/nitrolite/pkg/sign`: Signature types and interfaces
 - Standard library: `encoding/json`, `errors`, `fmt`, `time`
 
 ## See Also

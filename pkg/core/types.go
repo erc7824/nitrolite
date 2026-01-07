@@ -50,20 +50,52 @@ type Ledger struct {
 }
 
 // TransactionType represents the type of transaction
-type TransactionType string
+type TransactionType uint8
 
 const (
-	TransactionTypeTransfer       TransactionType = "transfer"
-	TransactionTypeRelease        TransactionType = "release"
-	TransactionTypeCommit         TransactionType = "commit"
-	TransactionTypeHomeDeposit    TransactionType = "home_deposit"
-	TransactionTypeHomeWithdrawal TransactionType = "home_withdrawal"
-	TransactionTypeMutualLock     TransactionType = "mutual_lock"
-	TransactionTypeEscrowDeposit  TransactionType = "escrow_deposit"
-	TransactionTypeEscrowLock     TransactionType = "escrow_lock"
-	TransactionTypeEscrowWithdraw TransactionType = "escrow_withdraw"
-	TransactionTypeMigrate        TransactionType = "migrate"
+	TransactionTypeHomeDeposit    = 10
+	TransactionTypeHomeWithdrawal = 11
+
+	TransactionTypeEscrowDeposit  = 20
+	TransactionTypeEscrowWithdraw = 21
+
+	TransactionTypeTransfer TransactionType = 30
+
+	TransactionTypeCommit  = 40
+	TransactionTypeRelease = 41
+
+	TransactionTypeMigrate    = 100
+	TransactionTypeEscrowLock = 110
+	TransactionTypeMutualLock = 120
 )
+
+// String returns the human-readable name of the transaction type
+func (t TransactionType) String() string {
+	switch t {
+	case TransactionTypeTransfer:
+		return "transfer"
+	case TransactionTypeRelease:
+		return "release"
+	case TransactionTypeCommit:
+		return "commit"
+	case TransactionTypeHomeDeposit:
+		return "home_deposit"
+	case TransactionTypeHomeWithdrawal:
+		return "home_withdrawal"
+	case TransactionTypeMutualLock:
+		return "mutual_lock"
+	case TransactionTypeEscrowDeposit:
+		return "escrow_deposit"
+	case TransactionTypeEscrowLock:
+		return "escrow_lock"
+	case TransactionTypeEscrowWithdraw:
+		return "escrow_withdraw"
+	case TransactionTypeMigrate:
+		return "migrate"
+	default:
+		return "unknown"
+	}
+}
 
 // Transaction represents a transaction record
 type Transaction struct {
@@ -79,21 +111,55 @@ type Transaction struct {
 }
 
 // TransitionType represents the type of state transition
-type TransitionType string
+type TransitionType int8
 
 const (
-	TransitionTypeTransferReceive TransitionType = "transfer_receive"
-	TransitionTypeTransferSend    TransitionType = "transfer_send"
-	TransitionTypeRelease         TransitionType = "release"
-	TransitionTypeCommit          TransitionType = "commit"
-	TransitionTypeHomeDeposit     TransitionType = "home_deposit"
-	TransitionTypeHomeWithdrawal  TransitionType = "home_withdrawal"
-	TransitionTypeMutualLock      TransitionType = "mutual_lock"
-	TransitionTypeEscrowDeposit   TransitionType = "escrow_deposit"
-	TransitionTypeEscrowLock      TransitionType = "escrow_lock"
-	TransitionTypeEscrowWithdraw  TransitionType = "escrow_withdraw"
-	TransitionTypeMigrate         TransitionType = "migrate"
+	TransitionTypeHomeDeposit    = 10
+	TransitionTypeHomeWithdrawal = 11
+
+	TransitionTypeEscrowDeposit  = 20
+	TransitionTypeEscrowWithdraw = 21
+
+	TransitionTypeTransferSend    TransitionType = 30
+	TransitionTypeTransferReceive TransitionType = 31
+
+	TransitionTypeCommit  = 40
+	TransitionTypeRelease = 41
+
+	TransitionTypeMigrate    = 100
+	TransitionTypeEscrowLock = 110
+	TransitionTypeMutualLock = 120
 )
+
+// String returns the human-readable name of the transition type
+func (t TransitionType) String() string {
+	switch t {
+	case TransitionTypeTransferReceive:
+		return "transfer_receive"
+	case TransitionTypeTransferSend:
+		return "transfer_send"
+	case TransitionTypeRelease:
+		return "release"
+	case TransitionTypeCommit:
+		return "commit"
+	case TransitionTypeHomeDeposit:
+		return "home_deposit"
+	case TransitionTypeHomeWithdrawal:
+		return "home_withdrawal"
+	case TransitionTypeMutualLock:
+		return "mutual_lock"
+	case TransitionTypeEscrowDeposit:
+		return "escrow_deposit"
+	case TransitionTypeEscrowLock:
+		return "escrow_lock"
+	case TransitionTypeEscrowWithdraw:
+		return "escrow_withdraw"
+	case TransitionTypeMigrate:
+		return "migrate"
+	default:
+		return "unknown"
+	}
+}
 
 // Transition represents a state transition
 type Transition struct {
@@ -127,4 +193,30 @@ type AssetAllowance struct {
 	Asset     string          `json:"asset"`     // Symbol of the asset
 	Allowance decimal.Decimal `json:"allowance"` // Maximum amount the session key can spend
 	Used      decimal.Decimal `json:"used"`      // Amount already spent by this session key
+}
+
+// ========= Blockchain CLient Response Types =========
+
+// HomeChannelDataResponse represents the response from getHomeChannelData
+type HomeChannelDataResponse struct {
+	Definition      ChannelDefinition `json:"definition"`
+	Node            string            `json:"node"`
+	LastState       State             `json:"last_state"`
+	ChallengeExpiry uint64            `json:"challenge_expiry"`
+}
+
+// EscrowDepositDataResponse represents the response from getEscrowDepositData
+type EscrowDepositDataResponse struct {
+	Definition      ChannelDefinition `json:"definition"`
+	Node            string            `json:"node"`
+	LastState       State             `json:"last_state"`
+	UnlockExpiry    uint64            `json:"unlock_expiry"`
+	ChallengeExpiry uint64            `json:"challenge_expiry"`
+}
+
+// EscrowWithdrawalDataResponse represents the response from getEscrowWithdrawalData
+type EscrowWithdrawalDataResponse struct {
+	Definition ChannelDefinition `json:"definition"`
+	Node       string            `json:"node"`
+	LastState  State             `json:"last_state"`
 }

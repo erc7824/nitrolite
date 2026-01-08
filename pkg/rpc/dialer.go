@@ -66,7 +66,7 @@ var DefaultWebsocketDialerConfig = WebsocketDialerConfig{
 }
 
 // WebsocketDialer implements the Dialer interface using WebSocket connections.
-// It provides thread-safe RPC communication with automatic ping/pong handling.
+// It provides thread-safe RPC communication with automatic ping handling.
 type WebsocketDialer struct {
 	cfg           WebsocketDialerConfig
 	dialCtx       *dialCtx                 // Connection context and resources
@@ -341,7 +341,7 @@ func (d *WebsocketDialer) pingPeriodically(ctx context.Context, handleClosure fu
 		case <-ticker.C:
 			// Send ping request
 			var params Payload
-			req := NewRequest(d.cfg.PingRequestID, PingMethod.String(), params)
+			req := NewRequest(d.cfg.PingRequestID, NodeV1PingMethod.String(), params)
 
 			// Use the connection context for ping requests
 			res, err := d.Call(ctx, &req)
@@ -351,8 +351,8 @@ func (d *WebsocketDialer) pingPeriodically(ctx context.Context, handleClosure fu
 				return
 			}
 
-			// Verify we got a pong response
-			if res.Method != PongMethod.String() {
+			// Verify we got a ping response
+			if res.Method != NodeV1PingMethod.String() {
 				lg.Warn("Unexpected response to ping", "method", res.Method)
 			}
 		}

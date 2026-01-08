@@ -218,9 +218,6 @@ func TestWebsocketDialer_UnsolicitedEvents(t *testing.T) {
 			json.Unmarshal(msg, &req)
 
 			method := req.Method
-			if method == "ping" {
-				method = "pong"
-			}
 
 			resp := rpc.Message{
 				RequestID: req.RequestID,
@@ -287,9 +284,7 @@ func createEchoServer(t *testing.T, extraHandlers map[string]func(*rpc.Message) 
 			if handler, exists := extraHandlers[method]; exists {
 				res = handler(&req)
 			} else {
-				if method == "ping" {
-					method = "pong"
-				} else {
+				if method != "node.v1.ping" {
 					method = "response_" + method
 				}
 

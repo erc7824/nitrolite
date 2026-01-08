@@ -127,50 +127,10 @@ func (c *Context) Fail(err error, fallbackMessage string) {
 
 	c.Response = NewErrorResponse(
 		c.Request.RequestID,
+		c.Request.Method,
 		message,
 	)
 }
-
-// // GetRawResponse returns the signed response message as raw bytes.
-// // This is called internally after handler processing to prepare the response.
-// func (c *Context) GetRawResponse() ([]byte, error) {
-// 	if c.Response.Method == "" {
-// 		c.Fail(nil, "internal server error: no response from handler")
-// 	}
-
-// 	return prepareRawResponse(c.Signer, c.Response.Res)
-// }
-
-// // prepareRawResponse creates a complete, signed RPC response message.
-// // This internal helper:
-// //  1. Computes the hash of the response payload
-// //  2. Signs the hash with the provided signer
-// //  3. Constructs a Response with the payload and signature
-// //  4. Marshals the complete response to JSON bytes
-// //
-// // Returns an error if hashing, signing, or marshaling fails.
-// func prepareRawResponse(signer sign.Signer, payload Message) ([]byte, error) {
-// 	payloadHash, err := payload.Hash()
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to hash response payload: %w", err)
-// 	}
-
-// 	signature, err := signer.Sign(payloadHash)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to sign response data: %w", err)
-// 	}
-
-// 	responseMessage := &Response{
-// 		Res: payload,
-// 		Sig: []sign.Signature{signature},
-// 	}
-// 	resMessageBytes, err := json.Marshal(responseMessage)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to marshal response message: %w", err)
-// 	}
-
-// 	return resMessageBytes, nil
-// }
 
 // SafeStorage provides thread-safe key-value storage for connection-specific data.
 // Each connection gets its own SafeStorage instance that persists for the

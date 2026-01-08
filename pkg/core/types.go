@@ -118,7 +118,7 @@ type Transaction struct {
 }
 
 // TransitionType represents the type of state transition
-type TransitionType int8
+type TransitionType uint8
 
 const (
 	TransitionTypeHomeDeposit    = 10

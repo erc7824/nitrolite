@@ -1,59 +1,102 @@
-// Package rpc provides the core data structures and utilities for the Clearnode RPC protocol.
+// Package rpc provides the core data structures and utilities for the Nitrolite Node RPC protocol.
 //
-// This package implements a secure, signature-based RPC communication protocol designed for
+// This package implements a secure RPC communication protocol designed for
 // blockchain and distributed systems. It provides strong typing, efficient encoding, and
-// clear separation between client-facing and internal errors.
+// clear error handling with versioned API endpoints.
 //
 // # Protocol Overview
 //
-// The protocol uses a request-response pattern with cryptographic signatures:
+// The protocol uses a request-response pattern with compact JSON encoding:
 //
-//   - Requests contain a payload and one or more signatures
-//   - Responses mirror the request structure with their own signatures
-//   - Payloads use a compact array-based JSON encoding for efficiency
+//   - Messages use typed communication (request, response, event, error response)
 //   - All messages include timestamps for replay protection
+//   - Methods follow versioned naming: {group}.v{version}.{action}
+//   - Responses preserve the request method for easy correlation
 //
 // # Core Types
 //
-// Request and Response types wrap payloads with signatures:
+// Messages are the fundamental unit of communication:
 //
-//	type Request struct {
-//	    Req Payload          // The request payload
-//	    Sig []sign.Signature // One or more signatures
+//	type Message struct {
+//	    Type      MsgType // Message type: Req, Resp, Event, or RespErr
+//	    RequestID uint64  // Unique request identifier
+//	    Method    string  // RPC method name (e.g., "node.v1.ping")
+//	    Payload   Payload // Method parameters or response data
+//	    Timestamp uint64  // Unix milliseconds timestamp
 //	}
 //
-//	type Response struct {
-//	    Res Payload          // The response payload
-//	    Sig []sign.Signature // One or more signatures
-//	}
+// Message types:
 //
-// Payloads contain the actual RPC data:
-//
-//	type Payload struct {
-//	    RequestID uint64 // Unique request identifier
-//	    Method    string // RPC method name
-//	    Params    Params // Method parameters
-//	    Timestamp uint64 // Unix milliseconds timestamp
-//	}
+//	MsgTypeReq     = 1  // Request message
+//	MsgTypeResp    = 2  // Success response message
+//	MsgTypeEvent   = 3  // Server-initiated event notification
+//	MsgTypeRespErr = 4  // Error response message
 //
 // # JSON Encoding
 //
-// Payloads use a compact array encoding for efficiency. A payload like:
+// Messages use a compact array encoding for efficiency. A message like:
 //
-//	Payload{
+//	Message{
+//	    Type:      MsgTypeReq,
 //	    RequestID: 12345,
-//	    Method: "wallet_transfer",
-//	    Params: {"to": "0xabc", "amount": "100"},
+//	    Method:    "node.v1.get_config",
+//	    Payload:   {},
 //	    Timestamp: 1634567890123,
 //	}
 //
 // Encodes to:
 //
-//	[12345, "wallet_transfer", {"to": "0xabc", "amount": "100"}, 1634567890123]
+//	[1, 12345, "node.v1.get_config", {}, 1634567890123]
 //
 // This format reduces message size while maintaining readability and compatibility.
 //
+// # API Versioning
+//
+// All RPC methods follow a versioned naming convention:
+//
+//	{group}.v{version}.{action}
+//
+// Examples:
+//
+//	node.v1.ping              // Node group, version 1, ping action
+//	channels.v1.get_channels  // Channels group, version 1, get channels action
+//	user.v1.get_balances      // User group, version 1, get balances action
+//
+// API groups:
+//
+//   - node: Node configuration and connectivity
+//   - channels: Payment channel management and state
+//   - app_sessions: Application session operations
+//   - session_keys: Session key management
+//   - user: User balances and transactions
+//
 // # Error Handling
+//
+// Error responses use MsgTypeRespErr and preserve the original request method:
+//
+//	// Success response
+//	Message{Type: MsgTypeResp, Method: "node.v1.ping", ...}
+//
+//	// Error response
+//	Message{Type: MsgTypeRespErr, Method: "node.v1.ping", Payload: {"error": "..."}}
+//
+// Creating error responses:
+//
+//	// In a handler
+//	if err := validate(request); err != nil {
+//	    return NewErrorResponse(request.RequestID, request.Method, err.Error())
+//	}
+//
+// Checking for errors in responses:
+//
+//	response, err := client.Call(ctx, &request)
+//	if err != nil {
+//	    return err
+//	}
+//	if err := response.Error(); err != nil {
+//	    // Handle RPC error
+//	    return fmt.Errorf("RPC error: %w", err)
+//	}
 //
 // The package provides explicit error types for client communication:
 //
@@ -69,52 +112,26 @@
 //
 // # Parameter Handling
 //
-// The Params type provides flexible parameter handling with type safety:
+// The Payload type provides flexible parameter handling with type safety:
 //
-//	// Creating parameters from a struct
-//	params, err := rpc.NewParams(struct{
-//	    Address string `json:"address"`
-//	    Amount  string `json:"amount"`
-//	}{
-//	    Address: "0x123...",
-//	    Amount:  "1000000000000000000",
+//	// Creating payload from a struct
+//	payload, err := rpc.NewPayload(NodeV1GetAssetsRequest{
+//	    ChainID: &chainID,
 //	})
 //
-//	// Extracting parameters into a struct
-//	var req TransferRequest
-//	err := params.Translate(&req)
-//
-// # Security Considerations
-//
-// When using this protocol:
-//
-//  1. Always verify signatures before processing requests
-//  2. Validate timestamps to prevent replay attacks
-//  3. Use rpc.Errorf() for safe client-facing errors
-//  4. Thoroughly validate all parameters
-//  5. Use unique request IDs to prevent duplicate processing
+//	// Extracting payload into a struct
+//	var resp NodeV1GetConfigResponse
+//	err := response.Payload.Translate(&resp)
 //
 // # Client Communication
 //
-// The package provides two levels of client APIs:
-//
-// 1. Low-level Dialer interface for direct RPC communication
-// 2. High-level Client type with methods for all ClearNode operations
-//
-// ## High-Level Client (Recommended)
-//
-// The Client type provides convenient methods for all RPC operations:
+// The Client type provides convenient methods for all V1 RPC operations:
 //
 //	// Create client with WebSocket dialer
 //	dialer := rpc.NewWebsocketDialer(rpc.DefaultWebsocketDialerConfig)
 //	client := rpc.NewClient(dialer)
 //
-//	// Set up event handlers
-//	client.HandleBalanceUpdateEvent(func(ctx context.Context, notif rpc.BalanceUpdateNotification, sigs []sign.Signature) {
-//	    log.Info("Balance updated", "balances", notif.BalanceUpdates)
-//	})
-//
-//	// Connect to server and start event handling
+//	// Connect to server
 //	err := client.Start(ctx, "wss://server.example.com/ws", func(err error) {
 //	    if err != nil {
 //	        log.Error("Connection closed", "error", err)
@@ -124,34 +141,43 @@
 //	    log.Fatal("Failed to start client", "error", err)
 //	}
 //
-//	// Make RPC calls
-//	config, _, err := client.GetConfig(ctx)
+//	// Make RPC calls - Node methods
+//	err = client.NodeV1Ping(ctx)
+//	if err != nil {
+//	    log.Error("Ping failed", "error", err)
+//	}
+//
+//	config, err := client.NodeV1GetConfig(ctx)
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
+//	log.Info("Connected to node", "address", config.NodeAddress)
 //
-//	// Authenticate
-//	authReq := rpc.AuthRequestRequest{
-//	    Address:            walletAddress,
-//	    SessionKey:         sessionKeyAddress,
-//	    Application:        "MyApp",
-//	}
-//	authResp, _, err := client.AuthWithSig(ctx, authReq, walletSigner)
+//	// User methods
+//	balances, err := client.UserV1GetBalances(ctx, rpc.UserV1GetBalancesRequest{
+//	    Wallet: walletAddress,
+//	})
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-//	jwtToken := authResp.JwtToken
+//	for _, balance := range balances.Balances {
+//	    log.Info("Balance", "asset", balance.Asset, "amount", balance.Amount)
+//	}
 //
-//	// Make authenticated calls
-//	balances, _, err := client.GetLedgerBalances(ctx, rpc.GetLedgerBalancesRequest{})
+//	// Channel methods
+//	channels, err := client.ChannelsV1GetChannels(ctx, rpc.ChannelsV1GetChannelsRequest{
+//	    Wallet: walletAddress,
+//	})
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 //
 // ## Low-Level Dialer
 //
 // For direct RPC communication without the convenience methods:
 //
-//	params, _ := rpc.NewParams(map[string]string{"key": "value"})
-//	payload := rpc.NewPayload(1, "method_name", params)
-//	request := rpc.NewRequest(payload)
+//	params, _ := rpc.NewPayload(map[string]string{"key": "value"})
+//	request := rpc.NewRequest(12345, "node.v1.ping", params)
 //
 //	response, err := dialer.Call(ctx, &request)
 //	if err != nil {
@@ -164,37 +190,37 @@
 //	        if event == nil {
 //	            break
 //	        }
-//	        log.Info("Received event", "method", event.Res.Method)
+//	        log.Info("Received event", "method", event.Method)
 //	    }
 //	}()
 //
 // # API Types
 //
-// The package includes comprehensive type definitions for the ClearNode RPC API:
+// The package includes comprehensive type definitions for the Nitrolite Node V1 RPC API:
 //
-// - Request/Response types for all RPC methods
-// - Asset and network configuration types
-// - Payment channel state and operations
-// - Application session management
-// - Ledger and transaction types
-// - Event notification types
+// Request/Response Types (organized by group):
+//   - Node: NodeV1PingRequest/Response, NodeV1GetConfigRequest/Response, etc.
+//   - Channels: ChannelsV1GetHomeChannelRequest/Response, etc.
+//   - AppSessions: AppSessionsV1CreateAppSessionRequest/Response, etc.
+//   - SessionKeys: SessionKeysV1RegisterRequest/Response, etc.
+//   - User: UserV1GetBalancesRequest/Response, etc.
 //
-// All monetary values use decimal.Decimal for arbitrary precision arithmetic.
+// Common Types:
+//   - ChannelV1: On-chain channel information
+//   - StateV1: Channel state with transitions and ledgers
+//   - TransactionV1: Transaction records
+//   - AssetV1: Supported asset information
+//   - BlockchainInfoV1: Supported network information
+//
+// All types follow the naming convention: {Group}V{Version}{Name}{Request|Response}
 //
 // # Server Implementation
 //
-// The package provides a complete RPC server implementation through the Node interface:
+// The package provides a complete RPC server implementation through the WebsocketNode:
 //
 //	// Create and configure the server
 //	config := rpc.WebsocketNodeConfig{
-//	    Signer: signer,
 //	    Logger: logger,
-//	    OnConnectHandler: func(send rpc.SendResponseFunc) {
-//	        // Handle new connections
-//	    },
-//	    OnAuthenticatedHandler: func(userID string, send rpc.SendResponseFunc) {
-//	        // Handle authentication
-//	    },
 //	}
 //
 //	node, err := rpc.NewWebsocketNode(config)
@@ -202,9 +228,11 @@
 //	    log.Fatal(err)
 //	}
 //
-//	// Register handlers
-//	node.Handle("get_balance", handleGetBalance)
-//	node.Handle("transfer", handleTransfer)
+//	// Register handlers (built-in handlers are registered automatically)
+//	// The node.v1.ping handler is registered by default
+//
+//	node.Handle("user.v1.get_balances", handleGetBalances)
+//	node.Handle("channels.v1.get_channels", handleGetChannels)
 //
 //	// Add middleware
 //	node.Use(loggingMiddleware)
@@ -213,7 +241,7 @@
 //	// Create handler groups
 //	privateGroup := node.NewGroup("private")
 //	privateGroup.Use(requireAuthMiddleware)
-//	privateGroup.Handle("create_channel", handleCreateChannel)
+//	privateGroup.Handle("channels.v1.request_creation", handleCreateChannel)
 //
 //	// Start the server
 //	http.Handle("/ws", node)
@@ -221,19 +249,25 @@
 //
 // Writing handlers:
 //
-//	func handleGetBalance(c *rpc.Context) {
+//	func handleGetBalances(c *rpc.Context) {
 //	    // Extract parameters
-//	    var req GetBalanceRequest
-//	    if err := c.Request.Req.Params.Translate(&req); err != nil {
+//	    var req UserV1GetBalancesRequest
+//	    if err := c.Request.Payload.Translate(&req); err != nil {
 //	        c.Fail(nil, "invalid parameters")
 //	        return
 //	    }
 //
 //	    // Process request
-//	    balance := getBalanceForUser(c.UserID, req.Asset)
+//	    balances := getBalancesForWallet(req.Wallet)
+//
+//	    // Create response
+//	    resp := UserV1GetBalancesResponse{
+//	        Balances: balances,
+//	    }
+//	    respPayload, _ := rpc.NewPayload(resp)
 //
 //	    // Send response
-//	    c.Succeed("get_balance", rpc.Params{"balance": balance})
+//	    c.Succeed("user.v1.get_balances", respPayload)
 //	}
 //
 // Writing middleware:
@@ -255,62 +289,62 @@
 //	    c.Next()
 //	}
 //
+// # Security Considerations
+//
+// When using this protocol:
+//
+//  1. Always validate timestamps to prevent replay attacks
+//  2. Use rpc.Errorf() for safe client-facing errors
+//  3. Thoroughly validate all parameters
+//  4. Use unique request IDs to prevent duplicate processing
+//  5. Implement proper authentication middleware
+//  6. Rate limit requests to prevent abuse
+//
 // # Example Usage
 //
 // Creating and sending a request:
 //
 //	// Create request
-//	params, _ := rpc.NewParams(map[string]string{"key": "value"})
-//	payload := rpc.NewPayload(12345, "method_name", params)
-//	request := rpc.NewRequest(payload, signature)
+//	params, _ := rpc.NewPayload(NodeV1GetAssetsRequest{})
+//	request := rpc.NewRequest(12345, "node.v1.get_assets", params)
 //
 //	// Marshal and send
 //	data, _ := json.Marshal(request)
-//	// ... send data over transport ...
+//	// ... send data over WebSocket ...
 //
 // Processing a request:
 //
 //	// Unmarshal request
-//	var request rpc.Request
+//	var request rpc.Message
 //	err := json.Unmarshal(data, &request)
 //
-//	// Verify signatures using GetSigners
-//	signers, err := request.GetSigners()
-//	if err != nil {
-//	    return rpc.Errorf("invalid signatures: %v", err)
-//	}
-//
-//	// Check if request is from a known address
-//	authorized := false
-//	for _, signer := range signers {
-//	    if signer == trustedAddress {
-//	        authorized = true
-//	        break
-//	    }
-//	}
-//	if !authorized {
-//	    return rpc.Errorf("unauthorized request")
+//	// Check message type
+//	if request.Type != rpc.MsgTypeReq {
+//	    return rpc.NewErrorResponse(request.RequestID, request.Method, "invalid message type")
 //	}
 //
 //	// Process based on method
-//	switch request.Req.Method {
-//	case "transfer":
-//	    var params TransferParams
-//	    if err := request.Req.Params.Translate(&params); err != nil {
-//	        return rpc.Errorf("invalid parameters: %v", err)
+//	switch request.Method {
+//	case "node.v1.ping":
+//	    return rpc.NewResponse(request.RequestID, "node.v1.ping", rpc.Payload{})
+//	case "user.v1.get_balances":
+//	    var params UserV1GetBalancesRequest
+//	    if err := request.Payload.Translate(&params); err != nil {
+//	        return rpc.NewErrorResponse(request.RequestID, request.Method, "invalid parameters")
 //	    }
-//	    // ... handle transfer ...
+//	    // ... handle get balances ...
 //	}
 //
 // # Testing
 //
-// The package includes a comprehensive test suite with mock implementations:
+// The package includes a comprehensive test suite:
 //
-// - client_test.go: Unit tests for all client methods
-// - client_internal_test.go: Tests for internal authentication methods
-// - client_manual_test.go: Integration tests against live server (requires credentials)
+//   - client_test.go: Unit tests for all V1 client methods
+//   - dialer_test.go: Tests for WebSocket dialer functionality
+//   - message_test.go: Tests for message encoding/decoding
+//   - payload_test.go: Tests for payload handling
 //
-// The manual test demonstrates real-world usage patterns and can be run with:
+// Run tests with:
 //
-//	TEST_WALLET_PK=<wallet_private_key> TEST_SESSION_PK=<session_private_key> go test -run TestManualClient
+//	go test github.com/erc7824/nitrolite/pkg/rpc
 package rpc

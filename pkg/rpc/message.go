@@ -10,9 +10,10 @@ import (
 type MsgType uint8
 
 var (
-	MsgTypeReq   MsgType = 1
-	MsgTypeResp  MsgType = 2
-	MsgTypeEvent MsgType = 3
+	MsgTypeReq     MsgType = 1
+	MsgTypeResp    MsgType = 2
+	MsgTypeEvent   MsgType = 3
+	MsgTypeRespErr MsgType = 4
 )
 
 // Message represents the core data structure for RPC communication.
@@ -54,7 +55,7 @@ type Message struct {
 // Example:
 //
 //	params, _ := NewParams(map[string]string{"address": "0x123"})
-//	message := NewMessage(12345, MsgTypeReq, "wallet_getBalance", params)
+//	message := NewMessage(MsgTypeReq, 12345, "wallet_getBalance", params)
 //
 // The resulting message will have the current timestamp and can be used
 // for requests, responses, or events depending on the type specified.
@@ -100,10 +101,6 @@ func NewRequest(requestID uint64, method string, params Payload) Message {
 //	// Create a success response
 //	params, _ := NewParams(map[string]string{"balance": "1000"})
 //	response := NewResponse(12345, "wallet_getBalance", params)
-//
-//	// Create an error response (use NewErrorResponse for convenience)
-//	errParams := NewErrorParams("insufficient balance")
-//	response := NewResponse(12345, ErrorMethod.String(), errParams)
 func NewResponse(requestID uint64, method string, params Payload) Message {
 	return NewMessage(MsgType(MsgTypeResp), requestID, method, params)
 }
@@ -112,37 +109,40 @@ func NewEvent(requestID uint64, method string, params Payload) Message {
 	return NewMessage(MsgType(MsgTypeEvent), requestID, method, params)
 }
 
-// NewErrorResponse creates a Response message containing an error message.
+// NewErrorResponse creates an error Response message containing an error message.
 // This is a convenience function that combines error parameter creation
 // and response construction in a single call.
 //
+// The message type is set to MsgTypeRespErr and the method is preserved from the request.
+//
 // Parameters:
 //   - requestID: The ID from the original request
+//   - method: The method from the original request
 //   - errMsg: The error message to send to the client
 //
 // Example usage:
 //
 //	// In an RPC handler when an error occurs
 //	if err := validateRequest(request); err != nil {
-//	    return NewErrorResponse(request.RequestID, err.Error())
+//	    return NewErrorResponse(request.RequestID, request.Method, err.Error())
 //	}
 //
 //	// Creating an error response
-//	errorResponse := NewErrorResponse(12345, "insufficient balance")
+//	errorResponse := NewErrorResponse(12345, "node.v1.ping", "insufficient balance")
 //
-// The resulting response will have the method set to the error method constant
+// The resulting response will have type MsgTypeRespErr, the same method as the request,
 // and params in the format: {"error": "<errMsg>"}
-func NewErrorResponse(requestID uint64, errMsg string) Message {
+func NewErrorResponse(requestID uint64, method string, errMsg string) Message {
 	errParams := NewErrorPayload(errMsg)
-	return NewMessage(MsgType(MsgTypeResp), requestID, ErrorMethod.String(), errParams)
+	return NewMessage(MsgType(MsgTypeRespErr), requestID, method, errParams)
 }
 
 // Error checks if the Message contains an error and returns it.
 // This method extracts any error stored in the message's payload
-// under the standard "error" key.
+// under the standard "error" key by checking if the message type is MsgTypeRespErr.
 //
 // Returns:
-//   - An error if the message contains an error message
+//   - An error if the message type is MsgTypeRespErr
 //   - nil if the message represents a successful operation
 //
 // This is typically used by clients to check if an RPC call failed:
@@ -165,7 +165,7 @@ func NewErrorResponse(requestID uint64, errMsg string) Message {
 // This method is designed to work with error responses created by NewErrorResponse
 // or any response where errors are stored using NewErrorParams.
 func (r Message) Error() error {
-	if r.Method != ErrorMethod.String() {
+	if r.Type != MsgTypeRespErr {
 		return nil
 	}
 

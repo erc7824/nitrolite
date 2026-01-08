@@ -22,8 +22,8 @@ func TestSessionKey(t *testing.T) {
 	app := "TestApp"
 	scope := "trade"
 	allowances := []Allowance{
-		{Asset: "usdc", Amount: "1000"},
-		{Asset: "eth", Amount: "5"},
+		{Asset: "usdc", Allowance: "1000"},
+		{Asset: "eth", Allowance: "5"},
 	}
 	expirationTime := time.Now().Add(24 * time.Hour)
 
@@ -136,8 +136,8 @@ func TestSessionKeySpendingValidation(t *testing.T) {
 	sessionKeyAddress := "0xsessionkey1234567890abcdef1234567890abcdef"
 
 	allowances := []Allowance{
-		{Asset: "usdc", Amount: "1000"},
-		{Asset: "eth", Amount: "5"},
+		{Asset: "usdc", Allowance: "1000"},
+		{Asset: "eth", Allowance: "5"},
 	}
 	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "TestApp", "trade", allowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
@@ -207,7 +207,7 @@ func TestSessionKeySpendingEdgeCases(t *testing.T) {
 
 	// Test 1: Session key with zero allowance
 	zeroAllowances := []Allowance{
-		{Asset: "usdc", Amount: "0"},
+		{Asset: "usdc", Allowance: "0"},
 	}
 	err = AddSessionKey(db, walletAddress, sessionKeyAddress, "ZeroApp", "trade", zeroAllowances, time.Now().Add(24*time.Hour))
 	require.NoError(t, err)
@@ -249,8 +249,8 @@ func TestUnsupportedAssetValidation(t *testing.T) {
 
 	// Test 1: Supported assets should pass validation
 	supportedAllowances := []Allowance{
-		{Asset: "usdc", Amount: "1000"},
-		{Asset: "eth", Amount: "5"},
+		{Asset: "usdc", Allowance: "1000"},
+		{Asset: "eth", Allowance: "5"},
 	}
 	err := ValidateAllowances(assetsCfg, supportedAllowances)
 	assert.NoError(t, err, "Should accept supported assets")
@@ -261,8 +261,8 @@ func TestUnsupportedAssetValidation(t *testing.T) {
 
 	// Test 3: Unsupported asset should fail validation
 	unsupportedAllowances := []Allowance{
-		{Asset: "usdc", Amount: "1000"}, // supported
-		{Asset: "btc", Amount: "1"},     // unsupported
+		{Asset: "usdc", Allowance: "1000"}, // supported
+		{Asset: "btc", Allowance: "1"},     // unsupported
 	}
 	err = ValidateAllowances(assetsCfg, unsupportedAllowances)
 	assert.Error(t, err, "Should reject unsupported assets")
@@ -270,14 +270,14 @@ func TestUnsupportedAssetValidation(t *testing.T) {
 
 	// Test 4: Zero amount should pass validation (0 is allowed)
 	zeroAllowances := []Allowance{
-		{Asset: "usdc", Amount: "0"},
+		{Asset: "usdc", Allowance: "0"},
 	}
 	err = ValidateAllowances(assetsCfg, zeroAllowances)
 	assert.NoError(t, err, "Should accept zero amounts")
 
 	// Test 5: Negative amount should fail validation
 	negativeAllowances := []Allowance{
-		{Asset: "usdc", Amount: "-100"},
+		{Asset: "usdc", Allowance: "-100"},
 	}
 	err = ValidateAllowances(assetsCfg, negativeAllowances)
 	assert.Error(t, err, "Should reject negative amounts")
@@ -285,7 +285,7 @@ func TestUnsupportedAssetValidation(t *testing.T) {
 
 	// Test 6: Invalid decimal format should fail validation
 	invalidAllowances := []Allowance{
-		{Asset: "usdc", Amount: "not-a-number"},
+		{Asset: "usdc", Allowance: "not-a-number"},
 	}
 	err = ValidateAllowances(assetsCfg, invalidAllowances)
 	assert.Error(t, err, "Should reject invalid decimal format")
@@ -310,13 +310,13 @@ func ValidateAllowances(assetsCfg *memory.AssetsConfig, allowances []Allowance) 
 			return fmt.Errorf("asset '%s' is not supported", allowance.Asset)
 		}
 
-		amount, err := decimal.NewFromString(allowance.Amount)
+		amount, err := decimal.NewFromString(allowance.Allowance)
 		if err != nil {
-			return fmt.Errorf("invalid amount '%s' for asset '%s': %w", allowance.Amount, allowance.Asset, err)
+			return fmt.Errorf("invalid amount '%s' for asset '%s': %w", allowance.Allowance, allowance.Asset, err)
 		}
 
 		if amount.LessThan(decimal.Zero) {
-			return fmt.Errorf("allowance amount cannot be negative for asset '%s', got '%s'", allowance.Asset, allowance.Amount)
+			return fmt.Errorf("allowance amount cannot be negative for asset '%s', got '%s'", allowance.Asset, allowance.Allowance)
 		}
 	}
 
@@ -333,7 +333,7 @@ func TestOneSessionKeyPerApp(t *testing.T) {
 	app := "TestApp"
 
 	allowances := []Allowance{
-		{Asset: "usdc", Amount: "500"},
+		{Asset: "usdc", Allowance: "500"},
 	}
 	expiration := time.Now().Add(24 * time.Hour)
 

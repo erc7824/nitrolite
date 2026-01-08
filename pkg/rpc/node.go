@@ -144,7 +144,7 @@ type WebsocketNodeConfig struct {
 // Required configuration:
 //   - Logger: Used for structured logging
 //
-// The node automatically registers a built-in "ping" handler that responds with "pong".
+// The node automatically registers a built-in "node.v1.ping" handler that responds with "node.v1.ping".
 //
 // Returns an error if required configuration is missing.
 func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
@@ -197,7 +197,7 @@ func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 		connHub:      NewConnectionHub(),
 	}
 
-	node.Handle(PingMethod.String(), node.handlePing) // Built-in ping handler
+	node.Handle(NodeV1PingMethod.String(), node.handlePing) // Built-in ping handler
 
 	return node, nil
 }
@@ -300,14 +300,14 @@ func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Cont
 		req := Message{}
 		if err := json.Unmarshal(messageBytes, &req); err != nil {
 			wn.cfg.Logger.Debug("invalid message format", "error", err, "message", string(messageBytes))
-			wn.sendErrorResponse(conn, req.RequestID, "invalid message format")
+			wn.sendErrorResponse(conn, req.RequestID, "", "invalid message format")
 			continue
 		}
 
 		methodRoute, ok := wn.routes[req.Method]
 		if !ok || len(methodRoute) == 0 {
 			wn.cfg.Logger.Debug("no handlers' route found for method", "method", req.Method)
-			wn.sendErrorResponse(conn, req.RequestID, fmt.Sprintf("unknown method: %s", req.Method))
+			wn.sendErrorResponse(conn, req.RequestID, req.Method, fmt.Sprintf("unknown method: %s", req.Method))
 			continue
 		}
 
@@ -323,7 +323,7 @@ func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Cont
 			routeHandlers = append(routeHandlers, handlers...)
 		}
 		if len(routeHandlers) == 0 {
-			wn.sendErrorResponse(conn, req.RequestID, fmt.Sprintf("unknown method: %s", req.Method))
+			wn.sendErrorResponse(conn, req.RequestID, req.Method, fmt.Sprintf("unknown method: %s", req.Method))
 			continue
 		}
 
@@ -343,7 +343,7 @@ func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Cont
 		// Marshal the response
 		responseBytes, err := json.Marshal(ctx.Response)
 		if err != nil {
-			wn.sendErrorResponse(conn, req.RequestID, defaultNodeErrorMessage)
+			wn.sendErrorResponse(conn, req.RequestID, req.Method, defaultNodeErrorMessage)
 			wn.cfg.Logger.Error("failed to marshal response", "error", err, "method", req.Method)
 			continue
 		}
@@ -475,13 +475,13 @@ func (wn *WebsocketNode) getSendResponseFunc(conn Connection) SendResponseFunc {
 
 // sendErrorResponse sends an error response to a connection.
 // It's used for protocol-level errors before request processing.
-func (wn *WebsocketNode) sendErrorResponse(conn Connection, requestID uint64, message string) {
+func (wn *WebsocketNode) sendErrorResponse(conn Connection, requestID uint64, method string, message string) {
 	if conn == nil {
 		wn.cfg.Logger.Error("connection is nil, cannot send error response", "requestID", requestID)
 		return
 	}
 
-	res := NewErrorResponse(requestID, message)
+	res := NewErrorResponse(requestID, method, message)
 	responseBytes, err := json.Marshal(res)
 	if err != nil {
 		wn.cfg.Logger.Error("failed to marshal error response", "error", err)
@@ -491,15 +491,15 @@ func (wn *WebsocketNode) sendErrorResponse(conn Connection, requestID uint64, me
 	conn.WriteRawResponse(responseBytes)
 }
 
-// handlePing is the built-in handler for the "ping" method.
+// handlePing is the built-in handler for the "node.v1.ping" method.
 // It provides a standard way for clients to check if the connection
 // is alive and measure round-trip time. The handler executes any
-// registered middleware before responding with "pong".
+// registered middleware before responding with the same method.
 //
 // This handler is automatically registered when the node is created.
 func (wn *WebsocketNode) handlePing(ctx *Context) {
 	ctx.Next() // Call any middleware first
-	ctx.Succeed(PongMethod.String(), nil)
+	ctx.Succeed(NodeV1PingMethod.String(), nil)
 }
 
 // prepareRawNotification creates a server-initiated notification message.

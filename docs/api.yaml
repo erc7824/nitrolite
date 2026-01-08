@@ -60,7 +60,6 @@ types:
         - name: account_id
           type: string
           description: Account identifier (varies based on transition type)
-          optional: true
         - name: amount
           type: string
           description: Amount involved in the transition
@@ -411,7 +410,7 @@ api:
             - name: get_home_channel
               description: Retrieve current on-chain home channel information
               request:
-                - field_name: user_wallet
+                - field_name: wallet
                   type: string
                   description: The user's wallet address
                 - field_name: asset
@@ -443,7 +442,6 @@ api:
                 - field_name: wallet
                   type: string
                   description: Filter by user's wallet address
-                  optional: true
                 - field_name: status
                   type: string
                   description: Filter by status
@@ -468,14 +466,14 @@ api:
             - name: get_latest_state
               description: Retrieve the current state of the user stored on the Node
               request:
-                - field_name: user_wallet
+                - field_name: wallet
                   type: string
                   description: The user's wallet address
                 - field_name: asset
                   type: string
                   description: The asset symbol
                 # by default returns the latest state regardless of signature
-                - field_name: signed_state
+                - field_name: only_signed
                   type: boolean
                   description: Can be enabled to get the latest signed state to know what is the current pending transition
               response:
@@ -502,10 +500,9 @@ api:
                   type: string
                   description: Filter by Home/Escrow Channel ID
                   optional: true
-                - field_name: signed_only
+                - field_name: only_signed
                   type: boolean
                   description: Return only signed states
-                  optional: true
                 - field_name: pagination
                   type: pagination_params
                   description: Pagination parameters (offset, limit, sort)

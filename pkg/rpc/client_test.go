@@ -2,119 +2,105 @@ package rpc_test
 
 import (
 	"context"
-	"errors"
 	"testing"
-	"time"
 
-	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/erc7824/nitrolite/pkg/rpc"
-	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
-// Test helpers
+// Test helpers for V1 client
 var (
-	testCtx     = context.Background()
-	fixedTime   = time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
-	testWallet  = "0x1234"
-	testWallet2 = "0x5678"
-	testChainID = uint32(1)
-	testToken   = "0xUSDC"
-	testSymbol  = "USDC"
+	testCtxV1      = context.Background()
+	testWalletV1   = "0x1234"
+	testWallet2V1  = "0x5678"
+	testChainIDV1  = uint32(1)
+	testTokenV1    = "0xUSDC"
+	testSymbolV1   = "USDC"
+	testAssetV1    = "usdc"
+	testChannelID  = "ch123"
+	testAppSession = "app123"
 )
 
-// setupClient creates a test client with mock dialer
+// setupClient creates a test V1 client with mock dialer
 func setupClient() (*rpc.Client, *MockDialer) {
 	mockDialer := NewMockDialer()
 	client := rpc.NewClient(mockDialer)
 	return client, mockDialer
 }
 
-// createResponse creates an RPC response with the given data
-func createResponse[T any](method rpc.Method, data T) (*rpc.Message, error) {
+// createResponseV1 creates an RPC response with the given data
+func createResponseV1[T any](method string, data T) (*rpc.Message, error) {
 	params, err := rpc.NewPayload(data)
 	if err != nil {
 		return nil, err
 	}
-	res := rpc.NewResponse(0, string(method), params)
+	res := rpc.NewResponse(0, method, params)
 	return &res, nil
 }
 
-// registerSimpleHandler registers a handler that returns the given response
-func registerSimpleHandler[T any](dialer *MockDialer, method rpc.Method, response T) {
-	dialer.RegisterHandler(method, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
-		return createResponse(method, response)
+// registerSimpleHandlerV1 registers a handler that returns the given response
+func registerSimpleHandlerV1[T any](dialer *MockDialer, method string, response T) {
+	dialer.RegisterHandler(rpc.Method(method), func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
+		return createResponseV1(method, response)
 	})
 }
 
-// registerErrorHandler registers a handler that returns an error response
-func registerErrorHandler(dialer *MockDialer, method rpc.Method, errMsg string) {
-	dialer.RegisterHandler(method, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
-		res := rpc.NewErrorResponse(0, errMsg)
-		return &res, nil
-	})
-}
+// ============================================================================
+// Node Group Tests
+// ============================================================================
 
-func TestClient_Ping(t *testing.T) {
+func TestClientV1_NodeV1Ping(t *testing.T) {
 	t.Parallel()
 
 	client, dialer := setupClient()
 
-	// Ping returns pong
-	dialer.RegisterHandler(rpc.PingMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
-		res := rpc.NewResponse(0, string(rpc.PongMethod), rpc.Payload{})
-		return &res, nil
-	})
+	registerSimpleHandlerV1(dialer, "node.v1.ping", rpc.NodeV1PingResponse{})
 
-	sigs, err := client.Ping(testCtx)
+	err := client.NodeV1Ping(testCtxV1)
 	assert.NoError(t, err)
-	assert.Empty(t, sigs)
 }
 
-func TestClient_GetConfig(t *testing.T) {
+func TestClientV1_NodeV1GetConfig(t *testing.T) {
 	t.Parallel()
 
 	client, dialer := setupClient()
 
-	config := rpc.BrokerConfig{
-		BrokerAddress: testWallet,
-		Blockchains: []rpc.BlockchainInfo{{
-			ID:                 testChainID,
-			CustodyAddress:     "0xabc",
-			AdjudicatorAddress: "0xdef",
-		}},
+	config := rpc.NodeV1GetConfigResponse{
+		NodeAddress: testWalletV1,
+		Blockchains: []rpc.BlockchainInfoV1{
+			{ChainID: testChainIDV1, ContractAddress: "0xContract"},
+		},
 	}
 
-	registerSimpleHandler(dialer, rpc.GetConfigMethod, config)
+	registerSimpleHandlerV1(dialer, "node.v1.get_config", config)
 
-	resp, sigs, err := client.GetConfig(testCtx)
-	assert.NoError(t, err)
-	assert.Empty(t, sigs)
-	assert.Equal(t, rpc.GetConfigResponse(config), resp)
+	resp, err := client.NodeV1GetConfig(testCtxV1)
+	require.NoError(t, err)
+	assert.Equal(t, testWalletV1, resp.NodeAddress)
+	assert.Len(t, resp.Blockchains, 1)
 }
 
-func TestClient_GetAssets(t *testing.T) {
+func TestClientV1_NodeV1GetAssets(t *testing.T) {
 	t.Parallel()
 
 	client, dialer := setupClient()
 
-	// Test data
-	assets := []rpc.Asset{
-		{Token: testToken, ChainID: testChainID, Symbol: testSymbol, Decimals: 6},
-		{Token: "0xETH", ChainID: testChainID, Symbol: "ETH", Decimals: 18},
+	assets := []rpc.AssetV1{
+		{Token: testTokenV1, ChainID: testChainIDV1, Symbol: testSymbolV1, Decimals: 6},
+		{Token: "0xETH", ChainID: testChainIDV1, Symbol: "ETH", Decimals: 18},
 		{Token: "0xDAI", ChainID: 2, Symbol: "DAI", Decimals: 18},
 	}
 
 	// Handler with filtering logic
-	dialer.RegisterHandler(rpc.GetAssetsMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
-		var req rpc.GetAssetsRequest
+	dialer.RegisterHandler(rpc.Method("node.v1.get_assets"), func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
+		var req rpc.NodeV1GetAssetsRequest
 		params.Translate(&req)
 
 		filtered := assets
 		if req.ChainID != nil {
-			var result []rpc.Asset
+			var result []rpc.AssetV1
 			for _, a := range assets {
 				if a.ChainID == *req.ChainID {
 					result = append(result, a)
@@ -123,304 +109,528 @@ func TestClient_GetAssets(t *testing.T) {
 			filtered = result
 		}
 
-		return createResponse(rpc.GetAssetsMethod, rpc.GetAssetsResponse{Assets: filtered})
+		return createResponseV1("node.v1.get_assets", rpc.NodeV1GetAssetsResponse{Assets: filtered})
 	})
 
 	t.Run("no filter", func(t *testing.T) {
-		resp, _, err := client.GetAssets(testCtx, rpc.GetAssetsRequest{})
+		resp, err := client.NodeV1GetAssets(testCtxV1, rpc.NodeV1GetAssetsRequest{})
 		require.NoError(t, err)
 		assert.Len(t, resp.Assets, 3)
 	})
 
 	t.Run("with chain filter", func(t *testing.T) {
-		resp, _, err := client.GetAssets(testCtx, rpc.GetAssetsRequest{ChainID: &testChainID})
+		resp, err := client.NodeV1GetAssets(testCtxV1, rpc.NodeV1GetAssetsRequest{ChainID: &testChainIDV1})
 		require.NoError(t, err)
 		assert.Len(t, resp.Assets, 2)
 	})
 }
 
-func TestClient_Channels(t *testing.T) {
-	t.Parallel()
+// ============================================================================
+// Channels Group Tests
+// ============================================================================
 
-	client, dialer := setupClient()
-	amount := decimal.NewFromInt(0) // Zero amount for channel creation
-
-	t.Run("create", func(t *testing.T) {
-		expected := rpc.CreateChannelResponse{
-			ChannelID: "ch123",
-			State: rpc.UnsignedState{
-				Intent: rpc.StateIntentInitialize, Version: 0,
-				Allocations: []rpc.StateAllocation{{
-					Participant: testWallet, TokenAddress: testToken, RawAmount: amount,
-				}},
-			},
-			StateSignature: sign.Signature{},
-		}
-		registerSimpleHandler(dialer, rpc.CreateChannelMethod, expected)
-
-		req := rpc.CreateChannelRequest{ChainID: testChainID, Token: testToken}
-		resp, _, err := client.CreateChannel(testCtx, req)
-		require.NoError(t, err)
-		assert.Equal(t, expected, resp)
-	})
-
-	t.Run("list", func(t *testing.T) {
-		channels := rpc.GetChannelsResponse{
-			Channels: []rpc.Channel{{
-				ChannelID: "ch123", Participant: testWallet, Status: rpc.ChannelStatusOpen,
-				Token: testToken, ChainID: testChainID, RawAmount: amount,
-			}},
-		}
-		registerSimpleHandler(dialer, rpc.GetChannelsMethod, channels)
-
-		resp, _, err := client.GetChannels(testCtx, rpc.GetChannelsRequest{})
-		require.NoError(t, err)
-		assert.Len(t, resp.Channels, 1)
-	})
-}
-
-func TestClient_Ledger(t *testing.T) {
+func TestClientV1_ChannelsV1GetHomeChannel(t *testing.T) {
 	t.Parallel()
 
 	client, dialer := setupClient()
 
-	t.Run("balances", func(t *testing.T) {
-		balances := rpc.GetLedgerBalancesResponse{
-			LedgerBalances: []rpc.LedgerBalance{
-				{Asset: testSymbol, Amount: decimal.NewFromInt(1000)},
-				{Asset: "eth", Amount: decimal.NewFromInt(5)},
-			},
-		}
-		registerSimpleHandler(dialer, rpc.GetLedgerBalancesMethod, balances)
-
-		resp, _, err := client.GetLedgerBalances(testCtx, rpc.GetLedgerBalancesRequest{})
-		require.NoError(t, err)
-		assert.Len(t, resp.LedgerBalances, 2)
-	})
-
-	t.Run("transactions", func(t *testing.T) {
-		dialer.RegisterHandler(rpc.GetLedgerTransactionsMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
-			txns := rpc.GetLedgerTransactionsResponse{
-				LedgerTransactions: []rpc.LedgerTransaction{{
-					Id: 1, TxType: "transfer",
-					FromAccount: "acc1", ToAccount: "acc2",
-					Asset: testSymbol, Amount: decimal.NewFromInt(50),
-					CreatedAt: fixedTime,
-				}},
-			}
-			return createResponse(rpc.GetLedgerTransactionsMethod, txns)
-		})
-
-		resp, _, err := client.GetLedgerTransactions(testCtx, rpc.GetLedgerTransactionsRequest{})
-		require.NoError(t, err)
-		require.Len(t, resp.LedgerTransactions, 1)
-
-		txn := resp.LedgerTransactions[0]
-		assert.True(t, txn.Amount.Equal(decimal.NewFromInt(50)))
-		assert.False(t, txn.CreatedAt.IsZero())
-	})
-}
-
-func TestClient_Transfer(t *testing.T) {
-	t.Parallel()
-
-	client, dialer := setupClient()
-
-	dialer.RegisterHandler(rpc.TransferMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
-		// Async notification
-		go func() {
-			time.Sleep(10 * time.Millisecond)
-			balanceUpdate := rpc.BalanceUpdateNotification{
-				BalanceUpdates: []rpc.LedgerBalance{{Asset: testSymbol, Amount: decimal.NewFromInt(900)}},
-			}
-			notifParams, _ := rpc.NewPayload(balanceUpdate)
-			publish(rpc.BalanceUpdateEvent, notifParams)
-		}()
-
-		txns := rpc.TransferResponse{
-			Transactions: []rpc.LedgerTransaction{{
-				Id: 1, TxType: "transfer",
-				FromAccount: "acc1", ToAccount: "acc2",
-				Asset: testSymbol, Amount: decimal.NewFromInt(100),
-				CreatedAt: fixedTime,
-			}},
-		}
-		return createResponse(rpc.TransferMethod, txns)
-	})
-
-	req := rpc.TransferRequest{
-		Destination: testWallet2,
-		Allocations: []rpc.TransferAllocation{{AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)}},
+	channel := rpc.ChannelsV1GetHomeChannelResponse{
+		Channel: rpc.ChannelV1{
+			ChannelID:    testChannelID,
+			UserWallet:   testWalletV1,
+			NodeWallet:   testWallet2V1,
+			Type:         "home",
+			BlockchainID: testChainIDV1,
+			TokenAddress: testTokenV1,
+			Challenge:    "3600",
+			Nonce:        "1",
+			Status:       "open",
+			StateVersion: "1",
+		},
 	}
 
-	resp, _, err := client.Transfer(testCtx, req)
+	registerSimpleHandlerV1(dialer, "channels.v1.get_home_channel", channel)
+
+	resp, err := client.ChannelsV1GetHomeChannel(testCtxV1, rpc.ChannelsV1GetHomeChannelRequest{
+		Wallet: testWalletV1,
+		Asset:  testAssetV1,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, testChannelID, resp.Channel.ChannelID)
+	assert.Equal(t, "home", resp.Channel.Type)
+}
+
+func TestClientV1_ChannelsV1GetEscrowChannel(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	channel := rpc.ChannelsV1GetEscrowChannelResponse{
+		Channel: rpc.ChannelV1{
+			ChannelID:    testChannelID,
+			Type:         "escrow",
+			BlockchainID: testChainIDV1,
+			Status:       "open",
+		},
+	}
+
+	registerSimpleHandlerV1(dialer, "channels.v1.get_escrow_channel", channel)
+
+	resp, err := client.ChannelsV1GetEscrowChannel(testCtxV1, rpc.ChannelsV1GetEscrowChannelRequest{
+		EscrowChannelID: testChannelID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "escrow", resp.Channel.Type)
+}
+
+func TestClientV1_ChannelsV1GetChannels(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	channels := rpc.ChannelsV1GetChannelsResponse{
+		Channels: []rpc.ChannelV1{
+			{ChannelID: "ch1", UserWallet: testWalletV1, Status: "open"},
+			{ChannelID: "ch2", UserWallet: testWalletV1, Status: "open"},
+		},
+		Metadata: rpc.PaginationMetadataV1{
+			Page:       1,
+			PerPage:    10,
+			TotalCount: 2,
+			PageCount:  1,
+		},
+	}
+
+	registerSimpleHandlerV1(dialer, "channels.v1.get_channels", channels)
+
+	resp, err := client.ChannelsV1GetChannels(testCtxV1, rpc.ChannelsV1GetChannelsRequest{
+		Wallet: testWalletV1,
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.Channels, 2)
+	assert.Equal(t, uint32(2), resp.Metadata.TotalCount)
+}
+
+func TestClientV1_ChannelsV1GetLatestState(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	state := rpc.ChannelsV1GetLatestStateResponse{
+		State: rpc.StateV1{
+			ID:         "state123",
+			Asset:      testAssetV1,
+			UserWallet: testWalletV1,
+			Epoch:      "1",
+			Version:    "5",
+			HomeLedger: rpc.LedgerV1{
+				TokenAddress: testTokenV1,
+				BlockchainID: testChainIDV1,
+				UserBalance:  "1000",
+				NodeBalance:  "500",
+			},
+			IsFinal: false,
+		},
+	}
+
+	registerSimpleHandlerV1(dialer, "channels.v1.get_latest_state", state)
+
+	resp, err := client.ChannelsV1GetLatestState(testCtxV1, rpc.ChannelsV1GetLatestStateRequest{
+		Wallet:     testWalletV1,
+		Asset:      testAssetV1,
+		OnlySigned: false,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "state123", resp.State.ID)
+	assert.Equal(t, testAssetV1, resp.State.Asset)
+}
+
+func TestClientV1_ChannelsV1GetStates(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	states := rpc.ChannelsV1GetStatesResponse{
+		States: []rpc.StateV1{
+			{ID: "state1", Version: "1", Asset: testAssetV1},
+			{ID: "state2", Version: "2", Asset: testAssetV1},
+		},
+		Metadata: rpc.PaginationMetadataV1{
+			Page:       1,
+			PerPage:    10,
+			TotalCount: 2,
+			PageCount:  1,
+		},
+	}
+
+	registerSimpleHandlerV1(dialer, "channels.v1.get_states", states)
+
+	resp, err := client.ChannelsV1GetStates(testCtxV1, rpc.ChannelsV1GetStatesRequest{
+		Wallet:     testWalletV1,
+		Asset:      testAssetV1,
+		OnlySigned: false,
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.States, 2)
+}
+
+func TestClientV1_ChannelsV1RequestCreation(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	response := rpc.ChannelsV1RequestCreationResponse{
+		Signature: "0xsig123",
+	}
+
+	registerSimpleHandlerV1(dialer, "channels.v1.request_creation", response)
+
+	resp, err := client.ChannelsV1RequestCreation(testCtxV1, rpc.ChannelsV1RequestCreationRequest{
+		State: rpc.StateV1{
+			ID:         "state123",
+			UserWallet: testWalletV1,
+			Asset:      testAssetV1,
+		},
+		ChannelDefinition: rpc.ChannelDefinitionV1{
+			Nonce:     "1",
+			Challenge: "3600",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "0xsig123", resp.Signature)
+}
+
+func TestClientV1_ChannelsV1SubmitState(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	response := rpc.ChannelsV1SubmitStateResponse{
+		Signature: "0xsig456",
+	}
+
+	registerSimpleHandlerV1(dialer, "channels.v1.submit_state", response)
+
+	resp, err := client.ChannelsV1SubmitState(testCtxV1, rpc.ChannelsV1SubmitStateRequest{
+		State: rpc.StateV1{
+			ID:      "state123",
+			Version: "2",
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "0xsig456", resp.Signature)
+}
+
+// ============================================================================
+// App Sessions Group Tests
+// ============================================================================
+
+func TestClientV1_AppSessionsV1GetAppDefinition(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	definition := rpc.AppSessionsV1GetAppDefinitionResponse{
+		Definition: rpc.AppDefinitionV1{
+			Application: "game",
+			Participants: []rpc.AppParticipantV1{
+				{WalletAddress: testWalletV1, SignatureWeight: 1},
+				{WalletAddress: testWallet2V1, SignatureWeight: 1},
+			},
+			Quorum: 2,
+			Nonce:  1,
+		},
+	}
+
+	registerSimpleHandlerV1(dialer, "app_sessions.v1.get_app_definition", definition)
+
+	resp, err := client.AppSessionsV1GetAppDefinition(testCtxV1, rpc.AppSessionsV1GetAppDefinitionRequest{
+		AppSessionID: testAppSession,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "game", resp.Definition.Application)
+	assert.Len(t, resp.Definition.Participants, 2)
+}
+
+func TestClientV1_AppSessionsV1GetAppSessions(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	sessions := rpc.AppSessionsV1GetAppSessionsResponse{
+		AppSessions: []rpc.AppSessionInfoV1{
+			{
+				AppSessionID: testAppSession,
+				Status:       "open",
+				Participants: []rpc.AppParticipantV1{
+					{WalletAddress: testWalletV1, SignatureWeight: 1},
+				},
+				Quorum:  1,
+				Version: 1,
+				Nonce:   1,
+			},
+		},
+		Metadata: rpc.PaginationMetadataV1{
+			Page:       1,
+			PerPage:    10,
+			TotalCount: 1,
+			PageCount:  1,
+		},
+	}
+
+	registerSimpleHandlerV1(dialer, "app_sessions.v1.get_app_sessions", sessions)
+
+	resp, err := client.AppSessionsV1GetAppSessions(testCtxV1, rpc.AppSessionsV1GetAppSessionsRequest{})
+	require.NoError(t, err)
+	assert.Len(t, resp.AppSessions, 1)
+	assert.Equal(t, testAppSession, resp.AppSessions[0].AppSessionID)
+}
+
+func TestClientV1_AppSessionsV1CreateAppSession(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	response := rpc.AppSessionsV1CreateAppSessionResponse{
+		AppSessionID: testAppSession,
+		Version:      "1",
+		Status:       "open",
+	}
+
+	registerSimpleHandlerV1(dialer, "app_sessions.v1.create_app_session", response)
+
+	resp, err := client.AppSessionsV1CreateAppSession(testCtxV1, rpc.AppSessionsV1CreateAppSessionRequest{
+		Definition: rpc.AppDefinitionV1{
+			Application: "game",
+			Participants: []rpc.AppParticipantV1{
+				{WalletAddress: testWalletV1, SignatureWeight: 1},
+			},
+			Quorum: 1,
+			Nonce:  1,
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, testAppSession, resp.AppSessionID)
+	assert.Equal(t, "open", resp.Status)
+}
+
+func TestClientV1_AppSessionsV1CloseAppSession(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	response := rpc.AppSessionsV1CloseAppSessionResponse{
+		AppSessionID: testAppSession,
+		Version:      "5",
+		Status:       "closed",
+	}
+
+	registerSimpleHandlerV1(dialer, "app_sessions.v1.close_app_session", response)
+
+	resp, err := client.AppSessionsV1CloseAppSession(testCtxV1, rpc.AppSessionsV1CloseAppSessionRequest{
+		AppSessionID: testAppSession,
+		Allocations: []rpc.AppAllocationV1{
+			{Participant: testWalletV1, Asset: testAssetV1, Amount: "100"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, testAppSession, resp.AppSessionID)
+	assert.Equal(t, "closed", resp.Status)
+}
+
+func TestClientV1_AppSessionsV1SubmitDepositState(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	response := rpc.AppSessionsV1SubmitDepositStateResponse{
+		Signature: "0xsig789",
+	}
+
+	registerSimpleHandlerV1(dialer, "app_sessions.v1.submit_deposit_state", response)
+
+	resp, err := client.AppSessionsV1SubmitDepositState(testCtxV1, rpc.AppSessionsV1SubmitDepositStateRequest{
+		AppStateUpdate: rpc.AppStateUpdateV1{
+			AppSessionID: testAppSession,
+			Intent:       "deposit",
+			Version:      2,
+		},
+		SigQuorum: 2,
+		UserState: rpc.StateV1{ID: "state123"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "0xsig789", resp.Signature)
+}
+
+func TestClientV1_AppSessionsV1SubmitAppState(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	response := rpc.AppSessionsV1SubmitAppStateResponse{
+		Signature: "0xsigabc",
+	}
+
+	registerSimpleHandlerV1(dialer, "app_sessions.v1.submit_app_state", response)
+
+	resp, err := client.AppSessionsV1SubmitAppState(testCtxV1, rpc.AppSessionsV1SubmitAppStateRequest{
+		AppStateUpdate: rpc.AppStateUpdateV1{
+			AppSessionID: testAppSession,
+			Intent:       "operate",
+			Version:      3,
+		},
+		SigQuorum: 2,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "0xsigabc", resp.Signature)
+}
+
+// ============================================================================
+// Session Keys Group Tests
+// ============================================================================
+
+func TestClientV1_SessionKeysV1Register(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	response := rpc.SessionKeysV1RegisterResponse{}
+
+	registerSimpleHandlerV1(dialer, "session_keys.v1.register", response)
+
+	_, err := client.SessionKeysV1Register(testCtxV1, rpc.SessionKeysV1RegisterRequest{
+		Address: testWalletV1,
+	})
+	require.NoError(t, err)
+}
+
+func TestClientV1_SessionKeysV1GetSessionKeys(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	response := rpc.SessionKeysV1GetSessionKeysResponse{
+		SessionKeys: []rpc.SessionKeyV1{
+			{
+				ID:          1,
+				SessionKey:  "0xkey123",
+				Application: "test-app",
+				Allowances: []rpc.AssetAllowanceV1{
+					{Asset: testAssetV1, Allowance: "1000", Used: "100"},
+				},
+				ExpiresAt: "2025-12-31T23:59:59Z",
+				CreatedAt: "2025-01-01T00:00:00Z",
+			},
+		},
+	}
+
+	registerSimpleHandlerV1(dialer, "session_keys.v1.get_session_keys", response)
+
+	resp, err := client.SessionKeysV1GetSessionKeys(testCtxV1, rpc.SessionKeysV1GetSessionKeysRequest{
+		Wallet: testWalletV1,
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.SessionKeys, 1)
+	assert.Equal(t, "0xkey123", resp.SessionKeys[0].SessionKey)
+}
+
+func TestClientV1_SessionKeysV1RevokeSessionKey(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	response := rpc.SessionKeysV1RevokeSessionKeyResponse{
+		SessionKey: "0xkey123",
+	}
+
+	registerSimpleHandlerV1(dialer, "session_keys.v1.revoke_session_key", response)
+
+	resp, err := client.SessionKeysV1RevokeSessionKey(testCtxV1, rpc.SessionKeysV1RevokeSessionKeyRequest{
+		SessionKey: "0xkey123",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "0xkey123", resp.SessionKey)
+}
+
+// ============================================================================
+// User Group Tests
+// ============================================================================
+
+func TestClientV1_UserV1GetBalances(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	balances := rpc.UserV1GetBalancesResponse{
+		Balances: []rpc.BalanceEntryV1{
+			{Asset: testAssetV1, Amount: "1000"},
+			{Asset: "eth", Amount: "5"},
+		},
+	}
+
+	registerSimpleHandlerV1(dialer, "user.v1.get_balances", balances)
+
+	resp, err := client.UserV1GetBalances(testCtxV1, rpc.UserV1GetBalancesRequest{
+		Wallet: testWalletV1,
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.Balances, 2)
+	assert.Equal(t, "1000", resp.Balances[0].Amount)
+}
+
+func TestClientV1_UserV1GetTransactions(t *testing.T) {
+	t.Parallel()
+
+	client, dialer := setupClient()
+
+	transactions := rpc.UserV1GetTransactionsResponse{
+		Transactions: []rpc.TransactionV1{
+			{
+				ID:          "tx1",
+				Asset:       testAssetV1,
+				FromAccount: testWalletV1,
+				ToAccount:   testWallet2V1,
+				Amount:      "100",
+				CreatedAt:   "2025-01-01T00:00:00Z",
+			},
+		},
+		Metadata: rpc.PaginationMetadataV1{
+			Page:       1,
+			PerPage:    10,
+			TotalCount: 1,
+			PageCount:  1,
+		},
+	}
+
+	registerSimpleHandlerV1(dialer, "user.v1.get_transactions", transactions)
+
+	resp, err := client.UserV1GetTransactions(testCtxV1, rpc.UserV1GetTransactionsRequest{
+		Wallet: testWalletV1,
+	})
 	require.NoError(t, err)
 	assert.Len(t, resp.Transactions, 1)
+	assert.Equal(t, "100", resp.Transactions[0].Amount)
 }
 
-func TestClient_AppSessions(t *testing.T) {
-	t.Parallel()
+// ============================================================================
+// Error Handling Tests
+// ============================================================================
 
-	client, dialer := setupClient()
-
-	appDef := rpc.AppDefinition{
-		Protocol:           "game",
-		ParticipantWallets: []string{testWallet, testWallet2},
-		Weights:            []int64{1, 1}, Quorum: 2, Challenge: 3600, Nonce: 1,
-	}
-
-	t.Run("create", func(t *testing.T) {
-		dialer.RegisterHandler(rpc.CreateAppSessionMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
-			var req rpc.CreateAppSessionRequest
-			params.Translate(&req)
-
-			if len(req.Definition.ParticipantWallets) < 2 {
-				return nil, errors.New("need at least 2 participants")
-			}
-
-			session := rpc.CreateAppSessionResponse{
-				AppSessionID: "app123", Status: "open",
-				ParticipantWallets: req.Definition.ParticipantWallets,
-			}
-			return createResponse(rpc.CreateAppSessionMethod, session)
-		})
-
-		req := rpc.CreateAppSessionRequest{
-			Definition: appDef,
-			Allocations: []rpc.AppAllocation{
-				{Participant: testWallet, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
-				{Participant: testWallet2, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
-			},
-		}
-
-		resp, _, err := client.CreateAppSession(testCtx, req)
-
-		require.NoError(t, err)
-		assert.Equal(t, "app123", resp.AppSessionID)
-		assert.Len(t, resp.ParticipantWallets, 2)
-	})
-
-	t.Run("list", func(t *testing.T) {
-		sessions := rpc.GetAppSessionsResponse{
-			AppSessions: []rpc.AppSession{{
-				AppSessionID: "app123", Status: "open",
-				ParticipantWallets: []string{testWallet, testWallet2},
-			}},
-		}
-		registerSimpleHandler(dialer, rpc.GetAppSessionsMethod, sessions)
-
-		resp, _, err := client.GetAppSessions(testCtx, rpc.GetAppSessionsRequest{})
-		require.NoError(t, err)
-		assert.Len(t, resp.AppSessions, 1)
-	})
-}
-
-func TestClient_ErrorHandling(t *testing.T) {
+func TestClientV1_ErrorHandling(t *testing.T) {
 	t.Parallel()
 
 	client, dialer := setupClient()
 
 	// No handler registered
-	_, _, err := client.GetConfig(testCtx)
+	_, err := client.NodeV1GetConfig(testCtxV1)
 	assert.Contains(t, err.Error(), "method not found")
 
 	// Handler returns error response
-	registerErrorHandler(dialer, rpc.GetAssetsMethod, "internal server error")
-	_, _, err = client.GetAssets(testCtx, rpc.GetAssetsRequest{})
+	dialer.RegisterHandler(rpc.Method("node.v1.get_assets"), func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
+		res := rpc.NewErrorResponse(0, "node.v1.get_assets", "internal server error")
+		return &res, nil
+	})
+
+	_, err = client.NodeV1GetAssets(testCtxV1, rpc.NodeV1GetAssetsRequest{})
 	assert.Contains(t, err.Error(), "internal server error")
-}
-
-func TestClient_ConcurrentOperations(t *testing.T) {
-	t.Parallel()
-
-	client, dialer := setupClient()
-
-	// Handler with delay
-	dialer.RegisterHandler(rpc.GetAssetsMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
-		time.Sleep(10 * time.Millisecond)
-		assets := rpc.GetAssetsResponse{Assets: []rpc.Asset{{Token: testToken}}}
-		return createResponse(rpc.GetAssetsMethod, assets)
-	})
-
-	// Run concurrent requests
-	const numRequests = 10
-	errs := make(chan error, numRequests)
-
-	for i := 0; i < numRequests; i++ {
-		go func() {
-			_, _, err := client.GetAssets(testCtx, rpc.GetAssetsRequest{})
-			errs <- err
-		}()
-	}
-
-	// Verify all succeeded
-	for i := 0; i < numRequests; i++ {
-		assert.NoError(t, <-errs)
-	}
-}
-
-// Additional test coverage for remaining methods
-func TestClient_AdditionalMethods(t *testing.T) {
-	t.Parallel()
-
-	client, dialer := setupClient()
-
-	t.Run("GetAppDefinition", func(t *testing.T) {
-		def := rpc.GetAppDefinitionResponse{
-			Protocol:           "game",
-			ParticipantWallets: []string{testWallet, testWallet2},
-		}
-		registerSimpleHandler(dialer, rpc.GetAppDefinitionMethod, def)
-
-		resp, _, err := client.GetAppDefinition(testCtx, rpc.GetAppDefinitionRequest{
-			AppSessionID: "app123",
-		})
-		require.NoError(t, err)
-		assert.Equal(t, def.Protocol, resp.Protocol)
-	})
-
-	t.Run("CloseChannel", func(t *testing.T) {
-		closeResp := rpc.CloseChannelResponse{
-			ChannelID: "ch123",
-			State:     rpc.UnsignedState{Intent: rpc.StateIntentFinalize},
-		}
-		registerSimpleHandler(dialer, rpc.CloseChannelMethod, closeResp)
-
-		req := rpc.CloseChannelRequest{
-			ChannelID: "ch123", FundsDestination: testWallet,
-		}
-
-		resp, _, err := client.CloseChannel(testCtx, req)
-		require.NoError(t, err)
-		assert.Equal(t, rpc.StateIntentFinalize, resp.State.Intent)
-	})
-
-	t.Run("SubmitAppState", func(t *testing.T) {
-		submit := rpc.SubmitAppStateResponse{
-			AppSessionID: "app123", Version: 2,
-		}
-		registerSimpleHandler(dialer, rpc.SubmitAppStateMethod, submit)
-
-		req := rpc.SubmitAppStateRequest{
-			AppSessionID: "app123",
-		}
-		resp, _, err := client.SubmitAppState(testCtx, req)
-		require.NoError(t, err)
-		assert.Equal(t, uint64(2), resp.Version)
-	})
-
-	t.Run("CloseAppSession", func(t *testing.T) {
-		closeApp := rpc.CloseAppSessionResponse{
-			AppSessionID: "app123", Status: "closed",
-		}
-		registerSimpleHandler(dialer, rpc.CloseAppSessionMethod, closeApp)
-
-		req := rpc.CloseAppSessionRequest{
-			AppSessionID: "app123",
-		}
-
-		resp, _, err := client.CloseAppSession(testCtx, req)
-		require.NoError(t, err)
-		assert.Equal(t, "closed", resp.Status)
-	})
 }

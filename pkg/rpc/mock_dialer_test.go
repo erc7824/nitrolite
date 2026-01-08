@@ -66,14 +66,14 @@ func (d *MockDialer) Call(ctx context.Context, req *rpc.Message) (*rpc.Message, 
 	// Find the handler for this method
 	handler, exists := d.handlers[rpc.Method(req.Method)]
 	if !exists {
-		res := rpc.NewErrorResponse(req.RequestID, "method not found")
+		res := rpc.NewErrorResponse(req.RequestID, req.Method, "method not found")
 		return &res, nil
 	}
 
 	// Call the handler with a notification publisher
 	res, err := handler(req.Payload, d.publishNotification)
 	if err != nil {
-		res := rpc.NewErrorResponse(req.RequestID, err.Error())
+		res := rpc.NewErrorResponse(req.RequestID, req.Method, err.Error())
 		return &res, nil
 	}
 

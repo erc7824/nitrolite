@@ -137,41 +137,6 @@ func TestContext_Fail(t *testing.T) {
 	})
 }
 
-// func TestContext_GetRawResponse(t *testing.T) {
-// 	t.Parallel()
-
-// 	ctx := &Context{
-// 		Signer: sign.NewMockSigner("signer1"),
-// 		Request: Request{
-// 			Req: Message{
-// 				RequestID: 6,
-// 			},
-// 		},
-// 	}
-
-// 	method := "method2"
-// 	params := Payload{
-// 		"key": json.RawMessage(`"value2"`),
-// 	}
-// 	ctx.Succeed(method, params)
-
-// 	rawResponse, err := ctx.GetRawResponse()
-// 	assert.NoError(t, err, "GetRawResponse should not return an error")
-// 	assert.NotEmpty(t, rawResponse, "Raw response should not be empty")
-
-// 	var responseMsg Response
-// 	err = json.Unmarshal(rawResponse, &responseMsg)
-// 	assert.NoError(t, err, "Unmarshalling raw response should not return an error")
-
-// 	assert.Equal(t, ctx.Request.Req.RequestID, responseMsg.Res.RequestID, "Response RequestID should match Request RequestID")
-// 	assert.Equal(t, method, responseMsg.Res.Method, "Response Method should match the expected method")
-// 	assert.Equal(t, params, responseMsg.Res.Params, "Response Params should match the expected params")
-// 	require.Len(t, responseMsg.Sig, 1, "Response Sig should contain one signature")
-
-// 	sig := responseMsg.Sig[0]
-// 	assert.True(t, strings.HasSuffix(string(sig), "-signed-by-signer1"), "Signature should end with the expected suffix")
-// }
-
 func TestSafeStorage(t *testing.T) {
 	t.Parallel()
 

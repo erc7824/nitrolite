@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/log"
-	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
@@ -39,7 +38,7 @@ type Node interface {
 	// Notify sends a server-initiated notification to a specific user.
 	// All active connections for the user will receive the notification.
 	// If the user has no active connections, the notification is dropped.
-	Notify(userID string, method string, params Params)
+	Notify(userID string, method string, params Payload)
 
 	// Use adds global middleware that will be executed for all requests.
 	// Middleware is executed in the order it was added, before any
@@ -98,11 +97,8 @@ type WebsocketNode struct {
 }
 
 // WebsocketNodeConfig contains all configuration options for creating a WebsocketNode.
-// Required fields are Signer and Logger; all others have sensible defaults.
+// The only required field is Logger; all others have sensible defaults.
 type WebsocketNodeConfig struct {
-	// Signer is used to sign all outgoing messages (required).
-	// This ensures message authenticity and integrity.
-	Signer sign.Signer
 	// Logger is used for structured logging throughout the node (required).
 	Logger log.Logger
 
@@ -146,16 +142,12 @@ type WebsocketNodeConfig struct {
 // The node is ready to accept WebSocket connections after creation.
 //
 // Required configuration:
-//   - Signer: Used to sign all outgoing messages
 //   - Logger: Used for structured logging
 //
-// The node automatically registers a built-in "ping" handler that responds with "pong".
+// The node automatically registers a built-in "node.v1.ping" handler that responds with "node.v1.ping".
 //
 // Returns an error if required configuration is missing.
 func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
-	if config.Signer == nil {
-		return nil, fmt.Errorf("signer cannot be nil")
-	}
 	if config.Logger == nil {
 		return nil, fmt.Errorf("logger cannot be nil")
 	}
@@ -205,7 +197,7 @@ func NewWebsocketNode(config WebsocketNodeConfig) (*WebsocketNode, error) {
 		connHub:      NewConnectionHub(),
 	}
 
-	node.Handle(PingMethod.String(), node.handlePing) // Built-in ping handler
+	node.Handle(NodeV1PingMethod.String(), node.handlePing) // Built-in ping handler
 
 	return node, nil
 }
@@ -253,15 +245,14 @@ func (wn *WebsocketNode) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wn.cfg.OnConnectHandler(wn.getSendResponseFunc(connection))
-	wn.cfg.Logger.Info("new WebSocket connection established", "connectionID", connectionID, "userID", connection.UserID())
+	wn.cfg.Logger.Info("new WebSocket connection established", "connectionID", connectionID)
 
 	// Cleanup function executed when connection closes
 	defer func() {
-		userID := connection.UserID()
 		wn.connHub.Remove(connectionID)
 
-		wn.cfg.OnDisconnectHandler(userID)
-		wn.cfg.Logger.Info("connection closed", "connectionID", connectionID, "userID", userID)
+		wn.cfg.OnDisconnectHandler("")
+		wn.cfg.Logger.Info("connection closed", "connectionID", connectionID)
 	}()
 
 	parentCtx, cancel := context.WithCancel(r.Context())
@@ -306,17 +297,17 @@ func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Cont
 			}
 		}
 
-		req := Request{}
+		req := Message{}
 		if err := json.Unmarshal(messageBytes, &req); err != nil {
 			wn.cfg.Logger.Debug("invalid message format", "error", err, "message", string(messageBytes))
-			wn.sendErrorResponse(conn, req.Req.RequestID, "invalid message format")
+			wn.sendErrorResponse(conn, req.RequestID, "", "invalid message format")
 			continue
 		}
 
-		methodRoute, ok := wn.routes[req.Req.Method]
+		methodRoute, ok := wn.routes[req.Method]
 		if !ok || len(methodRoute) == 0 {
-			wn.cfg.Logger.Debug("no handlers' route found for method", "method", req.Req.Method)
-			wn.sendErrorResponse(conn, req.Req.RequestID, fmt.Sprintf("unknown method: %s", req.Req.Method))
+			wn.cfg.Logger.Debug("no handlers' route found for method", "method", req.Method)
+			wn.sendErrorResponse(conn, req.RequestID, req.Method, fmt.Sprintf("unknown method: %s", req.Method))
 			continue
 		}
 
@@ -332,40 +323,31 @@ func (wn *WebsocketNode) processRequests(conn Connection, parentCtx context.Cont
 			routeHandlers = append(routeHandlers, handlers...)
 		}
 		if len(routeHandlers) == 0 {
-			wn.sendErrorResponse(conn, req.Req.RequestID, fmt.Sprintf("unknown method: %s", req.Req.Method))
+			wn.sendErrorResponse(conn, req.RequestID, req.Method, fmt.Sprintf("unknown method: %s", req.Method))
 			continue
 		}
 
 		wn.cfg.Logger.Info("processing message",
-			"requestID", req.Req.RequestID,
-			"userID", conn.UserID(),
-			"method", req.Req.Method,
+			"requestID", req.RequestID,
+			"method", req.Method,
 			"route", methodRoute)
 
 		ctx := &Context{
 			Context:  parentCtx,
-			UserID:   conn.UserID(),
-			Signer:   wn.cfg.Signer,
 			Request:  req,
 			handlers: routeHandlers,
 			Storage:  safeStorage,
 		}
 		ctx.Next() // Start processing the handlers
 
-		responseBytes, err := ctx.GetRawResponse()
+		// Marshal the response
+		responseBytes, err := json.Marshal(ctx.Response)
 		if err != nil {
-			wn.sendErrorResponse(conn, req.Req.RequestID, defaultNodeErrorMessage)
-			wn.cfg.Logger.Error("failed to prepare response", "error", err, "method", req.Req.Method)
+			wn.sendErrorResponse(conn, req.RequestID, req.Method, defaultNodeErrorMessage)
+			wn.cfg.Logger.Error("failed to marshal response", "error", err, "method", req.Method)
 			continue
 		}
 		conn.WriteRawResponse(responseBytes)
-
-		// Handle re-authentication
-		if conn.UserID() != ctx.UserID {
-			// If the user ID changed during processing, do the re-authentication
-			wn.connHub.Reauthenticate(conn.ConnectionID(), ctx.UserID)
-			wn.cfg.OnAuthenticatedHandler(ctx.UserID, wn.getSendResponseFunc(conn))
-		}
 	}
 }
 
@@ -462,21 +444,21 @@ func (wn *WebsocketNode) use(groupId string, middleware Handler) {
 // If the user has no active connections, the notification is silently dropped.
 //
 // Notifications have RequestID=0 to distinguish them from responses.
-func (wn *WebsocketNode) Notify(userID, method string, params Params) {
-	message, err := prepareRawNotification(wn.cfg.Signer, method, params)
-	if err != nil {
-		wn.cfg.Logger.Error("failed to prepare notification message", "error", err, "userID", userID, "method", method)
-		return
-	}
+func (wn *WebsocketNode) Notify(userID, method string, params Payload) {
+	// message, err := prepareRawNotification(method, params)
+	// if err != nil {
+	// 	wn.cfg.Logger.Error("failed to prepare notification message", "error", err, "userID", userID, "method", method)
+	// 	return
+	// }
 
-	wn.connHub.Publish(userID, message)
+	// wn.connHub.Publish(userID, message)
 }
 
 // getSendResponseFunc creates a SendResponseFunc for a specific connection.
 // The returned function can be used to send notifications to that connection.
 func (wn *WebsocketNode) getSendResponseFunc(conn Connection) SendResponseFunc {
-	return func(method string, params Params) {
-		responseBytes, err := prepareRawNotification(wn.cfg.Signer, method, params)
+	return func(method string, params Payload) {
+		responseBytes, err := prepareRawNotification(method, params)
 		if err != nil {
 			wn.cfg.Logger.Error("failed to prepare notification message", "error", err, "method", method)
 			return
@@ -493,41 +475,41 @@ func (wn *WebsocketNode) getSendResponseFunc(conn Connection) SendResponseFunc {
 
 // sendErrorResponse sends an error response to a connection.
 // It's used for protocol-level errors before request processing.
-func (wn *WebsocketNode) sendErrorResponse(conn Connection, requestID uint64, message string) {
+func (wn *WebsocketNode) sendErrorResponse(conn Connection, requestID uint64, method string, message string) {
 	if conn == nil {
 		wn.cfg.Logger.Error("connection is nil, cannot send error response", "requestID", requestID)
 		return
 	}
 
-	res := NewErrorResponse(requestID, message)
-	responseBytes, err := prepareRawResponse(wn.cfg.Signer, res.Res)
+	res := NewErrorResponse(requestID, method, message)
+	responseBytes, err := json.Marshal(res)
 	if err != nil {
-		wn.cfg.Logger.Error("failed to prepare error response", "error", err)
+		wn.cfg.Logger.Error("failed to marshal error response", "error", err)
 		return
 	}
 
 	conn.WriteRawResponse(responseBytes)
 }
 
-// handlePing is the built-in handler for the "ping" method.
+// handlePing is the built-in handler for the "node.v1.ping" method.
 // It provides a standard way for clients to check if the connection
 // is alive and measure round-trip time. The handler executes any
-// registered middleware before responding with "pong".
+// registered middleware before responding with the same method.
 //
 // This handler is automatically registered when the node is created.
 func (wn *WebsocketNode) handlePing(ctx *Context) {
 	ctx.Next() // Call any middleware first
-	ctx.Succeed(PongMethod.String(), nil)
+	ctx.Succeed(NodeV1PingMethod.String(), nil)
 }
 
-// prepareRawNotification creates a signed server-initiated notification message.
+// prepareRawNotification creates a server-initiated notification message.
 // Unlike responses, notifications don't correspond to a specific request.
-func prepareRawNotification(signer sign.Signer, method string, params Params) ([]byte, error) {
-	payload := NewPayload(0, method, params) // RequestID=0 for notifications
+func prepareRawNotification(method string, params Payload) ([]byte, error) {
+	msg := NewEvent(0, method, params) // RequestID=0 for notifications
 
-	responseBytes, err := prepareRawResponse(signer, payload)
+	responseBytes, err := json.Marshal(msg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal notification: %w", err)
 	}
 
 	return responseBytes, nil

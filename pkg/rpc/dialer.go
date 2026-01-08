@@ -26,11 +26,11 @@ type Dialer interface {
 	// Call sends an RPC request and waits for a response.
 	// It returns an error if the request cannot be sent or no response is received.
 	// The context can be used to cancel the request.
-	Call(ctx context.Context, req *Request) (*Response, error)
+	Call(ctx context.Context, req *Message) (*Message, error)
 
 	// EventCh returns a read-only channel for receiving unsolicited events from the server.
 	// Events are responses that don't match any pending request ID.
-	EventCh() <-chan *Response
+	EventCh() <-chan *Message
 }
 
 // dialCtx holds the connection context and resources
@@ -66,14 +66,14 @@ var DefaultWebsocketDialerConfig = WebsocketDialerConfig{
 }
 
 // WebsocketDialer implements the Dialer interface using WebSocket connections.
-// It provides thread-safe RPC communication with automatic ping/pong handling.
+// It provides thread-safe RPC communication with automatic ping handling.
 type WebsocketDialer struct {
 	cfg           WebsocketDialerConfig
-	dialCtx       *dialCtx                  // Connection context and resources
-	eventCh       chan *Response            // Channel for unsolicited events
-	responseSinks map[uint64]chan *Response // Map of request IDs to response channels
-	mu            sync.RWMutex              // Protects dialCtx and responseSinks
-	writeMu       sync.Mutex                // Serializes WebSocket write operations
+	dialCtx       *dialCtx                 // Connection context and resources
+	eventCh       chan *Message            // Channel for unsolicited events
+	responseSinks map[uint64]chan *Message // Map of request IDs to response channels
+	mu            sync.RWMutex             // Protects dialCtx and responseSinks
+	writeMu       sync.Mutex               // Serializes WebSocket write operations
 }
 
 // Ensure WebsocketDialer implements the Dialer interface
@@ -83,8 +83,8 @@ var _ Dialer = (*WebsocketDialer)(nil)
 func NewWebsocketDialer(cfg WebsocketDialerConfig) *WebsocketDialer {
 	return &WebsocketDialer{
 		cfg:           cfg,
-		eventCh:       make(chan *Response, cfg.EventChanSize),
-		responseSinks: make(map[uint64]chan *Response),
+		eventCh:       make(chan *Message, cfg.EventChanSize),
+		responseSinks: make(map[uint64]chan *Message),
 	}
 }
 
@@ -146,7 +146,7 @@ func (d *WebsocketDialer) Dial(parentCtx context.Context, url string, handleClos
 		conn: conn,
 		lg:   log.FromContext(parentCtx).WithName("ws-dialer"),
 	}
-	d.eventCh = make(chan *Response, d.cfg.EventChanSize)
+	d.eventCh = make(chan *Message, d.cfg.EventChanSize)
 	d.mu.Unlock()
 
 	// Start background goroutines
@@ -192,7 +192,7 @@ func (d *WebsocketDialer) closeOnContextDone(ctx context.Context, handleClosure 
 	for _, sink := range d.responseSinks {
 		close(sink)
 	}
-	d.responseSinks = make(map[uint64]chan *Response)
+	d.responseSinks = make(map[uint64]chan *Message)
 	d.mu.Unlock()
 
 	handleClosure(err)
@@ -225,7 +225,7 @@ func (d *WebsocketDialer) readMessages(ctx context.Context, handleClosure func(e
 		}
 
 		// Parse the response
-		var msg Response
+		var msg Message
 		if err := json.Unmarshal(messageBytes, &msg); err != nil {
 			lg.Warn("Malformed message", "message", string(messageBytes), "error", err)
 			continue
@@ -233,7 +233,7 @@ func (d *WebsocketDialer) readMessages(ctx context.Context, handleClosure func(e
 
 		// Route the response to the appropriate channel
 		d.mu.Lock()
-		responseSink, exists := d.responseSinks[msg.Res.RequestID]
+		responseSink, exists := d.responseSinks[msg.RequestID]
 		d.mu.Unlock()
 
 		if !exists {
@@ -250,7 +250,7 @@ func (d *WebsocketDialer) readMessages(ctx context.Context, handleClosure func(e
 			// Successfully sent
 		default:
 			// Channel full, drop the message
-			lg.Warn("Response channel full, dropping message", "requestID", msg.Res.RequestID)
+			lg.Warn("Response channel full, dropping message", "requestID", msg.RequestID)
 		}
 	}
 }
@@ -264,7 +264,7 @@ func (d *WebsocketDialer) readMessages(ctx context.Context, handleClosure func(e
 //	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 //	defer cancel()
 //	resp, err := dialer.Call(ctx, request)
-func (d *WebsocketDialer) Call(ctx context.Context, req *Request) (*Response, error) {
+func (d *WebsocketDialer) Call(ctx context.Context, req *Message) (*Message, error) {
 	if req == nil {
 		return nil, ErrNilRequest
 	}
@@ -277,8 +277,8 @@ func (d *WebsocketDialer) Call(ctx context.Context, req *Request) (*Response, er
 	}
 	conn := d.dialCtx.conn
 	connCtx := d.dialCtx.ctx
-	responseSink := make(chan *Response, 1) // Buffered to prevent blocking in readMessages
-	d.responseSinks[req.Req.RequestID] = responseSink
+	responseSink := make(chan *Message, 1) // Buffered to prevent blocking in readMessages
+	d.responseSinks[req.RequestID] = responseSink
 	d.mu.Unlock()
 
 	// Marshal the request
@@ -295,13 +295,13 @@ func (d *WebsocketDialer) Call(ctx context.Context, req *Request) (*Response, er
 	if err != nil {
 		// Clean up on send failure
 		d.mu.Lock()
-		delete(d.responseSinks, req.Req.RequestID)
+		delete(d.responseSinks, req.RequestID)
 		d.mu.Unlock()
 		return nil, fmt.Errorf("%w: %w", ErrSendingRequest, err)
 	}
 
 	// Wait for response or timeout
-	var res *Response
+	var res *Message
 	select {
 	case <-ctx.Done():
 		// Request context cancelled
@@ -313,11 +313,11 @@ func (d *WebsocketDialer) Call(ctx context.Context, req *Request) (*Response, er
 
 	// Clean up response channel
 	d.mu.Lock()
-	delete(d.responseSinks, req.Req.RequestID)
+	delete(d.responseSinks, req.RequestID)
 	d.mu.Unlock()
 
 	if res == nil {
-		return nil, fmt.Errorf("%w for request %d", ErrNoResponse, req.Req.RequestID)
+		return nil, fmt.Errorf("%w for request %d", ErrNoResponse, req.RequestID)
 	}
 	return res, nil
 }
@@ -340,9 +340,8 @@ func (d *WebsocketDialer) pingPeriodically(ctx context.Context, handleClosure fu
 			return
 		case <-ticker.C:
 			// Send ping request
-			var params Params
-			payload := NewPayload(d.cfg.PingRequestID, PingMethod.String(), params)
-			req := NewRequest(payload)
+			var params Payload
+			req := NewRequest(d.cfg.PingRequestID, NodeV1PingMethod.String(), params)
 
 			// Use the connection context for ping requests
 			res, err := d.Call(ctx, &req)
@@ -352,9 +351,9 @@ func (d *WebsocketDialer) pingPeriodically(ctx context.Context, handleClosure fu
 				return
 			}
 
-			// Verify we got a pong response
-			if res.Res.Method != PongMethod.String() {
-				lg.Warn("Unexpected response to ping", "method", res.Res.Method)
+			// Verify we got a ping response
+			if res.Method != NodeV1PingMethod.String() {
+				lg.Warn("Unexpected response to ping", "method", res.Method)
 			}
 		}
 	}
@@ -372,9 +371,9 @@ func (d *WebsocketDialer) pingPeriodically(ctx context.Context, handleClosure fu
 //	        break
 //	    }
 //	    // Handle event
-//	    log.Info("Received event", "method", event.Res.Method)
+//	    log.Info("Received event", "method", event.Method)
 //	}
-func (d *WebsocketDialer) EventCh() <-chan *Response {
+func (d *WebsocketDialer) EventCh() <-chan *Message {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 

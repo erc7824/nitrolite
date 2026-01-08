@@ -42,8 +42,8 @@ func NewRPCStore(db *gorm.DB) *RPCStore {
 }
 
 // StoreMessage stores an RPC message in the database
-func (s *RPCStore) StoreMessage(sender string, req *rpc.Payload, reqSigs []sign.Signature, resBytes []byte, resSigs []sign.Signature) error {
-	paramsBytes, err := json.Marshal(req.Params)
+func (s *RPCStore) StoreMessage(sender string, req *rpc.Message, reqSigs []sign.Signature, resBytes []byte, resSigs []sign.Signature) error {
+	paramsBytes, err := json.Marshal(req.Payload)
 	if err != nil {
 		return err
 	}

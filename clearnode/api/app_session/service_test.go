@@ -60,9 +60,9 @@ func createTestAppSession(t *testing.T, db *gorm.DB, sessionID string, protocol 
 }
 
 func createTestAppSessionService(db *gorm.DB, capturedNotifications map[string][]Notification) *AppSessionService {
-	var notifyFunc func(userID string, method string, params rpc.Params)
+	var notifyFunc func(userID string, method string, params rpc.Payload)
 	if capturedNotifications != nil {
-		notifyFunc = func(userID string, method string, params rpc.Params) {
+		notifyFunc = func(userID string, method string, params rpc.Payload) {
 			capturedNotifications[userID] = append(capturedNotifications[userID], Notification{
 				userID:    userID,
 				eventType: EventType(method),
@@ -70,7 +70,7 @@ func createTestAppSessionService(db *gorm.DB, capturedNotifications map[string][
 			})
 		}
 	} else {
-		notifyFunc = func(userID string, method string, params rpc.Params) {}
+		notifyFunc = func(userID string, method string, params rpc.Payload) {}
 	}
 	return NewAppSessionService(db, NewWSNotifier(notifyFunc, nil))
 }

@@ -13,7 +13,7 @@ import (
 )
 
 // Type alias for Allowance from rpc package
-type Allowance = rpc.Allowance
+type Allowance = rpc.AssetAllowanceV1
 
 var (
 	AppNameClearnode = "clearnode"
@@ -295,7 +295,7 @@ func ValidateSessionKeySpending(db *gorm.DB, sessionKey *SessionKey, assetSymbol
 	for _, allowance := range allowances {
 		if allowance.Asset == assetSymbol {
 			var err error
-			allowedAmount, err = decimal.NewFromString(allowance.Amount)
+			allowedAmount, err = decimal.NewFromString(allowance.Allowance)
 			if err != nil {
 				return fmt.Errorf("operation denied: failed to parse allowed amount: %w", err)
 			}

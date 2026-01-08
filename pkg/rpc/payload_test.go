@@ -15,15 +15,15 @@ func TestNewPayload(t *testing.T) {
 
 	id := uint64(1)
 	method := "testMethod"
-	params := rpc.Params{
+	params := rpc.Payload{
 		"param1": json.RawMessage("\"value1\""),
 		"param2": json.RawMessage("2"),
 	}
 
-	payload := rpc.NewPayload(id, method, params)
+	payload := rpc.NewMessage(rpc.MsgTypeReq, id, method, params)
 	assert.Equal(t, id, payload.RequestID)
 	assert.Equal(t, method, payload.Method)
-	assert.Equal(t, params, payload.Params)
+	assert.Equal(t, params, payload.Payload)
 	assert.LessOrEqual(t, payload.Timestamp, uint64(time.Now().UnixMilli()))
 }
 
@@ -33,16 +33,17 @@ func TestPayloadUnmarshalJSON(t *testing.T) {
 	tcs := []struct {
 		name     string
 		input    string
-		expected rpc.Payload
+		expected rpc.Message
 		errMsg   string
 	}{
 		{
 			name:  "valid payload",
-			input: `[1, "testMethod", {"param1": "value1", "param2": 2}, 1700000000000]`,
-			expected: rpc.Payload{
+			input: `[1, 1, "testMethod", {"param1": "value1", "param2": 2}, 1700000000000]`,
+			expected: rpc.Message{
+				Type:      1,
 				RequestID: 1,
 				Method:    "testMethod",
-				Params: rpc.Params{
+				Payload: rpc.Payload{
 					"param1": json.RawMessage("\"value1\""),
 					"param2": json.RawMessage("2"),
 				},
@@ -53,33 +54,33 @@ func TestPayloadUnmarshalJSON(t *testing.T) {
 		{
 			name:   "wrong number of elements",
 			input:  `[1, "testMethod", {"param1": "value1"}]`,
-			errMsg: "invalid RPCData: expected 4 elements in array",
+			errMsg: "invalid RPCData: expected 5 elements in array",
 		},
 		{
 			name:   "invalid request_id type",
-			input:  `["not a number", "testMethod", {"param1": "value1"}, 1700000000000]`,
+			input:  `[1, "not a number", "testMethod", {"param1": "value1"}, 1700000000000]`,
 			errMsg: "invalid request_id",
 		},
 		{
 			name:   "invalid method type",
-			input:  `[1, 123, {"param1": "value1"}, 1700000000000]`,
+			input:  `[1, 1, 123, {"param1": "value1"}, 1700000000000]`,
 			errMsg: "invalid method",
 		},
 		{
 			name:   "invalid params type",
-			input:  `[1, "testMethod", ["not", "an", "object"], 1700000000000]`,
+			input:  `[1, 1, "testMethod", ["not", "an", "object"], 1700000000000]`,
 			errMsg: "invalid params",
 		},
 		{
 			name:   "invalid timestamp type",
-			input:  `[1, "testMethod", {"param1": "value1"}, "not a number"]`,
+			input:  `[1, 1, "testMethod", {"param1": "value1"}, "not a number"]`,
 			errMsg: "invalid timestamp",
 		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			var payload rpc.Payload
+			var payload rpc.Message
 			err := json.Unmarshal([]byte(tc.input), &payload)
 			if tc.errMsg != "" {
 				require.Error(t, err)
@@ -97,31 +98,33 @@ func TestPayloadMarshalJSON(t *testing.T) {
 
 	tcs := []struct {
 		name     string
-		input    rpc.Payload
+		input    rpc.Message
 		expected string
 	}{
 		{
 			name: "valid payload",
-			input: rpc.Payload{
+			input: rpc.Message{
+				Type:      1,
 				RequestID: 1,
 				Method:    "testMethod",
-				Params: rpc.Params{
+				Payload: rpc.Payload{
 					"param1": json.RawMessage("\"value1\""),
 					"param2": json.RawMessage("2"),
 				},
 				Timestamp: 1700000000000,
 			},
-			expected: `[1,"testMethod",{"param1":"value1","param2":2},1700000000000]`,
+			expected: `[1,1,"testMethod",{"param1":"value1","param2":2},1700000000000]`,
 		},
 		{
 			name: "empty params",
-			input: rpc.Payload{
+			input: rpc.Message{
+				Type:      1,
 				RequestID: 2,
 				Method:    "anotherMethod",
-				Params:    rpc.Params{},
+				Payload:   rpc.Payload{},
 				Timestamp: 1700000001000,
 			},
-			expected: `[2,"anotherMethod",{},1700000001000]`,
+			expected: `[1,2,"anotherMethod",{},1700000001000]`,
 		},
 	}
 
@@ -140,7 +143,7 @@ func TestNewParams(t *testing.T) {
 	tcs := []struct {
 		name     string
 		input    any
-		expected rpc.Params
+		expected rpc.Payload
 		errMsg   string
 	}{
 		{
@@ -149,7 +152,7 @@ func TestNewParams(t *testing.T) {
 				"param1": "value1",
 				"param2": 2,
 			},
-			expected: rpc.Params{
+			expected: rpc.Payload{
 				"param1": json.RawMessage("\"value1\""),
 				"param2": json.RawMessage("2"),
 			},
@@ -159,13 +162,13 @@ func TestNewParams(t *testing.T) {
 			name:     "invalid non-map",
 			input:    []string{"not", "a", "map"},
 			expected: nil,
-			errMsg:   "error unmarshalling params: json: cannot unmarshal array into Go value of type rpc.Params",
+			errMsg:   "error unmarshalling params: json: cannot unmarshal array into Go value of type rpc.Payload",
 		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			params, err := rpc.NewParams(tc.input)
+			params, err := rpc.NewPayload(tc.input)
 			if tc.errMsg != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.errMsg)
@@ -185,7 +188,7 @@ func TestParamsTranslate(t *testing.T) {
 		Param2 int    `json:"param2"`
 	}
 
-	input := rpc.Params{
+	input := rpc.Payload{
 		"param1": json.RawMessage("\"value1\""),
 		"param2": json.RawMessage("2"),
 	}
@@ -221,24 +224,24 @@ func TestParamsError(t *testing.T) {
 
 	tcs := []struct {
 		name     string
-		input    rpc.Params
+		input    rpc.Payload
 		expected string
 	}{
 		{
 			name: "with error",
-			input: rpc.Params{
+			input: rpc.Payload{
 				"error": json.RawMessage("\"something went wrong\""),
 			},
 			expected: "something went wrong",
 		},
 		{
 			name:     "without error",
-			input:    rpc.Params{},
+			input:    rpc.Payload{},
 			expected: "",
 		},
 		{
 			name: "malformed error",
-			input: rpc.Params{
+			input: rpc.Payload{
 				"error": json.RawMessage("123"), // not a string
 			},
 			expected: "",

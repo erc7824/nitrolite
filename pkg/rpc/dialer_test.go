@@ -33,13 +33,13 @@ func TestWebsocketDialer_BasicConnection(t *testing.T) {
 	errorCh := connectDialer(t, ctx, dialer, server.Listener.Addr().String())
 
 	// Test basic call
-	params, err := rpc.NewParams(map[string]interface{}{"key": "value"})
+	payload, err := rpc.NewPayload(map[string]interface{}{"key": "value"})
 	require.NoError(t, err)
-	req := rpc.NewRequest(rpc.NewPayload(1, "test", params))
+	req := rpc.NewRequest(1, "test", payload)
 	resp, err := dialer.Call(ctx, &req)
 	require.NoError(t, err)
-	assert.Equal(t, "response_test", resp.Res.Method)
-	assert.Equal(t, req.Req.RequestID, resp.Res.RequestID)
+	assert.Equal(t, "response_test", resp.Method)
+	assert.Equal(t, req.RequestID, resp.RequestID)
 
 	// Ensure no errors occurred
 	select {
@@ -114,11 +114,11 @@ func TestWebsocketDialer_MultipleRequests(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 
-			params, err := rpc.NewParams(map[string]interface{}{
+			payload, err := rpc.NewPayload(map[string]interface{}{
 				"index": idx,
 			})
 			require.NoError(t, err)
-			req := rpc.NewRequest(rpc.NewPayload(uint64(idx), "test", params))
+			req := rpc.NewRequest(uint64(idx), "test", payload)
 
 			callCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 			defer cancel()
@@ -126,8 +126,8 @@ func TestWebsocketDialer_MultipleRequests(t *testing.T) {
 			resp, err := dialer.Call(callCtx, &req)
 			require.NoError(t, err)
 
-			assert.Equal(t, uint64(idx), resp.Res.RequestID)
-			assert.Equal(t, "response_test", resp.Res.Method)
+			assert.Equal(t, uint64(idx), resp.RequestID)
+			assert.Equal(t, "response_test", resp.Method)
 		}(i)
 	}
 
@@ -145,16 +145,15 @@ func TestWebsocketDialer_RequestTimeout(t *testing.T) {
 	t.Parallel()
 
 	// Create server that delays responses
-	extraHandlers := map[string]func(*rpc.Request) *rpc.Response{
-		"slow_request": func(req *rpc.Request) *rpc.Response {
+	extraHandlers := map[string]func(*rpc.Message) *rpc.Message{
+		"slow_request": func(req *rpc.Message) *rpc.Message {
 			time.Sleep(10 * time.Second) // Delay response
-			return &rpc.Response{
-				Res: rpc.Payload{
-					RequestID: req.Req.RequestID,
-					Method:    "response_slow_request",
-					Timestamp: uint64(time.Now().UnixMilli()),
-				},
-			}
+			res := rpc.NewResponse(
+				req.RequestID,
+				"response_slow_request",
+				rpc.Payload{},
+			)
+			return &res
 		},
 	}
 	server := createEchoServer(t, extraHandlers)
@@ -167,8 +166,8 @@ func TestWebsocketDialer_RequestTimeout(t *testing.T) {
 	errorCh := connectDialer(t, ctx, dialer, server.Listener.Addr().String())
 
 	// Test timeout
-	var params rpc.Params
-	req := rpc.NewRequest(rpc.NewPayload(1, "slow_request", params))
+	var payload rpc.Payload
+	req := rpc.NewRequest(1, "slow_request", payload)
 
 	callCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
@@ -195,16 +194,15 @@ func TestWebsocketDialer_UnsolicitedEvents(t *testing.T) {
 		defer conn.Close()
 
 		// Send unsolicited event immediately
-		params, err := rpc.NewParams(map[string]interface{}{"type": "notification"})
+		payload, err := rpc.NewPayload(map[string]interface{}{"type": "notification"})
 		require.NoError(t, err)
 
-		event := rpc.Response{
-			Res: rpc.Payload{
-				RequestID: 9999,
-				Method:    "unsolicited_event",
-				Params:    params,
-				Timestamp: uint64(time.Now().UnixMilli()),
-			},
+		event := rpc.Message{
+			Type:      rpc.MsgTypeEvent,
+			RequestID: 9999,
+			Method:    "unsolicited_event",
+			Payload:   payload,
+			Timestamp: uint64(time.Now().UnixMilli()),
 		}
 		eventJSON, _ := json.Marshal(event)
 		conn.WriteMessage(websocket.TextMessage, eventJSON)
@@ -216,20 +214,15 @@ func TestWebsocketDialer_UnsolicitedEvents(t *testing.T) {
 				return
 			}
 
-			var req rpc.Request
+			var req rpc.Message
 			json.Unmarshal(msg, &req)
 
-			method := req.Req.Method
-			if method == "ping" {
-				method = "pong"
-			}
+			method := req.Method
 
-			resp := rpc.Response{
-				Res: rpc.Payload{
-					RequestID: req.Req.RequestID,
-					Method:    method,
-					Timestamp: uint64(time.Now().UnixMilli()),
-				},
+			resp := rpc.Message{
+				RequestID: req.RequestID,
+				Method:    method,
+				Timestamp: uint64(time.Now().UnixMilli()),
 			}
 			respJSON, _ := json.Marshal(resp)
 			conn.WriteMessage(websocket.TextMessage, respJSON)
@@ -248,8 +241,8 @@ func TestWebsocketDialer_UnsolicitedEvents(t *testing.T) {
 	select {
 	case event := <-dialer.EventCh():
 		assert.NotNil(t, event)
-		assert.Equal(t, "unsolicited_event", event.Res.Method)
-		assert.Equal(t, uint64(9999), event.Res.RequestID)
+		assert.Equal(t, "unsolicited_event", event.Method)
+		assert.Equal(t, uint64(9999), event.RequestID)
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for unsolicited event")
 	}
@@ -264,9 +257,9 @@ func TestWebsocketDialer_UnsolicitedEvents(t *testing.T) {
 
 // Helper functions
 
-func createEchoServer(t *testing.T, extraHandlers map[string]func(*rpc.Request) *rpc.Response) *httptest.Server {
+func createEchoServer(t *testing.T, extraHandlers map[string]func(*rpc.Message) *rpc.Message) *httptest.Server {
 	if extraHandlers == nil {
-		extraHandlers = make(map[string]func(*rpc.Request) *rpc.Response)
+		extraHandlers = make(map[string]func(*rpc.Message) *rpc.Message)
 	}
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upgrader := websocket.Upgrader{}
@@ -280,24 +273,22 @@ func createEchoServer(t *testing.T, extraHandlers map[string]func(*rpc.Request) 
 				return
 			}
 
-			var req rpc.Request
+			var req rpc.Message
 			err = json.Unmarshal(msg, &req)
 			if err != nil {
 				continue
 			}
 
-			method := req.Req.Method
-			var res *rpc.Response
+			method := req.Method
+			var res *rpc.Message
 			if handler, exists := extraHandlers[method]; exists {
 				res = handler(&req)
 			} else {
-				if method == "ping" {
-					method = "pong"
-				} else {
+				if method != "node.v1.ping" {
 					method = "response_" + method
 				}
 
-				resp := rpc.NewResponse(rpc.NewPayload(req.Req.RequestID, method, req.Req.Params))
+				resp := rpc.NewResponse(req.RequestID, method, req.Payload)
 				res = &resp
 			}
 

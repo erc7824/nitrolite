@@ -33,7 +33,7 @@ func createSignedRPCContext(id int, method string, params any, signers ...Signer
 	return ctx
 }
 
-func assertResponse(t *testing.T, ctx *RPCContext, expectedMethod string) *rpc.Payload {
+func assertResponse(t *testing.T, ctx *RPCContext, expectedMethod string) *rpc.Message {
 	res := ctx.Message.Res
 	require.NotNil(t, res)
 	require.Equal(t, expectedMethod, res.Method)
@@ -160,7 +160,7 @@ func TestRPCRouterHandleGetRPCHistory(t *testing.T) {
 				res := assertResponse(t, ctx, "get_rpc_history")
 
 				require.Equal(t, uint64(idx+100), res.RequestID)
-				rpcHistory, ok := res.Params.(GetRPCHistoryResponse)
+				rpcHistory, ok := res.Payload.(GetRPCHistoryResponse)
 				require.True(t, ok, "Response parameter should be a GetRPCHistoryResponse")
 				assert.Len(t, rpcHistory.RPCEntries, tc.expectedRecordCount, "Should return expected number of records")
 
@@ -194,7 +194,7 @@ func TestRPCRouterHandleGetLedgerBalances(t *testing.T) {
 		router.HandleGetLedgerBalances(ctx)
 
 		res := assertResponse(t, ctx, "get_ledger_balances")
-		balancesResp, ok := res.Params.(GetLedgerBalancesResponse)
+		balancesResp, ok := res.Payload.(GetLedgerBalancesResponse)
 		balancesArray := balancesResp.LedgerBalances
 		require.True(t, ok)
 		require.Len(t, balancesArray, 1)
@@ -234,7 +234,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router.HandleTransfer(ctx)
 
 		res := assertResponse(t, ctx, "transfer")
-		transferResp, ok := res.Params.(TransferResponse)
+		transferResp, ok := res.Payload.(TransferResponse)
 		require.Len(t, transferResp.Transactions, 2, "Response should contain 2 transaction objects")
 
 		transferTransaction := transferResp.Transactions[0]
@@ -493,7 +493,7 @@ func TestRPCRouterHandleTransfer(t *testing.T) {
 		router.HandleTransfer(ctx1)
 
 		res1 := assertResponse(t, ctx1, "transfer")
-		transferResp1, ok := res1.Params.(TransferResponse)
+		transferResp1, ok := res1.Payload.(TransferResponse)
 		require.True(t, ok, "First transfer should succeed")
 		require.Len(t, transferResp1.Transactions, 1, "First transfer should have 1 transaction")
 
@@ -620,7 +620,7 @@ func TestRPCRouterHandleCreateAppSession(t *testing.T) {
 		router.HandleCreateApplication(ctx)
 
 		res := assertResponse(t, ctx, "create_app_session")
-		appResp, ok := res.Params.(AppSessionResponse)
+		appResp, ok := res.Payload.(AppSessionResponse)
 		require.True(t, ok)
 		require.Equal(t, string(ChannelStatusOpen), appResp.Status)
 		require.Equal(t, uint64(1), appResp.Version)
@@ -754,7 +754,7 @@ func TestRPCRouterHandleSubmitAppState(t *testing.T) {
 		router.HandleSubmitAppState(ctx)
 
 		res := assertResponse(t, ctx, "submit_app_state")
-		appResp, ok := res.Params.(AppSessionResponse)
+		appResp, ok := res.Payload.(AppSessionResponse)
 		require.True(t, ok)
 		require.Equal(t, string(ChannelStatusOpen), appResp.Status)
 		require.Equal(t, uint64(2), appResp.Version)
@@ -841,7 +841,7 @@ func TestRPCRouterHandleCloseAppSession(t *testing.T) {
 		router.HandleCloseApplication(ctx)
 
 		res := assertResponse(t, ctx, "close_app_session")
-		appResp, ok := res.Params.(AppSessionResponse)
+		appResp, ok := res.Payload.(AppSessionResponse)
 		require.True(t, ok)
 		require.Equal(t, string(ChannelStatusClosed), appResp.Status)
 		require.Equal(t, uint64(3), appResp.Version)
@@ -922,7 +922,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params.(ChannelOperationResponse)
+		resObj, ok := res.Payload.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be ChannelOperationResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
 		require.Equal(t, ch.State.Version+1, resObj.State.Version)
@@ -985,7 +985,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params.(ChannelOperationResponse)
+		resObj, ok := res.Payload.(ChannelOperationResponse)
 		require.True(t, ok)
 
 		// Channel amount should decrease
@@ -1235,7 +1235,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params.(ChannelOperationResponse)
+		resObj, ok := res.Payload.(ChannelOperationResponse)
 		require.True(t, ok)
 
 		// Should be initial amount (1000) + allocate amount (0) + resize amount (100) = 1100
@@ -1284,7 +1284,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params.(ChannelOperationResponse)
+		resObj, ok := res.Payload.(ChannelOperationResponse)
 		require.True(t, ok)
 
 		// Should be initial amount (1000) + allocate amount (0) - resize amount (100) = 900
@@ -1409,7 +1409,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params.(ChannelOperationResponse)
+		resObj, ok := res.Payload.(ChannelOperationResponse)
 		require.True(t, ok)
 
 		// Verify the large allocation was processed correctly
@@ -1466,7 +1466,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params.(ChannelOperationResponse)
+		resObj, ok := res.Payload.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
 		require.Equal(t, ch.State.Version+1, resObj.State.Version)
@@ -1538,7 +1538,7 @@ func TestRPCRouterHandleResizeChannel(t *testing.T) {
 		router.HandleResizeChannel(ctx)
 
 		res := assertResponse(t, ctx, "resize_channel")
-		resObj, ok := res.Params.(ChannelOperationResponse)
+		resObj, ok := res.Payload.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be ResizeChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
 		require.Equal(t, ch.State.Version+1, resObj.State.Version)
@@ -1650,7 +1650,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		router.HandleCloseChannel(ctx)
 
 		res := assertResponse(t, ctx, "close_channel")
-		resObj, ok := res.Params.(ChannelOperationResponse)
+		resObj, ok := res.Payload.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be CloseChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
 		require.Equal(t, ch.State.Version+1, resObj.State.Version)
@@ -1759,7 +1759,7 @@ func TestRPCRouterHandleCloseChannel(t *testing.T) {
 		router.HandleCloseChannel(ctx)
 
 		res := assertResponse(t, ctx, "close_channel")
-		resObj, ok := res.Params.(ChannelOperationResponse)
+		resObj, ok := res.Payload.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be CloseChannelResponse")
 		require.Equal(t, ch.ChannelID, resObj.ChannelID)
 
@@ -1796,7 +1796,7 @@ func TestRPCRouterHandleCreateChannel(t *testing.T) {
 		router.HandleCreateChannel(ctx)
 
 		res := assertResponse(t, ctx, "create_channel")
-		resObj, ok := res.Params.(ChannelOperationResponse)
+		resObj, ok := res.Payload.(ChannelOperationResponse)
 		require.True(t, ok, "Response should be CreateChannelResponse")
 
 		// Verify response structure
@@ -1957,7 +1957,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		router.HandleGetSessionKeys(ctx)
 
 		res := assertResponse(t, ctx, "get_session_keys")
-		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		getKeysResponse, ok := res.Payload.(GetSessionKeysResponse)
 		require.True(t, ok, "Response should be a GetSessionKeysResponse")
 		require.Len(t, getKeysResponse.SessionKeys, 2)
 
@@ -2011,7 +2011,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		router.HandleGetSessionKeys(ctx)
 
 		res := assertResponse(t, ctx, "get_session_keys")
-		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		getKeysResponse, ok := res.Payload.(GetSessionKeysResponse)
 		require.True(t, ok)
 		require.Len(t, getKeysResponse.SessionKeys, 1)
 
@@ -2033,7 +2033,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		router.HandleGetSessionKeys(ctx)
 
 		res := assertResponse(t, ctx, "get_session_keys")
-		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		getKeysResponse, ok := res.Payload.(GetSessionKeysResponse)
 		require.True(t, ok)
 		require.Len(t, getKeysResponse.SessionKeys, 0)
 	})
@@ -2072,7 +2072,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		router.HandleGetSessionKeys(ctx)
 
 		res := assertResponse(t, ctx, "get_session_keys")
-		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		getKeysResponse, ok := res.Payload.(GetSessionKeysResponse)
 		require.True(t, ok)
 		require.Len(t, getKeysResponse.SessionKeys, 1)
 		require.Equal(t, sessionKey1Addr, getKeysResponse.SessionKeys[0].SessionKey)
@@ -2097,7 +2097,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		router.HandleGetSessionKeys(ctx)
 
 		res := assertResponse(t, ctx, "get_session_keys")
-		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		getKeysResponse, ok := res.Payload.(GetSessionKeysResponse)
 		require.True(t, ok)
 		require.Len(t, getKeysResponse.SessionKeys, 1)
 		require.Equal(t, "ledger.readonly", getKeysResponse.SessionKeys[0].Scope)
@@ -2129,7 +2129,7 @@ func TestRPCRouterHandleGetSessionKeys(t *testing.T) {
 		router.HandleGetSessionKeys(ctx)
 
 		res := assertResponse(t, ctx, "get_session_keys")
-		getKeysResponse, ok := res.Params.(GetSessionKeysResponse)
+		getKeysResponse, ok := res.Payload.(GetSessionKeysResponse)
 		require.True(t, ok)
 		require.Len(t, getKeysResponse.SessionKeys, 1)
 		// Should only have the second session key
@@ -2176,7 +2176,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify response
 		res := assertResponse(t, ctx, "revoke_session_key")
-		revokeResp, ok := res.Params.(rpc.RevokeSessionKeyResponse)
+		revokeResp, ok := res.Payload.(rpc.RevokeSessionKeyResponse)
 		require.True(t, ok)
 		require.Equal(t, sessionKeyAAddr, revokeResp.SessionKey)
 
@@ -2232,7 +2232,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify response
 		res := assertResponse(t, ctx, "revoke_session_key")
-		revokeResp, ok := res.Params.(rpc.RevokeSessionKeyResponse)
+		revokeResp, ok := res.Payload.(rpc.RevokeSessionKeyResponse)
 		require.True(t, ok)
 		require.Equal(t, sessionKeyBAddr, revokeResp.SessionKey)
 
@@ -2282,7 +2282,7 @@ func TestRPCRouterHandleRevokeSessionKey(t *testing.T) {
 
 		// Verify response
 		res := assertResponse(t, ctx, "revoke_session_key")
-		revokeResp, ok := res.Params.(rpc.RevokeSessionKeyResponse)
+		revokeResp, ok := res.Payload.(rpc.RevokeSessionKeyResponse)
 		require.True(t, ok)
 		require.Equal(t, sessionKeyAAddr, revokeResp.SessionKey)
 

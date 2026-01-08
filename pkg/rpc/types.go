@@ -1,0 +1,292 @@
+// Package rpc provides the RPC API types for the Nitrolite Node service.
+//
+// This file contains common types and structs shared across V1 API groups.
+package rpc
+
+import "github.com/erc7824/nitrolite/pkg/core"
+
+// ============================================================================
+// Common Enums
+// ============================================================================
+
+// ============================================================================
+// Channel Types
+// ============================================================================
+
+// ChannelV1 represents an on-chain channel.
+type ChannelV1 struct {
+	// ChannelID is the unique identifier for the channel
+	ChannelID string `json:"channel_id"`
+	// UserWallet is the user wallet address
+	UserWallet string `json:"user_wallet"`
+	// NodeWallet is the node wallet address
+	NodeWallet string `json:"node_wallet"`
+	// Type is the type of the channel (home, escrow)
+	Type string `json:"type"`
+	// BlockchainID is the unique identifier for the blockchain
+	BlockchainID uint32 `json:"blockchain_id"`
+	// TokenAddress is the address of the token used in the channel
+	TokenAddress string `json:"token_address"`
+	// Challenge is the challenge period for the channel in seconds
+	Challenge string `json:"challenge"`
+	// Nonce is the nonce for the channel
+	Nonce string `json:"nonce"`
+	// Status is the current status of the channel (void, open, challenged, closed)
+	Status string `json:"status"`
+	// StateVersion is the on-chain state version of the channel
+	StateVersion string `json:"state_version"`
+}
+
+// ChannelDefinitionV1 represents the configuration for creating a channel.
+type ChannelDefinitionV1 struct {
+	// Nonce is a unique number to prevent replay attacks
+	Nonce string `json:"nonce"`
+	// Challenge is the challenge period for the channel in seconds
+	Challenge string `json:"challenge"`
+}
+
+// ============================================================================
+// State Types
+// ============================================================================
+
+// TransitionV1 represents a state transition.
+type TransitionV1 struct {
+	// Type is the type of state transition
+	Type core.TransitionType `json:"type"`
+	// TxHash is the transaction hash associated with the transition
+	TxHash string `json:"tx_hash"`
+	// AccountID is the account identifier (varies based on transition type)
+	AccountID string `json:"account_id"`
+	// Amount is the amount involved in the transition
+	Amount string `json:"amount"`
+}
+
+// LedgerV1 represents ledger balances for a channel.
+type LedgerV1 struct {
+	// TokenAddress is the address of the token used in this channel
+	TokenAddress string `json:"token_address"`
+	// BlockchainID is the unique identifier for the blockchain
+	BlockchainID uint32 `json:"blockchain_id"`
+	// UserBalance is the user balance in the channel
+	UserBalance string `json:"user_balance"`
+	// UserNetFlow is the user net flow in the channel
+	UserNetFlow string `json:"user_net_flow"`
+	// NodeBalance is the node balance in the channel
+	NodeBalance string `json:"node_balance"`
+	// NodeNetFlow is the node net flow in the channel
+	NodeNetFlow string `json:"node_net_flow"`
+}
+
+// StateV1 represents the current state of the user stored on Node.
+type StateV1 struct {
+	// ID is the deterministic ID (hash) of the state
+	ID string `json:"id"`
+	// Transitions is the list of transitions included in the state
+	Transitions []TransitionV1 `json:"transitions"`
+	// Asset is the asset type of the state
+	Asset string `json:"asset"`
+	// UserWallet is the user wallet address
+	UserWallet string `json:"user_wallet"`
+	// Epoch is the user Epoch Index
+	Epoch string `json:"epoch"`
+	// Version is the version of the state
+	Version string `json:"version"`
+	// HomeBlockchainID is the identifier for the home Channel blockchain network
+	HomeBlockchainID *uint32 `json:"home_blockchain_id,omitempty"`
+	// EscrowBlockchainID is the identifier for the escrow Channel blockchain network
+	EscrowBlockchainID *uint32 `json:"escrow_blockchain_id,omitempty"`
+	// HomeLedger contains user and node balances for the home channel
+	HomeLedger LedgerV1 `json:"home_ledger"`
+	// EscrowLedger contains user and node balances for the escrow channel
+	EscrowLedger *LedgerV1 `json:"escrow_ledger,omitempty"`
+	// IsFinal indicates if the state is final
+	IsFinal bool `json:"is_final"`
+	// UserSig is the user signature for the state
+	UserSig *string `json:"user_sig,omitempty"`
+	// NodeSig is the node signature for the state
+	NodeSig *string `json:"node_sig,omitempty"`
+}
+
+// ============================================================================
+// App Session Types
+// ============================================================================
+
+// AppParticipantV1 represents the definition for an app participant.
+type AppParticipantV1 struct {
+	// WalletAddress is the participant's wallet address
+	WalletAddress string `json:"wallet_address"`
+	// SignatureWeight is the signature weight for the participant
+	SignatureWeight int64 `json:"signature_weight"`
+}
+
+// AppDefinitionV1 represents the definition for an app session.
+type AppDefinitionV1 struct {
+	// Application is the application identifier from an app registry
+	Application string `json:"application"`
+	// Participants is the list of participants in the app session
+	Participants []AppParticipantV1 `json:"participants"`
+	// Quorum is the quorum required for the app session
+	Quorum uint64 `json:"quorum"`
+	// Nonce is a unique number to prevent replay attacks
+	Nonce uint64 `json:"nonce"`
+}
+
+// AppAllocationV1 represents the allocation of assets to a participant in an app session.
+type AppAllocationV1 struct {
+	// Participant is the participant's wallet address
+	Participant string `json:"participant"`
+	// Asset is the asset symbol
+	Asset string `json:"asset"`
+	// Amount is the amount allocated to the participant
+	Amount string `json:"amount"`
+}
+
+// AppStateUpdateV1 represents the current state of an application session.
+type AppStateUpdateV1 struct {
+	// AppSessionID is the unique application session identifier
+	AppSessionID string `json:"app_session_id"`
+	// Intent is the intent of the app session update (operate, deposit, withdraw)
+	Intent string `json:"intent"`
+	// Version is the version of the app state
+	Version uint64 `json:"version"`
+	// Allocations is the list of allocations in the app state
+	Allocations []AppAllocationV1 `json:"allocations"`
+	// SessionData is the JSON stringified session data
+	SessionData string `json:"session_data"`
+}
+
+// AppSessionInfoV1 represents information about an application session.
+type AppSessionInfoV1 struct {
+	// AppSessionID is the unique application session identifier
+	AppSessionID string `json:"app_session_id"`
+	// Status is the session status (open/closed)
+	Status string `json:"status"`
+	// Participants is the list of participant wallet addresses with weights
+	Participants []AppParticipantV1 `json:"participants"`
+	// SessionData is the JSON stringified session data
+	SessionData *string `json:"session_data,omitempty"`
+	// Quorum is the quorum required for operations
+	Quorum uint64 `json:"quorum"`
+	// Version is the current version of the session state
+	Version uint64 `json:"version"`
+	// Nonce is the nonce for the session
+	Nonce uint64 `json:"nonce"`
+	// Allocations is the list of allocations in the app state
+	Allocations []AppAllocationV1 `json:"allocations"`
+}
+
+// ============================================================================
+// Session Key Types
+// ============================================================================
+
+// AssetAllowanceV1 represents an asset allowance with usage tracking.
+type AssetAllowanceV1 struct {
+	// Asset is the symbol of the asset
+	Asset string `json:"asset"`
+	// Allowance is the maximum amount the session key can spend
+	Allowance string `json:"allowance"`
+	// Used is the amount already spent by this session key
+	Used string `json:"used"`
+}
+
+// SessionKeyV1 represents a session key with spending allowances.
+type SessionKeyV1 struct {
+	// ID is the unique identifier for the session key record
+	ID uint `json:"id"`
+	// SessionKey is the address of the session key
+	SessionKey string `json:"session_key"`
+	// Application is the name of the application authorized for this session key
+	Application string `json:"application"`
+	// Allowances contains asset allowances with usage tracking
+	Allowances []AssetAllowanceV1 `json:"allowances"`
+	// Scope is the permission scope for this session key
+	Scope *string `json:"scope,omitempty"`
+	// ExpiresAt is when the session key expires (ISO 8601 format)
+	ExpiresAt string `json:"expires_at"`
+	// CreatedAt is when the session key was created (ISO 8601 format)
+	CreatedAt string `json:"created_at"`
+}
+
+// ============================================================================
+// Asset and Blockchain Types
+// ============================================================================
+
+// AssetV1 represents information about a supported asset.
+type AssetV1 struct {
+	// Token is the token contract address
+	Token string `json:"token"`
+	// ChainID is the blockchain network ID
+	ChainID uint32 `json:"chain_id"`
+	// Symbol is the asset symbol
+	Symbol string `json:"symbol"`
+	// Decimals is the number of decimal places
+	Decimals uint8 `json:"decimals"`
+}
+
+// BlockchainInfoV1 represents information about a supported network.
+type BlockchainInfoV1 struct {
+	// ChainID is the blockchain network ID
+	ChainID uint32 `json:"chain_id"`
+	// ContractAddress is the contract address on this network
+	ContractAddress string `json:"contract_address"`
+}
+
+// ============================================================================
+// Balance and Transaction Types
+// ============================================================================
+
+// BalanceEntryV1 represents a balance for a specific asset.
+type BalanceEntryV1 struct {
+	// Asset is the asset symbol
+	Asset string `json:"asset"`
+	// Amount is the balance amount
+	Amount string `json:"amount"`
+}
+
+// TransactionV1 represents a transaction record.
+type TransactionV1 struct {
+	// ID is the unique transaction reference
+	ID string `json:"id"`
+	// Asset is the asset symbol
+	Asset string `json:"asset"`
+	// TxType is the transaction type
+	TxType core.TransactionType `json:"tx_type"`
+	// FromAccount is the account that sent the funds
+	FromAccount string `json:"from_account"`
+	// ToAccount is the account that received the funds
+	ToAccount string `json:"to_account"`
+	// SenderNewStateID is the ID of the new sender's channel state
+	SenderNewStateID *string `json:"sender_new_state_id,omitempty"`
+	// ReceiverNewStateID is the ID of the new receiver's channel state
+	ReceiverNewStateID *string `json:"receiver_new_state_id,omitempty"`
+	// Amount is the transaction amount
+	Amount string `json:"amount"`
+	// CreatedAt is when the transaction was created
+	CreatedAt string `json:"created_at"`
+}
+
+// ============================================================================
+// Pagination Types
+// ============================================================================
+
+// PaginationParamsV1 represents pagination request parameters.
+type PaginationParamsV1 struct {
+	// Offset is the pagination offset (number of items to skip)
+	Offset *uint32 `json:"offset,omitempty"`
+	// Limit is the number of items to return
+	Limit *uint32 `json:"limit,omitempty"`
+	// Sort is the sort order (asc/desc)
+	Sort *string `json:"sort,omitempty"`
+}
+
+// PaginationMetadataV1 represents pagination information.
+type PaginationMetadataV1 struct {
+	// Page is the current page number
+	Page uint32 `json:"page"`
+	// PerPage is the number of items per page
+	PerPage uint32 `json:"per_page"`
+	// TotalCount is the total number of items
+	TotalCount uint32 `json:"total_count"`
+	// PageCount is the total number of pages
+	PageCount uint32 `json:"page_count"`
+}

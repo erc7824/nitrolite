@@ -115,14 +115,14 @@ func TestRPCStoreStoreMessageError(t *testing.T) {
 	invalidParams["channel"] = make(chan int)
 	invalidParamsJSON, _ := json.Marshal(invalidParams) // This will actually fail
 
-	var params rpc.Params
+	var params rpc.Payload
 	// Attempting to use invalid JSON will cause an error
 	_ = json.Unmarshal([]byte(`{"key": "value"}`), &params)
 
-	req := &rpc.Payload{
+	req := &rpc.Message{
 		RequestID: 12345,
 		Method:    "test_method",
-		Params:    params,
+		Payload:   params,
 		Timestamp: uint64(time.Now().Unix()),
 	}
 	reqSig := []sign.Signature{sign.Signature([]byte("sig1"))}

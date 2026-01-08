@@ -2,11 +2,7 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"sync"
-
-	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
 // Handler defines the function signature for RPC request processors.
@@ -21,7 +17,7 @@ type Handler func(c *Context)
 // the server to push unsolicited messages to clients (e.g., balance updates,
 // connection events). The method parameter specifies the notification type,
 // and params contains the notification data.
-type SendResponseFunc func(method string, params Params)
+type SendResponseFunc func(method string, params Payload)
 
 // Context encapsulates all information related to an RPC request and provides
 // methods for handlers to process and respond. It implements a middleware
@@ -32,19 +28,14 @@ type SendResponseFunc func(method string, params Params)
 //   - Request/response container: Holds the incoming request and outgoing response
 //   - Middleware chain management: Tracks and executes the handler chain
 //   - Session state: Provides per-connection storage for maintaining state
-//   - Authentication context: Carries the authenticated user ID
 //   - Response helpers: Convenient methods for success and error responses
 type Context struct {
 	// Context is the standard Go context for the request
 	Context context.Context
-	// UserID is the authenticated user's identifier (empty if not authenticated)
-	UserID string
-	// Signer is used to sign the response message
-	Signer sign.Signer
 	// Request is the original RPC request message
-	Request Request
+	Request Message
 	// Response is the response message to be sent back to the client
-	Response Response
+	Response Message
 	// Storage provides per-connection storage for session data
 	Storage *SafeStorage
 
@@ -60,15 +51,13 @@ type Context struct {
 //
 // Example middleware pattern:
 //
-//	func authMiddleware(c *Context) {
-//	    // Pre-processing: check authentication
-//	    if c.UserID == "" {
-//	        c.Fail(nil, "authentication required")
+//	func invalidRequest(c *Context) {
+//	    // Pre-processing: check request message type
+//	    if c.Request.Type != MsgTypeReq {
+//	        c.Fail(nil, "invalid request")
 //	        return
 //	    }
 //	    c.Next() // Continue to next handler
-//	    // Post-processing: log the response
-//	    log.Info("Request processed", "user", c.UserID)
 //	}
 func (c *Context) Next() {
 	if len(c.handlers) == 0 {
@@ -88,14 +77,14 @@ func (c *Context) Next() {
 // Example:
 //
 //	func handleGetBalance(c *Context) {
-//	    balance := getBalanceForUser(c.UserID)
-//	    c.Succeed("get_balance", Params{"balance": balance})
+//	    balance := getBalanceForUser(c.Request.Payload{"userWallet"})
+//	    c.Succeed("get_balance", Payload{"balance": balance})
 //	}
-func (c *Context) Succeed(method string, params Params) {
-	c.Response.Res = NewPayload(
-		c.Request.Req.RequestID,
+func (c *Context) Succeed(method string, payload Payload) {
+	c.Response = NewResponse(
+		c.Request.RequestID,
 		method,
-		params,
+		payload,
 	)
 }
 
@@ -137,51 +126,51 @@ func (c *Context) Fail(err error, fallbackMessage string) {
 	}
 
 	c.Response = NewErrorResponse(
-		c.Request.Req.RequestID,
+		c.Request.RequestID,
 		message,
 	)
 }
 
-// GetRawResponse returns the signed response message as raw bytes.
-// This is called internally after handler processing to prepare the response.
-func (c *Context) GetRawResponse() ([]byte, error) {
-	if c.Response.Res.Method == "" {
-		c.Fail(nil, "internal server error: no response from handler")
-	}
+// // GetRawResponse returns the signed response message as raw bytes.
+// // This is called internally after handler processing to prepare the response.
+// func (c *Context) GetRawResponse() ([]byte, error) {
+// 	if c.Response.Method == "" {
+// 		c.Fail(nil, "internal server error: no response from handler")
+// 	}
 
-	return prepareRawResponse(c.Signer, c.Response.Res)
-}
+// 	return prepareRawResponse(c.Signer, c.Response.Res)
+// }
 
-// prepareRawResponse creates a complete, signed RPC response message.
-// This internal helper:
-//  1. Computes the hash of the response payload
-//  2. Signs the hash with the provided signer
-//  3. Constructs a Response with the payload and signature
-//  4. Marshals the complete response to JSON bytes
-//
-// Returns an error if hashing, signing, or marshaling fails.
-func prepareRawResponse(signer sign.Signer, payload Payload) ([]byte, error) {
-	payloadHash, err := payload.Hash()
-	if err != nil {
-		return nil, fmt.Errorf("failed to hash response payload: %w", err)
-	}
+// // prepareRawResponse creates a complete, signed RPC response message.
+// // This internal helper:
+// //  1. Computes the hash of the response payload
+// //  2. Signs the hash with the provided signer
+// //  3. Constructs a Response with the payload and signature
+// //  4. Marshals the complete response to JSON bytes
+// //
+// // Returns an error if hashing, signing, or marshaling fails.
+// func prepareRawResponse(signer sign.Signer, payload Message) ([]byte, error) {
+// 	payloadHash, err := payload.Hash()
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to hash response payload: %w", err)
+// 	}
 
-	signature, err := signer.Sign(payloadHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign response data: %w", err)
-	}
+// 	signature, err := signer.Sign(payloadHash)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to sign response data: %w", err)
+// 	}
 
-	responseMessage := &Response{
-		Res: payload,
-		Sig: []sign.Signature{signature},
-	}
-	resMessageBytes, err := json.Marshal(responseMessage)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal response message: %w", err)
-	}
+// 	responseMessage := &Response{
+// 		Res: payload,
+// 		Sig: []sign.Signature{signature},
+// 	}
+// 	resMessageBytes, err := json.Marshal(responseMessage)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to marshal response message: %w", err)
+// 	}
 
-	return resMessageBytes, nil
-}
+// 	return resMessageBytes, nil
+// }
 
 // SafeStorage provides thread-safe key-value storage for connection-specific data.
 // Each connection gets its own SafeStorage instance that persists for the

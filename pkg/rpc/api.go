@@ -80,24 +80,12 @@ const (
 	GetLedgerEntriesMethod Method = "get_ledger_entries"
 	// GetLedgerTransactionsMethod returns ledger transactions.
 	GetLedgerTransactionsMethod Method = "get_ledger_transactions"
-	// AuthRequestMethod initiates authentication with challenge generation.
-	AuthRequestMethod Method = "auth_request"
-	// AuthChallengeMethod is the response to an auth request with the challenge.
-	AuthChallengeMethod Method = "auth_challenge"
-	// AuthVerifyMethod verifies authentication via signature or JWT.
-	AuthVerifyMethod Method = "auth_verify"
-	// GetUserTagMethod returns the human-readable tag for a wallet (auth required).
-	GetUserTagMethod Method = "get_user_tag"
 	// GetLedgerBalancesMethod returns account balances (auth required).
 	GetLedgerBalancesMethod Method = "get_ledger_balances"
-	// GetRPCHistoryMethod returns RPC call history (auth required).
-	GetRPCHistoryMethod Method = "get_rpc_history"
 	// GetSessionKeysMethod returns session keys with allowances (auth required).
 	GetSessionKeysMethod Method = "get_session_keys"
 	// CreateChannelMethod creates a new payment channel (auth required).
 	CreateChannelMethod Method = "create_channel"
-	// ResizeChannelMethod resizes an existing channel (auth required).
-	ResizeChannelMethod Method = "resize_channel"
 	// CloseChannelMethod closes a payment channel (auth required).
 	CloseChannelMethod Method = "close_channel"
 	// TransferMethod transfers funds between accounts (auth required).
@@ -108,8 +96,6 @@ const (
 	SubmitAppStateMethod Method = "submit_app_state"
 	// CloseAppSessionMethod closes an application session (auth required).
 	CloseAppSessionMethod Method = "close_app_session"
-	// CleanupSessionKeyCacheMethod clears the session key cache (test mode only).
-	CleanupSessionKeyCacheMethod Method = "cleanup_session_key_cache"
 )
 
 // String returns the string representation of the method.

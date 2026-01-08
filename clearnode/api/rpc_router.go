@@ -247,7 +247,7 @@ func (r *RPCRouter) HandleCleanupSessionKeyCache(c *RPCContext) {
 	c.Succeed(c.Message.Req.Method, nil)
 }
 
-func parseParams(params rpc.Params, unmarshalTo any) error {
+func parseParams(params rpc.Payload, unmarshalTo any) error {
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return fmt.Errorf("failed to parse parameters: %w", err)

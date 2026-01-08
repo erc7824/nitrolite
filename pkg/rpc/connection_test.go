@@ -29,16 +29,13 @@ func TestNewWebsocketConnection(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 	require.Equal(t, cfg.ConnectionID, conn.ConnectionID())
-	require.Equal(t, cfg.UserID, conn.UserID())
 	require.Equal(t, 10, cap(conn.RawRequests()))
 
-	cfg.UserID = "user1"
 	cfg.ProcessBufferSize = 20
 	conn, err = rpc.NewWebsocketConnection(cfg)
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 	require.Equal(t, cfg.ConnectionID, conn.ConnectionID())
-	require.Equal(t, cfg.UserID, conn.UserID())
 	require.Equal(t, cfg.ProcessBufferSize, cap(conn.RawRequests()))
 }
 
@@ -105,35 +102,6 @@ func TestWebsocketConnection_ConnectionID(t *testing.T) {
 	conn, err := rpc.NewWebsocketConnection(cfg)
 	require.NoError(t, err)
 	require.Equal(t, cfg.ConnectionID, conn.ConnectionID())
-}
-
-func TestWebsocketConnection_UserID(t *testing.T) {
-	t.Parallel()
-
-	cfg := rpc.WebsocketConnectionConfig{
-		ConnectionID:  "conn1",
-		UserID:        "user1",
-		WebsocketConn: &websocket.Conn{},
-	}
-	conn, err := rpc.NewWebsocketConnection(cfg)
-	require.NoError(t, err)
-	require.Equal(t, cfg.UserID, conn.UserID())
-}
-
-func TestWebsocketConnection_SetUserID(t *testing.T) {
-	t.Parallel()
-
-	cfg := rpc.WebsocketConnectionConfig{
-		ConnectionID:  "conn1",
-		WebsocketConn: &websocket.Conn{},
-	}
-	conn, err := rpc.NewWebsocketConnection(cfg)
-	require.NoError(t, err)
-	require.Equal(t, "", conn.UserID())
-
-	newUserID := "user1"
-	conn.SetUserID(newUserID)
-	require.Equal(t, newUserID, conn.UserID())
 }
 
 func TestWebsocketConnection_WriteRawResponse(t *testing.T) {

@@ -9,11 +9,11 @@ import (
 // MockCallHandler is a function type that handles RPC calls in the mock dialer.
 // It receives the request parameters and a notification publisher function,
 // and returns response.
-type MockCallHandler func(params rpc.Params, publishNotification MockNotificationPublisher) (*rpc.Response, error)
+type MockCallHandler func(params rpc.Payload, publishNotification MockNotificationPublisher) (*rpc.Message, error)
 
 // MockNotificationPublisher is a function type that allows handlers to publish
 // asynchronous notifications to the client.
-type MockNotificationPublisher func(event rpc.Event, notification rpc.Params)
+type MockNotificationPublisher func(event rpc.Event, notification rpc.Payload)
 
 // Ensure MockDialer implements the Dialer interface
 var _ rpc.Dialer = (*MockDialer)(nil)
@@ -25,7 +25,7 @@ type MockDialer struct {
 	// handlers maps RPC methods to their mock handlers
 	handlers map[rpc.Method]MockCallHandler
 	// eventCh is the channel for publishing notifications to the client
-	eventCh chan *rpc.Response
+	eventCh chan *rpc.Message
 }
 
 // NewMockDialer creates a new mock dialer for testing.
@@ -33,7 +33,7 @@ type MockDialer struct {
 func NewMockDialer() *MockDialer {
 	return &MockDialer{
 		handlers: make(map[rpc.Method]MockCallHandler),
-		eventCh:  make(chan *rpc.Response, 10),
+		eventCh:  make(chan *rpc.Message, 10),
 	}
 }
 
@@ -58,22 +58,22 @@ func (d *MockDialer) IsConnected() bool {
 // Call handles RPC calls by routing them to registered mock handlers.
 // If no handler is registered for the method, it returns a "method not found" error.
 // Handler errors are converted to RPC error responses.
-func (d *MockDialer) Call(ctx context.Context, req *rpc.Request) (*rpc.Response, error) {
+func (d *MockDialer) Call(ctx context.Context, req *rpc.Message) (*rpc.Message, error) {
 	if req == nil {
 		return nil, rpc.ErrNilRequest
 	}
 
 	// Find the handler for this method
-	handler, exists := d.handlers[rpc.Method(req.Req.Method)]
+	handler, exists := d.handlers[rpc.Method(req.Method)]
 	if !exists {
-		res := rpc.NewErrorResponse(req.Req.RequestID, "method not found")
+		res := rpc.NewErrorResponse(req.RequestID, "method not found")
 		return &res, nil
 	}
 
 	// Call the handler with a notification publisher
-	res, err := handler(req.Req.Params, d.publishNotification)
+	res, err := handler(req.Payload, d.publishNotification)
 	if err != nil {
-		res := rpc.NewErrorResponse(req.Req.RequestID, err.Error())
+		res := rpc.NewErrorResponse(req.RequestID, err.Error())
 		return &res, nil
 	}
 
@@ -81,15 +81,14 @@ func (d *MockDialer) Call(ctx context.Context, req *rpc.Request) (*rpc.Response,
 }
 
 // EventCh returns the channel for receiving notifications.
-func (d *MockDialer) EventCh() <-chan *rpc.Response {
+func (d *MockDialer) EventCh() <-chan *rpc.Message {
 	return d.eventCh
 }
 
 // publishNotification is a helper method that handlers can use to send
 // asynchronous notifications to the client through the event channel.
-func (d *MockDialer) publishNotification(event rpc.Event, notification rpc.Params) {
-	resPayload := rpc.NewPayload(0, string(event), notification)
-	res := rpc.NewResponse(resPayload)
+func (d *MockDialer) publishNotification(event rpc.Event, notification rpc.Payload) {
+	res := rpc.NewEvent(0, string(event), notification)
 
 	// Non-blocking send to prevent handlers from getting stuck
 	select {

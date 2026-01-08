@@ -24,23 +24,13 @@ var (
 )
 
 // Connection represents an active RPC connection that handles bidirectional communication.
-// Implementations of this interface manage the connection lifecycle, message routing,
-// and authentication state. The interface is designed to be transport-agnostic,
-// though the primary implementation uses WebSocket.
+// Implementations of this interface manage the connection lifecycle and message routing.
+// The interface is designed to be transport-agnostic, though the primary implementation uses WebSocket.
 type Connection interface {
 	// ConnectionID returns the unique identifier for this connection.
 	// This ID is generated when the connection is established and remains
 	// constant throughout the connection's lifetime.
 	ConnectionID() string
-
-	// UserID returns the authenticated user's identifier for this connection.
-	// Returns an empty string if the connection has not been authenticated.
-	UserID() string
-
-	// SetUserID sets the UserID for this connection.
-	// This is typically called during authentication when the connection
-	// becomes associated with a specific user account.
-	SetUserID(userID string)
 
 	// RawRequests returns a read-only channel for receiving incoming raw request messages.
 	// Messages received on this channel are raw bytes that need to be unmarshaled
@@ -73,9 +63,9 @@ type GorillaWsConnectionAdapter interface {
 }
 
 // WebsocketConnection implements the Connection interface using WebSocket transport.
-// It manages bidirectional communication, handles authentication state, and provides
-// thread-safe operations for concurrent message processing. The connection supports
-// graceful shutdown and automatic cleanup of resources.
+// It manages bidirectional communication, and provides thread-safe operations
+// for concurrent message processing. The connection supports graceful shutdown
+// and automatic cleanup of resources.
 //
 // Key features:
 //   - Concurrent read/write operations with separate goroutines
@@ -88,8 +78,6 @@ type WebsocketConnection struct {
 	ctx context.Context
 	// connectionID is a unique identifier for this connection
 	connectionID string
-	// UserID is the authenticated user's identifier (empty if not authenticated)
-	userID string
 	// websocketConn is the underlying WebSocket connection
 	websocketConn GorillaWsConnectionAdapter
 	// writeTimeout is the maximum duration to wait for a write to complete
@@ -115,8 +103,6 @@ type WebsocketConnection struct {
 type WebsocketConnectionConfig struct {
 	// ConnectionID is the unique identifier for this connection (required)
 	ConnectionID string
-	// UserID is the initial authenticated user ID (optional, can be set later)
-	UserID string
 	// WebsocketConn is the underlying WebSocket connection (required)
 	WebsocketConn GorillaWsConnectionAdapter
 
@@ -160,7 +146,6 @@ func NewWebsocketConnection(config WebsocketConnectionConfig) (*WebsocketConnect
 
 	return &WebsocketConnection{
 		connectionID:  config.ConnectionID,
-		userID:        config.UserID,
 		websocketConn: config.WebsocketConn,
 		writeTimeout:  config.WriteTimeout,
 
@@ -242,20 +227,6 @@ func (conn *WebsocketConnection) Serve(parentCtx context.Context, handleClosure 
 // ConnectionID returns the unique identifier for this connection.
 func (conn *WebsocketConnection) ConnectionID() string {
 	return conn.connectionID
-}
-
-// UserID returns the authenticated user's identifier for this connection.
-func (conn *WebsocketConnection) UserID() string {
-	conn.mu.RLock()
-	defer conn.mu.RUnlock()
-	return conn.userID
-}
-
-// SetUserID sets the UserID for this connection.
-func (conn *WebsocketConnection) SetUserID(userID string) {
-	conn.mu.Lock()
-	defer conn.mu.Unlock()
-	conn.userID = userID
 }
 
 // RawRequests returns the channel for processing incoming requests.

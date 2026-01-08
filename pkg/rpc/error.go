@@ -84,7 +84,7 @@ func (e Error) Error() string {
 	return e.err.Error()
 }
 
-// NewErrorParams creates a Params map containing an error message.
+// NewErrorPayload creates a Params map containing an error message.
 // This is a convenience function for creating standardized error parameters
 // that follow the protocol's error response convention.
 //
@@ -93,16 +93,16 @@ func (e Error) Error() string {
 // Example usage:
 //
 //	// Creating error params for a validation failure
-//	errParams := NewErrorParams("invalid address format")
+//	errParams := NewErrorPayload("invalid address format")
 //	payload := NewPayload(requestID, method, errParams)
 //
 //	// Creating error params from an existing error
 //	if err := validateAmount(amount); err != nil {
-//	    errParams := NewErrorParams(err.Error())
+//	    errParams := NewErrorPayload(err.Error())
 //	    response := NewResponse(NewPayload(id, method, errParams))
 //	}
 //
 // The resulting Params will contain: {"error": "invalid address format"}
-func NewErrorParams(errMsg string) Params {
-	return Params{errorParamKey: json.RawMessage(fmt.Sprintf(`"%s"`, errMsg))}
+func NewErrorPayload(errMsg string) Payload {
+	return Payload{errorParamKey: json.RawMessage(fmt.Sprintf(`"%s"`, errMsg))}
 }

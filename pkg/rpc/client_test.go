@@ -33,26 +33,25 @@ func setupClient() (*rpc.Client, *MockDialer) {
 }
 
 // createResponse creates an RPC response with the given data
-func createResponse[T any](method rpc.Method, data T) (*rpc.Response, error) {
-	params, err := rpc.NewParams(data)
+func createResponse[T any](method rpc.Method, data T) (*rpc.Message, error) {
+	params, err := rpc.NewPayload(data)
 	if err != nil {
 		return nil, err
 	}
-	payload := rpc.NewPayload(0, string(method), params)
-	res := rpc.NewResponse(payload)
+	res := rpc.NewResponse(0, string(method), params)
 	return &res, nil
 }
 
 // registerSimpleHandler registers a handler that returns the given response
 func registerSimpleHandler[T any](dialer *MockDialer, method rpc.Method, response T) {
-	dialer.RegisterHandler(method, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
+	dialer.RegisterHandler(method, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
 		return createResponse(method, response)
 	})
 }
 
 // registerErrorHandler registers a handler that returns an error response
 func registerErrorHandler(dialer *MockDialer, method rpc.Method, errMsg string) {
-	dialer.RegisterHandler(method, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
+	dialer.RegisterHandler(method, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
 		res := rpc.NewErrorResponse(0, errMsg)
 		return &res, nil
 	})
@@ -64,9 +63,8 @@ func TestClient_Ping(t *testing.T) {
 	client, dialer := setupClient()
 
 	// Ping returns pong
-	dialer.RegisterHandler(rpc.PingMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
-		pongPayload := rpc.NewPayload(0, string(rpc.PongMethod), rpc.Params{})
-		res := rpc.NewResponse(pongPayload)
+	dialer.RegisterHandler(rpc.PingMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
+		res := rpc.NewResponse(0, string(rpc.PongMethod), rpc.Payload{})
 		return &res, nil
 	})
 
@@ -110,7 +108,7 @@ func TestClient_GetAssets(t *testing.T) {
 	}
 
 	// Handler with filtering logic
-	dialer.RegisterHandler(rpc.GetAssetsMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
+	dialer.RegisterHandler(rpc.GetAssetsMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
 		var req rpc.GetAssetsRequest
 		params.Translate(&req)
 
@@ -141,28 +139,6 @@ func TestClient_GetAssets(t *testing.T) {
 	})
 }
 
-func TestClient_Authentication(t *testing.T) {
-	t.Parallel()
-
-	client, dialer := setupClient()
-
-	jwtToken := "test.jwt.token"
-
-	// Auth verify handler for JWT
-	dialer.RegisterHandler(rpc.AuthVerifyMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
-		return createResponse(rpc.AuthVerifyMethod, rpc.AuthJWTVerifyResponse{
-			Address: testWallet, SessionKey: "session123", Success: true,
-		})
-	})
-
-	// Test JWT verify
-	jwtResp, _, err := client.AuthJWTVerify(testCtx, rpc.AuthJWTVerifyRequest{JWT: jwtToken})
-	require.NoError(t, err)
-	assert.True(t, jwtResp.Success)
-
-	// Note: AuthSigVerify test with signer is in client_internal_test.go
-}
-
 func TestClient_Channels(t *testing.T) {
 	t.Parallel()
 
@@ -183,11 +159,7 @@ func TestClient_Channels(t *testing.T) {
 		registerSimpleHandler(dialer, rpc.CreateChannelMethod, expected)
 
 		req := rpc.CreateChannelRequest{ChainID: testChainID, Token: testToken}
-		payload, err := client.PreparePayload(rpc.CreateChannelMethod, req)
-		require.NoError(t, err)
-		fullReq := rpc.NewRequest(payload, sign.Signature{})
-
-		resp, _, err := client.CreateChannel(testCtx, &fullReq)
+		resp, _, err := client.CreateChannel(testCtx, req)
 		require.NoError(t, err)
 		assert.Equal(t, expected, resp)
 	})
@@ -226,31 +198,8 @@ func TestClient_Ledger(t *testing.T) {
 		assert.Len(t, resp.LedgerBalances, 2)
 	})
 
-	t.Run("entries", func(t *testing.T) {
-		dialer.RegisterHandler(rpc.GetLedgerEntriesMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
-			entries := rpc.GetLedgerEntriesResponse{
-				LedgerEntries: []rpc.LedgerEntry{{
-					ID: 1, AccountID: "acc123", AccountType: rpc.AssetDefault,
-					Asset: testSymbol, Participant: testWallet,
-					Credit: decimal.NewFromInt(100), Debit: decimal.Zero,
-					CreatedAt: fixedTime,
-				}},
-			}
-			return createResponse(rpc.GetLedgerEntriesMethod, entries)
-		})
-
-		resp, _, err := client.GetLedgerEntries(testCtx, rpc.GetLedgerEntriesRequest{})
-		require.NoError(t, err)
-		require.Len(t, resp.LedgerEntries, 1)
-
-		entry := resp.LedgerEntries[0]
-		assert.Equal(t, uint(1), entry.ID)
-		assert.True(t, entry.Credit.Equal(decimal.NewFromInt(100)))
-		assert.False(t, entry.CreatedAt.IsZero())
-	})
-
 	t.Run("transactions", func(t *testing.T) {
-		dialer.RegisterHandler(rpc.GetLedgerTransactionsMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
+		dialer.RegisterHandler(rpc.GetLedgerTransactionsMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
 			txns := rpc.GetLedgerTransactionsResponse{
 				LedgerTransactions: []rpc.LedgerTransaction{{
 					Id: 1, TxType: "transfer",
@@ -277,14 +226,14 @@ func TestClient_Transfer(t *testing.T) {
 
 	client, dialer := setupClient()
 
-	dialer.RegisterHandler(rpc.TransferMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
+	dialer.RegisterHandler(rpc.TransferMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
 		// Async notification
 		go func() {
 			time.Sleep(10 * time.Millisecond)
 			balanceUpdate := rpc.BalanceUpdateNotification{
 				BalanceUpdates: []rpc.LedgerBalance{{Asset: testSymbol, Amount: decimal.NewFromInt(900)}},
 			}
-			notifParams, _ := rpc.NewParams(balanceUpdate)
+			notifParams, _ := rpc.NewPayload(balanceUpdate)
 			publish(rpc.BalanceUpdateEvent, notifParams)
 		}()
 
@@ -299,14 +248,12 @@ func TestClient_Transfer(t *testing.T) {
 		return createResponse(rpc.TransferMethod, txns)
 	})
 
-	payload, err := client.PreparePayload(rpc.TransferMethod, rpc.TransferRequest{
+	req := rpc.TransferRequest{
 		Destination: testWallet2,
 		Allocations: []rpc.TransferAllocation{{AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)}},
-	})
-	require.NoError(t, err)
-	fullReq := rpc.NewRequest(payload, sign.Signature{})
+	}
 
-	resp, _, err := client.Transfer(testCtx, &fullReq)
+	resp, _, err := client.Transfer(testCtx, req)
 	require.NoError(t, err)
 	assert.Len(t, resp.Transactions, 1)
 }
@@ -323,7 +270,7 @@ func TestClient_AppSessions(t *testing.T) {
 	}
 
 	t.Run("create", func(t *testing.T) {
-		dialer.RegisterHandler(rpc.CreateAppSessionMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
+		dialer.RegisterHandler(rpc.CreateAppSessionMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
 			var req rpc.CreateAppSessionRequest
 			params.Translate(&req)
 
@@ -338,7 +285,6 @@ func TestClient_AppSessions(t *testing.T) {
 			return createResponse(rpc.CreateAppSessionMethod, session)
 		})
 
-		sigs := []sign.Signature{{}, {}}
 		req := rpc.CreateAppSessionRequest{
 			Definition: appDef,
 			Allocations: []rpc.AppAllocation{
@@ -346,11 +292,8 @@ func TestClient_AppSessions(t *testing.T) {
 				{Participant: testWallet2, AssetSymbol: testSymbol, Amount: decimal.NewFromInt(100)},
 			},
 		}
-		payload, err := client.PreparePayload(rpc.CreateAppSessionMethod, req)
-		require.NoError(t, err)
-		fullReq := rpc.NewRequest(payload, sigs...)
 
-		resp, _, err := client.CreateAppSession(testCtx, &fullReq)
+		resp, _, err := client.CreateAppSession(testCtx, req)
 
 		require.NoError(t, err)
 		assert.Equal(t, "app123", resp.AppSessionID)
@@ -393,7 +336,7 @@ func TestClient_ConcurrentOperations(t *testing.T) {
 	client, dialer := setupClient()
 
 	// Handler with delay
-	dialer.RegisterHandler(rpc.GetAssetsMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
+	dialer.RegisterHandler(rpc.GetAssetsMethod, func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
 		time.Sleep(10 * time.Millisecond)
 		assets := rpc.GetAssetsResponse{Assets: []rpc.Asset{{Token: testToken}}}
 		return createResponse(rpc.GetAssetsMethod, assets)
@@ -436,48 +379,6 @@ func TestClient_AdditionalMethods(t *testing.T) {
 		assert.Equal(t, def.Protocol, resp.Protocol)
 	})
 
-	t.Run("GetUserTag", func(t *testing.T) {
-		tag := rpc.GetUserTagResponse{Tag: "alice"}
-		registerSimpleHandler(dialer, rpc.GetUserTagMethod, tag)
-
-		resp, _, err := client.GetUserTag(testCtx)
-		require.NoError(t, err)
-		assert.Equal(t, "alice", resp.Tag)
-	})
-
-	t.Run("GetRPCHistory", func(t *testing.T) {
-		history := rpc.GetRPCHistoryResponse{
-			RPCEntries: []rpc.HistoryEntry{{
-				ID: 1, Method: "transfer", Sender: testWallet,
-			}},
-		}
-		registerSimpleHandler(dialer, rpc.GetRPCHistoryMethod, history)
-
-		resp, _, err := client.GetRPCHistory(testCtx, rpc.GetRPCHistoryRequest{})
-		require.NoError(t, err)
-		assert.Len(t, resp.RPCEntries, 1)
-	})
-
-	t.Run("ResizeChannel", func(t *testing.T) {
-		resize := rpc.ResizeChannelResponse{
-			ChannelID: "ch123",
-			State:     rpc.UnsignedState{Intent: rpc.StateIntentResize},
-		}
-		registerSimpleHandler(dialer, rpc.ResizeChannelMethod, resize)
-
-		amount := decimal.NewFromInt(2000)
-		req := rpc.ResizeChannelRequest{
-			ChannelID: "ch123", ResizeAmount: &amount, FundsDestination: testWallet,
-		}
-		payload, err := client.PreparePayload(rpc.ResizeChannelMethod, req)
-		require.NoError(t, err)
-		fullReq := rpc.NewRequest(payload, sign.Signature{})
-
-		resp, _, err := client.ResizeChannel(testCtx, &fullReq)
-		require.NoError(t, err)
-		assert.Equal(t, rpc.StateIntentResize, resp.State.Intent)
-	})
-
 	t.Run("CloseChannel", func(t *testing.T) {
 		closeResp := rpc.CloseChannelResponse{
 			ChannelID: "ch123",
@@ -488,11 +389,8 @@ func TestClient_AdditionalMethods(t *testing.T) {
 		req := rpc.CloseChannelRequest{
 			ChannelID: "ch123", FundsDestination: testWallet,
 		}
-		payload, err := client.PreparePayload(rpc.CloseChannelMethod, req)
-		require.NoError(t, err)
-		fullReq := rpc.NewRequest(payload, sign.Signature{})
 
-		resp, _, err := client.CloseChannel(testCtx, &fullReq)
+		resp, _, err := client.CloseChannel(testCtx, req)
 		require.NoError(t, err)
 		assert.Equal(t, rpc.StateIntentFinalize, resp.State.Intent)
 	})
@@ -503,15 +401,10 @@ func TestClient_AdditionalMethods(t *testing.T) {
 		}
 		registerSimpleHandler(dialer, rpc.SubmitAppStateMethod, submit)
 
-		sigs := []sign.Signature{{}, {}}
 		req := rpc.SubmitAppStateRequest{
 			AppSessionID: "app123",
 		}
-		payload, err := client.PreparePayload(rpc.SubmitAppStateMethod, req)
-		require.NoError(t, err)
-		fullReq := rpc.NewRequest(payload, sigs...)
-
-		resp, _, err := client.SubmitAppState(testCtx, &fullReq)
+		resp, _, err := client.SubmitAppState(testCtx, req)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), resp.Version)
 	})
@@ -522,32 +415,12 @@ func TestClient_AdditionalMethods(t *testing.T) {
 		}
 		registerSimpleHandler(dialer, rpc.CloseAppSessionMethod, closeApp)
 
-		sigs := []sign.Signature{{}, {}}
 		req := rpc.CloseAppSessionRequest{
 			AppSessionID: "app123",
 		}
-		payload, err := client.PreparePayload(rpc.CloseAppSessionMethod, req)
-		require.NoError(t, err)
-		fullReq := rpc.NewRequest(payload, sigs...)
 
-		resp, _, err := client.CloseAppSession(testCtx, &fullReq)
+		resp, _, err := client.CloseAppSession(testCtx, req)
 		require.NoError(t, err)
 		assert.Equal(t, "closed", resp.Status)
 	})
-}
-
-func TestClient_CleanupSessionKeyCache(t *testing.T) {
-	t.Parallel()
-
-	client, dialer := setupClient()
-
-	// CleanupSessionKeyCache returns success
-	dialer.RegisterHandler(rpc.CleanupSessionKeyCacheMethod, func(params rpc.Params, publish MockNotificationPublisher) (*rpc.Response, error) {
-		res := rpc.NewResponse(rpc.NewPayload(0, string(rpc.CleanupSessionKeyCacheMethod), rpc.Params{}))
-		return &res, nil
-	})
-
-	sigs, err := client.CleanupSessionKeyCache(testCtx)
-	assert.NoError(t, err)
-	assert.Empty(t, sigs)
 }

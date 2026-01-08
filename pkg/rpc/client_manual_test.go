@@ -6,7 +6,6 @@ import (
 	"os"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
@@ -53,29 +52,6 @@ func TestManualClient(t *testing.T) {
 
 	assetSymbol := "ytest.usd"
 	testAllowanceAmount := "100"
-
-	var jwtToken string
-	t.Run("Authenticate With Signature", func(t *testing.T) {
-		authReq := rpc.AuthRequestRequest{
-			Address:     walletSigner.PublicKey().Address().String(),
-			SessionKey:  sessionSigner.PublicKey().Address().String(),
-			Application: "TestClient",
-			Allowances: []rpc.Allowance{
-				{
-					Asset:  assetSymbol,
-					Amount: testAllowanceAmount,
-				},
-			},
-			ExpiresAt: uint64(time.Now().Add(1 * time.Hour).Unix()),
-			Scope:     "",
-		}
-		authRes, _, err := client.AuthWithSig(ctx, authReq, walletSigner)
-		require.NoError(t, err)
-
-		require.True(t, authRes.Success, "auth_sig_verify should succeed")
-		require.NotEmpty(t, authRes.JwtToken, "jwt token should be set")
-		jwtToken = authRes.JwtToken
-	})
 
 	cancel()
 	fmt.Println("Context cancelled, restarting with JWT")
@@ -146,27 +122,6 @@ func TestManualClient(t *testing.T) {
 			},
 		},
 		{
-			name: "Authenticate With JWT",
-			fn: func(t *testing.T) {
-				authVerifyReq := rpc.AuthJWTVerifyRequest{
-					JWT: jwtToken,
-				}
-				verifyRes, _, err := client.AuthJWTVerify(ctx, authVerifyReq)
-				require.NoError(t, err)
-				require.True(t, verifyRes.Success, "auth_jwt_verify should succeed")
-				require.Equal(t, walletSigner.PublicKey().Address().String(), verifyRes.Address, "address should match")
-				require.Equal(t, sessionSigner.PublicKey().Address().String(), verifyRes.SessionKey, "session key should match")
-			},
-		},
-		{
-			name: "GetUserTag",
-			fn: func(t *testing.T) {
-				userTagRes, _, err := client.GetUserTag(ctx)
-				require.NoError(t, err)
-				fmt.Printf("User Tag: %+v\n", userTagRes.Tag)
-			},
-		},
-		{
 			name: "GetSessionKeys_VerifyAllowances",
 			fn: func(t *testing.T) {
 				sessionKeysRes, _, err := client.GetSessionKeys(ctx, rpc.GetSessionKeysRequest{})
@@ -232,21 +187,8 @@ func TestManualClient(t *testing.T) {
 					},
 					Allocations: appAllocationsV0_2,
 				}
-				createAppPayload, err := client.PreparePayload(rpc.CreateAppSessionMethod, createAppReq)
-				require.NoError(t, err)
 
-				createAppHash, err := createAppPayload.Hash()
-				require.NoError(t, err)
-
-				createAppResSig, err := sessionSigner.Sign(createAppHash)
-				require.NoError(t, err)
-
-				createAppFullReq := rpc.NewRequest(
-					createAppPayload,
-					createAppResSig,
-				)
-
-				createAppRes, _, err := client.CreateAppSession(ctx, &createAppFullReq)
+				createAppRes, _, err := client.CreateAppSession(ctx, createAppReq)
 				require.NoError(t, err)
 				fmt.Printf("App Session Created: %+v\n", createAppRes.AppSessionID)
 				appSessionID = createAppRes.AppSessionID
@@ -272,21 +214,8 @@ func TestManualClient(t *testing.T) {
 					Allocations:  appAllocationsV0_2,
 					SessionData:  &testSessionData,
 				}
-				updateAppPayload, err := client.PreparePayload(rpc.SubmitAppStateMethod, updateAppReq)
-				require.NoError(t, err)
 
-				updateAppHash, err := updateAppPayload.Hash()
-				require.NoError(t, err)
-
-				updateAppResSig, err := sessionSigner.Sign(updateAppHash)
-				require.NoError(t, err)
-
-				updateAppFullReq := rpc.NewRequest(
-					updateAppPayload,
-					updateAppResSig,
-				)
-
-				updateAppRes, _, err := client.SubmitAppState(ctx, &updateAppFullReq)
+				updateAppRes, _, err := client.SubmitAppState(ctx, updateAppReq)
 				require.NoError(t, err)
 				fmt.Printf("App Session Version Updated: %+v\n", updateAppRes.Version)
 
@@ -309,21 +238,8 @@ func TestManualClient(t *testing.T) {
 					AppSessionID: appSessionID,
 					Allocations:  appAllocationsV0_2,
 				}
-				closeAppPayload, err := client.PreparePayload(rpc.CloseAppSessionMethod, closeAppReq)
-				require.NoError(t, err)
 
-				closeAppHash, err := closeAppPayload.Hash()
-				require.NoError(t, err)
-
-				closeAppResSig, err := sessionSigner.Sign(closeAppHash)
-				require.NoError(t, err)
-
-				closeAppFullReq := rpc.NewRequest(
-					closeAppPayload,
-					closeAppResSig,
-				)
-
-				closeAppRes, _, err := client.CloseAppSession(ctx, &closeAppFullReq)
+				closeAppRes, _, err := client.CloseAppSession(ctx, closeAppReq)
 				require.NoError(t, err)
 				fmt.Printf("App Session closed with Version : %+v\n", closeAppRes.Version)
 
@@ -356,21 +272,8 @@ func TestManualClient(t *testing.T) {
 					},
 					Allocations: appAllocationsV0_4_Original,
 				}
-				createAppPayload, err := client.PreparePayload(rpc.CreateAppSessionMethod, createAppReq)
-				require.NoError(t, err)
 
-				createAppHash, err := createAppPayload.Hash()
-				require.NoError(t, err)
-
-				createAppResSig, err := sessionSigner.Sign(createAppHash)
-				require.NoError(t, err)
-
-				createAppFullReq := rpc.NewRequest(
-					createAppPayload,
-					createAppResSig,
-				)
-
-				createAppRes, _, err := client.CreateAppSession(ctx, &createAppFullReq)
+				createAppRes, _, err := client.CreateAppSession(ctx, createAppReq)
 				require.NoError(t, err)
 				fmt.Printf("App Session Created: %+v\n", createAppRes.AppSessionID)
 				appSessionID = createAppRes.AppSessionID
@@ -422,21 +325,8 @@ func TestManualClient(t *testing.T) {
 					Allocations:  appAllocationsV0_4_Original,
 					SessionData:  &testSessionData,
 				}
-				updateAppPayload, err := client.PreparePayload(rpc.SubmitAppStateMethod, updateAppReq)
-				require.NoError(t, err)
 
-				updateAppHash, err := updateAppPayload.Hash()
-				require.NoError(t, err)
-
-				updateAppResSig, err := sessionSigner.Sign(updateAppHash)
-				require.NoError(t, err)
-
-				updateAppFullReq := rpc.NewRequest(
-					updateAppPayload,
-					updateAppResSig,
-				)
-
-				updateAppRes, _, err := client.SubmitAppState(ctx, &updateAppFullReq)
+				updateAppRes, _, err := client.SubmitAppState(ctx, updateAppReq)
 				require.NoError(t, err)
 				fmt.Printf("App Session Version Updated: %+v\n", updateAppRes.Version)
 
@@ -461,21 +351,8 @@ func TestManualClient(t *testing.T) {
 					Version:      3,
 					Allocations:  appAllocationsV0_4_Deposited,
 				}
-				updateAppPayload, err := client.PreparePayload(rpc.SubmitAppStateMethod, updateAppReq)
-				require.NoError(t, err)
 
-				updateAppHash, err := updateAppPayload.Hash()
-				require.NoError(t, err)
-
-				updateAppResSig, err := sessionSigner.Sign(updateAppHash)
-				require.NoError(t, err)
-
-				updateAppFullReq := rpc.NewRequest(
-					updateAppPayload,
-					updateAppResSig,
-				)
-
-				updateAppRes, _, err := client.SubmitAppState(ctx, &updateAppFullReq)
+				updateAppRes, _, err := client.SubmitAppState(ctx, updateAppReq)
 				require.NoError(t, err)
 				fmt.Printf("App Session Version Updated: %+v\n", updateAppRes.Version)
 
@@ -524,21 +401,8 @@ func TestManualClient(t *testing.T) {
 					Version:      4,
 					Allocations:  appAllocationsV0_4_Original,
 				}
-				updateAppPayload, err := client.PreparePayload(rpc.SubmitAppStateMethod, updateAppReq)
-				require.NoError(t, err)
 
-				updateAppHash, err := updateAppPayload.Hash()
-				require.NoError(t, err)
-
-				updateAppResSig, err := sessionSigner.Sign(updateAppHash)
-				require.NoError(t, err)
-
-				updateAppFullReq := rpc.NewRequest(
-					updateAppPayload,
-					updateAppResSig,
-				)
-
-				updateAppRes, _, err := client.SubmitAppState(ctx, &updateAppFullReq)
+				updateAppRes, _, err := client.SubmitAppState(ctx, updateAppReq)
 				require.NoError(t, err)
 				fmt.Printf("App Session Version Updated: %+v\n", updateAppRes.Version)
 
@@ -561,21 +425,8 @@ func TestManualClient(t *testing.T) {
 					AppSessionID: appSessionID,
 					Allocations:  appAllocationsV0_4_Original,
 				}
-				closeAppPayload, err := client.PreparePayload(rpc.CloseAppSessionMethod, closeAppReq)
-				require.NoError(t, err)
 
-				closeAppHash, err := closeAppPayload.Hash()
-				require.NoError(t, err)
-
-				closeAppResSig, err := sessionSigner.Sign(closeAppHash)
-				require.NoError(t, err)
-
-				closeAppFullReq := rpc.NewRequest(
-					closeAppPayload,
-					closeAppResSig,
-				)
-
-				closeAppRes, _, err := client.CloseAppSession(ctx, &closeAppFullReq)
+				closeAppRes, _, err := client.CloseAppSession(ctx, closeAppReq)
 				require.NoError(t, err)
 				fmt.Printf("App Session closed with Version : %+v\n", closeAppRes.Version)
 

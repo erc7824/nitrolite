@@ -91,10 +91,10 @@ type StateV1 struct {
 	Epoch string `json:"epoch"`
 	// Version is the version of the state
 	Version string `json:"version"`
-	// HomeBlockchainID is the identifier for the home Channel blockchain network
-	HomeBlockchainID *uint32 `json:"home_blockchain_id,omitempty"`
-	// EscrowBlockchainID is the identifier for the escrow Channel blockchain network
-	EscrowBlockchainID *uint32 `json:"escrow_blockchain_id,omitempty"`
+	// HomeChannelID is the identifier for the home Channel blockchain network
+	HomeChannelID *string `json:"home_channel_id,omitempty"`
+	// EscrowChannelID is the identifier for the escrow Channel blockchain network
+	EscrowChannelID *string `json:"escrow_channel_id,omitempty"`
 	// HomeLedger contains user and node balances for the home channel
 	HomeLedger LedgerV1 `json:"home_ledger"`
 	// EscrowLedger contains user and node balances for the escrow channel

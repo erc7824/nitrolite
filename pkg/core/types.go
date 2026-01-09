@@ -1,6 +1,10 @@
 package core
 
-import "github.com/shopspring/decimal"
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
 
 type ChannelType uint8
 
@@ -46,10 +50,65 @@ type State struct {
 	NodeSig         *string      `json:"node_sig,omitempty"`          // Node signature for the state
 }
 
+func (state *State) GetLastTransition() *Transition {
+	if len(state.Transitions) == 0 {
+		return nil
+	}
+
+	lastTransition := state.Transitions[len(state.Transitions)-1]
+	if lastTransition.Type == TransitionTypeTransferReceive || lastTransition.Type == TransitionTypeRelease {
+		return nil
+	}
+
+	return &lastTransition
+}
+
+func (state *State) NextState() State {
+	var nextState State
+	if state.IsFinal {
+		nextState = State{
+			Transitions:     []Transition{},
+			Asset:           state.Asset,
+			UserWallet:      state.UserWallet,
+			Epoch:           state.Epoch + 1,
+			Version:         0,
+			HomeChannelID:   nil,
+			EscrowChannelID: nil,
+			HomeLedger:      Ledger{},
+			EscrowLedger:    nil,
+			IsFinal:         false,
+		}
+	} else {
+		nextState = State{
+			Transitions:     []Transition{},
+			Asset:           state.Asset,
+			UserWallet:      state.UserWallet,
+			Epoch:           state.Epoch,
+			Version:         state.Version + 1,
+			HomeChannelID:   state.HomeChannelID,
+			EscrowChannelID: state.EscrowChannelID,
+			HomeLedger:      state.HomeLedger,
+			EscrowLedger:    state.EscrowLedger,
+			IsFinal:         false,
+		}
+
+		if state.UserSig == nil {
+			nextState.Transitions = append(nextState.Transitions, state.Transitions...)
+		} else if t := state.GetLastTransition(); t.Type == TransitionTypeEscrowDeposit || t.Type == TransitionTypeEscrowWithdraw {
+			// escrowChannelID, escrowLedger: not-nil -> nil
+			nextState.EscrowChannelID = nil
+			nextState.EscrowLedger = nil
+		}
+	}
+	nextState.ID = GetStateID(nextState.UserWallet, nextState.Asset, nextState.Epoch, nextState.Version)
+
+	return nextState
+}
+
 // Ledger represents ledger balances
 type Ledger struct {
 	TokenAddress string          `json:"token_address"` // Address of the token used in this channel
-	BlockchainID uint64          `json:"blockchain_id"` // Unique identifier for the blockchain
+	BlockchainID uint32          `json:"blockchain_id"` // Unique identifier for the blockchain
 	UserBalance  decimal.Decimal `json:"user_balance"`  // User balance in the channel
 	UserNetFlow  decimal.Decimal `json:"user_net_flow"` // User net flow in the channel
 	NodeBalance  decimal.Decimal `json:"node_balance"`  // Node balance in the channel
@@ -114,7 +173,28 @@ type Transaction struct {
 	SenderNewStateID   *string         `json:"sender_new_state_id,omitempty"`   // The ID of the new sender's channel state
 	ReceiverNewStateID *string         `json:"receiver_new_state_id,omitempty"` // The ID of the new receiver's channel state
 	Amount             decimal.Decimal `json:"amount"`                          // Transaction amount
-	CreatedAt          string          `json:"created_at"`                      // When the transaction was created
+	CreatedAt          time.Time       `json:"created_at"`                      // When the transaction was created
+}
+
+// NewTransaction creates a new instance of Transaction
+// returns error if ID generation failed
+func NewTransaction(asset string, txType TransactionType, fromAccount, toAccount string, senderNewStateID, receiverNewStateID *string, amount decimal.Decimal) (Transaction, error) {
+	id, err := GetTransactionID(toAccount, fromAccount, senderNewStateID, receiverNewStateID)
+	if err != nil {
+		return Transaction{}, err
+	}
+
+	return Transaction{
+		ID:                 id,
+		Asset:              asset,
+		TxType:             txType,
+		FromAccount:        fromAccount,
+		ToAccount:          toAccount,
+		SenderNewStateID:   senderNewStateID,
+		ReceiverNewStateID: receiverNewStateID,
+		Amount:             amount,
+		CreatedAt:          time.Now().UTC(),
+	}, nil
 }
 
 // TransitionType represents the type of state transition
@@ -170,10 +250,20 @@ func (t TransitionType) String() string {
 
 // Transition represents a state transition
 type Transition struct {
-	Type      TransitionType  `json:"type"`                 // Type of state transition
-	TxHash    string          `json:"tx_hash"`              // Transaction hash associated with the transition
-	AccountID *string         `json:"account_id,omitempty"` // Account identifier (varies based on transition type)
-	Amount    decimal.Decimal `json:"amount"`               // Amount involved in the transition
+	Type      TransitionType  `json:"type"`       // Type of state transition
+	TxHash    string          `json:"tx_hash"`    // Transaction hash associated with the transition
+	AccountID string          `json:"account_id"` // Account identifier (varies based on transition type)
+	Amount    decimal.Decimal `json:"amount"`     // Amount involved in the transition
+}
+
+// NewTransition creates a new state transition
+func NewTransition(transitionType TransitionType, txHash string, accountID string, amount decimal.Decimal) *Transition {
+	return &Transition{
+		Type:      transitionType,
+		TxHash:    txHash,
+		AccountID: accountID,
+		Amount:    amount,
+	}
 }
 
 // Asset represents information about a supported asset

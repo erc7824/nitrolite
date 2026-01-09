@@ -30,7 +30,7 @@ func TestCreateCheckpoint(t *testing.T) {
 		serverSig := Signature{4, 5, 6}
 		channelId := common.HexToHash("0xchannel1")
 
-		err := CreateCheckpoint(db, channelId, 1, state, userSig, serverSig)
+		err := ScheduleCheckpoint(db, channelId, 1, state, userSig, serverSig)
 		require.NoError(t, err)
 
 		var action BlockchainAction
@@ -65,7 +65,7 @@ func TestCreateCheckpoint(t *testing.T) {
 		require.NoError(t, err)
 		sqlDB.Close()
 
-		err = CreateCheckpoint(db, channelId, 1, UnsignedState{}, Signature{}, Signature{})
+		err = ScheduleCheckpoint(db, channelId, 1, UnsignedState{}, Signature{}, Signature{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "database is closed")
 	})

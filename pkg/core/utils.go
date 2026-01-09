@@ -12,6 +12,7 @@ import (
 var (
 	uint8Type, _   = abi.NewType("uint8", "", nil)
 	uint32Type, _  = abi.NewType("uint32", "", nil)
+	uint64Type, _  = abi.NewType("uint64", "", nil)
 	uint256Type, _ = abi.NewType("uint256", "", nil)
 )
 
@@ -57,7 +58,7 @@ func GetEscrowChannelID(homeChannelID string, stateVersion uint64) (string, erro
 }
 
 // GetStateID creates a unique hash representing a specific snapshot of a user's wallet and asset state.
-func GetStateID(userWallet, asset string, epoch, version uint64) (string, error) {
+func GetStateID(userWallet, asset string, epoch, version uint64) string {
 	userAddr := common.HexToAddress(userWallet)
 
 	args := abi.Arguments{
@@ -67,17 +68,14 @@ func GetStateID(userWallet, asset string, epoch, version uint64) (string, error)
 		{Type: uint256Type},                // version
 	}
 
-	packed, err := args.Pack(
+	packed, _ := args.Pack(
 		userAddr,
 		asset,
 		new(big.Int).SetUint64(epoch),
 		new(big.Int).SetUint64(version),
 	)
-	if err != nil {
-		return "", fmt.Errorf("failed to pack state ID: %w", err)
-	}
 
-	return crypto.Keccak256Hash(packed).Hex(), nil
+	return crypto.Keccak256Hash(packed).Hex()
 }
 
 // GetTransactionID calculates a unique transaction reference based on the participating account and the resulting state.
@@ -114,26 +112,171 @@ func GetTransactionID(toAccount, fromAccount string, senderNewStateID, receiverN
 }
 
 // PackState encodes a channel ID and state into ABI-packed bytes for on-chain submission.
-func PackState(channelID string, state State) ([]byte, error) {
-	// TODO: refine with the current packing approach
-	allocationType, err := abi.NewType("tuple[]", "", []abi.ArgumentMarshaling{
-		{Name: "destination", Type: "address"},
+func PackState(state State) ([]byte, error) {
+	// Pack the state using the cross-chain state structure
+	ledgerType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{Name: "chainId", Type: "uint64"},
 		{Name: "token", Type: "address"},
-		{Name: "amount", Type: "uint256"},
+		{Name: "participantBalance", Type: "tuple", Components: []abi.ArgumentMarshaling{
+			{Name: "allocation", Type: "uint256"},
+			{Name: "netFlow", Type: "int256"},
+		}},
+		{Name: "nodeBalance", Type: "tuple", Components: []abi.ArgumentMarshaling{
+			{Name: "allocation", Type: "uint256"},
+			{Name: "netFlow", Type: "int256"},
+		}},
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	args := abi.Arguments{
-		{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}}, // channelID
-		{Type: uint8Type},                // intent
-		{Type: uint256Type},              // version
-		{Type: abi.Type{T: abi.BytesTy}}, // stateData
-		{Type: allocationType},           // allocations (tuple[])
+		{Type: uint256Type}, // version
+		{Type: uint64Type},  // homeChainId
+		{Type: uint8Type},   // intent
+		{Type: ledgerType},  // homeState
+		{Type: ledgerType},  // nonHomeState
 	}
 
-	packed, err := args.Pack(channelID, state.Version)
+	// Convert user balance and netflow to big.Int
+	userBalanceBI := state.HomeLedger.UserBalance.BigInt()
+	userNetFlowBI := state.HomeLedger.UserNetFlow.BigInt()
+	nodeBalanceBI := state.HomeLedger.NodeBalance.BigInt()
+	nodeNetFlowBI := state.HomeLedger.NodeNetFlow.BigInt()
+
+	homeState := struct {
+		ChainId            uint64
+		Token              common.Address
+		ParticipantBalance struct {
+			Allocation *big.Int
+			NetFlow    *big.Int
+		}
+		NodeBalance struct {
+			Allocation *big.Int
+			NetFlow    *big.Int
+		}
+	}{
+		ChainId: uint64(state.HomeLedger.BlockchainID),
+		Token:   common.HexToAddress(state.HomeLedger.TokenAddress),
+		ParticipantBalance: struct {
+			Allocation *big.Int
+			NetFlow    *big.Int
+		}{
+			Allocation: userBalanceBI,
+			NetFlow:    userNetFlowBI,
+		},
+		NodeBalance: struct {
+			Allocation *big.Int
+			NetFlow    *big.Int
+		}{
+			Allocation: nodeBalanceBI,
+			NetFlow:    nodeNetFlowBI,
+		},
+	}
+
+	// For nonHomeState, use escrow ledger if available, otherwise use zero values
+	var nonHomeState struct {
+		ChainId            uint64
+		Token              common.Address
+		ParticipantBalance struct {
+			Allocation *big.Int
+			NetFlow    *big.Int
+		}
+		NodeBalance struct {
+			Allocation *big.Int
+			NetFlow    *big.Int
+		}
+	}
+
+	if state.EscrowLedger != nil {
+		escrowUserBalanceBI := state.EscrowLedger.UserBalance.BigInt()
+		escrowUserNetFlowBI := state.EscrowLedger.UserNetFlow.BigInt()
+		escrowNodeBalanceBI := state.EscrowLedger.NodeBalance.BigInt()
+		escrowNodeNetFlowBI := state.EscrowLedger.NodeNetFlow.BigInt()
+
+		nonHomeState = struct {
+			ChainId            uint64
+			Token              common.Address
+			ParticipantBalance struct {
+				Allocation *big.Int
+				NetFlow    *big.Int
+			}
+			NodeBalance struct {
+				Allocation *big.Int
+				NetFlow    *big.Int
+			}
+		}{
+			ChainId: uint64(state.EscrowLedger.BlockchainID),
+			Token:   common.HexToAddress(state.EscrowLedger.TokenAddress),
+			ParticipantBalance: struct {
+				Allocation *big.Int
+				NetFlow    *big.Int
+			}{
+				Allocation: escrowUserBalanceBI,
+				NetFlow:    escrowUserNetFlowBI,
+			},
+			NodeBalance: struct {
+				Allocation *big.Int
+				NetFlow    *big.Int
+			}{
+				Allocation: escrowNodeBalanceBI,
+				NetFlow:    escrowNodeNetFlowBI,
+			},
+		}
+	} else {
+		nonHomeState = struct {
+			ChainId            uint64
+			Token              common.Address
+			ParticipantBalance struct {
+				Allocation *big.Int
+				NetFlow    *big.Int
+			}
+			NodeBalance struct {
+				Allocation *big.Int
+				NetFlow    *big.Int
+			}
+		}{
+			ChainId: 0,
+			Token:   common.Address{},
+			ParticipantBalance: struct {
+				Allocation *big.Int
+				NetFlow    *big.Int
+			}{
+				Allocation: big.NewInt(0),
+				NetFlow:    big.NewInt(0),
+			},
+			NodeBalance: struct {
+				Allocation *big.Int
+				NetFlow    *big.Int
+			}{
+				Allocation: big.NewInt(0),
+				NetFlow:    big.NewInt(0),
+			},
+		}
+	}
+
+	// Determine intent based on last transition
+	intent := uint8(0) // default intent
+	if lastTransition := state.GetLastTransition(); lastTransition != nil {
+		// Map transition type to intent
+		// This is a simplified mapping - adjust based on actual requirements
+		switch lastTransition.Type {
+		case TransitionTypeTransferSend, TransitionTypeTransferReceive:
+			intent = 1 // operate intent
+		case TransitionTypeHomeDeposit, TransitionTypeEscrowDeposit:
+			intent = 2 // deposit intent
+		case TransitionTypeHomeWithdrawal, TransitionTypeEscrowWithdraw:
+			intent = 3 // withdraw intent
+		}
+	}
+
+	packed, err := args.Pack(
+		big.NewInt(int64(state.Version)),
+		uint64(state.HomeLedger.BlockchainID),
+		intent,
+		homeState,
+		nonHomeState,
+	)
 	if err != nil {
 		return nil, err
 	}

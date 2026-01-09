@@ -51,7 +51,7 @@ type CheckpointData struct {
 	ServerSig Signature     `json:"server_sig"`
 }
 
-func CreateCheckpoint(tx *gorm.DB, channel common.Hash, chainID uint32, state UnsignedState, userSig, serverSig Signature) error {
+func ScheduleCheckpoint(tx *gorm.DB, channel common.Hash, chainID uint32, state UnsignedState, userSig, serverSig Signature) error {
 	data := CheckpointData{
 		State:     state,
 		UserSig:   userSig,

@@ -9,22 +9,46 @@ import (
 type ChannelType uint8
 
 var (
-	ChannelTypeHome   = 1
-	ChannelTypeEscrow = 2
+	ChannelTypeHome   ChannelType = 1
+	ChannelTypeEscrow ChannelType = 2
+)
+
+type ChannelStatus uint8
+
+var (
+	ChannelStatusVoid       ChannelStatus = 0
+	ChannelStatusOpen       ChannelStatus = 1
+	ChannelStatusChallenged ChannelStatus = 2
+	ChannelStatusClosed     ChannelStatus = 3
 )
 
 // Channel represents an on-chain channel
 type Channel struct {
-	ChannelID    string      `json:"channel_id"`    // Unique identifier for the channel
-	UserWallet   string      `json:"user_wallet"`   // User wallet address
-	NodeWallet   string      `json:"node_wallet"`   // Node wallet address
-	Type         ChannelType `json:"type"`          // Type of the channel (home, escrow)
-	BlockchainID uint32      `json:"blockchain_id"` // Unique identifier for the blockchain
-	TokenAddress string      `json:"token_address"` // Address of the token used in the channel
-	Challenge    uint64      `json:"challenge"`     // Challenge period for the channel in seconds
-	Nonce        uint64      `json:"nonce"`         // Nonce for the channel
-	Status       string      `json:"status"`        // Current status of the channel (void, open, challenged, closed)
-	StateVersion uint64      `json:"state_version"` // On-chain state version of the channel
+	ChannelID    string        `json:"channel_id"`    // Unique identifier for the channel
+	UserWallet   string        `json:"user_wallet"`   // User wallet address
+	NodeWallet   string        `json:"node_wallet"`   // Node wallet address
+	Type         ChannelType   `json:"type"`          // Type of the channel (home, escrow)
+	BlockchainID uint32        `json:"blockchain_id"` // Unique identifier for the blockchain
+	TokenAddress string        `json:"token_address"` // Address of the token used in the channel
+	Challenge    uint64        `json:"challenge"`     // Challenge period for the channel in seconds
+	Nonce        uint64        `json:"nonce"`         // Nonce for the channel
+	Status       ChannelStatus `json:"status"`        // Current status of the channel (void, open, challenged, closed)
+	StateVersion uint64        `json:"state_version"` // On-chain state version of the channel
+}
+
+func NewHomeChannel(channelID, userWallet, nodeWallet string, blockchainID uint32, tokenAddress string, nonce, challenge uint64) *Channel {
+	return &Channel{
+		ChannelID:    channelID,
+		UserWallet:   userWallet,
+		NodeWallet:   nodeWallet,
+		Type:         ChannelTypeHome,
+		BlockchainID: blockchainID,
+		TokenAddress: tokenAddress,
+		Nonce:        nonce,
+		Challenge:    challenge,
+		Status:       ChannelStatusVoid,
+		StateVersion: 0,
+	}
 }
 
 // ChannelDefinition represents configuration for creating a channel

@@ -32,7 +32,11 @@ func GetHomeChannelID(nodeAddress, userAddress, tokenAddress string, nonce, chal
 		{Type: uint256Type},                // nonce
 	}
 
-	packed, err := args.Pack(nodeAddr, userAddr, tokenAddr, challenge, nonce)
+	// Convert challenge to uint32 and nonce to big.Int for ABI packing
+	challenge32 := uint32(challenge)
+	nonceBI := new(big.Int).SetUint64(nonce)
+
+	packed, err := args.Pack(nodeAddr, userAddr, tokenAddr, challenge32, nonceBI)
 	if err != nil {
 		return "", err
 	}

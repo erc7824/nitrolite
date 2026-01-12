@@ -98,3 +98,71 @@ func toCoreLedger(ledger *rpc.LedgerV1) (*core.Ledger, error) {
 		NodeNetFlow:  nodeNetFlow,
 	}, nil
 }
+
+// toCoreChannelDefinition converts RPC channel definition to core type.
+func toCoreChannelDefinition(def rpc.ChannelDefinitionV1) (core.ChannelDefinition, error) {
+	nonce, err := strconv.ParseUint(def.Nonce, 10, 64)
+	if err != nil {
+		return core.ChannelDefinition{}, fmt.Errorf("failed to parse nonce: %w", err)
+	}
+
+	challenge, err := strconv.ParseUint(def.Challenge, 10, 64)
+	if err != nil {
+		return core.ChannelDefinition{}, fmt.Errorf("failed to parse challenge: %w", err)
+	}
+
+	return core.ChannelDefinition{
+		Nonce:     nonce,
+		Challenge: challenge,
+	}, nil
+}
+
+// validateInitialState validates that the state is a valid initial state for channel creation.
+func validateInitialState(state core.State) error {
+	// Must be version 1, epoch 1
+	if state.Version != 1 {
+		return fmt.Errorf("initial state must have version 1")
+	}
+	if state.Epoch != 1 {
+		return fmt.Errorf("initial state must have epoch 1")
+	}
+
+	// Must have no transitions (clean initial state)
+	if len(state.Transitions) > 0 {
+		return fmt.Errorf("initial state must have no transitions")
+	}
+
+	// Must have user wallet and asset
+	if state.UserWallet == "" {
+		return fmt.Errorf("user wallet is required")
+	}
+	if state.Asset == "" {
+		return fmt.Errorf("asset is required")
+	}
+
+	// Home ledger must be initialized with zero balances
+	if !state.HomeLedger.UserBalance.IsZero() || !state.HomeLedger.NodeBalance.IsZero() {
+		return fmt.Errorf("initial state must have zero balances")
+	}
+	if !state.HomeLedger.UserNetFlow.IsZero() || !state.HomeLedger.NodeNetFlow.IsZero() {
+		return fmt.Errorf("initial state must have zero net flows")
+	}
+
+	// Must not be final
+	if state.IsFinal {
+		return fmt.Errorf("initial state cannot be final")
+	}
+
+	// HomeChannelID should be nil for initial state (will be set by node)
+	if state.HomeChannelID != nil && *state.HomeChannelID != "" {
+		return fmt.Errorf("initial state should not have home_channel_id set")
+	}
+
+	// Must have valid state ID
+	expectedID := core.GetStateID(state.UserWallet, state.Asset, state.Epoch, state.Version)
+	if state.ID != expectedID {
+		return fmt.Errorf("state ID mismatch: expected %s, got %s", expectedID, state.ID)
+	}
+
+	return nil
+}

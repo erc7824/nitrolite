@@ -44,11 +44,9 @@ struct State {
     uint64 chainId;
     address token;
 
-    Balance participantBalance;
-    Balance nodeBalance;
-}
+    uint256 userAllocation;
+    uint256 userNetFlow;
 
-struct Balance {
-    uint256 allocation;
-    int256 netFlow;
+    uint256 nodeAllocation;
+    uint256 nodeNetFlow;
 }

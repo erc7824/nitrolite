@@ -137,7 +137,7 @@ contract ChannelsHub is IVault {
         require(initCCS.intent == StateIntent.CREATE, "invalid initial intent");
         require(!initCCS.homeState.isEmpty(), "home state cannot be empty");
         require(initCCS.nonHomeState.isEmpty(), "non-home state must be empty");
-        require(initCCS.homeState.nodeBalance.allocation == 0, "node balance must be zero in initial state");
+        require(initCCS.homeState.nodeAllocation == 0, "node balance must be zero in initial state");
 
         bytes32 channelId = Utils.getChannelId(def);
 
@@ -147,7 +147,7 @@ contract ChannelsHub is IVault {
         _channels[channelId] = Metadata({
             definition: def,
             lastState: initCCS,
-            participantLockedFunds: initCCS.homeState.participantBalance.allocation,
+            participantLockedFunds: initCCS.homeState.userAllocation,
             nodeLockedFunds: 0,
             challengeExpiry: 0
         });
@@ -155,7 +155,7 @@ contract ChannelsHub is IVault {
         // -- interactions --
         _pullFunds(
             initCCS.homeState.token,
-            initCCS.homeState.participantBalance.allocation
+            initCCS.homeState.userAllocation
         );
 
         emit ChannelCreated(channelId, def.participant, def.node, def, initCCS);

@@ -44,7 +44,7 @@ func toCoreState(state rpc.StateV1) (core.State, error) {
 
 	escrowLedger, err := toCoreLedger(state.EscrowLedger)
 	if err != nil {
-		return core.State{}, fmt.Errorf("failed to parse home ledger: %w", err)
+		return core.State{}, fmt.Errorf("failed to parse escrow ledger: %w", err)
 	}
 
 	return core.State{
@@ -81,12 +81,12 @@ func toCoreLedger(ledger *rpc.LedgerV1) (*core.Ledger, error) {
 
 	nodeBalance, err := decimal.NewFromString(ledger.NodeBalance)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse amount: %w", err)
+		return nil, fmt.Errorf("failed to parse node balance: %w", err)
 	}
 
 	nodeNetFlow, err := decimal.NewFromString(ledger.NodeNetFlow)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse amount: %w", err)
+		return nil, fmt.Errorf("failed to parse node net-flow: %w", err)
 	}
 
 	return &core.Ledger{

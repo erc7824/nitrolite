@@ -50,7 +50,20 @@ type State struct {
 	NodeSig         *string      `json:"node_sig,omitempty"`          // Node signature for the state
 }
 
-func (state *State) GetLastTransition() *Transition {
+func NewVoidState(asset, userWallet string) *State {
+	return &State{
+		Asset:      asset,
+		UserWallet: userWallet,
+		HomeLedger: Ledger{
+			UserBalance: decimal.Zero,
+			UserNetFlow: decimal.Zero,
+			NodeBalance: decimal.Zero,
+			NodeNetFlow: decimal.Zero,
+		},
+	}
+}
+
+func (state State) GetLastTransition() *Transition {
 	if len(state.Transitions) == 0 {
 		return nil
 	}
@@ -63,7 +76,7 @@ func (state *State) GetLastTransition() *Transition {
 	return &lastTransition
 }
 
-func (state *State) NextState() State {
+func (state State) NextState() State {
 	var nextState State
 	if state.IsFinal {
 		nextState = State{
@@ -74,9 +87,14 @@ func (state *State) NextState() State {
 			Version:         0,
 			HomeChannelID:   nil,
 			EscrowChannelID: nil,
-			HomeLedger:      Ledger{},
-			EscrowLedger:    nil,
-			IsFinal:         false,
+			HomeLedger: Ledger{
+				UserBalance: decimal.Zero,
+				UserNetFlow: decimal.Zero,
+				NodeBalance: decimal.Zero,
+				NodeNetFlow: decimal.Zero,
+			},
+			EscrowLedger: nil,
+			IsFinal:      false,
 		}
 	} else {
 		nextState = State{
@@ -94,7 +112,7 @@ func (state *State) NextState() State {
 
 		if state.UserSig == nil {
 			nextState.Transitions = append(nextState.Transitions, state.Transitions...)
-		} else if t := state.GetLastTransition(); t.Type == TransitionTypeEscrowDeposit || t.Type == TransitionTypeEscrowWithdraw {
+		} else if t := state.GetLastTransition(); t != nil && (t.Type == TransitionTypeEscrowDeposit || t.Type == TransitionTypeEscrowWithdraw) {
 			// escrowChannelID, escrowLedger: not-nil -> nil
 			nextState.EscrowChannelID = nil
 			nextState.EscrowLedger = nil
@@ -245,6 +263,26 @@ func (t TransitionType) String() string {
 		return "migrate"
 	default:
 		return "unknown"
+	}
+}
+
+func (t TransitionType) RequiresOpenChannel() bool {
+	switch t {
+	case TransitionTypeTransferReceive,
+		TransitionTypeTransferSend,
+		TransitionTypeRelease,
+		TransitionTypeCommit:
+		return false
+	case TransitionTypeHomeDeposit,
+		TransitionTypeHomeWithdrawal,
+		TransitionTypeMutualLock,
+		TransitionTypeEscrowDeposit,
+		TransitionTypeEscrowLock,
+		TransitionTypeEscrowWithdraw,
+		TransitionTypeMigrate:
+		return true
+	default:
+		return true
 	}
 }
 

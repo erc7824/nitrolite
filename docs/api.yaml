@@ -88,11 +88,11 @@ types:
           type: integer
           description: Version of the state
         - name: home_channel_id
-          type: integer
+          type: string
           description: Identifier for the home Channel
           optional: true
         - name: escrow_channel_id
-          type: integer
+          type: string
           description: Identifier for the escrow Channel
           optional: true
         - name: home_ledger

@@ -13,8 +13,8 @@ sequenceDiagram
         Node->>Client: Returns a state with home chain
         %% Note over Client: Check current state transitions
         Note over Client: createNextState(currentState) returns state
-        Note over Client: state.setID(CalculateStateID(state.userWallet, state.asset, cycleId, state.version))
-        Note over Client: NewTransition(depositT, state.ID(), userWallet, amount)
+        Note over Client: state.setID(CalculateStateID(state.userWallet, state.asset, epoch, state.version))
+        Note over Client: NewTransition(core.TransitionTypeHomeDeposit, state.ID(), userWallet, amount)
         Note over Client: state.applyTransitions(transitions) returns true
         Note over Client: signState(state) returns userSig
 
@@ -25,7 +25,7 @@ sequenceDiagram
         Note right of Node: StoreState(state)
         Node->>Client: Return node signature
 
-        Note over Client: PackState(channelId, state)
+        Note over Client: PackState(state)
         Client->>HomeChain: checkpoint(channelId, packedState)
         HomeChain->>Client: Return Tx Hash
         HomeChain-->>Node: Emits Checkpointed Event

@@ -68,15 +68,9 @@ type Client interface {
 
 // ========= TransitionValidator Interface =========
 
-// TransitionValidator validates state transitions
-type TransitionValidator interface {
-	// ValidateTransition validates a state transition and returns an error if invalid
-	ValidateTransition(currentState, proposedState State) error
-}
-
-// ========= TransitionApplier Interface =========
-
-// TransitionApplier applies state transitions
-type TransitionApplier interface {
-	Apply(state State, transition Transition) (State, error)
+// StateAdvancer applies state transitions
+type StateAdvancer interface {
+	ApplyTransition(state State, transition Transition) (State, error)
+	ValidateTransitions(currentState, proposedState State) error
+	ReapplyTransitions(base, new State) (State, error)
 }

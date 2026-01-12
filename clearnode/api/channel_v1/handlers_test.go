@@ -26,9 +26,18 @@ func (m *MockStore) BeginTx() (Store, func() error, func() error) {
 	return args.Get(0).(Store), args.Get(1).(func() error), args.Get(2).(func() error)
 }
 
-func (m *MockStore) GetLastUserState(wallet, asset string, signed bool) (core.State, error) {
+func (m *MockStore) GetLastUserState(wallet, asset string, signed bool) (*core.State, error) {
 	args := m.Called(wallet, asset, signed)
-	return args.Get(0).(core.State), args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	state := args.Get(0).(core.State)
+	return &state, args.Error(1)
+}
+
+func (m *MockStore) CheckOpenChannel(wallet, asset string) (bool, error) {
+	args := m.Called(wallet, asset)
+	return args.Bool(0), args.Error(1)
 }
 
 func (m *MockStore) StoreUserState(state core.State) error {
@@ -76,10 +85,21 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 	mockSigValidator := new(MockSigValidator)
 
 	handler := &Handler{
-		transitionApplier:   core.NewTransitionApplier(),
-		transitionValidator: core.NewSimpleTransitionValidator(),
-		store:               mockStore,
-		signer:              mockSigner,
+		stateAdvancer: core.NewStateAdvancerV1(),
+		useStoreInTx: func(handler StoreTxHandler) error {
+			commit := func() error { return nil }
+			revert := func() error { return nil }
+			mockStore.On("BeginTx").Return(mockTxStore, commit, revert).Once()
+
+			_, _, _ = mockStore.BeginTx()
+			err := handler(mockTxStore)
+			if err != nil {
+				_ = revert()
+				return err
+			}
+			return commit()
+		},
+		signer: mockSigner,
 		sigValidators: map[SigValidatorType]SigValidator{
 			EcdsaSigValidatorType: mockSigValidator,
 		},
@@ -127,7 +147,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 
 	// Apply the transfer send transition to update balances
 	var err error
-	incomingSenderState, err = handler.transitionApplier.Apply(incomingSenderState, transferSendTransition)
+	incomingSenderState, err = handler.stateAdvancer.ApplyTransition(incomingSenderState, transferSendTransition)
 	require.NoError(t, err)
 
 	// Sign the incoming sender state with user's signature
@@ -168,20 +188,17 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 		AccountID: senderWallet,
 		Amount:    transferAmount,
 	}
-	expectedReceiverState, err = handler.transitionApplier.Apply(expectedReceiverState, transferReceiveTransition)
+	expectedReceiverState, err = handler.stateAdvancer.ApplyTransition(expectedReceiverState, transferReceiveTransition)
 	require.NoError(t, err)
 
 	// Mock expectations
-	commitFunc := func() error { return nil }
-	revertFunc := func() error { return nil }
-
-	mockStore.On("BeginTx").Return(mockTxStore, commitFunc, revertFunc)
 	mockTxStore.On("GetLastUserState", senderWallet, asset, false).Return(currentSenderState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", senderWallet, asset).Return(nil)
 	mockSigValidator.On("Verify", senderWallet, packedSenderState, userSigBytes).Return(nil)
 
 	// For issueTransferReceiverState
 	mockTxStore.On("GetLastUserState", receiverWallet, asset, false).Return(currentReceiverState, nil)
+	mockTxStore.On("GetLastUserState", receiverWallet, asset, true).Return(nil, nil)
 	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
 		// Verify receiver state
 		return state.UserWallet == receiverWallet &&

@@ -32,6 +32,7 @@ type Listener interface {
 // ========= Client Interface =========
 
 // Client defines the interface for interacting with the ChannelsHub smart contract
+// TODO: add context to all methods
 type Client interface {
 	// Getters - IVault
 	GetAccountsBalances(accounts []string, tokens []string) ([][]decimal.Decimal, error)
@@ -67,8 +68,9 @@ type Client interface {
 
 // ========= TransitionValidator Interface =========
 
-// TransitionValidator validates state transitions
-type TransitionValidator interface {
-	// ValidateTransition validates a state transition and returns an error if invalid
-	ValidateTransition(currentState, proposedState State) error
+// StateAdvancer applies state transitions
+type StateAdvancer interface {
+	ApplyTransition(state State, transition Transition) (State, error)
+	ValidateTransitions(currentState, proposedState State) error
+	ReapplyTransitions(base, new State) (State, error)
 }

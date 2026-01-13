@@ -34,11 +34,24 @@ type Store interface {
 
 	// ScheduleInitiateEscrowWithdrawal queues a blockchain action to initiate
 	// withdrawal from an escrow channel (triggered by escrow_lock transition).
-	ScheduleInitiateEscrowWithdrawal(core.State) error
+	ScheduleInitiateEscrowWithdrawal(state core.State) error
 
 	// RecordTransaction creates a transaction record linking state transitions
 	// to track the history of operations (deposits, withdrawals, transfers, etc.).
-	RecordTransaction(core.Transaction) error
+	RecordTransaction(tx core.Transaction) error
+
+	// CreateChannel creates a new channel entity in the database.
+	// This is called during channel creation before the channel exists on-chain.
+	// The channel starts with OnChainStateVersion=0 to indicate it's pending blockchain confirmation.
+	CreateChannel(channel core.Channel) error
+
+	// GetChannelByID retrieves a channel by its unique identifier.
+	// Returns nil if the channel doesn't exist.
+	GetChannelByID(channelID string) (*core.Channel, error)
+
+	// GetActiveHomeChannel retrieves the active home channel for a user's wallet and asset.
+	// Returns nil if no home channel exists for the given wallet and asset.
+	GetActiveHomeChannel(wallet, asset string) (*core.Channel, error)
 }
 
 // EnsureNoOngoingStateTransitions Implementation Notes

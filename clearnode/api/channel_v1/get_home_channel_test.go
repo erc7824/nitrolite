@@ -1,0 +1,159 @@
+package channel_v1
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/erc7824/nitrolite/pkg/core"
+	"github.com/erc7824/nitrolite/pkg/rpc"
+)
+
+func TestGetHomeChannel_Success(t *testing.T) {
+	// Setup
+	mockTxStore := new(MockStore)
+	mockSigner := NewMockSigner()
+	mockSigValidator := new(MockSigValidator)
+	nodeAddress := mockSigner.PublicKey().Address().String()
+	minChallenge := uint64(3600)
+
+	handler := &Handler{
+		stateAdvancer: core.NewStateAdvancerV1(),
+		useStoreInTx: func(handler StoreTxHandler) error {
+			err := handler(mockTxStore)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		signer:       mockSigner,
+		nodeAddress:  nodeAddress,
+		minChallenge: minChallenge,
+		sigValidators: map[SigValidatorType]SigValidator{
+			EcdsaSigValidatorType: mockSigValidator,
+		},
+	}
+
+	// Test data
+	userWallet := "0x1234567890123456789012345678901234567890"
+	asset := "USDC"
+	homeChannelID := "0xHomeChannel123"
+
+	homeChannel := core.Channel{
+		ChannelID:    homeChannelID,
+		UserWallet:   userWallet,
+		NodeWallet:   nodeAddress,
+		Type:         core.ChannelTypeHome,
+		BlockchainID: 1,
+		TokenAddress: "0xTokenAddress",
+		Challenge:    86400,
+		Nonce:        12345,
+		Status:       core.ChannelStatusOpen,
+		StateVersion: 1,
+	}
+
+	// Mock expectations
+	mockTxStore.On("GetActiveHomeChannel", userWallet, asset).Return(&homeChannel, nil)
+
+	// Create RPC request
+	reqPayload := rpc.ChannelsV1GetHomeChannelRequest{
+		Wallet: userWallet,
+		Asset:  asset,
+	}
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	rpcRequest := rpc.Message{
+		Method:  "channels.v1.get_home_channel",
+		Payload: payload,
+	}
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpcRequest,
+	}
+
+	// Execute
+	handler.GetHomeChannel(ctx)
+
+	// Assert
+	assert.NotNil(t, ctx.Response.Payload)
+	assert.Nil(t, ctx.Response.Error())
+
+	var response rpc.ChannelsV1GetHomeChannelResponse
+	err = ctx.Response.Payload.Translate(&response)
+	require.NoError(t, err)
+
+	assert.Equal(t, homeChannelID, response.Channel.ChannelID)
+	assert.Equal(t, userWallet, response.Channel.UserWallet)
+	assert.Equal(t, nodeAddress, response.Channel.NodeWallet)
+	assert.Equal(t, "home", response.Channel.Type)
+	assert.Equal(t, uint32(1), response.Channel.BlockchainID)
+	assert.Equal(t, "open", response.Channel.Status)
+
+	// Verify all mock expectations
+	mockTxStore.AssertExpectations(t)
+}
+
+func TestGetHomeChannel_NotFound(t *testing.T) {
+	// Setup
+	mockTxStore := new(MockStore)
+	mockSigner := NewMockSigner()
+	mockSigValidator := new(MockSigValidator)
+	nodeAddress := mockSigner.PublicKey().Address().String()
+	minChallenge := uint64(3600)
+
+	handler := &Handler{
+		stateAdvancer: core.NewStateAdvancerV1(),
+		useStoreInTx: func(handler StoreTxHandler) error {
+			err := handler(mockTxStore)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		signer:       mockSigner,
+		nodeAddress:  nodeAddress,
+		minChallenge: minChallenge,
+		sigValidators: map[SigValidatorType]SigValidator{
+			EcdsaSigValidatorType: mockSigValidator,
+		},
+	}
+
+	// Test data
+	userWallet := "0x1234567890123456789012345678901234567890"
+	asset := "USDC"
+
+	// Mock expectations
+	mockTxStore.On("GetActiveHomeChannel", userWallet, asset).Return(nil, nil)
+
+	// Create RPC request
+	reqPayload := rpc.ChannelsV1GetHomeChannelRequest{
+		Wallet: userWallet,
+		Asset:  asset,
+	}
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	rpcRequest := rpc.Message{
+		Method:  "channels.v1.get_home_channel",
+		Payload: payload,
+	}
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpcRequest,
+	}
+
+	// Execute
+	handler.GetHomeChannel(ctx)
+
+	// Assert
+	assert.NotNil(t, ctx.Response.Error())
+	assert.Contains(t, ctx.Response.Error().Error(), "channel_not_found")
+
+	// Verify all mock expectations
+	mockTxStore.AssertExpectations(t)
+}

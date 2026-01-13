@@ -32,7 +32,11 @@ func GetHomeChannelID(nodeAddress, userAddress, tokenAddress string, nonce, chal
 		{Type: uint256Type},                // nonce
 	}
 
-	packed, err := args.Pack(nodeAddr, userAddr, tokenAddr, challenge, nonce)
+	// Convert challenge to uint32 and nonce to big.Int for ABI packing
+	challenge32 := uint32(challenge)
+	nonceBI := new(big.Int).SetUint64(nonce)
+
+	packed, err := args.Pack(nodeAddr, userAddr, tokenAddr, challenge32, nonceBI)
 	if err != nil {
 		return "", err
 	}
@@ -49,7 +53,9 @@ func GetEscrowChannelID(homeChannelID string, stateVersion uint64) (string, erro
 		{Type: uint256Type},                             // stateVersion
 	}
 
-	packed, err := args.Pack(rawHomeChannelID, stateVersion)
+	stateVersionBI := new(big.Int).SetUint64(stateVersion)
+
+	packed, err := args.Pack(rawHomeChannelID, stateVersionBI)
 	if err != nil {
 		return "", err
 	}
@@ -78,32 +84,24 @@ func GetStateID(userWallet, asset string, epoch, version uint64) string {
 	return crypto.Keccak256Hash(packed).Hex()
 }
 
-// GetTransactionID calculates a unique transaction reference based on the participating account and the resulting state.
-func GetTransactionID(toAccount, fromAccount string, senderNewStateID, receiverNewStateID *string) (string, error) {
-	var packed []byte
-	var err error
+// GetSenderTransactionID calculates and returns a unique transaction ID reference for actions initiated by user.
+func GetSenderTransactionID(toAccount string, senderNewStateID string) (string, error) {
+	return getTransactionID(toAccount, senderNewStateID)
+}
 
-	// 1) User Initiated: Hash(ToAccount, SenderNewStateID)
-	// 2) Node Initiated: Hash(FromAccount, ReceiverNewStateID)
+// GetReceiverTransactionID calculates and returns a unique transaction ID reference for actions initiated by node.
+func GetReceiverTransactionID(fromAccount, receiverNewStateID string) (string, error) {
+	return getTransactionID(fromAccount, receiverNewStateID)
+}
 
-	if senderNewStateID != nil {
-		args := abi.Arguments{
-			{Type: abi.Type{T: abi.StringTy}},               // ToAccount
-			{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}}, // SenderNewStateID
-		}
-		senderStateID := common.HexToHash(*senderNewStateID)
-		packed, err = args.Pack(toAccount, senderStateID)
-	} else if receiverNewStateID != nil {
-		args := abi.Arguments{
-			{Type: abi.Type{T: abi.StringTy}},               // FromAccount
-			{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}}, // ReceiverNewStateID
-		}
-		receiverStateID := common.HexToHash(*receiverNewStateID)
-		packed, err = args.Pack(fromAccount, receiverStateID)
-	} else {
-		return "", fmt.Errorf("transaction must have either SenderNewStateID or ReceiverNewStateID")
+func getTransactionID(account, newStateID string) (string, error) {
+	args := abi.Arguments{
+		{Type: abi.Type{T: abi.StringTy}},
+		{Type: abi.Type{T: abi.FixedBytesTy, Size: 32}},
 	}
 
+	receiverStateID := common.HexToHash(newStateID)
+	packed, err := args.Pack(account, receiverStateID)
 	if err != nil {
 		return "", fmt.Errorf("failed to pack transaction ID arguments: %w", err)
 	}

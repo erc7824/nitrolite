@@ -1,0 +1,96 @@
+package channel_v1
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/erc7824/nitrolite/pkg/core"
+	"github.com/erc7824/nitrolite/pkg/rpc"
+)
+
+func TestGetEscrowChannel_Success(t *testing.T) {
+	// Setup
+	mockTxStore := new(MockStore)
+	mockSigner := NewMockSigner()
+	mockSigValidator := new(MockSigValidator)
+	nodeAddress := mockSigner.PublicKey().Address().String()
+	minChallenge := uint64(3600)
+
+	handler := &Handler{
+		stateAdvancer: core.NewStateAdvancerV1(),
+		useStoreInTx: func(handler StoreTxHandler) error {
+			err := handler(mockTxStore)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		signer:       mockSigner,
+		nodeAddress:  nodeAddress,
+		minChallenge: minChallenge,
+		sigValidators: map[SigValidatorType]SigValidator{
+			EcdsaSigValidatorType: mockSigValidator,
+		},
+	}
+
+	// Test data
+	userWallet := "0x1234567890123456789012345678901234567890"
+	escrowChannelID := "0xEscrowChannel456"
+
+	escrowChannel := core.Channel{
+		ChannelID:    escrowChannelID,
+		UserWallet:   userWallet,
+		NodeWallet:   nodeAddress,
+		Type:         core.ChannelTypeEscrow,
+		BlockchainID: 2,
+		TokenAddress: "0xTokenAddress",
+		Challenge:    86400,
+		Nonce:        12345,
+		Status:       core.ChannelStatusOpen,
+		StateVersion: 2,
+	}
+
+	// Mock expectations
+	mockTxStore.On("GetChannelByID", escrowChannelID).Return(&escrowChannel, nil)
+
+	// Create RPC request
+	reqPayload := rpc.ChannelsV1GetEscrowChannelRequest{
+		EscrowChannelID: escrowChannelID,
+	}
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	rpcRequest := rpc.Message{
+		Method:  "channels.v1.get_escrow_channel",
+		Payload: payload,
+	}
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpcRequest,
+	}
+
+	// Execute
+	handler.GetEscrowChannel(ctx)
+
+	// Assert
+	assert.NotNil(t, ctx.Response.Payload)
+	assert.Nil(t, ctx.Response.Error())
+
+	var response rpc.ChannelsV1GetEscrowChannelResponse
+	err = ctx.Response.Payload.Translate(&response)
+	require.NoError(t, err)
+
+	assert.Equal(t, escrowChannelID, response.Channel.ChannelID)
+	assert.Equal(t, userWallet, response.Channel.UserWallet)
+	assert.Equal(t, nodeAddress, response.Channel.NodeWallet)
+	assert.Equal(t, "escrow", response.Channel.Type)
+	assert.Equal(t, uint32(2), response.Channel.BlockchainID)
+	assert.Equal(t, "open", response.Channel.Status)
+
+	// Verify all mock expectations
+	mockTxStore.AssertExpectations(t)
+}

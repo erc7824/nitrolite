@@ -43,6 +43,8 @@ type ChannelsV1GetChannelsRequest struct {
 	Wallet string `json:"wallet"`
 	// Status filters by status
 	Status *string `json:"status,omitempty"`
+	// Asset filters by asset
+	Asset *string `json:"asset,omitempty"`
 	// Pagination contains pagination parameters (offset, limit, sort)
 	Pagination *PaginationParamsV1 `json:"pagination,omitempty"`
 }

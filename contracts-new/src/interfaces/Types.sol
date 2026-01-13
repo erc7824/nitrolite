@@ -7,10 +7,18 @@ struct Definition {
     uint32 challengeDuration;
     address participant;
     address node;
-    uint256 nonce;
+    uint64 nonce;
+    bytes32 metadata;
     // to be added later:
     // address executionModule;
     // address signatureValidator;
+}
+
+enum ChannelStatus {
+    VOID,
+    OPERATING,
+    DISPUTED,
+    CLOSED
 }
 
 enum StateIntent {
@@ -25,9 +33,8 @@ enum StateIntent {
 }
 
 struct CrossChainState {
-    uint256 version;
+    uint64 version;
 
-    uint64 homeChainId;
     StateIntent intent;
 
     // to be added for fees logic:
@@ -45,8 +52,8 @@ struct State {
     address token;
 
     uint256 userAllocation;
-    uint256 userNetFlow;
+    int256 userNetFlow; // can be negative as user can withdraw funds without depositing them (e.g., on a non-home chain)
 
     uint256 nodeAllocation;
-    uint256 nodeNetFlow;
+    int256 nodeNetFlow; // can be negative as node can withdraw user funds
 }

@@ -46,17 +46,43 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		if err != nil {
 			return rpc.Errorf("failed to check existing channel: %v", err)
 		}
-		// User has no signed previous state
+		// User has no previous state
 		if currentState == nil {
-			logger.Debug("no previous signed state found, issuing a void state")
+			logger.Debug("no previous state found, issuing a void state")
 			currentState = core.NewVoidState(incomingState.Asset, incomingState.UserWallet)
+		}
+
+		// Calculate home channel ID
+		homeChannelID, err := core.GetHomeChannelID(
+			h.nodeAddress,
+			incomingState.UserWallet,
+			incomingState.HomeLedger.TokenAddress,
+			channelDef.Nonce,
+			channelDef.Challenge,
+		)
+		if err != nil {
+			return rpc.Errorf("failed to calculate channel ID: %v", err)
+		}
+
+		// Validate the home channel ID in the state
+		if incomingState.HomeChannelID == nil || *incomingState.HomeChannelID != homeChannelID {
+			return rpc.Errorf("incoming state home_channel_id is invalid")
+		}
+
+		if currentState.HomeChannelID != nil {
+			if !currentState.IsFinal {
+				return rpc.Errorf("channel is already initialized")
+			}
+			if currentState.IsFinal && *incomingState.HomeChannelID == *currentState.HomeChannelID {
+				return rpc.Errorf("cannot use same home channel id")
+			}
 		}
 
 		if channelDef.Nonce == 0 {
 			return rpc.Errorf("nonce must be non-zero")
 		}
 		if channelDef.Challenge < h.minChallenge {
-			return rpc.Errorf("challenge period must be non-zero")
+			return rpc.Errorf("challenge period must be at least %d seconds, but got %d", h.minChallenge, channelDef.Challenge)
 		}
 		logger.Debug("processing channel creation request", "incomingVersion", incomingState.Version)
 
@@ -81,23 +107,6 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		sigValidator := h.sigValidators[EcdsaSigValidatorType]
 		if err := sigValidator.Verify(incomingState.UserWallet, packedState, userSigBytes); err != nil {
 			return rpc.Errorf("invalid user signature: %v", err)
-		}
-
-		// Calculate home channel ID
-		homeChannelID, err := core.GetHomeChannelID(
-			h.nodeAddress,
-			incomingState.UserWallet,
-			incomingState.HomeLedger.TokenAddress,
-			channelDef.Nonce,
-			channelDef.Challenge,
-		)
-		if err != nil {
-			return rpc.Errorf("failed to calculate channel ID: %v", err)
-		}
-
-		// Validate the home channel ID in the state
-		if incomingState.HomeChannelID == nil || *incomingState.HomeChannelID != homeChannelID {
-			return rpc.Errorf("incoming state home_channel_id is invalid")
 		}
 
 		newHomeChannel := core.NewChannel(

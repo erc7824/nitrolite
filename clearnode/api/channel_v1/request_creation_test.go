@@ -193,20 +193,33 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 	// Test data
 	userWallet := "0x1234567890123456789012345678901234567890"
 	asset := "USDC"
+	tokenAddress := "0xToken"
+	nonce := uint64(12345)
 	lowChallenge := uint64(1800) // 30 minutes - below minimum
+
+	// Calculate home channel ID
+	homeChannelID, err := core.GetHomeChannelID(
+		nodeAddress,
+		userWallet,
+		tokenAddress,
+		nonce,
+		lowChallenge,
+	)
+	require.NoError(t, err)
 
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil).Once()
 
 	// Create RPC request with challenge below minimum
 	reqPayload := rpc.ChannelsV1RequestCreationRequest{
 		State: rpc.StateV1{
-			ID:         core.GetStateID(userWallet, asset, 1, 1),
-			UserWallet: userWallet,
-			Asset:      asset,
-			Epoch:      "1",
-			Version:    "1",
+			ID:            core.GetStateID(userWallet, asset, 1, 1),
+			UserWallet:    userWallet,
+			Asset:         asset,
+			Epoch:         "1",
+			Version:       "1",
+			HomeChannelID: &homeChannelID,
 			HomeLedger: rpc.LedgerV1{
-				TokenAddress: "0xToken",
+				TokenAddress: tokenAddress,
 				BlockchainID: 1,
 				UserBalance:  "0",
 				UserNetFlow:  "0",
@@ -216,7 +229,7 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 			IsFinal: false,
 		},
 		ChannelDefinition: rpc.ChannelDefinitionV1{
-			Nonce:     "12345",
+			Nonce:     decimal.NewFromInt(int64(nonce)).String(),
 			Challenge: decimal.NewFromInt(int64(lowChallenge)).String(),
 		},
 	}

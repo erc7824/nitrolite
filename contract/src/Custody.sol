@@ -528,6 +528,7 @@ contract Custody is IChannel, IDeposit, IChannelReader, EIP712 {
             if (!_isMoreRecent(meta.chan.adjudicator, candidate, meta.lastValidState)) revert InvalidState();
             if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
         } else {
+            // FIXME: it is not checked whether the challenge has already expired. Thus it is possible to remove a challenge that should already have expired
             // meta.stage == ChannelStatus.DISPUTE
             if (!IAdjudicator(meta.chan.adjudicator).adjudicate(meta.chan, candidate, proofs)) revert InvalidState();
 

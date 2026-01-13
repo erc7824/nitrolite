@@ -20,7 +20,6 @@ library Utils {
         return abi.encode(
             channelId,
             ccs.version,
-            ccs.homeChainId,
             ccs.intent,
             ccs.homeState,
             ccs.nonHomeState
@@ -42,6 +41,21 @@ library Utils {
 
         require(recoveredParticipant == participant, "invalid participant signature");
         require(recoveredNode == node, "invalid node signature");
+    }
+
+    function validateChallengerSignature(
+        CrossChainState memory ccs,
+        bytes32 channelId,
+        bytes memory challengerSig,
+        address participant,
+        address node
+    ) internal pure {
+        bytes memory packedChallengeState = abi.encodePacked(pack(ccs, channelId), "challenge");
+        bytes32 ethSignedHash = packedChallengeState.toEthSignedMessageHash();
+
+        address recoveredChallenger = ethSignedHash.recover(challengerSig);
+
+        require(recoveredChallenger == participant || recoveredChallenger == node, "challenger must be node or participant");
     }
 
     // ========== State ==========

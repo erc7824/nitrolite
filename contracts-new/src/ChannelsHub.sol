@@ -5,12 +5,12 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.so
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IVault} from "./interfaces/IVault.sol";
-import {Definition, CrossChainState, State, StateIntent} from "./interfaces/Types.sol";
+import {Definition, ChannelStatus, CrossChainState, State, StateIntent} from "./interfaces/Types.sol";
 
 import {Utils} from "./Utils.sol";
 
 contract ChannelsHub is IVault {
-    using {Utils.validateSignatures} for CrossChainState;
+    using {Utils.validateSignatures, Utils.validateChallengerSignature} for CrossChainState;
     using {Utils.isEmpty} for State;
     using SafeERC20 for IERC20;
 
@@ -20,11 +20,13 @@ contract ChannelsHub is IVault {
     error AddressCollision(address collision);
     error IncorrectChallengeDuration();
 
+    error ChannelDoesNotExist(bytes32 channelId);
+
     struct Metadata {
+        ChannelStatus status;
         Definition definition;
         CrossChainState lastState;
-        uint256 participantLockedFunds;
-        uint256 nodeLockedFunds;
+        uint256 lockedFunds;
         uint64 challengeExpiry; // timestamp when challenge period ends
     }
 
@@ -95,18 +97,18 @@ contract ChannelsHub is IVault {
     // TODO: replace with user-locked liquidity provision
 
     // user to deposit funds into node's balance
-    function deposit(address node, address token, uint256 amount) external payable {
+    function depositToVault(address node, address token, uint256 amount) external payable {
         require(node != address(0), InvalidAddress());
         require(amount > 0, InvalidAmount());
 
         _nodeBalances[node][token] += amount;
 
-        _pullFunds(token, amount);
+        _pullFunds(msg.sender, token, amount);
 
         emit Deposited(node, token, amount);
     }
 
-    function withdraw(address to, address token, uint256 amount) external {
+    function withdrawFromVault(address to, address token, uint256 amount) external {
         require(to != address(0), InvalidAddress());
         require(amount > 0, InvalidAmount());
 
@@ -128,14 +130,13 @@ contract ChannelsHub is IVault {
     // - open a new channel with User deposit funds ("entry to Clearnet")
     // - open a new channel with Node transfer funds to User (User joins Clearnet after already receiving funds)
     // - open and close channel in one go for atomic for User receiving and withdrawing funds
-    function create(Definition calldata def, CrossChainState calldata initCCS) external payable {
+    function createChannel(Definition calldata def, CrossChainState calldata initCCS) external payable {
         // -- checks --
         _requireValidDefinition(def);
+        _requireValidState(initCCS);
 
-        require(initCCS.homeChainId == block.chainid, "invalid home chain id for initial state");
         require(initCCS.version == 0, "invalid initial version");
         require(initCCS.intent == StateIntent.CREATE, "invalid initial intent");
-        require(!initCCS.homeState.isEmpty(), "home state cannot be empty");
         require(initCCS.nonHomeState.isEmpty(), "non-home state must be empty");
         require(initCCS.homeState.nodeAllocation == 0, "node balance must be zero in initial state");
 
@@ -145,15 +146,16 @@ contract ChannelsHub is IVault {
 
         // -- effects --
         _channels[channelId] = Metadata({
+            status: ChannelStatus.OPERATING,
             definition: def,
             lastState: initCCS,
-            participantLockedFunds: initCCS.homeState.userAllocation,
-            nodeLockedFunds: 0,
+            lockedFunds: initCCS.homeState.userAllocation,
             challengeExpiry: 0
         });
 
         // -- interactions --
         _pullFunds(
+            def.participant,
             initCCS.homeState.token,
             initCCS.homeState.userAllocation
         );
@@ -162,6 +164,80 @@ contract ChannelsHub is IVault {
     }
 
     event ChannelCreated(bytes32 indexed channelId, address indexed participant, address indexed node, Definition definition, CrossChainState initialState);
+
+    function depositToChannel(bytes32 channelId, CrossChainState calldata candidate) public payable {
+        // -- checks --
+        ChannelStatus status = _validateChannelStatusAndChallenge(channelId);
+
+        CrossChainState memory prevState = _channels[channelId].lastState;
+
+        require(candidate.intent == StateIntent.DEPOSIT, "invalid intent");
+        _requireValidState(candidate);
+        _requireValidTransition(candidate, prevState, false);
+
+        int256 depositAmount = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
+        require(depositAmount > 0, "deposit amount must be positive");
+
+        address participant = _channels[channelId].definition.participant;
+        address node = _channels[channelId].definition.node;
+
+        candidate.validateSignatures(channelId, participant, node);
+
+        // -- effects --
+        _clearDisputedStatus(channelId, status);
+        _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
+
+        _channels[channelId].lastState = candidate;
+        _channels[channelId].lockedFunds += uint256(depositAmount);
+
+        // -- interactions --
+        _pullFunds(
+            participant,
+            candidate.homeState.token,
+            uint256(depositAmount)
+        );
+
+        emit ChannelDeposited(channelId, candidate);
+    }
+
+    event ChannelDeposited(bytes32 indexed channelId, CrossChainState candidate);
+
+    function withdrawFromChannel(bytes32 channelId, CrossChainState calldata candidate) public payable {
+        // -- checks --
+        ChannelStatus status = _validateChannelStatusAndChallenge(channelId);
+
+        CrossChainState memory prevState = _channels[channelId].lastState;
+
+        require(candidate.intent == StateIntent.WITHDRAW, "invalid intent");
+        _requireValidState(candidate);
+        _requireValidTransition(candidate, prevState, false);
+
+        int256 withdrawalAmount = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
+        require(withdrawalAmount > 0, "invalid withdrawal amount");
+
+        address participant = _channels[channelId].definition.participant;
+        address node = _channels[channelId].definition.node;
+
+        candidate.validateSignatures(channelId, participant, node);
+
+        // -- effects --
+        _clearDisputedStatus(channelId, status);
+        _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
+
+        _channels[channelId].lastState = candidate;
+        _channels[channelId].lockedFunds -= uint256(withdrawalAmount);
+
+        // -- interactions --
+        _pushFunds(
+            participant,
+            candidate.homeState.token,
+            uint256(withdrawalAmount)
+        );
+
+        emit ChannelWithdrawn(channelId, candidate);
+    }
+
+    event ChannelWithdrawn(bytes32 indexed channelId, CrossChainState candidate);
 
     // usage:
     // - "open" channel on new chain in case of chain migration
@@ -191,27 +267,134 @@ contract ChannelsHub is IVault {
     // - withdraw User funds from a home chain to ERC20 (here)
     // - release Node's funds from a channel to the Node's internal vault balance (here)
     // - Node deposit funds into a home chain channel during bridging-deposit (here)
-    function checkpoint(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {
-        // There is a problem for the contract to differentiate between actions in the same state.
-        // a "deposit" state may also contain "unlock to / lock from Node"
-        // such action can either be:
-        // - included in the same state OR
-        // - provided as a proof state, which action must also be performed before processing a candidate ("deposit") state
+    function checkpointChannel(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {
+        // -- checks --
+        ChannelStatus status = _validateChannelStatusAndChallenge(channelId);
 
-        // However, the "proof" approach will lead to situations when it is possible to execute such proof several times
+        CrossChainState memory prevState = _channels[channelId].lastState;
+
+        require(candidate.intent == StateIntent.OPERATE, "invalid intent");
+        _requireValidState(candidate);
+        _requireValidTransition(candidate, prevState, true);
+
+        address participant = _channels[channelId].definition.participant;
+        address node = _channels[channelId].definition.node;
+
+        candidate.validateSignatures(channelId, participant, node);
+
+        // -- effects --
+        _clearDisputedStatus(channelId, status);
+        _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
+
+        _channels[channelId].lastState = candidate;
+
+        emit ChannelCheckpointed(channelId, candidate);
     }
 
     event ChannelCheckpointed(bytes32 indexed channelId, CrossChainState candidate);
 
     // usage:
     // - close a channel in case either party is unresponsive
-    function challenge(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof, bytes calldata challengerSig) external payable {}
+    function challengeChannel(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof, bytes calldata challengerSig) external payable {
+        Metadata storage channelMeta = _channels[channelId];
+        ChannelStatus status = channelMeta.status;
+
+        if (status != ChannelStatus.OPERATING) {
+            revert("invalid channel status");
+        }
+
+        CrossChainState memory prevState = channelMeta.lastState;
+        require(candidate.version >= prevState.version, "challenge candidate must have higher version than previous state");
+
+        address participant = channelMeta.definition.participant;
+        address node = channelMeta.definition.node;
+
+        if (candidate.version > prevState.version) {
+            // check candidate
+            require(candidate.intent == StateIntent.OPERATE, "invalid intent");
+            _requireValidState(candidate);
+            _requireValidTransition(candidate, prevState, true);
+
+            candidate.validateSignatures(channelId, participant, node);
+
+            // -- effects --
+            _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
+            channelMeta.lastState = candidate;
+        } /* else {
+            challenging with previous state, which was already processed
+            only `candidate.version == prev.version` is checked
+            `candidate == prevState` check is not required (but implied) as the protocol forbids a case where
+            2 different states have the same version
+            even if a different state with the same version is supplied, it does not affect
+            the protocol, as the new state is not processed - only challenger signature is verified
+        } */
+
+        candidate.validateChallengerSignature(channelId, challengerSig, participant, node);
+
+        channelMeta.status = ChannelStatus.DISPUTED;
+        uint64 challengeExpiry = uint64(block.timestamp) + channelMeta.definition.challengeDuration;
+        channelMeta.challengeExpiry = challengeExpiry;
+
+        emit ChannelChallenged(channelId, candidate, challengeExpiry);
+    }
 
     event ChannelChallenged(bytes32 indexed channelId, CrossChainState candidate, uint256 challengeExpiry);
 
     // usage:
     // - unilaterally close the channel withdrawing all funds
-    function close(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {}
+    function closeChannel(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {
+        // -- checks --
+        Metadata storage channelMeta = _channels[channelId];
+        ChannelStatus status = channelMeta.status;
+
+        if (status != ChannelStatus.OPERATING && status != ChannelStatus.DISPUTED) {
+            revert("invalid channel status");
+        }
+
+        CrossChainState memory prevState = channelMeta.lastState;
+        address node = channelMeta.definition.node;
+        address participant = channelMeta.definition.participant;
+
+        if (status == ChannelStatus.DISPUTED && block.timestamp > channelMeta.challengeExpiry) {
+            // withdraw user funds according to lastState
+            _pushFunds(
+                participant,
+                prevState.homeState.token,
+                prevState.homeState.userAllocation
+            );
+
+            _pushFunds(
+                node,
+                prevState.homeState.token,
+                prevState.homeState.nodeAllocation
+            );
+
+            emit ChannelClosed(channelId, prevState);
+        } else {
+            // status == ChannelStatus.OPERATING || status == ChannelStatus.DISPUTED && not expired
+
+            // validate candidate
+            require(candidate.intent == StateIntent.CLOSE, "invalid intent");
+            _requireValidState(candidate);
+            require(candidate.homeState.nodeAllocation == 0, "node allocation must be 0");
+            _requireValidTransition(candidate, prevState, true);
+
+            candidate.validateSignatures(channelId, participant, node);
+
+            // -- effects --
+            _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
+
+            _pushFunds(
+                participant,
+                candidate.homeState.token,
+                candidate.homeState.userAllocation
+            );
+
+            delete _channels[channelId];
+
+            emit ChannelClosed(channelId, candidate);
+        }
+    }
 
     event ChannelClosed(bytes32 indexed channelId, CrossChainState finalState);
 
@@ -285,14 +468,7 @@ contract ChannelsHub is IVault {
 
     // ========= Internal ==========
 
-    function _requireValidDefinition(Definition calldata def) internal pure {
-        require(def.participant != address(0), InvalidAddress());
-        require(def.node != address(0), InvalidAddress());
-        require(def.participant != def.node, AddressCollision(def.participant));
-        require(def.challengeDuration >= MIN_CHALLENGE_DURATION, IncorrectChallengeDuration());
-    }
-
-    function _pullFunds(address token, uint256 amount) internal {
+    function _pullFunds(address from, address token, uint256 amount) internal {
         if (amount == 0) return;
 
         if (token == address(0)) {
@@ -302,7 +478,7 @@ contract ChannelsHub is IVault {
         }
 
         if (token != address(0)) {
-            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+            IERC20(token).safeTransferFrom(from, address(this), amount);
         }
     }
 
@@ -316,7 +492,99 @@ contract ChannelsHub is IVault {
         }
     }
 
-    function _getChainId() internal view returns (uint64) {
-        return uint64(block.chainid); // narrowing to uint64 is safe according to EIP-2294
+
+    function _requireValidDefinition(Definition calldata def) internal pure {
+        require(def.participant != address(0), InvalidAddress());
+        require(def.node != address(0), InvalidAddress());
+        require(def.participant != def.node, AddressCollision(def.participant));
+        require(def.challengeDuration >= MIN_CHALLENGE_DURATION, IncorrectChallengeDuration());
+    }
+
+    /**
+     * @dev Validates that channel status is OPERATING or DISPUTED, and checks challenge expiry if DISPUTED
+     * @param channelId The channel identifier
+     * @return status The current channel status
+     */
+    function _validateChannelStatusAndChallenge(bytes32 channelId) internal view returns (ChannelStatus) {
+        ChannelStatus status = _channels[channelId].status;
+        if (status != ChannelStatus.OPERATING && status != ChannelStatus.DISPUTED) {
+            revert("invalid channel status");
+        }
+
+        if (status == ChannelStatus.DISPUTED) {
+            require(block.timestamp <= _channels[channelId].challengeExpiry, "challenge period has expired");
+        }
+
+        return status;
+    }
+
+    function _requireValidState(
+        CrossChainState memory state
+    ) internal view {
+        require(state.homeState.chainId == block.chainid, "invalid home state chain id");
+
+        uint256 allocsSum = state.homeState.userAllocation + state.homeState.nodeAllocation;
+        int256 netFlowsSum = state.homeState.userNetFlow + state.homeState.nodeNetFlow;
+        require(netFlowsSum >= 0, "negative net flow sum");
+        require(allocsSum == uint256(netFlowsSum), "allocation/net flow sum mismatch");
+    }
+
+    /**
+     * @dev Validates common candidate state properties against previous state
+     * @param candidate The new state to validate
+     * @param prevState The previous state to compare against
+     * @param requireZeroUserDelta If true, requires user net flow delta to be zero
+     */
+    function _requireValidTransition(
+        CrossChainState memory candidate,
+        CrossChainState memory prevState,
+        bool requireZeroUserDelta
+    ) internal pure {
+        require(candidate.version > prevState.version, "invalid version");
+        require(candidate.homeState.token == prevState.homeState.token, "home state token mismatch");
+
+        if (requireZeroUserDelta) {
+            int256 userDeltaAmount = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
+            require(userDeltaAmount == 0, "user delta must be 0");
+        }
+    }
+
+    /**
+     * @dev Adjusts node balance based on the net flow delta between states
+     * @param channelId The channel identifier
+     * @param node The node address
+     * @param token The token address
+     * @param prevState The previous state
+     * @param newState The new state
+     */
+    function _adjustNodeBalance(
+        bytes32 channelId,
+        address node,
+        address token,
+        CrossChainState memory prevState,
+        CrossChainState memory newState
+    ) internal {
+        int256 nodeDelta = newState.homeState.nodeNetFlow - prevState.homeState.nodeNetFlow;
+        if (nodeDelta < 0) {
+            // release Node's funds from the channel to the Node's internal vault balance
+            _nodeBalances[node][token] += uint256(-nodeDelta);
+            _channels[channelId].lockedFunds -= uint256(-nodeDelta);
+        } else if (nodeDelta > 0) {
+            // lock Node's funds into the channel from the Node's internal vault balance
+            _nodeBalances[node][token] -= uint256(nodeDelta);
+            _channels[channelId].lockedFunds += uint256(nodeDelta);
+        }
+    }
+
+    /**
+     * @dev Clears disputed status and resets challenge expiry if channel is in disputed state
+     * @param channelId The channel identifier
+     * @param status The current channel status
+     */
+    function _clearDisputedStatus(bytes32 channelId, ChannelStatus status) internal {
+        if (status == ChannelStatus.DISPUTED) {
+            _channels[channelId].status = ChannelStatus.OPERATING;
+            _channels[channelId].challengeExpiry = 0;
+        }
     }
 }

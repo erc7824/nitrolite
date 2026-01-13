@@ -42,7 +42,7 @@ interface IVault {
      * @param token Token address (use address(0) for native tokens)
      * @param amount Amount of tokens to deposit
      */
-    function deposit(address account, address token, uint256 amount) external payable;
+    function depositToVault(address account, address token, uint256 amount) external payable;
 
     /**
      * @notice Withdraws tokens from the contract
@@ -51,5 +51,5 @@ interface IVault {
      * @param token Token address (use address(0) for native tokens)
      * @param amount Amount of tokens to withdraw
      */
-    function withdraw(address account, address token, uint256 amount) external;
+    function withdrawFromVault(address account, address token, uint256 amount) external;
 }

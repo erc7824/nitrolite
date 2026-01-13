@@ -32,6 +32,11 @@ Given the 3 and 4, an invariant:
 
 ---
 
+5. A party never signs a state with a `version` that was already signed for this channel.
+
+Invariant:
+> No different states with the same `version` can exist for the same channel.
+
 ## Invariants
 
 ---
@@ -53,6 +58,7 @@ e.g. when processing "receive X, withdraw Y", increase `lockedFunds` (and "lock"
 - for challenge a state with `version` < `latestKnownVersion` per chain can not be accepted as valid
 - a channel with the same `channelId` can not be created twice
 - an escrow with the same `escrowId` can not be created twice
+- on-chain-stored state has already been processed
 
 ---
 

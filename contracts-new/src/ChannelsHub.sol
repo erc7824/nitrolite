@@ -49,8 +49,9 @@ contract ChannelsHub is IVault {
 
     // ******
 
-    function getNodeBalance(address node, address token) external view returns (uint256) {
-        // node's deposit + escrowDepositUnlocked funds + checkpointed Node's net flow (receive - send)
+    function getVaultBalance(address node, address token) external view returns (uint256) {
+        // TODO: add escrowDepositUnlocked funds
+        return _nodeBalances[node][token];
     }
 
     function getOpenChannels(address participant) external view returns (bytes32[] memory) {
@@ -61,12 +62,18 @@ contract ChannelsHub is IVault {
         external
         view
         returns (
+            ChannelStatus status,
             Definition memory definition,
             CrossChainState memory lastState,
             uint256 challengeExpiry,
-            uint256 participantLockedFunds
+            uint256 lockedFunds
         ) {
-        // return channel Metadata
+        Metadata memory meta = _channels[channelId];
+        status = meta.status;
+        definition = meta.definition;
+        lastState = meta.lastState;
+        challengeExpiry = meta.challengeExpiry;
+        lockedFunds = meta.lockedFunds;
     }
 
     function getEscrowDepositData(bytes32 escrowId)
@@ -168,18 +175,19 @@ contract ChannelsHub is IVault {
     function depositToChannel(bytes32 channelId, CrossChainState calldata candidate) public payable {
         // -- checks --
         ChannelStatus status = _validateChannelStatusAndChallenge(channelId);
-
-        CrossChainState memory prevState = _channels[channelId].lastState;
+        Metadata storage channelMeta = _channels[channelId];
+        CrossChainState memory prevState = channelMeta.lastState;
 
         require(candidate.intent == StateIntent.DEPOSIT, "invalid intent");
         _requireValidState(candidate);
-        _requireValidTransition(candidate, prevState, false);
 
-        int256 depositAmount = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
-        require(depositAmount > 0, "deposit amount must be positive");
+        address participant = channelMeta.definition.participant;
+        address node = channelMeta.definition.node;
 
-        address participant = _channels[channelId].definition.participant;
-        address node = _channels[channelId].definition.node;
+        _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], false);
+
+        int256 userDepositAmount = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
+        require(userDepositAmount > 0, "deposit amount must be positive");
 
         candidate.validateSignatures(channelId, participant, node);
 
@@ -187,14 +195,14 @@ contract ChannelsHub is IVault {
         _clearDisputedStatus(channelId, status);
         _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
 
-        _channels[channelId].lastState = candidate;
-        _channels[channelId].lockedFunds += uint256(depositAmount);
+        channelMeta.lastState = candidate;
+        channelMeta.lockedFunds += uint256(userDepositAmount);
 
         // -- interactions --
         _pullFunds(
             participant,
             candidate.homeState.token,
-            uint256(depositAmount)
+            uint256(userDepositAmount)
         );
 
         emit ChannelDeposited(channelId, candidate);
@@ -205,18 +213,22 @@ contract ChannelsHub is IVault {
     function withdrawFromChannel(bytes32 channelId, CrossChainState calldata candidate) public payable {
         // -- checks --
         ChannelStatus status = _validateChannelStatusAndChallenge(channelId);
-
-        CrossChainState memory prevState = _channels[channelId].lastState;
+        Metadata storage channelMeta = _channels[channelId];
+        CrossChainState memory prevState = channelMeta.lastState;
 
         require(candidate.intent == StateIntent.WITHDRAW, "invalid intent");
         _requireValidState(candidate);
-        _requireValidTransition(candidate, prevState, false);
 
-        int256 withdrawalAmount = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
-        require(withdrawalAmount > 0, "invalid withdrawal amount");
+        address participant = channelMeta.definition.participant;
+        address node = channelMeta.definition.node;
 
-        address participant = _channels[channelId].definition.participant;
-        address node = _channels[channelId].definition.node;
+        _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], false);
+
+        int256 userWithdrawalAmount = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
+        require(userWithdrawalAmount < 0, "invalid withdrawal amount");
+
+        // Verify withdrawal doesn't exceed user allocation
+        require(candidate.homeState.userAllocation <= prevState.homeState.userAllocation, "withdrawal exceeds allocation");
 
         candidate.validateSignatures(channelId, participant, node);
 
@@ -224,14 +236,14 @@ contract ChannelsHub is IVault {
         _clearDisputedStatus(channelId, status);
         _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
 
-        _channels[channelId].lastState = candidate;
-        _channels[channelId].lockedFunds -= uint256(withdrawalAmount);
+        channelMeta.lastState = candidate;
+        channelMeta.lockedFunds -= uint256(-userWithdrawalAmount);
 
         // -- interactions --
         _pushFunds(
             participant,
             candidate.homeState.token,
-            uint256(withdrawalAmount)
+            uint256(-userWithdrawalAmount)
         );
 
         emit ChannelWithdrawn(channelId, candidate);
@@ -270,15 +282,16 @@ contract ChannelsHub is IVault {
     function checkpointChannel(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {
         // -- checks --
         ChannelStatus status = _validateChannelStatusAndChallenge(channelId);
-
-        CrossChainState memory prevState = _channels[channelId].lastState;
+        Metadata storage channelMeta = _channels[channelId];
+        CrossChainState memory prevState = channelMeta.lastState;
 
         require(candidate.intent == StateIntent.OPERATE, "invalid intent");
         _requireValidState(candidate);
-        _requireValidTransition(candidate, prevState, true);
 
-        address participant = _channels[channelId].definition.participant;
-        address node = _channels[channelId].definition.node;
+        address participant = channelMeta.definition.participant;
+        address node = channelMeta.definition.node;
+
+        _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], true);
 
         candidate.validateSignatures(channelId, participant, node);
 
@@ -286,7 +299,7 @@ contract ChannelsHub is IVault {
         _clearDisputedStatus(channelId, status);
         _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
 
-        _channels[channelId].lastState = candidate;
+        channelMeta.lastState = candidate;
 
         emit ChannelCheckpointed(channelId, candidate);
     }
@@ -313,7 +326,7 @@ contract ChannelsHub is IVault {
             // check candidate
             require(candidate.intent == StateIntent.OPERATE, "invalid intent");
             _requireValidState(candidate);
-            _requireValidTransition(candidate, prevState, true);
+            _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], true);
 
             candidate.validateSignatures(channelId, participant, node);
 
@@ -377,7 +390,10 @@ contract ChannelsHub is IVault {
             require(candidate.intent == StateIntent.CLOSE, "invalid intent");
             _requireValidState(candidate);
             require(candidate.homeState.nodeAllocation == 0, "node allocation must be 0");
-            _requireValidTransition(candidate, prevState, true);
+            // Additional closure validation
+            require(candidate.homeState.userAllocation <= channelMeta.lockedFunds, "user allocation exceeds locked funds");
+            _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], true);
+
 
             candidate.validateSignatures(channelId, participant, node);
 
@@ -530,7 +546,9 @@ contract ChannelsHub is IVault {
     }
 
     /**
-     * @dev Validates common candidate state properties against previous state
+     * @dev Validates common candidate state properties against previous state, including
+     * that allocations will match locked funds after all adjustments
+     * Accounts for user net flow delta and node net flow delta
      * @param candidate The new state to validate
      * @param prevState The previous state to compare against
      * @param requireZeroUserDelta If true, requires user net flow delta to be zero
@@ -538,6 +556,8 @@ contract ChannelsHub is IVault {
     function _requireValidTransition(
         CrossChainState memory candidate,
         CrossChainState memory prevState,
+        uint256 currentLockedFunds,
+        uint256 nodeAvailableFunds,
         bool requireZeroUserDelta
     ) internal pure {
         require(candidate.version > prevState.version, "invalid version");
@@ -547,6 +567,21 @@ contract ChannelsHub is IVault {
             int256 userDeltaAmount = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
             require(userDeltaAmount == 0, "user delta must be 0");
         }
+
+        int256 userDelta = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
+
+        int256 nodeDelta = candidate.homeState.nodeNetFlow - prevState.homeState.nodeNetFlow;
+        if (nodeDelta > 0) {
+            require(nodeAvailableFunds >= uint256(nodeDelta), "insufficient node balance");
+        }
+
+        int256 expectedLockedFunds = int256(currentLockedFunds) + userDelta + nodeDelta;
+
+        require(expectedLockedFunds >= 0, "negative locked funds");
+
+        uint256 allocsSum = candidate.homeState.userAllocation + candidate.homeState.nodeAllocation;
+        require(allocsSum == uint256(expectedLockedFunds), "locked funds consistency mismatch");
+
     }
 
     /**

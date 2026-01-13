@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -36,12 +37,12 @@ type Channel struct {
 	StateVersion uint64        `json:"state_version"` // On-chain state version of the channel
 }
 
-func NewHomeChannel(channelID, userWallet, nodeWallet string, blockchainID uint32, tokenAddress string, nonce, challenge uint64) *Channel {
+func NewChannel(channelID, userWallet, nodeWallet string, ChType ChannelType, blockchainID uint32, tokenAddress string, nonce, challenge uint64) *Channel {
 	return &Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
 		NodeWallet:   nodeWallet,
-		Type:         ChannelTypeHome,
+		Type:         ChType,
 		BlockchainID: blockchainID,
 		TokenAddress: tokenAddress,
 		Nonce:        nonce,
@@ -219,14 +220,8 @@ type Transaction struct {
 }
 
 // NewTransaction creates a new instance of Transaction
-// returns error if ID generation failed
-func NewTransaction(asset string, txType TransactionType, fromAccount, toAccount string, senderNewStateID, receiverNewStateID *string, amount decimal.Decimal) (Transaction, error) {
-	id, err := GetTransactionID(toAccount, fromAccount, senderNewStateID, receiverNewStateID)
-	if err != nil {
-		return Transaction{}, err
-	}
-
-	return Transaction{
+func NewTransaction(id, asset string, txType TransactionType, fromAccount, toAccount string, senderNewStateID, receiverNewStateID *string, amount decimal.Decimal) *Transaction {
+	return &Transaction{
 		ID:                 id,
 		Asset:              asset,
 		TxType:             txType,
@@ -236,7 +231,128 @@ func NewTransaction(asset string, txType TransactionType, fromAccount, toAccount
 		ReceiverNewStateID: receiverNewStateID,
 		Amount:             amount,
 		CreatedAt:          time.Now().UTC(),
-	}, nil
+	}
+}
+
+// NewTransactionFromTransition maps the transition type to the appropriate transaction type and returns a pointer to a Transaction.
+func NewTransactionFromTransition(senderState State, receiverState *State, transition Transition) (*Transaction, error) {
+	var txType TransactionType
+	var toAccount, fromAccount string
+	// Transition validator is expected to make sure that all the fields are present and valid.
+
+	switch transition.Type {
+	case TransitionTypeHomeDeposit:
+		if senderState.HomeChannelID == nil {
+			return nil, fmt.Errorf("sender state has no home channel ID")
+		}
+
+		txType = TransactionTypeHomeDeposit
+		fromAccount = *senderState.HomeChannelID
+		toAccount = senderState.UserWallet
+
+	case TransitionTypeHomeWithdrawal:
+		if senderState.HomeChannelID == nil {
+			return nil, fmt.Errorf("sender state has no home channel ID")
+		}
+
+		txType = TransactionTypeHomeWithdrawal
+		fromAccount = senderState.UserWallet
+		toAccount = *senderState.HomeChannelID
+
+	case TransitionTypeEscrowDeposit:
+		if senderState.EscrowChannelID == nil {
+			return nil, fmt.Errorf("sender state has no escrow channel ID")
+		}
+
+		txType = TransactionTypeEscrowDeposit
+		fromAccount = *senderState.EscrowChannelID
+		toAccount = senderState.UserWallet
+
+	case TransitionTypeEscrowWithdraw:
+		if senderState.EscrowChannelID == nil || senderState.HomeChannelID == nil {
+			return nil, fmt.Errorf("sender state has no escrow or home channel ID")
+		}
+
+		txType = TransactionTypeEscrowWithdraw
+		fromAccount = *senderState.HomeChannelID
+		toAccount = *senderState.EscrowChannelID
+
+	case TransitionTypeTransferSend:
+		if receiverState == nil {
+			return nil, fmt.Errorf("receiver state must not be nil for 'transfer_send' transition")
+		}
+
+		txType = TransactionTypeTransfer
+		fromAccount = senderState.UserWallet
+		toAccount = transition.AccountID
+
+	case TransactionTypeCommit:
+		txType = TransactionTypeCommit
+		fromAccount = senderState.UserWallet
+		toAccount = transition.AccountID
+
+	case TransactionTypeRelease:
+		txType = TransactionTypeRelease
+		fromAccount = transition.AccountID
+		toAccount = senderState.UserWallet
+		if receiverState != nil {
+			return nil, fmt.Errorf("receiver state must not be nil for 'release' transition")
+		}
+
+	case TransitionTypeMutualLock:
+		if senderState.EscrowChannelID == nil || senderState.HomeChannelID == nil {
+			return nil, fmt.Errorf("sender state has no escrow or home channel ID")
+		}
+
+		txType = TransactionTypeMutualLock
+		fromAccount = *senderState.HomeChannelID
+		toAccount = *senderState.EscrowChannelID
+
+	case TransitionTypeEscrowLock:
+		if senderState.EscrowChannelID == nil || senderState.HomeChannelID == nil {
+			return nil, fmt.Errorf("sender state has no escrow or home channel ID")
+		}
+
+		txType = TransactionTypeEscrowLock
+		fromAccount = *senderState.HomeChannelID
+		toAccount = *senderState.EscrowChannelID
+
+	case TransitionTypeMigrate:
+		if senderState.EscrowChannelID == nil || senderState.HomeChannelID == nil {
+			return nil, fmt.Errorf("sender state has no escrow or home channel ID")
+		}
+
+		txType = TransactionTypeMigrate
+		fromAccount = *senderState.HomeChannelID
+		toAccount = *senderState.EscrowChannelID
+
+	default:
+		return nil, fmt.Errorf("invalid transition type")
+	}
+
+	var receiverStateID *string
+	var txID string
+	var err error
+	if receiverState != nil {
+		receiverStateID = &receiverState.ID
+		txID, err = GetReceiverTransactionID(fromAccount, receiverState.ID)
+	} else {
+		txID, err = GetSenderTransactionID(toAccount, senderState.ID)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTransaction(
+		txID,
+		senderState.Asset,
+		txType,
+		fromAccount,
+		toAccount,
+		&senderState.ID,
+		receiverStateID,
+		transition.Amount,
+	), nil
 }
 
 // TransitionType represents the type of state transition
@@ -293,11 +409,11 @@ func (t TransitionType) String() string {
 func (t TransitionType) RequiresOpenChannel() bool {
 	switch t {
 	case TransitionTypeTransferReceive,
-		TransitionTypeTransferSend,
-		TransitionTypeRelease,
-		TransitionTypeCommit:
+		TransitionTypeRelease:
 		return false
-	case TransitionTypeHomeDeposit,
+	case TransitionTypeTransferSend,
+		TransitionTypeCommit,
+		TransitionTypeHomeDeposit,
 		TransitionTypeHomeWithdrawal,
 		TransitionTypeMutualLock,
 		TransitionTypeEscrowDeposit,
@@ -313,16 +429,16 @@ func (t TransitionType) RequiresOpenChannel() bool {
 // Transition represents a state transition
 type Transition struct {
 	Type      TransitionType  `json:"type"`       // Type of state transition
-	TxHash    string          `json:"tx_hash"`    // Transaction hash associated with the transition
+	TxID      string          `json:"tx_id"`      // Transaction ID associated with the transition
 	AccountID string          `json:"account_id"` // Account identifier (varies based on transition type)
 	Amount    decimal.Decimal `json:"amount"`     // Amount involved in the transition
 }
 
 // NewTransition creates a new state transition
-func NewTransition(transitionType TransitionType, txHash string, accountID string, amount decimal.Decimal) *Transition {
+func NewTransition(transitionType TransitionType, txID, accountID string, amount decimal.Decimal) *Transition {
 	return &Transition{
 		Type:      transitionType,
-		TxHash:    txHash,
+		TxID:      txID,
 		AccountID: accountID,
 		Amount:    amount,
 	}

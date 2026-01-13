@@ -53,9 +53,25 @@ func (m *MockStore) RecordTransaction(tx core.Transaction) error {
 	return args.Error(0)
 }
 
-func (m *MockStore) CreateHomeChannel(channel core.Channel) error {
+func (m *MockStore) CreateChannel(channel core.Channel) error {
 	args := m.Called(channel)
 	return args.Error(0)
+}
+
+func (m *MockStore) GetChannelByID(channelID string) (*core.Channel, error) {
+	args := m.Called(channelID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*core.Channel), args.Error(1)
+}
+
+func (m *MockStore) GetActiveHomeChannel(wallet, asset string) (*core.Channel, error) {
+	args := m.Called(wallet, asset)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*core.Channel), args.Error(1)
 }
 
 func NewMockSigner() sign.Signer {

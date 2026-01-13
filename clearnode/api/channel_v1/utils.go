@@ -20,7 +20,7 @@ func toCoreState(state rpc.StateV1) (core.State, error) {
 
 		coreTransition := core.Transition{
 			Type:      transition.Type,
-			TxHash:    transition.TxHash,
+			TxID:      transition.TxID,
 			AccountID: transition.AccountID,
 			Amount:    decimalTxAmount,
 		}
@@ -117,52 +117,96 @@ func toCoreChannelDefinition(def rpc.ChannelDefinitionV1) (core.ChannelDefinitio
 	}, nil
 }
 
-// validateInitialState validates that the state is a valid initial state for channel creation.
-func validateInitialState(state core.State) error {
-	// Must be version 1, epoch 1
-	if state.Version != 1 {
-		return fmt.Errorf("initial state must have version 1")
+// channelTypeToString converts core.ChannelType to its string representation
+func channelTypeToString(t core.ChannelType) string {
+	switch t {
+	case core.ChannelTypeHome:
+		return "home"
+	case core.ChannelTypeEscrow:
+		return "escrow"
+	default:
+		return "unknown"
 	}
-	if state.Epoch != 1 {
-		return fmt.Errorf("initial state must have epoch 1")
+}
+
+// channelStatusToString converts core.ChannelStatus to its string representation
+func channelStatusToString(s core.ChannelStatus) string {
+	switch s {
+	case core.ChannelStatusVoid:
+		return "void"
+	case core.ChannelStatusOpen:
+		return "open"
+	case core.ChannelStatusChallenged:
+		return "challenged"
+	case core.ChannelStatusClosed:
+		return "closed"
+	default:
+		return "unknown"
+	}
+}
+
+// coreChannelToRPC converts a core.Channel to rpc.ChannelV1
+func coreChannelToRPC(channel core.Channel) rpc.ChannelV1 {
+	return rpc.ChannelV1{
+		ChannelID:    channel.ChannelID,
+		UserWallet:   channel.UserWallet,
+		NodeWallet:   channel.NodeWallet,
+		Type:         channelTypeToString(channel.Type),
+		BlockchainID: channel.BlockchainID,
+		TokenAddress: channel.TokenAddress,
+		Challenge:    strconv.FormatUint(channel.Challenge, 10),
+		Nonce:        strconv.FormatUint(channel.Nonce, 10),
+		Status:       channelStatusToString(channel.Status),
+		StateVersion: strconv.FormatUint(channel.StateVersion, 10),
+	}
+}
+
+// coreStateToRPC converts a core.State to rpc.StateV1
+func coreStateToRPC(state core.State) rpc.StateV1 {
+	transitions := make([]rpc.TransitionV1, len(state.Transitions))
+	for i, t := range state.Transitions {
+		transitions[i] = rpc.TransitionV1{
+			Type:      t.Type,
+			TxID:      t.TxID,
+			AccountID: t.AccountID,
+			Amount:    t.Amount.String(),
+		}
 	}
 
-	// Must have no transitions (clean initial state)
-	if len(state.Transitions) > 0 {
-		return fmt.Errorf("initial state must have no transitions")
+	homeLedger := rpc.LedgerV1{
+		TokenAddress: state.HomeLedger.TokenAddress,
+		BlockchainID: state.HomeLedger.BlockchainID,
+		UserBalance:  state.HomeLedger.UserBalance.String(),
+		UserNetFlow:  state.HomeLedger.UserNetFlow.String(),
+		NodeBalance:  state.HomeLedger.NodeBalance.String(),
+		NodeNetFlow:  state.HomeLedger.NodeNetFlow.String(),
 	}
 
-	// Must have user wallet and asset
-	if state.UserWallet == "" {
-		return fmt.Errorf("user wallet is required")
-	}
-	if state.Asset == "" {
-		return fmt.Errorf("asset is required")
-	}
-
-	// Home ledger must be initialized with zero balances
-	if !state.HomeLedger.UserBalance.IsZero() || !state.HomeLedger.NodeBalance.IsZero() {
-		return fmt.Errorf("initial state must have zero balances")
-	}
-	if !state.HomeLedger.UserNetFlow.IsZero() || !state.HomeLedger.NodeNetFlow.IsZero() {
-		return fmt.Errorf("initial state must have zero net flows")
+	var escrowLedger *rpc.LedgerV1
+	if state.EscrowLedger != nil {
+		escrowLedger = &rpc.LedgerV1{
+			TokenAddress: state.EscrowLedger.TokenAddress,
+			BlockchainID: state.EscrowLedger.BlockchainID,
+			UserBalance:  state.EscrowLedger.UserBalance.String(),
+			UserNetFlow:  state.EscrowLedger.UserNetFlow.String(),
+			NodeBalance:  state.EscrowLedger.NodeBalance.String(),
+			NodeNetFlow:  state.EscrowLedger.NodeNetFlow.String(),
+		}
 	}
 
-	// Must not be final
-	if state.IsFinal {
-		return fmt.Errorf("initial state cannot be final")
+	return rpc.StateV1{
+		ID:              state.ID,
+		Transitions:     transitions,
+		Asset:           state.Asset,
+		UserWallet:      state.UserWallet,
+		Epoch:           strconv.FormatUint(state.Epoch, 10),
+		Version:         strconv.FormatUint(state.Version, 10),
+		HomeChannelID:   state.HomeChannelID,
+		EscrowChannelID: state.EscrowChannelID,
+		HomeLedger:      homeLedger,
+		EscrowLedger:    escrowLedger,
+		IsFinal:         state.IsFinal,
+		UserSig:         state.UserSig,
+		NodeSig:         state.NodeSig,
 	}
-
-	// HomeChannelID should be nil for initial state (will be set by node)
-	if state.HomeChannelID != nil && *state.HomeChannelID != "" {
-		return fmt.Errorf("initial state should not have home_channel_id set")
-	}
-
-	// Must have valid state ID
-	expectedID := core.GetStateID(state.UserWallet, state.Asset, state.Epoch, state.Version)
-	if state.ID != expectedID {
-		return fmt.Errorf("state ID mismatch: expected %s, got %s", expectedID, state.ID)
-	}
-
-	return nil
 }

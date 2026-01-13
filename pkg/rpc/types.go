@@ -53,8 +53,8 @@ type ChannelDefinitionV1 struct {
 type TransitionV1 struct {
 	// Type is the type of state transition
 	Type core.TransitionType `json:"type"`
-	// TxHash is the transaction hash associated with the transition
-	TxHash string `json:"tx_hash"`
+	// TxID is the transaction ID associated with the transition
+	TxID string `json:"tx_id"`
 	// AccountID is the account identifier (varies based on transition type)
 	AccountID string `json:"account_id"`
 	// Amount is the amount involved in the transition

@@ -442,6 +442,10 @@ api:
                 - field_name: wallet
                   type: string
                   description: Filter by user's wallet address
+                - field_name: asset
+                  type: string
+                  description: Filter by asset
+                  optional: true
                 - field_name: status
                   type: string
                   description: Filter by status

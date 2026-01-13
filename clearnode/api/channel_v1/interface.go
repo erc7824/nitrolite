@@ -40,10 +40,18 @@ type Store interface {
 	// to track the history of operations (deposits, withdrawals, transfers, etc.).
 	RecordTransaction(tx core.Transaction) error
 
-	// CreateHomeChannel creates a new home channel entity in the database.
+	// CreateChannel creates a new channel entity in the database.
 	// This is called during channel creation before the channel exists on-chain.
 	// The channel starts with OnChainStateVersion=0 to indicate it's pending blockchain confirmation.
-	CreateHomeChannel(channel core.Channel) error
+	CreateChannel(channel core.Channel) error
+
+	// GetChannelByID retrieves a channel by its unique identifier.
+	// Returns nil if the channel doesn't exist.
+	GetChannelByID(channelID string) (*core.Channel, error)
+
+	// GetActiveHomeChannel retrieves the active home channel for a user's wallet and asset.
+	// Returns nil if no home channel exists for the given wallet and asset.
+	GetActiveHomeChannel(wallet, asset string) (*core.Channel, error)
 }
 
 // EnsureNoOngoingStateTransitions Implementation Notes

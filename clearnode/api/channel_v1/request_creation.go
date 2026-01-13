@@ -95,13 +95,16 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 			return rpc.Errorf("failed to calculate channel ID: %v", err)
 		}
 
-		// Set the home channel ID in the state
-		incomingState.HomeChannelID = &homeChannelID
+		// Validate the home channel ID in the state
+		if incomingState.HomeChannelID == nil || *incomingState.HomeChannelID != homeChannelID {
+			return rpc.Errorf("incoming state home_channel_id is invalid")
+		}
 
-		newHomeChannel := core.NewHomeChannel(
+		newHomeChannel := core.NewChannel(
 			homeChannelID,
 			incomingState.UserWallet,
 			h.nodeAddress,
+			core.ChannelTypeHome,
 			incomingState.HomeLedger.BlockchainID,
 			incomingState.HomeLedger.TokenAddress,
 			channelDef.Nonce,
@@ -109,7 +112,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		)
 
 		// Create the home channel entity
-		if err := tx.CreateHomeChannel(*newHomeChannel); err != nil {
+		if err := tx.CreateChannel(*newHomeChannel); err != nil {
 			return rpc.Errorf("failed to create channel: %v", err)
 		}
 
@@ -123,17 +126,42 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		incomingState.NodeSig = &nodeSig
 
 		incomingTransition := incomingState.GetLastTransition()
+		var transaction *core.Transaction
 		if incomingTransition != nil {
 			switch incomingTransition.Type {
 			case core.TransitionTypeHomeDeposit, core.TransitionTypeHomeWithdrawal:
+				transaction, err = core.NewTransactionFromTransition(incomingState, nil, *incomingTransition)
+				if err != nil {
+					return rpc.Errorf("failed to create transaction: %v", err)
+				}
+
 				// We return Node's signature, the user is expected to submit this on blockchain.
-				if err := h.recordTransaction(ctx, tx, incomingState, nil, *incomingTransition); err != nil {
-					return rpc.Errorf("failed to record transaction: %v", err)
+			case core.TransitionTypeTransferSend:
+				newReceiverState, err := h.issueTransferReceiverState(ctx, tx, incomingState)
+				if err != nil {
+					return rpc.Errorf("failed to issue receiver state: %v", err)
+				}
+				transaction, err = core.NewTransactionFromTransition(incomingState, &newReceiverState, *incomingTransition)
+				if err != nil {
+					return rpc.Errorf("failed to create transaction: %v", err)
 				}
 			default:
 				return rpc.Errorf("transition '%s' is not supported by this endpoint", incomingTransition.Type.String())
 			}
 		}
+		if err := tx.RecordTransaction(*transaction); err != nil {
+			return rpc.Errorf("failed to record transaction")
+		}
+
+		logger.Info("transaction recorded",
+			"id", transaction.ID,
+			"type", transaction.TxType.String(),
+			"from", transaction.FromAccount,
+			"to", transaction.ToAccount,
+			"senderStateID", transaction.SenderNewStateID,
+			"asset", transaction.Asset,
+			"amount", transaction.Amount.String(),
+		)
 
 		// Store the pending state
 		if err := tx.StoreUserState(incomingState); err != nil {

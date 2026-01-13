@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+
+	"github.com/shopspring/decimal"
 )
 
 var _ StateAdvancer = &StateAdvancerV1{}
@@ -59,6 +61,162 @@ func (a *StateAdvancerV1) ApplyTransition(state State, transition Transition) (S
 			},
 			EscrowLedger: state.EscrowLedger,
 			IsFinal:      state.IsFinal,
+		}, nil
+	case TransitionTypeHomeDeposit:
+		depositAmount := transition.Amount
+		return State{
+			ID:              state.ID,
+			Transitions:     append(state.Transitions, transition),
+			Asset:           state.Asset,
+			UserWallet:      state.UserWallet,
+			Epoch:           state.Epoch,
+			Version:         state.Version,
+			HomeChannelID:   state.HomeChannelID,
+			EscrowChannelID: state.EscrowChannelID,
+			HomeLedger: Ledger{
+				BlockchainID: state.HomeLedger.BlockchainID,
+				TokenAddress: state.HomeLedger.TokenAddress,
+				UserBalance:  state.HomeLedger.UserBalance.Add(depositAmount),
+				UserNetFlow:  state.HomeLedger.UserNetFlow.Add(depositAmount),
+				NodeBalance:  state.HomeLedger.NodeBalance,
+				NodeNetFlow:  state.HomeLedger.NodeNetFlow,
+			},
+			EscrowLedger: state.EscrowLedger,
+			IsFinal:      state.IsFinal,
+		}, nil
+	case TransitionTypeHomeWithdrawal:
+		withdrawalAmount := transition.Amount
+		return State{
+			ID:              state.ID,
+			Transitions:     append(state.Transitions, transition),
+			Asset:           state.Asset,
+			UserWallet:      state.UserWallet,
+			Epoch:           state.Epoch,
+			Version:         state.Version,
+			HomeChannelID:   state.HomeChannelID,
+			EscrowChannelID: state.EscrowChannelID,
+			HomeLedger: Ledger{
+				BlockchainID: state.HomeLedger.BlockchainID,
+				TokenAddress: state.HomeLedger.TokenAddress,
+				UserBalance:  state.HomeLedger.UserBalance.Sub(withdrawalAmount),
+				UserNetFlow:  state.HomeLedger.UserNetFlow.Sub(withdrawalAmount),
+				NodeBalance:  state.HomeLedger.NodeBalance,
+				NodeNetFlow:  state.HomeLedger.NodeNetFlow,
+			},
+			EscrowLedger: state.EscrowLedger,
+			IsFinal:      state.IsFinal,
+		}, nil
+	case TransitionTypeMutualLock:
+		lockAmount := transition.Amount
+		return State{
+			ID:              state.ID,
+			Transitions:     append(state.Transitions, transition),
+			Asset:           state.Asset,
+			UserWallet:      state.UserWallet,
+			Epoch:           state.Epoch,
+			Version:         state.Version,
+			HomeChannelID:   state.HomeChannelID,
+			EscrowChannelID: state.EscrowChannelID,
+			HomeLedger: Ledger{
+				BlockchainID: state.HomeLedger.BlockchainID,
+				TokenAddress: state.HomeLedger.TokenAddress,
+				UserBalance:  state.HomeLedger.UserBalance,
+				UserNetFlow:  state.HomeLedger.UserNetFlow,
+				NodeBalance:  state.HomeLedger.NodeBalance.Add(lockAmount),
+				NodeNetFlow:  state.HomeLedger.NodeNetFlow.Add(lockAmount),
+			},
+			EscrowLedger: &Ledger{
+				UserBalance: decimal.Zero.Add(lockAmount),
+				UserNetFlow: decimal.Zero.Add(lockAmount),
+				NodeBalance: decimal.Zero,
+				NodeNetFlow: decimal.Zero,
+			},
+			IsFinal: state.IsFinal,
+		}, nil
+	case TransitionTypeEscrowDeposit:
+		depositAmount := transition.Amount
+		return State{
+			ID:              state.ID,
+			Transitions:     append(state.Transitions, transition),
+			Asset:           state.Asset,
+			UserWallet:      state.UserWallet,
+			Epoch:           state.Epoch,
+			Version:         state.Version,
+			HomeChannelID:   state.HomeChannelID,
+			EscrowChannelID: state.EscrowChannelID,
+			HomeLedger: Ledger{
+				BlockchainID: state.HomeLedger.BlockchainID,
+				TokenAddress: state.HomeLedger.TokenAddress,
+				UserBalance:  state.HomeLedger.UserBalance.Add(depositAmount),
+				UserNetFlow:  state.HomeLedger.UserNetFlow,
+				NodeBalance:  state.HomeLedger.NodeBalance,
+				NodeNetFlow:  state.HomeLedger.NodeNetFlow.Add(depositAmount),
+			},
+			EscrowLedger: &Ledger{
+				BlockchainID: state.EscrowLedger.BlockchainID,
+				TokenAddress: state.EscrowLedger.TokenAddress,
+				UserBalance:  state.EscrowLedger.UserBalance.Sub(depositAmount),
+				UserNetFlow:  state.EscrowLedger.UserNetFlow,
+				NodeBalance:  state.EscrowLedger.NodeBalance,
+				NodeNetFlow:  state.EscrowLedger.NodeNetFlow.Sub(depositAmount),
+			},
+			IsFinal: state.IsFinal,
+		}, nil
+	case TransitionTypeEscrowLock:
+		lockAmount := transition.Amount
+		return State{
+			ID:              state.ID,
+			Transitions:     append(state.Transitions, transition),
+			Asset:           state.Asset,
+			UserWallet:      state.UserWallet,
+			Epoch:           state.Epoch,
+			Version:         state.Version,
+			HomeChannelID:   state.HomeChannelID,
+			EscrowChannelID: state.EscrowChannelID,
+			HomeLedger: Ledger{
+				BlockchainID: state.HomeLedger.BlockchainID,
+				TokenAddress: state.HomeLedger.TokenAddress,
+				UserBalance:  state.HomeLedger.UserBalance,
+				UserNetFlow:  state.HomeLedger.UserNetFlow,
+				NodeBalance:  state.HomeLedger.NodeBalance,
+				NodeNetFlow:  state.HomeLedger.NodeNetFlow,
+			},
+			EscrowLedger: &Ledger{
+				UserBalance: decimal.Zero,
+				UserNetFlow: decimal.Zero,
+				NodeBalance: decimal.Zero.Add(lockAmount),
+				NodeNetFlow: decimal.Zero.Add(lockAmount),
+			},
+			IsFinal: state.IsFinal,
+		}, nil
+	case TransitionTypeEscrowWithdraw:
+		withdrawAmount := transition.Amount
+		return State{
+			ID:              state.ID,
+			Transitions:     append(state.Transitions, transition),
+			Asset:           state.Asset,
+			UserWallet:      state.UserWallet,
+			Epoch:           state.Epoch,
+			Version:         state.Version,
+			HomeChannelID:   state.HomeChannelID,
+			EscrowChannelID: state.EscrowChannelID,
+			HomeLedger: Ledger{
+				BlockchainID: state.HomeLedger.BlockchainID,
+				TokenAddress: state.HomeLedger.TokenAddress,
+				UserBalance:  state.HomeLedger.UserBalance.Sub(withdrawAmount),
+				UserNetFlow:  state.HomeLedger.UserNetFlow,
+				NodeBalance:  state.HomeLedger.NodeBalance,
+				NodeNetFlow:  state.HomeLedger.NodeNetFlow.Sub(withdrawAmount),
+			},
+			EscrowLedger: &Ledger{
+				BlockchainID: state.EscrowLedger.BlockchainID,
+				TokenAddress: state.EscrowLedger.TokenAddress,
+				UserBalance:  state.EscrowLedger.UserBalance,
+				UserNetFlow:  state.EscrowLedger.UserNetFlow.Sub(withdrawAmount),
+				NodeBalance:  state.EscrowLedger.NodeBalance.Sub(withdrawAmount),
+				NodeNetFlow:  state.EscrowLedger.NodeNetFlow,
+			},
+			IsFinal: state.IsFinal,
 		}, nil
 	default:
 		return State{}, fmt.Errorf("transition type is not supported: %d", transition.Type)

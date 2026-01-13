@@ -16,7 +16,6 @@ import (
 
 func TestRequestCreation_Success(t *testing.T) {
 	// Setup
-	mockStore := new(MockStore)
 	mockTxStore := new(MockStore)
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
@@ -26,17 +25,11 @@ func TestRequestCreation_Success(t *testing.T) {
 	handler := &Handler{
 		stateAdvancer: core.NewStateAdvancerV1(),
 		useStoreInTx: func(handler StoreTxHandler) error {
-			commit := func() error { return nil }
-			revert := func() error { return nil }
-			mockStore.On("BeginTx").Return(mockTxStore, commit, revert).Once()
-
-			_, _, _ = mockStore.BeginTx()
 			err := handler(mockTxStore)
 			if err != nil {
-				_ = revert()
 				return err
 			}
-			return commit()
+			return nil
 		},
 		signer:       mockSigner,
 		nodeAddress:  nodeAddress,
@@ -55,34 +48,41 @@ func TestRequestCreation_Success(t *testing.T) {
 	challenge := uint64(86400)
 	depositAmount := decimal.NewFromInt(1000)
 
-	// Create initial state for channel creation with deposit transition
-	initialState := core.State{
-		ID: core.GetStateID(userWallet, asset, 1, 1),
-		Transitions: []core.Transition{
-			{
-				Type:      core.TransitionTypeHomeDeposit,
-				TxHash:    "0xDepositTxHash",
-				AccountID: userWallet,
-				Amount:    depositAmount,
-			},
-		},
-		Asset:      asset,
-		UserWallet: userWallet,
-		Epoch:      1,
-		Version:    1,
-		HomeLedger: core.Ledger{
-			TokenAddress: tokenAddress,
-			BlockchainID: blockchainID,
-			UserBalance:  depositAmount,
-			UserNetFlow:  depositAmount,
-			NodeBalance:  decimal.NewFromInt(0),
-			NodeNetFlow:  decimal.NewFromInt(0),
-		},
-		EscrowLedger: nil,
-		IsFinal:      false,
-		UserSig:      nil,
-		NodeSig:      nil,
+	// Create void state (starting point)
+	voidState := core.NewVoidState(asset, userWallet)
+	voidState.Epoch = 1
+	voidState.Version = 0
+	voidState.HomeLedger.TokenAddress = tokenAddress
+	voidState.HomeLedger.BlockchainID = blockchainID
+
+	// Create next state from void
+	initialState := voidState.NextState()
+
+	depositTxID, err := core.GetSenderTransactionID(userWallet, initialState.ID)
+	require.NoError(t, err)
+
+	// Create and apply home deposit transition
+	homeDepositTransition := core.Transition{
+		Type:      core.TransitionTypeHomeDeposit,
+		TxID:      depositTxID,
+		AccountID: userWallet,
+		Amount:    depositAmount,
 	}
+
+	// Apply the home deposit transition to update balances
+	initialState, err = handler.stateAdvancer.ApplyTransition(initialState, homeDepositTransition)
+	require.NoError(t, err)
+
+	// Calculate and set the home channel ID
+	homeChannelID, err := core.GetHomeChannelID(
+		nodeAddress,
+		userWallet,
+		tokenAddress,
+		nonce,
+		challenge,
+	)
+	require.NoError(t, err)
+	initialState.HomeChannelID = &homeChannelID
 
 	// Sign the initial state
 	packedState, err := core.PackState(initialState)
@@ -96,7 +96,7 @@ func TestRequestCreation_Success(t *testing.T) {
 	// Mock expectations
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil).Once()
 	mockSigValidator.On("Verify", userWallet, packedState, mock.Anything).Return(nil).Once()
-	mockTxStore.On("CreateHomeChannel", mock.MatchedBy(func(channel core.Channel) bool {
+	mockTxStore.On("CreateChannel", mock.MatchedBy(func(channel core.Channel) bool {
 		return channel.UserWallet == userWallet &&
 			channel.NodeWallet == nodeAddress &&
 			channel.Type == core.ChannelTypeHome &&
@@ -123,32 +123,9 @@ func TestRequestCreation_Success(t *testing.T) {
 	})).Return(nil).Once()
 
 	// Create RPC request
+	rpcState := toRPCState(initialState)
 	reqPayload := rpc.ChannelsV1RequestCreationRequest{
-		State: rpc.StateV1{
-			ID: initialState.ID,
-			Transitions: []rpc.TransitionV1{
-				{
-					Type:      core.TransitionTypeHomeDeposit,
-					TxHash:    "0xDepositTxHash",
-					AccountID: userWallet,
-					Amount:    depositAmount.String(),
-				},
-			},
-			Asset:      asset,
-			UserWallet: userWallet,
-			Epoch:      "1",
-			Version:    "1",
-			HomeLedger: rpc.LedgerV1{
-				TokenAddress: tokenAddress,
-				BlockchainID: blockchainID,
-				UserBalance:  depositAmount.String(),
-				UserNetFlow:  depositAmount.String(),
-				NodeBalance:  "0",
-				NodeNetFlow:  "0",
-			},
-			IsFinal: false,
-			UserSig: &userSigStr,
-		},
+		State: rpcState,
 		ChannelDefinition: rpc.ChannelDefinitionV1{
 			Nonce:     decimal.NewFromInt(int64(nonce)).String(),
 			Challenge: decimal.NewFromInt(int64(challenge)).String(),

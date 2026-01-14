@@ -5,7 +5,7 @@ go 1.25
 require (
 	github.com/c-bata/go-prompt v0.2.6
 	github.com/erc7824/nitrolite/clearnode v0.4.1-0.20251111101210-2b5215255c12
-	github.com/ethereum/go-ethereum v1.16.7
+	github.com/ethereum/go-ethereum v1.16.8
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/shopspring/decimal v1.4.0
 	golang.org/x/term v0.37.0

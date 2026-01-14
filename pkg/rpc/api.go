@@ -200,7 +200,9 @@ type AppSessionsV1CreateAppSessionRequest struct {
 	// Definition is the application definition including participants and quorum
 	Definition AppDefinitionV1 `json:"definition"`
 	// SessionData is the optional JSON stringified session data
-	SessionData *string `json:"session_data,omitempty"`
+	SessionData string `json:"session_data"`
+
+	Signatures []string `json:"signatures,omitempty"` // Participant signatures for the app session creation
 }
 
 // AppSessionsV1CreateAppSessionResponse returns the created application session information.
@@ -209,8 +211,8 @@ type AppSessionsV1CreateAppSessionResponse struct {
 	AppSessionID string `json:"app_session_id"`
 	// Version is the initial version of the session
 	Version string `json:"version"`
-	// Status is the status of the session (open)
-	Status string `json:"status"`
+	// IsClosed is the status of the session (open)
+	IsClosed bool `json:"is_closed"`
 }
 
 // AppSessionsV1CloseAppSessionRequest closes an application session and redistributes funds.

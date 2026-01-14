@@ -1,0 +1,289 @@
+package app_session_v1
+
+import (
+	"time"
+
+	"github.com/erc7824/nitrolite/pkg/app"
+	"github.com/erc7824/nitrolite/pkg/core"
+	"github.com/erc7824/nitrolite/pkg/log"
+	"github.com/erc7824/nitrolite/pkg/rpc"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/shopspring/decimal"
+)
+
+// SubmitDepositState processes app session deposit state submissions.
+func (h *Handler) SubmitDepositState(c *rpc.Context) {
+	ctx := c.Context
+	logger := log.FromContext(ctx)
+
+	var reqPayload rpc.AppSessionsV1SubmitDepositStateRequest
+	if err := c.Request.Payload.Translate(&reqPayload); err != nil {
+		c.Fail(err, "failed to parse parameters")
+		return
+	}
+
+	logger.Debug("processing app session deposit request",
+		"appSessionID", reqPayload.AppStateUpdate.AppSessionID,
+		"version", reqPayload.AppStateUpdate.Version)
+
+	var nodeSig string
+	err := h.useStoreInTx(func(tx AppStoreV1) error {
+		appStateUpd, err := unmapAppStateUpdateV1(&reqPayload.AppStateUpdate)
+		if err != nil {
+			return rpc.Errorf("failed to parse app state update: %v", err)
+		}
+		userState, err := unmapStateV1(reqPayload.UserState)
+		if err != nil {
+			return rpc.Errorf("failed to parse user state: %v", err)
+		}
+
+		lastTransition := userState.GetLastTransition()
+		if lastTransition == nil {
+			return rpc.Errorf("user state has no transitions")
+		}
+		if lastTransition.Type != core.TransitionTypeCommit {
+			return rpc.Errorf("user state transition must have 'commit' type, got '%s'", lastTransition.Type.String())
+		}
+
+		if lastTransition.Type.RequiresOpenChannel() {
+			userHasOpenChannel, err := tx.CheckOpenChannel(userState.UserWallet, userState.Asset)
+			if err != nil {
+				return rpc.Errorf("failed to check open channel: %v", err)
+			}
+			if !userHasOpenChannel {
+				return rpc.Errorf("user has no open channel")
+			}
+		}
+
+		if lastTransition.AccountID != appStateUpd.AppSessionID {
+			return rpc.Errorf("user state transition account ID '%s' does not match app session ID '%s'",
+				lastTransition.AccountID, appStateUpd.AppSessionID)
+		}
+
+		// Validate user signature on user state
+		if userState.UserSig == nil {
+			return rpc.Errorf("missing user signature on user state")
+		}
+
+		packedUserState, err := core.PackState(userState)
+		if err != nil {
+			return rpc.Errorf("failed to pack user state: %v", err)
+		}
+
+		userSigBytes, err := hexutil.Decode(*userState.UserSig)
+		if err != nil {
+			return rpc.Errorf("failed to decode user signature: %v", err)
+		}
+
+		sigValidator := h.sigValidator[EcdsaSigType]
+		err = sigValidator.Verify(userState.UserWallet, packedUserState, userSigBytes)
+		if err != nil {
+			return rpc.Errorf("failed to validate signature: %v", err)
+		}
+
+		currentState, err := tx.GetLastUserState(userState.UserWallet, userState.Asset, false)
+		if err != nil {
+			return rpc.Errorf("failed to get last user state: %v", err)
+		}
+		if currentState == nil {
+			currentState = core.NewVoidState(userState.Asset, userState.UserWallet)
+		}
+		if err := tx.EnsureNoOngoingStateTransitions(userState.UserWallet, userState.Asset); err != nil {
+			return rpc.Errorf("ongoing state transitions check failed: %v", err)
+		}
+
+		if err := h.stateAdvancer.ValidateTransitions(*currentState, userState); err != nil {
+			return rpc.Errorf("invalid state transitions: %v", err)
+		}
+
+		appSession, err := tx.GetAppSession(appStateUpd.AppSessionID, false)
+		if err != nil {
+			return rpc.Errorf("app session not found: %v", err)
+		}
+		if appSession == nil {
+			return rpc.Errorf("app session not found")
+		}
+
+		if appStateUpd.Version != appSession.Version+1 {
+			return rpc.Errorf("invalid app session version: expected %d, got %d", appSession.Version+1, appStateUpd.Version)
+		}
+
+		if appStateUpd.Intent != app.AppStateUpdateIntentDeposit {
+			return rpc.Errorf("invalid intent: expected 'deposit', got '%s'", appStateUpd.Intent)
+		}
+
+		participantWeights := getParticipantWeights(appSession.Participants)
+
+		// Validate signatures and quorum
+		if len(reqPayload.AppStateUpdate.Signatures) == 0 {
+			return rpc.Errorf("no signatures provided")
+		}
+
+		// Pack the app state update for signature verification
+		packedStateUpdate, err := app.PackAppStateUpdate(appStateUpd)
+		if err != nil {
+			return rpc.Errorf("failed to pack app state update: %v", err)
+		}
+
+		// Verify signatures and calculate quorum
+		sigRecoverer := h.sigValidator[EcdsaSigType]
+		signedWeights := make(map[string]bool)
+		var achievedQuorum uint8
+
+		for _, sigHex := range reqPayload.AppStateUpdate.Signatures {
+			sigBytes, err := hexutil.Decode(sigHex)
+			if err != nil {
+				return rpc.Errorf("failed to decode signature: %v", err)
+			}
+
+			// Recover the signer address from the signature
+			signerAddress, err := sigRecoverer.Recover(packedStateUpdate, sigBytes)
+			if err != nil {
+				return rpc.Errorf("failed to recover signer address: %v", err)
+			}
+
+			// Check if signer is a participant
+			weight, isParticipant := participantWeights[signerAddress]
+			if !isParticipant {
+				return rpc.Errorf("signature from non-participant: %s", signerAddress)
+			}
+
+			// Add weight if not already counted
+			if !signedWeights[signerAddress] {
+				signedWeights[signerAddress] = true
+				achievedQuorum += weight
+			}
+		}
+
+		// Check if quorum is met
+		if achievedQuorum < appSession.Quorum {
+			return rpc.Errorf("quorum not met: achieved %d, required %d", achievedQuorum, appSession.Quorum)
+		}
+
+		currentAllocations, err := tx.GetParticipantAllocations(appSession.SessionID)
+		if err != nil {
+			return rpc.Errorf("failed to get current allocations: %v", err)
+		}
+
+		// Track total deposit amount to validate against transition amount
+		totalDepositAmount := decimal.Zero
+
+		for _, alloc := range appStateUpd.Allocations {
+			if alloc.Amount.IsNegative() {
+				return rpc.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.Asset)
+			}
+
+			participantAllocs := currentAllocations[alloc.Participant]
+			if participantAllocs == nil {
+				participantAllocs = make(map[string]decimal.Decimal)
+			}
+			currentAmount := participantAllocs[alloc.Asset]
+
+			if alloc.Amount.LessThan(currentAmount) {
+				return rpc.Errorf("decreased allocation for participant %s", alloc.Participant)
+			}
+
+			if alloc.Amount.GreaterThan(currentAmount) {
+				// Validate participant
+				if _, ok := participantWeights[alloc.Participant]; !ok {
+					return rpc.Errorf("allocation to non-participant %s", alloc.Participant)
+				}
+
+				// Validate that allocation asset matches user state asset
+				if alloc.Asset != userState.Asset {
+					return rpc.Errorf("allocation asset '%s' does not match user state asset '%s'", alloc.Asset, userState.Asset)
+				}
+
+				depositAmount := alloc.Amount.Sub(currentAmount)
+				if depositAmount.LessThanOrEqual(decimal.Zero) {
+					return rpc.Errorf("invalid deposit amount: %s for asset %s", depositAmount, alloc.Asset)
+				}
+
+				// Accumulate total deposit amount
+				totalDepositAmount = totalDepositAmount.Add(depositAmount)
+
+				balance, err := tx.GetAccountBalance(alloc.Participant, alloc.Asset)
+				if err != nil {
+					return rpc.Errorf("failed to get account balance: %v", err)
+				}
+
+				if depositAmount.GreaterThan(balance) {
+					return rpc.Errorf("insufficient balance for participant %s", alloc.Participant)
+				}
+
+				if err := tx.RecordLedgerEntry(appSession.SessionID, alloc.Asset, depositAmount, nil); err != nil {
+					return rpc.Errorf("failed to record ledger entry: %v", err)
+				}
+			}
+		}
+
+		// Validate that total deposit amount matches the transition amount
+		if !totalDepositAmount.Equal(lastTransition.Amount) {
+			return rpc.Errorf("total deposit amount %s does not match transition amount %s", totalDepositAmount.String(), lastTransition.Amount.String())
+		}
+
+		// Update app session version
+		appSession.Version++
+		// Overwrite session data if provided
+		if reqPayload.AppStateUpdate.SessionData != "" {
+			appSession.SessionData = reqPayload.AppStateUpdate.SessionData
+		}
+		appSession.UpdatedAt = time.Now()
+
+		if err := tx.UpdateAppSession(*appSession); err != nil {
+			return rpc.Errorf("failed to update app session: %v", err)
+		}
+
+		// Sign the user state with node's signature
+		userStateHash := crypto.Keccak256Hash(packedUserState).Bytes()
+		_nodeSig, err := h.signer.Sign(userStateHash)
+		if err != nil {
+			return rpc.Errorf("failed to sign user state: %v", err)
+		}
+		nodeSig = _nodeSig.String()
+		userState.NodeSig = &nodeSig
+
+		if err := tx.StoreUserState(userState); err != nil {
+			return rpc.Errorf("failed to store user state: %v", err)
+		}
+
+		transaction, err := core.NewTransactionFromTransition(userState, nil, *lastTransition)
+		if err != nil {
+			return rpc.Errorf("failed to create transaction: %v", err)
+		}
+
+		if err := tx.RecordTransaction(*transaction); err != nil {
+			return rpc.Errorf("failed to record channel transaction: %v", err)
+		}
+
+		logger.Info("processed deposit state",
+			"appSessionID", appSession.SessionID,
+			"appSessionVersion", appSession.Version,
+			"userWallet", userState.UserWallet,
+			"userStateVersion", userState.Version,
+			"channelTransition", lastTransition.Type.String())
+
+		return nil
+	})
+
+	if err != nil {
+		logger.Error("failed to process deposit state", "error", err)
+		c.Fail(err, "failed to process deposit state")
+		return
+	}
+
+	resp := rpc.AppSessionsV1SubmitDepositStateResponse{
+		Signature: nodeSig,
+	}
+
+	payload, err := rpc.NewPayload(resp)
+	if err != nil {
+		c.Fail(err, "failed to create response")
+		return
+	}
+
+	c.Succeed(c.Request.Method, payload)
+	logger.Info("successfully processed deposit state",
+		"appSessionID", reqPayload.AppStateUpdate.AppSessionID)
+}

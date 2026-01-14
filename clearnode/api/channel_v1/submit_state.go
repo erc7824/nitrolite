@@ -83,7 +83,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 			}
 		}
 		if err := tx.EnsureNoOngoingStateTransitions(incomingState.UserWallet, incomingState.Asset); err != nil {
-			return rpc.Errorf("failed to check for ongoing state transitions: %v", err)
+			return rpc.Errorf("ongoing state transitions check failed: %v", err)
 		}
 
 		if err := h.stateAdvancer.ValidateAdvancement(*currentState, incomingState); err != nil {

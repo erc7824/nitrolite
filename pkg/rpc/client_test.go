@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
@@ -394,7 +395,7 @@ func TestClientV1_AppSessionsV1CreateAppSession(t *testing.T) {
 	response := rpc.AppSessionsV1CreateAppSessionResponse{
 		AppSessionID: testAppSession,
 		Version:      "1",
-		Status:       "open",
+		IsClosed:     false,
 	}
 
 	registerSimpleHandlerV1(dialer, "app_sessions.v1.create_app_session", response)
@@ -411,7 +412,7 @@ func TestClientV1_AppSessionsV1CreateAppSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, testAppSession, resp.AppSessionID)
-	assert.Equal(t, "open", resp.Status)
+	assert.Equal(t, "open", resp.IsClosed)
 }
 
 func TestClientV1_AppSessionsV1CloseAppSession(t *testing.T) {
@@ -452,7 +453,7 @@ func TestClientV1_AppSessionsV1SubmitDepositState(t *testing.T) {
 	resp, err := client.AppSessionsV1SubmitDepositState(testCtxV1, rpc.AppSessionsV1SubmitDepositStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: testAppSession,
-			Intent:       "deposit",
+			Intent:       app.AppStateUpdateIntentDeposit,
 			Version:      2,
 		},
 		SigQuorum: 2,
@@ -476,7 +477,7 @@ func TestClientV1_AppSessionsV1SubmitAppState(t *testing.T) {
 	resp, err := client.AppSessionsV1SubmitAppState(testCtxV1, rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: testAppSession,
-			Intent:       "operate",
+			Intent:       app.AppStateUpdateIntentOperate,
 			Version:      3,
 		},
 		SigQuorum: 2,

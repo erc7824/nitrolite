@@ -16,7 +16,7 @@ This produces the following invariant:
 
 Invariant:
 > The Node always have funds to transfer to the User IN-BETWEEN OPERATIONS
-(this it NOT TRUE for non-home chain deposit, -//- withdrawal or a home chain migration, please see below).
+(this is NOT TRUE for non-home chain deposit, -//- withdrawal or a home chain migration, please see below).
 
 ---
 
@@ -43,7 +43,7 @@ Invariant:
 
 - (NOT TRUE) only less-or-equal amount of internally-accounted funds can be withdrawn (NOT TRUE for states that include "receive" off-chain ops)
 
-The absense of the beforementioned invariant creates a huge risk of an attacker draining the Node.
+The absence of the beforementioned invariant creates a huge risk of an attacker draining the Node.
 To protect from this, the Node should keep CORRECT track of off-chain user funds.
 CAUTION IS REQUIRED.
 
@@ -53,7 +53,7 @@ e.g. when processing "receive X, withdraw Y", increase `lockedFunds` (and "lock"
 ---
 
 - User funds can be withdrawn only after channel is finalized (closed or challenged) or during WITHDRAW action
-- any action is valid only with a Node's signature (for now, but this condition may be loosen to improve UX by making protocol more complex)
+- any action is valid only with a Node's signature (for now, but this condition may be loosened to improve UX by making protocol more complex)
 - a state with `version` <= `latestKnownVersion` per chain can not be accepted as valid
 - for challenge a state with `version` < `latestKnownVersion` per chain can not be accepted as valid
 - a channel with the same `channelId` can not be created twice

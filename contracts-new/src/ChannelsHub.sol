@@ -3,13 +3,14 @@ pragma solidity 0.8.30;
 
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
 import {IVault} from "./interfaces/IVault.sol";
 import {Definition, ChannelStatus, CrossChainState, State, StateIntent} from "./interfaces/Types.sol";
 
 import {Utils} from "./Utils.sol";
 
-contract ChannelsHub is IVault {
+contract ChannelsHub is IVault, ReentrancyGuard {
     using {Utils.validateSignatures, Utils.validateChallengerSignature} for CrossChainState;
     using {Utils.isEmpty} for State;
     using SafeERC20 for IERC20;
@@ -139,6 +140,10 @@ contract ChannelsHub is IVault {
     // - open and close channel in one go for atomic for User receiving and withdrawing funds
     function createChannel(Definition calldata def, CrossChainState calldata initCCS) external payable {
         // -- checks --
+        bytes32 channelId = Utils.getChannelId(def);
+        ChannelStatus status = _channels[channelId].status;
+        require(status == ChannelStatus.VOID, "channel already exists");
+
         _requireValidDefinition(def);
         _requireValidState(initCCS);
 
@@ -146,8 +151,6 @@ contract ChannelsHub is IVault {
         require(initCCS.intent == StateIntent.CREATE, "invalid initial intent");
         require(initCCS.nonHomeState.isEmpty(), "non-home state must be empty");
         require(initCCS.homeState.nodeAllocation == 0, "node balance must be zero in initial state");
-
-        bytes32 channelId = Utils.getChannelId(def);
 
         initCCS.validateSignatures(channelId, def.participant, def.node);
 
@@ -367,7 +370,12 @@ contract ChannelsHub is IVault {
         address participant = channelMeta.definition.participant;
 
         if (status == ChannelStatus.DISPUTED && block.timestamp > channelMeta.challengeExpiry) {
-            // withdraw user funds according to lastState
+            // -- effects --
+            channelMeta.status = ChannelStatus.CLOSED;
+            channelMeta.lockedFunds = 0;
+            channelMeta.challengeExpiry = 0;
+
+            // -- interactions --
             _pushFunds(
                 participant,
                 prevState.homeState.token,
@@ -389,24 +397,29 @@ contract ChannelsHub is IVault {
         // validate candidate
         require(candidate.intent == StateIntent.CLOSE, "invalid intent");
         _requireValidState(candidate);
-        require(candidate.homeState.nodeAllocation == 0, "node allocation must be 0");
         // Additional closure validation
-        require(candidate.homeState.userAllocation <= channelMeta.lockedFunds, "user allocation exceeds locked funds");
+        require(candidate.homeState.userAllocation + candidate.homeState.nodeAllocation <= channelMeta.lockedFunds, "allocation sum exceeds locked funds");
         _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], true);
-
 
         candidate.validateSignatures(channelId, participant, node);
 
         // -- effects --
         _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
 
+        channelMeta.status = ChannelStatus.CLOSED;
+        channelMeta.lockedFunds = 0;
+        if (status == ChannelStatus.OPERATING) {
+            channelMeta.lastState = candidate;
+        } else {
+            channelMeta.challengeExpiry = 0;
+        }
+
+        // -- interactions --
         _pushFunds(
             participant,
             candidate.homeState.token,
             candidate.homeState.userAllocation
         );
-
-        delete _channels[channelId];
 
         emit ChannelClosed(channelId, candidate);
     }
@@ -483,7 +496,7 @@ contract ChannelsHub is IVault {
 
     // ========= Internal ==========
 
-    function _pullFunds(address from, address token, uint256 amount) internal {
+    function _pullFunds(address from, address token, uint256 amount) internal nonReentrant {
         if (amount == 0) return;
 
         if (token == address(0)) {
@@ -497,7 +510,7 @@ contract ChannelsHub is IVault {
         }
     }
 
-    function _pushFunds(address to, address token, uint256 amount) internal {
+    function _pushFunds(address to, address token, uint256 amount) internal nonReentrant {
         if (amount == 0) return;
 
         if (token == address(0)) {

@@ -409,13 +409,10 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         // -- effects --
         _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
 
+        channelMeta.lastState = candidate;
         channelMeta.status = ChannelStatus.CLOSED;
         channelMeta.lockedFunds = 0;
-        if (status == ChannelStatus.OPERATING) {
-            channelMeta.lastState = candidate;
-        } else {
-            channelMeta.challengeExpiry = 0;
-        }
+        channelMeta.challengeExpiry = 0;
 
         // -- interactions --
         _pushFunds(
@@ -529,7 +526,6 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         }
     }
 
-
     function _requireValidDefinition(Definition calldata def) internal pure {
         require(def.user != address(0), InvalidAddress());
         require(def.node != address(0), InvalidAddress());
@@ -584,25 +580,19 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         require(candidate.version > prevState.version, "invalid version");
         require(candidate.homeState.token == prevState.homeState.token, "home state token mismatch");
 
-        if (requireZeroUserDelta) {
-            int256 userDeltaAmount = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
-            require(userDeltaAmount == 0, "user delta must be 0");
-        }
-
-        int256 userDelta = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
+        int256 userDeltaAmount = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
+        require(!requireZeroUserDelta || userDeltaAmount == 0, "user delta must be 0");
 
         int256 nodeDelta = candidate.homeState.nodeNetFlow - prevState.homeState.nodeNetFlow;
         if (nodeDelta > 0) {
             require(nodeAvailableFunds >= nodeDelta.toUint256(), "insufficient node balance");
         }
 
-        int256 expectedLockedFunds = currentLockedFunds.toInt256() + userDelta + nodeDelta;
-
+        int256 expectedLockedFunds = currentLockedFunds.toInt256() + userDeltaAmount + nodeDelta;
         require(expectedLockedFunds >= 0, "negative locked funds");
 
         uint256 allocsSum = candidate.homeState.userAllocation + candidate.homeState.nodeAllocation;
         require(allocsSum == expectedLockedFunds.toUint256(), "locked funds consistency mismatch");
-
     }
 
     /**

@@ -11,7 +11,7 @@ library Utils {
     using MessageHashUtils for bytes;
 
     function getChannelId(Definition memory def) internal pure returns (bytes32) {
-        return keccak256(abi.encode(def.challengeDuration, def.user, def.node, def.nonce));
+        return keccak256(abi.encode(def));
     }
 
     // ========== Cross-Chain State ==========

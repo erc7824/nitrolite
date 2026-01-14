@@ -1,0 +1,673 @@
+package app_session_v1
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/shopspring/decimal"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	"github.com/erc7824/nitrolite/pkg/app"
+	"github.com/erc7824/nitrolite/pkg/core"
+	"github.com/erc7824/nitrolite/pkg/rpc"
+)
+
+func TestSubmitDepositState_Success(t *testing.T) {
+	// Setup
+	mockStore := new(MockStore)
+	mockSigner := NewMockSigner()
+	mockSigValidator := new(MockSigValidator)
+	nodeAddress := mockSigner.PublicKey().Address().String()
+
+	handler := &Handler{
+		stateAdvancer: core.NewStateAdvancerV1(),
+		useStoreInTx: func(handler StoreTxHandler) error {
+			return handler(mockStore)
+		},
+		signer:      mockSigner,
+		nodeAddress: nodeAddress,
+		sigValidator: map[SigType]SigValidator{
+			EcdsaSigType: mockSigValidator,
+		},
+	}
+
+	// Test data
+	participant1 := "0x1111111111111111111111111111111111111111"
+	participant2 := "0x2222222222222222222222222222222222222222"
+	asset := "USDC"
+	homeChannelID := "0xHomeChannel123"
+	depositAmount := decimal.NewFromInt(100)
+	appSessionID := "0xAppSession123"
+
+	// Create existing app session
+	existingAppSession := &app.AppSessionV1{
+		SessionID:   appSessionID,
+		Application: "test-app",
+		Participants: []app.AppParticipantV1{
+			{
+				WalletAddress:   participant1,
+				SignatureWeight: 1,
+			},
+			{
+				WalletAddress:   participant2,
+				SignatureWeight: 1,
+			},
+		},
+		Quorum:      1,
+		Nonce:       12345,
+		IsClosed:    false,
+		Version:     1,
+		SessionData: "",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	// Create user's current state (before deposit)
+	currentUserState := core.State{
+		ID:            core.GetStateID(participant1, asset, 1, 1),
+		Transitions:   []core.Transition{},
+		Asset:         asset,
+		UserWallet:    participant1,
+		Epoch:         1,
+		Version:       1,
+		HomeChannelID: &homeChannelID,
+		HomeLedger: core.Ledger{
+			TokenAddress: "0xTokenAddress",
+			BlockchainID: 1,
+			UserBalance:  decimal.NewFromInt(500),
+			UserNetFlow:  decimal.NewFromInt(0),
+			NodeBalance:  decimal.NewFromInt(500),
+			NodeNetFlow:  decimal.NewFromInt(0),
+		},
+		EscrowLedger: nil,
+		IsFinal:      false,
+		UserSig:      nil,
+		NodeSig:      nil,
+	}
+
+	// Create incoming user state (with commit transition)
+	incomingUserState := currentUserState.NextState()
+	commitTransition := core.Transition{
+		Type:      core.TransitionTypeCommit,
+		TxID:      "commit-tx-id",
+		AccountID: appSessionID,
+		Amount:    depositAmount,
+	}
+
+	// Apply the commit transition to update balances
+	incomingUserState, err := handler.stateAdvancer.ApplyTransition(incomingUserState, commitTransition)
+	require.NoError(t, err)
+
+	// Sign the incoming user state with user's signature
+	userKey, _ := crypto.GenerateKey()
+	packedUserState, _ := core.PackState(incomingUserState)
+	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
+	userSigHex := hexutil.Encode(userSigBytes)
+	incomingUserState.UserSig = &userSigHex
+
+	// Create app state update with proper hex signature
+	appSigKey, _ := crypto.GenerateKey()
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentDeposit,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{
+				Participant: participant1,
+				Asset:       asset,
+				Amount:      depositAmount,
+			},
+		},
+		SessionData: `{"updated": "data"}`,
+	}
+	packedAppStateUpdate, _ := app.PackAppStateUpdate(appStateUpdateCore)
+	appSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedAppStateUpdate).Bytes(), appSigKey)
+	appSigHex := hexutil.Encode(appSigBytes)
+
+	appStateUpdate := rpc.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentDeposit,
+		Version:      2, // Next version
+		Allocations: []rpc.AppAllocationV1{
+			{
+				Participant: participant1,
+				Asset:       asset,
+				Amount:      depositAmount.String(),
+			},
+		},
+		SessionData: `{"updated": "data"}`,
+		Signatures: []string{
+			appSigHex, // Proper hex signature
+		},
+	}
+
+	// Mock expectations
+	mockStore.On("CheckOpenChannel", participant1, asset).Return(true, nil).Once()
+	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
+	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
+	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
+	mockStore.On("GetAppSession", appSessionID, false).Return(existingAppSession, nil).Once()
+
+	// Mock signature recovery for app state update
+	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
+
+	// Mock allocations check - empty initially
+	mockStore.On("GetParticipantAllocations", appSessionID).Return(
+		map[string]map[string]decimal.Decimal{},
+		nil,
+	).Once()
+
+	// Mock account balance check
+	mockStore.On("GetAccountBalance", participant1, asset).Return(decimal.NewFromInt(500), nil).Once()
+
+	// Mock ledger entry recording
+	mockStore.On("RecordLedgerEntry", appSessionID, asset, depositAmount, (*string)(nil)).Return(nil).Once()
+
+	// Mock app session update
+	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
+		return session.SessionID == appSessionID &&
+			session.Version == 2 &&
+			session.SessionData == `{"updated": "data"}`
+	})).Return(nil).Once()
+
+	// Mock user state storage
+	mockStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
+		return state.UserWallet == participant1 &&
+			state.Version == incomingUserState.Version &&
+			len(state.Transitions) == 1 &&
+			state.Transitions[0].Type == core.TransitionTypeCommit &&
+			state.NodeSig != nil
+	})).Return(nil).Once()
+
+	// Mock transaction recording
+	mockStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
+		return tx.TxType == core.TransactionTypeCommit &&
+			tx.Amount.Equal(depositAmount) &&
+			tx.ToAccount == appSessionID
+	})).Return(nil).Once()
+
+	// Create RPC request
+	rpcState := toRPCState(incomingUserState)
+	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
+		AppStateUpdate: appStateUpdate,
+		UserState:      rpcState,
+	}
+
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1SubmitDepositStateMethod), payload),
+	}
+
+	// Execute
+	handler.SubmitDepositState(ctx)
+
+	// Assert
+	assert.NotNil(t, ctx.Response)
+
+	// Check for errors first
+	if respErr := ctx.Response.Error(); respErr != nil {
+		t.Fatalf("Unexpected error response: %v", respErr)
+	}
+
+	assert.Equal(t, rpc.MsgTypeResp, ctx.Response.Type)
+
+	// Parse response
+	var response rpc.AppSessionsV1SubmitDepositStateResponse
+	err = ctx.Response.Payload.Translate(&response)
+	require.NoError(t, err)
+	assert.NotEmpty(t, response.Signature, "Node signature should be present")
+
+	// Verify all mock expectations
+	mockStore.AssertExpectations(t)
+	mockSigValidator.AssertExpectations(t)
+}
+
+func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
+	// Setup
+	mockStore := new(MockStore)
+	mockSigner := NewMockSigner()
+	mockSigValidator := new(MockSigValidator)
+	nodeAddress := mockSigner.PublicKey().Address().String()
+
+	handler := &Handler{
+		stateAdvancer: core.NewStateAdvancerV1(),
+		useStoreInTx: func(handler StoreTxHandler) error {
+			return handler(mockStore)
+		},
+		signer:      mockSigner,
+		nodeAddress: nodeAddress,
+		sigValidator: map[SigType]SigValidator{
+			EcdsaSigType: mockSigValidator,
+		},
+	}
+
+	// Test data
+	participant1 := "0x1111111111111111111111111111111111111111"
+	asset := "USDC"
+	homeChannelID := "0xHomeChannel123"
+	appSessionID := "0xAppSession123"
+
+	// Create user state with WRONG transition type (transfer_send instead of commit)
+	userState := core.State{
+		ID:         core.GetStateID(participant1, asset, 1, 2),
+		Asset:      asset,
+		UserWallet: participant1,
+		Epoch:      1,
+		Version:    2,
+		Transitions: []core.Transition{
+			{
+				Type:      core.TransitionTypeTransferSend, // Wrong type!
+				TxID:      "tx-id",
+				AccountID: appSessionID,
+				Amount:    decimal.NewFromInt(100),
+			},
+		},
+		HomeChannelID: &homeChannelID,
+		HomeLedger: core.Ledger{
+			TokenAddress: "0xTokenAddress",
+			BlockchainID: 1,
+			UserBalance:  decimal.NewFromInt(400),
+			UserNetFlow:  decimal.NewFromInt(0),
+			NodeBalance:  decimal.NewFromInt(500),
+			NodeNetFlow:  decimal.NewFromInt(0),
+		},
+		IsFinal: false,
+	}
+
+	// Sign the user state
+	userKey, _ := crypto.GenerateKey()
+	packedUserState, _ := core.PackState(userState)
+	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
+	userSigHex := hexutil.Encode(userSigBytes)
+	userState.UserSig = &userSigHex
+
+	// Create app state update with proper hex signature (though we'll fail before signature check)
+	appSigKey, _ := crypto.GenerateKey()
+	depositAmt := decimal.NewFromInt(100)
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentDeposit,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{
+				Participant: participant1,
+				Asset:       asset,
+				Amount:      depositAmt,
+			},
+		},
+		SessionData: "",
+	}
+	packedAppStateUpdate, _ := app.PackAppStateUpdate(appStateUpdateCore)
+	appSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedAppStateUpdate).Bytes(), appSigKey)
+	appSigHex := hexutil.Encode(appSigBytes)
+
+	appStateUpdate := rpc.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentDeposit,
+		Version:      2,
+		Allocations: []rpc.AppAllocationV1{
+			{
+				Participant: participant1,
+				Asset:       asset,
+				Amount:      "100",
+			},
+		},
+		Signatures: []string{appSigHex},
+	}
+
+	// Create RPC request
+	rpcState := toRPCState(userState)
+	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
+		AppStateUpdate: appStateUpdate,
+		UserState:      rpcState,
+	}
+
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1SubmitDepositStateMethod), payload),
+	}
+
+	// Execute
+	handler.SubmitDepositState(ctx)
+
+	// Assert
+	assert.NotNil(t, ctx.Response)
+
+	// Verify response contains error
+	err = ctx.Response.Error()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "commit")
+
+	// Verify no mocks were called since we fail early
+	mockStore.AssertExpectations(t)
+	mockSigValidator.AssertExpectations(t)
+}
+
+func TestSubmitDepositState_InsufficientBalance(t *testing.T) {
+	// Setup
+	mockStore := new(MockStore)
+	mockSigner := NewMockSigner()
+	mockSigValidator := new(MockSigValidator)
+	nodeAddress := mockSigner.PublicKey().Address().String()
+
+	handler := &Handler{
+		stateAdvancer: core.NewStateAdvancerV1(),
+		useStoreInTx: func(handler StoreTxHandler) error {
+			return handler(mockStore)
+		},
+		signer:      mockSigner,
+		nodeAddress: nodeAddress,
+		sigValidator: map[SigType]SigValidator{
+			EcdsaSigType: mockSigValidator,
+		},
+	}
+
+	// Test data
+	participant1 := "0x1111111111111111111111111111111111111111"
+	participant2 := "0x2222222222222222222222222222222222222222"
+	asset := "USDC"
+	homeChannelID := "0xHomeChannel123"
+	depositAmount := decimal.NewFromInt(100) // Reasonable deposit amount
+	appSessionID := "0xAppSession123"
+
+	// Create existing app session
+	existingAppSession := &app.AppSessionV1{
+		SessionID:   appSessionID,
+		Application: "test-app",
+		Participants: []app.AppParticipantV1{
+			{
+				WalletAddress:   participant1,
+				SignatureWeight: 1,
+			},
+			{
+				WalletAddress:   participant2,
+				SignatureWeight: 1,
+			},
+		},
+		Quorum:   1,
+		Nonce:    12345,
+		IsClosed: false,
+		Version:  1,
+	}
+
+	// Create user's current state with sufficient channel balance
+	currentUserState := core.State{
+		ID:            core.GetStateID(participant1, asset, 1, 1),
+		Transitions:   []core.Transition{},
+		Asset:         asset,
+		UserWallet:    participant1,
+		Epoch:         1,
+		Version:       1,
+		HomeChannelID: &homeChannelID,
+		HomeLedger: core.Ledger{
+			TokenAddress: "0xTokenAddress",
+			BlockchainID: 1,
+			UserBalance:  decimal.NewFromInt(500), // Sufficient channel balance
+			UserNetFlow:  decimal.NewFromInt(0),
+			NodeBalance:  decimal.NewFromInt(500),
+			NodeNetFlow:  decimal.NewFromInt(0),
+		},
+		IsFinal: false,
+	}
+
+	// Create incoming user state with commit transition
+	incomingUserState := currentUserState.NextState()
+	commitTransition := core.Transition{
+		Type:      core.TransitionTypeCommit,
+		TxID:      "commit-tx-id",
+		AccountID: appSessionID,
+		Amount:    depositAmount,
+	}
+	incomingUserState, err := handler.stateAdvancer.ApplyTransition(incomingUserState, commitTransition)
+	require.NoError(t, err)
+
+	// Sign the user state
+	userKey, _ := crypto.GenerateKey()
+	packedUserState, _ := core.PackState(incomingUserState)
+	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
+	userSigHex := hexutil.Encode(userSigBytes)
+	incomingUserState.UserSig = &userSigHex
+
+	// Create app state update with proper hex signature
+	appSigKey, _ := crypto.GenerateKey()
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentDeposit,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{
+				Participant: participant1,
+				Asset:       asset,
+				Amount:      depositAmount,
+			},
+		},
+		SessionData: "",
+	}
+	packedAppStateUpdate, _ := app.PackAppStateUpdate(appStateUpdateCore)
+	appSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedAppStateUpdate).Bytes(), appSigKey)
+	appSigHex := hexutil.Encode(appSigBytes)
+
+	appStateUpdate := rpc.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentDeposit,
+		Version:      2,
+		Allocations: []rpc.AppAllocationV1{
+			{
+				Participant: participant1,
+				Asset:       asset,
+				Amount:      depositAmount.String(),
+			},
+		},
+		Signatures: []string{appSigHex},
+	}
+
+	// Mock expectations
+	mockStore.On("CheckOpenChannel", participant1, asset).Return(true, nil).Once()
+	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
+	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
+	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
+	mockStore.On("GetAppSession", appSessionID, false).Return(existingAppSession, nil).Once()
+	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
+	mockStore.On("GetParticipantAllocations", appSessionID).Return(
+		map[string]map[string]decimal.Decimal{},
+		nil,
+	).Once()
+	// Return insufficient balance (50 < 100 needed for deposit)
+	mockStore.On("GetAccountBalance", participant1, asset).Return(decimal.NewFromInt(50), nil).Once()
+
+	// Create RPC request
+	rpcState := toRPCState(incomingUserState)
+	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
+		AppStateUpdate: appStateUpdate,
+		UserState:      rpcState,
+	}
+
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1SubmitDepositStateMethod), payload),
+	}
+
+	// Execute
+	handler.SubmitDepositState(ctx)
+
+	// Assert
+	assert.NotNil(t, ctx.Response)
+
+	// Verify response contains error about insufficient balance
+	err = ctx.Response.Error()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "insufficient balance")
+
+	// Verify all mocks were called
+	mockStore.AssertExpectations(t)
+	mockSigValidator.AssertExpectations(t)
+}
+
+func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
+	// Setup
+	mockStore := new(MockStore)
+	mockSigner := NewMockSigner()
+	mockSigValidator := new(MockSigValidator)
+	nodeAddress := mockSigner.PublicKey().Address().String()
+
+	handler := &Handler{
+		stateAdvancer: core.NewStateAdvancerV1(),
+		useStoreInTx: func(handler StoreTxHandler) error {
+			return handler(mockStore)
+		},
+		signer:      mockSigner,
+		nodeAddress: nodeAddress,
+		sigValidator: map[SigType]SigValidator{
+			EcdsaSigType: mockSigValidator,
+		},
+	}
+
+	// Test data
+	participant1 := "0x1111111111111111111111111111111111111111"
+	participant2 := "0x2222222222222222222222222222222222222222"
+	asset := "USDC"
+	homeChannelID := "0xHomeChannel123"
+	depositAmount := decimal.NewFromInt(100)
+	appSessionID := "0xAppSession123"
+
+	// Create existing app session with higher quorum requirement
+	existingAppSession := &app.AppSessionV1{
+		SessionID:   appSessionID,
+		Application: "test-app",
+		Participants: []app.AppParticipantV1{
+			{
+				WalletAddress:   participant1,
+				SignatureWeight: 1,
+			},
+			{
+				WalletAddress:   participant2,
+				SignatureWeight: 1,
+			},
+		},
+		Quorum:   2, // Need both signatures
+		Nonce:    12345,
+		IsClosed: false,
+		Version:  1,
+	}
+
+	// Create user state
+	currentUserState := core.State{
+		ID:            core.GetStateID(participant1, asset, 1, 1),
+		Transitions:   []core.Transition{},
+		Asset:         asset,
+		UserWallet:    participant1,
+		Epoch:         1,
+		Version:       1,
+		HomeChannelID: &homeChannelID,
+		HomeLedger: core.Ledger{
+			TokenAddress: "0xTokenAddress",
+			BlockchainID: 1,
+			UserBalance:  decimal.NewFromInt(500),
+			UserNetFlow:  decimal.NewFromInt(0),
+			NodeBalance:  decimal.NewFromInt(500),
+			NodeNetFlow:  decimal.NewFromInt(0),
+		},
+		IsFinal: false,
+	}
+
+	incomingUserState := currentUserState.NextState()
+	commitTransition := core.Transition{
+		Type:      core.TransitionTypeCommit,
+		TxID:      "commit-tx-id",
+		AccountID: appSessionID,
+		Amount:    depositAmount,
+	}
+	incomingUserState, err := handler.stateAdvancer.ApplyTransition(incomingUserState, commitTransition)
+	require.NoError(t, err)
+
+	userKey, _ := crypto.GenerateKey()
+	packedUserState, _ := core.PackState(incomingUserState)
+	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
+	userSigHex := hexutil.Encode(userSigBytes)
+	incomingUserState.UserSig = &userSigHex
+
+	// Create app state update with only one signature (insufficient) - using proper hex
+	appSigKey, _ := crypto.GenerateKey()
+	appStateUpdateCore := app.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentDeposit,
+		Version:      2,
+		Allocations: []app.AppAllocationV1{
+			{
+				Participant: participant1,
+				Asset:       asset,
+				Amount:      depositAmount,
+			},
+		},
+		SessionData: "",
+	}
+	packedAppStateUpdate, _ := app.PackAppStateUpdate(appStateUpdateCore)
+	appSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedAppStateUpdate).Bytes(), appSigKey)
+	appSigHex := hexutil.Encode(appSigBytes)
+
+	appStateUpdate := rpc.AppStateUpdateV1{
+		AppSessionID: appSessionID,
+		Intent:       app.AppStateUpdateIntentDeposit,
+		Version:      2,
+		Allocations: []rpc.AppAllocationV1{
+			{
+				Participant: participant1,
+				Asset:       asset,
+				Amount:      depositAmount.String(),
+			},
+		},
+		Signatures: []string{appSigHex}, // Only one signature, but quorum is 2
+	}
+
+	// Mock expectations
+	mockStore.On("CheckOpenChannel", participant1, asset).Return(true, nil).Once()
+	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
+	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
+	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
+	mockStore.On("GetAppSession", appSessionID, false).Return(existingAppSession, nil).Once()
+	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
+
+	// Create RPC request
+	rpcState := toRPCState(incomingUserState)
+	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
+		AppStateUpdate: appStateUpdate,
+		UserState:      rpcState,
+	}
+
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1SubmitDepositStateMethod), payload),
+	}
+
+	// Execute
+	handler.SubmitDepositState(ctx)
+
+	// Assert
+	assert.NotNil(t, ctx.Response)
+
+	// Verify response contains error about quorum
+	err = ctx.Response.Error()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "quorum not met")
+
+	// Verify all mocks were called
+	mockStore.AssertExpectations(t)
+	mockSigValidator.AssertExpectations(t)
+}

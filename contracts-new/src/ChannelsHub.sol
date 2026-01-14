@@ -271,12 +271,9 @@ contract ChannelsHub is IVault {
     event ChannelMigrated(bytes32 indexed channelId, Definition definition, CrossChainState initialState);
 
     // usage:
-    // - "close" channel on old chain in case of chain migration (basically, a "checkpoint" in a common sense)
     // - acknowledge latest funds change on Home chain
     // - resolve a challenge
 
-    // - deposit User funds into a home chain from ERC20 (here)
-    // - withdraw User funds from a home chain to ERC20 (here)
     // - release Node's funds from a channel to the Node's internal vault balance (here)
     // - Node deposit funds into a home chain channel during bridging-deposit (here)
     function checkpointChannel(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {
@@ -355,6 +352,7 @@ contract ChannelsHub is IVault {
 
     // usage:
     // - unilaterally close the channel withdrawing all funds
+    // - "close" channel on old chain in case of chain migration
     function closeChannel(bytes32 channelId, CrossChainState calldata candidate, CrossChainState[] calldata proof) external payable {
         // -- checks --
         Metadata storage channelMeta = _channels[channelId];
@@ -383,33 +381,34 @@ contract ChannelsHub is IVault {
             );
 
             emit ChannelClosed(channelId, prevState);
-        } else {
-            // status == ChannelStatus.OPERATING || status == ChannelStatus.DISPUTED && not expired
-
-            // validate candidate
-            require(candidate.intent == StateIntent.CLOSE, "invalid intent");
-            _requireValidState(candidate);
-            require(candidate.homeState.nodeAllocation == 0, "node allocation must be 0");
-            // Additional closure validation
-            require(candidate.homeState.userAllocation <= channelMeta.lockedFunds, "user allocation exceeds locked funds");
-            _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], true);
-
-
-            candidate.validateSignatures(channelId, participant, node);
-
-            // -- effects --
-            _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
-
-            _pushFunds(
-                participant,
-                candidate.homeState.token,
-                candidate.homeState.userAllocation
-            );
-
-            delete _channels[channelId];
-
-            emit ChannelClosed(channelId, candidate);
+            return;
         }
+
+        // status == ChannelStatus.OPERATING || status == ChannelStatus.DISPUTED && not expired
+
+        // validate candidate
+        require(candidate.intent == StateIntent.CLOSE, "invalid intent");
+        _requireValidState(candidate);
+        require(candidate.homeState.nodeAllocation == 0, "node allocation must be 0");
+        // Additional closure validation
+        require(candidate.homeState.userAllocation <= channelMeta.lockedFunds, "user allocation exceeds locked funds");
+        _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], true);
+
+
+        candidate.validateSignatures(channelId, participant, node);
+
+        // -- effects --
+        _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
+
+        _pushFunds(
+            participant,
+            candidate.homeState.token,
+            candidate.homeState.userAllocation
+        );
+
+        delete _channels[channelId];
+
+        emit ChannelClosed(channelId, candidate);
     }
 
     event ChannelClosed(bytes32 indexed channelId, CrossChainState finalState);

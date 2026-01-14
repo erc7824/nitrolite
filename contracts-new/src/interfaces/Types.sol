@@ -5,7 +5,7 @@ pragma solidity 0.8.30;
 
 struct Definition {
     uint32 challengeDuration;
-    address participant;
+    address user;
     address node;
     uint64 nonce;
     bytes32 metadata;
@@ -43,7 +43,7 @@ struct CrossChainState {
     State homeState;
     State nonHomeState;
 
-    bytes participantSig;
+    bytes userSig;
     bytes nodeSig;
 }
 

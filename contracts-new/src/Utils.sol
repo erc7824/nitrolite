@@ -11,7 +11,7 @@ library Utils {
     using MessageHashUtils for bytes;
 
     function getChannelId(Definition memory def) internal pure returns (bytes32) {
-        return keccak256(abi.encode(def.challengeDuration, def.participant, def.node, def.nonce));
+        return keccak256(abi.encode(def.challengeDuration, def.user, def.node, def.nonce));
     }
 
     // ========== Cross-Chain State ==========
@@ -31,15 +31,15 @@ library Utils {
     function validateSignatures(
         CrossChainState memory ccs,
         bytes32 channelId,
-        address participant,
+        address user,
         address node
     ) internal pure {
         bytes32 ethSignedHash = pack(ccs, channelId).toEthSignedMessageHash();
 
-        address recoveredParticipant = ethSignedHash.recover(ccs.participantSig);
+        address recoveredUser = ethSignedHash.recover(ccs.userSig);
         address recoveredNode = ethSignedHash.recover(ccs.nodeSig);
 
-        require(recoveredParticipant == participant, "invalid participant signature");
+        require(recoveredUser == user, "invalid user signature");
         require(recoveredNode == node, "invalid node signature");
     }
 
@@ -47,7 +47,7 @@ library Utils {
         CrossChainState memory ccs,
         bytes32 channelId,
         bytes memory challengerSig,
-        address participant,
+        address user,
         address node
     ) internal pure {
         bytes memory packedChallengeState = abi.encodePacked(pack(ccs, channelId), "challenge");
@@ -55,7 +55,7 @@ library Utils {
 
         address recoveredChallenger = ethSignedHash.recover(challengerSig);
 
-        require(recoveredChallenger == participant || recoveredChallenger == node, "challenger must be node or participant");
+        require(recoveredChallenger == user || recoveredChallenger == node, "challenger must be node or user");
     }
 
     // ========== State ==========

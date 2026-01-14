@@ -71,13 +71,13 @@ contract ChannelsHubLifecycleTest is Test {
                 nodeAllocation: 0,
                 nodeNetFlow: 0
             }),
-            participantSig: "",
+            userSig: "",
             nodeSig: ""
         });
     }
 
     function signStateWithBothParties(CrossChainState memory state, bytes32 channelId) internal pure returns (CrossChainState memory) {
-        state.participantSig = TestUtils.signStateEIP191(vm, channelId, state, alicePK);
+        state.userSig = TestUtils.signStateEIP191(vm, channelId, state, alicePK);
         state.nodeSig = TestUtils.signStateEIP191(vm, channelId, state, nodePK);
         return state;
     }
@@ -106,13 +106,13 @@ contract ChannelsHubLifecycleTest is Test {
     function test_happyPath() public {
         Definition memory def = Definition({
             challengeDuration: CHALLENGE_DURATION,
-            participant: alice,
+            user: alice,
             node: node,
             nonce: NONCE,
             metadata: bytes32(0)
         });
 
-        bytes32 channelId = keccak256(abi.encode(def.challengeDuration, def.participant, def.node, def.nonce));
+        bytes32 channelId = keccak256(abi.encode(def.challengeDuration, def.user, def.node, def.nonce));
 
         // Check VOID status before channel creation
         (ChannelStatus status,,,,) = cHub.getChannelData(channelId);
@@ -142,7 +142,7 @@ contract ChannelsHubLifecycleTest is Test {
                 nodeAllocation: 0,
                 nodeNetFlow: 0
             }),
-            participantSig: "",
+            userSig: "",
             nodeSig: ""
         });
 

@@ -55,8 +55,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         return _nodeBalances[node][token];
     }
 
-    function getOpenChannels(address participant) external view returns (bytes32[] memory) {
-        // return list of open channelIds between participant and node
+    function getOpenChannels(address user) external view returns (bytes32[] memory) {
+        // return list of open channelIds between user and node
     }
 
     function getChannelData(bytes32 channelId)
@@ -83,7 +83,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         returns (
             Definition memory definition,
             CrossChainState memory lastState,
-            uint256 participantLockedFunds,
+            uint256 userLockedFunds,
             uint64 unlockExpiry,
             uint64 challengeExpiry
         ) {
@@ -96,7 +96,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         returns (
             Definition memory definition,
             CrossChainState memory lastState,
-            uint256 participantLockedFunds
+            uint256 userLockedFunds
         ) {
         // return escrow withdrawal Metadata
     }
@@ -152,7 +152,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         require(initCCS.nonHomeState.isEmpty(), "non-home state must be empty");
         require(initCCS.homeState.nodeAllocation == 0, "node balance must be zero in initial state");
 
-        initCCS.validateSignatures(channelId, def.participant, def.node);
+        initCCS.validateSignatures(channelId, def.user, def.node);
 
         // -- effects --
         _channels[channelId] = Metadata({
@@ -165,15 +165,15 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
         // -- interactions --
         _pullFunds(
-            def.participant,
+            def.user,
             initCCS.homeState.token,
             initCCS.homeState.userAllocation
         );
 
-        emit ChannelCreated(channelId, def.participant, def.node, def, initCCS);
+        emit ChannelCreated(channelId, def.user, def.node, def, initCCS);
     }
 
-    event ChannelCreated(bytes32 indexed channelId, address indexed participant, address indexed node, Definition definition, CrossChainState initialState);
+    event ChannelCreated(bytes32 indexed channelId, address indexed user, address indexed node, Definition definition, CrossChainState initialState);
 
     function depositToChannel(bytes32 channelId, CrossChainState calldata candidate) public payable {
         // -- checks --
@@ -184,7 +184,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         require(candidate.intent == StateIntent.DEPOSIT, "invalid intent");
         _requireValidState(candidate);
 
-        address participant = channelMeta.definition.participant;
+        address user = channelMeta.definition.user;
         address node = channelMeta.definition.node;
 
         _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], false);
@@ -192,7 +192,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         int256 userDepositAmount = candidate.homeState.userNetFlow - prevState.homeState.userNetFlow;
         require(userDepositAmount > 0, "deposit amount must be positive");
 
-        candidate.validateSignatures(channelId, participant, node);
+        candidate.validateSignatures(channelId, user, node);
 
         // -- effects --
         _clearDisputedStatus(channelId, status);
@@ -203,7 +203,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
         // -- interactions --
         _pullFunds(
-            participant,
+            user,
             candidate.homeState.token,
             uint256(userDepositAmount)
         );
@@ -222,7 +222,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         require(candidate.intent == StateIntent.WITHDRAW, "invalid intent");
         _requireValidState(candidate);
 
-        address participant = channelMeta.definition.participant;
+        address user = channelMeta.definition.user;
         address node = channelMeta.definition.node;
 
         _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], false);
@@ -233,7 +233,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         // Verify withdrawal doesn't exceed user allocation
         require(candidate.homeState.userAllocation <= prevState.homeState.userAllocation, "withdrawal exceeds allocation");
 
-        candidate.validateSignatures(channelId, participant, node);
+        candidate.validateSignatures(channelId, user, node);
 
         // -- effects --
         _clearDisputedStatus(channelId, status);
@@ -244,7 +244,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
         // -- interactions --
         _pushFunds(
-            participant,
+            user,
             candidate.homeState.token,
             uint256(-userWithdrawalAmount)
         );
@@ -265,10 +265,10 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         // -- effects --
         // store channel definition
         // store initial state
-        // move `nodeLockedFunds` to `participantLockedFunds` in Metadata
+        // move `nodeLockedFunds` to `userLockedFunds` in Metadata
 
         // -- interactions --
-        // pull funds from participant
+        // pull funds from user
     }
 
     event ChannelMigrated(bytes32 indexed channelId, Definition definition, CrossChainState initialState);
@@ -288,12 +288,12 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         require(candidate.intent == StateIntent.OPERATE, "invalid intent");
         _requireValidState(candidate);
 
-        address participant = channelMeta.definition.participant;
+        address user = channelMeta.definition.user;
         address node = channelMeta.definition.node;
 
         _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], true);
 
-        candidate.validateSignatures(channelId, participant, node);
+        candidate.validateSignatures(channelId, user, node);
 
         // -- effects --
         _clearDisputedStatus(channelId, status);
@@ -319,7 +319,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         CrossChainState memory prevState = channelMeta.lastState;
         require(candidate.version >= prevState.version, "challenge candidate must have higher version than previous state");
 
-        address participant = channelMeta.definition.participant;
+        address user = channelMeta.definition.user;
         address node = channelMeta.definition.node;
 
         if (candidate.version > prevState.version) {
@@ -328,7 +328,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
             _requireValidState(candidate);
             _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], true);
 
-            candidate.validateSignatures(channelId, participant, node);
+            candidate.validateSignatures(channelId, user, node);
 
             // -- effects --
             _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
@@ -342,7 +342,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
             the protocol, as the new state is not processed - only challenger signature is verified
         } */
 
-        candidate.validateChallengerSignature(channelId, challengerSig, participant, node);
+        candidate.validateChallengerSignature(channelId, challengerSig, user, node);
 
         channelMeta.status = ChannelStatus.DISPUTED;
         uint64 challengeExpiry = uint64(block.timestamp) + channelMeta.definition.challengeDuration;
@@ -367,7 +367,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
         CrossChainState memory prevState = channelMeta.lastState;
         address node = channelMeta.definition.node;
-        address participant = channelMeta.definition.participant;
+        address user = channelMeta.definition.user;
 
         if (status == ChannelStatus.DISPUTED && block.timestamp > channelMeta.challengeExpiry) {
             // -- effects --
@@ -377,7 +377,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
             // -- interactions --
             _pushFunds(
-                participant,
+                user,
                 prevState.homeState.token,
                 prevState.homeState.userAllocation
             );
@@ -401,7 +401,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         require(candidate.homeState.userAllocation + candidate.homeState.nodeAllocation <= channelMeta.lockedFunds, "allocation sum exceeds locked funds");
         _requireValidTransition(candidate, prevState, channelMeta.lockedFunds, _nodeBalances[node][candidate.homeState.token], true);
 
-        candidate.validateSignatures(channelId, participant, node);
+        candidate.validateSignatures(channelId, user, node);
 
         // -- effects --
         _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
@@ -416,9 +416,15 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
         // -- interactions --
         _pushFunds(
-            participant,
+            user,
             candidate.homeState.token,
             candidate.homeState.userAllocation
+        );
+
+        _pushFunds(
+            node,
+            candidate.homeState.token,
+            candidate.homeState.nodeAllocation
         );
 
         emit ChannelClosed(channelId, candidate);
@@ -431,7 +437,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
     struct EscrowDepositMetadata {
         Definition definition;
         CrossChainState lastState;
-        uint256 participantLockedFunds;
+        uint256 userLockedFunds;
         uint64 unlockExpiry;
         uint64 challengeExpiry;
     }
@@ -455,7 +461,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         // pull funds from user
     }
 
-    event EscrowDepositInitiated(bytes32 indexed escrowId, address indexed participant, address indexed node, Definition definition, CrossChainState initialState);
+    event EscrowDepositInitiated(bytes32 indexed escrowId, address indexed user, address indexed node, Definition definition, CrossChainState initialState);
 
     // usage:
     // - challenge bridging-deposit process
@@ -473,14 +479,14 @@ contract ChannelsHub is IVault, ReentrancyGuard {
     struct EscrowWithdrawalMetadata {
         Definition definition;
         CrossChainState lastState;
-        uint256 participantLockedFunds;
+        uint256 userLockedFunds;
     }
 
     // usage:
     // - lock Node's funds during bridging-withdrawal
     function initiateEscrowWithdrawal(Definition calldata def, CrossChainState calldata initCCS) external payable {}
 
-    event EscrowWithdrawalInitiated(bytes32 indexed escrowId, address indexed participant, address indexed node, Definition definition, CrossChainState initialState);
+    event EscrowWithdrawalInitiated(bytes32 indexed escrowId, address indexed user, address indexed node, Definition definition, CrossChainState initialState);
 
     // usage:
     // - challenge bridging-withdrawal process
@@ -522,9 +528,9 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
 
     function _requireValidDefinition(Definition calldata def) internal pure {
-        require(def.participant != address(0), InvalidAddress());
+        require(def.user != address(0), InvalidAddress());
         require(def.node != address(0), InvalidAddress());
-        require(def.participant != def.node, AddressCollision(def.participant));
+        require(def.user != def.node, AddressCollision(def.user));
         require(def.challengeDuration >= MIN_CHALLENGE_DURATION, IncorrectChallengeDuration());
     }
 

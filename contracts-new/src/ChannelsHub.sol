@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeCast} from "lib/openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
 import {IVault} from "./interfaces/IVault.sol";
@@ -14,6 +15,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
     using {Utils.validateSignatures, Utils.validateChallengerSignature} for CrossChainState;
     using {Utils.isEmpty} for State;
     using SafeERC20 for IERC20;
+    using SafeCast for int256;
+    using SafeCast for uint256;
 
     error InvalidAddress();
     error InvalidAmount();
@@ -199,13 +202,13 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
 
         channelMeta.lastState = candidate;
-        channelMeta.lockedFunds += uint256(userDepositAmount);
+        channelMeta.lockedFunds += userDepositAmount.toUint256();
 
         // -- interactions --
         _pullFunds(
             user,
             candidate.homeState.token,
-            uint256(userDepositAmount)
+            userDepositAmount.toUint256()
         );
 
         emit ChannelDeposited(channelId, candidate);
@@ -240,13 +243,13 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         _adjustNodeBalance(channelId, node, candidate.homeState.token, prevState, candidate);
 
         channelMeta.lastState = candidate;
-        channelMeta.lockedFunds -= uint256(-userWithdrawalAmount);
+        channelMeta.lockedFunds -= (-userWithdrawalAmount).toUint256();
 
         // -- interactions --
         _pushFunds(
             user,
             candidate.homeState.token,
-            uint256(-userWithdrawalAmount)
+            (-userWithdrawalAmount).toUint256()
         );
 
         emit ChannelWithdrawn(channelId, candidate);
@@ -560,7 +563,7 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         uint256 allocsSum = state.homeState.userAllocation + state.homeState.nodeAllocation;
         int256 netFlowsSum = state.homeState.userNetFlow + state.homeState.nodeNetFlow;
         require(netFlowsSum >= 0, "negative net flow sum");
-        require(allocsSum == uint256(netFlowsSum), "allocation/net flow sum mismatch");
+        require(allocsSum == netFlowsSum.toUint256(), "allocation/net flow sum mismatch");
     }
 
     /**
@@ -590,15 +593,15 @@ contract ChannelsHub is IVault, ReentrancyGuard {
 
         int256 nodeDelta = candidate.homeState.nodeNetFlow - prevState.homeState.nodeNetFlow;
         if (nodeDelta > 0) {
-            require(nodeAvailableFunds >= uint256(nodeDelta), "insufficient node balance");
+            require(nodeAvailableFunds >= nodeDelta.toUint256(), "insufficient node balance");
         }
 
-        int256 expectedLockedFunds = int256(currentLockedFunds) + userDelta + nodeDelta;
+        int256 expectedLockedFunds = currentLockedFunds.toInt256() + userDelta + nodeDelta;
 
         require(expectedLockedFunds >= 0, "negative locked funds");
 
         uint256 allocsSum = candidate.homeState.userAllocation + candidate.homeState.nodeAllocation;
-        require(allocsSum == uint256(expectedLockedFunds), "locked funds consistency mismatch");
+        require(allocsSum == expectedLockedFunds.toUint256(), "locked funds consistency mismatch");
 
     }
 
@@ -620,12 +623,12 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         int256 nodeDelta = newState.homeState.nodeNetFlow - prevState.homeState.nodeNetFlow;
         if (nodeDelta < 0) {
             // release Node's funds from the channel to the Node's internal vault balance
-            _nodeBalances[node][token] += uint256(-nodeDelta);
-            _channels[channelId].lockedFunds -= uint256(-nodeDelta);
+            _nodeBalances[node][token] += (-nodeDelta).toUint256();
+            _channels[channelId].lockedFunds -= (-nodeDelta).toUint256();
         } else if (nodeDelta > 0) {
             // lock Node's funds into the channel from the Node's internal vault balance
-            _nodeBalances[node][token] -= uint256(nodeDelta);
-            _channels[channelId].lockedFunds += uint256(nodeDelta);
+            _nodeBalances[node][token] -= nodeDelta.toUint256();
+            _channels[channelId].lockedFunds += nodeDelta.toUint256();
         }
     }
 

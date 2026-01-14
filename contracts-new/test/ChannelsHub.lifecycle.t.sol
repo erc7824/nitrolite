@@ -275,9 +275,9 @@ contract ChannelsHubLifecycleTest is Test {
         vm.prank(alice);
         cHub.closeChannel(channelId, state, new CrossChainState[](0));
 
-        // Check VOID status after channel closure
+        // Check CLOSED status after channel closure
         (ChannelStatus finalStatus,,,,) = cHub.getChannelData(channelId);
-        assertEq(uint8(finalStatus), uint8(ChannelStatus.VOID), "Channel should be VOID after closure");
+        assertEq(uint8(finalStatus), uint8(ChannelStatus.CLOSED), "Channel should be CLOSED after closure");
 
         // Verify user balance after channel closure (received back 1287)
         assertEq(token.balanceOf(alice), INITIAL_BALANCE - 1300 + 1287, "User balance after channel closure");

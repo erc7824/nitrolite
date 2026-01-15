@@ -70,7 +70,5 @@ type Client interface {
 
 // StateAdvancer applies state transitions
 type StateAdvancer interface {
-	ApplyTransition(state State, transition Transition) (State, error)
-	ValidateTransitions(currentState, proposedState State) error
-	ReapplyTransitions(base, new State) (State, error)
+	ValidateAdvancement(currentState, proposedState State) error
 }

@@ -66,8 +66,8 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 			return rpc.Errorf("failed to check for ongoing state transitions: %v", err)
 		}
 
-		if err := h.stateAdvancer.ValidateTransitions(*currentState, incomingState); err != nil {
-			return rpc.Errorf("invalid state transition: %v", err)
+		if err := h.stateAdvancer.ValidateAdvancement(*currentState, incomingState); err != nil {
+			return rpc.Errorf("invalid state transition: %w", err)
 		}
 
 		packedState, err := core.PackState(incomingState)
@@ -113,7 +113,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 				if err != nil {
 					return rpc.Errorf("failed to issue receiver state: %v", err)
 				}
-				transaction, err = core.NewTransactionFromTransition(incomingState, &newReceiverState, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(incomingState, newReceiverState, *incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}

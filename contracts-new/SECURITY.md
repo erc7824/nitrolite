@@ -62,6 +62,62 @@ e.g. when processing "receive X, withdraw Y", increase `lockedFunds` (and "lock"
 
 ---
 
-It is easy to implement the protocol without NON-home chain operations, as all on-chain operations will
-end up submitting a state on-chain, while off-chain ops (transfer, app-session ops) will just produce an off-chain
-state with a changed amount.
+## Formal Invariants List
+
+### Channel identity and authorization
+
+1. **Channel uniqueness**: A channel identified by `channelId = hash(Definition)` can be created at most once.
+2. **Signature authorization**: Every enforceable state must be signed by both User and Node (unless explicitly relaxed in future versions).
+3. **Version monotonicity**: For a given channel, every valid state has a strictly increasing `version`.
+4. **Version uniqueness**: No two different states with the same `version` may exist for the same channel.
+
+---
+
+### State validity
+
+5. **Per-chain correctness**: For any per-chain state, allocations and net flows are internally consistent and non-negative where required by the chain role (home vs non-home).
+6. **Single-chain enforcement (current scope)**: For single-chain operation, the home-state `chainId` must equal `block.chainid`.
+7. **Allocation backing**: The sum of allocations in an enforced state must equal the amount of locked collateral implied by previous state plus net flow deltas.
+8. **No retrogression**: A state with `version ≤ lastEnforcedVersion` cannot be enforced or checkpointed.
+
+---
+
+### Liquidity and accounting
+
+9. **Locked funds safety**: Channel locked funds are never negative.
+10. **Node liquidity constraint**: Whenever a state requires locking Node funds, the Node must have sufficient available on-chain liquidity at enforcement time.
+11. **Controlled imbalance**: User or Node net flows may temporarily exceed allocations only during explicitly allowed escrow or migration phases.
+
+---
+
+### Operational semantics
+
+12. **Deposit semantics**: A state with intent `DEPOSIT` must include a positive user net-flow delta.
+13. **Withdrawal semantics**: A state with intent `WITHDRAW` must include a negative user net-flow delta and must not increase user allocation beyond previous allocation.
+14. **Operate / checkpoint semantics**: A state with intent `OPERATE` must not change user net flow on the enforcing chain.
+15. **Close semantics**: A state with intent `CLOSE` finalizes the channel and distributes allocations to both parties.
+
+---
+
+### Challenge mechanism
+
+16. **Challenge admissibility**: A channel can only be challenged when in `OPERATING` state.
+17. **Latest-state challenge rule**: A challenge must reference a state with `version ≥ lastEnforcedVersion`; if higher, that state is enforced first.
+18. **Challenge resolution**: Any strictly newer valid state supersedes an active challenge and returns the channel to `OPERATING`.
+19. **Challenge finality**: If no newer state is enforced before challenge expiry, the channel may be unilaterally closed using the last enforced state.
+
+---
+
+### Cross-chain and multi-state structure
+
+20. **Bounded per-chain states**: At any moment, a cross-chain channel state contains at most two per-chain states (home and non-home).
+21. **Flow suspension**: During escrow deposit, escrow withdrawal, or migration, the Node must not issue new states until completion or challenge.
+22. **Recoverability**: Every escrow or migration phase must be completable or revertible via timeout and challenge on at least one chain.
+
+---
+
+### Safety guarantees
+
+23. **Enforcement determinism**: Enforcing the same `(prevState, candidateState)` pair always yields the same on-chain result.
+24. **Invariant preservation**: Every state transition that can be enforced on-chain preserves all invariants listed above.
+25. **Latest-state dominance**: The economically correct outcome is always determined by the latest valid signed state, regardless of enforcement order.

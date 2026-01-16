@@ -6,18 +6,17 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// AppStoreV1 defines the persistence layer interface for app session management.
-type AppStoreV1 interface {
+// Store defines the persistence layer interface for app session management.
+type Store interface {
 	// App session operations
 	CreateAppSession(session app.AppSessionV1) error
-	GetAppSession(sessionID string, isClosed bool) (*app.AppSessionV1, error)
+	GetAppSession(sessionID string) (*app.AppSessionV1, error)
 	UpdateAppSession(session app.AppSessionV1) error
 	GetAppSessionBalances(sessionID string) (map[string]decimal.Decimal, error)
 	GetParticipantAllocations(sessionID string) (map[string]map[string]decimal.Decimal, error)
 
 	// Ledger operations
 	RecordLedgerEntry(accountID, asset string, amount decimal.Decimal, sessionKey *string) error
-	GetAccountBalance(accountID, asset string) (decimal.Decimal, error)
 
 	RecordTransaction(tx core.Transaction) error
 
@@ -38,7 +37,7 @@ type AppStoreV1 interface {
 
 // StoreTxHandler is a function that executes Store operations within a transaction.
 // If the handler returns an error, the transaction is rolled back; otherwise it's committed.
-type StoreTxHandler func(AppStoreV1) error
+type StoreTxHandler func(Store) error
 
 // StoreTxProvider wraps Store operations in a database transaction.
 // It accepts a StoreTxHandler and manages transaction lifecycle (begin, commit, rollback).

@@ -412,7 +412,7 @@ func TestClientV1_AppSessionsV1CreateAppSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, testAppSession, resp.AppSessionID)
-	assert.Equal(t, "open", resp.IsClosed)
+	assert.False(t, resp.IsClosed)
 }
 
 func TestClientV1_AppSessionsV1CloseAppSession(t *testing.T) {
@@ -445,7 +445,7 @@ func TestClientV1_AppSessionsV1SubmitDepositState(t *testing.T) {
 	client, dialer := setupClient()
 
 	response := rpc.AppSessionsV1SubmitDepositStateResponse{
-		Signature: "0xsig789",
+		StateNodeSig: "0xsig789",
 	}
 
 	registerSimpleHandlerV1(dialer, "app_sessions.v1.submit_deposit_state", response)
@@ -460,7 +460,7 @@ func TestClientV1_AppSessionsV1SubmitDepositState(t *testing.T) {
 		UserState: rpc.StateV1{ID: "state123"},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "0xsig789", resp.Signature)
+	assert.Equal(t, "0xsig789", resp.StateNodeSig)
 }
 
 func TestClientV1_AppSessionsV1SubmitAppState(t *testing.T) {

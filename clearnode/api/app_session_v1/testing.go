@@ -12,7 +12,7 @@ import (
 	"github.com/erc7824/nitrolite/pkg/sign"
 )
 
-// MockStore is a mock implementation of the AppStoreV1 interface
+// MockStore is a mock implementation of the Store interface
 type MockStore struct {
 	mock.Mock
 }
@@ -22,8 +22,8 @@ func (m *MockStore) CreateAppSession(session app.AppSessionV1) error {
 	return args.Error(0)
 }
 
-func (m *MockStore) GetAppSession(sessionID string, isClosed bool) (*app.AppSessionV1, error) {
-	args := m.Called(sessionID, isClosed)
+func (m *MockStore) GetAppSession(sessionID string) (*app.AppSessionV1, error) {
+	args := m.Called(sessionID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

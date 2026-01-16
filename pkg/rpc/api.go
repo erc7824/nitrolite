@@ -139,6 +139,8 @@ type ChannelsV1HomeChannelCreatedEvent struct {
 type AppSessionsV1SubmitDepositStateRequest struct {
 	// AppStateUpdate is the application session state update to be submitted
 	AppStateUpdate AppStateUpdateV1 `json:"app_state_update"`
+	// AppStateSignatures is the list of participant signatures for the app state update
+	AppStateSignatures []string `json:"app_state_signatures"`
 	// SigQuorum is the signature quorum for the application session
 	SigQuorum uint64 `json:"sig_quorum"`
 	// UserState is the user state associated with the application session update
@@ -147,8 +149,8 @@ type AppSessionsV1SubmitDepositStateRequest struct {
 
 // AppSessionsV1SubmitDepositStateResponse returns the Node's signature for the deposit state.
 type AppSessionsV1SubmitDepositStateResponse struct {
-	// Signature is the Node's signature for the deposit state
-	Signature string `json:"signature"`
+	// StateNodeSig is the Node's signature for the deposit state
+	StateNodeSig string `json:"signature"`
 }
 
 // AppSessionsV1SubmitAppStateRequest submits an application session state update.

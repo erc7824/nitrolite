@@ -27,17 +27,19 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		"appSessionID", reqPayload.AppStateUpdate.AppSessionID,
 		"version", reqPayload.AppStateUpdate.Version)
 
-	var nodeSig string
-	err := h.useStoreInTx(func(tx AppStoreV1) error {
-		appStateUpd, err := unmapAppStateUpdateV1(&reqPayload.AppStateUpdate)
-		if err != nil {
-			return rpc.Errorf("failed to parse app state update: %v", err)
-		}
-		userState, err := unmapStateV1(reqPayload.UserState)
-		if err != nil {
-			return rpc.Errorf("failed to parse user state: %v", err)
-		}
+	appStateUpd, err := unmapAppStateUpdateV1(&reqPayload.AppStateUpdate)
+	if err != nil {
+		c.Fail(err, "failed to parse app state update")
+		return
+	}
+	userState, err := unmapStateV1(reqPayload.UserState)
+	if err != nil {
+		c.Fail(err, "failed to parse user state")
+		return
+	}
 
+	var nodeSig string
+	err = h.useStoreInTx(func(tx Store) error {
 		lastTransition := userState.GetLastTransition()
 		if lastTransition == nil {
 			return rpc.Errorf("user state has no transitions")
@@ -97,7 +99,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("invalid state transitions: %v", err)
 		}
 
-		appSession, err := tx.GetAppSession(appStateUpd.AppSessionID, false)
+		appSession, err := tx.GetAppSession(appStateUpd.AppSessionID)
 		if err != nil {
 			return rpc.Errorf("app session not found: %v", err)
 		}
@@ -116,12 +118,12 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		participantWeights := getParticipantWeights(appSession.Participants)
 
 		// Validate signatures and quorum
-		if len(reqPayload.AppStateUpdate.Signatures) == 0 {
+		if len(reqPayload.AppStateSignatures) == 0 {
 			return rpc.Errorf("no signatures provided")
 		}
 
 		// Pack the app state update for signature verification
-		packedStateUpdate, err := app.PackAppStateUpdate(appStateUpd)
+		packedStateUpdate, err := app.PackAppStateUpdateV1(appStateUpd)
 		if err != nil {
 			return rpc.Errorf("failed to pack app state update: %v", err)
 		}
@@ -131,7 +133,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		signedWeights := make(map[string]bool)
 		var achievedQuorum uint8
 
-		for _, sigHex := range reqPayload.AppStateUpdate.Signatures {
+		for _, sigHex := range reqPayload.AppStateSignatures {
 			sigBytes, err := hexutil.Decode(sigHex)
 			if err != nil {
 				return rpc.Errorf("failed to decode signature: %v", err)
@@ -176,12 +178,12 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 
 			participantAllocs := currentAllocations[alloc.Participant]
 			if participantAllocs == nil {
-				participantAllocs = make(map[string]decimal.Decimal)
+				participantAllocs = make(map[string]decimal.Decimal, 0)
 			}
 			currentAmount := participantAllocs[alloc.Asset]
 
 			if alloc.Amount.LessThan(currentAmount) {
-				return rpc.Errorf("decreased allocation for participant %s", alloc.Participant)
+				return rpc.Errorf("decreased allocation for %s for participant %s", alloc.Asset, alloc.Participant)
 			}
 
 			if alloc.Amount.GreaterThan(currentAmount) {
@@ -192,25 +194,13 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 
 				// Validate that allocation asset matches user state asset
 				if alloc.Asset != userState.Asset {
-					return rpc.Errorf("allocation asset '%s' does not match user state asset '%s'", alloc.Asset, userState.Asset)
+					return rpc.Errorf("app session deposit allocation for asset '%s' does not match user channel state asset '%s'", alloc.Asset, userState.Asset)
 				}
 
 				depositAmount := alloc.Amount.Sub(currentAmount)
-				if depositAmount.LessThanOrEqual(decimal.Zero) {
-					return rpc.Errorf("invalid deposit amount: %s for asset %s", depositAmount, alloc.Asset)
-				}
 
 				// Accumulate total deposit amount
 				totalDepositAmount = totalDepositAmount.Add(depositAmount)
-
-				balance, err := tx.GetAccountBalance(alloc.Participant, alloc.Asset)
-				if err != nil {
-					return rpc.Errorf("failed to get account balance: %v", err)
-				}
-
-				if depositAmount.GreaterThan(balance) {
-					return rpc.Errorf("insufficient balance for participant %s", alloc.Participant)
-				}
 
 				if err := tx.RecordLedgerEntry(appSession.SessionID, alloc.Asset, depositAmount, nil); err != nil {
 					return rpc.Errorf("failed to record ledger entry: %v", err)
@@ -236,6 +226,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		}
 
 		// Sign the user state with node's signature
+		// TODO:create a function to handle state signing
 		userStateHash := crypto.Keccak256Hash(packedUserState).Bytes()
 		_nodeSig, err := h.signer.Sign(userStateHash)
 		if err != nil {
@@ -274,7 +265,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 	}
 
 	resp := rpc.AppSessionsV1SubmitDepositStateResponse{
-		Signature: nodeSig,
+		StateNodeSig: nodeSig,
 	}
 
 	payload, err := rpc.NewPayload(resp)
@@ -285,5 +276,9 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 
 	c.Succeed(c.Request.Method, payload)
 	logger.Info("successfully processed deposit state",
-		"appSessionID", reqPayload.AppStateUpdate.AppSessionID)
+		"appSessionID", reqPayload.AppStateUpdate.AppSessionID,
+		"userWallet", userState.UserWallet,
+		"userStateVersion", userState.Version,
+		"asset", userState.Asset,
+		"amount", userState.GetLastTransition().Amount)
 }

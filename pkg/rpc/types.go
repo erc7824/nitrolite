@@ -156,8 +156,6 @@ type AppStateUpdateV1 struct {
 	Allocations []AppAllocationV1 `json:"allocations"`
 	// SessionData is the JSON stringified session data
 	SessionData string `json:"session_data"`
-	// Signatures is the list of participant signatures for this state update
-	Signatures []string `json:"signatures"`
 }
 
 // AppSessionInfoV1 represents information about an application session.

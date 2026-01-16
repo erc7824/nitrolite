@@ -118,7 +118,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 		},
 		SessionData: `{"updated": "data"}`,
 	}
-	packedAppStateUpdate, _ := app.PackAppStateUpdate(appStateUpdateCore)
+	packedAppStateUpdate, _ := app.PackAppStateUpdateV1(appStateUpdateCore)
 	appSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedAppStateUpdate).Bytes(), appSigKey)
 	appSigHex := hexutil.Encode(appSigBytes)
 
@@ -134,9 +134,6 @@ func TestSubmitDepositState_Success(t *testing.T) {
 			},
 		},
 		SessionData: `{"updated": "data"}`,
-		Signatures: []string{
-			appSigHex, // Proper hex signature
-		},
 	}
 
 	// Mock expectations
@@ -144,7 +141,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
-	mockStore.On("GetAppSession", appSessionID, false).Return(existingAppSession, nil).Once()
+	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
 
 	// Mock signature recovery for app state update
 	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
@@ -154,9 +151,6 @@ func TestSubmitDepositState_Success(t *testing.T) {
 		map[string]map[string]decimal.Decimal{},
 		nil,
 	).Once()
-
-	// Mock account balance check
-	mockStore.On("GetAccountBalance", participant1, asset).Return(decimal.NewFromInt(500), nil).Once()
 
 	// Mock ledger entry recording
 	mockStore.On("RecordLedgerEntry", appSessionID, asset, depositAmount, (*string)(nil)).Return(nil).Once()
@@ -187,8 +181,9 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	// Create RPC request
 	rpcState := toRPCState(*incomingUserState)
 	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
-		AppStateUpdate: appStateUpdate,
-		UserState:      rpcState,
+		AppStateUpdate:     appStateUpdate,
+		AppStateSignatures: []string{appSigHex},
+		UserState:          rpcState,
 	}
 
 	payload, err := rpc.NewPayload(reqPayload)
@@ -216,7 +211,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	var response rpc.AppSessionsV1SubmitDepositStateResponse
 	err = ctx.Response.Payload.Translate(&response)
 	require.NoError(t, err)
-	assert.NotEmpty(t, response.Signature, "Node signature should be present")
+	assert.NotEmpty(t, response.StateNodeSig, "Node signature should be present")
 
 	// Verify all mock expectations
 	mockStore.AssertExpectations(t)
@@ -298,7 +293,7 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 		},
 		SessionData: "",
 	}
-	packedAppStateUpdate, _ := app.PackAppStateUpdate(appStateUpdateCore)
+	packedAppStateUpdate, _ := app.PackAppStateUpdateV1(appStateUpdateCore)
 	appSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedAppStateUpdate).Bytes(), appSigKey)
 	appSigHex := hexutil.Encode(appSigBytes)
 
@@ -313,14 +308,14 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 				Amount:      "100",
 			},
 		},
-		Signatures: []string{appSigHex},
 	}
 
 	// Create RPC request
 	rpcState := toRPCState(userState)
 	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
-		AppStateUpdate: appStateUpdate,
-		UserState:      rpcState,
+		AppStateUpdate:     appStateUpdate,
+		AppStateSignatures: []string{appSigHex},
+		UserState:          rpcState,
 	}
 
 	payload, err := rpc.NewPayload(reqPayload)
@@ -343,164 +338,6 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 	assert.Contains(t, err.Error(), "commit")
 
 	// Verify no mocks were called since we fail early
-	mockStore.AssertExpectations(t)
-	mockSigValidator.AssertExpectations(t)
-}
-
-func TestSubmitDepositState_InsufficientBalance(t *testing.T) {
-	// Setup
-	mockStore := new(MockStore)
-	mockSigner := NewMockSigner()
-	mockSigValidator := new(MockSigValidator)
-	nodeAddress := mockSigner.PublicKey().Address().String()
-
-	handler := &Handler{
-		stateAdvancer: core.NewStateAdvancerV1(),
-		useStoreInTx: func(handler StoreTxHandler) error {
-			return handler(mockStore)
-		},
-		signer:      mockSigner,
-		nodeAddress: nodeAddress,
-		sigValidator: map[SigType]SigValidator{
-			EcdsaSigType: mockSigValidator,
-		},
-	}
-
-	// Test data
-	participant1 := "0x1111111111111111111111111111111111111111"
-	participant2 := "0x2222222222222222222222222222222222222222"
-	asset := "USDC"
-	homeChannelID := "0xHomeChannel123"
-	depositAmount := decimal.NewFromInt(100) // Reasonable deposit amount
-	appSessionID := "0xAppSession123"
-
-	// Create existing app session
-	existingAppSession := &app.AppSessionV1{
-		SessionID:   appSessionID,
-		Application: "test-app",
-		Participants: []app.AppParticipantV1{
-			{
-				WalletAddress:   participant1,
-				SignatureWeight: 1,
-			},
-			{
-				WalletAddress:   participant2,
-				SignatureWeight: 1,
-			},
-		},
-		Quorum:   1,
-		Nonce:    12345,
-		IsClosed: false,
-		Version:  1,
-	}
-
-	// Create user's current state with sufficient channel balance
-	currentUserState := core.State{
-		ID:            core.GetStateID(participant1, asset, 1, 1),
-		Transitions:   []core.Transition{},
-		Asset:         asset,
-		UserWallet:    participant1,
-		Epoch:         1,
-		Version:       1,
-		HomeChannelID: &homeChannelID,
-		HomeLedger: core.Ledger{
-			TokenAddress: "0xTokenAddress",
-			BlockchainID: 1,
-			UserBalance:  decimal.NewFromInt(500), // Sufficient channel balance
-			UserNetFlow:  decimal.NewFromInt(500),
-			NodeBalance:  decimal.NewFromInt(0),
-			NodeNetFlow:  decimal.NewFromInt(0),
-		},
-		IsFinal: false,
-	}
-
-	// Create incoming user state with commit transition
-	incomingUserState := currentUserState.NextState()
-
-	_, err := incomingUserState.ApplyCommitTransition(appSessionID, depositAmount)
-	require.NoError(t, err)
-
-	// Sign the user state
-	userKey, _ := crypto.GenerateKey()
-	packedUserState, _ := core.PackState(*incomingUserState)
-	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
-	userSigHex := hexutil.Encode(userSigBytes)
-	incomingUserState.UserSig = &userSigHex
-
-	// Create app state update with proper hex signature
-	appSigKey, _ := crypto.GenerateKey()
-	appStateUpdateCore := app.AppStateUpdateV1{
-		AppSessionID: appSessionID,
-		Intent:       app.AppStateUpdateIntentDeposit,
-		Version:      2,
-		Allocations: []app.AppAllocationV1{
-			{
-				Participant: participant1,
-				Asset:       asset,
-				Amount:      depositAmount,
-			},
-		},
-		SessionData: "",
-	}
-	packedAppStateUpdate, _ := app.PackAppStateUpdate(appStateUpdateCore)
-	appSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedAppStateUpdate).Bytes(), appSigKey)
-	appSigHex := hexutil.Encode(appSigBytes)
-
-	appStateUpdate := rpc.AppStateUpdateV1{
-		AppSessionID: appSessionID,
-		Intent:       app.AppStateUpdateIntentDeposit,
-		Version:      2,
-		Allocations: []rpc.AppAllocationV1{
-			{
-				Participant: participant1,
-				Asset:       asset,
-				Amount:      depositAmount.String(),
-			},
-		},
-		Signatures: []string{appSigHex},
-	}
-
-	// Mock expectations
-	mockStore.On("CheckOpenChannel", participant1, asset).Return(true, nil).Once()
-	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
-	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
-	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
-	mockStore.On("GetAppSession", appSessionID, false).Return(existingAppSession, nil).Once()
-	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
-	mockStore.On("GetParticipantAllocations", appSessionID).Return(
-		map[string]map[string]decimal.Decimal{},
-		nil,
-	).Once()
-	// Return insufficient balance (50 < 100 needed for deposit)
-	mockStore.On("GetAccountBalance", participant1, asset).Return(decimal.NewFromInt(50), nil).Once()
-
-	// Create RPC request
-	rpcState := toRPCState(*incomingUserState)
-	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
-		AppStateUpdate: appStateUpdate,
-		UserState:      rpcState,
-	}
-
-	payload, err := rpc.NewPayload(reqPayload)
-	require.NoError(t, err)
-
-	ctx := &rpc.Context{
-		Context: context.Background(),
-		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1SubmitDepositStateMethod), payload),
-	}
-
-	// Execute
-	handler.SubmitDepositState(ctx)
-
-	// Assert
-	assert.NotNil(t, ctx.Response)
-
-	// Verify response contains error about insufficient balance
-	err = ctx.Response.Error()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "insufficient balance")
-
-	// Verify all mocks were called
 	mockStore.AssertExpectations(t)
 	mockSigValidator.AssertExpectations(t)
 }
@@ -598,7 +435,7 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 		},
 		SessionData: "",
 	}
-	packedAppStateUpdate, _ := app.PackAppStateUpdate(appStateUpdateCore)
+	packedAppStateUpdate, _ := app.PackAppStateUpdateV1(appStateUpdateCore)
 	appSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedAppStateUpdate).Bytes(), appSigKey)
 	appSigHex := hexutil.Encode(appSigBytes)
 
@@ -613,7 +450,6 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 				Amount:      depositAmount.String(),
 			},
 		},
-		Signatures: []string{appSigHex}, // Only one signature, but quorum is 2
 	}
 
 	// Mock expectations
@@ -621,14 +457,15 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
-	mockStore.On("GetAppSession", appSessionID, false).Return(existingAppSession, nil).Once()
+	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
 	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
 
 	// Create RPC request
 	rpcState := toRPCState(*incomingUserState)
 	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
-		AppStateUpdate: appStateUpdate,
-		UserState:      rpcState,
+		AppStateUpdate:     appStateUpdate,
+		AppStateSignatures: []string{appSigHex},
+		UserState:          rpcState,
 	}
 
 	payload, err := rpc.NewPayload(reqPayload)

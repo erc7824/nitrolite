@@ -108,9 +108,9 @@ type AssetAllowanceV1 struct {
 	Used      decimal.Decimal
 }
 
-// PackCreateAppSessionRequest packs the Definition and SessionData for signing using ABI encoding.
+// PackCreateAppSessionRequestV1 packs the Definition and SessionData for signing using ABI encoding.
 // This is used to generate a deterministic hash that participants sign when creating an app session.
-func PackCreateAppSessionRequest(definition AppDefinitionV1, sessionData string) ([]byte, error) {
+func PackCreateAppSessionRequestV1(definition AppDefinitionV1, sessionData string) ([]byte, error) {
 	// Define the participant tuple type
 	participantType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{Name: "walletAddress", Type: "address"},
@@ -161,9 +161,9 @@ func PackCreateAppSessionRequest(definition AppDefinitionV1, sessionData string)
 	return crypto.Keccak256(packed), nil
 }
 
-// PackAppStateUpdate packs the AppStateUpdate for signing using ABI encoding.
+// PackAppStateUpdateV1 packs the AppStateUpdate for signing using ABI encoding.
 // This is used to generate a deterministic hash that participants sign when updating an app session state.
-func PackAppStateUpdate(stateUpdate AppStateUpdateV1) ([]byte, error) {
+func PackAppStateUpdateV1(stateUpdate AppStateUpdateV1) ([]byte, error) {
 	// Define the allocation tuple type
 	allocationType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
 		{Name: "participant", Type: "address"},

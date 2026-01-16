@@ -59,7 +59,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 	}
 
 	// Pack the request for signature verification
-	packedRequest, err := app.PackCreateAppSessionRequest(appDef, reqPayload.SessionData)
+	packedRequest, err := app.PackCreateAppSessionRequestV1(appDef, reqPayload.SessionData)
 	if err != nil {
 		c.Fail(rpc.Errorf("failed to pack request: %v", err), "")
 		return
@@ -70,6 +70,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 	signedWeights := make(map[string]bool)
 	var achievedQuorum uint8
 
+	// TODO: Can be moved to a function
 	for _, sigHex := range reqPayload.Signatures {
 		sigBytes, err := hexutil.Decode(sigHex)
 		if err != nil {
@@ -125,7 +126,7 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		UpdatedAt:    time.Now(),
 	}
 
-	err = h.useStoreInTx(func(store AppStoreV1) error {
+	err = h.useStoreInTx(func(store Store) error {
 		if err := store.CreateAppSession(appSession); err != nil {
 			return rpc.Errorf("failed to create app session: %v", err)
 		}

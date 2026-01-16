@@ -70,7 +70,7 @@ This directory contains the V1 API handlers for app session management, implemen
 - Each signature must be from a participant in the session
 
 **Signature Verification**:
-- Uses ABI encoding via `PackCreateAppSessionRequest` to create a deterministic hash
+- Uses ABI encoding via `PackCreateAppSessionRequestV1` to create a deterministic hash
 - Recovers signer addresses from ECDSA signatures
 - Validates that signers are participants
 - Accumulates signature weights to verify quorum is met
@@ -156,7 +156,7 @@ This directory contains the V1 API handlers for app session management, implemen
 - No conflicting allocations in other sessions
 
 **Signature Verification**:
-- Uses ABI encoding via `PackAppStateUpdate` to create a deterministic hash
+- Uses ABI encoding via `PackAppStateUpdateV1` to create a deterministic hash
 - App session ID encoded as `bytes32`
 - Allocation amounts encoded as `string` representation of decimals
 - Recovers signer addresses from ECDSA signatures
@@ -268,13 +268,13 @@ The implementation uses Ethereum ABI encoding for deterministic hashing and sign
 - Encodes: application (string), participants (address[], uint8[]), quorum (uint64), nonce (uint64)
 - Returns Keccak256 hash as hex string
 
-#### `PackCreateAppSessionRequest(definition AppDefinitionV1, sessionData string) ([]byte, error)`
+#### `PackCreateAppSessionRequestV1(definition AppDefinitionV1, sessionData string) ([]byte, error)`
 - Packs app session creation request for signature verification
 - Encodes: application, participants, quorum, nonce, sessionData
 - Returns Keccak256 hash of ABI-encoded data
 - Used in `create_app_session` to verify participant signatures
 
-#### `PackAppStateUpdate(stateUpdate AppStateUpdateV1) ([]byte, error)`
+#### `PackAppStateUpdateV1(stateUpdate AppStateUpdateV1) ([]byte, error)`
 - Packs app state update for signature verification
 - Encodes:
   - `appSessionID` as `bytes32` (using `common.HexToHash`)
@@ -298,10 +298,10 @@ The implementation uses:
 
 ### Store Interface
 
-The service requires an `AppStoreV1` interface for persistence operations:
+The service requires an `Store` interface for persistence operations:
 
 ```go
-type AppStoreV1 interface {
+type Store interface {
     // App session operations
     CreateAppSession(session app.AppSessionV1) error
     GetAppSession(sessionID string, isClosed bool) (*app.AppSessionV1, error)
@@ -390,8 +390,8 @@ This dual nature ensures atomicity between channel commits and app session depos
 **ABI Encoding for Signatures**:
 - All signature verification uses Ethereum ABI encoding for deterministic hashing
 - `GenerateAppSessionIDV1`: Uses ABI encoding to generate deterministic session IDs
-- `PackCreateAppSessionRequest`: ABI-encodes session creation data for signature verification
-- `PackAppStateUpdate`: ABI-encodes state updates with proper type handling:
+- `PackCreateAppSessionRequestV1`: ABI-encodes session creation data for signature verification
+- `PackAppStateUpdateV1`: ABI-encodes state updates with proper type handling:
   - App session ID as `bytes32` (not string) for efficient on-chain compatibility
   - Amounts as `string` representation for decimal precision
   - Addresses as native `address` type
@@ -433,10 +433,10 @@ To test the implementation:
 
 ```bash
 # Build the packages
-cd /Users/dimast/work/nitrolite/clearnode/api/app_session_v1
+cd clearnode/api/app_session_v1
 go build .
 
-cd /Users/dimast/work/nitrolite/pkg/app
+cd pkg/app
 go build .
 ```
 
@@ -444,8 +444,8 @@ go build .
 
 ## References
 
-- API Specification: `/Users/dimast/work/nitrolite/docs/api.yaml`
-- RPC Types: `/Users/dimast/work/nitrolite/pkg/rpc/`
-- Application Types: `/Users/dimast/work/nitrolite/pkg/app/`
-- Core Package: `/Users/dimast/work/nitrolite/pkg/core/`
-- Channel V1 Reference: `/Users/dimast/work/nitrolite/clearnode/api/channel_v1/`
+- API Specification: `docs/api.yaml`
+- RPC Types: `pkg/rpc/`
+- Application Types: `pkg/app/`
+- Core Package: `pkg/core/`
+- Channel V1 Reference: `clearnode/api/channel_v1/`

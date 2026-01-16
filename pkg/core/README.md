@@ -54,14 +54,14 @@ The `Client` interface abstracts the communication with the `ChannelsHub` smart 
 
 The `Listener` allows applications to react to on-chain state changes by registering handlers for events like `HomeChannelCreatedEvent` or `EscrowDepositFinalizedEvent`.
 
-### Transition Validator
+### State Advancer
 
-The `TransitionValidator` ensures that off-chain state updates follow the protocol rules.
+The `StateAdvancer` ensures that off-chain state updates follow the protocol rules.
 
 ```go
-validator := core.NewSimpleTransitionValidator()
-err := validator.ValidateTransition(oldState, newState)
-// Checks: Version increment, epoch consistency, signature presence, etc.
+advancer := core.NewStateAdvancerV1()
+err := advancer.ValidateAdvancement(oldState, newState)
+// Checks: Version increment, ledgers, epoch consistency, signature presence, etc.
 
 ```
 

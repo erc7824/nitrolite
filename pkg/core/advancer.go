@@ -74,7 +74,7 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 	}
 
 	if transitionLenDiff > 1 {
-		return fmt.Errorf("proposed state contains more than one new transtion")
+		return fmt.Errorf("proposed state contains more than one new transition")
 	}
 
 	if transitionLenDiff == 0 {
@@ -89,6 +89,7 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 		}
 
 		newTransition := proposedState.Transitions[len(proposedState.Transitions)-1]
+		lastTransition := currentState.GetLastTransition()
 
 		var err error
 		switch newTransition.Type {
@@ -109,7 +110,14 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 				proposedState.EscrowLedger.TokenAddress,
 				newTransition.Amount)
 		case TransitionTypeEscrowDeposit:
-			_, err = expectedState.ApplyEscrowDepositTransition(newTransition.Amount)
+			if lastTransition != nil && lastTransition.Type == TransitionTypeMutualLock {
+				if !lastTransition.Amount.Equal(newTransition.Amount) {
+					return fmt.Errorf("escrow deposit amount must be the same as mutual lock amount")
+				}
+				_, err = expectedState.ApplyEscrowDepositTransition(newTransition.Amount)
+			} else {
+				return fmt.Errorf("escrow deposit transition must follow a mutual lock transition")
+			}
 		case TransitionTypeEscrowLock:
 			if proposedState.EscrowLedger == nil {
 				return fmt.Errorf("proposed state escrow ledger is nil")
@@ -119,7 +127,14 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 				proposedState.EscrowLedger.TokenAddress,
 				newTransition.Amount)
 		case TransitionTypeEscrowWithdraw:
-			_, err = expectedState.ApplyEscrowWithdrawTransition(newTransition.Amount)
+			if lastTransition != nil && lastTransition.Type == TransitionTypeEscrowLock {
+				if !lastTransition.Amount.Equal(newTransition.Amount) {
+					return fmt.Errorf("escrow withdraw amount must be the same as escrow lock amount")
+				}
+				_, err = expectedState.ApplyEscrowWithdrawTransition(newTransition.Amount)
+			} else {
+				return fmt.Errorf("escrow withdraw transition must follow an escrow lock transition")
+			}
 		case TransitionTypeMigrate:
 			_, err = expectedState.ApplyMigrateTransition(newTransition.Amount)
 		default:

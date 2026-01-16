@@ -74,7 +74,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 	incomingSenderState := currentSenderState.NextState()
 
 	// Apply the transfer send transition to update balances
-	transferSendTranstion, err := incomingSenderState.ApplyTransferSendTransition(receiverWallet, transferAmount)
+	transferSendTransition, err := incomingSenderState.ApplyTransferSendTransition(receiverWallet, transferAmount)
 	require.NoError(t, err)
 
 	// Sign the incoming sender state with user's signature
@@ -109,7 +109,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 
 	// Expected receiver state after transfer receive
 	expectedReceiverState := currentReceiverState.NextState()
-	_, err = expectedReceiverState.ApplyTransferReceiveTransition(senderWallet, transferAmount, transferSendTranstion.TxID)
+	_, err = expectedReceiverState.ApplyTransferReceiveTransition(senderWallet, transferAmount, transferSendTransition.TxID)
 	require.NoError(t, err)
 
 	// Mock expectations
@@ -367,9 +367,17 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	withdrawAmount := decimal.NewFromInt(100)
 
 	// Create user's current state (signed, with escrow ledger)
+	// The last transition must be an EscrowLock for the EscrowWithdraw to be valid
 	currentSignedState := core.State{
-		ID:              core.GetStateID(userWallet, asset, 1, 2),
-		Transitions:     []core.Transition{},
+		ID: core.GetStateID(userWallet, asset, 1, 2),
+		Transitions: []core.Transition{
+			{
+				Type:      core.TransitionTypeEscrowLock,
+				TxID:      "0xPreviousEscrowLockTx",
+				AccountID: "",
+				Amount:    withdrawAmount,
+			},
+		},
 		Asset:           asset,
 		UserWallet:      userWallet,
 		Epoch:           1,
@@ -411,15 +419,15 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingState.UserSig = &userSigHex
 
+	// Create a copy for the unsigned state mock
+	currentUnsignedState := currentSignedState
+
 	// Mock expectations
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
+	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentUnsignedState, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, true).Return(currentSignedState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
 	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
-
-	// For issueExtraState - it will check for last unsigned state
-	// Return nil to indicate no unsigned state exists, so no extra state will be created
-	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil)
 
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
 		return tx.TxType == core.TransactionTypeEscrowWithdraw &&
@@ -895,9 +903,17 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	depositAmount := decimal.NewFromInt(100)
 
 	// Create user's current state (signed, with escrow ledger)
+	// The last transition must be a MutualLock for the EscrowDeposit to be valid
 	currentSignedState := core.State{
-		ID:              core.GetStateID(userWallet, asset, 1, 2),
-		Transitions:     []core.Transition{},
+		ID: core.GetStateID(userWallet, asset, 1, 2),
+		Transitions: []core.Transition{
+			{
+				Type:      core.TransitionTypeMutualLock,
+				TxID:      "0xPreviousMutualLockTx",
+				AccountID: "",
+				Amount:    depositAmount,
+			},
+		},
 		Asset:           asset,
 		UserWallet:      userWallet,
 		Epoch:           1,
@@ -939,15 +955,15 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingState.UserSig = &userSigHex
 
+	// Create a copy for the unsigned state mock
+	currentUnsignedState := currentSignedState
+
 	// Mock expectations
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
+	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentUnsignedState, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, true).Return(currentSignedState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
 	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
-
-	// For issueExtraState - it will check for last unsigned state
-	// Return nil to indicate no unsigned state exists, so no extra state will be created
-	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil)
 
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
 		return tx.TxType == core.TransactionTypeEscrowDeposit &&

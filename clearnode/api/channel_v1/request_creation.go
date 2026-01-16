@@ -86,7 +86,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		}
 		logger.Debug("processing channel creation request", "incomingVersion", incomingState.Version)
 
-		if err := h.stateAdvancer.ValidateTransitions(*currentState, incomingState); err != nil {
+		if err := h.stateAdvancer.ValidateAdvancement(*currentState, incomingState); err != nil {
 			return rpc.Errorf("invalid state: %v", err)
 		}
 
@@ -150,7 +150,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 				if err != nil {
 					return rpc.Errorf("failed to issue receiver state: %v", err)
 				}
-				transaction, err = core.NewTransactionFromTransition(incomingState, &newReceiverState, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(incomingState, newReceiverState, *incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}

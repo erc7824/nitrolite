@@ -50,28 +50,9 @@ func TestRequestCreation_Success(t *testing.T) {
 
 	// Create void state (starting point)
 	voidState := core.NewVoidState(asset, userWallet)
-	voidState.Epoch = 1
-	voidState.Version = 0
-	voidState.HomeLedger.TokenAddress = tokenAddress
-	voidState.HomeLedger.BlockchainID = blockchainID
 
 	// Create next state from void
 	initialState := voidState.NextState()
-
-	depositTxID, err := core.GetSenderTransactionID(userWallet, initialState.ID)
-	require.NoError(t, err)
-
-	// Create and apply home deposit transition
-	homeDepositTransition := core.Transition{
-		Type:      core.TransitionTypeHomeDeposit,
-		TxID:      depositTxID,
-		AccountID: userWallet,
-		Amount:    depositAmount,
-	}
-
-	// Apply the home deposit transition to update balances
-	initialState, err = handler.stateAdvancer.ApplyTransition(initialState, homeDepositTransition)
-	require.NoError(t, err)
 
 	// Calculate and set the home channel ID
 	homeChannelID, err := core.GetHomeChannelID(
@@ -83,9 +64,15 @@ func TestRequestCreation_Success(t *testing.T) {
 	)
 	require.NoError(t, err)
 	initialState.HomeChannelID = &homeChannelID
+	initialState.HomeLedger.TokenAddress = tokenAddress
+	initialState.HomeLedger.BlockchainID = blockchainID
+
+	// Apply the home deposit transition to update balances
+	_, err = initialState.ApplyHomeDepositTransition(depositAmount)
+	require.NoError(t, err)
 
 	// Sign the initial state
-	packedState, err := core.PackState(initialState)
+	packedState, err := core.PackState(*initialState)
 	require.NoError(t, err)
 	stateHash := crypto.Keccak256Hash(packedState).Bytes()
 	userSig, err := mockSigner.Sign(stateHash)
@@ -117,13 +104,13 @@ func TestRequestCreation_Success(t *testing.T) {
 		return state.UserWallet == userWallet &&
 			state.Asset == asset &&
 			state.Version == 1 &&
-			state.Epoch == 1 &&
+			state.Epoch == 0 &&
 			state.NodeSig != nil &&
 			state.HomeChannelID != nil
 	})).Return(nil).Once()
 
 	// Create RPC request
-	rpcState := toRPCState(initialState)
+	rpcState := toRPCState(*initialState)
 	reqPayload := rpc.ChannelsV1RequestCreationRequest{
 		State: rpcState,
 		ChannelDefinition: rpc.ChannelDefinitionV1{

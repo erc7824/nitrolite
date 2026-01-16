@@ -60,8 +60,8 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 1,
 			UserBalance:  decimal.NewFromInt(500),
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(500),
+			UserNetFlow:  decimal.NewFromInt(500),
+			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
@@ -72,23 +72,14 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 
 	// Create incoming sender state (with transfer send transition)
 	incomingSenderState := currentSenderState.NextState()
-	transferTxID, err := core.GetSenderTransactionID(receiverWallet, incomingSenderState.ID)
-	require.NoError(t, err)
-
-	transferSendTransition := core.Transition{
-		Type:      core.TransitionTypeTransferSend,
-		TxID:      transferTxID,
-		AccountID: receiverWallet,
-		Amount:    transferAmount,
-	}
 
 	// Apply the transfer send transition to update balances
-	incomingSenderState, err = handler.stateAdvancer.ApplyTransition(incomingSenderState, transferSendTransition)
+	transferSendTransition, err := incomingSenderState.ApplyTransferSendTransition(receiverWallet, transferAmount)
 	require.NoError(t, err)
 
 	// Sign the incoming sender state with user's signature
 	userKey, _ := crypto.GenerateKey()
-	packedSenderState, _ := core.PackState(incomingSenderState)
+	packedSenderState, _ := core.PackState(*incomingSenderState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedSenderState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingSenderState.UserSig = &userSigHex
@@ -106,8 +97,8 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 1,
 			UserBalance:  decimal.NewFromInt(200),
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(800),
+			UserNetFlow:  decimal.NewFromInt(200),
+			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
@@ -118,13 +109,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 
 	// Expected receiver state after transfer receive
 	expectedReceiverState := currentReceiverState.NextState()
-	transferReceiveTransition := core.Transition{
-		Type:      core.TransitionTypeTransferReceive,
-		TxID:      transferTxID,
-		AccountID: senderWallet,
-		Amount:    transferAmount,
-	}
-	expectedReceiverState, err = handler.stateAdvancer.ApplyTransition(expectedReceiverState, transferReceiveTransition)
+	_, err = expectedReceiverState.ApplyTransferReceiveTransition(senderWallet, transferAmount, transferSendTransition.TxID)
 	require.NoError(t, err)
 
 	// Mock expectations
@@ -164,7 +149,7 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Create RPC request
-	rpcState := toRPCState(incomingSenderState)
+	rpcState := toRPCState(*incomingSenderState)
 	reqPayload := rpc.ChannelsV1SubmitStateRequest{
 		State: rpcState,
 	}
@@ -244,8 +229,8 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 1,
 			UserBalance:  decimal.NewFromInt(500),
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(500),
+			UserNetFlow:  decimal.NewFromInt(500),
+			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
@@ -257,28 +242,14 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 	// Create incoming state with escrow lock transition
 	incomingState := currentState.NextState()
 
-	// Calculate escrow channel ID
-	escrowChannelID, err := core.GetEscrowChannelID(homeChannelID, incomingState.Version)
-	require.NoError(t, err)
-	incomingState.EscrowChannelID = &escrowChannelID
-
-	escrowLockTxID, err := core.GetSenderTransactionID(userWallet, incomingState.ID)
-	require.NoError(t, err)
-
-	escrowLockTransition := core.Transition{
-		Type:      core.TransitionTypeEscrowLock,
-		TxID:      escrowLockTxID,
-		AccountID: userWallet,
-		Amount:    lockAmount,
-	}
-
 	// Apply the escrow lock transition to update balances
-	incomingState, err = handler.stateAdvancer.ApplyTransition(incomingState, escrowLockTransition)
+	_, err := incomingState.ApplyEscrowLockTransition(2, "0xTokenAddress", lockAmount)
 	require.NoError(t, err)
+	escrowChannelID := *incomingState.EscrowChannelID
 
 	// Sign the incoming state with user's signature
 	userKey, _ := crypto.GenerateKey()
-	packedState, _ := core.PackState(incomingState)
+	packedState, _ := core.PackState(*incomingState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingState.UserSig = &userSigHex
@@ -329,7 +300,7 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Create RPC request
-	rpcState := toRPCState(incomingState)
+	rpcState := toRPCState(*incomingState)
 	reqPayload := rpc.ChannelsV1SubmitStateRequest{
 		State: rpcState,
 	}
@@ -396,9 +367,17 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	withdrawAmount := decimal.NewFromInt(100)
 
 	// Create user's current state (signed, with escrow ledger)
+	// The last transition must be an EscrowLock for the EscrowWithdraw to be valid
 	currentSignedState := core.State{
-		ID:              core.GetStateID(userWallet, asset, 1, 2),
-		Transitions:     []core.Transition{},
+		ID: core.GetStateID(userWallet, asset, 1, 2),
+		Transitions: []core.Transition{
+			{
+				Type:      core.TransitionTypeEscrowLock,
+				TxID:      "0xPreviousEscrowLockTx",
+				AccountID: "",
+				Amount:    withdrawAmount,
+			},
+		},
 		Asset:           asset,
 		UserWallet:      userWallet,
 		Epoch:           1,
@@ -409,17 +388,17 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 1,
 			UserBalance:  decimal.NewFromInt(400),
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(400),
+			UserNetFlow:  decimal.NewFromInt(400),
+			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: &core.Ledger{
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 2,
-			UserBalance:  decimal.NewFromInt(100),
+			UserBalance:  decimal.NewFromInt(0),
 			UserNetFlow:  decimal.NewFromInt(0),
 			NodeBalance:  decimal.NewFromInt(100),
-			NodeNetFlow:  decimal.NewFromInt(0),
+			NodeNetFlow:  decimal.NewFromInt(100),
 		},
 		IsFinal: false,
 		UserSig: stringPtr("0xPreviousUserSig"),
@@ -429,36 +408,26 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	// Create incoming state with escrow withdraw transition
 	incomingState := currentSignedState.NextState()
 
-	escrowWithdrawTxID, err := core.GetSenderTransactionID(userWallet, incomingState.ID)
-	require.NoError(t, err)
-
-	escrowWithdrawTransition := core.Transition{
-		Type:      core.TransitionTypeEscrowWithdraw,
-		TxID:      escrowWithdrawTxID,
-		AccountID: userWallet,
-		Amount:    withdrawAmount,
-	}
-
 	// Apply the escrow withdraw transition to update balances
-	incomingState, err = handler.stateAdvancer.ApplyTransition(incomingState, escrowWithdrawTransition)
+	_, err := incomingState.ApplyEscrowWithdrawTransition(withdrawAmount)
 	require.NoError(t, err)
 
 	// Sign the incoming state with user's signature
 	userKey, _ := crypto.GenerateKey()
-	packedState, _ := core.PackState(incomingState)
+	packedState, _ := core.PackState(*incomingState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingState.UserSig = &userSigHex
 
+	// Create a copy for the unsigned state mock
+	currentUnsignedState := currentSignedState
+
 	// Mock expectations
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
+	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentUnsignedState, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, true).Return(currentSignedState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
 	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
-
-	// For issueExtraState - it will check for last unsigned state
-	// Return nil to indicate no unsigned state exists, so no extra state will be created
-	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil)
 
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
 		return tx.TxType == core.TransactionTypeEscrowWithdraw &&
@@ -477,7 +446,7 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Create RPC request
-	rpcState := toRPCState(incomingState)
+	rpcState := toRPCState(*incomingState)
 	reqPayload := rpc.ChannelsV1SubmitStateRequest{
 		State: rpcState,
 	}
@@ -556,8 +525,8 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 			BlockchainID: 1,
 			UserBalance:  decimal.NewFromInt(500),
 			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(500),
-			NodeNetFlow:  decimal.NewFromInt(0),
+			NodeBalance:  decimal.NewFromInt(0),
+			NodeNetFlow:  decimal.NewFromInt(500),
 		},
 		EscrowLedger: nil,
 		IsFinal:      false,
@@ -568,23 +537,13 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 	// Create incoming state with home deposit transition
 	incomingState := currentState.NextState()
 
-	homeDepositTxID, err := core.GetSenderTransactionID(userWallet, incomingState.ID)
-	require.NoError(t, err)
-
-	homeDepositTransition := core.Transition{
-		Type:      core.TransitionTypeHomeDeposit,
-		TxID:      homeDepositTxID,
-		AccountID: userWallet,
-		Amount:    depositAmount,
-	}
-
 	// Apply the home deposit transition to update balances
-	incomingState, err = handler.stateAdvancer.ApplyTransition(incomingState, homeDepositTransition)
+	_, err := incomingState.ApplyHomeDepositTransition(depositAmount)
 	require.NoError(t, err)
 
 	// Sign the incoming state with user's signature
 	userKey, _ := crypto.GenerateKey()
-	packedState, _ := core.PackState(incomingState)
+	packedState, _ := core.PackState(*incomingState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingState.UserSig = &userSigHex
@@ -609,7 +568,7 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Create RPC request
-	rpcState := toRPCState(incomingState)
+	rpcState := toRPCState(*incomingState)
 	reqPayload := rpc.ChannelsV1SubmitStateRequest{
 		State: rpcState,
 	}
@@ -686,10 +645,10 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 		HomeLedger: core.Ledger{
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 1,
-			UserBalance:  decimal.NewFromInt(500),
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(500),
-			NodeNetFlow:  decimal.NewFromInt(0),
+			UserBalance:  decimal.NewFromInt(300),
+			UserNetFlow:  decimal.NewFromInt(400),
+			NodeBalance:  decimal.NewFromInt(0),
+			NodeNetFlow:  decimal.NewFromInt(-100),
 		},
 		EscrowLedger: nil,
 		IsFinal:      false,
@@ -700,23 +659,13 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 	// Create incoming state with home withdrawal transition
 	incomingState := currentState.NextState()
 
-	homeWithdrawalTxID, err := core.GetSenderTransactionID(userWallet, incomingState.ID)
-	require.NoError(t, err)
-
-	homeWithdrawalTransition := core.Transition{
-		Type:      core.TransitionTypeHomeWithdrawal,
-		TxID:      homeWithdrawalTxID,
-		AccountID: userWallet,
-		Amount:    withdrawalAmount,
-	}
-
 	// Apply the home withdrawal transition to update balances
-	incomingState, err = handler.stateAdvancer.ApplyTransition(incomingState, homeWithdrawalTransition)
+	_, err := incomingState.ApplyHomeWithdrawalTransition(withdrawalAmount)
 	require.NoError(t, err)
 
 	// Sign the incoming state with user's signature
 	userKey, _ := crypto.GenerateKey()
-	packedState, _ := core.PackState(incomingState)
+	packedState, _ := core.PackState(*incomingState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingState.UserSig = &userSigHex
@@ -741,7 +690,7 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Create RPC request
-	rpcState := toRPCState(incomingState)
+	rpcState := toRPCState(*incomingState)
 	reqPayload := rpc.ChannelsV1SubmitStateRequest{
 		State: rpcState,
 	}
@@ -821,8 +770,8 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 1,
 			UserBalance:  decimal.NewFromInt(500),
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(500),
+			UserNetFlow:  decimal.NewFromInt(500),
+			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
@@ -834,28 +783,14 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 	// Create incoming state with mutual lock transition
 	incomingState := currentState.NextState()
 
-	// Calculate escrow channel ID
-	escrowChannelID, err := core.GetEscrowChannelID(homeChannelID, incomingState.Version)
-	require.NoError(t, err)
-	incomingState.EscrowChannelID = &escrowChannelID
-
-	mutualLockTxID, err := core.GetSenderTransactionID(userWallet, incomingState.ID)
-	require.NoError(t, err)
-
-	mutualLockTransition := core.Transition{
-		Type:      core.TransitionTypeMutualLock,
-		TxID:      mutualLockTxID,
-		AccountID: userWallet,
-		Amount:    lockAmount,
-	}
-
 	// Apply the mutual lock transition to update balances
-	incomingState, err = handler.stateAdvancer.ApplyTransition(incomingState, mutualLockTransition)
+	_, err := incomingState.ApplyMutualLockTransition(2, "0xTokenAddress", lockAmount)
 	require.NoError(t, err)
+	escrowChannelID := *incomingState.EscrowChannelID
 
 	// Sign the incoming state with user's signature
 	userKey, _ := crypto.GenerateKey()
-	packedState, _ := core.PackState(incomingState)
+	packedState, _ := core.PackState(*incomingState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingState.UserSig = &userSigHex
@@ -901,7 +836,7 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Create RPC request
-	rpcState := toRPCState(incomingState)
+	rpcState := toRPCState(*incomingState)
 	reqPayload := rpc.ChannelsV1SubmitStateRequest{
 		State: rpcState,
 	}
@@ -968,9 +903,17 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	depositAmount := decimal.NewFromInt(100)
 
 	// Create user's current state (signed, with escrow ledger)
+	// The last transition must be a MutualLock for the EscrowDeposit to be valid
 	currentSignedState := core.State{
-		ID:              core.GetStateID(userWallet, asset, 1, 2),
-		Transitions:     []core.Transition{},
+		ID: core.GetStateID(userWallet, asset, 1, 2),
+		Transitions: []core.Transition{
+			{
+				Type:      core.TransitionTypeMutualLock,
+				TxID:      "0xPreviousMutualLockTx",
+				AccountID: "",
+				Amount:    depositAmount,
+			},
+		},
 		Asset:           asset,
 		UserWallet:      userWallet,
 		Epoch:           1,
@@ -981,16 +924,16 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 1,
 			UserBalance:  decimal.NewFromInt(400),
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(400),
-			NodeNetFlow:  decimal.NewFromInt(0),
+			UserNetFlow:  decimal.NewFromInt(400),
+			NodeBalance:  decimal.NewFromInt(100),
+			NodeNetFlow:  decimal.NewFromInt(100),
 		},
 		EscrowLedger: &core.Ledger{
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 2,
-			UserBalance:  decimal.NewFromInt(200),
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(200),
+			UserBalance:  decimal.NewFromInt(100),
+			UserNetFlow:  decimal.NewFromInt(100),
+			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		IsFinal: false,
@@ -1001,36 +944,26 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	// Create incoming state with escrow deposit transition
 	incomingState := currentSignedState.NextState()
 
-	escrowDepositTxID, err := core.GetSenderTransactionID(userWallet, incomingState.ID)
-	require.NoError(t, err)
-
-	escrowDepositTransition := core.Transition{
-		Type:      core.TransitionTypeEscrowDeposit,
-		TxID:      escrowDepositTxID,
-		AccountID: userWallet,
-		Amount:    depositAmount,
-	}
-
 	// Apply the escrow deposit transition to update balances
-	incomingState, err = handler.stateAdvancer.ApplyTransition(incomingState, escrowDepositTransition)
+	_, err := incomingState.ApplyEscrowDepositTransition(depositAmount)
 	require.NoError(t, err)
 
 	// Sign the incoming state with user's signature
 	userKey, _ := crypto.GenerateKey()
-	packedState, _ := core.PackState(incomingState)
+	packedState, _ := core.PackState(*incomingState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingState.UserSig = &userSigHex
 
+	// Create a copy for the unsigned state mock
+	currentUnsignedState := currentSignedState
+
 	// Mock expectations
 	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
+	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentUnsignedState, nil)
 	mockTxStore.On("GetLastUserState", userWallet, asset, true).Return(currentSignedState, nil)
 	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
 	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
-
-	// For issueExtraState - it will check for last unsigned state
-	// Return nil to indicate no unsigned state exists, so no extra state will be created
-	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil)
 
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
 		return tx.TxType == core.TransactionTypeEscrowDeposit &&
@@ -1049,7 +982,7 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	})).Return(nil)
 
 	// Create RPC request
-	rpcState := toRPCState(incomingState)
+	rpcState := toRPCState(*incomingState)
 	reqPayload := rpc.ChannelsV1SubmitStateRequest{
 		State: rpcState,
 	}

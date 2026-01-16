@@ -146,7 +146,7 @@ func (state State) NextState() *State {
 		}
 
 		if state.UserSig == nil {
-			nextState.Transitions = append(nextState.Transitions, state.Transitions...)
+			nextState.Transitions = state.Transitions
 		} else if t := state.GetLastTransition(); t != nil && (t.Type == TransitionTypeEscrowDeposit || t.Type == TransitionTypeEscrowWithdraw) {
 			// escrowChannelID, escrowLedger: not-nil -> nil
 			nextState.EscrowChannelID = nil

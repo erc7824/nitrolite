@@ -31,20 +31,16 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 	var nodeSig string
 	incomingTransition := incomingState.GetLastTransition()
 	err = h.useStoreInTx(func(tx Store) error {
-		signedState := false
-		if incomingTransition != nil {
-			switch incomingTransition.Type {
-			case core.TransitionTypeEscrowDeposit, core.TransitionTypeEscrowWithdraw, core.TransitionTypeMigrate:
-				signedState = true
+		if incomingTransition == nil {
+			return rpc.Errorf("incoming state has no transitions")
+		}
+		if incomingTransition.Type.RequiresOpenChannel() {
+			userHasOpenChannel, err := tx.CheckOpenChannel(incomingState.UserWallet, incomingState.Asset)
+			if err != nil {
+				return rpc.Errorf("failed to check open channel: %v", err)
 			}
-			if incomingTransition.Type.RequiresOpenChannel() {
-				userHasOpenChannel, err := tx.CheckOpenChannel(incomingState.UserWallet, incomingState.Asset)
-				if err != nil {
-					return rpc.Errorf("failed to check open channel: %v", err)
-				}
-				if !userHasOpenChannel {
-					return rpc.Errorf("user has no open channel")
-				}
+			if !userHasOpenChannel {
+				return rpc.Errorf("user has no open channel")
 			}
 		}
 
@@ -53,14 +49,38 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 			"asset", incomingState.Asset,
 			"incomingTransition", incomingTransition.Type.String())
 
-		currentState, err := tx.GetLastUserState(incomingState.UserWallet, incomingState.Asset, signedState)
+		currentState, err := tx.GetLastUserState(incomingState.UserWallet, incomingState.Asset, false)
 		if err != nil {
 			return rpc.Errorf("failed to get last user state: %v", err)
 		}
-		// User has no signed previous state
-		if currentState == nil {
-			logger.Info("no previous signed state found, issuing a void state")
-			currentState = core.NewVoidState(incomingState.Asset, incomingState.UserWallet)
+
+		var extraTransitions []core.Transition
+		switch incomingTransition.Type {
+		case core.TransitionTypeEscrowDeposit, core.TransitionTypeEscrowWithdraw, core.TransitionTypeMigrate:
+			latestStateVersion := currentState.Version
+			extraTransitions = currentState.Transitions
+
+			currentState, err = tx.GetLastUserState(incomingState.UserWallet, incomingState.Asset, true)
+			if err != nil {
+				return rpc.Errorf("failed to get last user state: %v", err)
+			}
+
+			// User has no signed previous state
+			if currentState == nil {
+				return rpc.Errorf("no signed previous state found for escrow/migrate transition")
+			}
+			if currentState.Version < latestStateVersion {
+				currentState.Version = latestStateVersion
+			} else if currentState.Version == latestStateVersion {
+				extraTransitions = nil // no extra transitions to reapply
+			}
+
+		default:
+			// User has no previous state
+			if currentState == nil {
+				logger.Debug("no previous state found, issuing a void state")
+				currentState = core.NewVoidState(incomingState.Asset, incomingState.UserWallet)
+			}
 		}
 		if err := tx.EnsureNoOngoingStateTransitions(incomingState.UserWallet, incomingState.Asset); err != nil {
 			return rpc.Errorf("failed to check for ongoing state transitions: %v", err)
@@ -145,7 +165,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
-				extraState, err := h.issueExtraState(ctx, tx, incomingState)
+				extraState, err := h.issueExtraState(ctx, tx, incomingState, extraTransitions)
 				if err != nil {
 					return rpc.Errorf("failed to issue an extra state: %v", err)
 				}
@@ -157,7 +177,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
 
-				extraState, err := h.issueExtraState(ctx, tx, incomingState)
+				extraState, err := h.issueExtraState(ctx, tx, incomingState, extraTransitions)
 				if err != nil {
 					return rpc.Errorf("failed to issue an extra state: %v", err)
 				}

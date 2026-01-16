@@ -109,7 +109,7 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 // When a user submits a signed state (e.g., after escrow_deposit or escrow_withdraw), any pending
 // unsigned transitions from the previous state are reapplied to create a new unsigned state.
 // This ensures that pending operations are preserved across state updates that require user signatures.
-func (h *Handler) issueExtraState(ctx context.Context, tx Store, incomingState core.State) (*core.State, error) {
+func (h *Handler) issueExtraState(ctx context.Context, tx Store, incomingState core.State, extraTransitions []core.Transition) (*core.State, error) {
 	logger := log.FromContext(ctx)
 
 	lastTransition := incomingState.GetLastTransition()
@@ -117,13 +117,8 @@ func (h *Handler) issueExtraState(ctx context.Context, tx Store, incomingState c
 		return nil, rpc.Errorf("incoming state has no transitions")
 	}
 
-	lastUnsignedState, err := tx.GetLastUserState(incomingState.UserWallet, incomingState.Asset, false)
-	if err != nil {
-		return nil, rpc.Errorf("failed to get last unsigned user state")
-	}
-
-	if lastUnsignedState == nil || lastUnsignedState.UserSig != nil {
-		return &incomingState, err
+	if len(extraTransitions) == 0 {
+		return &incomingState, nil
 	}
 
 	logger = logger.
@@ -133,8 +128,7 @@ func (h *Handler) issueExtraState(ctx context.Context, tx Store, incomingState c
 	extraState := incomingState.NextState()
 	logger.Debug("issuing extra state", "extraStateVersion", extraState.Version)
 
-	err = extraState.ApplyReceiverTransitions(lastUnsignedState.Transitions...)
-	if err != nil {
+	if err := extraState.ApplyReceiverTransitions(extraTransitions...); err != nil {
 		return nil, err
 	}
 

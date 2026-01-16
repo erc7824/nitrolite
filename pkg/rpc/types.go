@@ -3,7 +3,10 @@
 // This file contains common types and structs shared across V1 API groups.
 package rpc
 
-import "github.com/erc7824/nitrolite/pkg/core"
+import (
+	"github.com/erc7824/nitrolite/pkg/app"
+	"github.com/erc7824/nitrolite/pkg/core"
+)
 
 // ============================================================================
 // Common Enums
@@ -116,7 +119,7 @@ type AppParticipantV1 struct {
 	// WalletAddress is the participant's wallet address
 	WalletAddress string `json:"wallet_address"`
 	// SignatureWeight is the signature weight for the participant
-	SignatureWeight int64 `json:"signature_weight"`
+	SignatureWeight uint8 `json:"signature_weight"`
 }
 
 // AppDefinitionV1 represents the definition for an app session.
@@ -126,7 +129,7 @@ type AppDefinitionV1 struct {
 	// Participants is the list of participants in the app session
 	Participants []AppParticipantV1 `json:"participants"`
 	// Quorum is the quorum required for the app session
-	Quorum uint64 `json:"quorum"`
+	Quorum uint8 `json:"quorum"`
 	// Nonce is a unique number to prevent replay attacks
 	Nonce uint64 `json:"nonce"`
 }
@@ -146,7 +149,7 @@ type AppStateUpdateV1 struct {
 	// AppSessionID is the unique application session identifier
 	AppSessionID string `json:"app_session_id"`
 	// Intent is the intent of the app session update (operate, deposit, withdraw)
-	Intent string `json:"intent"`
+	Intent app.AppStateUpdateIntent `json:"intent"`
 	// Version is the version of the app state
 	Version uint64 `json:"version"`
 	// Allocations is the list of allocations in the app state

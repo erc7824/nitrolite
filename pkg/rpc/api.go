@@ -139,6 +139,8 @@ type ChannelsV1HomeChannelCreatedEvent struct {
 type AppSessionsV1SubmitDepositStateRequest struct {
 	// AppStateUpdate is the application session state update to be submitted
 	AppStateUpdate AppStateUpdateV1 `json:"app_state_update"`
+	// AppStateSignatures is the list of participant signatures for the app state update
+	AppStateSignatures []string `json:"app_state_signatures"`
 	// SigQuorum is the signature quorum for the application session
 	SigQuorum uint64 `json:"sig_quorum"`
 	// UserState is the user state associated with the application session update
@@ -147,8 +149,8 @@ type AppSessionsV1SubmitDepositStateRequest struct {
 
 // AppSessionsV1SubmitDepositStateResponse returns the Node's signature for the deposit state.
 type AppSessionsV1SubmitDepositStateResponse struct {
-	// Signature is the Node's signature for the deposit state
-	Signature string `json:"signature"`
+	// StateNodeSig is the Node's signature for the deposit state
+	StateNodeSig string `json:"signature"`
 }
 
 // AppSessionsV1SubmitAppStateRequest submits an application session state update.
@@ -200,7 +202,9 @@ type AppSessionsV1CreateAppSessionRequest struct {
 	// Definition is the application definition including participants and quorum
 	Definition AppDefinitionV1 `json:"definition"`
 	// SessionData is the optional JSON stringified session data
-	SessionData *string `json:"session_data,omitempty"`
+	SessionData string `json:"session_data"`
+
+	Signatures []string `json:"signatures,omitempty"` // Participant signatures for the app session creation
 }
 
 // AppSessionsV1CreateAppSessionResponse returns the created application session information.
@@ -209,8 +213,8 @@ type AppSessionsV1CreateAppSessionResponse struct {
 	AppSessionID string `json:"app_session_id"`
 	// Version is the initial version of the session
 	Version string `json:"version"`
-	// Status is the status of the session (open)
-	Status string `json:"status"`
+	// IsClosed is the status of the session (open)
+	IsClosed bool `json:"is_closed"`
 }
 
 // AppSessionsV1CloseAppSessionRequest closes an application session and redistributes funds.

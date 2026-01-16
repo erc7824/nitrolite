@@ -69,6 +69,7 @@ type Store interface {
 //   - migrate: Verify last_state.version == home_channel.state_version
 //
 // For channel creation: Verify home_channel.state_version != 0
+// TODO: Consider challenged channels
 
 // SigValidator validates cryptographic signatures on state transitions.
 type SigValidator interface {

@@ -586,9 +586,11 @@ api:
                 - field_name: app_state_update
                   type: app_state_update
                   description: The application session state update to be submitted
-                - field_name: sig_quorum
-                  type: integer
-                  description: The signature quorum for the application session
+                - name: app_state_signatures
+                  type: array
+                  description: App Session State Update signatures
+                  items:
+                    type: string
                 - field_name: user_state
                   type: state
                   description: The user state associated with the application session update
@@ -609,9 +611,11 @@ api:
                 - field_name: app_state_update
                   type: app_state_update
                   description: The application session state update to be submitted
-                - field_name: sig_quorum
-                  type: integer
-                  description: The signature quorum for the application session
+                - name: app_state_signatures
+                  type: array
+                  description: App Session State Update signatures
+                  items:
+                    type: string
               response:
                 - field_name: signature
                   type: string
@@ -674,6 +678,11 @@ api:
                   type: string
                   description: Optional JSON stringified session data
                   optional: true
+                - name: signatures
+                  type: array
+                  description: App Session creation signatures
+                  items:
+                    type: string
               response:
                 - field_name: app_session_id
                   type: string
@@ -689,38 +698,6 @@ api:
                   description: The application definition is invalid
                 - message: insufficient_balance
                   description: Participant has insufficient balance for allocations
-            - name: close_app_session
-              description: Close an application session and redistribute funds
-              request:
-                - field_name: app_session_id
-                  type: string
-                  description: The application session ID to close
-                - field_name: allocations
-                  type: array
-                  items:
-                    type: app_allocation
-                  description: Final asset allocations when closing the session
-                - field_name: session_data
-                  type: string
-                  description: Optional final JSON stringified session data
-                  optional: true
-              response:
-                - field_name: app_session_id
-                  type: string
-                  description: The closed application session ID
-                - field_name: version
-                  type: string
-                  description: Final version of the session
-                - field_name: status
-                  type: string
-                  description: Status of the session (closed)
-              errors:
-                - message: app_session_not_found
-                  description: The specified app session was not found
-                - message: quorum_not_met
-                  description: The signature quorum requirement is not satisfied
-                - message: invalid_allocations
-                  description: The allocations are invalid
 
     - name: session_keys (DRAFT)
       description: Operations related to session key management

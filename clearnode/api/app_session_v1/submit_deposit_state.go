@@ -93,7 +93,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("ongoing state transitions check failed: %v", err)
 		}
 
-		if err := h.stateAdvancer.ValidateTransitions(*currentState, userState); err != nil {
+		if err := h.stateAdvancer.ValidateAdvancement(*currentState, userState); err != nil {
 			return rpc.Errorf("invalid state transitions: %v", err)
 		}
 

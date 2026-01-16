@@ -80,8 +80,8 @@ func TestSubmitDepositState_Success(t *testing.T) {
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 1,
 			UserBalance:  decimal.NewFromInt(500),
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(500),
+			UserNetFlow:  decimal.NewFromInt(500),
+			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
@@ -92,20 +92,13 @@ func TestSubmitDepositState_Success(t *testing.T) {
 
 	// Create incoming user state (with commit transition)
 	incomingUserState := currentUserState.NextState()
-	commitTransition := core.Transition{
-		Type:      core.TransitionTypeCommit,
-		TxID:      "commit-tx-id",
-		AccountID: appSessionID,
-		Amount:    depositAmount,
-	}
 
-	// Apply the commit transition to update balances
-	incomingUserState, err := handler.stateAdvancer.ApplyTransition(incomingUserState, commitTransition)
+	_, err := incomingUserState.ApplyCommitTransition(appSessionID, depositAmount)
 	require.NoError(t, err)
 
 	// Sign the incoming user state with user's signature
 	userKey, _ := crypto.GenerateKey()
-	packedUserState, _ := core.PackState(incomingUserState)
+	packedUserState, _ := core.PackState(*incomingUserState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingUserState.UserSig = &userSigHex
@@ -192,7 +185,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	})).Return(nil).Once()
 
 	// Create RPC request
-	rpcState := toRPCState(incomingUserState)
+	rpcState := toRPCState(*incomingUserState)
 	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
 		AppStateUpdate: appStateUpdate,
 		UserState:      rpcState,
@@ -275,9 +268,9 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 1,
 			UserBalance:  decimal.NewFromInt(400),
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(500),
-			NodeNetFlow:  decimal.NewFromInt(0),
+			UserNetFlow:  decimal.NewFromInt(500),
+			NodeBalance:  decimal.NewFromInt(0),
+			NodeNetFlow:  decimal.NewFromInt(-100),
 		},
 		IsFinal: false,
 	}
@@ -414,8 +407,8 @@ func TestSubmitDepositState_InsufficientBalance(t *testing.T) {
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 1,
 			UserBalance:  decimal.NewFromInt(500), // Sufficient channel balance
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(500),
+			UserNetFlow:  decimal.NewFromInt(500),
+			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		IsFinal: false,
@@ -423,18 +416,13 @@ func TestSubmitDepositState_InsufficientBalance(t *testing.T) {
 
 	// Create incoming user state with commit transition
 	incomingUserState := currentUserState.NextState()
-	commitTransition := core.Transition{
-		Type:      core.TransitionTypeCommit,
-		TxID:      "commit-tx-id",
-		AccountID: appSessionID,
-		Amount:    depositAmount,
-	}
-	incomingUserState, err := handler.stateAdvancer.ApplyTransition(incomingUserState, commitTransition)
+
+	_, err := incomingUserState.ApplyCommitTransition(appSessionID, depositAmount)
 	require.NoError(t, err)
 
 	// Sign the user state
 	userKey, _ := crypto.GenerateKey()
-	packedUserState, _ := core.PackState(incomingUserState)
+	packedUserState, _ := core.PackState(*incomingUserState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingUserState.UserSig = &userSigHex
@@ -487,7 +475,7 @@ func TestSubmitDepositState_InsufficientBalance(t *testing.T) {
 	mockStore.On("GetAccountBalance", participant1, asset).Return(decimal.NewFromInt(50), nil).Once()
 
 	// Create RPC request
-	rpcState := toRPCState(incomingUserState)
+	rpcState := toRPCState(*incomingUserState)
 	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
 		AppStateUpdate: appStateUpdate,
 		UserState:      rpcState,
@@ -577,25 +565,20 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 			TokenAddress: "0xTokenAddress",
 			BlockchainID: 1,
 			UserBalance:  decimal.NewFromInt(500),
-			UserNetFlow:  decimal.NewFromInt(0),
-			NodeBalance:  decimal.NewFromInt(500),
+			UserNetFlow:  decimal.NewFromInt(500),
+			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		IsFinal: false,
 	}
 
 	incomingUserState := currentUserState.NextState()
-	commitTransition := core.Transition{
-		Type:      core.TransitionTypeCommit,
-		TxID:      "commit-tx-id",
-		AccountID: appSessionID,
-		Amount:    depositAmount,
-	}
-	incomingUserState, err := handler.stateAdvancer.ApplyTransition(incomingUserState, commitTransition)
+
+	_, err := incomingUserState.ApplyCommitTransition(appSessionID, depositAmount)
 	require.NoError(t, err)
 
 	userKey, _ := crypto.GenerateKey()
-	packedUserState, _ := core.PackState(incomingUserState)
+	packedUserState, _ := core.PackState(*incomingUserState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingUserState.UserSig = &userSigHex
@@ -642,7 +625,7 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
 
 	// Create RPC request
-	rpcState := toRPCState(incomingUserState)
+	rpcState := toRPCState(*incomingUserState)
 	reqPayload := rpc.AppSessionsV1SubmitDepositStateRequest{
 		AppStateUpdate: appStateUpdate,
 		UserState:      rpcState,

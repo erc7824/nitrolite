@@ -254,7 +254,7 @@ func (h *Handler) handleWithdrawIntent(
 	currentAllocations map[string]map[string]decimal.Decimal,
 	participantWeights map[string]uint8,
 ) error {
-	// Build a map of incoming allocations for validation and lookup
+	// Build incoming allocations map for validation
 	incomingAllocations := make(map[string]map[string]decimal.Decimal)
 
 	for _, alloc := range appStateUpd.Allocations {
@@ -267,6 +267,19 @@ func (h *Handler) handleWithdrawIntent(
 			return rpc.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.Asset)
 		}
 
+		// Check for new allocations (reject if current is zero but incoming is non-zero)
+		if !alloc.Amount.IsZero() {
+			currentAmount := decimal.Zero
+			if currentAllocations[alloc.Participant] != nil {
+				currentAmount = currentAllocations[alloc.Participant][alloc.Asset]
+			}
+
+			if currentAmount.IsZero() {
+				return rpc.Errorf("withdraw intent cannot add new allocation for participant %s, asset %s",
+					alloc.Participant, alloc.Asset)
+			}
+		}
+
 		// Store in incoming allocations map
 		if incomingAllocations[alloc.Participant] == nil {
 			incomingAllocations[alloc.Participant] = make(map[string]decimal.Decimal)
@@ -274,7 +287,7 @@ func (h *Handler) handleWithdrawIntent(
 		incomingAllocations[alloc.Participant][alloc.Asset] = alloc.Amount
 	}
 
-	// Verify all current allocations are present and validate withdrawals
+	// Verify all current allocations are present and process withdrawals
 	for participant, assets := range currentAllocations {
 		for asset, currentAmount := range assets {
 			if currentAmount.IsZero() {

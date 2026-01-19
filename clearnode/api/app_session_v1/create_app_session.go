@@ -36,10 +36,21 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		return
 	}
 
-	// Validate quorum against total weights
+	// Validate quorum is greater than zero
+	if reqPayload.Definition.Quorum == 0 {
+		c.Fail(nil, "quorum must be greater than zero")
+		return
+	}
+
+	// Validate quorum against total weights and check for duplicate participants
 	var totalWeights uint8
 	participantWeights := make(map[string]uint8)
 	for _, participant := range reqPayload.Definition.Participants {
+		// Check for duplicate participant addresses
+		if _, exists := participantWeights[participant.WalletAddress]; exists {
+			c.Fail(rpc.Errorf("duplicate participant address: %s", participant.WalletAddress), "")
+			return
+		}
 		totalWeights += participant.SignatureWeight
 		participantWeights[participant.WalletAddress] = participant.SignatureWeight
 	}

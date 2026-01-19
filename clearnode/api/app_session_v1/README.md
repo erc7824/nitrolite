@@ -13,6 +13,7 @@ This directory contains the V1 API handlers for app session management, implemen
   - `handler.go` - Handler struct and constructor
   - `create_app_session.go` - Create app session endpoint
   - `submit_deposit_state.go` - Submit deposit state endpoint
+  - `submit_app_state.go` - Submit app state endpoint (operate, withdraw, close)
   - `app_session.go` - Package documentation
 
 ### Business Logic Layer (`pkg/app`)
@@ -110,7 +111,7 @@ This directory contains the V1 API handlers for app session management, implemen
     "allocations": [
       {
         "participant": "0x...",
-        "asset": "USDC",
+        "asset": "usdc",
         "amount": "1000"
       }
     ],
@@ -245,6 +246,98 @@ This directory contains the V1 API handlers for app session management, implemen
         └────────────────────────────────────────────────────┘
 ```
 
+### 3. `app_sessions.v1.submit_app_state`
+
+**Purpose**: Processes app session state updates for operate, withdraw, and close intents. This endpoint handles non-deposit state changes within an app session.
+
+**Supported Intents**:
+- **operate**: Redistribute funds between participants (total per asset remains constant)
+- **withdraw**: Decrease participant allocations and return funds to channels
+- **close**: Release all funds and mark session as closed
+
+**Key Features**:
+- Validates quorum-based consensus with participant signatures
+- Enforces intent-specific validation rules
+- Issues channel states for withdrawn/released funds
+- Prevents deposit intents (must use `submit_deposit_state`)
+
+**Request**:
+```json
+{
+  "app_state_update": {
+    "app_session_id": "0x...",
+    "intent": "operate|withdraw|close",
+    "version": 3,
+    "allocations": [
+      {
+        "participant": "0x...",
+        "asset": "usdc",
+        "amount": "750"
+      }
+    ],
+    "session_data": "optional json string"
+  },
+  "signatures": ["0x...", "0x..."]
+}
+```
+
+**Response**:
+```json
+{
+  "signature": ""  // Empty for operate/withdraw/close intents
+}
+```
+
+**Validation**:
+
+*Common Validation (All Intents):*
+- App session must exist and be open
+- App session version must be sequential (current + 1)
+- Intent must be operate, withdraw, or close (not deposit)
+- Signatures must be provided and valid
+- Achieved quorum must meet the required quorum threshold
+- Each signature must be from a participant in the session
+- All allocations must be non-negative
+- All allocations must be to valid participants
+
+*Intent-Specific Validation:*
+
+**Operate Intent:**
+- All current non-zero allocations must be included in request
+- Total allocations per asset must match session balance exactly
+- Allows redistribution between participants
+- Records ledger entries for allocation changes
+
+**Withdraw Intent:**
+- All current non-zero allocations must be included in request
+- Allocations can only decrease or stay the same (no increases)
+- Records negative ledger entries for withdrawals
+- Issues channel states for participants receiving withdrawn funds
+- Cannot add allocations for new participants
+
+**Close Intent:**
+- All current allocations must match exactly (no changes allowed)
+- Releases ALL funds from session to participants
+- Records negative ledger entries for all releases
+- Issues channel states for all participants with allocations
+- Marks app session as closed (IsClosed = true)
+- Cannot have extra allocations not in current state
+
+**Signature Verification**:
+- Uses ABI encoding via `PackAppStateUpdateV1` to create a deterministic hash
+- App session ID encoded as `bytes32`
+- Allocation amounts encoded as `string` representation of decimals
+- Recovers signer addresses from ECDSA signatures
+- Validates that signers are participants
+- Accumulates signature weights to verify quorum is met
+
+**State Issuance for Withdrawals and Close**:
+For withdraw and close intents, the handler issues new channel states to participants receiving funds:
+- Creates a `release` transition in the participant's channel
+- Signs the new state with node signature (unless last signed state was a lock)
+- Stores the new channel state
+- Records the release transaction
+
 ## Implementation Details
 
 ### Files
@@ -253,6 +346,7 @@ This directory contains the V1 API handlers for app session management, implemen
 - `handler.go` - Handler struct with signature validators and signer
 - `create_app_session.go` - Create app session endpoint handler
 - `submit_deposit_state.go` - Submit deposit state endpoint handler
+- `submit_app_state.go` - Submit app state endpoint handler (operate, withdraw, close)
 - `interface.go` - Store and signature validator interfaces
 - `utils.go` - Mapping functions between RPC and core types
 
@@ -350,6 +444,7 @@ handler := app_session_v1.NewHandler(
 // Register with RPC router
 router.Register(rpc.AppSessionsV1CreateAppSessionMethod, handler.CreateAppSession)
 router.Register(rpc.AppSessionsV1SubmitDepositStateMethod, handler.SubmitDepositState)
+router.Register(rpc.AppSessionsV1SubmitAppStateMethod, handler.SubmitAppState)
 ```
 
 ## Key Implementation Decisions

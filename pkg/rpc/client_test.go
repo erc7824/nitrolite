@@ -480,7 +480,7 @@ func TestClientV1_AppSessionsV1SubmitAppState(t *testing.T) {
 			Intent:       app.AppStateUpdateIntentOperate,
 			Version:      3,
 		},
-		SigQuorum: 2,
+		Signatures: 2,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "0xsigabc", resp.Signature)

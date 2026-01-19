@@ -148,7 +148,7 @@ type AppAllocationV1 struct {
 type AppStateUpdateV1 struct {
 	// AppSessionID is the unique application session identifier
 	AppSessionID string `json:"app_session_id"`
-	// Intent is the intent of the app session update (operate, deposit, withdraw)
+	// Intent is the intent of the app session update (operate, deposit, withdraw, close)
 	Intent app.AppStateUpdateIntent `json:"intent"`
 	// Version is the version of the app state
 	Version uint64 `json:"version"`

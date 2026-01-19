@@ -157,8 +157,8 @@ type AppSessionsV1SubmitDepositStateResponse struct {
 type AppSessionsV1SubmitAppStateRequest struct {
 	// AppStateUpdate is the application session state update to be submitted
 	AppStateUpdate AppStateUpdateV1 `json:"app_state_update"`
-	// SigQuorum is the signature quorum for the application session
-	SigQuorum uint64 `json:"sig_quorum"`
+	// Signatures is the signature quorum for the application session
+	Signatures []string `json:"signatures"`
 }
 
 // AppSessionsV1SubmitAppStateResponse returns the Node's signature for the new User state.

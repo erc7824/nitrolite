@@ -106,7 +106,9 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		if appSession == nil {
 			return rpc.Errorf("app session not found")
 		}
-
+		if appSession.IsClosed {
+			return rpc.Errorf("app session is already closed")
+		}
 		if appStateUpd.Version != appSession.Version+1 {
 			return rpc.Errorf("invalid app session version: expected %d, got %d", appSession.Version+1, appStateUpd.Version)
 		}
@@ -117,7 +119,6 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 
 		participantWeights := getParticipantWeights(appSession.Participants)
 
-		// Validate signatures and quorum
 		if len(reqPayload.AppStateSignatures) == 0 {
 			return rpc.Errorf("no signatures provided")
 		}
@@ -128,39 +129,8 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("failed to pack app state update: %v", err)
 		}
 
-		// Verify signatures and calculate quorum
-		sigRecoverer := h.sigValidator[EcdsaSigType]
-		signedWeights := make(map[string]bool)
-		var achievedQuorum uint8
-
-		for _, sigHex := range reqPayload.AppStateSignatures {
-			sigBytes, err := hexutil.Decode(sigHex)
-			if err != nil {
-				return rpc.Errorf("failed to decode signature: %v", err)
-			}
-
-			// Recover the signer address from the signature
-			signerAddress, err := sigRecoverer.Recover(packedStateUpdate, sigBytes)
-			if err != nil {
-				return rpc.Errorf("failed to recover signer address: %v", err)
-			}
-
-			// Check if signer is a participant
-			weight, isParticipant := participantWeights[signerAddress]
-			if !isParticipant {
-				return rpc.Errorf("signature from non-participant: %s", signerAddress)
-			}
-
-			// Add weight if not already counted
-			if !signedWeights[signerAddress] {
-				signedWeights[signerAddress] = true
-				achievedQuorum += weight
-			}
-		}
-
-		// Check if quorum is met
-		if achievedQuorum < appSession.Quorum {
-			return rpc.Errorf("quorum not met: achieved %d, required %d", achievedQuorum, appSession.Quorum)
+		if err := h.verifyQuorum(participantWeights, appSession.Quorum, packedStateUpdate, reqPayload.AppStateSignatures); err != nil {
+			return err
 		}
 
 		currentAllocations, err := tx.GetParticipantAllocations(appSession.SessionID)
@@ -272,13 +242,13 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("failed to store user state: %v", err)
 		}
 
-		transaction, err := core.NewTransactionFromTransition(userState, nil, *lastTransition)
+		transaction, err := core.NewTransactionFromTransition(&userState, nil, *lastTransition)
 		if err != nil {
 			return rpc.Errorf("failed to create transaction: %v", err)
 		}
 
 		if err := tx.RecordTransaction(*transaction); err != nil {
-			return rpc.Errorf("failed to record channel transaction: %v", err)
+			return rpc.Errorf("failed to record transaction: %v", err)
 		}
 
 		logger.Info("processed deposit state",

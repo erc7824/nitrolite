@@ -1,14 +1,12 @@
 package app_session_v1
 
 import (
+	"context"
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/app"
-	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/shopspring/decimal"
 )
 
@@ -57,18 +55,15 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 		if appSession == nil {
 			return rpc.Errorf("app session not found")
 		}
-
 		if appSession.IsClosed {
 			return rpc.Errorf("app session is already closed")
 		}
-
 		if appStateUpd.Version != appSession.Version+1 {
 			return rpc.Errorf("invalid app session version: expected %d, got %d", appSession.Version+1, appStateUpd.Version)
 		}
 
 		participantWeights := getParticipantWeights(appSession.Participants)
 
-		// Validate signatures and quorum
 		if len(reqPayload.Signatures) == 0 {
 			return rpc.Errorf("no signatures provided")
 		}
@@ -79,39 +74,8 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 			return rpc.Errorf("failed to pack app state update: %v", err)
 		}
 
-		// Verify signatures and calculate quorum
-		sigRecoverer := h.sigValidator[EcdsaSigType]
-		signedWeights := make(map[string]bool)
-		var achievedQuorum uint8
-
-		for _, sigHex := range reqPayload.Signatures {
-			sigBytes, err := hexutil.Decode(sigHex)
-			if err != nil {
-				return rpc.Errorf("failed to decode signature: %v", err)
-			}
-
-			// Recover the signer address from the signature
-			signerAddress, err := sigRecoverer.Recover(packedStateUpdate, sigBytes)
-			if err != nil {
-				return rpc.Errorf("failed to recover signer address: %v", err)
-			}
-
-			// Check if signer is a participant
-			weight, isParticipant := participantWeights[signerAddress]
-			if !isParticipant {
-				return rpc.Errorf("signature from non-participant: %s", signerAddress)
-			}
-
-			// Add weight if not already counted
-			if !signedWeights[signerAddress] {
-				signedWeights[signerAddress] = true
-				achievedQuorum += weight
-			}
-		}
-
-		// Check if quorum is met
-		if achievedQuorum < appSession.Quorum {
-			return rpc.Errorf("quorum not met: achieved %d, required %d", achievedQuorum, appSession.Quorum)
+		if err := h.verifyQuorum(participantWeights, appSession.Quorum, packedStateUpdate, reqPayload.Signatures); err != nil {
+			return err
 		}
 
 		currentAllocations, err := tx.GetParticipantAllocations(appSession.SessionID)
@@ -123,19 +87,19 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 		switch appStateUpd.Intent {
 		case app.AppStateUpdateIntentOperate:
 			// For operate intent, total allocations per asset must match session balance (redistribution allowed)
-			if err := h.handleOperateIntent(tx, appStateUpd, currentAllocations, participantWeights); err != nil {
+			if err := h.handleOperateIntent(ctx, tx, appStateUpd, currentAllocations, participantWeights); err != nil {
 				return err
 			}
 
 		case app.AppStateUpdateIntentWithdraw:
 			// For withdraw intent, validate and record ledger changes
-			if err := h.handleWithdrawIntent(tx, appStateUpd, currentAllocations, participantWeights); err != nil {
+			if err := h.handleWithdrawIntent(ctx, tx, appStateUpd, currentAllocations, participantWeights); err != nil {
 				return err
 			}
 
 		case app.AppStateUpdateIntentClose:
 			// For close intent, validate final allocations and mark session as closed
-			if err := h.handleCloseIntent(tx, appStateUpd, currentAllocations, participantWeights); err != nil {
+			if err := h.handleCloseIntent(ctx, tx, appStateUpd, currentAllocations, participantWeights); err != nil {
 				return err
 			}
 			appSession.IsClosed = true
@@ -187,6 +151,7 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 // Operate intent allows redistribution of funds between participants as long as the total per asset stays the same.
 // Requires submitting full list of allocations even if some haven't changed.
 func (h *Handler) handleOperateIntent(
+	_ context.Context,
 	tx Store,
 	appStateUpd app.AppStateUpdateV1,
 	currentAllocations map[string]map[string]decimal.Decimal,
@@ -269,15 +234,10 @@ func (h *Handler) handleOperateIntent(
 			continue
 		}
 
-		totalAlloc, ok := allocationSum[asset]
+		_, ok := allocationSum[asset]
 		if !ok {
 			return rpc.Errorf("operate intent missing allocations for asset %s with balance %s",
 				asset, sessionBalance.String())
-		}
-
-		if !totalAlloc.Equal(sessionBalance) {
-			return rpc.Errorf("operate intent allocation mismatch for asset %s: total allocations %s, session balance %s",
-				asset, totalAlloc.String(), sessionBalance.String())
 		}
 	}
 
@@ -288,6 +248,7 @@ func (h *Handler) handleOperateIntent(
 // It also issues new channel states for participants receiving withdrawn funds.
 // Requires submitting full list of allocations even if some haven't changed.
 func (h *Handler) handleWithdrawIntent(
+	ctx context.Context,
 	tx Store,
 	appStateUpd app.AppStateUpdateV1,
 	currentAllocations map[string]map[string]decimal.Decimal,
@@ -341,7 +302,7 @@ func (h *Handler) handleWithdrawIntent(
 				}
 
 				// Issue new channel state for participant receiving withdrawn funds
-				if err := h.issueReleaseReceiverState(tx, participant, asset, appStateUpd.AppSessionID, withdrawAmount); err != nil {
+				if err := h.issueReleaseReceiverState(ctx, tx, participant, asset, appStateUpd.AppSessionID, withdrawAmount); err != nil {
 					return rpc.Errorf("failed to issue release state for participant %s: %v", participant, err)
 				}
 			}
@@ -354,6 +315,7 @@ func (h *Handler) handleWithdrawIntent(
 // handleCloseIntent processes close intent by validating that allocations match current state,
 // then releasing ALL funds from the session back to participants with channel state issuance.
 func (h *Handler) handleCloseIntent(
+	ctx context.Context,
 	tx Store,
 	appStateUpd app.AppStateUpdateV1,
 	currentAllocations map[string]map[string]decimal.Decimal,
@@ -428,71 +390,10 @@ func (h *Handler) handleCloseIntent(
 			}
 
 			// Issue new channel state for participant receiving funds back
-			if err := h.issueReleaseReceiverState(tx, participant, asset, appStateUpd.AppSessionID, amount); err != nil {
+			if err := h.issueReleaseReceiverState(ctx, tx, participant, asset, appStateUpd.AppSessionID, amount); err != nil {
 				return rpc.Errorf("failed to issue release state for participant %s: %v", participant, err)
 			}
 		}
-	}
-
-	return nil
-}
-
-// issueReleaseReceiverState creates a new channel state for a participant receiving funds from app session.
-// This follows the same pattern as issueTransferReceiverState in channel_v1 for transfer_receive transitions.
-func (h *Handler) issueReleaseReceiverState(tx Store, receiverWallet, asset, appSessionID string, amount decimal.Decimal) error {
-	// Get the receiver's current state (or create void state if none exists)
-	currentState, err := tx.GetLastUserState(receiverWallet, asset, false)
-	if err != nil {
-		return rpc.Errorf("failed to get receiver state: %v", err)
-	}
-	if currentState == nil {
-		currentState = core.NewVoidState(asset, receiverWallet)
-	}
-
-	// Create next state and apply release transition
-	newState := currentState.NextState()
-	_, err = newState.ApplyReleaseTransition(appSessionID, amount)
-	if err != nil {
-		return rpc.Errorf("failed to apply release transition: %v", err)
-	}
-
-	// Check if we need to sign the state (skip signing if last signed state was a lock)
-	lastSignedState, err := tx.GetLastUserState(receiverWallet, asset, true)
-	if err != nil {
-		return rpc.Errorf("failed to get last signed state: %v", err)
-	}
-
-	shouldSign := true
-	if lastSignedState != nil {
-		lastStateTransition := lastSignedState.GetLastTransition()
-		if lastStateTransition != nil {
-			if lastStateTransition.Type == core.TransitionTypeMutualLock ||
-				lastStateTransition.Type == core.TransitionTypeEscrowLock {
-				shouldSign = false
-			}
-		}
-	}
-
-	if shouldSign {
-		// Pack and sign the state
-		packedState, err := core.PackState(*newState)
-		if err != nil {
-			return rpc.Errorf("failed to pack receiver state: %v", err)
-		}
-
-		stateHash := crypto.Keccak256Hash(packedState).Bytes()
-		nodeSig, err := h.signer.Sign(stateHash)
-		if err != nil {
-			return rpc.Errorf("failed to sign receiver state: %v", err)
-		}
-
-		nodeSigStr := nodeSig.String()
-		newState.NodeSig = &nodeSigStr
-	}
-
-	// Store the new state
-	if err := tx.StoreUserState(*newState); err != nil {
-		return rpc.Errorf("failed to store receiver state: %v", err)
 	}
 
 	return nil

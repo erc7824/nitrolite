@@ -37,8 +37,8 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
-		SessionID:    appSessionID,
-		Application:  "test-app",
+		SessionID:   appSessionID,
+		Application: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 5},
 			{WalletAddress: participant2, SignatureWeight: 5},
@@ -132,8 +132,8 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
-		SessionID:    appSessionID,
-		Application:  "test-app",
+		SessionID:   appSessionID,
+		Application: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 5},
 			{WalletAddress: participant2, SignatureWeight: 5},
@@ -232,8 +232,8 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 	participant1 := "0x1111111111111111111111111111111111111111"
 
 	existingSession := &app.AppSessionV1{
-		SessionID:    appSessionID,
-		Application:  "test-app",
+		SessionID:   appSessionID,
+		Application: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 10},
 		},
@@ -271,6 +271,7 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 	// Mock expectations for channel state issuance (issueReleaseReceiverState)
 	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil)
 	mockStore.On("GetLastUserState", participant1, "USDC", true).Return(nil, nil)
+	mockStore.On("RecordTransaction", mock.Anything).Return(nil)
 	mockStore.On("StoreUserState", mock.Anything).Return(nil)
 
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
@@ -325,8 +326,8 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
-		SessionID:    appSessionID,
-		Application:  "test-app",
+		SessionID:   appSessionID,
+		Application: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 5},
 			{WalletAddress: participant2, SignatureWeight: 5},
@@ -370,6 +371,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(-100), (*string)(nil)).Return(nil)
 	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil)
 	mockStore.On("GetLastUserState", participant1, "USDC", true).Return(nil, nil)
+	mockStore.On("RecordTransaction", mock.Anything).Return(nil)
 	mockStore.On("StoreUserState", mock.Anything).Return(nil).Once()
 
 	// Participant 2: 50 USDC
@@ -428,8 +430,8 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 	participant1 := "0x1111111111111111111111111111111111111111"
 
 	existingSession := &app.AppSessionV1{
-		SessionID:    appSessionID,
-		Application:  "test-app",
+		SessionID:   appSessionID,
+		Application: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 10},
 		},
@@ -509,8 +511,8 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 	participant2 := "0x2222222222222222222222222222222222222222"
 
 	existingSession := &app.AppSessionV1{
-		SessionID:    appSessionID,
-		Application:  "test-app",
+		SessionID:   appSessionID,
+		Application: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 5},
 			{WalletAddress: participant2, SignatureWeight: 5},
@@ -602,8 +604,8 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 	participant1 := "0x1111111111111111111111111111111111111111"
 
 	existingSession := &app.AppSessionV1{
-		SessionID:    appSessionID,
-		Application:  "test-app",
+		SessionID:   appSessionID,
+		Application: "test-app",
 		Participants: []app.AppParticipantV1{
 			{WalletAddress: participant1, SignatureWeight: 10},
 		},
@@ -642,6 +644,7 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(-40), (*string)(nil)).Return(nil).Maybe()
 	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil).Maybe()
 	mockStore.On("GetLastUserState", participant1, "USDC", true).Return(nil, nil).Maybe()
+	mockStore.On("RecordTransaction", mock.Anything).Return(nil)
 	mockStore.On("StoreUserState", mock.Anything).Return(nil).Maybe()
 
 	// Create RPC context

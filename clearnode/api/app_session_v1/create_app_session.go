@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
@@ -65,43 +63,8 @@ func (h *Handler) CreateAppSession(c *rpc.Context) {
 		return
 	}
 
-	// Verify signatures and calculate quorum
-	sigRecoverer := h.sigValidator[EcdsaSigType]
-	signedWeights := make(map[string]bool)
-	var achievedQuorum uint8
-
-	// TODO: Can be moved to a function
-	for _, sigHex := range reqPayload.Signatures {
-		sigBytes, err := hexutil.Decode(sigHex)
-		if err != nil {
-			c.Fail(rpc.Errorf("failed to decode signature: %v", err), "")
-			return
-		}
-
-		// Recover the signer address from the signature (this also validates the signature)
-		signerAddress, err := sigRecoverer.Recover(packedRequest, sigBytes)
-		if err != nil {
-			c.Fail(rpc.Errorf("failed to recover signer address: %v", err), "")
-			return
-		}
-
-		// Check if signer is a participant
-		weight, isParticipant := participantWeights[signerAddress]
-		if !isParticipant {
-			c.Fail(rpc.Errorf("signature from non-participant: %s", signerAddress), "")
-			return
-		}
-
-		// Add weight if not already counted
-		if !signedWeights[signerAddress] {
-			signedWeights[signerAddress] = true
-			achievedQuorum += weight
-		}
-	}
-
-	// Check if quorum is met
-	if achievedQuorum < reqPayload.Definition.Quorum {
-		c.Fail(rpc.Errorf("quorum not met: achieved %d, required %d", achievedQuorum, reqPayload.Definition.Quorum), "")
+	if err := h.verifyQuorum(participantWeights, appDef.Quorum, packedRequest, reqPayload.Signatures); err != nil {
+		c.Fail(err, "failed to verify quorum")
 		return
 	}
 

@@ -8,6 +8,7 @@ import {MockERC20} from "./mocks/MockERC20.sol";
 import {TestUtils} from "./TestUtils.sol";
 
 import {ChannelsHub} from "../src/ChannelsHub.sol";
+import {Utils} from "../src/Utils.sol";
 import {CrossChainState, Definition, StateIntent, State, ChannelStatus} from "../src/interfaces/Types.sol";
 
 contract ChannelsHubLifecycleTest is Test {
@@ -112,7 +113,7 @@ contract ChannelsHubLifecycleTest is Test {
             metadata: bytes32(0)
         });
 
-        bytes32 channelId = keccak256(abi.encode(def.challengeDuration, def.user, def.node, def.nonce));
+        bytes32 channelId = Utils.getChannelId(def);
 
         // Check VOID status before channel creation
         (ChannelStatus status,,,,) = cHub.getChannelData(channelId);
@@ -268,8 +269,8 @@ contract ChannelsHubLifecycleTest is Test {
         state = signStateWithBothParties(state, channelId);
 
         // close channel
-        // Expected: user allocation = 1287, node allocation = 0
-        state = nextState(state, StateIntent.CLOSE, [uint256(1287), uint256(0)], [int256(1300), int256(-13)]);
+        // Expected: allocations = 0, user net flow 13, node net flow -13
+        state = nextState(state, StateIntent.CLOSE, [uint256(0), uint256(0)], [int256(13), int256(-13)]);
         state = signStateWithBothParties(state, channelId);
 
         vm.prank(alice);

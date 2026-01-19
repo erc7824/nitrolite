@@ -7,13 +7,17 @@ import (
 	"github.com/erc7824/nitrolite/pkg/log"
 )
 
-// EventHandlerService handles on-chain events
+// EventHandlerService processes blockchain events and updates the local database state accordingly.
+// It handles events from both home channels (user state channels) and escrow channels (temporary lock channels).
+// All handlers execute within database transactions provided by useStoreInTx to ensure atomicity.
 type EventHandlerService struct {
 	useStoreInTx StoreTxProvider
 	logger       log.Logger
 }
 
-// NewEventHandlerService creates a new event handler service
+// NewEventHandlerService creates a new EventHandlerService instance.
+// The useStoreInTx parameter wraps all store operations in database transactions.
+// The logger is used for structured logging of event processing.
 func NewEventHandlerService(useStoreInTx StoreTxProvider, logger log.Logger) *EventHandlerService {
 	return &EventHandlerService{
 		useStoreInTx: useStoreInTx,
@@ -21,7 +25,9 @@ func NewEventHandlerService(useStoreInTx StoreTxProvider, logger log.Logger) *Ev
 	}
 }
 
-// HandleHomeChannelCreated handles the HomeChannelCreated event
+// HandleHomeChannelCreated processes the HomeChannelCreated event emitted when a home channel
+// is successfully created on-chain. It updates the channel status to Open and sets the state version.
+// The channel must exist in the database with type ChannelTypeHome, otherwise a warning is logged.
 func (s *EventHandlerService) HandleHomeChannelCreated(event *core.HomeChannelCreatedEvent) error {
 	return s.useStoreInTx(func(tx Store) error {
 		chanID := event.ChannelID
@@ -44,20 +50,23 @@ func (s *EventHandlerService) HandleHomeChannelCreated(event *core.HomeChannelCr
 		if err != nil {
 			return err
 		}
-		s.logger.Info("handled HomeChannelCreated event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
 
+		s.logger.Info("handled HomeChannelCreated event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
 		return nil
 	})
 }
 
-// HandleHomeChannelMigrated handles the HomeChannelMigrated event
+// HandleHomeChannelMigrated processes the HomeChannelMigrated event emitted when a home channel
+// is migrated to a new version or blockchain. This is currently not implemented and logs a warning.
+// TODO: Implement HomeChannelMigrated handler logic
 func (s *EventHandlerService) HandleHomeChannelMigrated(event *core.HomeChannelMigratedEvent) error {
-	// TODO: Implement HomeChannelMigrated handler logic
-	s.logger.Info("Unexpected HomeChannelMigrated event", "channelId", event.ChannelID, "stateVersion", event.StateVersion)
+	s.logger.Warn("unexpected HomeChannelMigrated event", "channelId", event.ChannelID, "stateVersion", event.StateVersion)
 	return nil
 }
 
-// HandleHomeChannelCheckpointed handles the HomeChannelCheckpointed event
+// HandleHomeChannelCheckpointed processes the HomeChannelCheckpointed event emitted when a channel
+// state is successfully checkpointed on-chain. It updates the channel's state version and clears
+// the Challenged status if present, returning the channel to Open status.
 func (s *EventHandlerService) HandleHomeChannelCheckpointed(event *core.HomeChannelCheckpointedEvent) error {
 	return s.useStoreInTx(func(tx Store) error {
 		chanID := event.ChannelID
@@ -83,13 +92,16 @@ func (s *EventHandlerService) HandleHomeChannelCheckpointed(event *core.HomeChan
 		if err != nil {
 			return err
 		}
-		s.logger.Info("handled HomeChannelCheckpointed event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
 
+		s.logger.Info("handled HomeChannelCheckpointed event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
 		return nil
 	})
 }
 
-// HandleHomeChannelChallenged handles the HomeChannelChallenged event
+// HandleHomeChannelChallenged processes the HomeChannelChallenged event emitted when a potentially
+// stale state is submitted on-chain. It updates the channel status to Challenged, sets the challenge
+// expiration time, and automatically schedules a checkpoint of the latest signed state if available
+// to resolve the challenge.
 func (s *EventHandlerService) HandleHomeChannelChallenged(event *core.HomeChannelChallengedEvent) error {
 	return s.useStoreInTx(func(tx Store) error {
 		chanID := event.ChannelID
@@ -106,31 +118,42 @@ func (s *EventHandlerService) HandleHomeChannelChallenged(event *core.HomeChanne
 			return nil
 		}
 
-		if event.StateVersion < channel.StateVersion {
-			// TODO: SCHEDULE CHECKPOINT ACTION
+		if event.StateVersion <= channel.StateVersion {
+			s.logger.Warn("stale HomeChannelChallenged event received", "channelId", chanID, "eventStateVersion", event.StateVersion, "currentStateVersion", channel.StateVersion)
+			return nil
 		}
-		if event.StateVersion > channel.StateVersion {
-			channel.StateVersion = event.StateVersion
-		}
-
-		unixExpiry := event.ChallengeExpiry
-		expirationTime := time.Unix(int64(unixExpiry), 0) // TODO: recheck format
-
-		channel.ChallengeExpiresAt = &expirationTime
-
+		channel.StateVersion = event.StateVersion
 		channel.Status = core.ChannelStatusChallenged
 
-		err = tx.UpdateChannel(*channel)
+		expirationTime := time.Unix(int64(event.ChallengeExpiry), 0)
+		channel.ChallengeExpiresAt = &expirationTime
+
+		if err := tx.UpdateChannel(*channel); err != nil {
+			return err
+		}
+
+		lastSignedState, err := tx.GetLastStateByChannelID(chanID, true)
 		if err != nil {
 			return err
 		}
-		s.logger.Info("handled HomeChannelChallenged event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
+		if lastSignedState == nil {
+			s.logger.Warn("no state found for channel during HomeChannelChallenged event", "channelId", chanID)
+		} else if lastSignedState.Version <= event.StateVersion {
+			s.logger.Warn("last signed state version is not greater than challenged state version", "channelId", chanID, "lastSignedStateVersion", lastSignedState.Version, "challengedStateVersion", event.StateVersion)
+		} else {
+			if err := tx.ScheduleCheckpoint(lastSignedState.ID); err != nil {
+				return err
+			}
+		}
 
+		s.logger.Info("handled HomeChannelChallenged event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
 		return nil
 	})
 }
 
-// HandleHomeChannelClosed handles the HomeChannelClosed event
+// HandleHomeChannelClosed processes the HomeChannelClosed event emitted when a home channel is
+// finalized and closed on-chain. It updates the channel status to Closed and sets the final state version.
+// Once closed, no further state updates are possible for this channel.
 func (s *EventHandlerService) HandleHomeChannelClosed(event *core.HomeChannelClosedEvent) error {
 	return s.useStoreInTx(func(tx Store) error {
 		chanID := event.ChannelID
@@ -150,48 +173,252 @@ func (s *EventHandlerService) HandleHomeChannelClosed(event *core.HomeChannelClo
 		channel.StateVersion = event.StateVersion
 		channel.Status = core.ChannelStatusClosed
 
-		err = tx.UpdateChannel(*channel)
-		if err != nil {
+		if err := tx.UpdateChannel(*channel); err != nil {
 			return err
 		}
-		s.logger.Info("handled HomeChannelClosed event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
 
+		s.logger.Info("handled HomeChannelClosed event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
 		return nil
 	})
 }
 
-// HandleEscrowDepositInitiated handles the EscrowDepositInitiated event
+// HandleEscrowDepositInitiated processes the EscrowDepositInitiated event emitted when an escrow
+// deposit operation begins on-chain. It updates the escrow channel status to Open, sets the state
+// version, and schedules a checkpoint to finalize the deposit if a matching state exists in the database.
 func (s *EventHandlerService) HandleEscrowDepositInitiated(event *core.EscrowDepositInitiatedEvent) error {
-	// TODO: Implement EscrowDepositInitiated handler logic
-	return nil
+	return s.useStoreInTx(func(tx Store) error {
+		chanID := event.ChannelID
+		channel, err := tx.GetChannelByID(chanID)
+		if err != nil {
+			return err
+		}
+		if channel == nil {
+			s.logger.Warn("channel not found in DB during EscrowDepositInitiated event", "channelId", chanID)
+			return nil
+		}
+		if channel.Type != core.ChannelTypeEscrow {
+			s.logger.Warn("channel type mismatch during EscrowDepositInitiated event", "channelId", chanID, "expectedType", core.ChannelTypeEscrow, "actualType", channel.Type)
+			return nil
+		}
+
+		channel.StateVersion = event.StateVersion
+		channel.Status = core.ChannelStatusOpen
+
+		if err := tx.UpdateChannel(*channel); err != nil {
+			return err
+		}
+
+		state, err := tx.GetStateByChannelIDAndVersion(chanID, event.StateVersion)
+		if err != nil {
+			return err
+		}
+		if state == nil {
+			s.logger.Warn("no state found for channel during EscrowDepositInitiated event", "channelId", chanID)
+		} else {
+			if err := tx.ScheduleCheckpoint(state.ID); err != nil {
+				return err
+			}
+		}
+
+		s.logger.Info("handled EscrowDepositInitiated event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
+		return nil
+	})
 }
 
-// HandleEscrowDepositChallenged handles the EscrowDepositChallenged event
+// HandleEscrowDepositChallenged processes the EscrowDepositChallenged event emitted when an escrow
+// deposit is challenged on-chain. Similar to home channel challenges, it marks the channel as Challenged,
+// sets the expiration time, and automatically schedules a checkpoint with the latest signed state
+// to resolve the challenge.
 func (s *EventHandlerService) HandleEscrowDepositChallenged(event *core.EscrowDepositChallengedEvent) error {
-	// TODO: Implement EscrowDepositChallenged handler logic
-	return nil
+	return s.useStoreInTx(func(tx Store) error {
+		chanID := event.ChannelID
+		channel, err := tx.GetChannelByID(chanID)
+		if err != nil {
+			return err
+		}
+		if channel == nil {
+			s.logger.Warn("channel not found in DB during EscrowDepositChallenged event", "channelId", chanID)
+			return nil
+		}
+		if channel.Type != core.ChannelTypeEscrow {
+			s.logger.Warn("channel type mismatch during EscrowDepositChallenged event", "channelId", chanID, "expectedType", core.ChannelTypeEscrow, "actualType", channel.Type)
+			return nil
+		}
+
+		if event.StateVersion <= channel.StateVersion {
+			s.logger.Warn("stale EscrowDepositChallenged event received", "channelId", chanID, "eventStateVersion", event.StateVersion, "currentStateVersion", channel.StateVersion)
+			return nil
+		}
+		channel.StateVersion = event.StateVersion
+		channel.Status = core.ChannelStatusChallenged
+
+		expirationTime := time.Unix(int64(event.ChallengeExpiry), 0)
+		channel.ChallengeExpiresAt = &expirationTime
+
+		if err := tx.UpdateChannel(*channel); err != nil {
+			return err
+		}
+
+		lastSignedState, err := tx.GetLastStateByChannelID(chanID, true)
+		if err != nil {
+			return err
+		}
+		if lastSignedState == nil {
+			s.logger.Warn("no state found for channel during EscrowDepositChallenged event", "channelId", chanID)
+		} else if lastSignedState.Version <= event.StateVersion {
+			s.logger.Warn("last signed state version is not greater than challenged state version", "channelId", chanID, "lastSignedStateVersion", lastSignedState.Version, "challengedStateVersion", event.StateVersion)
+		} else {
+			if err := tx.ScheduleCheckpointEscrowDeposit(lastSignedState.ID); err != nil {
+				return err
+			}
+		}
+
+		s.logger.Info("handled EscrowDepositChallenged event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
+		return nil
+	})
 }
 
-// HandleEscrowDepositFinalized handles the EscrowDepositFinalized event
+// HandleEscrowDepositFinalized processes the EscrowDepositFinalized event emitted when an escrow
+// deposit is successfully finalized on-chain. It updates the channel status to Closed and sets
+// the final state version, completing the deposit lifecycle.
 func (s *EventHandlerService) HandleEscrowDepositFinalized(event *core.EscrowDepositFinalizedEvent) error {
-	// TODO: Implement EscrowDepositFinalized handler logic
-	return nil
+	return s.useStoreInTx(func(tx Store) error {
+		chanID := event.ChannelID
+		channel, err := tx.GetChannelByID(chanID)
+		if err != nil {
+			return err
+		}
+		if channel == nil {
+			s.logger.Warn("channel not found in DB during EscrowDepositFinalized event", "channelId", chanID)
+			return nil
+		}
+		if channel.Type != core.ChannelTypeEscrow {
+			s.logger.Warn("channel type mismatch during EscrowDepositFinalized event", "channelId", chanID, "expectedType", core.ChannelTypeEscrow, "actualType", channel.Type)
+			return nil
+		}
+
+		channel.StateVersion = event.StateVersion
+		channel.Status = core.ChannelStatusClosed
+
+		if err := tx.UpdateChannel(*channel); err != nil {
+			return err
+		}
+
+		s.logger.Info("handled EscrowDepositFinalized event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
+		return nil
+	})
 }
 
-// HandleEscrowWithdrawalInitiated handles the EscrowWithdrawalInitiated event
+// HandleEscrowWithdrawalInitiated processes the EscrowWithdrawalInitiated event emitted when an escrow
+// withdrawal operation begins on-chain. It updates the escrow channel status to Open and sets the state
+// version to reflect the initiated withdrawal.
 func (s *EventHandlerService) HandleEscrowWithdrawalInitiated(event *core.EscrowWithdrawalInitiatedEvent) error {
-	// TODO: Implement EscrowWithdrawalInitiated handler logic
-	return nil
+	return s.useStoreInTx(func(tx Store) error {
+		chanID := event.ChannelID
+		channel, err := tx.GetChannelByID(chanID)
+		if err != nil {
+			return err
+		}
+		if channel == nil {
+			s.logger.Warn("channel not found in DB during EscrowWithdrawalInitiated event", "channelId", chanID)
+			return nil
+		}
+		if channel.Type != core.ChannelTypeEscrow {
+			s.logger.Warn("channel type mismatch during EscrowWithdrawalInitiated event", "channelId", chanID, "expectedType", core.ChannelTypeEscrow, "actualType", channel.Type)
+			return nil
+		}
+
+		channel.StateVersion = event.StateVersion
+		channel.Status = core.ChannelStatusOpen
+
+		if err := tx.UpdateChannel(*channel); err != nil {
+			return err
+		}
+
+		s.logger.Info("handled EscrowWithdrawalInitiated event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
+		return nil
+	})
 }
 
-// HandleEscrowWithdrawalChallenged handles the EscrowWithdrawalChallenged event
+// HandleEscrowWithdrawalChallenged processes the EscrowWithdrawalChallenged event emitted when an escrow
+// withdrawal is challenged on-chain. It marks the channel as Challenged, sets the expiration time,
+// and schedules a checkpoint for escrow withdrawal with the latest signed state to resolve the challenge.
 func (s *EventHandlerService) HandleEscrowWithdrawalChallenged(event *core.EscrowWithdrawalChallengedEvent) error {
-	// TODO: Implement EscrowWithdrawalChallenged handler logic
-	return nil
+	return s.useStoreInTx(func(tx Store) error {
+		chanID := event.ChannelID
+		channel, err := tx.GetChannelByID(chanID)
+		if err != nil {
+			return err
+		}
+		if channel == nil {
+			s.logger.Warn("channel not found in DB during EscrowWithdrawalChallenged event", "channelId", chanID)
+			return nil
+		}
+		if channel.Type != core.ChannelTypeEscrow {
+			s.logger.Warn("channel type mismatch during EscrowWithdrawalChallenged event", "channelId", chanID, "expectedType", core.ChannelTypeEscrow, "actualType", channel.Type)
+			return nil
+		}
+
+		if event.StateVersion <= channel.StateVersion {
+			s.logger.Warn("stale EscrowWithdrawalChallenged event received", "channelId", chanID, "eventStateVersion", event.StateVersion, "currentStateVersion", channel.StateVersion)
+			return nil
+		}
+		channel.StateVersion = event.StateVersion
+		channel.Status = core.ChannelStatusChallenged
+
+		expirationTime := time.Unix(int64(event.ChallengeExpiry), 0)
+		channel.ChallengeExpiresAt = &expirationTime
+
+		if err := tx.UpdateChannel(*channel); err != nil {
+			return err
+		}
+
+		lastSignedState, err := tx.GetLastStateByChannelID(chanID, true)
+		if err != nil {
+			return err
+		}
+		if lastSignedState == nil {
+			s.logger.Warn("no state found for channel during EscrowWithdrawalChallenged event", "channelId", chanID)
+		} else if lastSignedState.Version <= event.StateVersion {
+			s.logger.Warn("last signed state version is not greater than challenged state version", "channelId", chanID, "lastSignedStateVersion", lastSignedState.Version, "challengedStateVersion", event.StateVersion)
+		} else {
+			if err := tx.ScheduleCheckpointEscrowWithdrawal(lastSignedState.ID); err != nil {
+				return err
+			}
+		}
+
+		s.logger.Info("handled EscrowWithdrawalChallenged event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
+		return nil
+	})
 }
 
-// HandleEscrowWithdrawalFinalized handles the EscrowWithdrawalFinalized event
+// HandleEscrowWithdrawalFinalized processes the EscrowWithdrawalFinalized event emitted when an escrow
+// withdrawal is successfully finalized on-chain. It updates the channel status to Closed and sets
+// the final state version, completing the withdrawal lifecycle.
 func (s *EventHandlerService) HandleEscrowWithdrawalFinalized(event *core.EscrowWithdrawalFinalizedEvent) error {
-	// TODO: Implement EscrowWithdrawalFinalized handler logic
-	return nil
+	return s.useStoreInTx(func(tx Store) error {
+		chanID := event.ChannelID
+		channel, err := tx.GetChannelByID(chanID)
+		if err != nil {
+			return err
+		}
+		if channel == nil {
+			s.logger.Warn("channel not found in DB during EscrowWithdrawalFinalized event", "channelId", chanID)
+			return nil
+		}
+		if channel.Type != core.ChannelTypeEscrow {
+			s.logger.Warn("channel type mismatch during EscrowWithdrawalFinalized event", "channelId", chanID, "expectedType", core.ChannelTypeEscrow, "actualType", channel.Type)
+			return nil
+		}
+
+		channel.StateVersion = event.StateVersion
+		channel.Status = core.ChannelStatusClosed
+
+		if err := tx.UpdateChannel(*channel); err != nil {
+			return err
+		}
+
+		s.logger.Info("handled EscrowWithdrawalFinalized event", "channelId", event.ChannelID, "stateVersion", event.StateVersion, "userWallet", channel.UserWallet)
+		return nil
+	})
 }

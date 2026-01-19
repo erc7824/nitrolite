@@ -152,7 +152,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 					return err
 				}
 
-				if err := tx.ScheduleInitiateEscrowWithdrawal(incomingState); err != nil {
+				if err := tx.ScheduleInitiateEscrowWithdrawal(incomingState.ID); err != nil {
 					return rpc.Errorf("failed to schedule blockchain action: %v", err)
 				}
 				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)

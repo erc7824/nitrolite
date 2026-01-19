@@ -13,34 +13,36 @@ type StoreTxHandler func(Store) error
 // Returns an error if the handler fails or the transaction cannot be committed.
 type StoreTxProvider func(StoreTxHandler) error
 
-// Store defines the persistence layer interface for channel state management.
+// Store defines the persistence layer interface for channel and state data.
 // All methods should be implemented to work within database transactions.
+// Implementations are typically provided by the database layer and wrapped by StoreTxProvider.
 type Store interface {
-	// GetLastUserState retrieves the most recent state for a user's asset.
+	// GetLastStateByChannelID retrieves the most recent state for a given channel.
 	// If signed is true, only returns states with both user and node signatures.
-	// Returns nil state if no matching state exists.
-	GetLastUserState(wallet, asset string, signed bool) (*core.State, error)
+	// Returns nil if no matching state exists.
+	GetLastStateByChannelID(channelID string, signed bool) (*core.State, error)
 
-	// CheckOpenChannel verifies if a user has an active channel for the given asset.
-	CheckOpenChannel(wallet, asset string) (bool, error)
+	// GetStateByChannelIDAndVersion retrieves a specific state version for a channel.
+	// Returns nil if the state with the specified version does not exist.
+	GetStateByChannelIDAndVersion(channelID string, version uint64) (*core.State, error)
 
-	// StoreUserState persists a new user state to the database.
-	StoreUserState(state core.State) error
-
-	// RecordTransaction creates a transaction record linking state transitions
-	// to track the history of operations (deposits, withdrawals, transfers, etc.).
-	RecordTransaction(tx core.Transaction) error
-
-	// UpdateChannel updates an existing channel entity in the database.
+	// UpdateChannel persists changes to a channel's metadata (status, version, etc).
+	// The channel must already exist in the database.
 	UpdateChannel(channel core.Channel) error
 
 	// GetChannelByID retrieves a channel by its unique identifier.
-	// Returns nil if the channel doesn't exist.
+	// Returns nil if the channel does not exist.
 	GetChannelByID(channelID string) (*core.Channel, error)
 
-	// GetActiveHomeChannel retrieves the active home channel for a user's wallet and asset.
-	// Returns nil if no home channel exists for the given wallet and asset.
-	GetActiveHomeChannel(wallet, asset string) (*core.Channel, error)
+	// ScheduleCheckpoint schedules a checkpoint operation for a home channel state.
+	// This queues the state to be submitted on-chain to update the channel's on-chain state.
+	ScheduleCheckpoint(stateID string) error
 
-	ScheduleCheckpoint(ChannelID string, StateVersion uint64) error
+	// ScheduleCheckpointEscrowDeposit schedules a checkpoint for an escrow deposit operation.
+	// This queues the state to be submitted on-chain to finalize an escrow deposit.
+	ScheduleCheckpointEscrowDeposit(stateID string) error
+
+	// ScheduleCheckpointEscrowWithdrawal schedules a checkpoint for an escrow withdrawal operation.
+	// This queues the state to be submitted on-chain to finalize an escrow withdrawal.
+	ScheduleCheckpointEscrowWithdrawal(stateID string) error
 }

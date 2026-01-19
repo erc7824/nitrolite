@@ -171,6 +171,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		// Track total deposit amount to validate against transition amount
 		totalDepositAmount := decimal.Zero
 
+		incomingAllocations := make(map[string]map[string]decimal.Decimal)
 		for _, alloc := range appStateUpd.Allocations {
 			if alloc.Amount.IsNegative() {
 				return rpc.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.Asset)
@@ -204,6 +205,38 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 
 				if err := tx.RecordLedgerEntry(appSession.SessionID, alloc.Asset, depositAmount, nil); err != nil {
 					return rpc.Errorf("failed to record ledger entry: %v", err)
+				}
+			}
+
+			// Store in incoming allocations map
+			if incomingAllocations[alloc.Participant] == nil {
+				incomingAllocations[alloc.Participant] = make(map[string]decimal.Decimal)
+			}
+			incomingAllocations[alloc.Participant][alloc.Asset] = alloc.Amount
+		}
+
+		// Verify all session balances are accounted for
+		for participant, assets := range currentAllocations {
+			for asset, currentAmount := range assets {
+				if currentAmount.IsZero() {
+					continue
+				}
+				if asset == userState.Asset {
+					// Skip asset being deposited to avoid double-checking
+					continue
+				}
+
+				// Check if this participant+asset is included in the incoming request
+				incomingAmount, found := incomingAllocations[participant][asset]
+				if !found {
+					return rpc.Errorf("deposit intent missing allocation for participant %s, asset %s with current amount %s",
+						participant, asset, currentAmount.String())
+				}
+
+				// Verify amounts match exactly
+				if !incomingAmount.Equal(currentAmount) {
+					return rpc.Errorf("deposit intent requires non-deposited asset allocations to match current state: participant %s, asset %s, current %s, provided %s",
+						participant, asset, currentAmount.String(), incomingAmount.String())
 				}
 			}
 		}

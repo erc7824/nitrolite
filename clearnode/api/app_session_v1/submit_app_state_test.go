@@ -346,10 +346,6 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 		},
 	}
 
-	sessionBalances := map[string]decimal.Decimal{
-		"USDC": decimal.NewFromInt(150),
-	}
-
 	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
 		AppStateUpdate: rpc.AppStateUpdateV1{
 			AppSessionID: appSessionID,
@@ -367,8 +363,21 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	// Mock expectations
 	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
 	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
-	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
 	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
+
+	// Mock expectations for fund release and channel state issuance on close
+	// Participant 1: 100 USDC
+	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(-100), (*string)(nil)).Return(nil)
+	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil)
+	mockStore.On("GetLastUserState", participant1, "USDC", true).Return(nil, nil)
+	mockStore.On("StoreUserState", mock.Anything).Return(nil).Once()
+
+	// Participant 2: 50 USDC
+	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(-50), (*string)(nil)).Return(nil)
+	mockStore.On("GetLastUserState", participant2, "USDC", false).Return(nil, nil)
+	mockStore.On("GetLastUserState", participant2, "USDC", true).Return(nil, nil)
+	mockStore.On("StoreUserState", mock.Anything).Return(nil).Once()
+
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
 		return session.Version == 2 && session.IsClosed
 	})).Return(nil)
@@ -391,6 +400,267 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 		t.Fatalf("Unexpected error response: %v", respErr)
 	}
 	assert.Equal(t, rpc.MsgTypeResp, ctx.Response.Type)
+
+	mockStore.AssertExpectations(t)
+	mockSigValidator.AssertExpectations(t)
+}
+
+func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
+	// Setup
+	mockStore := new(MockStore)
+	mockSigValidator := new(MockSigValidator)
+
+	storeTxProvider := func(fn StoreTxHandler) error {
+		return fn(mockStore)
+	}
+
+	handler := NewHandler(
+		storeTxProvider,
+		nil,
+		nil,
+		map[SigType]SigValidator{
+			EcdsaSigType: mockSigValidator,
+		},
+		"0xNode",
+	)
+
+	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+	participant1 := "0x1111111111111111111111111111111111111111"
+
+	existingSession := &app.AppSessionV1{
+		SessionID:    appSessionID,
+		Application:  "test-app",
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: participant1, SignatureWeight: 10},
+		},
+		Quorum:      10,
+		IsClosed:    false,
+		Version:     1,
+		SessionData: "",
+	}
+
+	currentAllocations := map[string]map[string]decimal.Decimal{
+		participant1: {
+			"USDC": decimal.NewFromInt(100),
+		},
+	}
+
+	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
+		AppStateUpdate: rpc.AppStateUpdateV1{
+			AppSessionID: appSessionID,
+			Intent:       app.AppStateUpdateIntentClose,
+			Version:      2,
+			Allocations: []rpc.AppAllocationV1{
+				{Participant: participant1, Asset: "USDC", Amount: "50"}, // Mismatch: trying to close with different amount
+			},
+			SessionData: "",
+		},
+		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+	}
+
+	// Mock expectations
+	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
+	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
+	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
+
+	// Create RPC context
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1SubmitAppStateMethod), payload),
+	}
+
+	// Execute
+	handler.SubmitAppState(ctx)
+
+	// Assert - should fail because allocations don't match current state
+	require.NotNil(t, ctx.Response)
+	respErr := ctx.Response.Error()
+	require.NotNil(t, respErr, "Expected error for close with allocation mismatch")
+	assert.Contains(t, respErr.Error(), "close intent requires allocations to match current state")
+
+	mockStore.AssertExpectations(t)
+	mockSigValidator.AssertExpectations(t)
+}
+
+func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
+	// Setup
+	mockStore := new(MockStore)
+	mockSigValidator := new(MockSigValidator)
+
+	storeTxProvider := func(fn StoreTxHandler) error {
+		return fn(mockStore)
+	}
+
+	handler := NewHandler(
+		storeTxProvider,
+		nil,
+		nil,
+		map[SigType]SigValidator{
+			EcdsaSigType: mockSigValidator,
+		},
+		"0xNode",
+	)
+
+	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+	participant1 := "0x1111111111111111111111111111111111111111"
+	participant2 := "0x2222222222222222222222222222222222222222"
+
+	existingSession := &app.AppSessionV1{
+		SessionID:    appSessionID,
+		Application:  "test-app",
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: participant1, SignatureWeight: 5},
+			{WalletAddress: participant2, SignatureWeight: 5},
+		},
+		Quorum:      5,
+		IsClosed:    false,
+		Version:     1,
+		SessionData: "",
+	}
+
+	currentAllocations := map[string]map[string]decimal.Decimal{
+		participant1: {
+			"USDC": decimal.NewFromInt(100),
+		},
+		participant2: {
+			"USDC": decimal.NewFromInt(50),
+		},
+	}
+
+	sessionBalances := map[string]decimal.Decimal{
+		"USDC": decimal.NewFromInt(150),
+	}
+
+	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
+		AppStateUpdate: rpc.AppStateUpdateV1{
+			AppSessionID: appSessionID,
+			Intent:       app.AppStateUpdateIntentOperate,
+			Version:      2,
+			Allocations: []rpc.AppAllocationV1{
+				{Participant: participant1, Asset: "USDC", Amount: "150"}, // Only one participant - missing participant2
+			},
+			SessionData: "",
+		},
+		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+	}
+
+	// Mock expectations
+	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
+	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
+	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
+	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
+
+	// Map iteration order is non-deterministic, so participant1 might be processed before the participant2 missing error
+	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(50), (*string)(nil)).Return(nil).Maybe()
+
+	// Create RPC context
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1SubmitAppStateMethod), payload),
+	}
+
+	// Execute
+	handler.SubmitAppState(ctx)
+
+	// Assert - should fail because participant2 allocation is missing
+	require.NotNil(t, ctx.Response)
+	respErr := ctx.Response.Error()
+	require.NotNil(t, respErr, "Expected error for operate with missing allocation")
+	assert.Contains(t, respErr.Error(), "operate intent missing allocation")
+
+	mockStore.AssertExpectations(t)
+	mockSigValidator.AssertExpectations(t)
+}
+
+func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) {
+	// Setup
+	mockStore := new(MockStore)
+	mockSigValidator := new(MockSigValidator)
+	mockSigner := NewMockSigner()
+
+	storeTxProvider := func(fn StoreTxHandler) error {
+		return fn(mockStore)
+	}
+
+	handler := NewHandler(
+		storeTxProvider,
+		mockSigner,
+		nil,
+		map[SigType]SigValidator{
+			EcdsaSigType: mockSigValidator,
+		},
+		"0xNode",
+	)
+
+	appSessionID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+	participant1 := "0x1111111111111111111111111111111111111111"
+
+	existingSession := &app.AppSessionV1{
+		SessionID:    appSessionID,
+		Application:  "test-app",
+		Participants: []app.AppParticipantV1{
+			{WalletAddress: participant1, SignatureWeight: 10},
+		},
+		Quorum:      10,
+		IsClosed:    false,
+		Version:     1,
+		SessionData: "",
+	}
+
+	currentAllocations := map[string]map[string]decimal.Decimal{
+		participant1: {
+			"USDC": decimal.NewFromInt(100),
+			"DAI":  decimal.NewFromInt(50),
+		},
+	}
+
+	reqPayload := rpc.AppSessionsV1SubmitAppStateRequest{
+		AppStateUpdate: rpc.AppStateUpdateV1{
+			AppSessionID: appSessionID,
+			Intent:       app.AppStateUpdateIntentWithdraw,
+			Version:      2,
+			Allocations: []rpc.AppAllocationV1{
+				{Participant: participant1, Asset: "USDC", Amount: "60"}, // Missing DAI allocation
+			},
+			SessionData: "",
+		},
+		Signatures: []string{"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef00"},
+	}
+
+	// Mock expectations
+	mockStore.On("GetAppSession", appSessionID).Return(existingSession, nil)
+	mockStore.On("GetParticipantAllocations", appSessionID).Return(currentAllocations, nil)
+	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
+
+	// Map iteration order is non-deterministic, so USDC might be processed before the DAI missing error
+	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(-40), (*string)(nil)).Return(nil).Maybe()
+	mockStore.On("GetLastUserState", participant1, "USDC", false).Return(nil, nil).Maybe()
+	mockStore.On("GetLastUserState", participant1, "USDC", true).Return(nil, nil).Maybe()
+	mockStore.On("StoreUserState", mock.Anything).Return(nil).Maybe()
+
+	// Create RPC context
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpc.NewRequest(1, string(rpc.AppSessionsV1SubmitAppStateMethod), payload),
+	}
+
+	// Execute
+	handler.SubmitAppState(ctx)
+
+	// Assert - should fail because DAI allocation is missing
+	require.NotNil(t, ctx.Response)
+	respErr := ctx.Response.Error()
+	require.NotNil(t, respErr, "Expected error for withdraw with missing allocation")
+	assert.Contains(t, respErr.Error(), "withdraw intent missing allocation")
 
 	mockStore.AssertExpectations(t)
 	mockSigValidator.AssertExpectations(t)

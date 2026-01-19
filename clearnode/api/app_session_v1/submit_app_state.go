@@ -185,6 +185,7 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 
 // handleOperateIntent processes operate intent by validating total allocations and recording ledger changes.
 // Operate intent allows redistribution of funds between participants as long as the total per asset stays the same.
+// Requires submitting full list of allocations even if some haven't changed.
 func (h *Handler) handleOperateIntent(
 	tx Store,
 	appStateUpd app.AppStateUpdateV1,
@@ -197,7 +198,8 @@ func (h *Handler) handleOperateIntent(
 		return rpc.Errorf("failed to get app session balances: %v", err)
 	}
 
-	// Track total allocations per asset
+	// Build a map of incoming allocations for validation and lookup
+	incomingAllocations := make(map[string]map[string]decimal.Decimal)
 	allocationSum := make(map[string]decimal.Decimal)
 
 	for _, alloc := range appStateUpd.Allocations {
@@ -217,18 +219,33 @@ func (h *Handler) handleOperateIntent(
 			allocationSum[alloc.Asset] = alloc.Amount
 		}
 
-		// Get current allocation for this participant and asset
-		participantAllocs := currentAllocations[alloc.Participant]
-		if participantAllocs == nil {
-			participantAllocs = make(map[string]decimal.Decimal)
+		// Store in incoming allocations map
+		if incomingAllocations[alloc.Participant] == nil {
+			incomingAllocations[alloc.Participant] = make(map[string]decimal.Decimal)
 		}
-		currentAmount := participantAllocs[alloc.Asset]
+		incomingAllocations[alloc.Participant][alloc.Asset] = alloc.Amount
+	}
 
-		// Calculate the difference and record ledger entry if changed
-		diff := alloc.Amount.Sub(currentAmount)
-		if !diff.IsZero() {
-			if err := tx.RecordLedgerEntry(appStateUpd.AppSessionID, alloc.Asset, diff, nil); err != nil {
-				return rpc.Errorf("failed to record operate ledger entry: %v", err)
+	// Verify all current allocations are present in the incoming request
+	for participant, assets := range currentAllocations {
+		for asset, currentAmount := range assets {
+			if currentAmount.IsZero() {
+				continue
+			}
+
+			// Check if this participant+asset is included in the incoming request
+			incomingAmount, found := incomingAllocations[participant][asset]
+			if !found {
+				return rpc.Errorf("operate intent missing allocation for participant %s, asset %s with current amount %s",
+					participant, asset, currentAmount.String())
+			}
+
+			// Calculate the difference and record ledger entry if changed
+			diff := incomingAmount.Sub(currentAmount)
+			if !diff.IsZero() {
+				if err := tx.RecordLedgerEntry(appStateUpd.AppSessionID, asset, diff, nil); err != nil {
+					return rpc.Errorf("failed to record operate ledger entry: %v", err)
+				}
 			}
 		}
 	}
@@ -269,12 +286,16 @@ func (h *Handler) handleOperateIntent(
 
 // handleWithdrawIntent processes withdraw intent by validating and recording ledger changes.
 // It also issues new channel states for participants receiving withdrawn funds.
+// Requires submitting full list of allocations even if some haven't changed.
 func (h *Handler) handleWithdrawIntent(
 	tx Store,
 	appStateUpd app.AppStateUpdateV1,
 	currentAllocations map[string]map[string]decimal.Decimal,
 	participantWeights map[string]uint8,
 ) error {
+	// Build a map of incoming allocations for validation and lookup
+	incomingAllocations := make(map[string]map[string]decimal.Decimal)
+
 	for _, alloc := range appStateUpd.Allocations {
 		// Validate participant exists
 		if _, ok := participantWeights[alloc.Participant]; !ok {
@@ -285,28 +306,44 @@ func (h *Handler) handleWithdrawIntent(
 			return rpc.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.Asset)
 		}
 
-		participantAllocs := currentAllocations[alloc.Participant]
-		if participantAllocs == nil {
-			participantAllocs = make(map[string]decimal.Decimal)
+		// Store in incoming allocations map
+		if incomingAllocations[alloc.Participant] == nil {
+			incomingAllocations[alloc.Participant] = make(map[string]decimal.Decimal)
 		}
-		currentAmount := participantAllocs[alloc.Asset]
+		incomingAllocations[alloc.Participant][alloc.Asset] = alloc.Amount
+	}
 
-		// For withdraw, amounts can only decrease or stay the same
-		if alloc.Amount.GreaterThan(currentAmount) {
-			return rpc.Errorf("withdraw intent cannot increase allocations: participant %s, asset %s",
-				alloc.Participant, alloc.Asset)
-		}
-
-		if alloc.Amount.LessThan(currentAmount) {
-			// Record the withdrawal (negative ledger entry for the session)
-			withdrawAmount := currentAmount.Sub(alloc.Amount)
-			if err := tx.RecordLedgerEntry(appStateUpd.AppSessionID, alloc.Asset, withdrawAmount.Neg(), nil); err != nil {
-				return rpc.Errorf("failed to record withdrawal ledger entry: %v", err)
+	// Verify all current allocations are present and validate withdrawals
+	for participant, assets := range currentAllocations {
+		for asset, currentAmount := range assets {
+			if currentAmount.IsZero() {
+				continue
 			}
 
-			// Issue new channel state for participant receiving withdrawn funds
-			if err := h.issueReleaseReceiverState(tx, alloc.Participant, alloc.Asset, appStateUpd.AppSessionID, withdrawAmount); err != nil {
-				return rpc.Errorf("failed to issue release state for participant %s: %v", alloc.Participant, err)
+			// Check if this participant+asset is included in the incoming request
+			incomingAmount, found := incomingAllocations[participant][asset]
+			if !found {
+				return rpc.Errorf("withdraw intent missing allocation for participant %s, asset %s with current amount %s",
+					participant, asset, currentAmount.String())
+			}
+
+			// For withdraw, amounts can only decrease or stay the same
+			if incomingAmount.GreaterThan(currentAmount) {
+				return rpc.Errorf("withdraw intent cannot increase allocations: participant %s, asset %s",
+					participant, asset)
+			}
+
+			if incomingAmount.LessThan(currentAmount) {
+				// Record the withdrawal (negative ledger entry for the session)
+				withdrawAmount := currentAmount.Sub(incomingAmount)
+				if err := tx.RecordLedgerEntry(appStateUpd.AppSessionID, asset, withdrawAmount.Neg(), nil); err != nil {
+					return rpc.Errorf("failed to record withdrawal ledger entry: %v", err)
+				}
+
+				// Issue new channel state for participant receiving withdrawn funds
+				if err := h.issueReleaseReceiverState(tx, participant, asset, appStateUpd.AppSessionID, withdrawAmount); err != nil {
+					return rpc.Errorf("failed to issue release state for participant %s: %v", participant, err)
+				}
 			}
 		}
 	}
@@ -314,22 +351,16 @@ func (h *Handler) handleWithdrawIntent(
 	return nil
 }
 
-// handleCloseIntent processes close intent by validating final allocations and recording ledger changes.
+// handleCloseIntent processes close intent by validating that allocations match current state,
+// then releasing ALL funds from the session back to participants with channel state issuance.
 func (h *Handler) handleCloseIntent(
 	tx Store,
 	appStateUpd app.AppStateUpdateV1,
 	currentAllocations map[string]map[string]decimal.Decimal,
 	participantWeights map[string]uint8,
 ) error {
-	// Get total balances in the session
-	sessionBalances, err := tx.GetAppSessionBalances(appStateUpd.AppSessionID)
-	if err != nil {
-		return rpc.Errorf("failed to get app session balances: %v", err)
-	}
-
-	// Track total allocations per asset
-	totalAllocations := make(map[string]decimal.Decimal)
-
+	// Build a map of incoming allocations for easy lookup
+	incomingAllocations := make(map[string]map[string]decimal.Decimal)
 	for _, alloc := range appStateUpd.Allocations {
 		// Validate participant exists
 		if _, ok := participantWeights[alloc.Participant]; !ok {
@@ -340,68 +371,66 @@ func (h *Handler) handleCloseIntent(
 			return rpc.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.Asset)
 		}
 
-		// Accumulate total allocations per asset
-		if existing, ok := totalAllocations[alloc.Asset]; ok {
-			totalAllocations[alloc.Asset] = existing.Add(alloc.Amount)
-		} else {
-			totalAllocations[alloc.Asset] = alloc.Amount
+		if incomingAllocations[alloc.Participant] == nil {
+			incomingAllocations[alloc.Participant] = make(map[string]decimal.Decimal)
+		}
+		incomingAllocations[alloc.Participant][alloc.Asset] = alloc.Amount
+	}
+
+	// Iterate over current allocations (source of truth) and verify they match incoming allocations
+	for participant, assets := range currentAllocations {
+		for asset, currentAmount := range assets {
+			if currentAmount.IsZero() {
+				continue
+			}
+
+			// Check if this participant+asset is included in the incoming request
+			incomingAmount, found := incomingAllocations[participant][asset]
+			if !found {
+				return rpc.Errorf("close intent missing allocation for participant %s, asset %s with current amount %s",
+					participant, asset, currentAmount.String())
+			}
+
+			// Verify amounts match exactly
+			if !incomingAmount.Equal(currentAmount) {
+				return rpc.Errorf("close intent requires allocations to match current state: participant %s, asset %s, current %s, provided %s",
+					participant, asset, currentAmount.String(), incomingAmount.String())
+			}
 		}
 	}
 
-	// Validate that total allocations equal total session balances for each asset
-	for asset, totalAlloc := range totalAllocations {
-		sessionBalance, ok := sessionBalances[asset]
-		if !ok {
-			sessionBalance = decimal.Zero
-		}
+	// Verify there are no extra allocations in the request that don't exist in current state
+	for participant, assets := range incomingAllocations {
+		for asset, incomingAmount := range assets {
+			currentAmount := decimal.Zero
+			if currentAllocations[participant] != nil {
+				currentAmount = currentAllocations[participant][asset]
+			}
 
-		if !totalAlloc.Equal(sessionBalance) {
-			return rpc.Errorf("close intent allocation mismatch for asset %s: total allocations %s, session balance %s",
-				asset, totalAlloc.String(), sessionBalance.String())
-		}
-	}
-
-	// Verify all session balances are accounted for
-	for asset, sessionBalance := range sessionBalances {
-		if sessionBalance.IsZero() {
-			continue
-		}
-
-		totalAlloc, ok := totalAllocations[asset]
-		if !ok {
-			return rpc.Errorf("close intent missing allocations for asset %s with balance %s",
-				asset, sessionBalance.String())
-		}
-
-		if !totalAlloc.Equal(sessionBalance) {
-			return rpc.Errorf("close intent allocation mismatch for asset %s: total allocations %s, session balance %s",
-				asset, totalAlloc.String(), sessionBalance.String())
+			// If incoming has an allocation but current doesn't (or is zero), reject
+			if currentAmount.IsZero() && !incomingAmount.IsZero() {
+				return rpc.Errorf("close intent contains unexpected allocation for participant %s, asset %s with amount %s",
+					participant, asset, incomingAmount.String())
+			}
 		}
 	}
 
-	// Record final withdrawals for each participant and issue channel states
-	for _, alloc := range appStateUpd.Allocations {
-		participantAllocs := currentAllocations[alloc.Participant]
-		if participantAllocs == nil {
-			participantAllocs = make(map[string]decimal.Decimal)
-		}
-		currentAmount := participantAllocs[alloc.Asset]
+	// Iterate over current allocations and release each non-zero amount
+	for participant, assets := range currentAllocations {
+		for asset, amount := range assets {
+			if amount.IsZero() {
+				continue
+			}
 
-		// Calculate the difference (should be zero or negative since we're closing)
-		if alloc.Amount.LessThan(currentAmount) {
-			withdrawAmount := currentAmount.Sub(alloc.Amount)
-			if err := tx.RecordLedgerEntry(appStateUpd.AppSessionID, alloc.Asset, withdrawAmount.Neg(), nil); err != nil {
+			// Record negative ledger entry (funds leaving the session)
+			if err := tx.RecordLedgerEntry(appStateUpd.AppSessionID, asset, amount.Neg(), nil); err != nil {
 				return rpc.Errorf("failed to record close ledger entry: %v", err)
 			}
 
-			// Issue new channel state for participant receiving funds on close
-			if err := h.issueReleaseReceiverState(tx, alloc.Participant, alloc.Asset, appStateUpd.AppSessionID, withdrawAmount); err != nil {
-				return rpc.Errorf("failed to issue release state for participant %s: %v", alloc.Participant, err)
+			// Issue new channel state for participant receiving funds back
+			if err := h.issueReleaseReceiverState(tx, participant, asset, appStateUpd.AppSessionID, amount); err != nil {
+				return rpc.Errorf("failed to issue release state for participant %s: %v", participant, err)
 			}
-		} else if alloc.Amount.GreaterThan(currentAmount) {
-			// This shouldn't happen in close, but let's be explicit
-			return rpc.Errorf("close intent cannot increase allocations: participant %s, asset %s",
-				alloc.Participant, alloc.Asset)
 		}
 	}
 

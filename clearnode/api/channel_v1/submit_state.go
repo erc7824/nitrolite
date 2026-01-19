@@ -32,6 +32,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 	incomingTransition := incomingState.GetLastTransition()
 	err = h.useStoreInTx(func(tx Store) error {
 		if incomingTransition == nil {
+			// TODO: add support for final states without transitions
 			return rpc.Errorf("incoming state has no transitions")
 		}
 		if incomingTransition.Type.RequiresOpenChannel() {
@@ -123,7 +124,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 			switch incomingTransition.Type {
 			case core.TransitionTypeHomeDeposit, core.TransitionTypeHomeWithdrawal:
 				// We return Node's signature, the user is expected to submit this on blockchain.
-				transaction, err = core.NewTransactionFromTransition(incomingState, nil, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
@@ -133,7 +134,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 				if err != nil {
 					return rpc.Errorf("failed to issue receiver state: %v", err)
 				}
-				transaction, err = core.NewTransactionFromTransition(incomingState, newReceiverState, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, newReceiverState, *incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
@@ -142,7 +143,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 					return err
 				}
 
-				transaction, err = core.NewTransactionFromTransition(incomingState, nil, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
@@ -154,14 +155,14 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 				if err := tx.ScheduleInitiateEscrowWithdrawal(incomingState); err != nil {
 					return rpc.Errorf("failed to schedule blockchain action: %v", err)
 				}
-				transaction, err = core.NewTransactionFromTransition(incomingState, nil, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
 			case core.TransitionTypeEscrowDeposit:
 				// We return Node's signature, the user is expected to submit this on blockchain.
 				// Optionally schedule blockchain action (finalizeEscrowDeposit) on escrow chain
-				transaction, err = core.NewTransactionFromTransition(incomingState, nil, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
@@ -172,7 +173,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 				logger.Info("extra state issued", "userID", extraState.UserWallet, "asset", extraState.Asset, "version", extraState.Version)
 
 			case core.TransitionTypeEscrowWithdraw:
-				transaction, err = core.NewTransactionFromTransition(incomingState, nil, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}

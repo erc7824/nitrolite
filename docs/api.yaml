@@ -611,9 +611,9 @@ api:
                 - field_name: app_state_update
                   type: app_state_update
                   description: The application session state update to be submitted
-                - name: app_state_signatures
+                - name: signatures
                   type: array
-                  description: App Session State Update signatures
+                  description: App Session State Update signatures required for quorum
                   items:
                     type: string
               response:

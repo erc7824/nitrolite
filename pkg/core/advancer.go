@@ -81,6 +81,8 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 		if !proposedState.IsFinal {
 			return fmt.Errorf("no new transitions in non-final state")
 		}
+
+		expectedState.Finalize()
 	}
 
 	if transitionLenDiff == 1 {
@@ -155,6 +157,9 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 	}
 	if err := proposedState.HomeLedger.Validate(); err != nil {
 		return fmt.Errorf("invalid home ledger: %w", err)
+	}
+	if proposedState.IsFinal && !expectedState.IsFinal {
+		return fmt.Errorf("expected state is not final but proposed state is final")
 	}
 
 	if (expectedState.EscrowChannelID == nil) != (proposedState.EscrowChannelID == nil) {

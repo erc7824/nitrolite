@@ -158,6 +158,13 @@ func (state State) NextState() *State {
 	return nextState
 }
 
+func (state *State) Finalize() {
+	state.IsFinal = true
+
+	state.HomeLedger.UserNetFlow = state.HomeLedger.UserNetFlow.Sub(state.HomeLedger.UserBalance)
+	state.HomeLedger.UserBalance = decimal.Zero
+}
+
 func (state *State) ApplyReceiverTransitions(transitions ...Transition) error {
 	for _, transition := range transitions {
 		var err error
@@ -537,10 +544,25 @@ func NewTransaction(id, asset string, txType TransactionType, fromAccount, toAcc
 }
 
 // NewTransactionFromTransition maps the transition type to the appropriate transaction type and returns a pointer to a Transaction.
-func NewTransactionFromTransition(senderState State, receiverState *State, transition Transition) (*Transaction, error) {
+func NewTransactionFromTransition(senderState *State, receiverState *State, transition Transition) (*Transaction, error) {
 	var txType TransactionType
 	var toAccount, fromAccount string
 	// Transition validator is expected to make sure that all the fields are present and valid.
+
+	if transition.Type != TransitionTypeRelease && senderState == nil {
+		return nil, fmt.Errorf("sender state must not be nil for non-release transitions")
+	}
+
+	var senderStateID *string
+	asset := ""
+	if senderState != nil {
+		senderStateID = &senderState.ID
+		asset = senderState.Asset
+	} else if receiverState != nil {
+		asset = receiverState.Asset
+	} else {
+		return nil, fmt.Errorf("both sender and receiver states are nil")
+	}
 
 	switch transition.Type {
 	case TransitionTypeHomeDeposit:
@@ -596,8 +618,8 @@ func NewTransactionFromTransition(senderState State, receiverState *State, trans
 	case TransactionTypeRelease:
 		txType = TransactionTypeRelease
 		fromAccount = transition.AccountID
-		toAccount = senderState.UserWallet
-		if receiverState != nil {
+		toAccount = receiverState.UserWallet
+		if receiverState == nil {
 			return nil, fmt.Errorf("receiver state must not be nil for 'release' transition")
 		}
 
@@ -647,11 +669,11 @@ func NewTransactionFromTransition(senderState State, receiverState *State, trans
 
 	return NewTransaction(
 		txID,
-		senderState.Asset,
+		asset,
 		txType,
 		fromAccount,
 		toAccount,
-		&senderState.ID,
+		senderStateID,
 		receiverStateID,
 		transition.Amount,
 	), nil

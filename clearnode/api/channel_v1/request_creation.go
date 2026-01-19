@@ -139,7 +139,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		if incomingTransition != nil {
 			switch incomingTransition.Type {
 			case core.TransitionTypeHomeDeposit, core.TransitionTypeHomeWithdrawal:
-				transaction, err = core.NewTransactionFromTransition(incomingState, nil, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}
@@ -150,7 +150,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 				if err != nil {
 					return rpc.Errorf("failed to issue receiver state: %v", err)
 				}
-				transaction, err = core.NewTransactionFromTransition(incomingState, newReceiverState, *incomingTransition)
+				transaction, err = core.NewTransactionFromTransition(&incomingState, newReceiverState, *incomingTransition)
 				if err != nil {
 					return rpc.Errorf("failed to create transaction: %v", err)
 				}

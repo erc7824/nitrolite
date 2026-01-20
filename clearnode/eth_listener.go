@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"regexp"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/erc7824/nitrolite/clearnode/store/database"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -17,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/layer-3/clearsync/pkg/debounce"
 	"github.com/pkg/errors"
+	"gorm.io/gorm"
 )
 
 const (
@@ -254,4 +257,36 @@ func waitForBackOffTimeout(logger log.Logger, backOffCount int, originator strin
 		logger.Info("backing off", "originator", originator, "backOffCollisionCount", backOffCount)
 		<-time.After(time.Duration(2^backOffCount-1) * time.Second)
 	}
+}
+
+// saveContractEvent saves a contract event to the database if it has not been processed before.
+// It returns ErrCustodyEventAlreadyProcessed if the event was already processed.
+func saveContractEvent(tx *gorm.DB, name string, event any, rawLog types.Log) error {
+	alreadyProcessed, err := IsContractEventPresent(tx, c.chainID, rawLog.TxHash.Hex(), uint32(rawLog.Index))
+	if err != nil {
+		return err
+	}
+
+	if alreadyProcessed {
+		c.logger.Debug("event already processed", "name", name, "txHash", rawLog.TxHash.Hex(), "logIndex", rawLog.Index)
+		return ErrCustodyEventAlreadyProcessed
+	}
+
+	eventData, err := database.MarshalEvent(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event data for %s: %w", name, err)
+	}
+
+	contractEvent := &ContractEvent{
+		ContractAddress: c.custodyAddr.Hex(),
+		ChainID:         c.chainID,
+		Name:            name,
+		BlockNumber:     rawLog.BlockNumber,
+		TransactionHash: rawLog.TxHash.Hex(),
+		LogIndex:        uint32(rawLog.Index),
+		Data:            eventData,
+		CreatedAt:       time.Now(),
+	}
+
+	return StoreContractEvent(tx, contractEvent)
 }

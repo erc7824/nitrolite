@@ -181,6 +181,8 @@ type AppSessionsV1GetAppDefinitionResponse struct {
 
 // AppSessionsV1GetAppSessionsRequest lists all application sessions for a participant with optional filtering.
 type AppSessionsV1GetAppSessionsRequest struct {
+	// AppSessionID filters by application session ID
+	AppSessionID *string `json:"app_session_id,omitempty"`
 	// Participant filters by participant wallet address
 	Participant *string `json:"participant,omitempty"`
 	// Status filters by status (open/closed)
@@ -342,6 +344,8 @@ type NodeV1GetConfigRequest struct{}
 type NodeV1GetConfigResponse struct {
 	// NodeAddress is the node wallet address
 	NodeAddress string `json:"node_address"`
+	// NodeVersion is the node software version
+	NodeVersion string `json:"node_version"`
 	// Blockchains is the list of supported networks
 	Blockchains []BlockchainInfoV1 `json:"blockchains"`
 }

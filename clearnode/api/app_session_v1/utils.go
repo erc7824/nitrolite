@@ -149,3 +149,50 @@ func getParticipantWeights(participants []app.AppParticipantV1) map[string]uint8
 	}
 	return weights
 }
+
+func mapAppSessionInfoV1(session app.AppSessionV1, allocations map[string]map[string]decimal.Decimal) rpc.AppSessionInfoV1 {
+	participants := make([]rpc.AppParticipantV1, len(session.Participants))
+	for i, p := range session.Participants {
+		participants[i] = rpc.AppParticipantV1{
+			WalletAddress:   p.WalletAddress,
+			SignatureWeight: p.SignatureWeight,
+		}
+	}
+
+	var sessionData *string
+	if session.SessionData != "" {
+		sessionData = &session.SessionData
+	}
+
+	// Convert allocations map to RPC format
+	rpcAllocations := []rpc.AppAllocationV1{}
+	for participant, assetMap := range allocations {
+		for asset, amount := range assetMap {
+			rpcAllocations = append(rpcAllocations, rpc.AppAllocationV1{
+				Participant: participant,
+				Asset:       asset,
+				Amount:      amount.String(),
+			})
+		}
+	}
+
+	return rpc.AppSessionInfoV1{
+		AppSessionID: session.SessionID,
+		Status:       session.Status.String(),
+		Participants: participants,
+		SessionData:  sessionData,
+		Quorum:       uint64(session.Quorum),
+		Version:      session.Version,
+		Nonce:        session.Nonce,
+		Allocations:  rpcAllocations,
+	}
+}
+
+func mapPaginationMetadataV1(meta core.PaginationMetadata) rpc.PaginationMetadataV1 {
+	return rpc.PaginationMetadataV1{
+		Page:       meta.Page,
+		PerPage:    meta.PerPage,
+		TotalCount: meta.TotalCount,
+		PageCount:  meta.PageCount,
+	}
+}

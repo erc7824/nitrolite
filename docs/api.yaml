@@ -249,34 +249,52 @@ types:
           type: string
           description: Amount already spent by this session key
 
-  - asset:
-      description: Information about a supported asset
+  - token:
+      description: Information about a supported token
       fields:
-        - name: token
+        - name: name
           type: string
-          description: Token contract address
-        - name: chain_id
-          type: integer
-          description: Blockchain network ID
+          description: Token name
         - name: symbol
           type: string
-          description: Asset symbol
+          description: Token symbol
+        - name: address
+          type: string
+          description: Token contract address
+        - name: blockchain_id
+          type: integer
+          description: Blockchain network ID
         - name: decimals
           type: integer
           description: Number of decimal places
 
+  - asset:
+      description: Information about a supported asset
+      fields:
+        - name: name
+          type: string
+          description: Asset name
+        - name: symbol
+          type: string
+          description: Asset symbol
+        - name: tokens
+          type: array
+          items:
+            type: token
+          description: Supported tokens for the asset
+
   - blockchain_info:
       description: Information about a supported network
       fields:
-        - name: chain_id
+        - name: name
+          type: string
+          description: Blockchain name
+        - name: blockchain_id
           type: integer
           description: Blockchain network ID
-        - name: custody_address
+        - name: contract_address
           type: string
-          description: Custody contract address on this network
-        - name: adjudicator_address
-          type: string
-          description: Adjudicator contract address on this network
+          description: Address of the main contract on this blockchain
 
   - balance_entry:
       description: Balance for a specific asset
@@ -643,6 +661,10 @@ api:
             - name: get_app_sessions
               description: List all application sessions for a participant with optional filtering
               request:
+                - field_name: app_session_id
+                  type: string
+                  description: Filter by application session ID
+                  optional: true
                 - field_name: participant
                   type: string
                   description: Filter by participant wallet address
@@ -838,6 +860,9 @@ api:
                 - field_name: node_address
                   type: string
                   description: Node wallet address
+                - field_name: node_version
+                  type: string
+                  description: Node software version
                 - field_name: blockchains
                   type: array
                   items:
@@ -845,7 +870,7 @@ api:
                   description: List of supported networks
               errors: []
             - name: get_assets
-              description: Retrieve all supported assets with optional chain filter
+              description: Retrieve all supported assets with optional blockchain filter
               request:
                 - field_name: chain_id
                   type: integer
@@ -856,5 +881,5 @@ api:
                   type: array
                   items:
                     type: asset
-                  description: List of supported assets
+                  description: List of supported assets (filtered by blockchain if chain_id is provided)
               errors: []

@@ -71,7 +71,7 @@ func TestClientV1_NodeV1GetConfig(t *testing.T) {
 	config := rpc.NodeV1GetConfigResponse{
 		NodeAddress: testWalletV1,
 		Blockchains: []rpc.BlockchainInfoV1{
-			{ChainID: testChainIDV1, ContractAddress: "0xContract"},
+			{BlockchainID: testChainIDV1, ContractAddress: "0xContract"},
 		},
 	}
 
@@ -89,41 +89,37 @@ func TestClientV1_NodeV1GetAssets(t *testing.T) {
 	client, dialer := setupClient()
 
 	assets := []rpc.AssetV1{
-		{Token: testTokenV1, ChainID: testChainIDV1, Symbol: testSymbolV1, Decimals: 6},
-		{Token: "0xETH", ChainID: testChainIDV1, Symbol: "ETH", Decimals: 18},
-		{Token: "0xDAI", ChainID: 2, Symbol: "DAI", Decimals: 18},
+		{
+			Name:   "USD Coin",
+			Symbol: testSymbolV1,
+			Tokens: []rpc.TokenV1{
+				{Name: "USDC on Ethereum", Symbol: testSymbolV1, Address: testTokenV1, BlockchainID: testChainIDV1, Decimals: 6},
+				{Name: "USDC on Polygon", Symbol: testSymbolV1, Address: "0xUSDC2", BlockchainID: 137, Decimals: 6},
+			},
+		},
+		{
+			Name:   "Ethereum",
+			Symbol: "ETH",
+			Tokens: []rpc.TokenV1{
+				{Name: "ETH on Ethereum", Symbol: "ETH", Address: "0xETH", BlockchainID: testChainIDV1, Decimals: 18},
+			},
+		},
+		{
+			Name:   "DAI",
+			Symbol: "DAI",
+			Tokens: []rpc.TokenV1{
+				{Name: "DAI on Polygon", Symbol: "DAI", Address: "0xDAI", BlockchainID: 137, Decimals: 18},
+			},
+		},
 	}
 
-	// Handler with filtering logic
-	dialer.RegisterHandler(rpc.Method("node.v1.get_assets"), func(params rpc.Payload, publish MockNotificationPublisher) (*rpc.Message, error) {
-		var req rpc.NodeV1GetAssetsRequest
-		params.Translate(&req)
+	registerSimpleHandlerV1(dialer, "node.v1.get_assets", rpc.NodeV1GetAssetsResponse{Assets: assets})
 
-		filtered := assets
-		if req.ChainID != nil {
-			var result []rpc.AssetV1
-			for _, a := range assets {
-				if a.ChainID == *req.ChainID {
-					result = append(result, a)
-				}
-			}
-			filtered = result
-		}
-
-		return createResponseV1("node.v1.get_assets", rpc.NodeV1GetAssetsResponse{Assets: filtered})
-	})
-
-	t.Run("no filter", func(t *testing.T) {
-		resp, err := client.NodeV1GetAssets(testCtxV1, rpc.NodeV1GetAssetsRequest{})
-		require.NoError(t, err)
-		assert.Len(t, resp.Assets, 3)
-	})
-
-	t.Run("with chain filter", func(t *testing.T) {
-		resp, err := client.NodeV1GetAssets(testCtxV1, rpc.NodeV1GetAssetsRequest{ChainID: &testChainIDV1})
-		require.NoError(t, err)
-		assert.Len(t, resp.Assets, 2)
-	})
+	resp, err := client.NodeV1GetAssets(testCtxV1, rpc.NodeV1GetAssetsRequest{})
+	require.NoError(t, err)
+	assert.Len(t, resp.Assets, 3)
+	assert.Equal(t, "USD Coin", resp.Assets[0].Name)
+	assert.Len(t, resp.Assets[0].Tokens, 2)
 }
 
 // ============================================================================

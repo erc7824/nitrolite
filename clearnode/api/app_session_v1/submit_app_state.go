@@ -55,7 +55,7 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 		if appSession == nil {
 			return rpc.Errorf("app session not found")
 		}
-		if appSession.IsClosed {
+		if appSession.Status == app.AppSessionStatusClosed {
 			return rpc.Errorf("app session is already closed")
 		}
 		if appStateUpd.Version != appSession.Version+1 {
@@ -102,7 +102,7 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 			if err := h.handleCloseIntent(ctx, tx, appStateUpd, currentAllocations, participantWeights); err != nil {
 				return err
 			}
-			appSession.IsClosed = true
+			appSession.Status = app.AppSessionStatusClosed
 		}
 
 		// Update app session version and data
@@ -120,7 +120,7 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 			"appSessionID", appSession.SessionID,
 			"appSessionVersion", appSession.Version,
 			"intent", appStateUpd.Intent.String(),
-			"isClosed", appSession.IsClosed)
+			"status", appSession.Status.String())
 
 		return nil
 	})
@@ -142,9 +142,6 @@ func (h *Handler) SubmitAppState(c *rpc.Context) {
 	}
 
 	c.Succeed(c.Request.Method, payload)
-	logger.Info("successfully processed app state update",
-		"appSessionID", reqPayload.AppStateUpdate.AppSessionID,
-		"intent", appStateUpd.Intent.String())
 }
 
 // handleOperateIntent processes operate intent by validating total allocations and recording ledger changes.

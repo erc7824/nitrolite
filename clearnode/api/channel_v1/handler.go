@@ -83,7 +83,7 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 		lastStateTransition = lastSignedState.GetLastTransition()
 	}
 
-	if !(lastStateTransition != nil && (lastStateTransition.Type == core.TransactionTypeMutualLock || lastStateTransition.Type == core.TransactionTypeEscrowLock)) {
+	if !(lastStateTransition != nil && (lastStateTransition.Type == core.TransitionTypeMutualLock || lastStateTransition.Type == core.TransitionTypeEscrowLock)) {
 		packedState, err := core.PackState(*newState)
 		if err != nil {
 			return nil, rpc.Errorf("failed to pack receiver state")

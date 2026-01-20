@@ -216,20 +216,34 @@ type SessionKeyV1 struct {
 
 // AssetV1 represents information about a supported asset.
 type AssetV1 struct {
-	// Token is the token contract address
-	Token string `json:"token"`
-	// ChainID is the blockchain network ID
-	ChainID uint32 `json:"chain_id"`
+	// Name is the asset name
+	Name string `json:"name"`
 	// Symbol is the asset symbol
 	Symbol string `json:"symbol"`
+	// Tokens is the list of supported tokens for the asset
+	Tokens []TokenV1 `json:"tokens"`
+}
+
+// TokenV1 represents information about a supported token.
+type TokenV1 struct {
+	// Name is the token name
+	Name string `json:"name"`
+	// Symbol is the token symbol
+	Symbol string `json:"symbol"`
+	// Address is the token contract address
+	Address string `json:"address"`
+	// BlockchainID is the blockchain network ID
+	BlockchainID uint32 `json:"blockchain_id"`
 	// Decimals is the number of decimal places
 	Decimals uint8 `json:"decimals"`
 }
 
 // BlockchainInfoV1 represents information about a supported network.
 type BlockchainInfoV1 struct {
-	// ChainID is the blockchain network ID
-	ChainID uint32 `json:"chain_id"`
+	// Name is the blockchain name
+	Name string `json:"name"`
+	// BlockchainID is the blockchain network ID
+	BlockchainID uint32 `json:"blockchain_id"`
 	// ContractAddress is the contract address on this network
 	ContractAddress string `json:"contract_address"`
 }

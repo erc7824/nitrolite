@@ -1,6 +1,6 @@
 # App Session V1 API Implementation
 
-This directory contains the V1 API handlers for app session management, implementing the `submit_deposit_state` and `create_app_session` endpoints.
+This directory contains the V1 API handlers for app session management, implementing the `create_app_session`, `submit_deposit_state`, `submit_app_state`, `get_app_sessions`, and `get_app_definition` endpoints.
 
 
 ## Architecture
@@ -14,6 +14,8 @@ This directory contains the V1 API handlers for app session management, implemen
   - `create_app_session.go` - Create app session endpoint
   - `submit_deposit_state.go` - Submit deposit state endpoint
   - `submit_app_state.go` - Submit app state endpoint (operate, withdraw, close)
+  - `get_app_sessions.go` - Get app sessions endpoint (with filtering)
+  - `get_app_definition.go` - Get app definition endpoint
   - `app_session.go` - Package documentation
 
 ### Business Logic Layer (`pkg/app`)
@@ -338,6 +340,120 @@ For withdraw and close intents, the handler issues new channel states to partici
 - Stores the new channel state
 - Records the release transaction
 
+### 4. `app_sessions.v1.get_app_sessions`
+
+**Purpose**: Retrieves application sessions with optional filtering by participant or app session ID. Includes participant allocations for each session.
+
+**Key Features**:
+- Query by app session ID or participant wallet address
+- Optional status filtering (open/closed)
+- Pagination support
+- Returns current allocations for each participant
+
+**Request**:
+```json
+{
+  "app_session_id": "0x...",  // Optional: filter by app session ID
+  // OR
+  "participant": "0x...",      // Optional: filter by participant wallet
+ 
+  "status": "open",            // Optional: filter by status (open/closed)
+  "pagination": {              // Optional: pagination parameters
+    "offset": 0,
+    "limit": 10,
+    "sort": "created_at DESC"
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "app_sessions": [
+    {
+      "app_session_id": "0x...",
+      "status": "open",
+      "participants": [
+        {
+          "wallet_address": "0x...",
+          "signature_weight": 1
+        }
+      ],
+      "quorum": 2,
+      "version": 3,
+      "nonce": 12345,
+      "session_data": "optional json string",
+      "allocations": [
+        {
+          "participant": "0x...",
+          "asset": "usdc",
+          "amount": "1000"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "page": 1,
+    "per_page": 10,
+    "total_count": 25,
+    "page_count": 3
+  }
+}
+```
+
+**Validation**:
+- At least one of `app_session_id` or `participant` must be provided
+- Status filter must be "open" or "closed" if provided
+- Pagination parameters are optional
+
+**Implementation Notes**:
+- Fetches allocations for each session using `GetParticipantAllocations`
+- Returns empty allocations array if no allocations exist
+- Status is converted to string representation ("open"/"closed")
+- SessionData is null if empty string
+
+### 5. `app_sessions.v1.get_app_definition`
+
+**Purpose**: Retrieves the application definition for a specific app session. Returns the immutable configuration established at session creation.
+
+**Key Features**:
+- Returns core session definition without state information
+- Includes participants, quorum, and nonce
+- Useful for signature verification and session validation
+
+**Request**:
+```json
+{
+  "app_session_id": "0x..."
+}
+```
+
+**Response**:
+```json
+{
+  "definition": {
+    "application": "game",
+    "participants": [
+      {
+        "wallet_address": "0x...",
+        "signature_weight": 1
+      }
+    ],
+    "quorum": 2,
+    "nonce": 12345
+  }
+}
+```
+
+**Validation**:
+- App session must exist
+- Returns error if session not found
+
+**Implementation Notes**:
+- Definition includes the immutable session parameters
+- Does not include dynamic state like version, status, or allocations
+- Nonce is from the session definition (not current version)
+
 ## Implementation Details
 
 ### Files
@@ -347,6 +463,8 @@ For withdraw and close intents, the handler issues new channel states to partici
 - `create_app_session.go` - Create app session endpoint handler
 - `submit_deposit_state.go` - Submit deposit state endpoint handler
 - `submit_app_state.go` - Submit app state endpoint handler (operate, withdraw, close)
+- `get_app_sessions.go` - Get app sessions endpoint handler (with filtering and pagination)
+- `get_app_definition.go` - Get app definition endpoint handler
 - `interface.go` - Store and signature validator interfaces
 - `utils.go` - Mapping functions between RPC and core types
 
@@ -398,7 +516,8 @@ The service requires an `Store` interface for persistence operations:
 type Store interface {
     // App session operations
     CreateAppSession(session app.AppSessionV1) error
-    GetAppSession(sessionID string, isClosed bool) (*app.AppSessionV1, error)
+    GetAppSession(sessionID string) (*app.AppSessionV1, error)
+    GetAppSessions(appSessionID *string, participant *string, status *string, params *core.PaginationParams) ([]app.AppSessionV1, core.PaginationMetadata, error)
     UpdateAppSession(session app.AppSessionV1) error
     GetAppSessionBalances(sessionID string) (map[string]decimal.Decimal, error)
     GetParticipantAllocations(sessionID string) (map[string]map[string]decimal.Decimal, error)
@@ -419,6 +538,9 @@ type Store interface {
 ```
 
 **Key Interface Notes:**
+- `GetAppSession`: Retrieves a single app session by ID (used by `get_app_definition` and `submit_app_state`)
+- `GetAppSessions`: Retrieves multiple app sessions with filtering and pagination (used by `get_app_sessions`)
+- `GetParticipantAllocations`: Returns current allocations per participant per asset (used by `get_app_sessions`)
 - `RecordTransaction`: Records channel state transactions (commit transitions from submit_deposit_state)
 - Channel state operations are needed because `submit_deposit_state` handles both channel and app session state
 
@@ -445,6 +567,8 @@ handler := app_session_v1.NewHandler(
 router.Register(rpc.AppSessionsV1CreateAppSessionMethod, handler.CreateAppSession)
 router.Register(rpc.AppSessionsV1SubmitDepositStateMethod, handler.SubmitDepositState)
 router.Register(rpc.AppSessionsV1SubmitAppStateMethod, handler.SubmitAppState)
+router.Register(rpc.AppSessionsV1GetAppSessionsMethod, handler.GetAppSessions)
+router.Register(rpc.AppSessionsV1GetAppDefinitionMethod, handler.GetAppDefinition)
 ```
 
 ## Key Implementation Decisions

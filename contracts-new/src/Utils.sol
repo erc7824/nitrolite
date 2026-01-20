@@ -14,6 +14,12 @@ library Utils {
         return keccak256(abi.encode(def));
     }
 
+    function getEscrowId(bytes32 channelId, CrossChainState memory ccs) internal pure returns (bytes32) {
+        // NOTE: `escrowId` is basically a hashed packed state, which equals to signed data in pre-EIP-191 signing.
+        // Should this invoke any problems, some text may be appended to the packed data to differentiate it, e.g. "escrow".
+        return keccak256(pack(ccs, channelId));
+    }
+
     // ========== Cross-Chain State ==========
 
     function pack(CrossChainState memory ccs, bytes32 channelId) internal pure returns (bytes memory) {

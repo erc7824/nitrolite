@@ -16,9 +16,18 @@ struct Definition {
 
 enum ChannelStatus {
     VOID,
+    MIGRATING_IN,
     OPERATING,
     DISPUTED,
-    CLOSED
+    CLOSED,
+    MIGRATED_OUT
+}
+
+enum EscrowStatus {
+    VOID,
+    INITIALIZED,
+    DISPUTED,
+    FINALIZED
 }
 
 enum StateIntent {
@@ -26,8 +35,13 @@ enum StateIntent {
     CREATE,
     CLOSE,
     DEPOSIT,
+    INITIATE_ESCROW_DEPOSIT,
+    FINALIZE_ESCROW_DEPOSIT,
     WITHDRAW,
-    MIGRATE_HOME,
+    INITIATE_ESCROW_WITHDRAWAL,
+    FINALIZE_ESCROW_WITHDRAWAL,
+    INITIATE_MIGRATION,
+    FINALIZE_MIGRATION,
     LOCK,
     UNLOCK
 }

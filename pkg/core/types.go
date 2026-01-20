@@ -423,7 +423,7 @@ func (state *State) ApplyFinalizeTransition() (Transition, error) {
 		return Transition{}, err
 	}
 
-	newTransition := NewTransition(TransitionTypeHomeDeposit, txID, accountID, amount)
+	newTransition := NewTransition(TransitionTypeFinalize, txID, accountID, amount)
 	state.Transitions = append(state.Transitions, *newTransition)
 
 	state.HomeLedger.UserNetFlow = state.HomeLedger.UserNetFlow.Sub(state.HomeLedger.UserBalance)

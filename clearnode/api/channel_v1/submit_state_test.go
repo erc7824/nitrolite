@@ -65,7 +65,6 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -102,7 +101,6 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -234,7 +232,6 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -398,7 +395,6 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 			NodeBalance:  decimal.NewFromInt(100),
 			NodeNetFlow:  decimal.NewFromInt(100),
 		},
-		IsFinal: false,
 		UserSig: stringPtr("0xPreviousUserSig"),
 		NodeSig: stringPtr("0xPreviousNodeSig"),
 	}
@@ -527,7 +523,6 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(500),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -649,7 +644,6 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(-100),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -773,7 +767,6 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -934,7 +927,6 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
-		IsFinal: false,
 		UserSig: stringPtr("0xPreviousUserSig"),
 		NodeSig: stringPtr("0xPreviousNodeSig"),
 	}
@@ -1048,7 +1040,6 @@ func toRPCState(state core.State) rpc.StateV1 {
 			NodeBalance:  state.HomeLedger.NodeBalance.String(),
 			NodeNetFlow:  state.HomeLedger.NodeNetFlow.String(),
 		},
-		IsFinal: state.IsFinal,
 		UserSig: state.UserSig,
 		NodeSig: state.NodeSig,
 	}

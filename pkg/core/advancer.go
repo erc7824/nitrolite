@@ -78,18 +78,10 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 	}
 
 	if transitionLenDiff == 0 {
-		if !proposedState.IsFinal {
-			return fmt.Errorf("no new transitions in non-final state")
-		}
-
-		expectedState.Finalize()
+		return fmt.Errorf("new state transition is expected")
 	}
 
 	if transitionLenDiff == 1 {
-		if proposedState.IsFinal {
-			return fmt.Errorf("cannot add new transitions to a final state")
-		}
-
 		newTransition := proposedState.Transitions[len(proposedState.Transitions)-1]
 		lastTransition := currentState.GetLastTransition()
 
@@ -139,6 +131,9 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 			}
 		case TransitionTypeMigrate:
 			_, err = expectedState.ApplyMigrateTransition(newTransition.Amount)
+		case TransitionTypeFinalize:
+			_, err = expectedState.ApplyFinalizeTransition()
+
 		default:
 			return fmt.Errorf("unsupported type for new transition: %d", newTransition.Type)
 		}
@@ -157,9 +152,6 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 	}
 	if err := proposedState.HomeLedger.Validate(); err != nil {
 		return fmt.Errorf("invalid home ledger: %w", err)
-	}
-	if proposedState.IsFinal && !expectedState.IsFinal {
-		return fmt.Errorf("expected state is not final but proposed state is final")
 	}
 
 	if (expectedState.EscrowChannelID == nil) != (proposedState.EscrowChannelID == nil) {

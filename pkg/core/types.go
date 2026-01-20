@@ -71,7 +71,6 @@ type State struct {
 	EscrowChannelID *string      `json:"escrow_channel_id,omitempty"` // Identifier for the escrow Channel ID
 	HomeLedger      Ledger       `json:"home_ledger"`                 // User and node balances for the home channel
 	EscrowLedger    *Ledger      `json:"escrow_ledger,omitempty"`     // User and node balances for the escrow channel
-	IsFinal         bool         `json:"is_final"`                    // Indicates if the state is final
 	UserSig         *string      `json:"user_sig,omitempty"`          // User signature for the state
 	NodeSig         *string      `json:"node_sig,omitempty"`          // Node signature for the state
 }
@@ -104,7 +103,7 @@ func (state State) GetLastTransition() *Transition {
 
 func (state State) NextState() *State {
 	var nextState *State
-	if state.IsFinal {
+	if state.IsFinal() {
 		nextState = &State{
 			Transitions:     []Transition{},
 			Asset:           state.Asset,
@@ -120,7 +119,6 @@ func (state State) NextState() *State {
 				NodeNetFlow: decimal.Zero,
 			},
 			EscrowLedger: nil,
-			IsFinal:      false,
 		}
 	} else {
 		nextState = &State{
@@ -133,17 +131,16 @@ func (state State) NextState() *State {
 			EscrowChannelID: state.EscrowChannelID,
 			HomeLedger:      state.HomeLedger,
 			EscrowLedger:    nil,
-			IsFinal:         false,
 		}
-		if state.EscrowLedger != nil {
-			nextState.EscrowLedger = &Ledger{
-				TokenAddress: state.EscrowLedger.TokenAddress,
-				BlockchainID: state.EscrowLedger.BlockchainID,
-				UserBalance:  state.EscrowLedger.UserBalance,
-				UserNetFlow:  state.EscrowLedger.UserNetFlow,
-				NodeBalance:  state.EscrowLedger.NodeBalance,
-				NodeNetFlow:  state.EscrowLedger.NodeNetFlow,
-			}
+	}
+	if state.EscrowLedger != nil {
+		nextState.EscrowLedger = &Ledger{
+			TokenAddress: state.EscrowLedger.TokenAddress,
+			BlockchainID: state.EscrowLedger.BlockchainID,
+			UserBalance:  state.EscrowLedger.UserBalance,
+			UserNetFlow:  state.EscrowLedger.UserNetFlow,
+			NodeBalance:  state.EscrowLedger.NodeBalance,
+			NodeNetFlow:  state.EscrowLedger.NodeNetFlow,
 		}
 
 		if state.UserSig == nil {
@@ -159,11 +156,11 @@ func (state State) NextState() *State {
 	return nextState
 }
 
-func (state *State) Finalize() {
-	state.IsFinal = true
-
-	state.HomeLedger.UserNetFlow = state.HomeLedger.UserNetFlow.Sub(state.HomeLedger.UserBalance)
-	state.HomeLedger.UserBalance = decimal.Zero
+func (state *State) IsFinal() bool {
+	if state.GetLastTransition() != nil && state.GetLastTransition().Type == TransitionTypeFinalize {
+		return true
+	}
+	return false
 }
 
 func (state *State) ApplyReceiverTransitions(transitions ...Transition) error {
@@ -414,6 +411,27 @@ func (state *State) ApplyMigrateTransition(amount decimal.Decimal) (Transition, 
 	return Transition{}, fmt.Errorf("migrate transition not implemented yet")
 }
 
+func (state *State) ApplyFinalizeTransition() (Transition, error) {
+	if state.HomeChannelID == nil {
+		return Transition{}, fmt.Errorf("missing home channel ID")
+	}
+
+	accountID := *state.HomeChannelID
+	amount := state.HomeLedger.UserBalance
+	txID, err := GetSenderTransactionID(accountID, state.ID)
+	if err != nil {
+		return Transition{}, err
+	}
+
+	newTransition := NewTransition(TransitionTypeHomeDeposit, txID, accountID, amount)
+	state.Transitions = append(state.Transitions, *newTransition)
+
+	state.HomeLedger.UserNetFlow = state.HomeLedger.UserNetFlow.Sub(state.HomeLedger.UserBalance)
+	state.HomeLedger.UserBalance = decimal.Zero
+
+	return *newTransition, nil
+}
+
 // Ledger represents ledger balances
 type Ledger struct {
 	TokenAddress string          `json:"token_address"` // Address of the token used in this channel
@@ -486,6 +504,8 @@ const (
 	TransactionTypeMigrate    TransactionType = 100
 	TransactionTypeEscrowLock TransactionType = 110
 	TransactionTypeMutualLock TransactionType = 120
+
+	TransactionTypeFinalize = 200
 )
 
 // String returns the human-readable name of the transaction type
@@ -511,6 +531,8 @@ func (t TransactionType) String() string {
 		return "escrow_withdraw"
 	case TransactionTypeMigrate:
 		return "migrate"
+	case TransactionTypeFinalize:
+		return "finalize"
 	default:
 		return "unknown"
 	}
@@ -650,7 +672,10 @@ func NewTransactionFromTransition(senderState *State, receiverState *State, tran
 		txType = TransactionTypeMigrate
 		fromAccount = *senderState.HomeChannelID
 		toAccount = *senderState.EscrowChannelID
-
+	case TransitionTypeFinalize:
+		txType = TransactionTypeFinalize
+		fromAccount = senderState.UserWallet
+		toAccount = *senderState.HomeChannelID
 	default:
 		return nil, fmt.Errorf("invalid transition type")
 	}
@@ -699,6 +724,8 @@ const (
 	TransitionTypeMigrate    = 100 // AccountID: EscrowChannelID
 	TransitionTypeEscrowLock = 110 // AccountID: EscrowChannelID
 	TransitionTypeMutualLock = 120 // AccountID: EscrowChannelID
+
+	TransitionTypeFinalize = 200
 )
 
 // String returns the human-readable name of the transition type
@@ -726,6 +753,8 @@ func (t TransitionType) String() string {
 		return "escrow_withdraw"
 	case TransitionTypeMigrate:
 		return "migrate"
+	case TransitionTypeFinalize:
+		return "finalize"
 	default:
 		return "unknown"
 	}

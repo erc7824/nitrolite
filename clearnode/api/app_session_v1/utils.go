@@ -76,7 +76,6 @@ func unmapStateV1(state rpc.StateV1) (core.State, error) {
 		EscrowChannelID: state.EscrowChannelID,
 		HomeLedger:      *homeLedger,
 		EscrowLedger:    escrowLedger,
-		IsFinal:         state.IsFinal,
 		UserSig:         state.UserSig,
 		NodeSig:         state.NodeSig,
 	}, nil

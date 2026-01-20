@@ -472,20 +472,20 @@ func (l Ledger) Validate() error {
 type TransactionType uint8
 
 const (
-	TransactionTypeHomeDeposit    = 10
-	TransactionTypeHomeWithdrawal = 11
+	TransactionTypeHomeDeposit    TransactionType = 10
+	TransactionTypeHomeWithdrawal TransactionType = 11
 
-	TransactionTypeEscrowDeposit  = 20
-	TransactionTypeEscrowWithdraw = 21
+	TransactionTypeEscrowDeposit  TransactionType = 20
+	TransactionTypeEscrowWithdraw TransactionType = 21
 
 	TransactionTypeTransfer TransactionType = 30
 
-	TransactionTypeCommit  = 40
-	TransactionTypeRelease = 41
+	TransactionTypeCommit  TransactionType = 40
+	TransactionTypeRelease TransactionType = 41
 
-	TransactionTypeMigrate    = 100
-	TransactionTypeEscrowLock = 110
-	TransactionTypeMutualLock = 120
+	TransactionTypeMigrate    TransactionType = 100
+	TransactionTypeEscrowLock TransactionType = 110
+	TransactionTypeMutualLock TransactionType = 120
 )
 
 // String returns the human-readable name of the transaction type
@@ -611,12 +611,12 @@ func NewTransactionFromTransition(senderState *State, receiverState *State, tran
 		fromAccount = senderState.UserWallet
 		toAccount = transition.AccountID
 
-	case TransactionTypeCommit:
+	case TransitionTypeCommit:
 		txType = TransactionTypeCommit
 		fromAccount = senderState.UserWallet
 		toAccount = transition.AccountID
 
-	case TransactionTypeRelease:
+	case TransitionTypeRelease:
 		txType = TransactionTypeRelease
 		fromAccount = transition.AccountID
 		toAccount = receiverState.UserWallet
@@ -786,12 +786,27 @@ func (t1 Transition) Equal(t2 Transition) error {
 	return nil
 }
 
+// Blockchain represents information about a supported blockchain network
+type Blockchain struct {
+	Name            string `json:"name"`             // Blockchain name
+	ID              uint32 `json:"id"`               // Blockchain network ID
+	ContractAddress string `json:"contract_address"` // Address of the main contract on this blockchain
+}
+
 // Asset represents information about a supported asset
 type Asset struct {
-	Token    string `json:"token"`    // Token contract address
-	ChainID  uint64 `json:"chain_id"` // Blockchain network ID
-	Symbol   string `json:"symbol"`   // Asset symbol
-	Decimals uint64 `json:"decimals"` // Number of decimal places
+	Name   string  `json:"name"`   // Asset name
+	Symbol string  `json:"symbol"` // Asset symbol
+	Tokens []Token `json:"tokens"` // Supported tokens for the asset
+}
+
+// Token represents information about a supported token
+type Token struct {
+	Name         string `json:"name"`          // Token name
+	Symbol       string `json:"symbol"`        // Token symbol
+	Address      string `json:"address"`       // Token contract address
+	BlockchainID uint32 `json:"blockchain_id"` // Blockchain network ID
+	Decimals     uint8  `json:"decimals"`      // Number of decimal places
 }
 
 // SessionKey represents a session key with spending allowances
@@ -836,4 +851,27 @@ type EscrowWithdrawalDataResponse struct {
 	Definition ChannelDefinition `json:"definition"`
 	Node       string            `json:"node"`
 	LastState  State             `json:"last_state"`
+}
+
+// ========= Storage Related Types =========
+
+// BalanceEntry represents a balance entry for an asset
+type BalanceEntry struct {
+	Asset   string          `json:"asset"`   // Asset symbol
+	Balance decimal.Decimal `json:"balance"` // Balance amount
+}
+
+// PaginationParams provides pagination configuration for getters
+type PaginationParams struct {
+	Offset *uint32
+	Limit  *uint32
+	Sort   *string
+}
+
+// PaginationMetadata contains pagination information for list responses.
+type PaginationMetadata struct {
+	Page       uint32 `json:"page"`        // Current page number
+	PerPage    uint32 `json:"per_page"`    // Number of items per page
+	TotalCount uint32 `json:"total_count"` // Total number of items
+	PageCount  uint32 `json:"page_count"`  // Total number of pages
 }

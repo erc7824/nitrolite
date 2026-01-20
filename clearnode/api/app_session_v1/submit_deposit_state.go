@@ -106,7 +106,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 		if appSession == nil {
 			return rpc.Errorf("app session not found")
 		}
-		if appSession.IsClosed {
+		if appSession.Status == app.AppSessionStatusClosed {
 			return rpc.Errorf("app session is already closed")
 		}
 		if appStateUpd.Version != appSession.Version+1 {

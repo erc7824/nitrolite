@@ -44,7 +44,7 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 			{WalletAddress: participant2, SignatureWeight: 5},
 		},
 		Quorum:      5,
-		IsClosed:    false,
+		Status:      app.AppSessionStatusOpen,
 		Version:     1,
 		SessionData: `{"state":"initial"}`,
 	}
@@ -82,7 +82,7 @@ func TestSubmitAppState_OperateIntent_NoRedistribution_Success(t *testing.T) {
 	mockStore.On("GetAppSessionBalances", appSessionID).Return(sessionBalances, nil)
 	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil)
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
-		return session.Version == 2 && session.SessionData == `{"state":"updated"}` && !session.IsClosed
+		return session.Version == 2 && session.SessionData == `{"state":"updated"}` && session.Status == app.AppSessionStatusOpen
 	})).Return(nil)
 
 	// Create RPC context
@@ -139,7 +139,7 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 			{WalletAddress: participant2, SignatureWeight: 5},
 		},
 		Quorum:      5,
-		IsClosed:    false,
+		Status:      app.AppSessionStatusOpen,
 		Version:     1,
 		SessionData: "",
 	}
@@ -182,7 +182,7 @@ func TestSubmitAppState_OperateIntent_WithRedistribution_Success(t *testing.T) {
 	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(-25), (*string)(nil)).Return(nil).Once()
 	mockStore.On("RecordLedgerEntry", appSessionID, "USDC", decimal.NewFromInt(25), (*string)(nil)).Return(nil).Once()
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
-		return session.Version == 2 && !session.IsClosed
+		return session.Version == 2 && session.Status == app.AppSessionStatusOpen
 	})).Return(nil)
 
 	// Create RPC context
@@ -238,7 +238,7 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 			{WalletAddress: participant1, SignatureWeight: 10},
 		},
 		Quorum:      10,
-		IsClosed:    false,
+		Status:      app.AppSessionStatusOpen,
 		Version:     1,
 		SessionData: "",
 	}
@@ -275,7 +275,7 @@ func TestSubmitAppState_WithdrawIntent_Success(t *testing.T) {
 	mockStore.On("StoreUserState", mock.Anything).Return(nil)
 
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
-		return session.Version == 2 && !session.IsClosed
+		return session.Version == 2 && session.Status == app.AppSessionStatusOpen
 	})).Return(nil)
 
 	// Create RPC context
@@ -333,7 +333,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 			{WalletAddress: participant2, SignatureWeight: 5},
 		},
 		Quorum:      5,
-		IsClosed:    false,
+		Status:      app.AppSessionStatusOpen,
 		Version:     1,
 		SessionData: "",
 	}
@@ -381,7 +381,7 @@ func TestSubmitAppState_CloseIntent_Success(t *testing.T) {
 	mockStore.On("StoreUserState", mock.Anything).Return(nil).Once()
 
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {
-		return session.Version == 2 && session.IsClosed
+		return session.Version == 2 && session.Status == app.AppSessionStatusClosed
 	})).Return(nil)
 
 	// Create RPC context
@@ -436,7 +436,7 @@ func TestSubmitAppState_CloseIntent_AllocationMismatch_Rejected(t *testing.T) {
 			{WalletAddress: participant1, SignatureWeight: 10},
 		},
 		Quorum:      10,
-		IsClosed:    false,
+		Status:      app.AppSessionStatusOpen,
 		Version:     1,
 		SessionData: "",
 	}
@@ -518,7 +518,7 @@ func TestSubmitAppState_OperateIntent_MissingAllocation_Rejected(t *testing.T) {
 			{WalletAddress: participant2, SignatureWeight: 5},
 		},
 		Quorum:      5,
-		IsClosed:    false,
+		Status:      app.AppSessionStatusOpen,
 		Version:     1,
 		SessionData: "",
 	}
@@ -610,7 +610,7 @@ func TestSubmitAppState_WithdrawIntent_MissingAllocation_Rejected(t *testing.T) 
 			{WalletAddress: participant1, SignatureWeight: 10},
 		},
 		Quorum:      10,
-		IsClosed:    false,
+		Status:      app.AppSessionStatusOpen,
 		Version:     1,
 		SessionData: "",
 	}
@@ -740,7 +740,7 @@ func TestSubmitAppState_ClosedSession_Rejected(t *testing.T) {
 
 	existingSession := &app.AppSessionV1{
 		SessionID: appSessionID,
-		IsClosed:  true, // Already closed
+		Status:    app.AppSessionStatusClosed, // Already closed
 		Version:   1,
 	}
 
@@ -799,7 +799,7 @@ func TestSubmitAppState_InvalidVersion_Rejected(t *testing.T) {
 
 	existingSession := &app.AppSessionV1{
 		SessionID: appSessionID,
-		IsClosed:  false,
+		Status:    app.AppSessionStatusOpen,
 		Version:   5, // Current version is 5
 	}
 

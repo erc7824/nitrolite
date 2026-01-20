@@ -30,6 +30,18 @@ func (m *MockStore) GetAppSession(sessionID string) (*app.AppSessionV1, error) {
 	return args.Get(0).(*app.AppSessionV1), args.Error(1)
 }
 
+func (m *MockStore) GetAppSessions(appSessionID *string, participant *string, status *string, pagination *core.PaginationParams) ([]app.AppSessionV1, core.PaginationMetadata, error) {
+	args := m.Called(appSessionID, participant, status, pagination)
+	if args.Get(0) == nil {
+		return nil, core.PaginationMetadata{}, args.Error(2)
+	}
+	var metadata core.PaginationMetadata
+	if args.Get(1) != nil {
+		metadata = args.Get(1).(core.PaginationMetadata)
+	}
+	return args.Get(0).([]app.AppSessionV1), metadata, args.Error(2)
+}
+
 func (m *MockStore) UpdateAppSession(session app.AppSessionV1) error {
 	args := m.Called(session)
 	return args.Error(0)

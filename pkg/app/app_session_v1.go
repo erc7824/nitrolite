@@ -34,6 +34,27 @@ func (intent AppStateUpdateIntent) String() string {
 	}
 }
 
+type AppSessionStatus uint8
+
+const (
+	AppSessionStatusVoid AppSessionStatus = iota
+	AppSessionStatusOpen
+	AppSessionStatusClosed
+)
+
+func (status AppSessionStatus) String() string {
+	switch status {
+	case AppSessionStatusVoid:
+		return ""
+	case AppSessionStatusOpen:
+		return "open"
+	case AppSessionStatusClosed:
+		return "closed"
+	default:
+		return "unknown"
+	}
+}
+
 // AppSessionV1 represents an application session in the V1 API.
 type AppSessionV1 struct {
 	SessionID    string
@@ -41,7 +62,7 @@ type AppSessionV1 struct {
 	Participants []AppParticipantV1
 	Quorum       uint8
 	Nonce        uint64
-	IsClosed     bool
+	Status       AppSessionStatus
 	Version      uint64
 	SessionData  string
 	CreatedAt    time.Time

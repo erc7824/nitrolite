@@ -11,6 +11,7 @@ type Store interface {
 	// App session operations
 	CreateAppSession(session app.AppSessionV1) error
 	GetAppSession(sessionID string) (*app.AppSessionV1, error)
+	GetAppSessions(appSessionID *string, participant *string, status *string, pagination *core.PaginationParams) ([]app.AppSessionV1, core.PaginationMetadata, error)
 	UpdateAppSession(session app.AppSessionV1) error
 	GetAppSessionBalances(sessionID string) (map[string]decimal.Decimal, error)
 	GetParticipantAllocations(sessionID string) (map[string]map[string]decimal.Decimal, error)

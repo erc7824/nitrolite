@@ -60,7 +60,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 		},
 		Quorum:      1,
 		Nonce:       12345,
-		IsClosed:    false,
+		Status:      app.AppSessionStatusOpen,
 		Version:     1,
 		SessionData: "",
 		CreatedAt:   time.Now(),
@@ -383,10 +383,10 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 				SignatureWeight: 1,
 			},
 		},
-		Quorum:   2, // Need both signatures
-		Nonce:    12345,
-		IsClosed: false,
-		Version:  1,
+		Quorum:  2, // Need both signatures
+		Nonce:   12345,
+		Status:  app.AppSessionStatusOpen,
+		Version: 1,
 	}
 
 	// Create user state

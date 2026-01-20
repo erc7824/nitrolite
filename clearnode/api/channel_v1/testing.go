@@ -43,8 +43,8 @@ func (m *MockStore) EnsureNoOngoingStateTransitions(wallet, asset string) error 
 	return args.Error(0)
 }
 
-func (m *MockStore) ScheduleInitiateEscrowWithdrawal(state core.State) error {
-	args := m.Called(state)
+func (m *MockStore) ScheduleInitiateEscrowWithdrawal(stateID string) error {
+	args := m.Called(stateID)
 	return args.Error(0)
 }
 

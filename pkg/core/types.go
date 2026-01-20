@@ -25,16 +25,17 @@ var (
 
 // Channel represents an on-chain channel
 type Channel struct {
-	ChannelID    string        `json:"channel_id"`    // Unique identifier for the channel
-	UserWallet   string        `json:"user_wallet"`   // User wallet address
-	NodeWallet   string        `json:"node_wallet"`   // Node wallet address
-	Type         ChannelType   `json:"type"`          // Type of the channel (home, escrow)
-	BlockchainID uint32        `json:"blockchain_id"` // Unique identifier for the blockchain
-	TokenAddress string        `json:"token_address"` // Address of the token used in the channel
-	Challenge    uint64        `json:"challenge"`     // Challenge period for the channel in seconds
-	Nonce        uint64        `json:"nonce"`         // Nonce for the channel
-	Status       ChannelStatus `json:"status"`        // Current status of the channel (void, open, challenged, closed)
-	StateVersion uint64        `json:"state_version"` // On-chain state version of the channel
+	ChannelID          string        `json:"channel_id"`                     // Unique identifier for the channel
+	UserWallet         string        `json:"user_wallet"`                    // User wallet address
+	NodeWallet         string        `json:"node_wallet"`                    // Node wallet address
+	Type               ChannelType   `json:"type"`                           // Type of the channel (home, escrow)
+	BlockchainID       uint32        `json:"blockchain_id"`                  // Unique identifier for the blockchain
+	TokenAddress       string        `json:"token_address"`                  // Address of the token used in the channel
+	Challenge          uint64        `json:"challenge"`                      // Challenge period for the channel in seconds
+	ChallengeExpiresAt *time.Time    `json:"challenge_expires_at,omitempty"` // Timestamp when the challenge period elapses
+	Nonce              uint64        `json:"nonce"`                          // Nonce for the channel
+	Status             ChannelStatus `json:"status"`                         // Current status of the channel (void, open, challenged, closed)
+	StateVersion       uint64        `json:"state_version"`                  // On-chain state version of the channel
 }
 
 func NewChannel(channelID, userWallet, nodeWallet string, ChType ChannelType, blockchainID uint32, tokenAddress string, nonce, challenge uint64) *Channel {

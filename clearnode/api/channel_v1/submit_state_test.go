@@ -280,10 +280,8 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 			channel.UserWallet == userWallet &&
 			channel.NodeWallet == nodeAddress
 	})).Return(nil)
-	mockTxStore.On("ScheduleInitiateEscrowWithdrawal", mock.MatchedBy(func(state core.State) bool {
-		return state.UserWallet == userWallet &&
-			state.Version == incomingState.Version &&
-			state.NodeSig != nil // Handler will have signed it by this point
+	mockTxStore.On("ScheduleInitiateEscrowWithdrawal", mock.MatchedBy(func(stateID string) bool {
+		return stateID == incomingState.ID
 	})).Return(nil)
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
 		return tx.TxType == core.TransactionTypeEscrowLock &&

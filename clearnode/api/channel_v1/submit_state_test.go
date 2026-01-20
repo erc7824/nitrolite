@@ -65,7 +65,6 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -102,7 +101,6 @@ func TestSubmitState_TransferSend_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -234,7 +232,6 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -398,7 +395,6 @@ func TestSubmitState_EscrowWithdraw_Success(t *testing.T) {
 			NodeBalance:  decimal.NewFromInt(100),
 			NodeNetFlow:  decimal.NewFromInt(100),
 		},
-		IsFinal: false,
 		UserSig: stringPtr("0xPreviousUserSig"),
 		NodeSig: stringPtr("0xPreviousNodeSig"),
 	}
@@ -527,7 +523,6 @@ func TestSubmitState_HomeDeposit_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(500),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -649,7 +644,6 @@ func TestSubmitState_HomeWithdrawal_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(-100),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -773,7 +767,6 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -934,7 +927,6 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
-		IsFinal: false,
 		UserSig: stringPtr("0xPreviousUserSig"),
 		NodeSig: stringPtr("0xPreviousNodeSig"),
 	}
@@ -1014,6 +1006,134 @@ func TestSubmitState_EscrowDeposit_Success(t *testing.T) {
 	mockSigValidator.AssertExpectations(t)
 }
 
+func TestSubmitState_Finalize_Success(t *testing.T) {
+	// Setup
+	mockTxStore := new(MockStore)
+	mockSigner := NewMockSigner()
+	mockSigValidator := new(MockSigValidator)
+	nodeAddress := mockSigner.PublicKey().Address().String()
+	minChallenge := uint64(3600)
+
+	handler := &Handler{
+		stateAdvancer: core.NewStateAdvancerV1(),
+		useStoreInTx: func(handler StoreTxHandler) error {
+			err := handler(mockTxStore)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+		signer:       mockSigner,
+		nodeAddress:  nodeAddress,
+		minChallenge: minChallenge,
+		sigValidators: map[SigValidatorType]SigValidator{
+			EcdsaSigValidatorType: mockSigValidator,
+		},
+	}
+
+	// Test data
+	userWallet := "0x1234567890123456789012345678901234567890"
+	asset := "USDC"
+	homeChannelID := "0xHomeChannel123"
+	userBalance := decimal.NewFromInt(300)
+
+	// Create user's current state (with existing home channel and balance)
+	currentState := core.State{
+		ID:            core.GetStateID(userWallet, asset, 1, 1),
+		Transitions:   []core.Transition{},
+		Asset:         asset,
+		UserWallet:    userWallet,
+		Epoch:         1,
+		Version:       1,
+		HomeChannelID: &homeChannelID,
+		HomeLedger: core.Ledger{
+			TokenAddress: "0xTokenAddress",
+			BlockchainID: 1,
+			UserBalance:  userBalance,
+			UserNetFlow:  userBalance,
+			NodeBalance:  decimal.NewFromInt(0),
+			NodeNetFlow:  decimal.NewFromInt(0),
+		},
+		EscrowLedger: nil,
+		UserSig:      nil,
+		NodeSig:      nil,
+	}
+
+	// Create incoming state with finalize transition
+	incomingState := currentState.NextState()
+
+	// Apply the finalize transition to update balances
+	finalizeTransition, err := incomingState.ApplyFinalizeTransition()
+	require.NoError(t, err)
+
+	// Sign the incoming state with user's signature
+	userKey, _ := crypto.GenerateKey()
+	packedState, _ := core.PackState(*incomingState)
+	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedState).Bytes(), userKey)
+	userSigHex := hexutil.Encode(userSigBytes)
+	incomingState.UserSig = &userSigHex
+
+	// Mock expectations
+	mockTxStore.On("CheckOpenChannel", userWallet, asset).Return(true, nil)
+	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(currentState, nil)
+	mockTxStore.On("EnsureNoOngoingStateTransitions", userWallet, asset).Return(nil)
+	mockSigValidator.On("Verify", userWallet, packedState, userSigBytes).Return(nil)
+	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
+		return tx.TxType == core.TransactionTypeFinalize &&
+			tx.FromAccount == userWallet &&
+			tx.ToAccount == homeChannelID &&
+			tx.Amount.Equal(userBalance)
+	})).Return(nil)
+	mockTxStore.On("StoreUserState", mock.MatchedBy(func(state core.State) bool {
+		return state.UserWallet == userWallet &&
+			state.Version == incomingState.Version &&
+			len(state.Transitions) == 1 &&
+			state.Transitions[0].Type == core.TransitionTypeFinalize &&
+			state.Transitions[0].Amount.Equal(userBalance) &&
+			state.HomeLedger.UserBalance.IsZero() &&
+			state.NodeSig != nil
+	})).Return(nil)
+
+	// Create RPC request
+	rpcState := toRPCState(*incomingState)
+	reqPayload := rpc.ChannelsV1SubmitStateRequest{
+		State: rpcState,
+	}
+	payload, err := rpc.NewPayload(reqPayload)
+	require.NoError(t, err)
+
+	rpcRequest := rpc.Message{
+		Method:  "channels.v1.submit_state",
+		Payload: payload,
+	}
+
+	ctx := &rpc.Context{
+		Context: context.Background(),
+		Request: rpcRequest,
+	}
+
+	// Execute
+	handler.SubmitState(ctx)
+
+	// Assert
+	assert.NotNil(t, ctx.Response.Payload)
+
+	var response rpc.ChannelsV1SubmitStateResponse
+	err = ctx.Response.Payload.Translate(&response)
+	require.NoError(t, err)
+	assert.Nil(t, ctx.Response.Error())
+	assert.NotEmpty(t, response.Signature, "Node signature should be present")
+
+	// Verify all mock expectations
+	mockTxStore.AssertExpectations(t)
+	mockSigValidator.AssertExpectations(t)
+
+	// Additional assertions specific to finalize transition
+	assert.True(t, incomingState.IsFinal(), "State should be marked as final")
+	assert.True(t, incomingState.HomeLedger.UserBalance.IsZero(), "User balance should be zero after finalize")
+	assert.Equal(t, userBalance, finalizeTransition.Amount, "Finalize amount should equal the original user balance")
+}
+
 // Helper function to create a string pointer
 func stringPtr(s string) *string {
 	return &s
@@ -1048,7 +1168,6 @@ func toRPCState(state core.State) rpc.StateV1 {
 			NodeBalance:  state.HomeLedger.NodeBalance.String(),
 			NodeNetFlow:  state.HomeLedger.NodeNetFlow.String(),
 		},
-		IsFinal: state.IsFinal,
 		UserSig: state.UserSig,
 		NodeSig: state.NodeSig,
 	}

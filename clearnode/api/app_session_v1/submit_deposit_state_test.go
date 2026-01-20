@@ -85,7 +85,6 @@ func TestSubmitDepositState_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      nil,
 		NodeSig:      nil,
 	}
@@ -267,7 +266,6 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(-100),
 		},
-		IsFinal: false,
 	}
 
 	// Sign the user state
@@ -406,7 +404,6 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 			NodeBalance:  decimal.NewFromInt(0),
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
-		IsFinal: false,
 	}
 
 	incomingUserState := currentUserState.NextState()

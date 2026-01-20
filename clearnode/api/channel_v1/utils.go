@@ -58,7 +58,6 @@ func toCoreState(state rpc.StateV1) (core.State, error) {
 		EscrowChannelID: state.EscrowChannelID,
 		HomeLedger:      *homeLedger,
 		EscrowLedger:    escrowLedger,
-		IsFinal:         state.IsFinal,
 		UserSig:         state.UserSig,
 		NodeSig:         state.NodeSig,
 	}, nil
@@ -205,7 +204,6 @@ func coreStateToRPC(state core.State) rpc.StateV1 {
 		EscrowChannelID: state.EscrowChannelID,
 		HomeLedger:      homeLedger,
 		EscrowLedger:    escrowLedger,
-		IsFinal:         state.IsFinal,
 		UserSig:         state.UserSig,
 		NodeSig:         state.NodeSig,
 	}

@@ -59,7 +59,6 @@ func TestGetLatestState_Success(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      stringPtr("0xUserSig"),
 		NodeSig:      stringPtr("0xNodeSig"),
 	}
@@ -156,7 +155,6 @@ func TestGetLatestState_OnlySigned(t *testing.T) {
 			NodeNetFlow:  decimal.NewFromInt(0),
 		},
 		EscrowLedger: nil,
-		IsFinal:      false,
 		UserSig:      stringPtr("0xUserSig"),
 		NodeSig:      stringPtr("0xNodeSig"),
 	}

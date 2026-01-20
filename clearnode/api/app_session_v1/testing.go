@@ -168,7 +168,6 @@ func toRPCState(state core.State) rpc.StateV1 {
 			NodeBalance:  state.HomeLedger.NodeBalance.String(),
 			NodeNetFlow:  state.HomeLedger.NodeNetFlow.String(),
 		},
-		IsFinal: state.IsFinal,
 		UserSig: state.UserSig,
 		NodeSig: state.NodeSig,
 	}

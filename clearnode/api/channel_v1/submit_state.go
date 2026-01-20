@@ -183,6 +183,11 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 					return rpc.Errorf("failed to issue an extra state: %v", err)
 				}
 				logger.Info("extra state issued", "userID", extraState.UserWallet, "asset", extraState.Asset, "version", extraState.Version)
+			case core.TransitionTypeFinalize:
+				transaction, err = core.NewTransactionFromTransition(&incomingState, nil, *incomingTransition)
+				if err != nil {
+					return rpc.Errorf("failed to create transaction: %v", err)
+				}
 			case core.TransitionTypeMigrate:
 				return rpc.Errorf("transition is not supported yet")
 				// extraState, err := h.issueExtraState(ctx, tx, incomingState)

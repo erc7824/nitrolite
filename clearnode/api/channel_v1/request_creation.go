@@ -70,10 +70,11 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		}
 
 		if currentState.HomeChannelID != nil {
-			if !currentState.IsFinal {
+			isFinal := currentState.IsFinal()
+			if !isFinal {
 				return rpc.Errorf("channel is already initialized")
 			}
-			if currentState.IsFinal && *incomingState.HomeChannelID == *currentState.HomeChannelID {
+			if isFinal && *incomingState.HomeChannelID == *currentState.HomeChannelID {
 				return rpc.Errorf("cannot use same home channel id")
 			}
 		}

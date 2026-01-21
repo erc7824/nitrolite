@@ -349,7 +349,7 @@ For withdraw and close intents, the handler issues new channel states to partici
 **Purpose**: Processes multi-session rebalancing operations atomically. Rebalancing redistributes funds across multiple app sessions in a single atomic operation, potentially involving multiple assets.
 
 **Use Cases**:
-- **Liquidity Management**: Redistribute liquidity from low-activity sessions to high-activity sessions
+- **Liquidity Management**: Redistribute liquidity among sessions
 - **Portfolio Rebalancing**: Adjust allocations across multiple gaming sessions or trading positions
 - **Cross-Session Settlements**: Settle obligations between multiple app sessions atomically
 - **Session Consolidation**: Move funds from multiple sessions into fewer sessions for efficiency
@@ -545,24 +545,6 @@ ORDER BY created_at DESC;
 | Funds Source | User channel | Session | Within session | Session to users | **Session to session** |
 | Transaction Count | 1 | N | 0 | N | **N × M (sessions × assets)** |
 | Atomicity | Single session | Single session | Single session | Single session | **Cross-session** |
-
-**Error Handling**:
-
-*Validation Errors:*
-- `invalid_intent`: One or more updates don't have "rebalance" intent
-- `quorum_not_met`: Insufficient signatures for one or more sessions
-- `invalid_version`: Session version mismatch
-- `insufficient_sessions`: Less than 2 sessions provided
-- `duplicate_session`: Same session appears multiple times
-
-*Conservation Errors:*
-- `conservation_violation`: Sum of balance changes is not zero for one or more assets
-- `insufficient_balance`: A session would go negative after rebalance
-
-*State Errors:*
-- `app_session_not_found`: One or more sessions don't exist
-- `app_session_closed`: One or more sessions are already closed
-- `invalid_allocations`: New allocations don't match session participants
 
 **Security Considerations**:
 1. **Signature Verification**: Each session's signatures are independently verified against its quorum requirements

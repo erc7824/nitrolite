@@ -58,7 +58,7 @@ func TestCreateAppSession_Success(t *testing.T) {
 			Quorum: 1, // Only need 1 signature
 			Nonce:  12345,
 		},
-		Signatures: []string{
+		QuorumSigs: []string{
 			"0x1234567890abcdef", // Mock signature from participant1
 		},
 		SessionData: `{"test": "data"}`,
@@ -157,7 +157,7 @@ func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 			Quorum: 3, // Need total weight of 3
 			Nonce:  12345,
 		},
-		Signatures: []string{
+		QuorumSigs: []string{
 			"0x1234", // participant1 (weight 2)
 			"0x5678", // participant2 (weight 1)
 		},
@@ -236,7 +236,7 @@ func TestCreateAppSession_ZeroNonce(t *testing.T) {
 			Quorum: 1,
 			Nonce:  0, // Zero nonce - invalid
 		},
-		Signatures: []string{"0x1234567890abcdef"},
+		QuorumSigs: []string{"0x1234567890abcdef"},
 	}
 
 	// Create RPC context
@@ -309,7 +309,7 @@ func TestCreateAppSession_QuorumExceedsTotalWeights(t *testing.T) {
 			Quorum: 5, // Total weights = 2, but quorum = 5
 			Nonce:  12345,
 		},
-		Signatures: []string{"0x1234567890abcdef"},
+		QuorumSigs: []string{"0x1234567890abcdef"},
 	}
 
 	// Create RPC context
@@ -378,7 +378,7 @@ func TestCreateAppSession_NoSignatures(t *testing.T) {
 			Quorum: 1,
 			Nonce:  12345,
 		},
-		Signatures: []string{}, // Empty signatures
+		QuorumSigs: []string{}, // Empty signatures
 	}
 
 	// Create RPC context
@@ -447,7 +447,7 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 			Quorum: 1,
 			Nonce:  12345,
 		},
-		Signatures: []string{"0x1234567890abcdef"},
+		QuorumSigs: []string{"0x1234567890abcdef"},
 	}
 
 	// Mock expectations - signature recovered from non-participant
@@ -528,7 +528,7 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 			Quorum: 3, // Need all 3
 			Nonce:  12345,
 		},
-		Signatures: []string{
+		QuorumSigs: []string{
 			"0x1234", // Only one signature, need 3 total weight
 		},
 	}
@@ -606,7 +606,7 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 			Quorum: 2, // Need both participants
 			Nonce:  12345,
 		},
-		Signatures: []string{
+		QuorumSigs: []string{
 			"0x1234", // participant1
 			"0x5678", // participant1 again (duplicate)
 		},
@@ -682,7 +682,7 @@ func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
 			Quorum: 1,
 			Nonce:  12345,
 		},
-		Signatures: []string{"not-valid-hex"}, // Invalid hex string
+		QuorumSigs: []string{"not-valid-hex"}, // Invalid hex string
 	}
 
 	// Create RPC context
@@ -750,7 +750,7 @@ func TestCreateAppSession_SignatureRecoveryFailure(t *testing.T) {
 			Quorum: 1,
 			Nonce:  12345,
 		},
-		Signatures: []string{"0x1234567890abcdef"},
+		QuorumSigs: []string{"0x1234567890abcdef"},
 	}
 
 	// Mock expectations - signature recovery fails

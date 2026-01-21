@@ -203,15 +203,13 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 			return rpc.Errorf("failed to record transaction")
 		}
 
-		logger.Info("transaction recorded",
-			"id", transaction.ID,
-			"type", transaction.TxType.String(),
+		logger.Info("recorded transaction",
+			"txID", transaction.ID,
+			"txType", transaction.TxType.String(),
 			"from", transaction.FromAccount,
 			"to", transaction.ToAccount,
-			"senderStateID", transaction.SenderNewStateID,
 			"asset", transaction.Asset,
-			"amount", transaction.Amount.String(),
-		)
+			"amount", transaction.Amount.String())
 
 		if err := tx.StoreUserState(incomingState); err != nil {
 			return rpc.Errorf("failed to store user state: %v", err)

@@ -68,7 +68,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 			return rpc.Errorf("missing user signature on user state")
 		}
 
-		packedUserState, err := core.PackState(userState)
+		packedUserState, err := h.statePacker.PackState(userState)
 		if err != nil {
 			return rpc.Errorf("failed to pack user state: %v", err)
 		}

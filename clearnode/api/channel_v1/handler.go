@@ -14,7 +14,9 @@ import (
 // Handler manages channel state transitions and provides RPC endpoints for state submission.
 type Handler struct {
 	stateAdvancer core.StateAdvancer
+	statePacker   core.StatePacker
 	useStoreInTx  StoreTxProvider
+	memoryStore   MemoryStore
 	signer        sign.Signer
 	sigValidators map[SigValidatorType]SigValidator
 	nodeAddress   string // Node's wallet address for channel ID calculation
@@ -23,15 +25,19 @@ type Handler struct {
 
 // NewHandler creates a new Handler instance with the provided dependencies.
 func NewHandler(
+	statePacker core.StatePacker,
 	useStoreInTx StoreTxProvider,
+	memoryStore MemoryStore,
 	signer sign.Signer,
 	sigValidators map[SigValidatorType]SigValidator,
 	nodeAddress string,
 	minChallenge uint64,
 ) *Handler {
 	return &Handler{
-		stateAdvancer: core.NewStateAdvancerV1(),
+		stateAdvancer: core.NewStateAdvancerV1(memoryStore),
+		statePacker:   statePacker,
 		useStoreInTx:  useStoreInTx,
+		memoryStore:   memoryStore,
 		signer:        signer,
 		sigValidators: sigValidators,
 		nodeAddress:   nodeAddress,
@@ -84,7 +90,7 @@ func (h *Handler) issueTransferReceiverState(ctx context.Context, tx Store, send
 	}
 
 	if !(lastStateTransition != nil && (lastStateTransition.Type == core.TransitionTypeMutualLock || lastStateTransition.Type == core.TransitionTypeEscrowLock)) {
-		packedState, err := core.PackState(*newState)
+		packedState, err := h.statePacker.PackState(*newState)
 		if err != nil {
 			return nil, rpc.Errorf("failed to pack receiver state")
 		}
@@ -132,7 +138,7 @@ func (h *Handler) issueExtraState(ctx context.Context, tx Store, incomingState c
 		return nil, err
 	}
 
-	packedState, err := core.PackState(*extraState)
+	packedState, err := h.statePacker.PackState(*extraState)
 	if err != nil {
 		return nil, rpc.Errorf("failed to pack extra state")
 	}

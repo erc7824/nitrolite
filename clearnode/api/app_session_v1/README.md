@@ -301,6 +301,7 @@ This directory contains the V1 API handlers for app session management, implemen
 - Each signature must be from a participant in the session
 - All allocations must be non-negative
 - All allocations must be to valid participants
+- **All allocation amounts must respect asset decimal precision** (validated via AssetStore)
 
 *Intent-Specific Validation:*
 
@@ -309,10 +310,12 @@ This directory contains the V1 API handlers for app session management, implemen
 - Total allocations per asset must match session balance exactly
 - Allows redistribution between participants
 - Records ledger entries for allocation changes
+- Validates decimal precision for each allocation amount
 
 **Withdraw Intent:**
 - All current non-zero allocations must be included in request
 - Allocations can only decrease or stay the same (no increases)
+- Validates decimal precision for calculated withdrawal amounts
 - Records negative ledger entries for withdrawals
 - Issues channel states for participants receiving withdrawn funds
 - Cannot add allocations for new participants
@@ -501,12 +504,26 @@ The implementation uses Ethereum ABI encoding for deterministic hashing and sign
 ### Dependencies
 
 The implementation uses:
-- `pkg/core` - State management and validation
+- `pkg/core` - State management, validation, and decimal precision utilities
 - `pkg/rpc` - RPC types and framework
 - `pkg/sign` - Cryptographic signing
 - `pkg/log` - Logging
 - `github.com/shopspring/decimal` - Precise decimal arithmetic
 - `github.com/ethereum/go-ethereum/crypto` - Ethereum cryptography
+
+### AssetStore Interface
+
+The handler requires an `AssetStore` interface for asset metadata operations:
+
+```go
+type AssetStore interface {
+    GetAssetDecimals(asset string) (uint8, error)
+}
+```
+
+This is used for:
+- **Decimal precision validation** - Ensures allocation amounts don't exceed the asset's decimal precision
+- Asset-specific validation during state updates
 
 ### Store Interface
 
@@ -557,8 +574,10 @@ sigValidators := map[app_session_v1.SigType]app_session_v1.SigValidator{
 // Create the handler
 handler := app_session_v1.NewHandler(
     storeTxProvider,  // StoreTxProvider (wraps store operations in transactions)
+    assetStore,      // AssetStore (provides asset metadata like decimals)
     signer,          // sign.Signer
     stateAdvancer,   // core.StateAdvancer
+    statePacker,     // core.StatePacker (packs state for signatures)
     sigValidators,   // map[SigType]SigValidator
     nodeAddress,     // string (node's wallet address)
 )
@@ -648,16 +667,19 @@ Following `channel_v1` structure:
 
 ## Testing
 
-To test the implementation:
+The implementation includes comprehensive test coverage:
 
 ```bash
-# Build the packages
+# Run all tests
 cd clearnode/api/app_session_v1
-go build .
+go test -v
 
-cd pkg/app
-go build .
+# Run specific test suites
+go test -v -run TestSubmitAppState_.*     # All submit_app_state tests
+go test -v -run TestSubmitDepositState_.* # All submit_deposit_state tests
+go test -v -run TestCreateAppSession_.*   # All create_app_session tests
 ```
+
 
 
 

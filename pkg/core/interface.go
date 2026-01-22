@@ -72,3 +72,20 @@ type Client interface {
 type StateAdvancer interface {
 	ValidateAdvancement(currentState, proposedState State) error
 }
+
+// ========= StatePacker Interface =========
+
+// StatePacker serializes channel states
+type StatePacker interface {
+	PackState(state State) ([]byte, error)
+}
+
+// ========= AssetStore Interface =========
+
+type AssetStore interface {
+	// GetAssetDecimals checks if an asset exists and returns its decimals in YN
+	GetAssetDecimals(asset string) (uint8, error)
+
+	// GetTokenDecimals returns the decimals for a token on a specific blockchain
+	GetTokenDecimals(blockchainID uint32, tokenAddress string) (uint8, error)
+}

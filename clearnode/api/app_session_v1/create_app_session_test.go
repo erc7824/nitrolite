@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 )
 
@@ -20,10 +21,16 @@ func TestCreateAppSession_Success(t *testing.T) {
 		return fn(mockStore)
 	}
 
+	mockSigner := NewMockSigner()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := NewHandler(
 		storeTxProvider,
-		nil, // signer not needed for create_app_session
-		nil, // state advancer not needed for create_app_session
+		mockAssetStore,
+		mockSigner,
+		core.NewStateAdvancerV1(mockAssetStore),
+		mockStatePacker,
 		map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
@@ -108,10 +115,16 @@ func TestCreateAppSession_QuorumWithMultipleSignatures(t *testing.T) {
 		return fn(mockStore)
 	}
 
+	mockSigner := NewMockSigner()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
-		nil,
+		mockAssetStore,
+		mockSigner,
+		core.NewStateAdvancerV1(mockAssetStore),
+		mockStatePacker,
 		map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
@@ -191,10 +204,16 @@ func TestCreateAppSession_ZeroNonce(t *testing.T) {
 		return fn(mockStore)
 	}
 
+	mockSigner := NewMockSigner()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
-		nil,
+		mockAssetStore,
+		mockSigner,
+		core.NewStateAdvancerV1(mockAssetStore),
+		mockStatePacker,
 		map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
@@ -253,10 +272,16 @@ func TestCreateAppSession_QuorumExceedsTotalWeights(t *testing.T) {
 		return fn(mockStore)
 	}
 
+	mockSigner := NewMockSigner()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
-		nil,
+		mockAssetStore,
+		mockSigner,
+		core.NewStateAdvancerV1(mockAssetStore),
+		mockStatePacker,
 		map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
@@ -321,10 +346,16 @@ func TestCreateAppSession_NoSignatures(t *testing.T) {
 		return fn(mockStore)
 	}
 
+	mockSigner := NewMockSigner()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
-		nil,
+		mockAssetStore,
+		mockSigner,
+		core.NewStateAdvancerV1(mockAssetStore),
+		mockStatePacker,
 		map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
@@ -383,10 +414,16 @@ func TestCreateAppSession_SignatureFromNonParticipant(t *testing.T) {
 		return fn(mockStore)
 	}
 
+	mockSigner := NewMockSigner()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
-		nil,
+		mockAssetStore,
+		mockSigner,
+		core.NewStateAdvancerV1(mockAssetStore),
+		mockStatePacker,
 		map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
@@ -449,10 +486,16 @@ func TestCreateAppSession_QuorumNotMet(t *testing.T) {
 		return fn(mockStore)
 	}
 
+	mockSigner := NewMockSigner()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
-		nil,
+		mockAssetStore,
+		mockSigner,
+		core.NewStateAdvancerV1(mockAssetStore),
+		mockStatePacker,
 		map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
@@ -526,10 +569,16 @@ func TestCreateAppSession_DuplicateSignatures(t *testing.T) {
 		return fn(mockStore)
 	}
 
+	mockSigner := NewMockSigner()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
-		nil,
+		mockAssetStore,
+		mockSigner,
+		core.NewStateAdvancerV1(mockAssetStore),
+		mockStatePacker,
 		map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
@@ -601,10 +650,16 @@ func TestCreateAppSession_InvalidSignatureHex(t *testing.T) {
 		return fn(mockStore)
 	}
 
+	mockSigner := NewMockSigner()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
-		nil,
+		mockAssetStore,
+		mockSigner,
+		core.NewStateAdvancerV1(mockAssetStore),
+		mockStatePacker,
 		map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
@@ -663,10 +718,16 @@ func TestCreateAppSession_SignatureRecoveryFailure(t *testing.T) {
 		return fn(mockStore)
 	}
 
+	mockSigner := NewMockSigner()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := NewHandler(
 		storeTxProvider,
-		nil,
-		nil,
+		mockAssetStore,
+		mockSigner,
+		core.NewStateAdvancerV1(mockAssetStore),
+		mockStatePacker,
 		map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},

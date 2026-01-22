@@ -132,6 +132,30 @@ func (m *MockSigValidator) Verify(wallet string, data, sig []byte) error {
 	return args.Error(0)
 }
 
+// MockAssetStore is a mock implementation of the core.AssetStore interface
+type MockAssetStore struct {
+	mock.Mock
+}
+
+func (m *MockAssetStore) GetAssetDecimals(asset string) (uint8, error) {
+	args := m.Called(asset)
+	return args.Get(0).(uint8), args.Error(1)
+}
+
+func (m *MockAssetStore) GetTokenDecimals(blockchainID uint32, tokenAddress string) (uint8, error) {
+	args := m.Called(blockchainID, tokenAddress)
+	return args.Get(0).(uint8), args.Error(1)
+}
+
+type MockStatePacker struct {
+	mock.Mock
+}
+
+func (m *MockStatePacker) PackState(state core.State) ([]byte, error) {
+	args := m.Called(state)
+	return args.Get(0).([]byte), args.Error(1)
+}
+
 // NewMockSigner creates a mock signer for testing
 func NewMockSigner() sign.Signer {
 	key, _ := crypto.GenerateKey()

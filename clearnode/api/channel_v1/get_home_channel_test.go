@@ -14,13 +14,16 @@ import (
 func TestGetHomeChannel_Success(t *testing.T) {
 	// Setup
 	mockTxStore := new(MockStore)
+	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint64(3600)
+	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
-		stateAdvancer: core.NewStateAdvancerV1(),
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 		useStoreInTx: func(handler StoreTxHandler) error {
 			err := handler(mockTxStore)
 			if err != nil {
@@ -100,13 +103,16 @@ func TestGetHomeChannel_Success(t *testing.T) {
 func TestGetHomeChannel_NotFound(t *testing.T) {
 	// Setup
 	mockTxStore := new(MockStore)
+	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint64(3600)
+	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
-		stateAdvancer: core.NewStateAdvancerV1(),
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 		useStoreInTx: func(handler StoreTxHandler) error {
 			err := handler(mockTxStore)
 			if err != nil {

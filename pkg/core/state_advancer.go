@@ -7,11 +7,15 @@ import (
 var _ StateAdvancer = &StateAdvancerV1{}
 
 // StateAdvancerV1 provides basic validation for state transitions
-type StateAdvancerV1 struct{}
+type StateAdvancerV1 struct {
+	assetStore AssetStore
+}
 
 // NewStateAdvancerV1 creates a new simple transition validator
-func NewStateAdvancerV1() *StateAdvancerV1 {
-	return &StateAdvancerV1{}
+func NewStateAdvancerV1(assetStore AssetStore) *StateAdvancerV1 {
+	return &StateAdvancerV1{
+		assetStore: assetStore,
+	}
 }
 
 // ValidateAdvancement validates that the proposed state is a valid advancement of the current state
@@ -83,9 +87,18 @@ func (v *StateAdvancerV1) ValidateAdvancement(currentState, proposedState State)
 
 	if transitionLenDiff == 1 {
 		newTransition := proposedState.Transitions[len(proposedState.Transitions)-1]
+
+		decimals, err := v.assetStore.GetAssetDecimals(proposedState.Asset)
+		if err != nil {
+			return fmt.Errorf("failed to get asset decimals: %w", err)
+		}
+
+		if err := ValidateDecimalPrecision(newTransition.Amount, decimals); err != nil {
+			return fmt.Errorf("invalid amount for asset %s: %w", proposedState.Asset, err)
+		}
+
 		lastTransition := currentState.GetLastTransition()
 
-		var err error
 		switch newTransition.Type {
 		case TransitionTypeHomeDeposit:
 			_, err = expectedState.ApplyHomeDepositTransition(newTransition.Amount)

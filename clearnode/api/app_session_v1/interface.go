@@ -17,7 +17,7 @@ type Store interface {
 	GetParticipantAllocations(sessionID string) (map[string]map[string]decimal.Decimal, error)
 
 	// Ledger operations
-	RecordLedgerEntry(accountID, asset string, amount decimal.Decimal, sessionKey *string) error
+	RecordLedgerEntry(accountID, asset string, amount decimal.Decimal) error
 
 	RecordTransaction(tx core.Transaction) error
 

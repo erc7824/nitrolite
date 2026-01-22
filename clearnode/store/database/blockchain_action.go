@@ -1,11 +1,9 @@
 package database
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/erc7824/nitrolite/pkg/sign"
 	"github.com/ethereum/go-ethereum/common"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -15,7 +13,10 @@ type BlockchainActionType string
 type BlockchainActionStatus string
 
 const (
-	ActionTypeCheckpoint BlockchainActionType = "checkpoint"
+	ActionTypeCheckpoint                 BlockchainActionType = "cp"
+	ActionTypeEscrowWithdrawal           BlockchainActionType = "escrow_withdrawal"
+	ActionTypeCheckpointEscrowDeposit    BlockchainActionType = "cp_escrow_deposit"
+	ActionTypeCheckpointEscrowWithdrawal BlockchainActionType = "cp_escrow_withdrawal"
 )
 
 const (
@@ -25,10 +26,10 @@ const (
 )
 
 type BlockchainAction struct {
-	ID        int64                  `gorm:"primary_key"`
-	Type      BlockchainActionType   `gorm:"column:action_type;not null"`
-	ChannelID common.Hash            `gorm:"column:channel_id;not null"`
-	ChainID   uint32                 `gorm:"column:chain_id;not null"`
+	ID      int64                `gorm:"primary_key"`
+	Type    BlockchainActionType `gorm:"column:action_type;not null"`
+	StateID string               `gorm:"column:state_id;not null"`
+	// ChainID   uint32                 `gorm:"column:chain_id;not null"`
 	Data      datatypes.JSON         `gorm:"column:action_data;type:text;not null"`
 	Status    BlockchainActionStatus `gorm:"column:status;not null"`
 	Retries   int                    `gorm:"column:retry_count;default:0"`
@@ -42,38 +43,80 @@ func (BlockchainAction) TableName() string {
 	return "blockchain_actions"
 }
 
-// Type alias for signature compatibility
-type Signature = sign.Signature
-
-type CheckpointData struct {
-	State     UnsignedState `json:"state"`
-	UserSig   Signature     `json:"user_sig"`
-	ServerSig Signature     `json:"server_sig"`
-}
-
-func ScheduleCheckpoint(tx *gorm.DB, channel common.Hash, chainID uint32, state UnsignedState, userSig, serverSig Signature) error {
-	data := CheckpointData{
-		State:     state,
-		UserSig:   userSig,
-		ServerSig: serverSig,
-	}
-
-	bytes, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("marshal checkpoint data: %w", err)
-	}
+// ScheduleInitiateEscrowWithdrawal queues a blockchain action to initiate withdrawal.
+func (s *DBStore) ScheduleInitiateEscrowWithdrawal(stateID string) error {
+	// bytes, err := json.Marshal(data)
+	// if err != nil {
+	// 	return fmt.Errorf("marshal checkpoint data: %w", err)
+	// }
 
 	action := &BlockchainAction{
-		Type:      ActionTypeCheckpoint,
-		ChannelID: channel,
-		ChainID:   chainID,
-		Data:      bytes,
+		Type:    ActionTypeCheckpoint,
+		StateID: stateID,
+		// ChainID: 1,
+		// Data:      bytes,
 		Status:    StatusPending,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
 
-	return tx.Create(action).Error
+	return s.db.Create(action).Error
+}
+
+func (s *DBStore) ScheduleCheckpoint(stateID string) error {
+	// bytes, err := json.Marshal(data)
+	// if err != nil {
+	// 	return fmt.Errorf("marshal checkpoint data: %w", err)
+	// }
+
+	action := &BlockchainAction{
+		Type:    ActionTypeCheckpoint,
+		StateID: stateID,
+		// Data:      bytes,
+		Status:    StatusPending,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	return s.db.Create(action).Error
+}
+
+// ScheduleCheckpointEscrowDeposit schedules a checkpoint for an escrow deposit operation.
+func (s *DBStore) ScheduleCheckpointEscrowDeposit(stateID string) error {
+	// bytes, err := json.Marshal(data)
+	// if err != nil {
+	// 	return fmt.Errorf("marshal checkpoint data: %w", err)
+	// }
+
+	action := &BlockchainAction{
+		Type:    ActionTypeCheckpoint,
+		StateID: stateID,
+		// Data:      bytes,
+		Status:    StatusPending,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	return s.db.Create(action).Error
+}
+
+// ScheduleCheckpointEscrowWithdrawal schedules a checkpoint for an escrow withdrawal operation.
+func (s *DBStore) ScheduleCheckpointEscrowWithdrawal(stateID string) error {
+	// bytes, err := json.Marshal(data)
+	// if err != nil {
+	// 	return fmt.Errorf("marshal checkpoint data: %w", err)
+	// }
+
+	action := &BlockchainAction{
+		Type:    ActionTypeCheckpoint,
+		StateID: stateID,
+		// Data:      bytes,
+		Status:    StatusPending,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	return s.db.Create(action).Error
 }
 
 func (a *BlockchainAction) Fail(tx *gorm.DB, err string) error {

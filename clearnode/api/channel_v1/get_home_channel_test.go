@@ -45,16 +45,15 @@ func TestGetHomeChannel_Success(t *testing.T) {
 	homeChannelID := "0xHomeChannel123"
 
 	homeChannel := core.Channel{
-		ChannelID:    homeChannelID,
-		UserWallet:   userWallet,
-		NodeWallet:   nodeAddress,
-		Type:         core.ChannelTypeHome,
-		BlockchainID: 1,
-		TokenAddress: "0xTokenAddress",
-		Challenge:    86400,
-		Nonce:        12345,
-		Status:       core.ChannelStatusOpen,
-		StateVersion: 1,
+		ChannelID:         homeChannelID,
+		UserWallet:        userWallet,
+		Type:              core.ChannelTypeHome,
+		BlockchainID:      1,
+		TokenAddress:      "0xTokenAddress",
+		ChallengeDuration: 86400,
+		Nonce:             12345,
+		Status:            core.ChannelStatusOpen,
+		StateVersion:      1,
 	}
 
 	// Mock expectations

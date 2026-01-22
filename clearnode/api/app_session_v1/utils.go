@@ -2,6 +2,7 @@ package app_session_v1
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 
 	"github.com/erc7824/nitrolite/pkg/app"
@@ -174,6 +175,21 @@ func mapAppSessionInfoV1(session app.AppSessionV1, allocations map[string]map[st
 			})
 		}
 	}
+	slices.SortFunc(rpcAllocations, func(a, b rpc.AppAllocationV1) int {
+		if a.Asset > b.Asset {
+			return 1
+		} else if a.Asset < b.Asset {
+			return -1
+		}
+
+		if a.Participant > b.Participant {
+			return 1
+		} else if a.Participant < b.Participant {
+			return -1
+		}
+
+		return 0
+	})
 
 	return rpc.AppSessionInfoV1{
 		AppSessionID: session.SessionID,

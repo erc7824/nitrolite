@@ -4,6 +4,8 @@
 package rpc
 
 import (
+	"time"
+
 	"github.com/erc7824/nitrolite/pkg/app"
 	"github.com/erc7824/nitrolite/pkg/core"
 )
@@ -22,16 +24,16 @@ type ChannelV1 struct {
 	ChannelID string `json:"channel_id"`
 	// UserWallet is the user wallet address
 	UserWallet string `json:"user_wallet"`
-	// NodeWallet is the node wallet address
-	NodeWallet string `json:"node_wallet"`
 	// Type is the type of the channel (home, escrow)
 	Type string `json:"type"`
 	// BlockchainID is the unique identifier for the blockchain
 	BlockchainID uint32 `json:"blockchain_id"`
 	// TokenAddress is the address of the token used in the channel
 	TokenAddress string `json:"token_address"`
-	// Challenge is the challenge period for the channel in seconds
-	Challenge string `json:"challenge"`
+	// ChallengeDuration is the challenge period for the channel in seconds
+	ChallengeDuration string `json:"challenge_duration"`
+	// ChallegeExpiresAt
+	ChallengeExpiresAt *time.Time `json:"challenge_expires_at"`
 	// Nonce is the nonce for the channel
 	Nonce string `json:"nonce"`
 	// Status is the current status of the channel (void, open, challenged, closed)

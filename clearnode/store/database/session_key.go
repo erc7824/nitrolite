@@ -12,6 +12,8 @@ import (
 	"gorm.io/gorm"
 )
 
+// LEGACY
+
 // Type alias for Allowance from rpc package
 type Allowance = rpc.AssetAllowanceV1
 
@@ -261,7 +263,7 @@ func CalculateSessionKeySpending(db *gorm.DB, sessionKeyAddress string, assetSym
 	}
 
 	var res result
-	err := db.Model(&Entry{}).
+	err := db.Model(&AppLedgerEntryV1{}).
 		Where("session_key = ? AND asset_symbol = ?", sessionKeyAddress, assetSymbol).
 		Select("COALESCE(SUM(debit), 0) AS total_spent").
 		Scan(&res).Error

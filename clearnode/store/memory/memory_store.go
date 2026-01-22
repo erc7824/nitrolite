@@ -14,7 +14,7 @@ type MemoryStoreV1 struct {
 	assetDecimals   map[string]uint8                          // map[asset]decimals
 }
 
-func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint32]BlockchainConfig) *MemoryStoreV1 {
+func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint32]BlockchainConfig) MemoryStore {
 	supportedBlockchainIDs := make(map[uint32]struct{})
 	blockchains := make([]core.Blockchain, 0, len(blockchainsConfig))
 	for _, bc := range blockchainsConfig {
@@ -118,7 +118,7 @@ func NewMemoryStoreV1(assetsConfig AssetsConfig, blockchainsConfig map[uint32]Bl
 	}
 }
 
-func NewMemoryStoreV1FromConfig(configDirPath string) (*MemoryStoreV1, error) {
+func NewMemoryStoreV1FromConfig(configDirPath string) (MemoryStore, error) {
 	blockchainConfig, err := LoadEnabledBlockchains(configDirPath)
 	if err != nil {
 		return nil, err

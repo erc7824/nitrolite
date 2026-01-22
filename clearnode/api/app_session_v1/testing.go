@@ -63,8 +63,8 @@ func (m *MockStore) GetParticipantAllocations(sessionID string) (map[string]map[
 	return args.Get(0).(map[string]map[string]decimal.Decimal), args.Error(1)
 }
 
-func (m *MockStore) RecordLedgerEntry(accountID, asset string, amount decimal.Decimal, sessionKey *string) error {
-	args := m.Called(accountID, asset, amount, sessionKey)
+func (m *MockStore) RecordLedgerEntry(accountID, asset string, amount decimal.Decimal) error {
+	args := m.Called(accountID, asset, amount)
 	return args.Error(0)
 }
 

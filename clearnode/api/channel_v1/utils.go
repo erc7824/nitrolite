@@ -147,16 +147,16 @@ func channelStatusToString(s core.ChannelStatus) string {
 // coreChannelToRPC converts a core.Channel to rpc.ChannelV1
 func coreChannelToRPC(channel core.Channel) rpc.ChannelV1 {
 	return rpc.ChannelV1{
-		ChannelID:    channel.ChannelID,
-		UserWallet:   channel.UserWallet,
-		NodeWallet:   channel.NodeWallet,
-		Type:         channelTypeToString(channel.Type),
-		BlockchainID: channel.BlockchainID,
-		TokenAddress: channel.TokenAddress,
-		Challenge:    strconv.FormatUint(channel.Challenge, 10),
-		Nonce:        strconv.FormatUint(channel.Nonce, 10),
-		Status:       channelStatusToString(channel.Status),
-		StateVersion: strconv.FormatUint(channel.StateVersion, 10),
+		ChannelID:          channel.ChannelID,
+		UserWallet:         channel.UserWallet,
+		Type:               channelTypeToString(channel.Type),
+		BlockchainID:       channel.BlockchainID,
+		TokenAddress:       channel.TokenAddress,
+		ChallengeDuration:  strconv.FormatUint(channel.ChallengeDuration, 10),
+		ChallengeExpiresAt: channel.ChallengeExpiresAt,
+		Nonce:              strconv.FormatUint(channel.Nonce, 10),
+		Status:             channelStatusToString(channel.Status),
+		StateVersion:       strconv.FormatUint(channel.StateVersion, 10),
 	}
 }
 

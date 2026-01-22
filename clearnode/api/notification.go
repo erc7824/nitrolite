@@ -74,7 +74,7 @@ func NewChannelNotification(channel db.Channel) *Notification {
 			Status:              channel.Status,
 			Token:               channel.Token,
 			BlockchainID:        channel.BlockchainID,
-			Challenge:           channel.Challenge,
+			Challenge:           channel.ChallengeDuration,
 			Nonce:               channel.Nonce,
 			OnChainStateVersion: channel.OnChainStateVersion,
 			CreatedAt:           channel.CreatedAt.Format(time.RFC3339),
@@ -93,7 +93,7 @@ func NewTransferNotification(wallet string, transferredAllocations TransferRespo
 }
 
 // NewAppSessionNotification creates a notification for an app session update event
-func NewAppSessionNotification(participant string, appSession db.AppSession, participantAllocations []AppAllocation) *Notification {
+func NewAppSessionNotification(participant string, appSession db.AppSessionV1, participantAllocations []AppAllocation) *Notification {
 	appSessionData := rpc.AppSession{
 		AppSessionID:       appSession.SessionID,
 		Status:             string(appSession.Status),

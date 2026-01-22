@@ -27,29 +27,27 @@ var (
 type Channel struct {
 	ChannelID          string        `json:"channel_id"`                     // Unique identifier for the channel
 	UserWallet         string        `json:"user_wallet"`                    // User wallet address
-	NodeWallet         string        `json:"node_wallet"`                    // Node wallet address
 	Type               ChannelType   `json:"type"`                           // Type of the channel (home, escrow)
 	BlockchainID       uint32        `json:"blockchain_id"`                  // Unique identifier for the blockchain
 	TokenAddress       string        `json:"token_address"`                  // Address of the token used in the channel
-	Challenge          uint64        `json:"challenge"`                      // Challenge period for the channel in seconds
+	ChallengeDuration  uint64        `json:"challenge_duration"`             // Challenge period for the channel in seconds
 	ChallengeExpiresAt *time.Time    `json:"challenge_expires_at,omitempty"` // Timestamp when the challenge period elapses
 	Nonce              uint64        `json:"nonce"`                          // Nonce for the channel
 	Status             ChannelStatus `json:"status"`                         // Current status of the channel (void, open, challenged, closed)
 	StateVersion       uint64        `json:"state_version"`                  // On-chain state version of the channel
 }
 
-func NewChannel(channelID, userWallet, nodeWallet string, ChType ChannelType, blockchainID uint32, tokenAddress string, nonce, challenge uint64) *Channel {
+func NewChannel(channelID, userWallet string, ChType ChannelType, blockchainID uint32, tokenAddress string, nonce, challenge uint64) *Channel {
 	return &Channel{
-		ChannelID:    channelID,
-		UserWallet:   userWallet,
-		NodeWallet:   nodeWallet,
-		Type:         ChType,
-		BlockchainID: blockchainID,
-		TokenAddress: tokenAddress,
-		Nonce:        nonce,
-		Challenge:    challenge,
-		Status:       ChannelStatusVoid,
-		StateVersion: 0,
+		ChannelID:         channelID,
+		UserWallet:        userWallet,
+		Type:              ChType,
+		BlockchainID:      blockchainID,
+		TokenAddress:      tokenAddress,
+		Nonce:             nonce,
+		ChallengeDuration: challenge,
+		Status:            ChannelStatusVoid,
+		StateVersion:      0,
 	}
 }
 
@@ -896,6 +894,23 @@ type PaginationParams struct {
 	Offset *uint32
 	Limit  *uint32
 	Sort   *string
+}
+
+// GetOffsetAndLimit extracts offset and limit from pagination params with defaults and max limit enforcement.
+func (p *PaginationParams) GetOffsetAndLimit(defaultLimit, maxLimit uint32) (offset, limit uint32) {
+	offset = 0
+	limit = defaultLimit
+
+	if p != nil {
+		if p.Offset != nil {
+			offset = *p.Offset
+		}
+		if p.Limit != nil {
+			limit = min(*p.Limit, maxLimit)
+		}
+	}
+
+	return offset, limit
 }
 
 // PaginationMetadata contains pagination information for list responses.

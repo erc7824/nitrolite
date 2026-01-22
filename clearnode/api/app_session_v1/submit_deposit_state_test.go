@@ -158,7 +158,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	).Once()
 
 	// Mock ledger entry recording
-	mockStore.On("RecordLedgerEntry", appSessionID, asset, depositAmount, (*string)(nil)).Return(nil).Once()
+	mockStore.On("RecordLedgerEntry", appSessionID, asset, depositAmount).Return(nil).Once()
 
 	// Mock app session update
 	mockStore.On("UpdateAppSession", mock.MatchedBy(func(session app.AppSessionV1) bool {

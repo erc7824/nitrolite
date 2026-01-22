@@ -26,12 +26,10 @@ func TestHandleHomeChannelCreated_Success(t *testing.T) {
 	// Test data
 	channelID := "0xHomeChannel123"
 	userWallet := "0x1234567890123456789012345678901234567890"
-	nodeWallet := "0x0987654321098765432109876543210987654321"
 
 	channel := &core.Channel{
 		ChannelID:    channelID,
 		UserWallet:   userWallet,
-		NodeWallet:   nodeWallet,
 		Type:         core.ChannelTypeHome,
 		Status:       core.ChannelStatusVoid,
 		StateVersion: 0,

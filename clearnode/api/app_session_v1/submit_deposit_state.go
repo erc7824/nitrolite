@@ -173,7 +173,7 @@ func (h *Handler) SubmitDepositState(c *rpc.Context) {
 				// Accumulate total deposit amount
 				totalDepositAmount = totalDepositAmount.Add(depositAmount)
 
-				if err := tx.RecordLedgerEntry(appSession.SessionID, alloc.Asset, depositAmount, nil); err != nil {
+				if err := tx.RecordLedgerEntry(appSession.SessionID, alloc.Asset, depositAmount); err != nil {
 					return rpc.Errorf("failed to record ledger entry: %v", err)
 				}
 			}

@@ -270,16 +270,15 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 
 	// Create home channel for mocking
 	homeChannel := core.Channel{
-		ChannelID:    homeChannelID,
-		UserWallet:   userWallet,
-		NodeWallet:   nodeAddress,
-		Type:         core.ChannelTypeHome,
-		BlockchainID: 1,
-		TokenAddress: "0xTokenAddress",
-		Challenge:    challenge,
-		Nonce:        nonce,
-		Status:       core.ChannelStatusOpen,
-		StateVersion: 1,
+		ChannelID:         homeChannelID,
+		UserWallet:        userWallet,
+		Type:              core.ChannelTypeHome,
+		BlockchainID:      1,
+		TokenAddress:      "0xTokenAddress",
+		ChallengeDuration: challenge,
+		Nonce:             nonce,
+		Status:            core.ChannelStatusOpen,
+		StateVersion:      1,
 	}
 
 	// Mock expectations
@@ -296,8 +295,7 @@ func TestSubmitState_EscrowLock_Success(t *testing.T) {
 	mockTxStore.On("CreateChannel", mock.MatchedBy(func(channel core.Channel) bool {
 		return channel.ChannelID == escrowChannelID &&
 			channel.Type == core.ChannelTypeEscrow &&
-			channel.UserWallet == userWallet &&
-			channel.NodeWallet == nodeAddress
+			channel.UserWallet == userWallet
 	})).Return(nil)
 	mockTxStore.On("ScheduleInitiateEscrowWithdrawal", mock.MatchedBy(func(stateID string) bool {
 		return stateID == incomingState.ID
@@ -852,16 +850,15 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 
 	// Create home channel for mocking
 	homeChannel := core.Channel{
-		ChannelID:    homeChannelID,
-		UserWallet:   userWallet,
-		NodeWallet:   nodeAddress,
-		Type:         core.ChannelTypeHome,
-		BlockchainID: 1,
-		TokenAddress: "0xTokenAddress",
-		Challenge:    challenge,
-		Nonce:        nonce,
-		Status:       core.ChannelStatusOpen,
-		StateVersion: 1,
+		ChannelID:         homeChannelID,
+		UserWallet:        userWallet,
+		Type:              core.ChannelTypeHome,
+		BlockchainID:      1,
+		TokenAddress:      "0xTokenAddress",
+		ChallengeDuration: challenge,
+		Nonce:             nonce,
+		Status:            core.ChannelStatusOpen,
+		StateVersion:      1,
 	}
 
 	// Mock expectations
@@ -878,8 +875,7 @@ func TestSubmitState_MutualLock_Success(t *testing.T) {
 	mockTxStore.On("CreateChannel", mock.MatchedBy(func(channel core.Channel) bool {
 		return channel.ChannelID == escrowChannelID &&
 			channel.Type == core.ChannelTypeEscrow &&
-			channel.UserWallet == userWallet &&
-			channel.NodeWallet == nodeAddress
+			channel.UserWallet == userWallet
 	})).Return(nil)
 	mockTxStore.On("RecordTransaction", mock.MatchedBy(func(tx core.Transaction) bool {
 		return tx.TxType == core.TransactionTypeMutualLock &&

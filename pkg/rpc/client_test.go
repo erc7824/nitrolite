@@ -133,16 +133,15 @@ func TestClientV1_ChannelsV1GetHomeChannel(t *testing.T) {
 
 	channel := rpc.ChannelsV1GetHomeChannelResponse{
 		Channel: rpc.ChannelV1{
-			ChannelID:    testChannelID,
-			UserWallet:   testWalletV1,
-			NodeWallet:   testWallet2V1,
-			Type:         "home",
-			BlockchainID: testChainIDV1,
-			TokenAddress: testTokenV1,
-			Challenge:    "3600",
-			Nonce:        "1",
-			Status:       "open",
-			StateVersion: "1",
+			ChannelID:         testChannelID,
+			UserWallet:        testWalletV1,
+			Type:              "home",
+			BlockchainID:      testChainIDV1,
+			TokenAddress:      testTokenV1,
+			ChallengeDuration: "3600",
+			Nonce:             "1",
+			Status:            "open",
+			StateVersion:      "1",
 		},
 	}
 

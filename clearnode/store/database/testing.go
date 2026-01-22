@@ -56,7 +56,7 @@ func setupTestSqlite(t testing.TB) *gorm.DB {
 		t.Fatalf("Failed to open SQLite database: %v", err)
 	}
 
-	err = database.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &ContractEvent{}, &LedgerTransaction{}, &BlockchainAction{}, &SessionKey{})
+	err = database.AutoMigrate(&AppLedgerEntryV1{}, &Channel{}, &AppSessionV1{}, &ContractEvent{}, &Transaction{}, &BlockchainAction{}, &SessionKey{})
 	if err != nil {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}
@@ -101,7 +101,7 @@ func setupTestPostgres(ctx context.Context, t testing.TB) (*gorm.DB, testcontain
 		t.Fatalf("Failed to open PostgreSQL database: %v", err)
 	}
 
-	err = database.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &ContractEvent{}, &LedgerTransaction{}, &BlockchainAction{}, &SessionKey{})
+	err = database.AutoMigrate(&AppLedgerEntryV1{}, &Channel{}, &AppSessionV1{}, &ContractEvent{}, &Transaction{}, &BlockchainAction{}, &SessionKey{})
 	if err != nil {
 		t.Fatalf("Failed to run migrations: %v", err)
 	}

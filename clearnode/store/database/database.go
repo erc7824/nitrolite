@@ -256,7 +256,7 @@ func migratePostgres(cnf DatabaseConfig, embedMigrations embed.FS) error {
 }
 
 func migrateSqlite(db *gorm.DB) error {
-	if err := db.AutoMigrate(&Entry{}, &Channel{}, &AppSession{}, &RPCRecord{}, &ContractEvent{}, &BlockchainAction{}, &SessionKey{}); err != nil {
+	if err := db.AutoMigrate(&AppLedgerEntryV1{}, &Channel{}, &AppSessionV1{}, &ContractEvent{}, &BlockchainAction{}, &SessionKey{}); err != nil {
 		return err
 	}
 	return nil

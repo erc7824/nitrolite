@@ -96,12 +96,11 @@ func TestRequestCreation_Success(t *testing.T) {
 	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("CreateChannel", mock.MatchedBy(func(channel core.Channel) bool {
 		return channel.UserWallet == userWallet &&
-			channel.NodeWallet == nodeAddress &&
 			channel.Type == core.ChannelTypeHome &&
 			channel.BlockchainID == blockchainID &&
 			channel.TokenAddress == tokenAddress &&
 			channel.Nonce == nonce &&
-			channel.Challenge == challenge &&
+			channel.ChallengeDuration == challenge &&
 			channel.Status == core.ChannelStatusVoid &&
 			channel.StateVersion == 0
 	})).Return(nil).Once()

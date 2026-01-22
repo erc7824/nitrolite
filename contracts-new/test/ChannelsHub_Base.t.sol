@@ -116,8 +116,8 @@ contract ChannelsHubTest_Base is Test {
         });
     }
 
-    function signStateWithBothParties(CrossChainState memory state, bytes32 channelId) internal pure returns (CrossChainState memory) {
-        state.userSig = TestUtils.signStateEIP191(vm, channelId, state, alicePK);
+    function signStateWithBothParties(CrossChainState memory state, bytes32 channelId, uint256 userPK) internal pure returns (CrossChainState memory) {
+        state.userSig = TestUtils.signStateEIP191(vm, channelId, state, userPK);
         state.nodeSig = TestUtils.signStateEIP191(vm, channelId, state, nodePK);
         return state;
     }

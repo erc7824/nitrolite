@@ -56,7 +56,7 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
             nodeSig: ""
         });
 
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         vm.prank(alice);
         cHub.createChannel(def, state);
@@ -66,7 +66,7 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
 
         // transfer 42 (allocation decreases by 42, node net flow decreases by 42)
         state = nextState(state, StateIntent.OPERATE, [uint256(958), uint256(0)], [int256(1000), int256(-42)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // invoke a checkpoint
         // Expected: user allocation = 958, user net flow = 1000, node allocation = 0, node net flow = -42
@@ -76,12 +76,12 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
 
         // receive 24 (allocation increases by 24, node net flow increases by 24)
         state = nextState(state, StateIntent.OPERATE, [uint256(982), uint256(0)], [int256(1000), int256(-18)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // invoke a deposit (500)
         // Expected: user allocation = 1482, user net flow = 1500, node allocation = 0, node net flow = -18
         state = nextState(state, StateIntent.DEPOSIT, [uint256(1482), uint256(0)], [int256(1500), int256(-18)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         vm.prank(alice);
         cHub.depositToChannel(channelId, state);
@@ -92,16 +92,16 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
 
         // transfer 1
         state = nextState(state, StateIntent.OPERATE, [uint256(1481), uint256(0)], [int256(1500), int256(-19)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // transfer 2
         state = nextState(state, StateIntent.OPERATE, [uint256(1479), uint256(0)], [int256(1500), int256(-21)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // invoke a withdrawal (100)
         // Expected: user allocation = 1379, user net flow = 1400, node allocation = 0, node net flow = -21
         state = nextState(state, StateIntent.WITHDRAW, [uint256(1379), uint256(0)], [int256(1400), int256(-21)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         vm.prank(alice);
         cHub.withdrawFromChannel(channelId, state);
@@ -112,16 +112,16 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
 
         // transfer 3
         state = nextState(state, StateIntent.OPERATE, [uint256(1376), uint256(0)], [int256(1400), int256(-24)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // receive 10
         state = nextState(state, StateIntent.OPERATE, [uint256(1386), uint256(0)], [int256(1400), int256(-14)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // invoke a deposit (200)
         // Expected: user allocation = 1586, user net flow = 1600, node allocation = 0, node net flow = -14
         state = nextState(state, StateIntent.DEPOSIT, [uint256(1586), uint256(0)], [int256(1600), int256(-14)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         vm.prank(alice);
         cHub.depositToChannel(channelId, state);
@@ -132,28 +132,28 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
 
         // receive 1
         state = nextState(state, StateIntent.OPERATE, [uint256(1587), uint256(0)], [int256(1600), int256(-13)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // transfer 2
         state = nextState(state, StateIntent.OPERATE, [uint256(1585), uint256(0)], [int256(1600), int256(-15)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // receive 3
         state = nextState(state, StateIntent.OPERATE, [uint256(1588), uint256(0)], [int256(1600), int256(-12)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // transfer 4
         state = nextState(state, StateIntent.OPERATE, [uint256(1584), uint256(0)], [int256(1600), int256(-16)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // receive 5
         state = nextState(state, StateIntent.OPERATE, [uint256(1589), uint256(0)], [int256(1600), int256(-11)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // withdraw (300)
         // Expected: user allocation = 1289, user net flow = 1300, node allocation = 0, node net flow = -11
         state = nextState(state, StateIntent.WITHDRAW, [uint256(1289), uint256(0)], [int256(1300), int256(-11)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         vm.prank(alice);
         cHub.withdrawFromChannel(channelId, state);
@@ -165,22 +165,22 @@ contract ChannelsHubTest_SingleChain_Lifecycle is ChannelsHubTest_Base {
         // transfer 1
         // Expected: user allocation = 1288, user net flow = 1300, node allocation = 0, node net flow = -12
         state = nextState(state, StateIntent.OPERATE, [uint256(1288), uint256(0)], [int256(1300), int256(-12)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // receive 2
         // Expected: user allocation = 1290, user net flow = 1300, node allocation = 0, node net flow = -10
         state = nextState(state, StateIntent.OPERATE, [uint256(1290), uint256(0)], [int256(1300), int256(-10)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // transfer 3
         // Expected: user allocation = 1287, user net flow = 1300, node allocation = 0, node net flow = -13
         state = nextState(state, StateIntent.OPERATE, [uint256(1287), uint256(0)], [int256(1300), int256(-13)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         // close channel
         // Expected: allocations = 0, user net flow 13, node net flow -13
         state = nextState(state, StateIntent.CLOSE, [uint256(0), uint256(0)], [int256(13), int256(-13)]);
-        state = signStateWithBothParties(state, channelId);
+        state = signStateWithBothParties(state, channelId, alicePK);
 
         vm.prank(alice);
         cHub.closeChannel(channelId, state, new CrossChainState[](0));

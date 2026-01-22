@@ -49,6 +49,17 @@ library Utils {
         require(recoveredNode == node, "invalid node signature");
     }
 
+    // supports only EIP-191 signatures for now
+    function validateNodeSignature(
+        CrossChainState memory ccs,
+        bytes32 channelId,
+        address node
+    ) internal pure {
+        bytes32 ethSignedHash = pack(ccs, channelId).toEthSignedMessageHash();
+        address recoveredNode = ethSignedHash.recover(ccs.nodeSig);
+        require(recoveredNode == node, "invalid node signature");
+    }
+
     function validateChallengerSignature(
         CrossChainState memory ccs,
         bytes32 channelId,

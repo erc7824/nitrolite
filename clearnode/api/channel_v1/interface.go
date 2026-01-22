@@ -84,3 +84,14 @@ type SigValidatorType string
 // EcdsaSigValidatorType represents the ECDSA (Elliptic Curve Digital Signature Algorithm)
 // validator, used for Ethereum-style signature verification.
 const EcdsaSigValidatorType SigValidatorType = "ecdsa"
+
+type MemoryStore interface {
+	// IsAssetSupported checks if a given asset (token) is supported on the specified blockchain.
+	IsAssetSupported(asset, tokenAddress string, blockchainID uint32) (bool, error)
+
+	// GetAssetDecimals checks if an asset exists and returns its decimals in YN
+	GetAssetDecimals(asset string) (uint8, error)
+
+	// GetTokenDecimals returns the decimals for a token on a specific blockchain
+	GetTokenDecimals(blockchainID uint32, tokenAddress string) (uint8, error)
+}

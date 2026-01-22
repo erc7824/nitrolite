@@ -21,6 +21,9 @@ func TestGetAppSessions_SuccessWithParticipant(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := &Handler{
 		useStoreInTx: func(fn StoreTxHandler) error {
 			return fn(mockStore)
@@ -30,7 +33,8 @@ func TestGetAppSessions_SuccessWithParticipant(t *testing.T) {
 		sigValidator: map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
-		stateAdvancer: core.NewStateAdvancerV1(),
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 	}
 
 	// Test data
@@ -144,6 +148,9 @@ func TestGetAppSessions_SuccessWithAppSessionID(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := &Handler{
 		useStoreInTx: func(fn StoreTxHandler) error {
 			return fn(mockStore)
@@ -153,7 +160,8 @@ func TestGetAppSessions_SuccessWithAppSessionID(t *testing.T) {
 		sigValidator: map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
-		stateAdvancer: core.NewStateAdvancerV1(),
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 	}
 
 	// Test data
@@ -229,6 +237,9 @@ func TestGetAppSessions_MissingRequiredParams(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := &Handler{
 		useStoreInTx: func(fn StoreTxHandler) error {
 			return fn(mockStore)
@@ -238,7 +249,8 @@ func TestGetAppSessions_MissingRequiredParams(t *testing.T) {
 		sigValidator: map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
-		stateAdvancer: core.NewStateAdvancerV1(),
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 	}
 
 	// Create RPC request without app_session_id or participant
@@ -273,6 +285,9 @@ func TestGetAppSessions_WithStatusFilter(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := &Handler{
 		useStoreInTx: func(fn StoreTxHandler) error {
 			return fn(mockStore)
@@ -282,7 +297,8 @@ func TestGetAppSessions_WithStatusFilter(t *testing.T) {
 		sigValidator: map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
-		stateAdvancer: core.NewStateAdvancerV1(),
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 	}
 
 	// Test data
@@ -359,6 +375,9 @@ func TestGetAppSessions_StoreError(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
+
 	handler := &Handler{
 		useStoreInTx: func(fn StoreTxHandler) error {
 			return fn(mockStore)
@@ -368,7 +387,8 @@ func TestGetAppSessions_StoreError(t *testing.T) {
 		sigValidator: map[SigType]SigValidator{
 			EcdsaSigType: mockSigValidator,
 		},
-		stateAdvancer: core.NewStateAdvancerV1(),
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 	}
 
 	// Test data

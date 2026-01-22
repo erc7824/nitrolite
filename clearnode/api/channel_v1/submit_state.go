@@ -91,7 +91,7 @@ func (h *Handler) SubmitState(c *rpc.Context) {
 			return rpc.Errorf("invalid state transition: %w", err)
 		}
 
-		packedState, err := core.PackState(incomingState)
+		packedState, err := h.statePacker.PackState(incomingState)
 		if err != nil {
 			return rpc.Errorf("failed to pack state: %v", err)
 		}
@@ -259,7 +259,19 @@ func (h *Handler) createEscrowChannel(tx Store, incomingState core.State) error 
 	if homeChannel == nil {
 		return rpc.Errorf("home channel does not exist")
 	}
-	// TODO: validate that token address is supported
+
+	ok, err := h.memoryStore.IsAssetSupported(incomingState.Asset, incomingState.EscrowLedger.TokenAddress, incomingState.EscrowLedger.BlockchainID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return rpc.Errorf(
+			"asset %s is not supported on blockchain %d with token address %s",
+			incomingState.Asset,
+			incomingState.EscrowLedger.BlockchainID,
+			incomingState.EscrowLedger.TokenAddress)
+	}
+
 	newEscrowChannel := core.NewChannel(
 		escrowChannelID,
 		incomingState.UserWallet,

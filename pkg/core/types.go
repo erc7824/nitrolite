@@ -824,9 +824,10 @@ type Blockchain struct {
 
 // Asset represents information about a supported asset
 type Asset struct {
-	Name   string  `json:"name"`   // Asset name
-	Symbol string  `json:"symbol"` // Asset symbol
-	Tokens []Token `json:"tokens"` // Supported tokens for the asset
+	Name     string  `json:"name"`     // Asset name
+	Decimals uint8   `json:"decimals"` // Number of decimal places at YN
+	Symbol   string  `json:"symbol"`   // Asset symbol
+	Tokens   []Token `json:"tokens"`   // Supported tokens for the asset
 }
 
 // Token represents information about a supported token

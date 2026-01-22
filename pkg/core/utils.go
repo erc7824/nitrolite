@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/shopspring/decimal"
 )
 
 var (
@@ -15,6 +16,31 @@ var (
 	uint64Type, _  = abi.NewType("uint64", "", nil)
 	uint256Type, _ = abi.NewType("uint256", "", nil)
 )
+
+// ValidateDecimalPrecision validates that an amount doesn't exceed the maximum allowed decimal places.
+func ValidateDecimalPrecision(amount decimal.Decimal, maxDecimals uint8) error {
+	if amount.Exponent() < -int32(maxDecimals) {
+		return fmt.Errorf("amount exceeds maximum decimal precision: max %d decimals allowed, got %d", maxDecimals, -amount.Exponent())
+	}
+	return nil
+}
+
+// DecimalToBigInt converts a decimal.Decimal amount to *big.Int scaled to the token's smallest unit.
+// For example, 1.23 USDC (6 decimals) becomes 1230000.
+// This is used when preparing amounts for smart contract calls.
+func DecimalToBigInt(amount decimal.Decimal, decimals uint8) (*big.Int, error) {
+	// Multiply by 10^decimals to convert to smallest unit
+	multiplier := decimal.New(1, int32(decimals))
+	scaled := amount.Mul(multiplier)
+
+	err := ValidateDecimalPrecision(scaled, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to big.Int, truncating any remaining fractional part
+	return scaled.BigInt(), nil
+}
 
 // GetHomeChannelID generates a unique identifier for a primary channel between a node and a user.
 func GetHomeChannelID(nodeAddress, userAddress, tokenAddress string, nonce, challenge uint64) (string, error) {
@@ -107,244 +133,4 @@ func getTransactionID(account, newStateID string) (string, error) {
 	}
 
 	return crypto.Keccak256Hash(packed).Hex(), nil
-}
-
-// PackState encodes a channel ID and state into ABI-packed bytes for on-chain submission.
-func PackState(state State) ([]byte, error) {
-	// Pack the state using the cross-chain state structure
-	ledgerType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-		{Name: "chainId", Type: "uint64"},
-		{Name: "token", Type: "address"},
-		{Name: "participantBalance", Type: "tuple", Components: []abi.ArgumentMarshaling{
-			{Name: "allocation", Type: "uint256"},
-			{Name: "netFlow", Type: "int256"},
-		}},
-		{Name: "nodeBalance", Type: "tuple", Components: []abi.ArgumentMarshaling{
-			{Name: "allocation", Type: "uint256"},
-			{Name: "netFlow", Type: "int256"},
-		}},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	args := abi.Arguments{
-		{Type: uint256Type}, // version
-		{Type: uint64Type},  // homeChainId
-		{Type: uint8Type},   // intent
-		{Type: ledgerType},  // homeState
-		{Type: ledgerType},  // nonHomeState
-	}
-
-	// Convert user balance and netflow to big.Int
-	userBalanceBI := state.HomeLedger.UserBalance.BigInt()
-	userNetFlowBI := state.HomeLedger.UserNetFlow.BigInt()
-	nodeBalanceBI := state.HomeLedger.NodeBalance.BigInt()
-	nodeNetFlowBI := state.HomeLedger.NodeNetFlow.BigInt()
-
-	homeState := struct {
-		ChainId            uint64
-		Token              common.Address
-		ParticipantBalance struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}
-		NodeBalance struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}
-	}{
-		ChainId: uint64(state.HomeLedger.BlockchainID),
-		Token:   common.HexToAddress(state.HomeLedger.TokenAddress),
-		ParticipantBalance: struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}{
-			Allocation: userBalanceBI,
-			NetFlow:    userNetFlowBI,
-		},
-		NodeBalance: struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}{
-			Allocation: nodeBalanceBI,
-			NetFlow:    nodeNetFlowBI,
-		},
-	}
-
-	// For nonHomeState, use escrow ledger if available, otherwise use zero values
-	var nonHomeState struct {
-		ChainId            uint64
-		Token              common.Address
-		ParticipantBalance struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}
-		NodeBalance struct {
-			Allocation *big.Int
-			NetFlow    *big.Int
-		}
-	}
-
-	if state.EscrowLedger != nil {
-		escrowUserBalanceBI := state.EscrowLedger.UserBalance.BigInt()
-		escrowUserNetFlowBI := state.EscrowLedger.UserNetFlow.BigInt()
-		escrowNodeBalanceBI := state.EscrowLedger.NodeBalance.BigInt()
-		escrowNodeNetFlowBI := state.EscrowLedger.NodeNetFlow.BigInt()
-
-		nonHomeState = struct {
-			ChainId            uint64
-			Token              common.Address
-			ParticipantBalance struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}
-			NodeBalance struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}
-		}{
-			ChainId: uint64(state.EscrowLedger.BlockchainID),
-			Token:   common.HexToAddress(state.EscrowLedger.TokenAddress),
-			ParticipantBalance: struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}{
-				Allocation: escrowUserBalanceBI,
-				NetFlow:    escrowUserNetFlowBI,
-			},
-			NodeBalance: struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}{
-				Allocation: escrowNodeBalanceBI,
-				NetFlow:    escrowNodeNetFlowBI,
-			},
-		}
-	} else {
-		nonHomeState = struct {
-			ChainId            uint64
-			Token              common.Address
-			ParticipantBalance struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}
-			NodeBalance struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}
-		}{
-			ChainId: 0,
-			Token:   common.Address{},
-			ParticipantBalance: struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}{
-				Allocation: big.NewInt(0),
-				NetFlow:    big.NewInt(0),
-			},
-			NodeBalance: struct {
-				Allocation *big.Int
-				NetFlow    *big.Int
-			}{
-				Allocation: big.NewInt(0),
-				NetFlow:    big.NewInt(0),
-			},
-		}
-	}
-
-	// Determine intent based on last transition
-	intent := uint8(0) // default intent
-	if lastTransition := state.GetLastTransition(); lastTransition != nil {
-		// Map transition type to intent
-		// This is a simplified mapping - adjust based on actual requirements
-		switch lastTransition.Type {
-		case TransitionTypeTransferSend, TransitionTypeTransferReceive:
-			intent = 1 // operate intent
-		case TransitionTypeHomeDeposit, TransitionTypeEscrowDeposit:
-			intent = 2 // deposit intent
-		case TransitionTypeHomeWithdrawal, TransitionTypeEscrowWithdraw:
-			intent = 3 // withdraw intent
-		}
-	}
-
-	packed, err := args.Pack(
-		big.NewInt(int64(state.Version)),
-		uint64(state.HomeLedger.BlockchainID),
-		intent,
-		homeState,
-		nonHomeState,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return packed, nil
-}
-
-// UnpackState decodes ABI-packed bytes back into a State struct for off-chain processing.
-func UnpackState(data []byte) (*State, error) {
-	crossChainStateType, err := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
-		{Name: "version", Type: "uint256"},
-		{Name: "homeChainId", Type: "uint64"},
-		{Name: "intent", Type: "uint8"},
-		{Name: "homeState", Type: "tuple", Components: []abi.ArgumentMarshaling{
-			{Name: "chainId", Type: "uint64"},
-			{Name: "token", Type: "address"},
-			{Name: "participantBalance", Type: "tuple", Components: []abi.ArgumentMarshaling{
-				{Name: "allocation", Type: "uint256"},
-				{Name: "netFlow", Type: "int256"},
-			}},
-			{Name: "nodeBalance", Type: "tuple", Components: []abi.ArgumentMarshaling{
-				{Name: "allocation", Type: "uint256"},
-				{Name: "netFlow", Type: "int256"},
-			}},
-		}},
-		{Name: "nonHomeState", Type: "tuple", Components: []abi.ArgumentMarshaling{
-			{Name: "chainId", Type: "uint64"},
-			{Name: "token", Type: "address"},
-			{Name: "participantBalance", Type: "tuple", Components: []abi.ArgumentMarshaling{
-				{Name: "allocation", Type: "uint256"},
-				{Name: "netFlow", Type: "int256"},
-			}},
-			{Name: "nodeBalance", Type: "tuple", Components: []abi.ArgumentMarshaling{
-				{Name: "allocation", Type: "uint256"},
-				{Name: "netFlow", Type: "int256"},
-			}},
-		}},
-		{Name: "participantSig", Type: "bytes"},
-		{Name: "nodeSig", Type: "bytes"},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cross chain state type: %w", err)
-	}
-
-	args := abi.Arguments{{Type: crossChainStateType}}
-	unpacked, err := args.Unpack(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unpack data: %w", err)
-	}
-
-	if len(unpacked) == 0 {
-		return nil, fmt.Errorf("no data unpacked")
-	}
-
-	unpackedMap, ok := unpacked[0].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("failed to convert unpacked data to map")
-	}
-
-	state := &State{}
-	if version, ok := unpackedMap["version"].(*big.Int); ok {
-		state.Version = version.Uint64()
-	}
-	if participantSig, ok := unpackedMap["participantSig"].([]byte); ok {
-		sigStr := string(participantSig)
-		state.UserSig = &sigStr
-	}
-	if nodeSig, ok := unpackedMap["nodeSig"].([]byte); ok {
-		sigStr := string(nodeSig)
-		state.NodeSig = &sigStr
-	}
-
-	return state, nil
 }

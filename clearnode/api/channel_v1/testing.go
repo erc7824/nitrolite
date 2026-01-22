@@ -90,3 +90,47 @@ func (m *MockSigValidator) Verify(wallet string, data, sig []byte) error {
 	args := m.Called(wallet, data, sig)
 	return args.Error(0)
 }
+
+// MockMemoryStore is a mock implementation of the MemoryStore interface
+type MockMemoryStore struct {
+	mock.Mock
+}
+
+func (m *MockMemoryStore) IsAssetSupported(asset, tokenAddress string, blockchainID uint32) (bool, error) {
+	args := m.Called(asset, tokenAddress, blockchainID)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockMemoryStore) GetAssetDecimals(asset string) (uint8, error) {
+	args := m.Called(asset)
+	return args.Get(0).(uint8), args.Error(1)
+}
+
+func (m *MockMemoryStore) GetTokenDecimals(blockchainID uint32, tokenAddress string) (uint8, error) {
+	args := m.Called(blockchainID, tokenAddress)
+	return args.Get(0).(uint8), args.Error(1)
+}
+
+// MockAssetStore is a mock implementation of the core.AssetStore interface
+type MockAssetStore struct {
+	mock.Mock
+}
+
+func (m *MockAssetStore) GetAssetDecimals(asset string) (uint8, error) {
+	args := m.Called(asset)
+	return args.Get(0).(uint8), args.Error(1)
+}
+
+func (m *MockAssetStore) GetTokenDecimals(blockchainID uint32, tokenAddress string) (uint8, error) {
+	args := m.Called(blockchainID, tokenAddress)
+	return args.Get(0).(uint8), args.Error(1)
+}
+
+type MockStatePacker struct {
+	mock.Mock
+}
+
+func (m *MockStatePacker) PackState(state core.State) ([]byte, error) {
+	args := m.Called(state)
+	return args.Get(0).([]byte), args.Error(1)
+}

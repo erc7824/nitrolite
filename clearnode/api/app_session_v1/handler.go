@@ -16,8 +16,10 @@ import (
 // Handler manages app session operations and provides RPC endpoints for app session management.
 type Handler struct {
 	useStoreInTx  StoreTxProvider
+	assetStore    AssetStore
 	signer        sign.Signer
 	stateAdvancer core.StateAdvancer
+	statePacker   core.StatePacker
 	sigValidator  map[SigType]SigValidator
 	nodeAddress   string // Node's wallet address
 }
@@ -25,15 +27,19 @@ type Handler struct {
 // NewHandler creates a new Handler instance with the provided dependencies.
 func NewHandler(
 	useStoreInTx StoreTxProvider,
+	assetStore AssetStore,
 	signer sign.Signer,
 	stateAdvancer core.StateAdvancer,
+	statePacker core.StatePacker,
 	sigValidators map[SigType]SigValidator,
 	nodeAddress string,
 ) *Handler {
 	return &Handler{
 		useStoreInTx:  useStoreInTx,
+		assetStore:    assetStore,
 		signer:        signer,
 		stateAdvancer: stateAdvancer,
+		statePacker:   statePacker,
 		sigValidator:  sigValidators,
 		nodeAddress:   nodeAddress,
 	}
@@ -127,7 +133,7 @@ func (h *Handler) issueReleaseReceiverState(ctx context.Context, tx Store, recei
 
 	if shouldSign {
 		// Pack and sign the state
-		packedState, err := core.PackState(*newState)
+		packedState, err := h.statePacker.PackState(*newState)
 		if err != nil {
 			return rpc.Errorf("failed to pack receiver state: %v", err)
 		}

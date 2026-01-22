@@ -17,13 +17,17 @@ import (
 func TestRequestCreation_Success(t *testing.T) {
 	// Setup
 	mockTxStore := new(MockStore)
+	mockMemoryStore := new(MockMemoryStore)
+	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint64(3600) // 1 hour
+	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
-		stateAdvancer: core.NewStateAdvancerV1(),
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 		useStoreInTx: func(handler StoreTxHandler) error {
 			err := handler(mockTxStore)
 			if err != nil {
@@ -31,6 +35,7 @@ func TestRequestCreation_Success(t *testing.T) {
 			}
 			return nil
 		},
+		memoryStore:  mockMemoryStore,
 		signer:       mockSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
@@ -71,8 +76,11 @@ func TestRequestCreation_Success(t *testing.T) {
 	_, err = initialState.ApplyHomeDepositTransition(depositAmount)
 	require.NoError(t, err)
 
+	// Set up mock for PackState (called during signing)
+	mockAssetStore.On("GetTokenDecimals", blockchainID, tokenAddress).Return(uint8(6), nil)
+
 	// Sign the initial state
-	packedState, err := core.PackState(*initialState)
+	packedState, err := core.PackState(*initialState, mockAssetStore)
 	require.NoError(t, err)
 	stateHash := crypto.Keccak256Hash(packedState).Bytes()
 	userSig, err := mockSigner.Sign(stateHash)
@@ -80,9 +88,12 @@ func TestRequestCreation_Success(t *testing.T) {
 	userSigStr := userSig.String()
 	initialState.UserSig = &userSigStr
 
-	// Mock expectations
+	// Mock expectations for handler
+	mockMemoryStore.On("IsAssetSupported", asset, tokenAddress, blockchainID).Return(true, nil).Once()
+	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil).Once()
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil).Once()
 	mockSigValidator.On("Verify", userWallet, packedState, mock.Anything).Return(nil).Once()
+	mockStatePacker.On("PackState", mock.Anything).Return(packedState, nil)
 	mockTxStore.On("CreateChannel", mock.MatchedBy(func(channel core.Channel) bool {
 		return channel.UserWallet == userWallet &&
 			channel.NodeWallet == nodeAddress &&
@@ -152,6 +163,8 @@ func TestRequestCreation_Success(t *testing.T) {
 	assert.NotEmpty(t, response.Signature)
 
 	// Verify all mocks were called
+	mockMemoryStore.AssertExpectations(t)
+	mockAssetStore.AssertExpectations(t)
 	mockTxStore.AssertExpectations(t)
 	mockSigValidator.AssertExpectations(t)
 }
@@ -159,16 +172,21 @@ func TestRequestCreation_Success(t *testing.T) {
 func TestRequestCreation_InvalidChallenge(t *testing.T) {
 	// Setup
 	mockTxStore := new(MockStore)
+	mockMemoryStore := new(MockMemoryStore)
+	mockAssetStore := new(MockAssetStore)
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
 	minChallenge := uint64(3600) // 1 hour
+	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
-		stateAdvancer: core.NewStateAdvancerV1(),
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockTxStore)
 		},
+		memoryStore:  mockMemoryStore,
 		signer:       mockSigner,
 		nodeAddress:  nodeAddress,
 		minChallenge: minChallenge,
@@ -194,6 +212,7 @@ func TestRequestCreation_InvalidChallenge(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	mockMemoryStore.On("IsAssetSupported", asset, tokenAddress, uint32(1)).Return(true, nil).Once()
 	mockTxStore.On("GetLastUserState", userWallet, asset, false).Return(nil, nil).Once()
 
 	// Create RPC request with challenge below minimum

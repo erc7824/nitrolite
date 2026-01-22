@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/erc7824/nitrolite/pkg/app"
+	"github.com/erc7824/nitrolite/pkg/core"
 	"github.com/erc7824/nitrolite/pkg/log"
 	"github.com/erc7824/nitrolite/pkg/rpc"
 	"github.com/shopspring/decimal"
@@ -174,6 +175,15 @@ func (h *Handler) handleOperateIntent(
 			return rpc.Errorf("negative allocation: %s for asset %s", alloc.Amount, alloc.Asset)
 		}
 
+		decimals, err := h.assetStore.GetAssetDecimals(alloc.Asset)
+		if err != nil {
+			return rpc.Errorf("failed to get asset decimals: %v", err)
+		}
+
+		if err := core.ValidateDecimalPrecision(alloc.Amount, decimals); err != nil {
+			return rpc.Errorf("invalid amount for allocation with asset %s and participant %s: %w", alloc.Asset, alloc.Participant, err)
+		}
+
 		// Sum up allocations per asset
 		if existing, ok := allocationSum[alloc.Asset]; ok {
 			allocationSum[alloc.Asset] = existing.Add(alloc.Amount)
@@ -309,6 +319,15 @@ func (h *Handler) handleWithdrawIntent(
 				withdrawAmount := currentAmount.Sub(incomingAmount)
 				if err := tx.RecordLedgerEntry(appStateUpd.AppSessionID, asset, withdrawAmount.Neg(), nil); err != nil {
 					return rpc.Errorf("failed to record withdrawal ledger entry: %v", err)
+				}
+
+				decimals, err := h.assetStore.GetAssetDecimals(asset)
+				if err != nil {
+					return rpc.Errorf("failed to get asset decimals: %v", err)
+				}
+
+				if err := core.ValidateDecimalPrecision(withdrawAmount, decimals); err != nil {
+					return rpc.Errorf("invalid withdraw amount for allocation with asset %s and participant %s: %w", asset, participant, err)
 				}
 
 				// Issue new channel state for participant receiving withdrawn funds

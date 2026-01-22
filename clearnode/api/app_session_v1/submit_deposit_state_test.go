@@ -23,9 +23,13 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
-		stateAdvancer: core.NewStateAdvancerV1(),
+		assetStore:    mockAssetStore,
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
@@ -97,7 +101,8 @@ func TestSubmitDepositState_Success(t *testing.T) {
 
 	// Sign the incoming user state with user's signature
 	userKey, _ := crypto.GenerateKey()
-	packedUserState, _ := core.PackState(*incomingUserState)
+	mockStatePacker.On("PackState", mock.Anything).Return([]byte("packed"), nil)
+	packedUserState, _ := mockStatePacker.PackState(*incomingUserState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingUserState.UserSig = &userSigHex
@@ -140,6 +145,7 @@ func TestSubmitDepositState_Success(t *testing.T) {
 	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
+	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
 
 	// Mock signature recovery for app state update
@@ -223,9 +229,13 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
-		stateAdvancer: core.NewStateAdvancerV1(),
+		assetStore:    mockAssetStore,
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
@@ -270,7 +280,8 @@ func TestSubmitDepositState_InvalidTransitionType(t *testing.T) {
 
 	// Sign the user state
 	userKey, _ := crypto.GenerateKey()
-	packedUserState, _ := core.PackState(userState)
+	mockStatePacker.On("PackState", mock.Anything).Return([]byte("packed"), nil)
+	packedUserState, _ := mockStatePacker.PackState(userState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	userState.UserSig = &userSigHex
@@ -346,9 +357,13 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	mockSigner := NewMockSigner()
 	mockSigValidator := new(MockSigValidator)
 	nodeAddress := mockSigner.PublicKey().Address().String()
+	mockAssetStore := new(MockAssetStore)
+	mockStatePacker := new(MockStatePacker)
 
 	handler := &Handler{
-		stateAdvancer: core.NewStateAdvancerV1(),
+		assetStore:    mockAssetStore,
+		stateAdvancer: core.NewStateAdvancerV1(mockAssetStore),
+		statePacker:   mockStatePacker,
 		useStoreInTx: func(handler StoreTxHandler) error {
 			return handler(mockStore)
 		},
@@ -412,7 +427,8 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	require.NoError(t, err)
 
 	userKey, _ := crypto.GenerateKey()
-	packedUserState, _ := core.PackState(*incomingUserState)
+	mockStatePacker.On("PackState", mock.Anything).Return([]byte("packed"), nil)
+	packedUserState, _ := mockStatePacker.PackState(*incomingUserState)
 	userSigBytes, _ := crypto.Sign(crypto.Keccak256Hash(packedUserState).Bytes(), userKey)
 	userSigHex := hexutil.Encode(userSigBytes)
 	incomingUserState.UserSig = &userSigHex
@@ -454,6 +470,7 @@ func TestSubmitDepositState_QuorumNotMet(t *testing.T) {
 	mockSigValidator.On("Verify", participant1, packedUserState, userSigBytes).Return(nil).Once()
 	mockStore.On("GetLastUserState", participant1, asset, false).Return(currentUserState, nil).Once()
 	mockStore.On("EnsureNoOngoingStateTransitions", participant1, asset).Return(nil).Once()
+	mockAssetStore.On("GetAssetDecimals", asset).Return(uint8(6), nil)
 	mockStore.On("GetAppSession", appSessionID).Return(existingAppSession, nil).Once()
 	mockSigValidator.On("Recover", mock.Anything, mock.Anything).Return(participant1, nil).Once()
 

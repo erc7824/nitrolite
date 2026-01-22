@@ -39,6 +39,20 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		WithKV("userWallet", incomingState.UserWallet).
 		WithKV("asset", incomingState.Asset)
 
+	ok, err := h.memoryStore.IsAssetSupported(incomingState.Asset, incomingState.HomeLedger.TokenAddress, incomingState.HomeLedger.BlockchainID)
+	if err != nil {
+		c.Fail(err, "failed to check asset support")
+		return
+	}
+	if !ok {
+		c.Fail(rpc.Errorf(
+			"asset %s is not supported on blockchain %d with token address %s",
+			incomingState.Asset,
+			incomingState.EscrowLedger.BlockchainID,
+			incomingState.EscrowLedger.TokenAddress), "")
+		return
+	}
+
 	var nodeSig string
 	err = h.useStoreInTx(func(tx Store) error {
 		// Check if channel already exists
@@ -92,7 +106,7 @@ func (h *Handler) RequestCreation(c *rpc.Context) {
 		}
 
 		// Pack and validate user signature
-		packedState, err := core.PackState(incomingState)
+		packedState, err := h.statePacker.PackState(incomingState)
 		if err != nil {
 			return rpc.Errorf("failed to pack state: %v", err)
 		}

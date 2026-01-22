@@ -59,3 +59,8 @@ type SigType string
 // EcdsaSigType represents the ECDSA (Elliptic Curve Digital Signature Algorithm)
 // validator, used for Ethereum-style signature verification.
 const EcdsaSigType SigType = "ecdsa"
+
+type AssetStore interface {
+	// GetAssetDecimals checks if an asset exists and returns its decimals in YN
+	GetAssetDecimals(asset string) (uint8, error)
+}

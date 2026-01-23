@@ -156,7 +156,7 @@ library EscrowDepositEngine {
 
         uint256 depositAmount = ctx.initState.nonHomeState.userAllocation;
         require(candidate.nonHomeState.userNetFlow == depositAmount.toInt256(), "invalid user net flow");
-        require(candidate.nonHomeState.nodeNetFlow == -int256(depositAmount), "invalid node net flow");
+        require(candidate.nonHomeState.nodeNetFlow == -(depositAmount).toInt256(), "invalid node net flow");
         require(candidate.nonHomeState.userAllocation == 0, "user allocation must be zero on non-home");
         require(candidate.nonHomeState.nodeAllocation == 0, "node allocation must be zero on non-home");
 
@@ -168,7 +168,7 @@ library EscrowDepositEngine {
         require(userHomeNfDelta == 0, "home user net flow must not change");
 
         // Calculate effects
-        effects.nodeFundsDelta = -int256(ctx.lockedAmount); // Release to node vault
+        effects.nodeFundsDelta = -(ctx.lockedAmount).toInt256(); // Release to node vault
         effects.newStatus = EscrowStatus.FINALIZED;
         effects.updateInitState = false;
 

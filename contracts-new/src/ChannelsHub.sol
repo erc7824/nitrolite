@@ -105,7 +105,18 @@ contract ChannelsHub is IVault, ReentrancyGuard {
         external
         view
         returns (uint256[][] memory)
-    {}
+    {
+        uint256[][] memory balances = new uint256[][](accounts.length);
+        for (uint256 i = 0; i < accounts.length; i++) {
+            uint256[] memory row = new uint256[](tokens.length);
+            for (uint256 j = 0; j < tokens.length; j++) {
+                row[j] = _nodeBalances[accounts[i]][tokens[j]];
+            }
+            balances[i] = row;
+        }
+
+        return balances;
+    }
 
     // ******
 
@@ -287,18 +298,23 @@ contract ChannelsHub is IVault, ReentrancyGuard {
             bytes32 escrowId = _escrowDepositIds[escrowHeadTemp];
             EscrowDepositMeta storage meta = _escrowDeposits[escrowId];
 
-            // only still "INITIALIZED" escrows can be purged: "CHALLENGED" escrows require manual finalization, while "FINALIZED" were already manually purged
+            // Skip already-finalized escrows so they don't block the queue
+            if (meta.status == EscrowStatus.FINALIZED) {
+                escrowHeadTemp++;
+                continue;
+            }
+            // only still "INITIALIZED" escrows can be purged: "CHALLENGED" escrows require manual finalization
             if (meta.unlockAt <= block.timestamp && meta.status == EscrowStatus.INITIALIZED) {
                 _nodeBalances[meta.node][meta.initState.nonHomeState.token] += meta.lockedAmount;
                 meta.status = EscrowStatus.FINALIZED;
                 meta.lockedAmount = 0;
                 purgedCount++;
-            } else {
-                break;
-            }
-
-            escrowHeadTemp++;
-        }
+                escrowHeadTemp++;
+                continue;
+             } else {
+                 break;
+             }
+         }
 
         escrowHead = escrowHeadTemp;
 
@@ -775,7 +791,8 @@ contract ChannelsHub is IVault, ReentrancyGuard {
     }
 
     function _isHomeChain(bytes32 channelId) internal view returns (bool) {
-        if (_channels[channelId].status == ChannelStatus.VOID) {
+        ChannelStatus status = _channels[channelId].status;
+        if (status == ChannelStatus.VOID || status == ChannelStatus.MIGRATED_OUT) {
             return false;
         }
 

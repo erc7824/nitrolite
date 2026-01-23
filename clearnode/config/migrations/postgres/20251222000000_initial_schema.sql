@@ -23,7 +23,7 @@ CREATE INDEX idx_channels_status ON channels(status);
 -- Channel States table: Immutable state records
 CREATE TABLE channel_states (
     id CHAR(66) PRIMARY KEY, -- Deterministic hash: Hash(UserWallet, Asset, Epoch, Version)
-    transitions TEXT NOT NULL, -- JSON array of state transitions
+    transitions JSONB NOT NULL, -- JSON array of state transitions
     asset VARCHAR(20) NOT NULL,
     user_wallet CHAR(42) NOT NULL,
     epoch BIGINT NOT NULL,
@@ -45,7 +45,7 @@ CREATE TABLE channel_states (
     escrow_node_balance NUMERIC(78, 18) NOT NULL DEFAULT 0,
     escrow_node_net_flow NUMERIC(78, 18) NOT NULL DEFAULT 0,
 
-    user_sig TEXT,
+    user_sig TEXT, -- TODO: consider using fixed char length
     node_sig TEXT,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -143,7 +143,7 @@ CREATE TABLE blockchain_actions (
     id BIGSERIAL PRIMARY KEY,
     action_type SMALLINT NOT NULL,
     state_id CHAR(66),
-    action_data TEXT, -- JSON
+    action_data JSONB,
     status SMALLINT NOT NULL DEFAULT 0,
     retry_count INTEGER NOT NULL DEFAULT 0,
     last_error TEXT,
